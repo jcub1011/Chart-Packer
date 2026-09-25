@@ -12,7 +12,8 @@ implementation is based on.
   [docs/sng-spec.md](docs/sng-spec.md). The reference implementation was consulted only to
   confirm behaviour such as field order, which checks the reader makes and how `song.ini` is
   parsed. Source files whose behaviour follows the reference name the upstream file in their
-  documentation comments.
+  documentation comments. The known-keys table in `SngCli/KnownKeys.cs` was one of the sources
+  for the key names and types in `ChartPacker.Core/Metadata/KnownKeys.cs`.
 
 ```
 Copyright (c) 2023 Matthew Sitton
@@ -34,3 +35,12 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
+
+## GuitarGame_ChartFormats
+
+- **Project:** [TheNathannator/GuitarGame_ChartFormats](https://github.com/TheNathannator/GuitarGame_ChartFormats)
+- **License:** [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain dedication)
+- **Used for:** the `song.ini` tag lists that sng-spec §6.3 names as the metadata key registry.
+  `ChartPacker.Core/Metadata/KnownKeys.cs` takes its key names and value types from the Standard
+  Tags and the Clone Hero, Phase Shift, Frets on Fire X and Editor on Fire tag lists. No text is
+  copied; the key descriptions are Chart-Packer's own.

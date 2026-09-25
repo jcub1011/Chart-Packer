@@ -14,5 +14,12 @@
       <StronglyTypedFileName>$(IntermediateOutputPath)FindingMessages.Designer.cs</StronglyTypedFileName>
       <PublicClass>false</PublicClass>
     </EmbeddedResource>
+    <EmbeddedResource Update="Resources\KnownKeyDescriptions.resx">
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>ChartPacker.Core.Resources</StronglyTypedNamespace>
+      <StronglyTypedClassName>KnownKeyDescriptions</StronglyTypedClassName>
+      <StronglyTypedFileName>$(IntermediateOutputPath)KnownKeyDescriptions.Designer.cs</StronglyTypedFileName>
+      <PublicClass>false</PublicClass>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>

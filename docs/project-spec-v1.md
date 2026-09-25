@@ -286,6 +286,9 @@ Behaviour:
    stays in sync with the grid.
    - **Implemented so far:** click a value to edit it, and add and remove rows. Still to come:
      reorder, the raw view, and items 2 and 4.
+   - **Adding a row** offers a dropdown of the known keys (`KnownKeys`, with a short description
+     of each). The key box filters the list as you type, and any other key can be typed instead.
+     Keys the selection already has are left out of the list.
    - **Bulk editing.** With several items selected, the grid shows the union of their keys,
      compared ignoring case. A row whose value differs between the items, or that some of them
      lack, shows `<<contains distinct values>>`.

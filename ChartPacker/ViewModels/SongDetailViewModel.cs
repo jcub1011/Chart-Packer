@@ -112,6 +112,10 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private string? _newRowError;
 
+        /// <summary>Known keys to offer for a new row: every one the selection doesn't already use.</summary>
+        [ObservableProperty]
+        private IReadOnlyList<KnownKey> _availableKeys = [];
+
         public bool ShowPlaceholder => _entries.Count == 0;
 
         public bool HasError => ErrorMessage is not null;
@@ -257,6 +261,7 @@ namespace ChartPacker.ViewModels
             NewKey = "";
             NewValue = "";
             NewRowError = null;
+            RefreshAvailableKeys();
             IsAdding = true;
         }
 
@@ -452,7 +457,21 @@ namespace ChartPacker.ViewModels
                 Metadata.RemoveAt(Metadata.Count - 1);
 
             MetadataNote = _loadNote ?? (Metadata.Count == 0 ? Strings.NoMetadata : null);
+            RefreshAvailableKeys();
             RefreshState();
+        }
+
+        /// <summary>
+        /// Offers the known keys that aren't a row yet. A removed row's key is offered again, since
+        /// adding it back is allowed; a hidden unset difficulty is offered too, and adding it edits it.
+        /// This is the same test <see cref="CommitAdd"/> uses to reject a key.
+        /// </summary>
+        private void RefreshAvailableKeys()
+        {
+            var used = Metadata.Where(r => !r.IsRemoved).Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var available = KnownKeys.All.Where(k => !used.Contains(k.Key)).ToList();
+            if (!available.SequenceEqual(AvailableKeys))
+                AvailableKeys = available;
         }
 
         private static async Task<LoadedSelection> LoadSingleAsync(SongEntry entry, CancellationToken cancellationToken)

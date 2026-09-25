@@ -24,6 +24,11 @@ namespace ChartPacker.ViewModels
 
         public string Key { get; }
 
+        /// <summary>What the key does, when it's a known key; otherwise <see langword="null"/>.</summary>
+        public string? KeyDescription => KnownKeys.TryGet(Key, out var known) ? known.Description : null;
+
+        public bool HasKeyDescription => KeyDescription is not null;
+
         /// <summary>The value as stored, or <see langword="null"/> when the selected songs don't share one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsDistinct), nameof(DisplayValue), nameof(ToolTip), nameof(EditPlaceholder), nameof(ShowRichValue), nameof(ShowDistinct))]

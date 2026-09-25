@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="name" xml:space="preserve">
+    <value>Title of the song</value>
+  </data>
+  <data name="artist" xml:space="preserve">
+    <value>Artist or band who performed the song</value>
+  </data>
+  <data name="album" xml:space="preserve">
+    <value>Album the song appears on</value>
+  </data>
+  <data name="genre" xml:space="preserve">
+    <value>Genre of the song</value>
+  </data>
+  <data name="year" xml:space="preserve">
+    <value>Year the song was released</value>
+  </data>
+  <data name="charter" xml:space="preserve">
+    <value>Who charted the song</value>
+  </data>
+  <data name="song_length" xml:space="preserve">
+    <value>Length of the audio, in milliseconds</value>
+  </data>
+  <data name="preview_start_time" xml:space="preserve">
+    <value>Where the song preview starts, in milliseconds</value>
+  </data>
+  <data name="delay" xml:space="preserve">
+    <value>Shifts the chart against the audio, in milliseconds (can be negative)</value>
+  </data>
+  <data name="diff_band" xml:space="preserve">
+    <value>Overall band difficulty</value>
+  </data>
+  <data name="diff_guitar" xml:space="preserve">
+    <value>Lead guitar difficulty</value>
+  </data>
+  <data name="diff_guitarghl" xml:space="preserve">
+    <value>6-fret lead guitar difficulty</value>
+  </data>
+  <data name="diff_guitar_coop" xml:space="preserve">
+    <value>Co-op guitar difficulty</value>
+  </data>
+  <data name="diff_guitar_coop_ghl" xml:space="preserve">
+    <value>6-fret co-op guitar difficulty</value>
+  </data>
+  <data name="diff_guitar_real" xml:space="preserve">
+    <value>Pro guitar (17-fret) difficulty</value>
+  </data>
+  <data name="diff_guitar_real_22" xml:space="preserve">
+    <value>Pro guitar (22-fret) difficulty</value>
+  </data>
+  <data name="diff_rhythm" xml:space="preserve">
+    <value>Rhythm guitar difficulty</value>
+  </data>
+  <data name="diff_rhythm_ghl" xml:space="preserve">
+    <value>6-fret rhythm guitar difficulty</value>
+  </data>
+  <data name="diff_bass" xml:space="preserve">
+    <value>Bass difficulty</value>
+  </data>
+  <data name="diff_bassghl" xml:space="preserve">
+    <value>6-fret bass difficulty</value>
+  </data>
+  <data name="diff_bass_real" xml:space="preserve">
+    <value>Pro bass (17-fret) difficulty</value>
+  </data>
+  <data name="diff_bass_real_22" xml:space="preserve">
+    <value>Pro bass (22-fret) difficulty</value>
+  </data>
+  <data name="diff_drums" xml:space="preserve">
+    <value>Drums difficulty</value>
+  </data>
+  <data name="diff_drums_real" xml:space="preserve">
+    <value>Pro drums difficulty</value>
+  </data>
+  <data name="diff_drums_real_ps" xml:space="preserve">
+    <value>Phase Shift real drums difficulty</value>
+  </data>
+  <data name="diff_keys" xml:space="preserve">
+    <value>Keys difficulty</value>
+  </data>
+  <data name="diff_keys_real" xml:space="preserve">
+    <value>Pro keys difficulty</value>
+  </data>
+  <data name="diff_keys_real_ps" xml:space="preserve">
+    <value>Phase Shift real keys difficulty</value>
+  </data>
+  <data name="diff_vocals" xml:space="preserve">
+    <value>Vocals difficulty</value>
+  </data>
+  <data name="diff_vocals_harm" xml:space="preserve">
+    <value>Harmonies difficulty</value>
+  </data>
+  <data name="diff_dance" xml:space="preserve">
+    <value>Dance difficulty</value>
+  </data>
+  <data name="sub_genre" xml:space="preserve">
+    <value>More specific genre of the song</value>
+  </data>
+  <data name="preview_end_time" xml:space="preserve">
+    <value>Where the song preview ends, in milliseconds</value>
+  </data>
+  <data name="preview" xml:space="preserve">
+    <value>Preview start and end, in milliseconds, e.g. 55000 85000</value>
+  </data>
+  <data name="rating" xml:space="preserve">
+    <value>Age rating: 1 family friendly, 2 supervision recommended, 3 mature, 4 or 0 unrated</value>
+  </data>
+  <data name="version" xml:space="preserve">
+    <value>Revision number of the chart</value>
+  </data>
+  <data name="album_track" xml:space="preserve">
+    <value>Position of the song when sorting by album</value>
+  </data>
+  <data name="playlist" xml:space="preserve">
+    <value>Playlist the song is grouped under</value>
+  </data>
+  <data name="sub_playlist" xml:space="preserve">
+    <value>Sub-playlist within the playlist</value>
+  </data>
+  <data name="playlist_track" xml:space="preserve">
+    <value>Position of the song when sorting by playlist</value>
+  </data>
+  <data name="loading_phrase" xml:space="preserve">
+    <value>Flavour text shown while the song loads</value>
+  </data>
+  <data name="tags" xml:space="preserve">
+    <value>Miscellaneous tags, e.g. cover</value>
+  </data>
+  <data name="modchart" xml:space="preserve">
+    <value>Marks the song as a modchart, for filtering</value>
+  </data>
+  <data name="lyrics" xml:space="preserve">
+    <value>Marks the song as having lyrics, for filtering</value>
+  </data>
+  <data name="pro_drums" xml:space="preserve">
+    <value>Forces the drums track to be pro drums</value>
+  </data>
+  <data name="five_lane_drums" xml:space="preserve">
+    <value>Forces the drums track to be 5-lane</value>
+  </data>
+  <data name="drum_fallback_blue" xml:space="preserve">
+    <value>Which note 5-lane drums fall back to on 4-lane</value>
+  </data>
+  <data name="vocal_gender" xml:space="preserve">
+    <value>Singer's voice type: male or female</value>
+  </data>
+  <data name="vocal_scroll_speed" xml:space="preserve">
+    <value>Vocals track speed, as a percentage (default 100)</value>
+  </data>
+  <data name="tuning_offset_cents" xml:space="preserve">
+    <value>Nudges vocal pitch by this many cents, for non-A440 songs</value>
+  </data>
+  <data name="real_guitar_tuning" xml:space="preserve">
+    <value>Tuning for 17-fret pro guitar</value>
+  </data>
+  <data name="real_guitar_22_tuning" xml:space="preserve">
+    <value>Tuning for 22-fret pro guitar</value>
+  </data>
+  <data name="real_bass_tuning" xml:space="preserve">
+    <value>Tuning for 17-fret pro bass</value>
+  </data>
+  <data name="real_bass_22_tuning" xml:space="preserve">
+    <value>Tuning for 22-fret pro bass</value>
+  </data>
+  <data name="real_keys_lane_count_right" xml:space="preserve">
+    <value>Number of right-hand lanes in real keys</value>
+  </data>
+  <data name="real_keys_lane_count_left" xml:space="preserve">
+    <value>Number of left-hand lanes in real keys</value>
+  </data>
+  <data name="hopo_frequency" xml:space="preserve">
+    <value>Overrides the HOPO threshold, in ticks</value>
+  </data>
+  <data name="eighthnote_hopo" xml:space="preserve">
+    <value>Sets the HOPO threshold to an eighth note</value>
+  </data>
+  <data name="sustain_cutoff_threshold" xml:space="preserve">
+    <value>Overrides the sustain cutoff threshold, in ticks</value>
+  </data>
+  <data name="multiplier_note" xml:space="preserve">
+    <value>MIDI note used for star power on 5-fret guitar (103 or 116)</value>
+  </data>
+  <data name="end_events" xml:space="preserve">
+    <value>Whether the chart's end events are respected</value>
+  </data>
+  <data name="sysex_slider" xml:space="preserve">
+    <value>Enables MIDI SysEx events for slider and tap notes</value>
+  </data>
+  <data name="sysex_high_hat_ctrl" xml:space="preserve">
+    <value>Enables MIDI SysEx events for real drums hi-hat pedal control</value>
+  </data>
+  <data name="sysex_rimshot" xml:space="preserve">
+    <value>Enables MIDI SysEx events for real drums rimshots</value>
+  </data>
+  <data name="sysex_open_bass" xml:space="preserve">
+    <value>Enables MIDI SysEx events for open notes</value>
+  </data>
+  <data name="sysex_pro_slide" xml:space="preserve">
+    <value>Enables MIDI SysEx events for pro guitar and bass slide directions</value>
+  </data>
+  <data name="guitar_type" xml:space="preserve">
+    <value>Sound sample set for guitar</value>
+  </data>
+  <data name="bass_type" xml:space="preserve">
+    <value>Sound sample set for bass</value>
+  </data>
+  <data name="kit_type" xml:space="preserve">
+    <value>Sound sample set for drums</value>
+  </data>
+  <data name="keys_type" xml:space="preserve">
+    <value>Sound sample set for keys</value>
+  </data>
+  <data name="dance_type" xml:space="preserve">
+    <value>Sound sample set for dance</value>
+  </data>
+  <data name="eof_midi_import_drum_accent_velocity" xml:space="preserve">
+    <value>MIDI velocity that marks drum notes as accents (Editor on Fire)</value>
+  </data>
+  <data name="eof_midi_import_drum_ghost_velocity" xml:space="preserve">
+    <value>MIDI velocity that marks drum notes as ghost notes (Editor on Fire)</value>
+  </data>
+  <data name="icon" xml:space="preserve">
+    <value>Name of the icon shown for the song</value>
+  </data>
+  <data name="cover" xml:space="preserve">
+    <value>File name of the cover image</value>
+  </data>
+  <data name="background" xml:space="preserve">
+    <value>File name of the background image</value>
+  </data>
+  <data name="video" xml:space="preserve">
+    <value>File name of the background video</value>
+  </data>
+  <data name="video_loop" xml:space="preserve">
+    <value>Whether the background video loops</value>
+  </data>
+  <data name="video_start_time" xml:space="preserve">
+    <value>Where video playback starts, in milliseconds (can be negative)</value>
+  </data>
+  <data name="video_end_time" xml:space="preserve">
+    <value>Where video playback ends, in milliseconds (-1 for none)</value>
+  </data>
+  <data name="cassettecolor" xml:space="preserve">
+    <value>Hex colour of the cassette on the song screen (Frets on Fire X)</value>
+  </data>
+  <data name="link_name_a" xml:space="preserve">
+    <value>Name of banner A (Phase Shift)</value>
+  </data>
+  <data name="link_name_b" xml:space="preserve">
+    <value>Name of banner B (Phase Shift)</value>
+  </data>
+  <data name="banner_link_a" xml:space="preserve">
+    <value>Link opened by clicking banner A (Phase Shift)</value>
+  </data>
+  <data name="banner_link_b" xml:space="preserve">
+    <value>Link opened by clicking banner B (Phase Shift)</value>
+  </data>
+  <data name="tutorial" xml:space="preserve">
+    <value>Marks the song as a tutorial (Frets on Fire X)</value>
+  </data>
+  <data name="boss_battle" xml:space="preserve">
+    <value>Marks the song as a boss battle (Frets on Fire X)</value>
+  </data>
+  <data name="unlock_id" xml:space="preserve">
+    <value>Career ID of the song (Frets on Fire X)</value>
+  </data>
+  <data name="unlock_require" xml:space="preserve">
+    <value>Career ID that must be completed to unlock the song (Frets on Fire X)</value>
+  </data>
+  <data name="unlock_text" xml:space="preserve">
+    <value>Text shown while the song is locked (Frets on Fire X)</value>
+  </data>
+  <data name="unlock_completed" xml:space="preserve">
+    <value>Whether the song is unlocked (Frets on Fire X)</value>
+  </data>
+</root>

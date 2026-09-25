@@ -328,6 +328,9 @@
   <data name="NewKeyWatermark" xml:space="preserve">
     <value>Key</value>
   </data>
+  <data name="NewKeyToolTip" xml:space="preserve">
+    <value>Pick a known key, or type your own</value>
+  </data>
   <data name="NewValueWatermark" xml:space="preserve">
     <value>Value</value>
   </data>

@@ -5,6 +5,7 @@
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:res="using:ChartPacker.Resources"
              xmlns:ctl="using:ChartPacker.Controls"
+             xmlns:meta="using:ChartPacker.Core.Metadata"
              mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
              x:Class="ChartPacker.Views.SongDetailView"
              x:DataType="vm:SongDetailViewModel">
@@ -233,8 +234,15 @@
                                                MaxWidth="220"
                                                Margin="0,2,16,0"
                                                TextTrimming="CharacterEllipsis"
-                                               ToolTip.Tip="{Binding Key}"
-                                               Text="{Binding Key}" />
+                                               Text="{Binding Key}">
+                                        <!-- The key in full (it may be trimmed), and what it does when it's a known key. -->
+                                        <ToolTip.Tip>
+                                            <StackPanel MaxWidth="320" Spacing="2">
+                                                <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Key}" />
+                                                <TextBlock TextWrapping="Wrap" Text="{Binding KeyDescription}" IsVisible="{Binding HasKeyDescription}" />
+                                            </StackPanel>
+                                        </ToolTip.Tip>
+                                    </TextBlock>
 
                                     <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
                                     <Button Grid.Column="2"
@@ -296,22 +304,37 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- New row: key and value, both checked before anything goes into the drafts. -->
+                    <!-- New row: key and value, both checked before anything goes into the drafts.
+                         The key box suggests the known keys not already in use, and takes any other key typed. -->
                     <StackPanel Margin="14,6,0,0" Spacing="4" IsVisible="{Binding IsAdding}">
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
-                            <TextBox Grid.Column="0"
-                                     Width="180"
-                                     Text="{Binding NewKey}"
-                                     PlaceholderText="{x:Static res:Strings.NewKeyWatermark}"
-                                     IsVisible="{Binding IsAdding}"
-                                     ctl:FocusWhenShown.IsEnabled="True"
-                                     AutomationProperties.Name="{x:Static res:Strings.NewKeyWatermark}">
-                                <TextBox.KeyBindings>
-                                    <KeyBinding Gesture="Enter" Command="{Binding CommitAddCommand}" />
-                                    <KeyBinding Gesture="Escape" Command="{Binding CancelAddCommand}" />
-                                </TextBox.KeyBindings>
-                            </TextBox>
-                            <TextBox Grid.Column="1"
+                            <AutoCompleteBox x:Name="NewKeyBox"
+                                             Grid.Column="0"
+                                             Width="220"
+                                             Text="{Binding NewKey}"
+                                             ItemsSource="{Binding AvailableKeys}"
+                                             ValueMemberBinding="{Binding Key, DataType=meta:KnownKey}"
+                                             FilterMode="Contains"
+                                             MinimumPrefixLength="0"
+                                             MaxDropDownHeight="320"
+                                             PlaceholderText="{x:Static res:Strings.NewKeyWatermark}"
+                                             IsVisible="{Binding IsAdding}"
+                                             ctl:FocusWhenShown.IsEnabled="True"
+                                             ToolTip.Tip="{x:Static res:Strings.NewKeyToolTip}"
+                                             AutomationProperties.Name="{x:Static res:Strings.NewKeyWatermark}">
+                                <AutoCompleteBox.ItemTemplate>
+                                    <!-- A fixed width: the list is virtualised, so sizing to content would
+                                         resize the dropdown to the widest visible item as it scrolls. -->
+                                    <DataTemplate x:DataType="meta:KnownKey">
+                                        <StackPanel Width="300" Margin="0,2" Spacing="1">
+                                            <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Key}" />
+                                            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Description}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </AutoCompleteBox.ItemTemplate>
+                            </AutoCompleteBox>
+                            <TextBox x:Name="NewValueBox"
+                                     Grid.Column="1"
                                      Text="{Binding NewValue}"
                                      PlaceholderText="{x:Static res:Strings.NewValueWatermark}"
                                      AutomationProperties.Name="{x:Static res:Strings.NewValueWatermark}">
