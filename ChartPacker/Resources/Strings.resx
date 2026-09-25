@@ -50,6 +50,18 @@
   <data name="FolderPathWatermark" xml:space="preserve">
     <value>No folder selected</value>
   </data>
+  <data name="RescanButton" xml:space="preserve">
+    <value>Re-scan</value>
+  </data>
+  <data name="RescanToolTip" xml:space="preserve">
+    <value>Search the chosen folder for songs (F5)</value>
+  </data>
+  <data name="NotScannedHint" xml:space="preserve">
+    <value>Select Re-scan to search this folder</value>
+  </data>
+  <data name="StaleHint" xml:space="preserve">
+    <value>The list is out of date. Select Re-scan to update it.</value>
+  </data>
   <data name="ScanDepthLabel" xml:space="preserve">
     <value>Search depth</value>
   </data>

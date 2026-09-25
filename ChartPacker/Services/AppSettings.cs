@@ -13,5 +13,8 @@ namespace ChartPacker.Services
 
         /// <summary>How many folder levels below the picked folder the library scan searches.</summary>
         public int ScanMaxDepth { get; set; } = DefaultScanMaxDepth;
+
+        /// <summary>The last folder picked in the library panel. It is restored at launch but not scanned.</summary>
+        public string? LastFolder { get; set; }
     }
 }

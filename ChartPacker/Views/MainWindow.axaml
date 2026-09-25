@@ -12,6 +12,10 @@
         Width="1000" Height="640"
         MinWidth="560" MinHeight="360">
 
+    <Window.KeyBindings>
+        <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
+    </Window.KeyBindings>
+
     <Grid x:Name="RootGrid">
         <Grid.ColumnDefinitions>
             <!-- Library (0), splitter (1), detail (2). MainWindow.axaml.cs indexes these. -->

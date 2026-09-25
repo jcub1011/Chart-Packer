@@ -12,6 +12,7 @@
 
     <UserControl.Resources>
         <StreamGeometry x:Key="SngIconGeometry">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M12,9.5 A2.5,2.5 0 1 1 12,14.5 A2.5,2.5 0 1 1 12,9.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="InfoIconGeometry">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M11,10 L13,10 L13,17 L11,17 Z M12,6 A1.25,1.25 0 1 1 12,8.5 A1.25,1.25 0 1 1 12,6 Z</StreamGeometry>
         <StreamGeometry x:Key="FolderIconGeometry">M2,6 A2,2 0 0 1 4,4 L9.2,4 L11.2,6 L20,6 A2,2 0 0 1 22,8 L22,18 A2,2 0 0 1 20,20 L4,20 A2,2 0 0 1 2,18 Z</StreamGeometry>
         <conv:EntryKindToIconConverter x:Key="EntryKindToIcon"
                                        SngFile="{StaticResource SngIconGeometry}"
@@ -41,6 +42,17 @@
                 </Animation>
             </Style.Animations>
         </Style>
+        <Style Selector="Border.stale">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.12" />
+            </Setter>
+        </Style>
         <Style Selector="TextBlock.muted">
             <Setter Property="Opacity" Value="0.7" />
         </Style>
@@ -64,9 +76,10 @@
                         Command="{Binding BrowseCommand}"
                         AutomationProperties.Name="{x:Static res:Strings.BrowseButton}" />
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="{x:Static res:Strings.ScanDepthLabel}" VerticalAlignment="Center" />
-                <NumericUpDown Value="{Binding ScanDepth}"
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.ScanDepthLabel}" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Column="1"
+                               Value="{Binding ScanDepth}"
                                Minimum="0"
                                Maximum="{Binding MaxScanDepth}"
                                Increment="1"
@@ -76,7 +89,25 @@
                                MinWidth="110"
                                ToolTip.Tip="{x:Static res:Strings.ScanDepthToolTip}"
                                AutomationProperties.Name="{x:Static res:Strings.ScanDepthLabel}" />
-            </StackPanel>
+                <Button Grid.Column="3"
+                        Content="{x:Static res:Strings.RescanButton}"
+                        Command="{Binding RescanCommand}"
+                        ToolTip.Tip="{x:Static res:Strings.RescanToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.RescanButton}" />
+            </Grid>
+
+            <Border Classes="stale" IsVisible="{Binding IsStale}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <PathIcon Grid.Column="0"
+                              Width="14" Height="14"
+                              VerticalAlignment="Center"
+                              Data="{StaticResource InfoIconGeometry}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{x:Static res:Strings.StaleHint}"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
         </StackPanel>
 
         <StackPanel DockPanel.Dock="Bottom"
@@ -135,6 +166,12 @@
                      HorizontalAlignment="Center" />
                 <TextBlock Classes="muted centered" Text="{x:Static res:Strings.Scanning}" />
             </StackPanel>
+
+            <TextBlock Classes="muted centered"
+                       VerticalAlignment="Center"
+                       Margin="16"
+                       Text="{x:Static res:Strings.NotScannedHint}"
+                       IsVisible="{Binding ShowNotScanned}" />
 
             <TextBlock Classes="muted centered"
                        VerticalAlignment="Center"

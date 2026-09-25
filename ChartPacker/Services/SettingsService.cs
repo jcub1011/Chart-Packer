@@ -73,6 +73,9 @@ namespace ChartPacker.Services
                 settings.LibraryPaneWidth = AppSettings.DefaultLibraryPaneWidth;
 
             settings.ScanMaxDepth = Math.Clamp(settings.ScanMaxDepth, 0, AppSettings.MaxScanMaxDepth);
+
+            if (string.IsNullOrWhiteSpace(settings.LastFolder))
+                settings.LastFolder = null;
         }
     }
 }
