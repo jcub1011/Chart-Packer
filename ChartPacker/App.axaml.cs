@@ -24,7 +24,10 @@ namespace ChartPacker
                 var window = new MainWindow();
                 var folderPicker = new AvaloniaFolderPickerService(() => window);
 
-                window.DataContext = new MainWindowViewModel(new LibraryViewModel(folderPicker, settings), settings);
+                window.DataContext = new MainWindowViewModel(
+                    new LibraryViewModel(folderPicker, settings),
+                    new SongDetailViewModel(),
+                    settings);
 
                 // Subscribed after MainWindow's own Closing handler, which captures the splitter width first.
                 window.Closing += (_, _) => settings.Save();

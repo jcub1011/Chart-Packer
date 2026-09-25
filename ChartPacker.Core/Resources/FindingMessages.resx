@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SectionMetadata" xml:space="preserve">
+    <value>metadata</value>
+    <comment>Section name, inserted into other messages.</comment>
+  </data>
+  <data name="SectionFileIndex" xml:space="preserve">
+    <value>file index</value>
+    <comment>Section name, inserted into other messages.</comment>
+  </data>
+  <data name="SectionFileData" xml:space="preserve">
+    <value>file data</value>
+    <comment>Section name, inserted into other messages.</comment>
+  </data>
+  <data name="BadIdentifier" xml:space="preserve">
+    <value>The file doesn't start with "SNGPKG", so it isn't an .sng file.</value>
+  </data>
+  <data name="UnsupportedVersionFormat" xml:space="preserve">
+    <value>The file uses format version {0}. Only version 1 is supported.</value>
+    <comment>{0} is the version number read from the file.</comment>
+  </data>
+  <data name="HeaderTruncatedFormat" xml:space="preserve">
+    <value>The file is only {0:N0} bytes long, too short for the 26-byte header.</value>
+    <comment>{0} is the file size in bytes.</comment>
+  </data>
+  <data name="SectionTruncatedFormat" xml:space="preserve">
+    <value>The file ends before the {0} section's length field.</value>
+    <comment>{0} is a section name.</comment>
+  </data>
+  <data name="SectionPastEndFormat" xml:space="preserve">
+    <value>The {0} section says it is {1:N0} bytes long, which runs past the end of the file.</value>
+    <comment>{0} is a section name; {1} is the declared length.</comment>
+  </data>
+  <data name="FilePastEndFormat" xml:space="preserve">
+    <value>"{0}" is {1:N0} bytes at offset {2:N0}, which runs past the end of the file.</value>
+    <comment>{0} is a stored filename; {1} its length; {2} its offset.</comment>
+  </data>
+  <data name="SectionTooLargeFormat" xml:space="preserve">
+    <value>The {0} section says it is {1:N0} bytes long, which is too large to be real.</value>
+    <comment>{0} is a section name; {1} is the declared length.</comment>
+  </data>
+  <data name="LengthMismatchFormat" xml:space="preserve">
+    <value>The {0} section says it is {1:N0} bytes long, but its entries use {2:N0}.</value>
+    <comment>{0} is a section name; {1} the declared length; {2} the bytes actually used.</comment>
+  </data>
+  <data name="EntryOverrunFormat" xml:space="preserve">
+    <value>Entry {0:N0} in the {1} section runs past the section's declared length of {2:N0} bytes.</value>
+    <comment>{0} is the 1-based entry number; {1} a section name; {2} the declared length.</comment>
+  </data>
+  <data name="NegativeKeyLengthFormat" xml:space="preserve">
+    <value>Metadata entry {0:N0} has a negative key length ({1:N0}).</value>
+    <comment>{0} is the 1-based entry number; {1} the length.</comment>
+  </data>
+  <data name="NegativeValueLengthFormat" xml:space="preserve">
+    <value>Metadata entry {0:N0} has a negative value length ({1:N0}).</value>
+    <comment>{0} is the 1-based entry number; {1} the length.</comment>
+  </data>
+  <data name="CountTooLargeFormat" xml:space="preserve">
+    <value>The {0} section says it holds {1:N0} entries, which can't fit in its {2:N0} bytes.</value>
+    <comment>{0} is a section name; {1} the declared count; {2} the declared length.</comment>
+  </data>
+  <data name="InvalidKeyTextFormat" xml:space="preserve">
+    <value>Metadata key {0:N0} isn't valid UTF-8 or contains a NUL byte.</value>
+    <comment>{0} is the 1-based entry number.</comment>
+  </data>
+  <data name="InvalidValueTextFormat" xml:space="preserve">
+    <value>The value of metadata key "{0}" isn't valid UTF-8 or contains a NUL byte.</value>
+    <comment>{0} is the key.</comment>
+  </data>
+  <data name="InvalidFilenameTextFormat" xml:space="preserve">
+    <value>Filename {0:N0} isn't valid UTF-8 or contains a NUL byte.</value>
+    <comment>{0} is the 1-based entry number.</comment>
+  </data>
+  <data name="FileOutsideDataFormat" xml:space="preserve">
+    <value>"{0}" is {1:N0} bytes at offset {2:N0}, which is outside the file data section.</value>
+    <comment>{0} is a stored filename; {1} its length; {2} its offset.</comment>
+  </data>
+  <data name="FilesOverlapFormat" xml:space="preserve">
+    <value>"{0}" and "{1}" overlap in the file data.</value>
+    <comment>{0} and {1} are stored filenames.</comment>
+  </data>
+  <data name="FileDataGaps" xml:space="preserve">
+    <value>There are unused bytes between files in the file data.</value>
+  </data>
+  <data name="FileDataOutOfOrder" xml:space="preserve">
+    <value>Files aren't stored in the same order as the file index lists them.</value>
+  </data>
+  <data name="FileDataSumMismatchFormat" xml:space="preserve">
+    <value>The file sizes add up to {0:N0} bytes, but the file data section says it is {1:N0}.</value>
+    <comment>{0} is the sum of file sizes; {1} the declared section length.</comment>
+  </data>
+  <data name="TrailingBytesFormat" xml:space="preserve">
+    <value>There are {0:N0} extra bytes after the end of the file data section.</value>
+    <comment>{0} is the number of extra bytes.</comment>
+  </data>
+</root>

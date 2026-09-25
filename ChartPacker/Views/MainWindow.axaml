@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartPacker.ViewModels"
-        xmlns:res="using:ChartPacker.Resources"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="640"
@@ -31,24 +30,7 @@
                       Width="4"
                       Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
 
-        <!-- Placeholder until decoding and parsing are implemented. -->
-        <StackPanel Grid.Column="2"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Margin="24"
-                    Spacing="6">
-            <TextBlock HorizontalAlignment="Center"
-                       TextAlignment="Center"
-                       TextWrapping="Wrap"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Text="{Binding Library.SelectedEntry.DisplayName, FallbackValue={x:Static res:Strings.DetailPlaceholderTitle}, TargetNullValue={x:Static res:Strings.DetailPlaceholderTitle}}" />
-            <TextBlock HorizontalAlignment="Center"
-                       TextAlignment="Center"
-                       TextWrapping="Wrap"
-                       Opacity="0.7"
-                       Text="{x:Static res:Strings.DetailPlaceholderBody}" />
-        </StackPanel>
+        <ContentControl Grid.Column="2" Content="{Binding Detail}" />
     </Grid>
 
 </Window>

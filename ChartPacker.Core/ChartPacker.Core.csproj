@@ -5,4 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Resources\FindingMessages.resx">
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>ChartPacker.Core.Resources</StronglyTypedNamespace>
+      <StronglyTypedClassName>FindingMessages</StronglyTypedClassName>
+      <StronglyTypedFileName>$(IntermediateOutputPath)FindingMessages.Designer.cs</StronglyTypedFileName>
+      <PublicClass>false</PublicClass>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>

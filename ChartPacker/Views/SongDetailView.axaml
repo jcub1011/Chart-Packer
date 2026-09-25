@@ -1,0 +1,155 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ChartPacker.ViewModels"
+             xmlns:res="using:ChartPacker.Resources"
+             xmlns:ctl="using:ChartPacker.Controls"
+             mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
+             x:Class="ChartPacker.Views.SongDetailView"
+             x:DataType="vm:SongDetailViewModel">
+
+    <UserControl.Resources>
+        <!-- Fluent has an error brush but no warning one; these are the Windows caution colours. -->
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="WarningTextBrush" Color="#9D5D00" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="WarningTextBrush" Color="#FCE100" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,20,0,6" />
+        </Style>
+        <Style Selector="TextBlock.finding">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.finding.error">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="24"
+                    Spacing="6"
+                    IsVisible="{Binding ShowPlaceholder}">
+            <TextBlock Classes="centered"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Text="{x:Static res:Strings.DetailPlaceholderTitle}" />
+            <TextBlock Classes="muted centered" Text="{x:Static res:Strings.DetailPlaceholderBody}" />
+        </StackPanel>
+
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="12"
+                    IsVisible="{Binding IsLoading}">
+            <Arc Classes="spinner"
+                 Classes.active="{Binding IsLoading}"
+                 Width="36" Height="36" StrokeThickness="3"
+                 HorizontalAlignment="Center" />
+            <TextBlock Classes="muted centered" Text="{x:Static res:Strings.Loading}" />
+        </StackPanel>
+
+        <TextBlock Classes="centered"
+                   VerticalAlignment="Center"
+                   Margin="24"
+                   Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
+                   Text="{Binding ErrorMessage}"
+                   IsVisible="{Binding HasError}" />
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding ShowDetails}">
+            <StackPanel Margin="20,16">
+                <SelectableTextBlock FontSize="18"
+                                     FontWeight="SemiBold"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding Entry.DisplayName, FallbackValue=''}" />
+                <SelectableTextBlock Opacity="0.7"
+                                     FontSize="12"
+                                     Margin="0,2,0,0"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding Subtitle}" />
+
+                <ItemsControl ItemsSource="{Binding Findings}"
+                              IsVisible="{Binding HasFindings}"
+                              Margin="0,12,0,0"
+                              AutomationProperties.Name="{x:Static res:Strings.FindingsListName}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FindingRow">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,2">
+                                <TextBlock Grid.Column="0"
+                                           Classes="finding"
+                                           Classes.error="{Binding IsError}"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding RuleId}" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="finding"
+                                           Classes.error="{Binding IsError}"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding Message}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Classes="section" Text="{Binding MetadataHeader}" />
+                <TextBlock Classes="muted" Text="{Binding MetadataNote}" IsVisible="{Binding HasMetadataNote}" />
+                <ItemsControl ItemsSource="{Binding Metadata}"
+                              Grid.IsSharedSizeScope="True"
+                              AutomationProperties.Name="{x:Static res:Strings.MetadataListName}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MetadataRow">
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Classes="muted"
+                                           MaxWidth="220"
+                                           Margin="0,0,16,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Key}"
+                                           Text="{Binding Key}" />
+                                <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
+                                <SelectableTextBlock Grid.Column="1"
+                                                     TextWrapping="Wrap"
+                                                     ctl:RichTextMarkup.Text="{Binding Value}"
+                                                     ToolTip.Tip="{Binding ToolTip}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Classes="section" Text="{Binding FilesHeader}" />
+                <TextBlock Classes="muted" Text="{x:Static res:Strings.NoFiles}" IsVisible="{Binding ShowNoFiles}" />
+                <ItemsControl ItemsSource="{Binding Files}"
+                              AutomationProperties.Name="{x:Static res:Strings.FilesListName}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FileRow">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,2">
+                                <TextBlock Grid.Column="0"
+                                           TextTrimming="PathSegmentEllipsis"
+                                           ToolTip.Tip="{Binding Path}"
+                                           Text="{Binding Path}" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="muted"
+                                           HorizontalAlignment="Right"
+                                           Text="{Binding Size}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

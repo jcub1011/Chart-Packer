@@ -99,6 +99,69 @@
     <value>Select a song</value>
   </data>
   <data name="DetailPlaceholderBody" xml:space="preserve">
-    <value>Song details will appear here once decoding is implemented.</value>
+    <value>Choose a song in the list to see its metadata and files</value>
+  </data>
+  <data name="Loading" xml:space="preserve">
+    <value>Loading…</value>
+  </data>
+  <data name="DetailUnreadableFormat" xml:space="preserve">
+    <value>This song can't be read: {0}</value>
+    <comment>{0} is the system error message.</comment>
+  </data>
+  <data name="SubtitleFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment>{0} is the song's full path; {1} its total size, e.g. "6.2 MB".</comment>
+  </data>
+  <data name="FindingsListName" xml:space="preserve">
+    <value>Problems</value>
+  </data>
+  <data name="MetadataListName" xml:space="preserve">
+    <value>Metadata</value>
+  </data>
+  <data name="MetadataHeaderFormat" xml:space="preserve">
+    <value>Metadata ({0:N0})</value>
+    <comment>{0} is the number of metadata keys.</comment>
+  </data>
+  <data name="NoMetadata" xml:space="preserve">
+    <value>No metadata</value>
+  </data>
+  <data name="NoSongIni" xml:space="preserve">
+    <value>This folder has no song.ini</value>
+  </data>
+  <data name="SongIniNoSongSection" xml:space="preserve">
+    <value>song.ini has no [song] section</value>
+  </data>
+  <data name="SongIniTooLarge" xml:space="preserve">
+    <value>song.ini is too large to read</value>
+  </data>
+  <data name="FilesListName" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="FilesHeaderFormat" xml:space="preserve">
+    <value>Files ({0:N0})</value>
+    <comment>{0} is the number of files.</comment>
+  </data>
+  <data name="NoFiles" xml:space="preserve">
+    <value>No files</value>
+  </data>
+  <data name="SizeBytesFormat" xml:space="preserve">
+    <value>{0:N0} B</value>
+    <comment>{0} is a size in bytes.</comment>
+  </data>
+  <data name="SizeKilobytesFormat" xml:space="preserve">
+    <value>{0:0.#} KB</value>
+    <comment>{0} is a size in kilobytes (1024 bytes).</comment>
+  </data>
+  <data name="SizeMegabytesFormat" xml:space="preserve">
+    <value>{0:0.#} MB</value>
+    <comment>{0} is a size in megabytes (1024 KB).</comment>
+  </data>
+  <data name="SizeGigabytesFormat" xml:space="preserve">
+    <value>{0:0.##} GB</value>
+    <comment>{0} is a size in gigabytes (1024 MB).</comment>
+  </data>
+  <data name="StoredMillisecondsFormat" xml:space="preserve">
+    <value>Stored value: {0} (milliseconds)</value>
+    <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the value as stored, e.g. "225123".</comment>
   </data>
 </root>
