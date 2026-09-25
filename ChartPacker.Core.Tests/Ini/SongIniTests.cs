@@ -15,6 +15,29 @@ public sealed class SongIniTests
     public void DeleteRoot() => _root.Delete(recursive: true);
 
     [TestMethod]
+    public void WriteProducesOneSongSectionThatParsesBack()
+    {
+        var pairs = new[] { P("name", "Title"), P("loading_phrase", "a = b"), P("delay", "0") };
+        var writer = new StringWriter { NewLine = "\n" };
+
+        SongIni.Write(writer, pairs);
+
+        Assert.AreEqual("[song]\nname = Title\nloading_phrase = a = b\ndelay = 0\n", writer.ToString());
+        CollectionAssert.AreEqual(pairs, Parse(writer.ToString())!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task WriteAsyncHasNoByteOrderMark()
+    {
+        string path = Path.Combine(_root.FullName, "song.ini");
+
+        await SongIni.WriteAsync(path, [P("name", "Title")]);
+
+        Assert.AreEqual((byte)'[', File.ReadAllBytes(path)[0]);
+        Assert.AreEqual("Title", (await SongIni.ReadAsync(path)).Pairs.Single().Value);
+    }
+
+    [TestMethod]
     public void ReadsSongSectionInFileOrder()
     {
         var pairs = Parse("""

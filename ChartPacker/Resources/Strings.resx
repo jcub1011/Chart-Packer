@@ -164,4 +164,136 @@
     <value>Stored value: {0} (milliseconds)</value>
     <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the value as stored, e.g. "225123".</comment>
   </data>
+  <data name="OutputLabel" xml:space="preserve">
+    <value>Output folder</value>
+  </data>
+  <data name="OutputWatermark" xml:space="preserve">
+    <value>Next to the scanned songs</value>
+  </data>
+  <data name="OutputToolTip" xml:space="preserve">
+    <value>Where Pack and Unpack write. Each item keeps its place relative to the scanned folder.</value>
+  </data>
+  <data name="BrowseOutputDialogTitle" xml:space="preserve">
+    <value>Choose the output folder</value>
+  </data>
+  <data name="ResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="ResetOutputToolTip" xml:space="preserve">
+    <value>Write next to the scanned songs again</value>
+  </data>
+  <data name="OverwriteLabel" xml:space="preserve">
+    <value>If the output exists</value>
+  </data>
+  <data name="OverwriteToolTip" xml:space="preserve">
+    <value>What to do when the .sng or folder being written already exists</value>
+  </data>
+  <data name="OverwriteSkip" xml:space="preserve">
+    <value>Skip it</value>
+  </data>
+  <data name="OverwriteOverwrite" xml:space="preserve">
+    <value>Overwrite it</value>
+  </data>
+  <data name="OverwriteRename" xml:space="preserve">
+    <value>Keep both (rename)</value>
+  </data>
+  <data name="PackButton" xml:space="preserve">
+    <value>Pack</value>
+  </data>
+  <data name="PackToolTip" xml:space="preserve">
+    <value>Pack the selected song folders into .sng files</value>
+  </data>
+  <data name="UnpackButton" xml:space="preserve">
+    <value>Unpack</value>
+  </data>
+  <data name="UnpackToolTip" xml:space="preserve">
+    <value>Unpack the selected .sng files into song folders</value>
+  </data>
+  <data name="MultipleSelectedFormat" xml:space="preserve">
+    <value>{0:N0} items selected</value>
+    <comment>{0} is the number of selected items (always 2 or more).</comment>
+  </data>
+  <data name="MultipleSelectedBody" xml:space="preserve">
+    <value>Select Pack or Unpack to process them all. Items that are already in that form are skipped.</value>
+  </data>
+  <data name="JobPackingFormat" xml:space="preserve">
+    <value>Packing {0:N0} of {1:N0}…</value>
+    <comment>{0} is the item being packed; {1} the total.</comment>
+  </data>
+  <data name="JobUnpackingFormat" xml:space="preserve">
+    <value>Unpacking {0:N0} of {1:N0}…</value>
+    <comment>{0} is the item being unpacked; {1} the total.</comment>
+  </data>
+  <data name="JobPackSummaryFormat" xml:space="preserve">
+    <value>Pack finished: {0:N0} packed · {1:N0} skipped · {2:N0} failed</value>
+    <comment>{0} succeeded; {1} skipped; {2} failed.</comment>
+  </data>
+  <data name="JobPackCancelledFormat" xml:space="preserve">
+    <value>Pack cancelled: {0:N0} packed · {1:N0} skipped · {2:N0} failed</value>
+    <comment>{0} succeeded; {1} skipped; {2} failed.</comment>
+  </data>
+  <data name="JobUnpackSummaryFormat" xml:space="preserve">
+    <value>Unpack finished: {0:N0} unpacked · {1:N0} skipped · {2:N0} failed</value>
+    <comment>{0} succeeded; {1} skipped; {2} failed.</comment>
+  </data>
+  <data name="JobUnpackCancelledFormat" xml:space="preserve">
+    <value>Unpack cancelled: {0:N0} unpacked · {1:N0} skipped · {2:N0} failed</value>
+    <comment>{0} succeeded; {1} skipped; {2} failed.</comment>
+  </data>
+  <data name="JobAlreadyPackedFormat" xml:space="preserve">
+    <value>"{0}" is already packed and was skipped.</value>
+    <comment>{0} is the .sng file name, e.g. "Song.sng".</comment>
+  </data>
+  <data name="JobAlreadyUnpackedFormat" xml:space="preserve">
+    <value>"{0}" is already unpacked and was skipped.</value>
+    <comment>{0} is the song folder's name.</comment>
+  </data>
+  <data name="JobOutputExistsFormat" xml:space="preserve">
+    <value>Skipped because {0} already exists.</value>
+    <comment>{0} is the existing output path.</comment>
+  </data>
+  <data name="JobFailedFormat" xml:space="preserve">
+    <value>Failed: {0}</value>
+    <comment>{0} is the system error message.</comment>
+  </data>
+  <data name="JobNotPacked" xml:space="preserve">
+    <value>Not packed because of the errors below.</value>
+  </data>
+  <data name="JobNotUnpacked" xml:space="preserve">
+    <value>Not unpacked because of the errors below.</value>
+  </data>
+  <data name="JobPackedFormat" xml:space="preserve">
+    <value>Packed to {0}</value>
+    <comment>{0} is the .sng path written.</comment>
+  </data>
+  <data name="JobUnpackedFormat" xml:space="preserve">
+    <value>Unpacked to {0}</value>
+    <comment>{0} is the folder written.</comment>
+  </data>
+  <data name="JobUnpackedWithErrorsFormat" xml:space="preserve">
+    <value>Unpacked to {0}, but some files were left out (see below).</value>
+    <comment>{0} is the folder written.</comment>
+  </data>
+  <data name="JobDetailsButton" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="JobResultsListName" xml:space="preserve">
+    <value>Pack and unpack results</value>
+  </data>
+  <data name="CancelButton" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="DismissButton" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="FlatPackLabel" xml:space="preserve">
+    <value>Pack into one folder (flat)</value>
+  </data>
+  <data name="FlatPackToolTip" xml:space="preserve">
+    <value>Put every packed .sng directly in the output folder instead of mirroring the scanned folder's layout. If two folders would make the same .sng, the first one packed keeps the name; the others are skipped, or renamed when the output policy is "Keep both".</value>
+  </data>
+  <data name="JobDuplicateOutputFormat" xml:space="preserve">
+    <value>Skipped because {0} was already written by "{1}" in this job.</value>
+    <comment>{0} is the output path; {1} the earlier item's path relative to the scanned folder.</comment>
+  </data>
 </root>

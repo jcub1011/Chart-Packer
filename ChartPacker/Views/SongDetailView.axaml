@@ -45,8 +45,8 @@
             <TextBlock Classes="centered"
                        FontSize="18"
                        FontWeight="SemiBold"
-                       Text="{x:Static res:Strings.DetailPlaceholderTitle}" />
-            <TextBlock Classes="muted centered" Text="{x:Static res:Strings.DetailPlaceholderBody}" />
+                       Text="{Binding PlaceholderTitle}" />
+            <TextBlock Classes="muted centered" Text="{Binding PlaceholderBody}" />
         </StackPanel>
 
         <StackPanel VerticalAlignment="Center"

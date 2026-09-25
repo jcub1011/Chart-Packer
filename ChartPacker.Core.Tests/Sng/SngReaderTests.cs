@@ -11,7 +11,7 @@ public sealed class SngReaderTests
     /// <c>notes.chart</c> containing <c>ABC</c> (stored masked as <c>51 52 53</c>). The format it
     /// follows is defined by mdsitton/SngFileFormat's README (see THIRD-PARTY-NOTICES.md).
     /// </summary>
-    private static readonly byte[] WorkedExample = Convert.FromHexString(
+    internal static readonly byte[] WorkedExample = Convert.FromHexString(
         "534E47504B4701000000101112131415" +
         "161718191A1B1C1D1E1F180000000000" +
         "00000100000000000000040000006E61" +

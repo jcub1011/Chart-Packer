@@ -16,12 +16,17 @@ namespace ChartPacker.ViewModels
             {
                 if (e.PropertyName == nameof(LibraryViewModel.SelectedEntry))
                     _ = Detail.ShowAsync(Library.SelectedEntry);
+                else if (e.PropertyName == nameof(LibraryViewModel.SelectedCount))
+                    Detail.SelectionCount = Library.SelectedCount;
             };
         }
 
         public LibraryViewModel Library { get; }
 
         public SongDetailViewModel Detail { get; }
+
+        /// <summary>The pack/unpack results panel, shown under both panels.</summary>
+        public JobViewModel Job => Library.Job;
 
         /// <summary>Persisted width of the library panel. The view applies it on open and writes it back on close.</summary>
         public double LibraryPaneWidth

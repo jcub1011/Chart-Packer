@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using ChartPacker.Core.Jobs;
 
 namespace ChartPacker.Services
 {
@@ -76,6 +77,12 @@ namespace ChartPacker.Services
 
             if (string.IsNullOrWhiteSpace(settings.LastFolder))
                 settings.LastFolder = null;
+
+            if (string.IsNullOrWhiteSpace(settings.OutputFolder))
+                settings.OutputFolder = null;
+
+            if (!Enum.IsDefined(settings.OverwritePolicy))
+                settings.OverwritePolicy = OverwritePolicy.Skip;
         }
     }
 }

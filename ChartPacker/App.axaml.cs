@@ -25,7 +25,7 @@ namespace ChartPacker
                 var folderPicker = new AvaloniaFolderPickerService(() => window);
 
                 window.DataContext = new MainWindowViewModel(
-                    new LibraryViewModel(folderPicker, settings),
+                    new LibraryViewModel(folderPicker, settings, new JobViewModel()),
                     new SongDetailViewModel(),
                     settings);
 

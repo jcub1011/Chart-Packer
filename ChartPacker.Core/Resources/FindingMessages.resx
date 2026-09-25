@@ -134,4 +134,91 @@
     <value>There are {0:N0} extra bytes after the end of the file data section.</value>
     <comment>{0} is the number of extra bytes.</comment>
   </data>
+  <data name="ReasonTooLongFormat" xml:space="preserve">
+    <value>it is {0:N0} bytes long, and stored names can be at most {1:N0}</value>
+    <comment>{0} is the name's length in UTF-8 bytes; {1} the limit.</comment>
+  </data>
+  <data name="ReasonDotDot" xml:space="preserve">
+    <value>it contains ".."</value>
+  </data>
+  <data name="ReasonEmptySegment" xml:space="preserve">
+    <value>it has an empty folder or file name</value>
+  </data>
+  <data name="ReasonControlCharacter" xml:space="preserve">
+    <value>it contains a control character</value>
+  </data>
+  <data name="ReasonReservedCharacterFormat" xml:space="preserve">
+    <value>it contains "{0}", which isn't allowed in filenames</value>
+    <comment>{0} is the offending character.</comment>
+  </data>
+  <data name="ReasonTrailingCharacter" xml:space="preserve">
+    <value>a folder or file name ends with a period or a space</value>
+  </data>
+  <data name="ReasonReservedNameFormat" xml:space="preserve">
+    <value>"{0}" is a reserved name on Windows</value>
+    <comment>{0} is the reserved name, e.g. CON.</comment>
+  </data>
+  <data name="FilenameProblemFormat" xml:space="preserve">
+    <value>"{0}" can't be stored: {1}.</value>
+    <comment>{0} is the filename; {1} one of the Reason* strings.</comment>
+  </data>
+  <data name="DuplicateFilenameFormat" xml:space="preserve">
+    <value>"{0}" and "{1}" have the same name when case is ignored.</value>
+    <comment>{0} and {1} are the two filenames.</comment>
+  </data>
+  <data name="UnsafeExtractNameFormat" xml:space="preserve">
+    <value>"{0}" wasn't extracted because it isn't a safe filename: {1}.</value>
+    <comment>{0} is the stored filename; {1} one of the Reason* strings.</comment>
+  </data>
+  <data name="ExtractOutsideFolderFormat" xml:space="preserve">
+    <value>"{0}" wasn't extracted because it would be written outside the output folder.</value>
+    <comment>{0} is the stored filename.</comment>
+  </data>
+  <data name="DuplicateExtractNameFormat" xml:space="preserve">
+    <value>"{0}" wasn't extracted because another file with the same name, ignoring case, already was.</value>
+    <comment>{0} is the stored filename.</comment>
+  </data>
+  <data name="StoredSongIni" xml:space="preserve">
+    <value>The .sng contains its own song.ini. It wasn't extracted; the song.ini generated from the metadata was written instead.</value>
+  </data>
+  <data name="KeyForbiddenCharacterFormat" xml:space="preserve">
+    <value>The metadata key "{0}" contains ;, =, a line break or a NUL, which song.ini can't hold.</value>
+    <comment>{0} is the key.</comment>
+  </data>
+  <data name="ValueForbiddenCharacterFormat" xml:space="preserve">
+    <value>The value of "{0}" contains ;, a line break or a NUL, which song.ini can't hold.</value>
+    <comment>{0} is the key.</comment>
+  </data>
+  <data name="EmptyKey" xml:space="preserve">
+    <value>A metadata entry has an empty key.</value>
+  </data>
+  <data name="EmptyValueDroppedFormat" xml:space="preserve">
+    <value>"{0}" has an empty value and was left out.</value>
+    <comment>{0} is the key.</comment>
+  </data>
+  <data name="MetadataNotWrittenFormat" xml:space="preserve">
+    <value>"{0}" was left out of song.ini because its key or value contains a character song.ini can't hold.</value>
+    <comment>{0} is the key.</comment>
+  </data>
+  <data name="NoSongIni" xml:space="preserve">
+    <value>There's no song.ini, so the .sng will have no metadata.</value>
+  </data>
+  <data name="SongIniNoSongSection" xml:space="preserve">
+    <value>song.ini has no [song] section, so the .sng will have no metadata.</value>
+  </data>
+  <data name="SongIniTooLarge" xml:space="preserve">
+    <value>song.ini is too large to read.</value>
+  </data>
+  <data name="ExcludedJunkFormat" xml:space="preserve">
+    <value>"{0}" was left out as OS or tool junk.</value>
+    <comment>{0} is a file or folder path.</comment>
+  </data>
+  <data name="ExcludedNestedSngFormat" xml:space="preserve">
+    <value>"{0}" was left out because an .sng can't contain another .sng.</value>
+    <comment>{0} is a file path.</comment>
+  </data>
+  <data name="ExcludedSubfolderFormat" xml:space="preserve">
+    <value>The subfolder "{0}" was left out because subfolders aren't included.</value>
+    <comment>{0} is a folder path.</comment>
+  </data>
 </root>

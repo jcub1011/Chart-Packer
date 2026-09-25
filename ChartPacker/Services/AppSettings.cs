@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using ChartPacker.Core.Jobs;
+
 namespace ChartPacker.Services
 {
     /// <summary>User settings persisted to <c>settings.json</c>. See spec §8.</summary>
@@ -16,5 +19,15 @@ namespace ChartPacker.Services
 
         /// <summary>The last folder picked in the library panel. It is restored at launch but not scanned.</summary>
         public string? LastFolder { get; set; }
+
+        /// <summary>Where Pack and Unpack write. <see langword="null"/> means the scanned folder.</summary>
+        public string? OutputFolder { get; set; }
+
+        /// <summary>What Pack and Unpack do when an output already exists.</summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<OverwritePolicy>))]
+        public OverwritePolicy OverwritePolicy { get; set; } = OverwritePolicy.Skip;
+
+        /// <summary>Whether Pack writes every .sng directly in the output folder instead of mirroring the scanned folder's layout.</summary>
+        public bool FlatPackOutput { get; set; }
     }
 }

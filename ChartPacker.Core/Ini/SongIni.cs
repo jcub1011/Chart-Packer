@@ -20,7 +20,7 @@ public enum SongIniStatus
 /// <param name="Pairs">The <c>[song]</c> pairs in file order; empty unless <paramref name="Status"/> is <see cref="SongIniStatus.Ok"/>.</param>
 public sealed record SongIniReadResult(SongIniStatus Status, IReadOnlyList<KeyValuePair<string, string>> Pairs);
 
-/// <summary>Reads the <c>[song]</c> section of a <c>song.ini</c>.</summary>
+/// <summary>Reads and writes the <c>[song]</c> section of a <c>song.ini</c>.</summary>
 /// <remarks>
 /// Written independently, to match the parsing rules of <c>SongLib/IniParser.cs</c> in
 /// <see href="https://github.com/mdsitton/SngFileFormat">mdsitton/SngFileFormat</see> at commit
@@ -118,5 +118,33 @@ public static class SongIni
         return pairs is null
             ? new SongIniReadResult(SongIniStatus.NoSongSection, [])
             : new SongIniReadResult(SongIniStatus.Ok, pairs);
+    }
+
+    /// <summary>
+    /// Writes <paramref name="pairs"/> as a single <c>[song]</c> section of <c>key = value</c>
+    /// lines, the form the reference decoder produces (sng-spec §9.5).
+    /// </summary>
+    /// <remarks>Callers leave out pairs that can't round-trip through INI (sng-spec §6.1).</remarks>
+    public static void Write(TextWriter writer, IEnumerable<KeyValuePair<string, string>> pairs)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(pairs);
+
+        writer.WriteLine("[" + SongSection + "]");
+        foreach (var (key, value) in pairs)
+            writer.WriteLine(key + " = " + value);
+    }
+
+    /// <summary>Writes <paramref name="pairs"/> to <paramref name="path"/> as UTF-8 without a byte order mark.</summary>
+    /// <exception cref="IOException">The file can't be written.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access to the file is denied.</exception>
+    /// <exception cref="OperationCanceledException">The write was cancelled.</exception>
+    public static async Task WriteAsync(string path, IEnumerable<KeyValuePair<string, string>> pairs, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var text = new StringWriter();
+        Write(text, pairs);
+        await File.WriteAllTextAsync(path, text.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken).ConfigureAwait(false);
     }
 }

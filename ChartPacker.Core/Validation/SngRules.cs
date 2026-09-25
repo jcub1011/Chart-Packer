@@ -24,6 +24,27 @@ public static class SngRules
     /// <summary>Invalid UTF-8, or a <c>0x00</c> byte, in a key, value or filename.</summary>
     public const string Sng013 = "SNG013";
 
+    /// <summary>A key contains <c>;</c>, <c>\r</c>, <c>\n</c> or <c>=</c>.</summary>
+    public const string Sng020 = "SNG020";
+
+    /// <summary>A value contains <c>;</c>, <c>\r</c> or <c>\n</c>.</summary>
+    public const string Sng021 = "SNG021";
+
+    /// <summary>An empty key.</summary>
+    public const string Sng023 = "SNG023";
+
+    /// <summary>A path segment breaks the filename rules (forbidden or control character, <c>..</c>, trailing <c>.</c> or space, reserved name, empty segment).</summary>
+    public const string Sng030 = "SNG030";
+
+    /// <summary>The stored filename is longer than 255 UTF-8 bytes.</summary>
+    public const string Sng031 = "SNG031";
+
+    /// <summary>A duplicate filename, compared ignoring case.</summary>
+    public const string Sng032 = "SNG032";
+
+    /// <summary>The filename would resolve to a path outside the extraction folder.</summary>
+    public const string Sng033 = "SNG033";
+
     /// <summary>A file range is outside the FileData section, or two file ranges overlap.</summary>
     public const string Sng040 = "SNG040";
 
@@ -35,4 +56,22 @@ public static class SngRules
 
     /// <summary>There are bytes after the end of the FileData section.</summary>
     public const string Sng043 = "SNG043";
+
+    /// <summary><c>song.ini</c> is stored as a file.</summary>
+    public const string Sng053 = "SNG053";
+
+    /// <summary>An empty value. It is dropped when packing.</summary>
+    public const string Sng061 = "SNG061";
+
+    /// <summary>There is no <c>song.ini</c>.</summary>
+    public const string Sng070 = "SNG070";
+
+    /// <summary><c>song.ini</c> has no <c>[song]</c> section (or can't be read).</summary>
+    public const string Sng071 = "SNG071";
+
+    /// <summary>A file or folder was excluded as OS or tool junk.</summary>
+    public const string Sng072 = "SNG072";
+
+    /// <summary>A subfolder was skipped because including subfolders is turned off.</summary>
+    public const string Sng073 = "SNG073";
 }

@@ -70,7 +70,17 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private string? _subtitle;
 
+        /// <summary>How many items are selected in the library. Details are only shown for one.</summary>
+        [ObservableProperty]
+        private int _selectionCount;
+
         public bool ShowPlaceholder => Entry is null;
+
+        public string PlaceholderTitle => SelectionCount > 1
+            ? string.Format(CultureInfo.CurrentCulture, Strings.MultipleSelectedFormat, SelectionCount)
+            : Strings.DetailPlaceholderTitle;
+
+        public string PlaceholderBody => SelectionCount > 1 ? Strings.MultipleSelectedBody : Strings.DetailPlaceholderBody;
 
         public bool HasError => ErrorMessage is not null;
 
@@ -144,6 +154,12 @@ namespace ChartPacker.ViewModels
         partial void OnErrorMessageChanged(string? value) => RefreshState();
 
         partial void OnMetadataNoteChanged(string? value) => RefreshState();
+
+        partial void OnSelectionCountChanged(int value)
+        {
+            OnPropertyChanged(nameof(PlaceholderTitle));
+            OnPropertyChanged(nameof(PlaceholderBody));
+        }
 
         private void Apply(SongEntry entry, LoadedDetails details)
         {
