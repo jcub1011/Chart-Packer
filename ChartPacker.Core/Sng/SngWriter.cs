@@ -89,26 +89,13 @@ public static class SngWriter
         {
             using (var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024))
             {
-                WriteHeaderAndIndex(output, mask.Span, metadata, files);
+                var index = files.Select(f => new IndexEntry(f.StoredName, (ulong)f.Length)).ToList();
+                WriteHeaderAndIndex(output, mask.Span, metadata, index);
                 WriteFileData(output, mask.Span, files, bytesWritten, cancellationToken);
                 output.Flush(flushToDisk: true);
             }
 
-            IReadOnlyList<Finding> findings = [];
-            if (verify)
-            {
-                SngReadResult check = SngReader.Read(tempPath, cancellationToken);
-                findings = check.Findings;
-                if (check.HasErrors)
-                {
-                    TryDelete(tempPath);
-                    return findings;
-                }
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            File.Move(tempPath, targetPath, overwrite);
-            return findings;
+            return VerifyAndCommit(tempPath, targetPath, overwrite, verify, cancellationToken);
         }
         catch
         {
@@ -117,11 +104,96 @@ public static class SngWriter
         }
     }
 
+    /// <summary>
+    /// Replaces the metadata of the <c>.sng</c> at <paramref name="sngPath"/> on the thread pool,
+    /// keeping its mask and copying its file data without unmasking it (project spec F5.5).
+    /// </summary>
+    /// <remarks>
+    /// The file is re-read first, and left untouched if that finds a structural error. The new file
+    /// keeps the files in index order with their stored names; only the metadata section and the
+    /// <c>contentsIndex</c> values change. Gaps between files and bytes after the FileData section
+    /// (SNG041, SNG043) aren't carried over. The rewrite goes to a temp file, is verified, and is then
+    /// renamed over the original.
+    /// </remarks>
+    /// <param name="sngPath">The <c>.sng</c> to rewrite.</param>
+    /// <param name="metadata">The complete new metadata, written in order.</param>
+    /// <param name="cancellationToken">Cancels the rewrite; the temp file is removed and the original is untouched.</param>
+    /// <returns>
+    /// The findings that stopped the rewrite (the original's structural errors, or the verify pass's),
+    /// or the verify pass's non-error findings when it succeeded. Any error means nothing was written.
+    /// </returns>
+    /// <exception cref="IOException">The file can't be read or replaced.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access to the file is denied.</exception>
+    /// <exception cref="OperationCanceledException">The rewrite was cancelled.</exception>
+    public static Task<IReadOnlyList<Finding>> RewriteMetadataAsync(
+        string sngPath,
+        IReadOnlyList<KeyValuePair<string, string>> metadata,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sngPath);
+        ArgumentNullException.ThrowIfNull(metadata);
+
+        return Task.Run(() => RewriteMetadata(sngPath, metadata, cancellationToken), cancellationToken);
+    }
+
+    private static IReadOnlyList<Finding> RewriteMetadata(
+        string sngPath,
+        IReadOnlyList<KeyValuePair<string, string>> metadata,
+        CancellationToken cancellationToken)
+    {
+        SngReadResult source = SngReader.Read(sngPath, cancellationToken);
+        if (source.HasErrors || source.Header is not { } header)
+            return source.Findings;
+
+        string tempPath = sngPath + TempSuffix;
+        try
+        {
+            using (var input = File.OpenHandle(sngPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024))
+            {
+                var index = source.Files.Select(f => new IndexEntry(f.Name, f.Length)).ToList();
+                WriteHeaderAndIndex(output, header.Mask.Span, metadata, index);
+
+                foreach (SngFileEntry file in source.Files)
+                    SngFileData.CopyRaw(input, file, output, cancellationToken);
+
+                output.Flush(flushToDisk: true);
+            }
+
+            return VerifyAndCommit(tempPath, sngPath, overwrite: true, verify: true, cancellationToken);
+        }
+        catch
+        {
+            TryDelete(tempPath);
+            throw;
+        }
+    }
+
+    /// <summary>Optionally verifies the finished temp file, then renames it over the target.</summary>
+    private static IReadOnlyList<Finding> VerifyAndCommit(string tempPath, string targetPath, bool overwrite, bool verify, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<Finding> findings = [];
+        if (verify)
+        {
+            SngReadResult check = SngReader.Read(tempPath, cancellationToken);
+            findings = check.Findings;
+            if (check.HasErrors)
+            {
+                TryDelete(tempPath);
+                return findings;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        File.Move(tempPath, targetPath, overwrite);
+        return findings;
+    }
+
     private static void WriteHeaderAndIndex(
         Stream output,
         ReadOnlySpan<byte> mask,
         IReadOnlyList<KeyValuePair<string, string>> metadata,
-        IReadOnlyList<SngSourceFile> files)
+        IReadOnlyList<IndexEntry> files)
     {
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -169,7 +241,7 @@ public static class SngWriter
         WriteUInt64(buffer, (ulong)files.Count);
         for (int i = 0; i < files.Count; i++)
         {
-            ulong length = (ulong)files[i].Length;
+            ulong length = files[i].Length;
             buffer.GetSpan(1)[0] = (byte)names[i].Length;
             buffer.Advance(1);
             buffer.Write(names[i]);
@@ -230,6 +302,9 @@ public static class SngWriter
             ArrayPool<byte>.Shared.Return(chunk);
         }
     }
+
+    /// <summary>A FileIndex entry to write: the stored name and the file's length.</summary>
+    private readonly record struct IndexEntry(string StoredName, ulong Length);
 
     private static IOException SizeChanged(SngSourceFile file) =>
         new($"'{file.SourcePath}' changed size while it was being packed.");

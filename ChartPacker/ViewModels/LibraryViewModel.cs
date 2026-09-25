@@ -30,6 +30,8 @@ namespace ChartPacker.ViewModels
     {
         private readonly IFolderPickerService _folderPicker;
         private readonly SettingsService _settings;
+        private readonly MetadataDraftStore _drafts;
+        private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
         private CancellationTokenSource? _scanCts;
 
         // What the list currently reflects: the folder and depth of the most recent scan.
@@ -39,10 +41,11 @@ namespace ChartPacker.ViewModels
         // A job has written to disk since the last scan.
         private bool _outputsChanged;
 
-        public LibraryViewModel(IFolderPickerService folderPicker, SettingsService settings, JobViewModel job)
+        public LibraryViewModel(IFolderPickerService folderPicker, SettingsService settings, MetadataDraftStore drafts, JobViewModel job)
         {
             _folderPicker = folderPicker;
             _settings = settings;
+            _drafts = drafts;
             Job = job;
             _scanDepth = settings.Settings.ScanMaxDepth;
             _folderPath = settings.Settings.LastFolder;
@@ -56,8 +59,14 @@ namespace ChartPacker.ViewModels
             _selectedOverwriteOption = OverwriteOptions.First(o => o.Value == settings.Settings.OverwritePolicy);
             _flatPackOutput = settings.Settings.FlatPackOutput;
 
-            Selection = new SelectionModel<SongEntry> { SingleSelect = false, Source = Entries };
+            Selection = new SelectionModel<LibraryItemViewModel> { SingleSelect = false, Source = Entries };
             Selection.PropertyChanged += OnSelectionPropertyChanged;
+
+            _drafts.DraftsChanged += path =>
+            {
+                if (_itemsByPath.TryGetValue(path, out var item))
+                    item.HasDrafts = _drafts.HasDrafts(path);
+            };
 
             Job.PropertyChanged += (_, e) =>
             {
@@ -68,10 +77,10 @@ namespace ChartPacker.ViewModels
 
         public JobViewModel Job { get; }
 
-        public AvaloniaList<SongEntry> Entries { get; } = new();
+        public AvaloniaList<LibraryItemViewModel> Entries { get; } = new();
 
-        /// <summary>The list's selection. Several items can be selected for Pack and Unpack.</summary>
-        public SelectionModel<SongEntry> Selection { get; }
+        /// <summary>The list's selection. Several items can be selected for Pack, Unpack and bulk metadata editing.</summary>
+        public SelectionModel<LibraryItemViewModel> Selection { get; }
 
         public IReadOnlyList<OverwriteOption> OverwriteOptions { get; }
 
@@ -94,9 +103,9 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private string? _errorMessage;
 
-        /// <summary>The selected item when exactly one is selected; otherwise <see langword="null"/>.</summary>
+        /// <summary>The selected items, in list order rather than the order they were clicked.</summary>
         [ObservableProperty]
-        private SongEntry? _selectedEntry;
+        private IReadOnlyList<SongEntry> _selectedEntries = [];
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
@@ -196,8 +205,7 @@ namespace ChartPacker.ViewModels
             if (_scannedFolder is not { } scanRoot || EffectiveOutputFolder is not { } destination)
                 return;
 
-            // In list order rather than the order the items were clicked.
-            var entries = Selection.SelectedIndexes.Order().Select(i => Entries[i]).ToList();
+            var entries = SelectedEntries;
             var layout = kind == JobKind.Pack && FlatPackOutput ? OutputLayout.Flat : OutputLayout.Mirror;
             await Job.RunAsync(kind, entries, scanRoot, destination, SelectedOverwriteOption.Value, layout);
 
@@ -239,6 +247,7 @@ namespace ChartPacker.ViewModels
             _outputsChanged = false;
             Selection.Clear();
             Entries.Clear();
+            _itemsByPath.Clear();
             ErrorMessage = null;
             IsScanning = true;
             RefreshState();
@@ -249,13 +258,20 @@ namespace ChartPacker.ViewModels
             {
                 if (_scanCts != cts)
                     return;
-                Entries.AddRange(batch);
+                var items = batch.Select(e => new LibraryItemViewModel(e, _drafts.HasDrafts(e.FullPath))).ToList();
+                foreach (var item in items)
+                    _itemsByPath[item.Entry.FullPath] = item;
+                Entries.AddRange(items);
                 RefreshState();
             });
 
             try
             {
                 await SongLibraryScanner.ScanAsync(folder, depth, progress, cts.Token);
+
+                // Drafts for songs that were deleted or moved can never be saved.
+                if (_scanCts == cts)
+                    _drafts.DiscardMissing();
             }
             catch (OperationCanceledException)
             {
@@ -283,7 +299,9 @@ namespace ChartPacker.ViewModels
                 return;
 
             SelectedCount = Selection.Count;
-            SelectedEntry = Selection.Count == 1 ? Selection.SelectedItem : null;
+            var selected = Selection.SelectedIndexes.Order().Select(i => Entries[i].Entry).ToList();
+            if (!selected.SequenceEqual(SelectedEntries))
+                SelectedEntries = selected;
         }
 
         /// <summary>Raises change notifications for every derived display state.</summary>

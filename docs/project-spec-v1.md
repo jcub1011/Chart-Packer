@@ -277,12 +277,35 @@ Acceptance criteria:
 
 ### F5. Metadata editor
 
-**Input:** the metadata of a Pack Plan, or of an existing `.sng`.
+**Input:** the metadata of a Pack Plan, or of an existing `.sng`. In the library, the metadata
+of one or more selected `.sng` files and song folders (whose metadata is their `song.ini`).
 
 Behaviour:
 
 1. A grid of key/value rows with add, remove and reorder, plus a raw text (INI-style) view that
    stays in sync with the grid.
+   - **Implemented so far:** click a value to edit it, and add and remove rows. Still to come:
+     reorder, the raw view, and items 2 and 4.
+   - **Bulk editing.** With several items selected, the grid shows the union of their keys,
+     compared ignoring case. A row whose value differs between the items, or that some of them
+     lack, shows `<<contains distinct values>>`.
+     - Editing a row sets that key on every selected item, adding it where it's missing.
+     - Removing a row removes the key from every item that has it.
+     - Nothing else changes: values that differ in other rows are kept.
+   - **Drafts.** Edits are held in memory for each item, and survive a change of selection,
+     until **Save** writes the selected items. **Discard** throws them away. Closing the app with
+     drafts asks first.
+     - Edited rows show `*`, added rows `+`, and removed rows are struck through. Each has a
+       revert button.
+     - The library list marks items that have drafts.
+   - **Saving writes only the edited keys.** A draft records changes per key, and Save re-reads
+     each file and applies them to what's on disk.
+   - **Saving a song folder edits its `song.ini` in place.**
+     - Comments, other sections, unedited lines, the encoding and the line endings are kept.
+     - New keys go at the end of `[song]`.
+     - A folder without a `song.ini` gets one.
+   - Time values are edited in milliseconds. Unset difficulties (`diff_* = -1`) stay hidden, and
+     adding one edits its stored value.
 2. **Known keys** ([sng-spec §6.3](sng-spec.md#metadata-rules)):
    - a friendly label, the expected type, and a matching editor (a number box for integers, a
      checkbox for booleans, text otherwise)

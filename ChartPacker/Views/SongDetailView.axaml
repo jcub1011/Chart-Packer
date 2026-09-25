@@ -20,6 +20,9 @@
                     <SolidColorBrush x:Key="WarningTextBrush" Color="#FCE100" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+            <StreamGeometry x:Key="RevertIconGeometry">M4,9 L9,4 L9,7.5 L13,7.5 A6.5,6.5 0 0 1 13,20.5 L8,20.5 L8,18.5 L13,18.5 A4.5,4.5 0 0 0 13,9.5 L9,9.5 L9,14 Z</StreamGeometry>
+            <StreamGeometry x:Key="RemoveIconGeometry">M5.3,4 L12,10.7 L18.7,4 L20,5.3 L13.3,12 L20,18.7 L18.7,20 L12,13.3 L5.3,20 L4,18.7 L10.7,12 L4,5.3 Z</StreamGeometry>
+            <StreamGeometry x:Key="AddIconGeometry">M11,4 L13,4 L13,11 L20,11 L20,13 L13,13 L13,20 L11,20 L11,13 L4,13 L4,11 L11,11 Z</StreamGeometry>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -34,6 +37,62 @@
         <Style Selector="TextBlock.finding.error">
             <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
         </Style>
+        <Style Selector="TextBlock.error">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+
+        <!-- Row markers: * edited, + added; removed rows are struck through. -->
+        <Style Selector="TextBlock.marker">
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+        </Style>
+        <Style Selector="TextBlock.removed">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+        <Style Selector="TextBlock.distinct">
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+
+        <!-- A metadata value: reads as plain text, and is a button so it can be clicked or tabbed to for editing. -->
+        <Style Selector="Button.value">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="Margin" Value="-4,0,0,0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Cursor" Value="Ibeam" />
+        </Style>
+        <Style Selector="Button.value:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="Button.value:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListMediumBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <!-- Read-only (e.g. while saving, or a removed row) should still read normally. -->
+        <Style Selector="Button.value:disabled">
+            <Setter Property="Cursor" Value="Arrow" />
+        </Style>
+        <Style Selector="Button.value:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+
+        <Style Selector="Button.icon">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
     </UserControl.Styles>
 
     <Panel>
@@ -45,8 +104,8 @@
             <TextBlock Classes="centered"
                        FontSize="18"
                        FontWeight="SemiBold"
-                       Text="{Binding PlaceholderTitle}" />
-            <TextBlock Classes="muted centered" Text="{Binding PlaceholderBody}" />
+                       Text="{x:Static res:Strings.DetailPlaceholderTitle}" />
+            <TextBlock Classes="muted centered" Text="{x:Static res:Strings.DetailPlaceholderBody}" />
         </StackPanel>
 
         <StackPanel VerticalAlignment="Center"
@@ -67,89 +126,232 @@
                    Text="{Binding ErrorMessage}"
                    IsVisible="{Binding HasError}" />
 
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding ShowDetails}">
-            <StackPanel Margin="20,16">
-                <SelectableTextBlock FontSize="18"
-                                     FontWeight="SemiBold"
-                                     TextWrapping="Wrap"
-                                     Text="{Binding Entry.DisplayName, FallbackValue=''}" />
-                <SelectableTextBlock Opacity="0.7"
-                                     FontSize="12"
-                                     Margin="0,2,0,0"
-                                     TextWrapping="Wrap"
-                                     Text="{Binding Subtitle}" />
+        <DockPanel IsVisible="{Binding ShowDetails}">
+            <!-- Save/Discard for the selected items' unsaved changes. -->
+            <Border DockPanel.Dock="Bottom"
+                    Padding="20,10"
+                    BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    IsVisible="{Binding ShowActionBar}">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="error" Text="{Binding SaveError}" IsVisible="{Binding HasSaveError}" />
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Arc Classes="spinner"
+                                 Classes.active="{Binding IsSaving}"
+                                 IsVisible="{Binding IsSaving}"
+                                 Width="12" Height="12" StrokeThickness="2"
+                                 VerticalAlignment="Center" />
+                            <TextBlock Classes="muted"
+                                       VerticalAlignment="Center"
+                                       Text="{x:Static res:Strings.UnsavedChanges}"
+                                       IsVisible="{Binding HasDrafts}" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Content="{x:Static res:Strings.DiscardButton}"
+                                Command="{Binding DiscardCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.DiscardToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.DiscardButton}" />
+                        <Button Grid.Column="2"
+                                Classes="accent"
+                                Content="{x:Static res:Strings.SaveButton}"
+                                Command="{Binding SaveCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.SaveToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.SaveButton}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
 
-                <ItemsControl ItemsSource="{Binding Findings}"
-                              IsVisible="{Binding HasFindings}"
-                              Margin="0,12,0,0"
-                              AutomationProperties.Name="{x:Static res:Strings.FindingsListName}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:FindingRow">
-                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,2">
-                                <TextBlock Grid.Column="0"
-                                           Classes="finding"
-                                           Classes.error="{Binding IsError}"
-                                           FontWeight="SemiBold"
-                                           Text="{Binding RuleId}" />
-                                <TextBlock Grid.Column="1"
-                                           Classes="finding"
-                                           Classes.error="{Binding IsError}"
-                                           TextWrapping="Wrap"
-                                           Text="{Binding Message}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="20,16">
+                    <SelectableTextBlock FontSize="18"
+                                         FontWeight="SemiBold"
+                                         TextWrapping="Wrap"
+                                         Text="{Binding Title}" />
+                    <SelectableTextBlock Opacity="0.7"
+                                         FontSize="12"
+                                         Margin="0,2,0,0"
+                                         TextWrapping="Wrap"
+                                         Text="{Binding Subtitle}" />
 
-                <TextBlock Classes="section" Text="{Binding MetadataHeader}" />
-                <TextBlock Classes="muted" Text="{Binding MetadataNote}" IsVisible="{Binding HasMetadataNote}" />
-                <ItemsControl ItemsSource="{Binding Metadata}"
-                              Grid.IsSharedSizeScope="True"
-                              AutomationProperties.Name="{x:Static res:Strings.MetadataListName}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:MetadataRow">
-                            <Grid Margin="0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Classes="muted"
-                                           MaxWidth="220"
-                                           Margin="0,0,16,0"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip.Tip="{Binding Key}"
-                                           Text="{Binding Key}" />
-                                <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
-                                <SelectableTextBlock Grid.Column="1"
-                                                     TextWrapping="Wrap"
-                                                     ctl:RichTextMarkup.Text="{Binding Value}"
-                                                     ToolTip.Tip="{Binding ToolTip}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Findings}"
+                                  IsVisible="{Binding HasFindings}"
+                                  Margin="0,12,0,0"
+                                  AutomationProperties.Name="{x:Static res:Strings.FindingsListName}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FindingRow">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,2">
+                                    <TextBlock Grid.Column="0"
+                                               Classes="finding"
+                                               Classes.error="{Binding IsError}"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding RuleId}" />
+                                    <TextBlock Grid.Column="1"
+                                               Classes="finding"
+                                               Classes.error="{Binding IsError}"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding Message}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                <TextBlock Classes="section" Text="{Binding FilesHeader}" />
-                <TextBlock Classes="muted" Text="{x:Static res:Strings.NoFiles}" IsVisible="{Binding ShowNoFiles}" />
-                <ItemsControl ItemsSource="{Binding Files}"
-                              AutomationProperties.Name="{x:Static res:Strings.FilesListName}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:FileRow">
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,2">
-                                <TextBlock Grid.Column="0"
-                                           TextTrimming="PathSegmentEllipsis"
-                                           ToolTip.Tip="{Binding Path}"
-                                           Text="{Binding Path}" />
-                                <TextBlock Grid.Column="1"
-                                           Classes="muted"
-                                           HorizontalAlignment="Right"
-                                           Text="{Binding Size}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </ScrollViewer>
+                    <TextBlock Classes="section" Text="{Binding MetadataHeader}" />
+                    <TextBlock Classes="finding" TextWrapping="Wrap" Margin="0,0,0,6" Text="{Binding ReadOnlyNote}" IsVisible="{Binding HasReadOnlyNote}" />
+                    <TextBlock Classes="muted" Text="{Binding MetadataNote}" IsVisible="{Binding HasMetadataNote}" />
+                    <ItemsControl ItemsSource="{Binding Metadata}"
+                                  Grid.IsSharedSizeScope="True"
+                                  AutomationProperties.Name="{x:Static res:Strings.MetadataListName}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MetadataRowViewModel">
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataActions" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Classes="marker"
+                                               Margin="0,2,0,0"
+                                               Text="{Binding Marker}" />
+                                    <TextBlock Grid.Column="1"
+                                               Classes="muted"
+                                               Classes.removed="{Binding IsRemoved}"
+                                               MaxWidth="220"
+                                               Margin="0,2,16,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding Key}"
+                                               Text="{Binding Key}" />
+
+                                    <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
+                                    <Button Grid.Column="2"
+                                            Classes="value"
+                                            Command="{Binding BeginEditCommand}"
+                                            IsVisible="{Binding !IsEditing}"
+                                            ToolTip.Tip="{Binding ToolTip}"
+                                            AutomationProperties.Name="{Binding Key}">
+                                        <Panel>
+                                            <TextBlock TextWrapping="Wrap"
+                                                       Classes.removed="{Binding IsRemoved}"
+                                                       ctl:RichTextMarkup.Text="{Binding DisplayValue}"
+                                                       IsVisible="{Binding ShowRichValue}" />
+                                            <TextBlock TextWrapping="Wrap"
+                                                       Classes="distinct"
+                                                       Classes.removed="{Binding IsRemoved}"
+                                                       Text="{Binding DisplayValue}"
+                                                       IsVisible="{Binding ShowDistinct}" />
+                                        </Panel>
+                                    </Button>
+                                    <StackPanel Grid.Column="2" IsVisible="{Binding IsEditing}">
+                                        <!-- Enter or leaving the box keeps the text; Escape drops it. -->
+                                        <TextBox Text="{Binding EditText}"
+                                                 PlaceholderText="{Binding EditPlaceholder}"
+                                                 IsVisible="{Binding IsEditing}"
+                                                 ctl:FocusWhenShown.IsEnabled="True"
+                                                 LostFocus="OnEditLostFocus"
+                                                 AutomationProperties.Name="{Binding Key}">
+                                            <TextBox.KeyBindings>
+                                                <KeyBinding Gesture="Enter" Command="{Binding CommitCommand}" />
+                                                <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
+                                            </TextBox.KeyBindings>
+                                        </TextBox>
+                                        <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="3"
+                                                Orientation="Horizontal"
+                                                Margin="4,0,0,0"
+                                                IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
+                                        <Button Classes="icon"
+                                                Command="{Binding RevertCommand}"
+                                                IsVisible="{Binding IsChanged}"
+                                                ToolTip.Tip="{x:Static res:Strings.RevertRowToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.RevertRowToolTip}">
+                                            <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                        </Button>
+                                        <Button Classes="icon"
+                                                Command="{Binding RemoveCommand}"
+                                                IsVisible="{Binding CanRemove}"
+                                                ToolTip.Tip="{x:Static res:Strings.RemoveRowToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.RemoveRowToolTip}">
+                                            <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- New row: key and value, both checked before anything goes into the drafts. -->
+                    <StackPanel Margin="14,6,0,0" Spacing="4" IsVisible="{Binding IsAdding}">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0"
+                                     Width="180"
+                                     Text="{Binding NewKey}"
+                                     PlaceholderText="{x:Static res:Strings.NewKeyWatermark}"
+                                     IsVisible="{Binding IsAdding}"
+                                     ctl:FocusWhenShown.IsEnabled="True"
+                                     AutomationProperties.Name="{x:Static res:Strings.NewKeyWatermark}">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding CommitAddCommand}" />
+                                    <KeyBinding Gesture="Escape" Command="{Binding CancelAddCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding NewValue}"
+                                     PlaceholderText="{x:Static res:Strings.NewValueWatermark}"
+                                     AutomationProperties.Name="{x:Static res:Strings.NewValueWatermark}">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding CommitAddCommand}" />
+                                    <KeyBinding Gesture="Escape" Command="{Binding CancelAddCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <Button Grid.Column="2"
+                                    Content="{x:Static res:Strings.AddButton}"
+                                    Command="{Binding CommitAddCommand}"
+                                    AutomationProperties.Name="{x:Static res:Strings.AddButton}" />
+                            <Button Grid.Column="3"
+                                    Content="{x:Static res:Strings.CancelButton}"
+                                    Command="{Binding CancelAddCommand}"
+                                    AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                        </Grid>
+                        <TextBlock Classes="error" Text="{Binding NewRowError}" IsVisible="{Binding HasNewRowError}" />
+                    </StackPanel>
+                    <Button Classes="icon"
+                            Margin="10,4,0,0"
+                            Command="{Binding BeginAddCommand}"
+                            IsVisible="{Binding ShowAddRow}"
+                            AutomationProperties.Name="{x:Static res:Strings.AddRowButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                            <TextBlock Text="{x:Static res:Strings.AddRowButton}" />
+                        </StackPanel>
+                    </Button>
+
+                    <StackPanel IsVisible="{Binding ShowFiles}">
+                        <TextBlock Classes="section" Text="{Binding FilesHeader}" />
+                        <TextBlock Classes="muted" Text="{x:Static res:Strings.NoFiles}" IsVisible="{Binding ShowNoFiles}" />
+                        <ItemsControl ItemsSource="{Binding Files}"
+                                      AutomationProperties.Name="{x:Static res:Strings.FilesListName}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FileRow">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,2">
+                                        <TextBlock Grid.Column="0"
+                                                   TextTrimming="PathSegmentEllipsis"
+                                                   ToolTip.Tip="{Binding Path}"
+                                                   Text="{Binding Path}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="muted"
+                                                   HorizontalAlignment="Right"
+                                                   Text="{Binding Size}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
     </Panel>
 </UserControl>

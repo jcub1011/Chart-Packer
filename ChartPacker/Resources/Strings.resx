@@ -213,9 +213,6 @@
     <value>{0:N0} items selected</value>
     <comment>{0} is the number of selected items (always 2 or more).</comment>
   </data>
-  <data name="MultipleSelectedBody" xml:space="preserve">
-    <value>Select Pack or Unpack to process them all. Items that are already in that form are skipped.</value>
-  </data>
   <data name="JobPackingFormat" xml:space="preserve">
     <value>Packing {0:N0} of {1:N0}…</value>
     <comment>{0} is the item being packed; {1} the total.</comment>
@@ -295,5 +292,101 @@
   <data name="JobDuplicateOutputFormat" xml:space="preserve">
     <value>Skipped because {0} was already written by "{1}" in this job.</value>
     <comment>{0} is the output path; {1} the earlier item's path relative to the scanned folder.</comment>
+  </data>
+  <data name="DistinctValues" xml:space="preserve">
+    <value>&lt;&lt;contains distinct values&gt;&gt;</value>
+    <comment>Shown for a metadata row whose value differs between the selected items, or that some of them don't have.</comment>
+  </data>
+  <data name="BulkSubtitleFormat" xml:space="preserve">
+    <value>{0:N0} .sng files · {1:N0} folders</value>
+    <comment>{0} is the number of selected .sng files; {1} the number of selected song folders.</comment>
+  </data>
+  <data name="SaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SaveToolTip" xml:space="preserve">
+    <value>Write the changes to the selected items. Only the rows that were edited, added or removed change.</value>
+  </data>
+  <data name="DiscardButton" xml:space="preserve">
+    <value>Discard</value>
+  </data>
+  <data name="DiscardToolTip" xml:space="preserve">
+    <value>Throw away the unsaved changes to the selected items</value>
+  </data>
+  <data name="UnsavedChanges" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="UnsavedToolTip" xml:space="preserve">
+    <value>This item has unsaved metadata changes</value>
+  </data>
+  <data name="AddRowButton" xml:space="preserve">
+    <value>Add row</value>
+  </data>
+  <data name="AddButton" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="NewKeyWatermark" xml:space="preserve">
+    <value>Key</value>
+  </data>
+  <data name="NewValueWatermark" xml:space="preserve">
+    <value>Value</value>
+  </data>
+  <data name="EditValueToolTip" xml:space="preserve">
+    <value>Click to edit</value>
+  </data>
+  <data name="RevertRowToolTip" xml:space="preserve">
+    <value>Undo the changes to this row</value>
+  </data>
+  <data name="RemoveRowToolTip" xml:space="preserve">
+    <value>Remove this row</value>
+  </data>
+  <data name="ValueEmpty" xml:space="preserve">
+    <value>Enter a value, or remove the row instead.</value>
+  </data>
+  <data name="ValueForbidden" xml:space="preserve">
+    <value>Values can't contain ; or line breaks.</value>
+  </data>
+  <data name="KeyEmpty" xml:space="preserve">
+    <value>Enter a key.</value>
+  </data>
+  <data name="KeyForbidden" xml:space="preserve">
+    <value>Keys can't contain ;, = or line breaks.</value>
+  </data>
+  <data name="KeyExists" xml:space="preserve">
+    <value>This key already exists. Edit its row instead.</value>
+  </data>
+  <data name="SngHasErrorsFormat" xml:space="preserve">
+    <value>Editing is off: "{0}" has structural errors.</value>
+    <comment>{0} is the item's display name.</comment>
+  </data>
+  <data name="SongIniTooLargeFormat" xml:space="preserve">
+    <value>Editing is off: the song.ini in "{0}" is too large to read.</value>
+    <comment>{0} is the item's display name.</comment>
+  </data>
+  <data name="ItemUnreadableFormat" xml:space="preserve">
+    <value>Editing is off: "{0}" can't be read: {1}</value>
+    <comment>{0} is the item's display name; {1} the system error message.</comment>
+  </data>
+  <data name="SaveFailedFormat" xml:space="preserve">
+    <value>Some changes couldn't be saved and are still pending:
+{0}</value>
+    <comment>{0} is one line per failed item.</comment>
+  </data>
+  <data name="SaveFailedItemFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is the item's display name; {1} why it couldn't be saved.</comment>
+  </data>
+  <data name="CloseUnsavedTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="CloseUnsavedOne" xml:space="preserve">
+    <value>1 item has unsaved metadata changes. Close and discard them?</value>
+  </data>
+  <data name="CloseUnsavedFormat" xml:space="preserve">
+    <value>{0:N0} items have unsaved metadata changes. Close and discard them?</value>
+    <comment>{0} is the number of items (always 2 or more).</comment>
+  </data>
+  <data name="DiscardAndCloseButton" xml:space="preserve">
+    <value>Discard and close</value>
   </data>
 </root>

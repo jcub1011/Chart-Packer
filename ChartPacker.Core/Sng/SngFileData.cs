@@ -25,7 +25,44 @@ public static class SngFileData
         ArgumentNullException.ThrowIfNull(sng);
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(destination);
+        if (mask.Length != SngMask.MaskSize)
+            throw new ArgumentException($"The mask must be {SngMask.MaskSize} bytes.", nameof(mask));
 
+        Copy(sng, entry, mask, destination, cancellationToken);
+    }
+
+    /// <summary>
+    /// Copies <paramref name="entry"/>'s bytes from <paramref name="sng"/> to
+    /// <paramref name="destination"/> as stored, still masked.
+    /// </summary>
+    /// <remarks>
+    /// Masking depends only on each byte's position within its own file (sng-spec §5), so the copy
+    /// stays valid under the same mask wherever the file lands in a new <c>.sng</c>.
+    /// The entry's range must already have been checked against the file, as <see cref="SngReader"/> does.
+    /// </remarks>
+    /// <exception cref="IOException">The file can't be read, or ended early.</exception>
+    /// <exception cref="OperationCanceledException">The copy was cancelled.</exception>
+    public static void CopyRaw(
+        SafeFileHandle sng,
+        SngFileEntry entry,
+        Stream destination,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sng);
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(destination);
+
+        Copy(sng, entry, ReadOnlySpan<byte>.Empty, destination, cancellationToken);
+    }
+
+    /// <summary>Copies the entry's bytes, unmasking them with <paramref name="mask"/> unless it's empty.</summary>
+    private static void Copy(
+        SafeFileHandle sng,
+        SngFileEntry entry,
+        ReadOnlySpan<byte> mask,
+        Stream destination,
+        CancellationToken cancellationToken)
+    {
         byte[] chunk = ArrayPool<byte>.Shared.Rent(ChunkSize);
         try
         {
@@ -38,7 +75,8 @@ public static class SngFileData
                 Span<byte> data = chunk.AsSpan(0, wanted);
                 ReadExact(sng, data, checked((long)(entry.Offset + done)));
 
-                SngMask.Apply(data, mask, (long)done);
+                if (!mask.IsEmpty)
+                    SngMask.Apply(data, mask, (long)done);
                 destination.Write(data);
                 done += (ulong)wanted;
             }

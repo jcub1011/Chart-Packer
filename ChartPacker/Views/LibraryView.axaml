@@ -3,7 +3,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:ChartPacker.ViewModels"
-             xmlns:scan="using:ChartPacker.Core.Scanning"
              xmlns:conv="using:ChartPacker.Converters"
              xmlns:res="using:ChartPacker.Resources"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="600"
@@ -158,22 +157,32 @@
                      SelectionMode="Multiple"
                      AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
                 <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="scan:SongEntry">
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10"
-                              ToolTip.Tip="{Binding FullPath}">
+                    <DataTemplate x:DataType="vm:LibraryItemViewModel">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10"
+                              ToolTip.Tip="{Binding Entry.FullPath}">
                             <PathIcon Grid.Column="0"
                                       Width="16" Height="16"
                                       VerticalAlignment="Center"
-                                      Data="{Binding Kind, Converter={StaticResource EntryKindToIcon}}" />
+                                      Data="{Binding Entry.Kind, Converter={StaticResource EntryKindToIcon}}" />
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="{Binding DisplayName}"
+                                <TextBlock Text="{Binding Entry.DisplayName}"
                                            FontWeight="SemiBold"
                                            TextTrimming="CharacterEllipsis" />
                                 <TextBlock Classes="muted"
-                                           Text="{Binding RelativePath}"
+                                           Text="{Binding Entry.RelativePath}"
                                            FontSize="12"
                                            TextTrimming="PathSegmentEllipsis" />
                             </StackPanel>
+                            <!-- Unsaved metadata changes. -->
+                            <Ellipse Grid.Column="2"
+                                     Width="8" Height="8"
+                                     VerticalAlignment="Center"
+                                     IsVisible="{Binding HasDrafts}"
+                                     ToolTip.Tip="{x:Static res:Strings.UnsavedToolTip}">
+                                <Ellipse.Fill>
+                                    <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+                                </Ellipse.Fill>
+                            </Ellipse>
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>

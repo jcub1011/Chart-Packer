@@ -18,11 +18,31 @@ namespace ChartPacker.Views
 
             // The splitter position is view state, so it's applied and captured here rather than bound.
             Opened += (_, _) => RestoreLibraryPaneWidth();
-            Closing += (_, _) =>
+            Closing += OnClosing;
+        }
+
+        // Set once the user has agreed to lose their unsaved metadata changes.
+        private bool _discardConfirmed;
+
+        private async void OnClosing(object? sender, WindowClosingEventArgs e)
+        {
+            if (DataContext is not MainWindowViewModel vm)
+                return;
+
+            // Closing can't wait for a dialog, so cancel it, ask, and close again if the user agrees.
+            if (!_discardConfirmed && vm.HasUnsavedDrafts)
             {
-                if (DataContext is MainWindowViewModel vm)
-                    vm.LibraryPaneWidth = LibraryColumn.ActualWidth;
-            };
+                e.Cancel = true;
+                if (await vm.ConfirmDiscardDraftsAsync())
+                {
+                    _discardConfirmed = true;
+                    Close();
+                }
+
+                return;
+            }
+
+            vm.LibraryPaneWidth = LibraryColumn.ActualWidth;
         }
 
         private void RestoreLibraryPaneWidth()
