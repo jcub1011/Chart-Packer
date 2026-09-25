@@ -104,8 +104,6 @@ namespace ChartPacker.ViewModels
             return this;
         }
 
-        partial void OnIsEditingChanged(bool value) => _owner.OnRowEditingChanged();
-
         /// <summary>Re-evaluates the commands after the panel's editability changed.</summary>
         public void RefreshCommands()
         {

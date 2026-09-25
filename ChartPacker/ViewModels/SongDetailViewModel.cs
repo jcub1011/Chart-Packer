@@ -233,9 +233,6 @@ namespace ChartPacker.ViewModels
             }
         }
 
-        /// <summary>A row started or stopped editing: Save counts text still being typed.</summary>
-        internal void OnRowEditingChanged() => SaveCommand.NotifyCanExecuteChanged();
-
         internal void SetValue(string key, string value)
         {
             BulkMetadata.Set(Items(), key, value);
@@ -293,18 +290,13 @@ namespace ChartPacker.ViewModels
             NewRowError = null;
         }
 
-        private bool CanSave() => CanEdit && (HasDrafts || Metadata.Any(r => r.IsEditing)) && !_job.IsRunning;
+        // Only committed changes count: text still in an edit box isn't a change yet.
+        private bool CanSave() => CanEdit && HasDrafts && !_job.IsRunning;
 
         /// <summary>Writes the selected songs' drafts. Songs that fail keep their drafts.</summary>
         [RelayCommand(CanExecute = nameof(CanSave))]
         private async Task SaveAsync()
         {
-            // Text still in an edit box is part of what the user means to save.
-            foreach (var row in Metadata.Where(r => r.IsEditing).ToList())
-                row.CommitCommand.Execute(null);
-            if (Metadata.Any(r => r.IsEditing) || !HasDrafts)
-                return;
-
             var entries = _entries;
             var dirty = _songs.Where(s => !s.Item.Draft.IsEmpty).ToList();
             var failures = new List<string>();

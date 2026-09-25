@@ -87,6 +87,18 @@
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
         </Style>
 
+        <!-- A value's edit box, sized so its text lands exactly where Button.value's did: border 1 +
+             padding 3,1 matches that padding of 4,2, and there's no minimum size, so the row doesn't
+             move when editing starts. The focus border is drawn behind the text, so it doesn't shift either. -->
+        <Style Selector="TextBox.inline">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="3,1" />
+            <Setter Property="Margin" Value="-4,0,0,0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
         <Style Selector="Button.icon">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -245,7 +257,8 @@
                                     </Button>
                                     <StackPanel Grid.Column="2" IsVisible="{Binding IsEditing}">
                                         <!-- Enter or leaving the box keeps the text; Escape drops it. -->
-                                        <TextBox Text="{Binding EditText}"
+                                        <TextBox Classes="inline"
+                                                 Text="{Binding EditText}"
                                                  PlaceholderText="{Binding EditPlaceholder}"
                                                  IsVisible="{Binding IsEditing}"
                                                  ctl:FocusWhenShown.IsEnabled="True"
