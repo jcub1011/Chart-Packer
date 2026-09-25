@@ -1,20 +1,50 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartPacker.ViewModels"
+        xmlns:res="using:ChartPacker.Resources"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="640"
         x:Class="ChartPacker.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="ChartPacker">
+        Title="Chart-Packer"
+        Width="1000" Height="640"
+        MinWidth="560" MinHeight="360">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+    <Grid x:Name="RootGrid">
+        <Grid.ColumnDefinitions>
+            <!-- Library (0), splitter (1), detail (2). MainWindow.axaml.cs indexes these. -->
+            <ColumnDefinition Width="320" MinWidth="220" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" MinWidth="240" />
+        </Grid.ColumnDefinitions>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <ContentControl Grid.Column="0" Content="{Binding Library}" />
+
+        <GridSplitter Grid.Column="1"
+                      ResizeDirection="Columns"
+                      Width="4"
+                      Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+
+        <!-- Placeholder until decoding and parsing are implemented. -->
+        <StackPanel Grid.Column="2"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="24"
+                    Spacing="6">
+            <TextBlock HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Text="{Binding Library.SelectedEntry.DisplayName, FallbackValue={x:Static res:Strings.DetailPlaceholderTitle}, TargetNullValue={x:Static res:Strings.DetailPlaceholderTitle}}" />
+            <TextBlock HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Opacity="0.7"
+                       Text="{x:Static res:Strings.DetailPlaceholderBody}" />
+        </StackPanel>
+    </Grid>
 
 </Window>

@@ -1,12 +1,39 @@
+using System;
 using Avalonia.Controls;
+using ChartPacker.ViewModels;
 
 namespace ChartPacker.Views
 {
     public partial class MainWindow : Window
     {
+        private const double SplitterWidth = 4;
+
+        private ColumnDefinition LibraryColumn => RootGrid.ColumnDefinitions[0];
+
+        private ColumnDefinition DetailColumn => RootGrid.ColumnDefinitions[2];
+
         public MainWindow()
         {
             InitializeComponent();
+
+            // The splitter position is view state, so it's applied and captured here rather than bound.
+            Opened += (_, _) => RestoreLibraryPaneWidth();
+            Closing += (_, _) =>
+            {
+                if (DataContext is MainWindowViewModel vm)
+                    vm.LibraryPaneWidth = LibraryColumn.ActualWidth;
+            };
+        }
+
+        private void RestoreLibraryPaneWidth()
+        {
+            if (DataContext is not MainWindowViewModel vm)
+                return;
+
+            // Keep the detail panel at least its minimum width if the window opens smaller than last time.
+            double max = Math.Max(LibraryColumn.MinWidth, ClientSize.Width - DetailColumn.MinWidth - SplitterWidth);
+            double width = Math.Clamp(vm.LibraryPaneWidth, LibraryColumn.MinWidth, max);
+            LibraryColumn.Width = new GridLength(width, GridUnitType.Pixel);
         }
     }
 }

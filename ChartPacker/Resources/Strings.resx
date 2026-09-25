@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="BrowseButton" xml:space="preserve">
+    <value>Browse…</value>
+  </data>
+  <data name="BrowseDialogTitle" xml:space="preserve">
+    <value>Choose a folder of songs</value>
+  </data>
+  <data name="FolderPathWatermark" xml:space="preserve">
+    <value>No folder selected</value>
+  </data>
+  <data name="ScanDepthLabel" xml:space="preserve">
+    <value>Search depth</value>
+  </data>
+  <data name="ScanDepthToolTip" xml:space="preserve">
+    <value>How many folder levels below the chosen folder to search</value>
+  </data>
+  <data name="LibraryListName" xml:space="preserve">
+    <value>Songs</value>
+  </data>
+  <data name="LibraryPrompt" xml:space="preserve">
+    <value>Choose a folder to find .sng files and song folders</value>
+  </data>
+  <data name="Scanning" xml:space="preserve">
+    <value>Scanning…</value>
+  </data>
+  <data name="ScanningCountFormat" xml:space="preserve">
+    <value>Scanning… {0:N0} found</value>
+    <comment>{0} is the number of songs found so far.</comment>
+  </data>
+  <data name="SongCountOne" xml:space="preserve">
+    <value>1 song</value>
+  </data>
+  <data name="SongCountFormat" xml:space="preserve">
+    <value>{0:N0} songs</value>
+    <comment>{0} is the number of songs found. Used for every count except 1.</comment>
+  </data>
+  <data name="EmptyFolder" xml:space="preserve">
+    <value>This folder is empty</value>
+  </data>
+  <data name="FolderUnreadableFormat" xml:space="preserve">
+    <value>This folder can't be read: {0}</value>
+    <comment>{0} is the system error message.</comment>
+  </data>
+  <data name="DetailPlaceholderTitle" xml:space="preserve">
+    <value>Select a song</value>
+  </data>
+  <data name="DetailPlaceholderBody" xml:space="preserve">
+    <value>Song details will appear here once decoding is implemented.</value>
+  </data>
+</root>

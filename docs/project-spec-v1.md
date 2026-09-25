@@ -57,7 +57,7 @@ Goals:
 Chart-Packer.slnx
 ├── ChartPacker/              Avalonia desktop app (MVVM)            (exists)
 ├── ChartPacker.Core/         UI-free library: format, validation, pack/unpack pipelines
-└── ChartPacker.Core.Tests/   xUnit tests for Core
+└── ChartPacker.Core.Tests/   MSTest tests for Core
 ```
 
 ### 4.1 `ChartPacker.Core`
@@ -111,7 +111,8 @@ through `IProgress<T>`.
   `Avalonia.Fonts.Inter` and `CommunityToolkit.Mvvm`. It may also use
   `AvaloniaUI.DiagnosticsSupport`, but only in **Debug** builds (the scaffold already excludes
   it from other configurations).
-- Tests may use xUnit and its runner.
+- Tests may use MSTest (via `MSTest.Sdk`) and Microsoft.Testing.Platform, opted into for
+  `dotnet test` in `global.json`.
 - Image preview uses Avalonia's built-in Skia `Bitmap`.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.
@@ -518,6 +519,17 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | AOT smoke | CI runs `dotnet publish -c Release -r <rid>` on each OS. The build must produce **zero** trim or AOT warnings, then CI launches the published binary with `--self-test` (a headless mode that packs, validates and unpacks the §11 example and exits 0). |
 
 UI view models are unit-tested against Core using fake services. v1 has no automated UI tests.
+
+**Test isolation (required).** Tests must never read, create, modify or delete the real user
+preferences and settings files, or anything else in the per-user config folder (§8). They use
+temp files and folders only. Two things enforce this:
+
+- **Explicit paths.** Services that persist state (such as `SettingsService`) take their file
+  path as an argument and have no default. Only the app's composition root passes the real
+  location, from `UserConfigPaths`. Tests pass a temp path.
+- **Run guard.** Every test project includes a guard (`ChartPacker.Core.Tests/Isolation/UserConfigGuard.cs`
+  is the reference). It snapshots the real config folder before the run and fails the run if
+  anything in it was created, modified or deleted.
 
 ## 11. Milestones
 

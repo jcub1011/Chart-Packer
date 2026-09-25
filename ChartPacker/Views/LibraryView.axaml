@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ChartPacker.ViewModels"
+             xmlns:scan="using:ChartPacker.Core.Scanning"
+             xmlns:conv="using:ChartPacker.Converters"
+             xmlns:res="using:ChartPacker.Resources"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="600"
+             x:Class="ChartPacker.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel">
+
+    <UserControl.Resources>
+        <StreamGeometry x:Key="SngIconGeometry">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M12,9.5 A2.5,2.5 0 1 1 12,14.5 A2.5,2.5 0 1 1 12,9.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="FolderIconGeometry">M2,6 A2,2 0 0 1 4,4 L9.2,4 L11.2,6 L20,6 A2,2 0 0 1 22,8 L22,18 A2,2 0 0 1 20,20 L4,20 A2,2 0 0 1 2,18 Z</StreamGeometry>
+        <conv:EntryKindToIconConverter x:Key="EntryKindToIcon"
+                                       SngFile="{StaticResource SngIconGeometry}"
+                                       SongFolder="{StaticResource FolderIconGeometry}" />
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Fluent has no progress ring, so the spinner is a rotating arc. It only animates while
+             the "active" class is set, so it doesn't tick while hidden. -->
+        <Style Selector="Arc.spinner">
+            <Setter Property="StartAngle" Value="0" />
+            <Setter Property="SweepAngle" Value="270" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="Stroke">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+        </Style>
+        <Style Selector="Arc.spinner.active">
+            <Style.Animations>
+                <Animation Duration="0:0:0.9" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="TextBlock.centered">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Grid.Column="0"
+                         IsReadOnly="True"
+                         Text="{Binding FolderPath}"
+                         PlaceholderText="{x:Static res:Strings.FolderPathWatermark}"
+                         ToolTip.Tip="{Binding FolderPath}" />
+                <Button Grid.Column="1"
+                        Content="{x:Static res:Strings.BrowseButton}"
+                        Command="{Binding BrowseCommand}"
+                        AutomationProperties.Name="{x:Static res:Strings.BrowseButton}" />
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{x:Static res:Strings.ScanDepthLabel}" VerticalAlignment="Center" />
+                <NumericUpDown Value="{Binding ScanDepth}"
+                               Minimum="0"
+                               Maximum="{Binding MaxScanDepth}"
+                               Increment="1"
+                               FormatString="0"
+                               ParsingNumberStyle="Integer"
+                               ClipValueToMinMax="True"
+                               MinWidth="110"
+                               ToolTip.Tip="{x:Static res:Strings.ScanDepthToolTip}"
+                               AutomationProperties.Name="{x:Static res:Strings.ScanDepthLabel}" />
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    Margin="0,8,0,0"
+                    IsVisible="{Binding ShowStatus}">
+            <Arc Classes="spinner"
+                 Classes.active="{Binding IsScanning}"
+                 IsVisible="{Binding IsScanning}"
+                 Width="12" Height="12" StrokeThickness="2"
+                 VerticalAlignment="Center" />
+            <TextBlock Classes="muted" Text="{Binding StatusText}" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <Panel>
+            <ListBox ItemsSource="{Binding Entries}"
+                     SelectedItem="{Binding SelectedEntry}"
+                     SelectionMode="Single"
+                     AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="scan:SongEntry">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10"
+                              ToolTip.Tip="{Binding FullPath}">
+                            <PathIcon Grid.Column="0"
+                                      Width="16" Height="16"
+                                      VerticalAlignment="Center"
+                                      Data="{Binding Kind, Converter={StaticResource EntryKindToIcon}}" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{Binding DisplayName}"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Classes="muted"
+                                           Text="{Binding RelativePath}"
+                                           FontSize="12"
+                                           TextTrimming="PathSegmentEllipsis" />
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <TextBlock Classes="muted centered"
+                       VerticalAlignment="Center"
+                       Margin="16"
+                       Text="{x:Static res:Strings.LibraryPrompt}"
+                       IsVisible="{Binding ShowPrompt}" />
+
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Spacing="12"
+                        IsVisible="{Binding ShowCenteredSpinner}">
+                <Arc Classes="spinner"
+                     Classes.active="{Binding ShowCenteredSpinner}"
+                     Width="36" Height="36" StrokeThickness="3"
+                     HorizontalAlignment="Center" />
+                <TextBlock Classes="muted centered" Text="{x:Static res:Strings.Scanning}" />
+            </StackPanel>
+
+            <TextBlock Classes="muted centered"
+                       VerticalAlignment="Center"
+                       Margin="16"
+                       Text="{x:Static res:Strings.EmptyFolder}"
+                       IsVisible="{Binding ShowEmpty}" />
+
+            <TextBlock Classes="centered"
+                       VerticalAlignment="Center"
+                       Margin="16"
+                       Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
+                       Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding HasError}" />
+        </Panel>
+    </DockPanel>
+</UserControl>
