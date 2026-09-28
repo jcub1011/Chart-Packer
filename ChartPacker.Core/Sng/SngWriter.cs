@@ -22,7 +22,8 @@ public sealed record SngSourceFile(string StoredName, string SourcePath, long Le
 /// <para>
 /// Unlike the reference writer, this one stores files contiguously in index order (A5), writes to
 /// a temp file and renames it into place so a target is never left half written (A6), and never
-/// holds a whole file in memory. It does no validation of names or metadata: callers check those
+/// holds a whole file in memory. The temp file is written through to disk chunk by chunk, so a
+/// cancel takes effect within one chunk instead of waiting on a flush of the whole file. It does no validation of names or metadata: callers check those
 /// first (see <c>PackPlanner</c>).
 /// </para>
 /// </remarks>
@@ -87,7 +88,7 @@ public static class SngWriter
         string tempPath = targetPath + TempSuffix;
         try
         {
-            using (var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024))
+            using (FileStream output = CreateTemp(tempPath))
             {
                 var index = files.Select(f => new IndexEntry(f.StoredName, (ulong)f.Length)).ToList();
                 WriteHeaderAndIndex(output, mask.Span, metadata, index);
@@ -149,7 +150,7 @@ public static class SngWriter
         try
         {
             using (var input = File.OpenHandle(sngPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024))
+            using (FileStream output = CreateTemp(tempPath))
             {
                 var index = source.Files.Select(f => new IndexEntry(f.Name, f.Length)).ToList();
                 WriteHeaderAndIndex(output, header.Mask.Span, metadata, index);
@@ -168,6 +169,13 @@ public static class SngWriter
             throw;
         }
     }
+
+    /// <summary>
+    /// Opens the temp file write-through, so the disk work happens in the chunk loop where
+    /// cancellation is checked, not in one final flush that can't be interrupted.
+    /// </summary>
+    private static FileStream CreateTemp(string tempPath) =>
+        new(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024, FileOptions.WriteThrough);
 
     /// <summary>Optionally verifies the finished temp file, then renames it over the target.</summary>
     private static IReadOnlyList<Finding> VerifyAndCommit(string tempPath, string targetPath, bool overwrite, bool verify, CancellationToken cancellationToken)
