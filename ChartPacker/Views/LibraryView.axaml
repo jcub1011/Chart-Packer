@@ -10,149 +10,112 @@
              x:DataType="vm:LibraryViewModel">
 
     <UserControl.Resources>
-        <StreamGeometry x:Key="SngIconGeometry">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M12,9.5 A2.5,2.5 0 1 1 12,14.5 A2.5,2.5 0 1 1 12,9.5 Z</StreamGeometry>
-        <StreamGeometry x:Key="InfoIconGeometry">M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M11,10 L13,10 L13,17 L11,17 Z M12,6 A1.25,1.25 0 1 1 12,8.5 A1.25,1.25 0 1 1 12,6 Z</StreamGeometry>
-        <StreamGeometry x:Key="FolderIconGeometry">M2,6 A2,2 0 0 1 4,4 L9.2,4 L11.2,6 L20,6 A2,2 0 0 1 22,8 L22,18 A2,2 0 0 1 20,20 L4,20 A2,2 0 0 1 2,18 Z</StreamGeometry>
         <conv:EntryKindToIconConverter x:Key="EntryKindToIcon"
                                        SngFile="{StaticResource SngIconGeometry}"
                                        SongFolder="{StaticResource FolderIconGeometry}" />
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <Style Selector="Border.stale">
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="BorderThickness" Value="1" />
+        <Style Selector="TextBlock.path">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="PathSegmentEllipsis" />
+        </Style>
+
+        <!-- Selected rows are tinted, not filled, and get a violet bar on the left. The bar is always
+             there (transparent), so selecting doesn't shift the row. -->
+        <Style Selector="ListBox#EntryList ListBoxItem">
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox#EntryList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox#EntryList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
             <Setter Property="BorderBrush">
                 <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
             </Setter>
-            <Setter Property="Background">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.12" />
-            </Setter>
+        </Style>
+        <Style Selector="ListBox#EntryList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#558B5CF6" />
         </Style>
     </UserControl.Styles>
 
-    <DockPanel Margin="12">
-        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <TextBox Grid.Column="0"
-                         IsReadOnly="True"
-                         Text="{Binding FolderPath}"
-                         PlaceholderText="{x:Static res:Strings.FolderPathWatermark}"
-                         ToolTip.Tip="{Binding FolderPath}" />
-                <Button Grid.Column="1"
-                        Content="{x:Static res:Strings.BrowseButton}"
-                        Command="{Binding BrowseCommand}"
-                        AutomationProperties.Name="{x:Static res:Strings.BrowseButton}" />
-            </Grid>
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
-                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.ScanDepthLabel}" VerticalAlignment="Center" />
-                <NumericUpDown Grid.Column="1"
-                               Value="{Binding ScanDepth}"
-                               Minimum="0"
-                               Maximum="{Binding MaxScanDepth}"
-                               Increment="1"
-                               FormatString="0"
-                               ParsingNumberStyle="Integer"
-                               ClipValueToMinMax="True"
-                               MinWidth="110"
-                               ToolTip.Tip="{x:Static res:Strings.ScanDepthToolTip}"
-                               AutomationProperties.Name="{x:Static res:Strings.ScanDepthLabel}" />
-                <Button Grid.Column="3"
-                        Content="{x:Static res:Strings.RescanButton}"
-                        Command="{Binding RescanCommand}"
-                        ToolTip.Tip="{x:Static res:Strings.RescanToolTip}"
-                        AutomationProperties.Name="{x:Static res:Strings.RescanButton}" />
-            </Grid>
+    <DockPanel>
+        <!-- Where songs are read from and where Pack/Unpack write; both are chosen from the toolbar. -->
+        <Border DockPanel.Dock="Top"
+                Padding="12,10"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Classes="caption"
+                               VerticalAlignment="Center"
+                               Text="{x:Static res:Strings.InputLabel}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1"
+                               Classes="path"
+                               Classes.muted="{Binding ShowPrompt}"
+                               Text="{Binding FolderPath, TargetNullValue={x:Static res:Strings.FolderPathWatermark}}"
+                               ToolTip.Tip="{Binding FolderPath}" />
 
-            <Border Classes="stale" IsVisible="{Binding IsStale}">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                    <PathIcon Grid.Column="0"
-                              Width="14" Height="14"
-                              VerticalAlignment="Center"
-                              Data="{StaticResource InfoIconGeometry}" />
-                    <TextBlock Grid.Column="1"
-                               Text="{x:Static res:Strings.StaleHint}"
-                               TextWrapping="Wrap"
-                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                               Classes="caption"
+                               VerticalAlignment="Center"
+                               Text="{x:Static res:Strings.OutputLabel}" />
+                    <!-- Muted while it's the default (next to the scanned songs) rather than a chosen folder. -->
+                    <TextBlock Grid.Row="1" Grid.Column="1"
+                               Classes="path"
+                               Classes.muted="{Binding !HasCustomOutputFolder}"
+                               Text="{Binding EffectiveOutputFolder, TargetNullValue={x:Static res:Strings.OutputWatermark}}">
+                        <ToolTip.Tip>
+                            <StackPanel MaxWidth="360" Spacing="2">
+                                <TextBlock FontWeight="SemiBold" TextWrapping="Wrap"
+                                           Text="{Binding EffectiveOutputFolder, TargetNullValue={x:Static res:Strings.OutputWatermark}}" />
+                                <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.OutputToolTip}" />
+                            </StackPanel>
+                        </ToolTip.Tip>
+                    </TextBlock>
                 </Grid>
-            </Border>
-        </StackPanel>
 
-        <!-- Output folder, overwrite policy and the Pack/Unpack actions for the selected items. -->
-        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
-            <TextBlock Text="{x:Static res:Strings.OutputLabel}" />
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                <TextBox Grid.Column="0"
-                         IsReadOnly="True"
-                         Text="{Binding EffectiveOutputFolder}"
-                         PlaceholderText="{x:Static res:Strings.OutputWatermark}"
-                         ToolTip.Tip="{x:Static res:Strings.OutputToolTip}"
-                         AutomationProperties.Name="{x:Static res:Strings.OutputLabel}" />
-                <Button Grid.Column="1"
-                        Content="{x:Static res:Strings.BrowseButton}"
-                        Command="{Binding BrowseOutputCommand}"
-                        ToolTip.Tip="{x:Static res:Strings.BrowseOutputDialogTitle}"
-                        AutomationProperties.Name="{x:Static res:Strings.BrowseOutputDialogTitle}" />
-                <Button Grid.Column="2"
-                        Content="{x:Static res:Strings.ResetButton}"
-                        Command="{Binding ResetOutputCommand}"
-                        ToolTip.Tip="{x:Static res:Strings.ResetOutputToolTip}"
-                        AutomationProperties.Name="{x:Static res:Strings.ResetOutputToolTip}" />
-            </Grid>
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.OverwriteLabel}" VerticalAlignment="Center" />
-                <ComboBox Grid.Column="1"
-                          HorizontalAlignment="Stretch"
-                          ItemsSource="{Binding OverwriteOptions}"
-                          SelectedItem="{Binding SelectedOverwriteOption}"
-                          ToolTip.Tip="{x:Static res:Strings.OverwriteToolTip}"
-                          AutomationProperties.Name="{x:Static res:Strings.OverwriteLabel}">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:OverwriteOption">
-                            <TextBlock Text="{Binding Label}" />
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-            </Grid>
-            <CheckBox IsChecked="{Binding FlatPackOutput}"
-                      Content="{x:Static res:Strings.FlatPackLabel}"
-                      ToolTip.Tip="{x:Static res:Strings.FlatPackToolTip}"
-                      AutomationProperties.Name="{x:Static res:Strings.FlatPackLabel}" />
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                <Button Grid.Column="0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Classes="accent"
-                        Content="{x:Static res:Strings.PackButton}"
-                        Command="{Binding PackCommand}"
-                        ToolTip.Tip="{x:Static res:Strings.PackToolTip}"
-                        AutomationProperties.Name="{x:Static res:Strings.PackButton}" />
-                <Button Grid.Column="1"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Content="{x:Static res:Strings.UnpackButton}"
-                        Command="{Binding UnpackCommand}"
-                        ToolTip.Tip="{x:Static res:Strings.UnpackToolTip}"
-                        AutomationProperties.Name="{x:Static res:Strings.UnpackButton}" />
-            </Grid>
-        </StackPanel>
+                <Border Classes="banner" IsVisible="{Binding IsStale}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                        <PathIcon Grid.Column="0"
+                                  Width="12" Height="12"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource InfoIconGeometry}" />
+                        <TextBlock Grid.Column="1"
+                                   FontSize="12"
+                                   Text="{x:Static res:Strings.StaleHint}"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
 
-        <StackPanel DockPanel.Dock="Bottom"
-                    Orientation="Horizontal"
-                    Spacing="6"
-                    Margin="0,8,0,0"
-                    IsVisible="{Binding ShowStatus}">
-            <Arc Classes="spinner"
-                 Classes.active="{Binding IsScanning}"
-                 IsVisible="{Binding IsScanning}"
-                 Width="12" Height="12" StrokeThickness="2"
-                 VerticalAlignment="Center" />
-            <TextBlock Classes="muted" Text="{Binding StatusText}" VerticalAlignment="Center" />
-        </StackPanel>
+        <Border DockPanel.Dock="Bottom"
+                Padding="12,5"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                IsVisible="{Binding ShowStatus}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <Arc Classes="spinner"
+                     Classes.active="{Binding IsScanning}"
+                     IsVisible="{Binding IsScanning}"
+                     Width="10" Height="10" StrokeThickness="2"
+                     VerticalAlignment="Center" />
+                <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
 
         <Panel>
-            <ListBox ItemsSource="{Binding Entries}"
+            <ListBox x:Name="EntryList"
+                     Background="Transparent"
+                     ItemsSource="{Binding Entries}"
                      Selection="{Binding Selection}"
                      SelectionMode="Multiple"
                      AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
@@ -161,7 +124,8 @@
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10"
                               ToolTip.Tip="{Binding Entry.FullPath}">
                             <PathIcon Grid.Column="0"
-                                      Width="16" Height="16"
+                                      Width="14" Height="14"
+                                      Opacity="0.8"
                                       VerticalAlignment="Center"
                                       Data="{Binding Entry.Kind, Converter={StaticResource EntryKindToIcon}}" />
                             <StackPanel Grid.Column="1">
@@ -170,7 +134,7 @@
                                            TextTrimming="CharacterEllipsis" />
                                 <TextBlock Classes="muted"
                                            Text="{Binding Entry.RelativePath}"
-                                           FontSize="12"
+                                           FontSize="11"
                                            TextTrimming="PathSegmentEllipsis" />
                             </StackPanel>
                             <!-- Unsaved metadata changes. -->

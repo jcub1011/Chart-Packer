@@ -8,20 +8,6 @@
              x:Class="ChartPacker.Views.JobView"
              x:DataType="vm:JobViewModel">
 
-    <UserControl.Resources>
-        <!-- Fluent has an error brush but no warning one; these are the Windows caution colours. -->
-        <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="WarningTextBrush" Color="#9D5D00" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="WarningTextBrush" Color="#FCE100" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-        </ResourceDictionary>
-    </UserControl.Resources>
-
     <UserControl.Styles>
         <Style Selector="TextBlock.status.attention">
             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
@@ -38,8 +24,9 @@
     </UserControl.Styles>
 
     <Border BorderThickness="0,1,0,0"
-            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-            Padding="12,8">
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource SubtleBorderBrush}"
+            Padding="12,6">
         <DockPanel>
             <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                 <Arc Grid.Column="0"

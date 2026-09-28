@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartPacker.ViewModels"
+        xmlns:views="using:ChartPacker.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="640"
@@ -8,14 +9,15 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Chart-Packer"
+        Background="{DynamicResource AppBackgroundBrush}"
         Width="1000" Height="640"
-        MinWidth="560" MinHeight="360">
+        MinWidth="640" MinHeight="360">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
     </Window.KeyBindings>
 
-    <Grid x:Name="RootGrid" RowDefinitions="*,Auto">
+    <Grid x:Name="RootGrid" RowDefinitions="Auto,*,Auto">
         <Grid.ColumnDefinitions>
             <!-- Library (0), splitter (1), detail (2). MainWindow.axaml.cs indexes these. -->
             <ColumnDefinition Width="320" MinWidth="220" />
@@ -23,17 +25,22 @@
             <ColumnDefinition Width="*" MinWidth="240" />
         </Grid.ColumnDefinitions>
 
-        <ContentControl Grid.Column="0" Content="{Binding Library}" />
+        <views:ToolbarView Grid.Row="0" Grid.ColumnSpan="3" />
 
-        <GridSplitter Grid.Column="1"
+        <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource SurfaceBrush}">
+            <ContentControl Content="{Binding Library}" />
+        </Border>
+
+        <GridSplitter Grid.Row="1"
+                      Grid.Column="1"
                       ResizeDirection="Columns"
                       Width="4"
-                      Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+                      Background="{DynamicResource SubtleBorderBrush}" />
 
-        <ContentControl Grid.Column="2" Content="{Binding Detail}" />
+        <ContentControl Grid.Row="1" Grid.Column="2" Content="{Binding Detail}" />
 
         <!-- Pack/unpack results, under both panels. -->
-        <ContentControl Grid.Row="1"
+        <ContentControl Grid.Row="2"
                         Grid.Column="0"
                         Grid.ColumnSpan="3"
                         Content="{Binding Job}"

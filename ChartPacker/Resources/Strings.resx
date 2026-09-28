@@ -41,8 +41,8 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="BrowseButton" xml:space="preserve">
-    <value>Browse…</value>
+  <data name="InputLabel" xml:space="preserve">
+    <value>Input</value>
   </data>
   <data name="BrowseDialogTitle" xml:space="preserve">
     <value>Choose a folder of songs</value>
@@ -51,16 +51,16 @@
     <value>No folder selected</value>
   </data>
   <data name="RescanButton" xml:space="preserve">
-    <value>Re-scan</value>
+    <value>Scan</value>
   </data>
   <data name="RescanToolTip" xml:space="preserve">
     <value>Search the chosen folder for songs (F5)</value>
   </data>
   <data name="NotScannedHint" xml:space="preserve">
-    <value>Select Re-scan to search this folder</value>
+    <value>Select Scan (F5) to search this folder</value>
   </data>
   <data name="StaleHint" xml:space="preserve">
-    <value>The list is out of date. Select Re-scan to update it.</value>
+    <value>The list is out of date. Select Scan (F5) to update it.</value>
   </data>
   <data name="ScanDepthLabel" xml:space="preserve">
     <value>Search depth</value>
@@ -165,7 +165,7 @@
     <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the value as stored, e.g. "225123".</comment>
   </data>
   <data name="OutputLabel" xml:space="preserve">
-    <value>Output folder</value>
+    <value>Output</value>
   </data>
   <data name="OutputWatermark" xml:space="preserve">
     <value>Next to the scanned songs</value>
@@ -175,9 +175,6 @@
   </data>
   <data name="BrowseOutputDialogTitle" xml:space="preserve">
     <value>Choose the output folder</value>
-  </data>
-  <data name="ResetButton" xml:space="preserve">
-    <value>Reset</value>
   </data>
   <data name="ResetOutputToolTip" xml:space="preserve">
     <value>Write next to the scanned songs again</value>
@@ -189,13 +186,13 @@
     <value>What to do when the .sng or folder being written already exists</value>
   </data>
   <data name="OverwriteSkip" xml:space="preserve">
-    <value>Skip it</value>
+    <value>Skip existing</value>
   </data>
   <data name="OverwriteOverwrite" xml:space="preserve">
-    <value>Overwrite it</value>
+    <value>Overwrite</value>
   </data>
   <data name="OverwriteRename" xml:space="preserve">
-    <value>Keep both (rename)</value>
+    <value>Keep both</value>
   </data>
   <data name="PackButton" xml:space="preserve">
     <value>Pack</value>
@@ -312,9 +309,6 @@
   </data>
   <data name="DiscardToolTip" xml:space="preserve">
     <value>Throw away the unsaved changes to the selected items</value>
-  </data>
-  <data name="UnsavedChanges" xml:space="preserve">
-    <value>Unsaved changes</value>
   </data>
   <data name="UnsavedToolTip" xml:space="preserve">
     <value>This item has unsaved metadata changes</value>

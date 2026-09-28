@@ -10,27 +10,12 @@
              x:Class="ChartPacker.Views.SongDetailView"
              x:DataType="vm:SongDetailViewModel">
 
-    <UserControl.Resources>
-        <!-- Fluent has an error brush but no warning one; these are the Windows caution colours. -->
-        <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="WarningTextBrush" Color="#9D5D00" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="WarningTextBrush" Color="#FCE100" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-            <StreamGeometry x:Key="RevertIconGeometry">M4,9 L9,4 L9,7.5 L13,7.5 A6.5,6.5 0 0 1 13,20.5 L8,20.5 L8,18.5 L13,18.5 A4.5,4.5 0 0 0 13,9.5 L9,9.5 L9,14 Z</StreamGeometry>
-            <StreamGeometry x:Key="RemoveIconGeometry">M5.3,4 L12,10.7 L18.7,4 L20,5.3 L13.3,12 L20,18.7 L18.7,20 L12,13.3 L5.3,20 L4,18.7 L10.7,12 L4,5.3 Z</StreamGeometry>
-            <StreamGeometry x:Key="AddIconGeometry">M11,4 L13,4 L13,11 L20,11 L20,13 L13,13 L13,20 L11,20 L11,13 L4,13 L4,11 L11,11 Z</StreamGeometry>
-        </ResourceDictionary>
-    </UserControl.Resources>
-
     <UserControl.Styles>
         <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Margin" Value="0,20,0,6" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Margin" Value="0,22,0,8" />
         </Style>
         <Style Selector="TextBlock.finding">
             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
@@ -105,6 +90,10 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="5" />
             <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Button.icon:pointerover, Button.icon:focus-visible">
+            <Setter Property="Opacity" Value="1" />
         </Style>
     </UserControl.Styles>
 
@@ -140,39 +129,12 @@
                    IsVisible="{Binding HasError}" />
 
         <DockPanel IsVisible="{Binding ShowDetails}">
-            <!-- Save/Discard for the selected items' unsaved changes. -->
-            <Border DockPanel.Dock="Bottom"
-                    Padding="20,10"
-                    BorderThickness="0,1,0,0"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                    IsVisible="{Binding ShowActionBar}">
-                <StackPanel Spacing="6">
-                    <TextBlock Classes="error" Text="{Binding SaveError}" IsVisible="{Binding HasSaveError}" />
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <Arc Classes="spinner"
-                                 Classes.active="{Binding IsSaving}"
-                                 IsVisible="{Binding IsSaving}"
-                                 Width="12" Height="12" StrokeThickness="2"
-                                 VerticalAlignment="Center" />
-                            <TextBlock Classes="muted"
-                                       VerticalAlignment="Center"
-                                       Text="{x:Static res:Strings.UnsavedChanges}"
-                                       IsVisible="{Binding HasDrafts}" />
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Content="{x:Static res:Strings.DiscardButton}"
-                                Command="{Binding DiscardCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.DiscardToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.DiscardButton}" />
-                        <Button Grid.Column="2"
-                                Classes="accent"
-                                Content="{x:Static res:Strings.SaveButton}"
-                                Command="{Binding SaveCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.SaveToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.SaveButton}" />
-                    </Grid>
-                </StackPanel>
+            <!-- Save and Discard are on the toolbar; a failed save is reported here, above the rows it concerns. -->
+            <Border DockPanel.Dock="Top"
+                    Classes="banner error"
+                    Margin="20,12,20,0"
+                    IsVisible="{Binding HasSaveError}">
+                <SelectableTextBlock TextWrapping="Wrap" Text="{Binding SaveError}" />
             </Border>
 
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">

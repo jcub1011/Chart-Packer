@@ -146,8 +146,6 @@ namespace ChartPacker.ViewModels
         /// <summary>A selected song has unsaved changes.</summary>
         public bool HasDrafts => _songs.Any(s => !s.Item.Draft.IsEmpty);
 
-        public bool ShowActionBar => ShowDetails && (IsEditable || HasDrafts);
-
         public string MetadataHeader => string.Format(CultureInfo.CurrentCulture, Strings.MetadataHeaderFormat, Metadata.Count);
 
         public string FilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.FilesHeaderFormat, Files.Count);
@@ -572,7 +570,6 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(CanEdit));
             OnPropertyChanged(nameof(ShowAddRow));
             OnPropertyChanged(nameof(HasDrafts));
-            OnPropertyChanged(nameof(ShowActionBar));
             OnPropertyChanged(nameof(MetadataHeader));
             OnPropertyChanged(nameof(FilesHeader));
             RefreshCommands();

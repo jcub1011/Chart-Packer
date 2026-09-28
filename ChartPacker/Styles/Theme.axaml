@@ -1,0 +1,112 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- The app is dark only. Colours not covered by the Fluent palette in App.axaml live here.
+         These come after FluentTheme, so the Accent* keys override its accent-button colours. -->
+    <Styles.Resources>
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0E0F14" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#14151C" />
+        <SolidColorBrush x:Key="ToolbarBrush" Color="#181922" />
+        <SolidColorBrush x:Key="ToolbarGroupBrush" Color="#1D1E29" />
+        <SolidColorBrush x:Key="SubtleBorderBrush" Color="#262836" />
+        <SolidColorBrush x:Key="ToolHoverBrush" Color="#16FFFFFF" />
+        <SolidColorBrush x:Key="ToolPressedBrush" Color="#0CFFFFFF" />
+        <SolidColorBrush x:Key="AccentTintBrush" Color="#408B5CF6" />
+        <SolidColorBrush x:Key="AccentTextBrush" Color="#C4B5FD" />
+        <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
+
+        <SolidColorBrush x:Key="AccentButtonBackground" Color="#8B5CF6" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#9D74F8" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#7547E6" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#23242F" />
+        <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#E9E3FF" />
+        <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#5E6073" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="Transparent" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="Transparent" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="Transparent" />
+
+        <!-- Fluent outlines inputs in near-white on dark; soften them to match the surfaces. -->
+        <SolidColorBrush x:Key="TextControlBackground" Color="#1C1D27" />
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#222330" />
+        <SolidColorBrush x:Key="TextControlBorderBrush" Color="#34364A" />
+        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#4A4D66" />
+        <SolidColorBrush x:Key="ComboBoxBackground" Color="#1C1D27" />
+        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#222330" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#34364A" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#4A4D66" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#1C1D27" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#34364A" />
+    </Styles.Resources>
+
+    <!-- Toolbar -->
+    <Style Selector="Border.toolbar">
+        <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="8,6" />
+    </Style>
+    <!-- One toolbar section. An outlined group rather than divider lines, so it still reads as a section after wrapping. -->
+    <Style Selector="Border.toolbar-group">
+        <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="3" />
+    </Style>
+
+    <!-- Icon-only toolbar buttons. Tooltips show even when disabled, so a greyed-out icon can still be identified. -->
+    <Style Selector=":is(Button).tool">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+    </Style>
+    <Style Selector=":is(Button).tool:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <Style Selector=":is(Button).tool:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+    </Style>
+    <Style Selector=":is(Button).tool:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ToggleButton.tool:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+
+    <!-- Toolbar buttons with an icon and a label: Pack, Unpack, Save. -->
+    <Style Selector="Button.labelled">
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.caption">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.55" />
+    </Style>
+
+    <!-- An inline notice: accent-tinted, or red for an error. -->
+    <Style Selector="Border.banner">
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="#668B5CF6" />
+        <Setter Property="Background" Value="#1F8B5CF6" />
+    </Style>
+    <Style Selector="Border.banner.error">
+        <Setter Property="BorderBrush" Value="#66F87171" />
+        <Setter Property="Background" Value="#1FF87171" />
+    </Style>
+</Styles>
