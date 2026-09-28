@@ -9,8 +9,17 @@ public readonly record struct MetadataChange(string Key, string? Value)
     public bool IsRemoval => Value is null;
 }
 
+/// <summary>A pending change to a song's album art.</summary>
+/// <param name="SourcePath">The image to store as the album art, or <see langword="null"/> when the art is to be removed.</param>
+public readonly record struct AlbumArtChange(string? SourcePath)
+{
+    /// <summary>True when the album art is to be removed.</summary>
+    public bool IsRemoval => SourcePath is null;
+}
+
 /// <summary>
-/// Unsaved changes to one song's metadata, held per key rather than as a copy of the metadata.
+/// Unsaved changes to one song's metadata, held per key rather than as a copy of the metadata,
+/// plus any change to its album art.
 /// </summary>
 /// <remarks>
 /// Keys are matched ignoring case (sng-spec A7). Because only the changed keys are recorded,
@@ -23,8 +32,14 @@ public sealed class MetadataDraft
     private readonly List<string> _order = [];
     private readonly Dictionary<string, MetadataChange> _changes = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>True when there are no pending changes.</summary>
-    public bool IsEmpty => _changes.Count == 0;
+    /// <summary>True when there are no pending changes, to the metadata or the album art.</summary>
+    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null;
+
+    /// <summary>True when a metadata key has a pending change. The album art doesn't count.</summary>
+    public bool HasMetadataChanges => _changes.Count > 0;
+
+    /// <summary>The pending change to the album art, if there is one.</summary>
+    public AlbumArtChange? AlbumArt { get; private set; }
 
     /// <summary>The changed keys, in the order they were first changed.</summary>
     public IReadOnlyList<string> Keys => _order;
@@ -55,11 +70,25 @@ public sealed class MetadataDraft
             _order.RemoveAt(_order.FindIndex(k => k.Equals(key, StringComparison.OrdinalIgnoreCase)));
     }
 
+    /// <summary>Replaces the album art with the image at <paramref name="sourcePath"/>, replacing any earlier art change.</summary>
+    public void SetAlbumArt(string sourcePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sourcePath);
+        AlbumArt = new AlbumArtChange(sourcePath);
+    }
+
+    /// <summary>Marks the album art for removal, replacing any earlier art change.</summary>
+    public void RemoveAlbumArt() => AlbumArt = new AlbumArtChange(null);
+
+    /// <summary>Forgets any change to the album art.</summary>
+    public void RevertAlbumArt() => AlbumArt = null;
+
     /// <summary>Forgets every change.</summary>
     public void Clear()
     {
         _changes.Clear();
         _order.Clear();
+        AlbumArt = null;
     }
 
     /// <summary>Gets the pending change to <paramref name="key"/>, if there is one.</summary>

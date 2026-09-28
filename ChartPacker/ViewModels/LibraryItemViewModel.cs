@@ -35,6 +35,12 @@ namespace ChartPacker.ViewModels
         /// <summary>Maintained by <see cref="AlbumArtLoader"/>.</summary>
         internal AlbumArtState ArtState { get; set; }
 
+        /// <summary>The unsaved album-art change the thumbnail was last queued with. Maintained by <see cref="AlbumArtLoader"/>.</summary>
+        internal AlbumArtChange? ArtChange { get; set; }
+
+        /// <summary>Bumped by <see cref="AlbumArtLoader"/> whenever a read under way goes stale.</summary>
+        internal int ArtVersion { get; set; }
+
         /// <summary>The list has a row for this item. Read by <see cref="AlbumArtLoader"/>'s workers, so it's volatile.</summary>
         internal bool IsRealized
         {

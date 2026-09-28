@@ -38,7 +38,7 @@ namespace ChartPacker.ViewModels
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
         private CancellationTokenSource? _scanCts;
 
-        private readonly AlbumArtLoader _albumArt = new();
+        private readonly AlbumArtLoader _albumArt;
 
         // Per-item background loads (metadata and album art) for the current list. They outlive
         // the scan, so the list is usable meanwhile.
@@ -56,6 +56,7 @@ namespace ChartPacker.ViewModels
             _folderPicker = folderPicker;
             _settings = settings;
             _drafts = drafts;
+            _albumArt = new AlbumArtLoader(path => _drafts.HasDrafts(path) ? _drafts.Get(path).AlbumArt : null);
             Job = job;
             _scanDepth = settings.Settings.ScanMaxDepth;
             _folderPath = settings.Settings.LastFolder;
@@ -86,6 +87,9 @@ namespace ChartPacker.ViewModels
                     _ = ReloadSummaryAsync(item);
                 else
                     item.Refresh(DraftFor(path));
+
+                // Shows a staged image or removal; after a save or discard, what's on disk.
+                _albumArt.DraftChanged(item);
             };
 
             Job.PropertyChanged += (_, e) =>

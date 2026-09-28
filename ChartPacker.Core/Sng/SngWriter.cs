@@ -129,22 +129,62 @@ public static class SngWriter
     public static Task<IReadOnlyList<Finding>> RewriteMetadataAsync(
         string sngPath,
         IReadOnlyList<KeyValuePair<string, string>> metadata,
+        CancellationToken cancellationToken = default) =>
+        RewriteAsync(sngPath, metadata, [], [], cancellationToken);
+
+    /// <summary>
+    /// Rewrites the <c>.sng</c> at <paramref name="sngPath"/> on the thread pool with new metadata,
+    /// some stored files left out and some new files added, keeping its mask.
+    /// </summary>
+    /// <remarks>
+    /// Works as <see cref="RewriteMetadataAsync"/> does: the files that are kept are copied without
+    /// unmasking, in index order. The added files follow them, masked with the existing mask.
+    /// </remarks>
+    /// <param name="sngPath">The <c>.sng</c> to rewrite.</param>
+    /// <param name="metadata">The complete new metadata, written in order.</param>
+    /// <param name="removeNames">Stored names to leave out, matched ignoring case. Names that aren't stored are ignored.</param>
+    /// <param name="addFiles">Files to add after the kept ones, in order.</param>
+    /// <param name="cancellationToken">Cancels the rewrite; the temp file is removed and the original is untouched.</param>
+    /// <returns>As for <see cref="RewriteMetadataAsync"/>.</returns>
+    /// <exception cref="ArgumentException">An added file's name matches a kept file's or another added file's, ignoring case.</exception>
+    /// <exception cref="IOException">The file or an added file can't be read, an added file changed size, or the file can't be replaced.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access to a file is denied.</exception>
+    /// <exception cref="OperationCanceledException">The rewrite was cancelled.</exception>
+    public static Task<IReadOnlyList<Finding>> RewriteAsync(
+        string sngPath,
+        IReadOnlyList<KeyValuePair<string, string>> metadata,
+        IReadOnlyCollection<string> removeNames,
+        IReadOnlyList<SngSourceFile> addFiles,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sngPath);
         ArgumentNullException.ThrowIfNull(metadata);
+        ArgumentNullException.ThrowIfNull(removeNames);
+        ArgumentNullException.ThrowIfNull(addFiles);
 
-        return Task.Run(() => RewriteMetadata(sngPath, metadata, cancellationToken), cancellationToken);
+        return Task.Run(() => Rewrite(sngPath, metadata, removeNames, addFiles, cancellationToken), cancellationToken);
     }
 
-    private static IReadOnlyList<Finding> RewriteMetadata(
+    private static IReadOnlyList<Finding> Rewrite(
         string sngPath,
         IReadOnlyList<KeyValuePair<string, string>> metadata,
+        IReadOnlyCollection<string> removeNames,
+        IReadOnlyList<SngSourceFile> addFiles,
         CancellationToken cancellationToken)
     {
         SngReadResult source = SngReader.Read(sngPath, cancellationToken);
         if (source.HasErrors || source.Header is not { } header)
             return source.Findings;
+
+        var removed = new HashSet<string>(removeNames, StringComparer.OrdinalIgnoreCase);
+        var kept = source.Files.Where(f => !removed.Contains(f.Name)).ToList();
+
+        var names = new HashSet<string>(kept.Select(f => f.Name), StringComparer.OrdinalIgnoreCase);
+        foreach (SngSourceFile file in addFiles)
+        {
+            if (!names.Add(file.StoredName))
+                throw new ArgumentException($"The .sng already has a file named '{file.StoredName}'.", nameof(addFiles));
+        }
 
         string tempPath = sngPath + TempSuffix;
         try
@@ -152,11 +192,14 @@ public static class SngWriter
             using (var input = File.OpenHandle(sngPath, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (FileStream output = CreateTemp(tempPath))
             {
-                var index = source.Files.Select(f => new IndexEntry(f.Name, f.Length)).ToList();
+                var index = kept.Select(f => new IndexEntry(f.Name, f.Length))
+                    .Concat(addFiles.Select(f => new IndexEntry(f.StoredName, (ulong)f.Length)))
+                    .ToList();
                 WriteHeaderAndIndex(output, header.Mask.Span, metadata, index);
 
-                foreach (SngFileEntry file in source.Files)
+                foreach (SngFileEntry file in kept)
                     SngFileData.CopyRaw(input, file, output, cancellationToken);
+                WriteFileData(output, header.Mask.Span, addFiles, bytesWritten: null, cancellationToken);
 
                 output.Flush(flushToDisk: true);
             }

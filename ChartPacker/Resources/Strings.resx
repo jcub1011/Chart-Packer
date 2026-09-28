@@ -406,4 +406,48 @@
   <data name="DiscardAndCloseButton" xml:space="preserve">
     <value>Discard and close</value>
   </data>
+  <data name="AlbumArtName" xml:space="preserve">
+    <value>Album art</value>
+    <comment>Automation name of the album-art tile in the detail panel.</comment>
+  </data>
+  <data name="NoAlbumArt" xml:space="preserve">
+    <value>No album art</value>
+  </data>
+  <data name="AlbumArtDiffers" xml:space="preserve">
+    <value>Album art differs</value>
+    <comment>In the album-art tile when the selected songs don't all have the same image.</comment>
+  </data>
+  <data name="AlbumArtUnreadable" xml:space="preserve">
+    <value>Album art can't be shown</value>
+    <comment>In the album-art tile when the image can't be decoded.</comment>
+  </data>
+  <data name="AlbumArtWillBeRemoved" xml:space="preserve">
+    <value>Album art will be removed</value>
+  </data>
+  <data name="ReplaceArtToolTip" xml:space="preserve">
+    <value>Replace the album art…</value>
+  </data>
+  <data name="RemoveArtToolTip" xml:space="preserve">
+    <value>Remove the album art</value>
+  </data>
+  <data name="RevertArtToolTip" xml:space="preserve">
+    <value>Undo the change to the album art</value>
+  </data>
+  <data name="PickArtTitle" xml:space="preserve">
+    <value>Choose album art</value>
+  </data>
+  <data name="ArtFileTypeName" xml:space="preserve">
+    <value>Images (png, jpg, jpeg)</value>
+  </data>
+  <data name="ArtUnreadableFormat" xml:space="preserve">
+    <value>That image can't be used: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="ArtNotAnImage" xml:space="preserve">
+    <value>That file isn't a png, jpg or jpeg image that can be read.</value>
+  </data>
+  <data name="ArtTooLargeFormat" xml:space="preserve">
+    <value>That image is too large. Album art can be up to {0}.</value>
+    <comment>{0} is the size limit, e.g. "16 MB".</comment>
+  </data>
 </root>

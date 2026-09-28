@@ -110,5 +110,55 @@ public sealed class MetadataDraftTests
         Assert.IsEmpty(draft.Keys);
     }
 
+    [TestMethod]
+    public void ArtChangeMakesTheDraftDirtyWithoutMetadataChanges()
+    {
+        var draft = new MetadataDraft();
+        draft.SetAlbumArt(@"C:\art\cover.png");
+
+        Assert.IsFalse(draft.IsEmpty);
+        Assert.IsFalse(draft.HasMetadataChanges);
+        Assert.AreEqual(new AlbumArtChange(@"C:\art\cover.png"), draft.AlbumArt);
+        Assert.IsEmpty(draft.Keys);
+        CollectionAssert.AreEqual(new[] { P("name", "A") }, draft.ApplyTo([P("name", "A")]));
+    }
+
+    [TestMethod]
+    public void RemoveArtReplacesAnEarlierReplacement()
+    {
+        var draft = new MetadataDraft();
+        draft.SetAlbumArt("cover.png");
+
+        draft.RemoveAlbumArt();
+
+        Assert.IsTrue(draft.AlbumArt is { IsRemoval: true });
+    }
+
+    [TestMethod]
+    public void RevertArtLeavesMetadataChanges()
+    {
+        var draft = new MetadataDraft();
+        draft.Set("name", "New");
+        draft.RemoveAlbumArt();
+
+        draft.RevertAlbumArt();
+
+        Assert.IsNull(draft.AlbumArt);
+        Assert.IsTrue(draft.HasMetadataChanges);
+        Assert.IsFalse(draft.IsEmpty);
+    }
+
+    [TestMethod]
+    public void ClearForgetsTheArtChange()
+    {
+        var draft = new MetadataDraft();
+        draft.RemoveAlbumArt();
+
+        draft.Clear();
+
+        Assert.IsNull(draft.AlbumArt);
+        Assert.IsTrue(draft.IsEmpty);
+    }
+
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
 }

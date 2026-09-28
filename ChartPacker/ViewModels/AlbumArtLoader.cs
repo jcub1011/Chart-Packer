@@ -6,6 +6,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 
 namespace ChartPacker.ViewModels
@@ -30,12 +31,19 @@ namespace ChartPacker.ViewModels
     /// Loads album-art thumbnails for the rows the library list has on screen, a couple at a time.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Rows are queued when the list realizes them. One that has scrolled away by the time its turn
     /// comes is skipped, so fast scrolling doesn't read everything it passes. A loaded thumbnail
     /// stays on its item until the next scan, so scrolling back never re-reads it. Every method is
     /// called on the UI thread.
+    /// </para>
+    /// <para>
+    /// A thumbnail shows the song's unsaved album-art change, if it has one: the staged image, or
+    /// none when the art is to be removed. <see cref="DraftChanged"/> reloads it when that changes.
+    /// </para>
     /// </remarks>
-    public sealed class AlbumArtLoader
+    /// <param name="stagedArt">The unsaved album-art change for a song's path, if there is one.</param>
+    public sealed class AlbumArtLoader(Func<string, AlbumArtChange?> stagedArt)
     {
         private const int Parallelism = 2;
 
@@ -43,14 +51,14 @@ namespace ChartPacker.ViewModels
         private const int ThumbnailDecodeWidth = 72;
 
         private readonly List<Bitmap> _issued = [];
-        private Channel<LibraryItemViewModel>? _queue;
+        private Channel<ArtRequest>? _queue;
 
         /// <summary>Starts a new list: drops the old queue and disposes every thumbnail handed out for the old items.</summary>
         /// <param name="generation">Cancelled when these items are replaced; results arriving after that are discarded.</param>
         public void Reset(CancellationToken generation)
         {
             _queue?.Writer.TryComplete();
-            _queue = Channel.CreateUnbounded<LibraryItemViewModel>(new UnboundedChannelOptions { SingleWriter = true });
+            _queue = Channel.CreateUnbounded<ArtRequest>(new UnboundedChannelOptions { SingleWriter = true });
 
             // Disposed after the cleared list has been laid out and rendered without them.
             var old = _issued.ToArray();
@@ -71,33 +79,70 @@ namespace ChartPacker.ViewModels
         public void Realized(LibraryItemViewModel item)
         {
             item.IsRealized = true;
-            if (item.ArtState == AlbumArtState.NotLoaded && _queue is { } queue)
-            {
-                item.ArtState = AlbumArtState.Loading;
-                queue.Writer.TryWrite(item);
-            }
+            if (item.ArtState == AlbumArtState.NotLoaded)
+                Enqueue(item);
         }
 
         /// <summary>The list let go of <paramref name="item"/>'s row. Its thumbnail, if any, is kept.</summary>
         public void Unrealized(LibraryItemViewModel item) => item.IsRealized = false;
 
-        private async Task RunAsync(Channel<LibraryItemViewModel> queue, CancellationToken cancellationToken)
+        /// <summary>
+        /// <paramref name="item"/>'s draft may have changed, or been saved or discarded. Its art is
+        /// read again when the album-art change it shows is no longer the draft's.
+        /// </summary>
+        public void DraftChanged(LibraryItemViewModel item)
+        {
+            if (stagedArt(item.Entry.FullPath) != item.ArtChange)
+                Reload(item);
+        }
+
+        /// <summary>
+        /// Reads <paramref name="item"/>'s art again: now if its row is on screen, otherwise when it
+        /// next is. The old thumbnail stays until the new one arrives, and a read already under way
+        /// is discarded when it finishes.
+        /// </summary>
+        public void Reload(LibraryItemViewModel item)
+        {
+            item.ArtVersion++;
+            if (item.ArtState == AlbumArtState.Loading)
+                return;
+
+            item.ArtState = AlbumArtState.NotLoaded;
+            if (item.IsRealized)
+                Enqueue(item);
+        }
+
+        /// <summary>Queues <paramref name="item"/> with the album-art change its draft has now.</summary>
+        private void Enqueue(LibraryItemViewModel item)
+        {
+            if (_queue is not { } queue)
+                return;
+
+            item.ArtState = AlbumArtState.Loading;
+            item.ArtChange = stagedArt(item.Entry.FullPath);
+            queue.Writer.TryWrite(new ArtRequest(item, item.ArtChange, item.ArtVersion));
+        }
+
+        private async Task RunAsync(Channel<ArtRequest> queue, CancellationToken cancellationToken)
         {
             // Progress<T> posts back to the UI thread, where the items live.
-            var done = new Progress<(LibraryItemViewModel Item, Bitmap? Art, bool Skipped)>(result =>
+            var done = new Progress<(ArtRequest Request, Bitmap? Art, bool Skipped)>(result =>
             {
-                var (item, art, skipped) = result;
+                var (request, art, skipped) = result;
+                var item = request.Item;
                 if (cancellationToken.IsCancellationRequested)
                 {
                     art?.Dispose();
                     return;
                 }
 
-                if (skipped)
+                // Skipped, or read for a draft that has changed since: it's read again if it's
+                // (still, or once more) on screen.
+                if (skipped || request.Version != item.ArtVersion)
                 {
-                    // It may have scrolled back into view while the skip was on its way.
+                    art?.Dispose();
                     if (item.IsRealized)
-                        queue.Writer.TryWrite(item);
+                        Enqueue(item);
                     else
                         item.ArtState = AlbumArtState.NotLoaded;
                     return;
@@ -105,6 +150,8 @@ namespace ChartPacker.ViewModels
 
                 if (art is null)
                 {
+                    // A reload finds the art was removed. The old thumbnail stays in _issued until the next Reset.
+                    item.AlbumArt = null;
                     item.ArtState = AlbumArtState.None;
                     return;
                 }
@@ -113,20 +160,20 @@ namespace ChartPacker.ViewModels
                 item.AlbumArt = art;
                 item.ArtState = AlbumArtState.Loaded;
             });
-            IProgress<(LibraryItemViewModel, Bitmap?, bool)> report = done;
+            IProgress<(ArtRequest, Bitmap?, bool)> report = done;
             var options = new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = cancellationToken };
 
             try
             {
-                await Parallel.ForEachAsync(queue.Reader.ReadAllAsync(cancellationToken), options, async (item, token) =>
+                await Parallel.ForEachAsync(queue.Reader.ReadAllAsync(cancellationToken), options, async (request, token) =>
                 {
-                    if (!item.IsRealized)
+                    if (!request.Item.IsRealized)
                     {
-                        report.Report((item, null, true));
+                        report.Report((request, null, true));
                         return;
                     }
 
-                    report.Report((item, await LoadAsync(item.Entry, token).ConfigureAwait(false), false));
+                    report.Report((request, await LoadAsync(request, token).ConfigureAwait(false), false));
                 }).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -134,13 +181,22 @@ namespace ChartPacker.ViewModels
             }
         }
 
-        /// <summary>The entry's art decoded at thumbnail size, or <see langword="null"/> when it has none that can be read.</summary>
-        private static async Task<Bitmap?> LoadAsync(SongEntry entry, CancellationToken cancellationToken)
+        /// <summary>
+        /// The art the request's song will have once its draft is saved, decoded at thumbnail size,
+        /// or <see langword="null"/> when it has none that can be read.
+        /// </summary>
+        private static async Task<Bitmap?> LoadAsync(ArtRequest request, CancellationToken cancellationToken)
         {
             byte[]? bytes;
             try
             {
-                bytes = await AlbumArt.ReadAsync(entry, cancellationToken: cancellationToken).ConfigureAwait(false);
+                bytes = request.Change switch
+                {
+                    null => await AlbumArt.ReadAsync(request.Item.Entry, cancellationToken: cancellationToken).ConfigureAwait(false),
+                    { SourcePath: { } source } when new FileInfo(source).Length <= AlbumArt.DefaultMaxBytes =>
+                        await File.ReadAllBytesAsync(source, cancellationToken).ConfigureAwait(false),
+                    _ => null,
+                };
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -162,5 +218,8 @@ namespace ChartPacker.ViewModels
                 return null;
             }
         }
+
+        /// <summary>An item to read, with the album-art change and art version it was queued with.</summary>
+        private sealed record ArtRequest(LibraryItemViewModel Item, AlbumArtChange? Change, int Version);
     }
 }

@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -20,27 +23,35 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartPacker.ViewModels
 {
     /// <summary>A file in the song, with its size already formatted.</summary>
-    public sealed record FileRow(string Path, string Size);
+    /// <param name="Marker"><c>+</c> for a file a staged change adds.</param>
+    /// <param name="IsRemoved">A staged change removes the file.</param>
+    public sealed record FileRow(string Path, string Size, string? Marker = null, bool IsRemoved = false);
 
     /// <summary>A structural problem found in a <c>.sng</c>.</summary>
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
 
     /// <summary>
-    /// The right panel: the metadata of the songs selected in the library, editable for one song
-    /// or for all of them at once, plus the file list when one song is selected. For a <c>.sng</c>
-    /// both come from the container; for a folder, from its <c>song.ini</c> and a listing.
+    /// The right panel: the album art and metadata of the songs selected in the library, editable
+    /// for one song or for all of them at once, plus the file list when one song is selected. For a
+    /// <c>.sng</c> all of it comes from the container; for a folder, from its <c>song.ini</c>, its
+    /// album-art file and a listing.
     /// </summary>
     /// <remarks>
     /// Edits go into each song's <see cref="MetadataDraft"/> in the shared
     /// <see cref="MetadataDraftStore"/>, so they survive a change of selection. Nothing is written
-    /// until <see cref="SaveCommand"/>, which re-reads each file and changes only the edited keys.
+    /// until <see cref="SaveCommand"/>, which re-reads each file and changes only the edited keys
+    /// and, if it was changed, the album art.
     /// </remarks>
     public partial class SongDetailViewModel : ViewModelBase
     {
         private const int BulkLoadParallelism = 4;
 
+        // A 200px tile at 2x scaling.
+        private const int ArtDecodeWidth = 400;
+
         private readonly MetadataDraftStore _drafts;
         private readonly JobViewModel _job;
+        private readonly IImagePickerService _imagePicker;
         private CancellationTokenSource? _loadCts;
 
         // What's shown: the selection, and the songs among it whose metadata could be read.
@@ -50,10 +61,20 @@ namespace ChartPacker.ViewModels
         // Why there's no metadata, from loading, e.g. the folder has no song.ini.
         private string? _loadNote;
 
-        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job)
+        // The one selected song's files as they are on disk; Files adds the staged art change to them.
+        private IReadOnlyList<DiskFile> _diskFiles = [];
+
+        // Decoded album art by image hash: the first song's art, and every staged replacement.
+        private Dictionary<string, Bitmap> _artImages = [];
+
+        // Staged replacement images by source path.
+        private Dictionary<string, StagedArt> _stagedArt = new(StringComparer.Ordinal);
+
+        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker)
         {
             _drafts = drafts;
             _job = job;
+            _imagePicker = imagePicker;
             _job.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(JobViewModel.IsRunning))
@@ -116,6 +137,30 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private IReadOnlyList<KnownKey> _availableKeys = [];
 
+        /// <summary>The album art every selected song has once its draft is applied, or <see langword="null"/> when there's none to show.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasArtImage))]
+        private Bitmap? _artImage;
+
+        /// <summary>Shown in the tile instead of an image, e.g. "No album art" or "Album art differs".</summary>
+        [ObservableProperty]
+        private string? _artNote;
+
+        /// <summary>Why the chosen replacement image can't be used.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasArtError))]
+        private string? _artError;
+
+        public bool HasArtImage => ArtImage is not null;
+
+        public bool HasArtError => ArtError is not null;
+
+        /// <summary>A selected song has a staged album-art change.</summary>
+        public bool IsArtChanged => _songs.Any(s => s.Item.Draft.AlbumArt is not null);
+
+        /// <summary><c>*</c> beside the tile while the art has a staged change, like an edited row.</summary>
+        public string? ArtMarker => IsArtChanged ? "*" : null;
+
         public bool ShowPlaceholder => _entries.Count == 0;
 
         public bool HasError => ErrorMessage is not null;
@@ -148,7 +193,8 @@ namespace ChartPacker.ViewModels
 
         public string MetadataHeader => string.Format(CultureInfo.CurrentCulture, Strings.MetadataHeaderFormat, Metadata.Count);
 
-        public string FilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.FilesHeaderFormat, Files.Count);
+        // Counts the files there will be once the staged art change is saved.
+        public string FilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.FilesHeaderFormat, Files.Count(f => !f.IsRemoved));
 
         /// <summary>Why <paramref name="value"/> can't be stored, or <see langword="null"/> when it can.</summary>
         public static string? ValidateValue(string value) =>
@@ -172,6 +218,8 @@ namespace ChartPacker.ViewModels
             _entries = entries;
             _songs = [];
             _loadNote = null;
+            _diskFiles = [];
+            ReleaseArt();
             Metadata.Clear();
             Files.Clear();
             Findings.Clear();
@@ -187,6 +235,7 @@ namespace ChartPacker.ViewModels
             ReadOnlyNote = null;
             ErrorMessage = null;
             SaveError = null;
+            ArtError = null;
             CancelAdd();
             IsLoading = entries.Count > 0;
             RefreshState();
@@ -197,14 +246,27 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
+            // Drafts live on the UI thread, so the staged images to show are picked out here.
+            var stagedSources = entries
+                .Select(e => _drafts.Get(e.FullPath).AlbumArt?.SourcePath)
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
             try
             {
                 var loaded = await Task.Run(
-                    () => entries.Count == 1 ? LoadSingleAsync(entries[0], cts.Token) : LoadBulkAsync(entries, cts.Token),
+                    async () =>
+                    {
+                        var selection = entries.Count == 1 ? await LoadSingleAsync(entries[0], cts.Token) : await LoadBulkAsync(entries, cts.Token);
+                        return selection with { Art = await LoadArtAsync(selection.Songs, stagedSources, cts.Token) };
+                    },
                     cts.Token);
 
                 if (_loadCts == cts)
                     Apply(loaded);
+                else
+                    DisposeLater(loaded.Art.Images.Values);
             }
             catch (OperationCanceledException)
             {
@@ -293,6 +355,68 @@ namespace ChartPacker.ViewModels
             NewRowError = null;
         }
 
+        /// <summary>Asks for an image and stages it as every selected song's album art.</summary>
+        [RelayCommand(CanExecute = nameof(CanEdit))]
+        private async Task ReplaceArtAsync()
+        {
+            var songs = _songs;
+            string? path = await _imagePicker.PickImageAsync(Strings.PickArtTitle);
+            if (path is null || !ReferenceEquals(songs, _songs) || !CanEdit)
+                return;
+
+            ArtError = null;
+            if (AlbumArt.StoredNameFor(path) is null)
+            {
+                ArtError = Strings.ArtNotAnImage;
+                return;
+            }
+
+            var (art, bitmap) = await Task.Run(() => LoadStagedAsync(path, CancellationToken.None));
+
+            // The selection may have moved on while the image was read.
+            if (!ReferenceEquals(songs, _songs) || !CanEdit)
+            {
+                DisposeLater(bitmap is null ? [] : [bitmap]);
+                return;
+            }
+
+            if (art.Error is not null)
+            {
+                ArtError = art.Error;
+                return;
+            }
+
+            AddImage(art.Hash!, bitmap!);
+            _stagedArt[path] = art;
+            foreach (var song in _songs)
+                song.Item.Draft.SetAlbumArt(path);
+            OnDraftsChanged();
+        }
+
+        private bool CanRemoveArt() => CanEdit && _songs.Any(s => EffectiveArtKey(s) is not null);
+
+        /// <summary>Stages removing every selected song's album art.</summary>
+        [RelayCommand(CanExecute = nameof(CanRemoveArt))]
+        private void RemoveArt()
+        {
+            ArtError = null;
+            foreach (var song in _songs)
+                song.Item.Draft.RemoveAlbumArt();
+            OnDraftsChanged();
+        }
+
+        private bool CanRevertArt() => IsArtChanged && CanEdit;
+
+        /// <summary>Drops the staged album-art change of every selected song.</summary>
+        [RelayCommand(CanExecute = nameof(CanRevertArt))]
+        private void RevertArt()
+        {
+            ArtError = null;
+            foreach (var song in _songs)
+                song.Item.Draft.RevertAlbumArt();
+            OnDraftsChanged();
+        }
+
         // Only committed changes count: text still in an edit box isn't a change yet.
         private bool CanSave() => CanEdit && HasDrafts && !_job.IsRunning;
 
@@ -357,22 +481,36 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
         }
 
-        /// <summary>Re-reads the song and writes it back with only the draft's keys changed.</summary>
+        /// <summary>Re-reads the song and writes it back with only the draft's keys, and its album art if staged, changed.</summary>
         /// <returns>Why it couldn't be saved, or <see langword="null"/> on success.</returns>
         private static async Task<string?> SaveSongAsync(EditableSong song)
         {
+            var draft = song.Item.Draft;
             if (song.Entry.Kind == SongEntryKind.SngFile)
             {
                 var read = await SngReader.ReadAsync(song.Entry.FullPath).ConfigureAwait(false);
                 if (FirstError(read.Findings) is { } readError)
                     return readError;
 
-                var pairs = song.Item.Draft.ApplyTo(read.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList());
-                var findings = await SngWriter.RewriteMetadataAsync(song.Entry.FullPath, pairs).ConfigureAwait(false);
+                var pairs = draft.ApplyTo(read.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList());
+                List<string> remove = [];
+                List<SngSourceFile> add = [];
+                if (draft.AlbumArt is { } art)
+                {
+                    remove.AddRange(read.Files.Select(f => f.Name).Where(AlbumArt.IsAlbumArtName));
+                    if (art.SourcePath is { } source)
+                        add.Add(new SngSourceFile(AlbumArt.StoredNameFor(source)!, source, new FileInfo(source).Length));
+                }
+
+                var findings = await SngWriter.RewriteAsync(song.Entry.FullPath, pairs, remove, add).ConfigureAwait(false);
                 return FirstError(findings);
             }
 
-            await SongIni.ApplyEditsAsync(song.SongIniPath!, song.Item.Draft).ConfigureAwait(false);
+            // An art-only change mustn't create a song.ini in a folder that has none.
+            if (draft.HasMetadataChanges)
+                await SongIni.ApplyEditsAsync(song.SongIniPath!, draft).ConfigureAwait(false);
+            if (draft.AlbumArt is { } folderArt)
+                await AlbumArt.ApplyToFolderAsync(song.Entry.FullPath, folderArt).ConfigureAwait(false);
             return null;
         }
 
@@ -402,14 +540,26 @@ namespace ChartPacker.ViewModels
             foreach (var song in _songs)
                 _drafts.NotifyChanged(song.Entry.FullPath);
             RebuildRows();
+            RefreshArt();
         }
 
         private void Apply(LoadedSelection loaded)
         {
             _songs = loaded.Songs
-                .Where(s => s.Pairs is not null)
-                .Select(s => new EditableSong(s.Entry, new MetadataItem(s.Pairs!, _drafts.Get(s.Entry.FullPath)), s.SongIniPath))
+                .Select((s, i) => (Song: s, ArtHash: loaded.Art.DiskHashes[i]))
+                .Where(x => x.Song.Pairs is not null)
+                .Select(x => new EditableSong(x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath)), x.Song.SongIniPath, x.ArtHash))
                 .ToList();
+            _artImages = loaded.Art.Images;
+            _stagedArt = loaded.Art.Staged;
+            _diskFiles = loaded.Files;
+
+            // A staged image that can no longer be read (moved, say) is reported like a bad pick.
+            ArtError = _songs
+                .Select(s => s.Item.Draft.AlbumArt?.SourcePath)
+                .OfType<string>()
+                .Select(p => _stagedArt.GetValueOrDefault(p)?.Error)
+                .FirstOrDefault(e => e is not null);
             ReadOnlyNote = loaded.Songs.Select(s => s.ReadOnlyReason).FirstOrDefault(r => r is not null);
             _loadNote = loaded.MetadataNote;
 
@@ -423,9 +573,9 @@ namespace ChartPacker.ViewModels
                 Subtitle = string.Format(CultureInfo.CurrentCulture, Strings.SubtitleFormat, _entries[0].FullPath, ByteSizeFormatter.Format(loaded.TotalSize));
             }
 
-            Files.AddRange(loaded.Files);
             Findings.AddRange(loaded.Findings);
             RebuildRows();
+            RefreshArt();
         }
 
         /// <summary>
@@ -482,7 +632,7 @@ namespace ChartPacker.ViewModels
                 return new LoadedSelection(
                     [SngSong(entry, result)],
                     size,
-                    result.Files.Select(f => new FileRow(f.Name, ByteSizeFormatter.Format(f.Length))).ToList(),
+                    result.Files.Select(f => new DiskFile(f.Name, f.Length)).ToList(),
                     result.Findings.Select(f => new FindingRow(f.RuleId, f.Message, f.Severity == Severity.Error)).ToList(),
                     MetadataNote: null);
             }
@@ -497,7 +647,7 @@ namespace ChartPacker.ViewModels
             return new LoadedSelection(
                 [song],
                 (ulong)files.Sum(f => f.Length),
-                files.Select(f => new FileRow(f.RelativePath, ByteSizeFormatter.Format((ulong)f.Length))).ToList(),
+                files.Select(f => new DiskFile(f.RelativePath, (ulong)f.Length)).ToList(),
                 [],
                 note);
         }
@@ -555,6 +705,198 @@ namespace ChartPacker.ViewModels
             Directory.EnumerateFiles(folder)
                 .FirstOrDefault(f => Path.GetFileName(f).Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase));
 
+        /// <summary>
+        /// The key of the art <paramref name="song"/> will have once its draft is saved: an image
+        /// hash, <see langword="null"/> for none, or, for a staged image that can't be read, a key
+        /// no other image shares.
+        /// </summary>
+        private string? EffectiveArtKey(EditableSong song) => song.Item.Draft.AlbumArt switch
+        {
+            null => song.DiskArtHash,
+            { SourcePath: null } => null,
+            { SourcePath: { } source } => _stagedArt.GetValueOrDefault(source)?.Hash ?? "unreadable:" + source,
+        };
+
+        /// <summary>Shows the art the selected songs share, or why there's none to show, and marks the files a staged change touches.</summary>
+        private void RefreshArt()
+        {
+            var keys = _songs.Select(EffectiveArtKey).Distinct(StringComparer.Ordinal).ToList();
+            if (keys.Count > 1)
+            {
+                ArtImage = null;
+                ArtNote = Strings.AlbumArtDiffers;
+            }
+            else if (keys.Count == 1 && keys[0] is { } key)
+            {
+                ArtImage = _artImages.GetValueOrDefault(key);
+                ArtNote = ArtImage is null ? Strings.AlbumArtUnreadable : null;
+            }
+            else
+            {
+                ArtImage = null;
+                ArtNote = _songs.Any(s => s.Item.Draft.AlbumArt is { IsRemoval: true }) ? Strings.AlbumArtWillBeRemoved : Strings.NoAlbumArt;
+            }
+
+            RebuildFiles();
+            OnPropertyChanged(nameof(IsArtChanged));
+            OnPropertyChanged(nameof(ArtMarker));
+            RefreshCommands();
+        }
+
+        /// <summary>The one selected song's files, with the ones a staged art change removes struck through and the one it adds marked.</summary>
+        private void RebuildFiles()
+        {
+            var change = _songs.Count == 1 ? _songs[0].Item.Draft.AlbumArt : null;
+            var rows = _diskFiles
+                .Select(f => new FileRow(f.Path, ByteSizeFormatter.Format(f.Length), IsRemoved: change is not null && AlbumArt.IsAlbumArtName(f.Path)))
+                .ToList();
+            if (change?.SourcePath is { } source && AlbumArt.StoredNameFor(source) is { } name)
+            {
+                string size = _stagedArt.TryGetValue(source, out var staged) && staged.Error is null ? ByteSizeFormatter.Format((ulong)staged.Length) : "";
+                rows.Add(new FileRow(name, size, Marker: "+"));
+            }
+
+            if (!rows.SequenceEqual(Files))
+            {
+                Files.Clear();
+                Files.AddRange(rows);
+            }
+
+            OnPropertyChanged(nameof(ShowNoFiles));
+            OnPropertyChanged(nameof(FilesHeader));
+        }
+
+        private void AddImage(string hash, Bitmap bitmap)
+        {
+            if (!_artImages.TryAdd(hash, bitmap))
+                DisposeLater([bitmap]);
+        }
+
+        /// <summary>Stops showing the current art and lets go of every decoded image.</summary>
+        private void ReleaseArt()
+        {
+            ArtImage = null;
+            ArtNote = null;
+            DisposeLater(_artImages.Values);
+            _artImages = [];
+            _stagedArt = new(StringComparer.Ordinal);
+        }
+
+        /// <summary>Disposes <paramref name="bitmaps"/> once the UI has rendered without them.</summary>
+        private static void DisposeLater(IEnumerable<Bitmap> bitmaps)
+        {
+            var old = bitmaps.ToArray();
+            if (old.Length == 0)
+                return;
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var bitmap in old)
+                    bitmap.Dispose();
+            }, DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Hashes each readable song's album art, decodes the first one's (the only one that can be
+        /// what every song shares), and reads the staged replacement images.
+        /// </summary>
+        private static async Task<LoadedArt> LoadArtAsync(IReadOnlyList<LoadedSong> songs, IReadOnlyList<string> stagedSources, CancellationToken cancellationToken)
+        {
+            var hashes = new string?[songs.Count];
+            var images = new Dictionary<string, Bitmap>(StringComparer.Ordinal);
+            var staged = new Dictionary<string, StagedArt>(StringComparer.Ordinal);
+            int first = songs.ToList().FindIndex(s => s.Pairs is not null);
+            var options = new ParallelOptions { MaxDegreeOfParallelism = BulkLoadParallelism, CancellationToken = cancellationToken };
+
+            try
+            {
+                await Parallel.ForEachAsync(Enumerable.Range(0, songs.Count), options, async (i, token) =>
+                {
+                    if (songs[i].Pairs is null)
+                        return;
+
+                    byte[]? bytes;
+                    try
+                    {
+                        bytes = await AlbumArt.ReadAsync(songs[i].Entry, cancellationToken: token).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        return;
+                    }
+
+                    if (bytes is null)
+                        return;
+
+                    hashes[i] = Hash(bytes);
+                    if (i == first && Decode(bytes) is { } bitmap)
+                    {
+                        lock (images)
+                            images[hashes[i]!] = bitmap;
+                    }
+                }).ConfigureAwait(false);
+
+                foreach (string source in stagedSources)
+                {
+                    var (art, bitmap) = await LoadStagedAsync(source, cancellationToken).ConfigureAwait(false);
+                    staged[source] = art;
+                    if (bitmap is not null && !images.TryAdd(art.Hash!, bitmap))
+                        bitmap.Dispose();
+                }
+            }
+            catch
+            {
+                foreach (var bitmap in images.Values)
+                    bitmap.Dispose();
+                throw;
+            }
+
+            return new LoadedArt(hashes, images, staged);
+        }
+
+        /// <summary>Reads, hashes and decodes an image chosen as album art.</summary>
+        /// <returns>The image, with its decoded bitmap; or, when it can't be used, why not and no bitmap.</returns>
+        private static async Task<(StagedArt Art, Bitmap? Bitmap)> LoadStagedAsync(string path, CancellationToken cancellationToken)
+        {
+            byte[] bytes;
+            try
+            {
+                long length = new FileInfo(path).Length;
+                if (length > AlbumArt.DefaultMaxBytes)
+                {
+                    string limit = ByteSizeFormatter.Format((ulong)AlbumArt.DefaultMaxBytes);
+                    return (new StagedArt(null, length, string.Format(CultureInfo.CurrentCulture, Strings.ArtTooLargeFormat, limit)), null);
+                }
+
+                bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return (new StagedArt(null, 0, string.Format(CultureInfo.CurrentCulture, Strings.ArtUnreadableFormat, ex.Message)), null);
+            }
+
+            return Decode(bytes) is { } bitmap
+                ? (new StagedArt(Hash(bytes), bytes.Length, null), bitmap)
+                : (new StagedArt(null, bytes.Length, Strings.ArtNotAnImage), null);
+        }
+
+        private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+
+        /// <summary>The image decoded at tile size, or <see langword="null"/> when it can't be decoded.</summary>
+        private static Bitmap? Decode(byte[] bytes)
+        {
+            try
+            {
+                using var stream = new MemoryStream(bytes, writable: false);
+                return Bitmap.DecodeToWidth(stream, ArtDecodeWidth, BitmapInterpolationMode.HighQuality);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Corrupt or unsupported images surface as assorted decoder exceptions.
+                return null;
+            }
+        }
+
         /// <summary>Raises change notifications for every derived display state.</summary>
         private void RefreshState()
         {
@@ -572,6 +914,8 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasDrafts));
             OnPropertyChanged(nameof(MetadataHeader));
             OnPropertyChanged(nameof(FilesHeader));
+            OnPropertyChanged(nameof(IsArtChanged));
+            OnPropertyChanged(nameof(ArtMarker));
             RefreshCommands();
         }
 
@@ -580,13 +924,31 @@ namespace ChartPacker.ViewModels
             SaveCommand.NotifyCanExecuteChanged();
             DiscardCommand.NotifyCanExecuteChanged();
             BeginAddCommand.NotifyCanExecuteChanged();
+            ReplaceArtCommand.NotifyCanExecuteChanged();
+            RemoveArtCommand.NotifyCanExecuteChanged();
+            RevertArtCommand.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
                 row.RefreshCommands();
         }
 
         /// <summary>A selected song whose metadata was read, with its draft.</summary>
         /// <param name="SongIniPath">For a folder, the song.ini to edit (which may not exist yet).</param>
-        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath);
+        /// <param name="DiskArtHash">The hash of its album art as stored, or <see langword="null"/> when it has none that could be read.</param>
+        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath, string? DiskArtHash);
+
+        /// <summary>A file of the one selected song, as stored.</summary>
+        private sealed record DiskFile(string Path, ulong Length);
+
+        /// <summary>An image chosen as album art.</summary>
+        /// <param name="Hash">Its hash, or <see langword="null"/> when it can't be used.</param>
+        /// <param name="Error">Why it can't be used, if it can't.</param>
+        private sealed record StagedArt(string? Hash, long Length, string? Error);
+
+        /// <summary>The selection's album art as loaded off the UI thread.</summary>
+        /// <param name="DiskHashes">Each loaded song's art hash, by index.</param>
+        /// <param name="Images">Decoded images by hash.</param>
+        /// <param name="Staged">Staged replacement images by source path.</param>
+        private sealed record LoadedArt(IReadOnlyList<string?> DiskHashes, Dictionary<string, Bitmap> Images, Dictionary<string, StagedArt> Staged);
 
         /// <summary>One song's metadata as loaded off the UI thread.</summary>
         /// <param name="Pairs">The stored pairs, or <see langword="null"/> when the song couldn't be read.</param>
@@ -597,8 +959,12 @@ namespace ChartPacker.ViewModels
         private sealed record LoadedSelection(
             IReadOnlyList<LoadedSong> Songs,
             ulong TotalSize,
-            IReadOnlyList<FileRow> Files,
+            IReadOnlyList<DiskFile> Files,
             IReadOnlyList<FindingRow> Findings,
-            string? MetadataNote);
+            string? MetadataNote)
+        {
+            /// <summary>Filled in after the metadata by <see cref="LoadArtAsync"/>.</summary>
+            public LoadedArt Art { get; init; } = new([], [], []);
+        }
     }
 }

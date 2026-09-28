@@ -1,3 +1,4 @@
+using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Sng;
 using Microsoft.Win32.SafeHandles;
 
@@ -11,6 +12,91 @@ public static class AlbumArt
 
     // In preference order, matched ignoring case.
     private static readonly string[] Names = ["album.png", "album.jpg", "album.jpeg"];
+
+    /// <summary>Whether <paramref name="name"/> is an album-art name, ignoring case. Names with a folder never are.</summary>
+    public static bool IsAlbumArtName(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return Names.Contains(name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The name to store the image at <paramref name="sourcePath"/> under: <c>album.</c> plus its
+    /// lowercased extension, or <see langword="null"/> when it isn't a png, jpg or jpeg.
+    /// </summary>
+    public static string? StoredNameFor(string sourcePath)
+    {
+        ArgumentNullException.ThrowIfNull(sourcePath);
+        string name = "album" + Path.GetExtension(sourcePath).ToLowerInvariant();
+        return IsAlbumArtName(name) ? name : null;
+    }
+
+    /// <summary>
+    /// Applies <paramref name="change"/> to the song folder <paramref name="folder"/>: every
+    /// album-art file directly in it is deleted, and a replacement is copied in as
+    /// <see cref="StoredNameFor"/> names it. Art in subfolders is left alone.
+    /// </summary>
+    /// <remarks>
+    /// The replacement is copied to a temp file before anything is deleted, so a copy that fails
+    /// leaves the old art in place, and the source may be one of the files being replaced.
+    /// </remarks>
+    /// <exception cref="ArgumentException">The replacement isn't a png, jpg or jpeg.</exception>
+    /// <exception cref="IOException">A file can't be read, written or deleted.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">Cancelled before anything was deleted.</exception>
+    public static async Task ApplyToFolderAsync(string folder, AlbumArtChange change, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folder);
+
+        string? target = null;
+        string? tempPath = null;
+        if (change.SourcePath is { } source)
+        {
+            string name = StoredNameFor(source)
+                ?? throw new ArgumentException($"'{source}' isn't a png, jpg or jpeg image.", nameof(change));
+            target = Path.Combine(folder, name);
+            tempPath = target + ".tmp";
+
+            try
+            {
+                await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 1, useAsync: true))
+                await using (var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024, useAsync: true))
+                    await input.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                TryDelete(tempPath);
+                throw;
+            }
+        }
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (string path in Directory.EnumerateFiles(folder).Where(p => IsAlbumArtName(Path.GetFileName(p))).ToList())
+                File.Delete(path);
+
+            if (tempPath is not null)
+                File.Move(tempPath, target!, overwrite: true);
+        }
+        catch
+        {
+            if (tempPath is not null)
+                TryDelete(tempPath);
+            throw;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
 
     /// <summary>
     /// Reads <paramref name="entry"/>'s album art on the thread pool. A folder's art must be

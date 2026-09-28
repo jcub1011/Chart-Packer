@@ -1,3 +1,4 @@
+using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
 using ChartPacker.Core.Tests.Sng;
@@ -131,6 +132,80 @@ public sealed class AlbumArtTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => AlbumArt.ReadAsync(Folder(folder), cancellationToken: cts.Token));
     }
+
+    [TestMethod]
+    [DataRow(@"C:\pics\Cover.PNG", "album.png")]
+    [DataRow("cover.jpg", "album.jpg")]
+    [DataRow("cover.JPEG", "album.jpeg")]
+    [DataRow("cover.gif", null)]
+    [DataRow("cover", null)]
+    public void StoredNameUsesTheLowercasedExtension(string source, string? expected) =>
+        Assert.AreEqual(expected, AlbumArt.StoredNameFor(source));
+
+    [TestMethod]
+    [DataRow("album.png", true)]
+    [DataRow("ALBUM.Jpg", true)]
+    [DataRow("album.jpeg", true)]
+    [DataRow("album.gif", false)]
+    [DataRow("art/album.png", false)]
+    [DataRow("background.png", false)]
+    public void RecognisesAlbumArtNames(string name, bool expected) =>
+        Assert.AreEqual(expected, AlbumArt.IsAlbumArtName(name));
+
+    [TestMethod]
+    public async Task ReplacingInAFolderLeavesOnlyTheNewImage()
+    {
+        string folder = CreateFolder(("Album.JPG", Jpg), ("album.jpeg", Jpg), ("notes.chart", [1]));
+        string source = WriteLoose("cover.PNG", Png);
+
+        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(source));
+
+        CollectionAssert.AreEquivalent(new[] { "album.png", "notes.chart" }, FileNames(folder));
+        CollectionAssert.AreEqual(Png, File.ReadAllBytes(Path.Combine(folder, "album.png")));
+        CollectionAssert.AreEqual(Png, File.ReadAllBytes(source));
+    }
+
+    [TestMethod]
+    public async Task RemovingInAFolderDeletesEveryVariantButNotSubfolderArt()
+    {
+        string folder = CreateFolder(("album.png", Png), ("album.jpg", Jpg), ("art/album.png", Png), ("notes.chart", [1]));
+
+        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(null));
+
+        CollectionAssert.AreEquivalent(new[] { "notes.chart" }, FileNames(folder));
+        Assert.IsTrue(File.Exists(Path.Combine(folder, "art", "album.png")));
+    }
+
+    [TestMethod]
+    public async Task ReplacementCanBeTheFoldersOwnImage()
+    {
+        string folder = CreateFolder(("album.jpg", Jpg), ("album.png", Png));
+
+        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(Path.Combine(folder, "album.jpg")));
+
+        CollectionAssert.AreEquivalent(new[] { "album.jpg" }, FileNames(folder));
+        CollectionAssert.AreEqual(Jpg, File.ReadAllBytes(Path.Combine(folder, "album.jpg")));
+    }
+
+    [TestMethod]
+    public async Task MissingReplacementLeavesTheOldArt()
+    {
+        string folder = CreateFolder(("album.jpg", Jpg));
+
+        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(Path.Combine(_root.FullName, "missing.png"))));
+
+        CollectionAssert.AreEquivalent(new[] { "album.jpg" }, FileNames(folder));
+    }
+
+    private string WriteLoose(string name, byte[] data)
+    {
+        string path = Path.Combine(_root.FullName, name);
+        File.WriteAllBytes(path, data);
+        return path;
+    }
+
+    private static string[] FileNames(string folder) => Directory.GetFiles(folder).Select(Path.GetFileName).ToArray()!;
 
     /// <summary>The builder stores data as given, so it's masked here to be stored the way a real .sng would.</summary>
     private static byte[] Masked(SngBuilder builder, byte[] data)

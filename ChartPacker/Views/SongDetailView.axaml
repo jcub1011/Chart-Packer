@@ -85,6 +85,52 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
+        <Style Selector="Border.artTile">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <!-- The tile's action buttons: dark chips that stay legible over any image. Hidden until the
+             tile is hovered or one of them has focus; one that can't act right now isn't shown. -->
+        <Style Selector="StackPanel.artActions">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Border.artTile:pointerover StackPanel.artActions, StackPanel.artActions:focus-within">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.artAction">
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="#CC000000" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.artAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F0000000" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.artAction:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.artAction:disabled">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Button.artAction PathIcon">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+        </Style>
+        <Style Selector="Border.artBadge">
+            <Setter Property="Background" Value="#CC000000" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,0" />
+        </Style>
+
         <Style Selector="Button.icon">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -148,6 +194,93 @@
                                          Margin="0,2,0,0"
                                          TextWrapping="Wrap"
                                          Text="{Binding Subtitle}" />
+
+                    <!-- Album art on the left, the one selected song's files on the right. -->
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20" Margin="0,16,0,0">
+                        <StackPanel Grid.Column="0" Width="200" Spacing="6">
+                            <!-- The actions show while the pointer is over the tile, or focus is on one of them. -->
+                            <Border Classes="artTile"
+                                    Width="200" Height="200"
+                                    AutomationProperties.Name="{x:Static res:Strings.AlbumArtName}">
+                                <Panel>
+                                    <Image Source="{Binding ArtImage}"
+                                           Stretch="Uniform"
+                                           IsVisible="{Binding HasArtImage}" />
+                                    <TextBlock Classes="muted centered"
+                                               Margin="12"
+                                               VerticalAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding ArtNote}"
+                                               IsVisible="{Binding !HasArtImage}" />
+
+                                    <!-- Always shown while the art has a staged change, like an edited row's marker. -->
+                                    <Border Classes="artBadge"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Margin="6"
+                                            IsVisible="{Binding IsArtChanged}">
+                                        <TextBlock Classes="marker" Text="{Binding ArtMarker}" />
+                                    </Border>
+
+                                    <StackPanel Classes="artActions"
+                                                Orientation="Horizontal"
+                                                Spacing="4"
+                                                Margin="6"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Bottom">
+                                        <!-- Hidden by Button.artAction:disabled unless there's a change to revert. -->
+                                        <Button Classes="artAction"
+                                                Command="{Binding RevertArtCommand}"
+                                                ToolTip.Tip="{x:Static res:Strings.RevertArtToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.RevertArtToolTip}">
+                                            <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                        </Button>
+                                        <Button Classes="artAction"
+                                                Command="{Binding ReplaceArtCommand}"
+                                                ToolTip.Tip="{x:Static res:Strings.ReplaceArtToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.ReplaceArtToolTip}">
+                                            <PathIcon Data="{StaticResource ImageAddIconGeometry}" />
+                                        </Button>
+                                        <Button Classes="artAction"
+                                                Command="{Binding RemoveArtCommand}"
+                                                ToolTip.Tip="{x:Static res:Strings.RemoveArtToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.RemoveArtToolTip}">
+                                            <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Panel>
+                            </Border>
+                            <TextBlock Classes="error" Text="{Binding ArtError}" IsVisible="{Binding HasArtError}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" IsVisible="{Binding ShowFiles}">
+                            <TextBlock Classes="section" Margin="0,0,0,8" Text="{Binding FilesHeader}" />
+                            <TextBlock Classes="muted" Text="{x:Static res:Strings.NoFiles}" IsVisible="{Binding ShowNoFiles}" />
+                            <ItemsControl ItemsSource="{Binding Files}"
+                                          AutomationProperties.Name="{x:Static res:Strings.FilesListName}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:FileRow">
+                                        <Grid ColumnDefinitions="14,*,Auto" ColumnSpacing="0" Margin="0,2">
+                                            <TextBlock Grid.Column="0"
+                                                       Classes="marker"
+                                                       Text="{Binding Marker}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Classes.removed="{Binding IsRemoved}"
+                                                       TextTrimming="PathSegmentEllipsis"
+                                                       ToolTip.Tip="{Binding Path}"
+                                                       Text="{Binding Path}" />
+                                            <TextBlock Grid.Column="2"
+                                                       Classes="muted"
+                                                       Classes.removed="{Binding IsRemoved}"
+                                                       Margin="16,0,0,0"
+                                                       HorizontalAlignment="Right"
+                                                       Text="{Binding Size}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
 
                     <ItemsControl ItemsSource="{Binding Findings}"
                                   IsVisible="{Binding HasFindings}"
@@ -326,28 +459,6 @@
                             <TextBlock Text="{x:Static res:Strings.AddRowButton}" />
                         </StackPanel>
                     </Button>
-
-                    <StackPanel IsVisible="{Binding ShowFiles}">
-                        <TextBlock Classes="section" Text="{Binding FilesHeader}" />
-                        <TextBlock Classes="muted" Text="{x:Static res:Strings.NoFiles}" IsVisible="{Binding ShowNoFiles}" />
-                        <ItemsControl ItemsSource="{Binding Files}"
-                                      AutomationProperties.Name="{x:Static res:Strings.FilesListName}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:FileRow">
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,2">
-                                        <TextBlock Grid.Column="0"
-                                                   TextTrimming="PathSegmentEllipsis"
-                                                   ToolTip.Tip="{Binding Path}"
-                                                   Text="{Binding Path}" />
-                                        <TextBlock Grid.Column="1"
-                                                   Classes="muted"
-                                                   HorizontalAlignment="Right"
-                                                   Text="{Binding Size}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>

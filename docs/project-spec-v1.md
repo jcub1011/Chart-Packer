@@ -1,7 +1,7 @@
 # Chart-Packer — Project Specification v1
 
 | | |
-|---|---|
+| --- | --- |
 | **Status** | Draft |
 | **Scope** | Version 1.0 feature set |
 | **Format reference** | [sng-spec.md](sng-spec.md). Every format rule below links into it. |
@@ -42,7 +42,7 @@ Goals:
 ## 3. Target users and platforms
 
 | | |
-|---|---|
+| --- | --- |
 | **Users** | Chart authors preparing releases, and players converting or inspecting their libraries |
 | **Runtime** | .NET 10 (LTS), published as **Native AOT**: a self-contained native executable with no .NET runtime to install |
 | **Platforms / RIDs** | `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64`, `linux-arm64` |
@@ -53,7 +53,7 @@ Goals:
 
 ## 4. Architecture
 
-```
+```txt
 Chart-Packer.slnx
 ├── ChartPacker/              Avalonia desktop app (MVVM)            (exists)
 ├── ChartPacker.Core/         UI-free library: format, validation, pack/unpack pipelines
@@ -309,6 +309,20 @@ Behaviour:
      - A folder without a `song.ini` gets one.
    - Time values are edited in milliseconds. Unset difficulties (`diff_* = -1`) stay hidden, and
      adding one edits its stored value.
+   - **Album art.** A tile at the top of the panel shows the album art. Hovering it shows icon
+     buttons in its bottom-right corner: replace (a png, jpg or jpeg up to 16 MB) and remove. With
+     one song selected, its file list sits to the right of the tile.
+     - An art change is staged in the draft like a metadata edit. The tile is marked `*` and gets a
+       revert button. The file list strikes through the `album.*` files it removes and marks the
+       one it adds `+`. The library thumbnail shows the staged image, or no art, before saving.
+     - With several items selected, the tile shows their art when every image is identical
+       (compared by SHA-256), and "Album art differs" otherwise. Replace and Remove apply to all of
+       them.
+     - Saving replaces every top-level `album.png`/`album.jpg`/`album.jpeg` with `album.<ext>` of
+       the chosen image, or removes them all. In a `.sng` this is part of the same rewrite as the
+       metadata (item 5): the new image is masked with the existing mask. In a folder the old files
+       are deleted permanently, and a folder without a `song.ini` doesn't get one for an art-only
+       change.
 2. **Known keys** ([sng-spec §6.3](sng-spec.md#metadata-rules)):
    - a friendly label, the expected type, and a matching editor (a number box for integers, a
      checkbox for booleans, text otherwise)
@@ -367,7 +381,8 @@ Acceptance criteria:
 
 ---
 
-<a id="validation-rules"></a>
+`<a id="validation-rules"></a>`
+
 ## 6. Validation rule catalogue
 
 Severity meanings:
@@ -383,7 +398,7 @@ folder or Pack Plan.
 ### Structure
 
 | ID | Sev. | Scope | Rule | Reference |
-|----|------|-------|------|-----------|
+| ---- | ------ | ------- | ------ | ----------- |
 | SNG001 | Error | S | The first 6 bytes aren't `SNGPKG` | [§4.1](sng-spec.md#sec-header) |
 | SNG002 | Error | S | `version` isn't `1` | [A2](sng-spec.md#a2) |
 | SNG003 | Error | S | A section length, string length or file range goes past the end of the file (truncated file) | [§3](sng-spec.md#file-layout) |
@@ -395,7 +410,7 @@ folder or Pack Plan.
 ### Metadata
 
 | ID | Sev. | Scope | Rule | Reference |
-|----|------|-------|------|-----------|
+| ---- | ------ | ------- | ------ | ----------- |
 | SNG020 | Error | S F | A key contains `;`, `\r`, `\n` or `=` | [§6.1](sng-spec.md#metadata-rules) |
 | SNG021 | Error | S F | A value contains `;`, `\r` or `\n` | [§6.1](sng-spec.md#metadata-rules) |
 | SNG022 | Error | S F | A duplicate key, compared ignoring case | [A7](sng-spec.md#a7) |
@@ -408,7 +423,7 @@ folder or Pack Plan.
 ### Filenames
 
 | ID | Sev. | Scope | Rule | Reference |
-|----|------|-------|------|-----------|
+| ---- | ------ | ------- | ------ | ----------- |
 | SNG030 | Error | S F | A path segment contains a forbidden character, a control character or DEL, `..`, ends with `.` or a space, is a Windows reserved name, or is empty | [§7](sng-spec.md#filename-rules), [A1](sng-spec.md#a1), [A12](sng-spec.md#a12) |
 | SNG031 | Error | S F | The stored filename is longer than 255 UTF-8 bytes | [§7](sng-spec.md#filename-rules) |
 | SNG032 | Error | S F | A duplicate filename, compared ignoring case | [A7](sng-spec.md#a7) |
@@ -417,7 +432,7 @@ folder or Pack Plan.
 ### File data
 
 | ID | Sev. | Scope | Rule | Reference |
-|----|------|-------|------|-----------|
+| ---- | ------ | ------- | ------ | ----------- |
 | SNG040 | Error | S | A file range is outside the FileData section, or two file ranges overlap | [A5](sng-spec.md#a5) |
 | SNG041 | Warning | S | Gaps between files, or files not stored in index order | [A5](sng-spec.md#a5) |
 | SNG042 | Warning | S | The sum of `contentsLen` values doesn't equal `fileDataLen` | [A5](sng-spec.md#a5) |
@@ -426,7 +441,7 @@ folder or Pack Plan.
 ### Registry and completeness
 
 | ID | Sev. | Scope | Rule | Reference |
-|----|------|-------|------|-----------|
+| ---- | ------ | ------- | ------ | ----------- |
 | SNG050 | Info | S F | The filename isn't in the registry (this is allowed) | [§8](sng-spec.md#filename-registry) |
 | SNG051 | Warning | S F | There is no `notes.chart` or `notes.mid` | [§8](sng-spec.md#filename-registry) |
 | SNG052 | Warning | S F | There is no registered audio stem | [§8](sng-spec.md#filename-registry) |
@@ -436,7 +451,7 @@ folder or Pack Plan.
 ### Source folder only
 
 | ID | Sev. | Scope | Rule | Reference |
-|----|------|-------|------|-----------|
+| ---- | ------ | ------- | ------ | ----------- |
 | SNG070 | Warning | F | There is no `song.ini`, so metadata comes from the `[Song]` section of `notes.chart` | [§9.4](sng-spec.md#reference-behaviour) |
 | SNG071 | Warning | F | `song.ini` has no `[song]` section. Metadata comes from `notes.chart` or the editor. (The reference tool fails the song in this case.) | [§9.4](sng-spec.md#reference-behaviour) |
 | SNG072 | Info | F | A file or folder was excluded as OS or tool junk | [A14](sng-spec.md#a14) |
@@ -454,7 +469,7 @@ Inspect, Unpack or Validate, and dropping several items offers Batch. Light and 
 follow the OS. Everything can be reached by keyboard, and controls have automation names for
 screen readers.
 
-```
+```txt
 ┌──────────┬───────────────────────────────────────────────────────────────┐
 │  Pack    │  PACK                                                         │
 │  Unpack  │  Source:  [ D:\Songs\Artist - Title        ] [Browse]         │
@@ -471,7 +486,7 @@ screen readers.
 └──────────┴───────────────────────────────────────────────────────────────┘
 ```
 
-```
+```txt
 ┌──────────┬───────────────────────────────────────────────────────────────┐
 │          │  INSPECT  Artist - Title.sng            [Extract all] [Edit]  │
 │          │  Header: SNGPKG · v1 · mask 3F 9A … 01                        │
@@ -485,7 +500,7 @@ screen readers.
 └──────────┴───────────────────────────────────────────────────────────────┘
 ```
 
-```
+```txt
 ┌──────────┬───────────────────────────────────────────────────────────────┐
 │          │  BATCH  Mode: (•) Pack  ( ) Unpack    Parallel: [4 ▾]         │
 │          │  Input: [ D:\Songs ]   Output: [ D:\SNG ]   [x] Skip existing │
@@ -567,7 +582,8 @@ temp files and folders only. Two things enforce this:
 | **M4: Batch** | F4 | AC4.x pass |
 | **M5: Packaging and release** | Per-RID AOT builds: Windows zip, macOS `.app`/`.dmg`, Linux tarball or AppImage | CI builds all six RIDs. Native AOT can't cross-compile between operating systems, so there is one runner per OS (Windows, macOS, Linux). |
 
-<a id="future"></a>
+`<a id="future"></a>`
+
 ## 12. Future (after v1)
 
 - Opus audio transcoding and JPEG image re-encoding, plus album-art resizing, like
