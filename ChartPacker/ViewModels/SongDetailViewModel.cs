@@ -24,8 +24,13 @@ namespace ChartPacker.ViewModels
 {
     /// <summary>A file in the song, with its size already formatted.</summary>
     /// <param name="Marker"><c>+</c> for a file a staged change adds.</param>
-    /// <param name="IsRemoved">A staged change removes the file.</param>
-    public sealed record FileRow(string Path, string Size, string? Marker = null, bool IsRemoved = false);
+    /// <param name="IsRemoved">A staged change removes or replaces the file.</param>
+    /// <param name="CanRemove">The file can be removed, or, when it's added, the add dropped.</param>
+    /// <param name="CanRevert">The staged change that removes or replaces the file can be dropped.</param>
+    public sealed record FileRow(string Path, string Size, string? Marker = null, bool IsRemoved = false, bool CanRemove = false, bool CanRevert = false)
+    {
+        public bool IsAdded => Marker is not null;
+    }
 
     /// <summary>A structural problem found in a <c>.sng</c>.</summary>
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
@@ -39,8 +44,8 @@ namespace ChartPacker.ViewModels
     /// <remarks>
     /// Edits go into each song's <see cref="MetadataDraft"/> in the shared
     /// <see cref="MetadataDraftStore"/>, so they survive a change of selection. Nothing is written
-    /// until <see cref="SaveCommand"/>, which re-reads each file and changes only the edited keys
-    /// and, if it was changed, the album art.
+    /// until <see cref="SaveCommand"/>, which re-reads each file and changes only the edited keys,
+    /// the album art if it was changed, and the files added or removed.
     /// </remarks>
     public partial class SongDetailViewModel : ViewModelBase
     {
@@ -52,6 +57,7 @@ namespace ChartPacker.ViewModels
         private readonly MetadataDraftStore _drafts;
         private readonly JobViewModel _job;
         private readonly IImagePickerService _imagePicker;
+        private readonly IFilePickerService _filePicker;
         private CancellationTokenSource? _loadCts;
 
         // What's shown: the selection, and the songs among it whose metadata could be read.
@@ -61,7 +67,7 @@ namespace ChartPacker.ViewModels
         // Why there's no metadata, from loading, e.g. the folder has no song.ini.
         private string? _loadNote;
 
-        // The one selected song's files as they are on disk; Files adds the staged art change to them.
+        // The one selected song's files as they are on disk; Files adds the staged art and file changes to them.
         private IReadOnlyList<DiskFile> _diskFiles = [];
 
         // Decoded album art by image hash: the first song's art, and every staged replacement.
@@ -70,11 +76,12 @@ namespace ChartPacker.ViewModels
         // Staged replacement images by source path.
         private Dictionary<string, StagedArt> _stagedArt = new(StringComparer.Ordinal);
 
-        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker)
+        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker)
         {
             _drafts = drafts;
             _job = job;
             _imagePicker = imagePicker;
+            _filePicker = filePicker;
             _job.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(JobViewModel.IsRunning))
@@ -151,9 +158,16 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasArtError))]
         private string? _artError;
 
+        /// <summary>Why some of the chosen files couldn't be added.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasFilesError))]
+        private string? _filesError;
+
         public bool HasArtImage => ArtImage is not null;
 
         public bool HasArtError => ArtError is not null;
+
+        public bool HasFilesError => FilesError is not null;
 
         /// <summary>A selected song has a staged album-art change.</summary>
         public bool IsArtChanged => _songs.Any(s => s.Item.Draft.AlbumArt is not null);
@@ -193,7 +207,7 @@ namespace ChartPacker.ViewModels
 
         public string MetadataHeader => string.Format(CultureInfo.CurrentCulture, Strings.MetadataHeaderFormat, Metadata.Count);
 
-        // Counts the files there will be once the staged art change is saved.
+        // Counts the files there will be once the staged changes are saved.
         public string FilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.FilesHeaderFormat, Files.Count(f => !f.IsRemoved));
 
         /// <summary>Why <paramref name="value"/> can't be stored, or <see langword="null"/> when it can.</summary>
@@ -236,6 +250,7 @@ namespace ChartPacker.ViewModels
             ErrorMessage = null;
             SaveError = null;
             ArtError = null;
+            FilesError = null;
             CancelAdd();
             IsLoading = entries.Count > 0;
             RefreshState();
@@ -364,6 +379,13 @@ namespace ChartPacker.ViewModels
             if (path is null || !ReferenceEquals(songs, _songs) || !CanEdit)
                 return;
 
+            await StageArtAsync(path);
+        }
+
+        /// <summary>Reads the image at <paramref name="path"/> and, if it can be used, stages it as every selected song's album art.</summary>
+        private async Task StageArtAsync(string path)
+        {
+            var songs = _songs;
             ArtError = null;
             if (AlbumArt.StoredNameFor(path) is null)
             {
@@ -417,6 +439,120 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
         }
 
+        // Files are shown, and so changed, only when one song is selected.
+        private bool CanChangeFiles() => CanEdit && !IsBulk && _songs.Count == 1;
+
+        /// <summary>
+        /// Asks for files and stages adding them to the selected song, each under its own name. A
+        /// file named like album art is staged as the album art instead.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanChangeFiles))]
+        private async Task AddFilesAsync()
+        {
+            var songs = _songs;
+            var paths = await _filePicker.PickFilesAsync(Strings.PickFilesTitle);
+            if (paths.Count == 0 || !ReferenceEquals(songs, _songs) || !CanChangeFiles())
+                return;
+
+            var song = songs[0];
+            bool isSng = song.Entry.Kind == SongEntryKind.SngFile;
+            var errors = new List<string>();
+            string? art = null;
+            foreach (string path in paths)
+            {
+                string name = Path.GetFileName(path);
+                if (AlbumArt.IsAlbumArtName(name))
+                {
+                    art = path;
+                    continue;
+                }
+
+                if (name.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add(string.Format(CultureInfo.CurrentCulture, Strings.FileSongIniReservedFormat, name));
+                    continue;
+                }
+
+                if (isSng)
+                {
+                    if (FilenameRules.FindProblem(name) is { } problem)
+                    {
+                        errors.Add(string.Format(CultureInfo.CurrentCulture, Strings.FileNameInvalidFormat, name, problem.Reason));
+                        continue;
+                    }
+
+                    name = FilenameRules.NormaliseStoredName(name);
+                }
+
+                long length;
+                try
+                {
+                    length = new FileInfo(path).Length;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    errors.Add(string.Format(CultureInfo.CurrentCulture, Strings.FileUnreadableFormat, name, ex.Message));
+                    continue;
+                }
+
+                song.Item.Draft.AddFile(new AddedFile(name, path, length));
+            }
+
+            FilesError = errors.Count > 0 ? string.Join(Environment.NewLine, errors) : null;
+            OnDraftsChanged();
+            if (art is not null)
+                await StageArtAsync(art);
+        }
+
+        /// <summary>Stages removing <paramref name="row"/>'s file, or drops it when it's one the draft adds.</summary>
+        [RelayCommand(CanExecute = nameof(CanChangeFiles))]
+        private void RemoveFile(FileRow? row)
+        {
+            if (row is null || !row.CanRemove || !CanChangeFiles())
+                return;
+
+            var draft = _songs[0].Item.Draft;
+            if (AlbumArt.IsAlbumArtName(row.Path))
+            {
+                if (row.IsAdded)
+                    draft.RevertAlbumArt();
+                else
+                    draft.RemoveAlbumArt();
+                ArtError = null;
+            }
+            else if (row.IsAdded)
+            {
+                draft.RevertFile(row.Path);
+            }
+            else
+            {
+                draft.RemoveFile(row.Path);
+            }
+
+            OnDraftsChanged();
+        }
+
+        /// <summary>Drops the staged change that removes or replaces <paramref name="row"/>'s file.</summary>
+        [RelayCommand(CanExecute = nameof(CanChangeFiles))]
+        private void RevertFile(FileRow? row)
+        {
+            if (row is null || !row.CanRevert || !CanChangeFiles())
+                return;
+
+            var draft = _songs[0].Item.Draft;
+            if (AlbumArt.IsAlbumArtName(row.Path))
+            {
+                draft.RevertAlbumArt();
+                ArtError = null;
+            }
+            else
+            {
+                draft.RevertFile(row.Path);
+            }
+
+            OnDraftsChanged();
+        }
+
         // Only committed changes count: text still in an edit box isn't a change yet.
         private bool CanSave() => CanEdit && HasDrafts && !_job.IsRunning;
 
@@ -440,7 +576,7 @@ namespace ChartPacker.ViewModels
                     {
                         error = await Task.Run(() => SaveSongAsync(song));
                     }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
                     {
                         error = ex.Message;
                     }
@@ -476,41 +612,21 @@ namespace ChartPacker.ViewModels
         private void Discard()
         {
             CancelAdd();
+            FilesError = null;
             foreach (var song in _songs)
                 song.Item.Draft.Clear();
             OnDraftsChanged();
         }
 
-        /// <summary>Re-reads the song and writes it back with only the draft's keys, and its album art if staged, changed.</summary>
+        /// <summary>Re-reads the song and writes it back with only the draft's keys, album art and files changed.</summary>
         /// <returns>Why it couldn't be saved, or <see langword="null"/> on success.</returns>
         private static async Task<string?> SaveSongAsync(EditableSong song)
         {
             var draft = song.Item.Draft;
             if (song.Entry.Kind == SongEntryKind.SngFile)
-            {
-                var read = await SngReader.ReadAsync(song.Entry.FullPath).ConfigureAwait(false);
-                if (FirstError(read.Findings) is { } readError)
-                    return readError;
+                return FirstError(await DraftWriter.SaveSngAsync(song.Entry.FullPath, draft).ConfigureAwait(false));
 
-                var pairs = draft.ApplyTo(read.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList());
-                List<string> remove = [];
-                List<SngSourceFile> add = [];
-                if (draft.AlbumArt is { } art)
-                {
-                    remove.AddRange(read.Files.Select(f => f.Name).Where(AlbumArt.IsAlbumArtName));
-                    if (art.SourcePath is { } source)
-                        add.Add(new SngSourceFile(AlbumArt.StoredNameFor(source)!, source, new FileInfo(source).Length));
-                }
-
-                var findings = await SngWriter.RewriteAsync(song.Entry.FullPath, pairs, remove, add).ConfigureAwait(false);
-                return FirstError(findings);
-            }
-
-            // An art-only change mustn't create a song.ini in a folder that has none.
-            if (draft.HasMetadataChanges)
-                await SongIni.ApplyEditsAsync(song.SongIniPath!, draft).ConfigureAwait(false);
-            if (draft.AlbumArt is { } folderArt)
-                await AlbumArt.ApplyToFolderAsync(song.Entry.FullPath, folderArt).ConfigureAwait(false);
+            await DraftWriter.SaveFolderAsync(song.Entry.FullPath, song.SongIniPath!, draft).ConfigureAwait(false);
             return null;
         }
 
@@ -743,17 +859,36 @@ namespace ChartPacker.ViewModels
             RefreshCommands();
         }
 
-        /// <summary>The one selected song's files, with the ones a staged art change removes struck through and the one it adds marked.</summary>
+        /// <summary>
+        /// The one selected song's files, with the ones a staged change removes or replaces struck
+        /// through and the ones it adds marked. The album-art files follow the art change; a
+        /// folder's song.ini is edited as metadata, so it can't be removed.
+        /// </summary>
         private void RebuildFiles()
         {
-            var change = _songs.Count == 1 ? _songs[0].Item.Draft.AlbumArt : null;
+            var song = _songs.Count == 1 ? _songs[0] : null;
+            var draft = song?.Item.Draft;
+            var change = draft?.AlbumArt;
+            bool isFolder = song is not null && song.Entry.Kind != SongEntryKind.SngFile;
+
             var rows = _diskFiles
-                .Select(f => new FileRow(f.Path, ByteSizeFormatter.Format(f.Length), IsRemoved: change is not null && AlbumArt.IsAlbumArtName(f.Path)))
+                .Select(f =>
+                {
+                    bool removed = (change is not null && AlbumArt.IsAlbumArtName(f.Path))
+                        || (draft is not null && (draft.IsFileRemoved(f.Path) || draft.IsFileAdded(f.Path)));
+                    bool isSongIni = isFolder && f.Path.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase);
+                    return new FileRow(f.Path, ByteSizeFormatter.Format(f.Length),
+                        IsRemoved: removed, CanRemove: draft is not null && !removed && !isSongIni, CanRevert: draft is not null && removed);
+                })
                 .ToList();
+
+            if (draft is not null)
+                rows.AddRange(draft.AddedFiles.Select(f => new FileRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+", CanRemove: true)));
+
             if (change?.SourcePath is { } source && AlbumArt.StoredNameFor(source) is { } name)
             {
                 string size = _stagedArt.TryGetValue(source, out var staged) && staged.Error is null ? ByteSizeFormatter.Format((ulong)staged.Length) : "";
-                rows.Add(new FileRow(name, size, Marker: "+"));
+                rows.Add(new FileRow(name, size, Marker: "+", CanRemove: true));
             }
 
             if (!rows.SequenceEqual(Files))
@@ -927,6 +1062,9 @@ namespace ChartPacker.ViewModels
             ReplaceArtCommand.NotifyCanExecuteChanged();
             RemoveArtCommand.NotifyCanExecuteChanged();
             RevertArtCommand.NotifyCanExecuteChanged();
+            AddFilesCommand.NotifyCanExecuteChanged();
+            RemoveFileCommand.NotifyCanExecuteChanged();
+            RevertFileCommand.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
                 row.RefreshCommands();
         }

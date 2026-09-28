@@ -160,5 +160,78 @@ public sealed class MetadataDraftTests
         Assert.IsTrue(draft.IsEmpty);
     }
 
+    [TestMethod]
+    public void FileChangesMakeTheDraftDirtyWithoutMetadataChanges()
+    {
+        var draft = new MetadataDraft();
+        draft.RemoveFile("notes.chart");
+        draft.AddFile(new AddedFile("guitar.ogg", @"C:\src\guitar.ogg", 10));
+
+        Assert.IsFalse(draft.IsEmpty);
+        Assert.IsTrue(draft.HasFileChanges);
+        Assert.IsFalse(draft.HasMetadataChanges);
+        Assert.IsNull(draft.AlbumArt);
+        Assert.IsTrue(draft.IsFileRemoved("NOTES.chart"));
+        Assert.IsTrue(draft.IsFileAdded("Guitar.OGG"));
+    }
+
+    [TestMethod]
+    public void AddingANameAgainReplacesTheEarlierAdd()
+    {
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("guitar.ogg", "a.ogg", 1));
+        draft.AddFile(new AddedFile("drums.ogg", "d.ogg", 3));
+
+        draft.AddFile(new AddedFile("GUITAR.ogg", "b.ogg", 2));
+
+        CollectionAssert.AreEqual(
+            new[] { new AddedFile("GUITAR.ogg", "b.ogg", 2), new AddedFile("drums.ogg", "d.ogg", 3) },
+            draft.AddedFiles.ToArray());
+    }
+
+    [TestMethod]
+    public void RevertFileForgetsBothTheAddAndTheRemoval()
+    {
+        var draft = new MetadataDraft();
+        draft.RemoveFile("song.ogg");
+        draft.AddFile(new AddedFile("song.ogg", "new.ogg", 1));
+        draft.RemoveFile("notes.chart");
+
+        draft.RevertFile("SONG.ogg");
+
+        Assert.IsFalse(draft.IsFileRemoved("song.ogg"));
+        Assert.IsFalse(draft.IsFileAdded("song.ogg"));
+        CollectionAssert.AreEqual(new[] { "notes.chart" }, draft.RemovedFiles.ToArray());
+        Assert.IsEmpty(draft.AddedFiles);
+    }
+
+    [TestMethod]
+    public void RevertingEveryFileChangeLeavesTheDraftEmpty()
+    {
+        var draft = new MetadataDraft();
+        draft.RemoveFile("notes.chart");
+        draft.AddFile(new AddedFile("guitar.ogg", "g.ogg", 1));
+
+        draft.RevertFile("notes.chart");
+        draft.RevertFile("guitar.ogg");
+
+        Assert.IsTrue(draft.IsEmpty);
+        Assert.IsFalse(draft.HasFileChanges);
+    }
+
+    [TestMethod]
+    public void ClearForgetsTheFileChanges()
+    {
+        var draft = new MetadataDraft();
+        draft.RemoveFile("notes.chart");
+        draft.AddFile(new AddedFile("guitar.ogg", "g.ogg", 1));
+
+        draft.Clear();
+
+        Assert.IsTrue(draft.IsEmpty);
+        Assert.IsEmpty(draft.RemovedFiles);
+        Assert.IsEmpty(draft.AddedFiles);
+    }
+
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
 }

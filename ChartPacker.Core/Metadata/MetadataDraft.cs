@@ -17,29 +17,47 @@ public readonly record struct AlbumArtChange(string? SourcePath)
     public bool IsRemoval => SourcePath is null;
 }
 
+/// <summary>A file to add to a song.</summary>
+/// <param name="StoredName">The name to store it under, relative to the song.</param>
+/// <param name="SourcePath">The file to copy in.</param>
+/// <param name="Length">Its size when it was chosen, for display. Saving reads the size afresh.</param>
+public readonly record struct AddedFile(string StoredName, string SourcePath, long Length);
+
 /// <summary>
 /// Unsaved changes to one song's metadata, held per key rather than as a copy of the metadata,
-/// plus any change to its album art.
+/// plus any change to its album art and to its other files.
 /// </summary>
 /// <remarks>
-/// Keys are matched ignoring case (sng-spec A7). Because only the changed keys are recorded,
-/// <see cref="ApplyTo"/> can be run against whatever is on disk at save time: every key the user
-/// didn't touch is carried over exactly as stored.
+/// Keys and file names are matched ignoring case (sng-spec A7). Because only the changed keys are
+/// recorded, <see cref="ApplyTo"/> can be run against whatever is on disk at save time: every key
+/// the user didn't touch is carried over exactly as stored. Likewise only the removed and added
+/// files are recorded; an added file whose name is already in the song replaces it.
 /// </remarks>
 public sealed class MetadataDraft
 {
     // Insertion order matters: keys added by the draft are appended in the order they were added.
     private readonly List<string> _order = [];
     private readonly Dictionary<string, MetadataChange> _changes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _removedFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<AddedFile> _addedFiles = [];
 
-    /// <summary>True when there are no pending changes, to the metadata or the album art.</summary>
-    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null;
+    /// <summary>True when there are no pending changes, to the metadata, the album art or the files.</summary>
+    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasFileChanges;
 
-    /// <summary>True when a metadata key has a pending change. The album art doesn't count.</summary>
+    /// <summary>True when a metadata key has a pending change. The album art and files don't count.</summary>
     public bool HasMetadataChanges => _changes.Count > 0;
+
+    /// <summary>True when a file is to be removed or added. The album art doesn't count.</summary>
+    public bool HasFileChanges => _removedFiles.Count > 0 || _addedFiles.Count > 0;
 
     /// <summary>The pending change to the album art, if there is one.</summary>
     public AlbumArtChange? AlbumArt { get; private set; }
+
+    /// <summary>The names of the files to remove, relative to the song.</summary>
+    public IReadOnlyCollection<string> RemovedFiles => _removedFiles;
+
+    /// <summary>The files to add, in the order they were added.</summary>
+    public IReadOnlyList<AddedFile> AddedFiles => _addedFiles;
 
     /// <summary>The changed keys, in the order they were first changed.</summary>
     public IReadOnlyList<string> Keys => _order;
@@ -83,12 +101,58 @@ public sealed class MetadataDraft
     /// <summary>Forgets any change to the album art.</summary>
     public void RevertAlbumArt() => AlbumArt = null;
 
+    /// <summary>Stages <paramref name="file"/> to be added, replacing any earlier add under the same name.</summary>
+    public void AddFile(AddedFile file)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(file.StoredName);
+        ArgumentException.ThrowIfNullOrEmpty(file.SourcePath);
+
+        int index = FindAdded(file.StoredName);
+        if (index >= 0)
+            _addedFiles[index] = file;
+        else
+            _addedFiles.Add(file);
+    }
+
+    /// <summary>Marks the file <paramref name="name"/> for removal.</summary>
+    public void RemoveFile(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        _removedFiles.Add(name);
+    }
+
+    /// <summary>Forgets any removal or add of the file <paramref name="name"/>.</summary>
+    public void RevertFile(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        _removedFiles.Remove(name);
+        int index = FindAdded(name);
+        if (index >= 0)
+            _addedFiles.RemoveAt(index);
+    }
+
+    /// <summary>Whether the file <paramref name="name"/> is marked for removal.</summary>
+    public bool IsFileRemoved(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return _removedFiles.Contains(name);
+    }
+
+    /// <summary>Whether a file is staged to be added as <paramref name="name"/>.</summary>
+    public bool IsFileAdded(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return FindAdded(name) >= 0;
+    }
+
     /// <summary>Forgets every change.</summary>
     public void Clear()
     {
         _changes.Clear();
         _order.Clear();
         AlbumArt = null;
+        _removedFiles.Clear();
+        _addedFiles.Clear();
     }
 
     /// <summary>Gets the pending change to <paramref name="key"/>, if there is one.</summary>
@@ -135,6 +199,9 @@ public sealed class MetadataDraft
 
         return result;
     }
+
+    private int FindAdded(string name) =>
+        _addedFiles.FindIndex(f => f.StoredName.Equals(name, StringComparison.OrdinalIgnoreCase));
 
     private void Record(MetadataChange change)
     {

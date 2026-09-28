@@ -260,12 +260,14 @@
                                           AutomationProperties.Name="{x:Static res:Strings.FilesListName}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:FileRow">
-                                        <Grid ColumnDefinitions="14,*,Auto" ColumnSpacing="0" Margin="0,2">
+                                        <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="0" Margin="0,1">
                                             <TextBlock Grid.Column="0"
                                                        Classes="marker"
+                                                       VerticalAlignment="Center"
                                                        Text="{Binding Marker}" />
                                             <TextBlock Grid.Column="1"
                                                        Classes.removed="{Binding IsRemoved}"
+                                                       VerticalAlignment="Center"
                                                        TextTrimming="PathSegmentEllipsis"
                                                        ToolTip.Tip="{Binding Path}"
                                                        Text="{Binding Path}" />
@@ -273,12 +275,52 @@
                                                        Classes="muted"
                                                        Classes.removed="{Binding IsRemoved}"
                                                        Margin="16,0,0,0"
+                                                       VerticalAlignment="Center"
                                                        HorizontalAlignment="Right"
                                                        Text="{Binding Size}" />
+
+                                            <!-- One action per row: remove a file (or drop an added one), or undo its removal.
+                                                 Sized for a button, so the sizes line up on a row that has none (a folder's song.ini). -->
+                                            <Panel Grid.Column="3"
+                                                   MinWidth="20"
+                                                   Margin="4,0,0,0"
+                                                   IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
+                                                <Button Classes="icon"
+                                                        Padding="4"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RevertFileCommand, FallbackValue={x:Null}}"
+                                                        CommandParameter="{Binding}"
+                                                        IsVisible="{Binding CanRevert}"
+                                                        ToolTip.Tip="{x:Static res:Strings.RevertFileToolTip}"
+                                                        AutomationProperties.Name="{x:Static res:Strings.RevertFileToolTip}">
+                                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                                </Button>
+                                                <Button Classes="icon"
+                                                        Padding="4"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RemoveFileCommand, FallbackValue={x:Null}}"
+                                                        CommandParameter="{Binding}"
+                                                        IsVisible="{Binding CanRemove}"
+                                                        ToolTip.Tip="{x:Static res:Strings.RemoveFileToolTip}"
+                                                        AutomationProperties.Name="{x:Static res:Strings.RemoveFileToolTip}">
+                                                    <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                                </Button>
+                                            </Panel>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock Classes="error" Text="{Binding FilesError}" IsVisible="{Binding HasFilesError}" />
+                            <Button Classes="icon"
+                                    Margin="10,4,0,0"
+                                    Command="{Binding AddFilesCommand}"
+                                    IsVisible="{Binding CanEdit}"
+                                    AutomationProperties.Name="{x:Static res:Strings.AddFilesButton}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                                    <TextBlock Text="{x:Static res:Strings.AddFilesButton}" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Grid>
 

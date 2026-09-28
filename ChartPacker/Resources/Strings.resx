@@ -331,7 +331,7 @@
     <value>Throw away the unsaved changes to the selected items</value>
   </data>
   <data name="UnsavedToolTip" xml:space="preserve">
-    <value>This item has unsaved metadata changes</value>
+    <value>This item has unsaved changes</value>
   </data>
   <data name="AddRowButton" xml:space="preserve">
     <value>Add row</value>
@@ -397,10 +397,10 @@
     <value>Unsaved changes</value>
   </data>
   <data name="CloseUnsavedOne" xml:space="preserve">
-    <value>1 item has unsaved metadata changes. Close and discard them?</value>
+    <value>1 item has unsaved changes. Close and discard them?</value>
   </data>
   <data name="CloseUnsavedFormat" xml:space="preserve">
-    <value>{0:N0} items have unsaved metadata changes. Close and discard them?</value>
+    <value>{0:N0} items have unsaved changes. Close and discard them?</value>
     <comment>{0} is the number of items (always 2 or more).</comment>
   </data>
   <data name="DiscardAndCloseButton" xml:space="preserve">
@@ -449,5 +449,29 @@
   <data name="ArtTooLargeFormat" xml:space="preserve">
     <value>That image is too large. Album art can be up to {0}.</value>
     <comment>{0} is the size limit, e.g. "16 MB".</comment>
+  </data>
+  <data name="AddFilesButton" xml:space="preserve">
+    <value>Add files</value>
+  </data>
+  <data name="PickFilesTitle" xml:space="preserve">
+    <value>Choose files to add</value>
+  </data>
+  <data name="RemoveFileToolTip" xml:space="preserve">
+    <value>Remove this file</value>
+  </data>
+  <data name="RevertFileToolTip" xml:space="preserve">
+    <value>Undo the change to this file</value>
+  </data>
+  <data name="FileSongIniReservedFormat" xml:space="preserve">
+    <value>{0} can't be added. Edit the metadata instead.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
+  <data name="FileNameInvalidFormat" xml:space="preserve">
+    <value>{0} can't be stored in a .sng: {1}</value>
+    <comment>{0} is the file name; {1} is the reason.</comment>
+  </data>
+  <data name="FileUnreadableFormat" xml:space="preserve">
+    <value>{0} can't be added: {1}</value>
+    <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
 </root>

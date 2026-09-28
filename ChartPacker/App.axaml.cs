@@ -24,13 +24,14 @@ namespace ChartPacker
                 var window = new MainWindow();
                 var folderPicker = new AvaloniaFolderPickerService(() => window);
                 var imagePicker = new AvaloniaImagePickerService(() => window);
+                var filePicker = new AvaloniaFilePickerService(() => window);
                 var confirmation = new AvaloniaConfirmationService(() => window);
                 var drafts = new MetadataDraftStore();
                 var job = new JobViewModel(settings);
 
                 window.DataContext = new MainWindowViewModel(
                     new LibraryViewModel(folderPicker, settings, drafts, job),
-                    new SongDetailViewModel(drafts, job, imagePicker),
+                    new SongDetailViewModel(drafts, job, imagePicker, filePicker),
                     settings,
                     drafts,
                     confirmation);

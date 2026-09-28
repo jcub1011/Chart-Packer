@@ -323,6 +323,21 @@ Behaviour:
        metadata (item 5): the new image is masked with the existing mask. In a folder the old files
        are deleted permanently, and a folder without a `song.ini` doesn't get one for an art-only
        change.
+   - **Files.** With one song selected, **Add files** under the file list picks any number of
+     files, and each row has a remove button. Changes are staged in the draft like the art, so they
+     survive a change of selection, and **Discard** or closing without saving drops them.
+     - Added files are marked `+`, and their remove button drops the add. Removed files are struck
+       through and get a revert button.
+     - Each file is added under its own name: in the folder's root, or in the `.sng` under its
+       normalised stored name (A10). Adding a name that's already there replaces that file. The
+       old row is struck through, and reverting either row undoes the replacement.
+     - A name that breaks the `.sng` filename rules (A1) is refused, and so is `song.ini`, which
+       is edited as metadata. A folder's own `song.ini` can't be removed.
+     - `album.png`/`album.jpg`/`album.jpeg` rows go through the album-art change instead, so the
+       tile and the list always agree.
+     - Saving a `.sng` makes the file changes part of the same rewrite (item 5). In a folder,
+       every added file is copied to a temp file before anything is deleted, so a copy that fails
+       leaves the folder unchanged. Removed files are deleted permanently.
 2. **Known keys** ([sng-spec §6.3](sng-spec.md#metadata-rules)):
    - a friendly label, the expected type, and a matching editor (a number box for integers, a
      checkbox for booleans, text otherwise)
