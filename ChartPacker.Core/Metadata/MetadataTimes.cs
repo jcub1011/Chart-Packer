@@ -71,6 +71,24 @@ public static class MetadataTimes
         return string.Create(CultureInfo.InvariantCulture, $"{(milliseconds < 0 ? "-" : "")}{hours:00}:{minutes:00}:{seconds:00}:{ms:000}");
     }
 
+    /// <summary>
+    /// Formats a non-negative millisecond count as a compact duration, <c>M:SS</c> or <c>H:MM:SS</c>,
+    /// dropping the milliseconds.
+    /// </summary>
+    public static string FormatDuration(long milliseconds)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(milliseconds);
+
+        long totalSeconds = milliseconds / 1000;
+        long seconds = totalSeconds % 60;
+        long minutes = totalSeconds / 60 % 60;
+        long hours = totalSeconds / 3600;
+
+        return hours > 0
+            ? string.Create(CultureInfo.InvariantCulture, $"{hours}:{minutes:00}:{seconds:00}")
+            : string.Create(CultureInfo.InvariantCulture, $"{minutes}:{seconds:00}");
+    }
+
     /// <summary>Parses an integer in the spec's form (§6.2): an optional sign, then digits.</summary>
     private static bool TryParse(string text, bool allowNegative, out long value) =>
         long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value) && (allowNegative || value >= 0);

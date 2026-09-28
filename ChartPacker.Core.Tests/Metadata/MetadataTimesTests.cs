@@ -17,6 +17,20 @@ public sealed class MetadataTimesTests
         Assert.AreEqual(expected, MetadataTimes.FormatMilliseconds(ms));
 
     [TestMethod]
+    [DataRow(0L, "0:00")]
+    [DataRow(59_999L, "0:59")]
+    [DataRow(225_123L, "3:45")]
+    [DataRow(3_599_999L, "59:59")]
+    [DataRow(3_723_000L, "1:02:03")]
+    [DataRow(360_000_000L, "100:00:00")]
+    public void FormatsDurations(long ms, string expected) =>
+        Assert.AreEqual(expected, MetadataTimes.FormatDuration(ms));
+
+    [TestMethod]
+    public void NegativeDurationThrows() =>
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => MetadataTimes.FormatDuration(-1));
+
+    [TestMethod]
     [DataRow("song_length", "225123", "00:03:45:123")]
     [DataRow("SONG_LENGTH", "+1000", "00:00:01:000")]
     [DataRow("preview_start_time", "55000", "00:00:55:000")]

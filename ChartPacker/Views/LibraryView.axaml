@@ -42,6 +42,38 @@
         <Style Selector="ListBox#EntryList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#558B5CF6" />
         </Style>
+
+        <Style Selector="Border.art-tile">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+        </Style>
+
+        <!-- The entry's kind after its title: neutral for a folder, accent for a .sng. -->
+        <Style Selector="Border.kind-chip">
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.kind-chip > TextBlock">
+            <Setter Property="FontSize" Value="9" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="Border.kind-chip.sng">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.kind-chip.sng > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
     </UserControl.Styles>
 
     <DockPanel>
@@ -123,19 +155,37 @@
                     <DataTemplate x:DataType="vm:LibraryItemViewModel">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10"
                               ToolTip.Tip="{Binding Entry.FullPath}">
-                            <PathIcon Grid.Column="0"
-                                      Width="14" Height="14"
-                                      Opacity="0.8"
-                                      VerticalAlignment="Center"
-                                      Data="{Binding Entry.Kind, Converter={StaticResource EntryKindToIcon}}" />
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="{Binding Entry.DisplayName}"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" />
+                            <!-- Album art, or the kind glyph when there's none (or it hasn't loaded yet). -->
+                            <Border Grid.Column="0" Classes="art-tile">
+                                <Panel>
+                                    <PathIcon Width="16" Height="16"
+                                              Opacity="0.8"
+                                              IsVisible="{Binding !HasAlbumArt}"
+                                              Data="{Binding Entry.Kind, Converter={StaticResource EntryKindToIcon}}" />
+                                    <Image Source="{Binding AlbumArt}"
+                                           Stretch="UniformToFill"
+                                           IsVisible="{Binding HasAlbumArt}" />
+                                </Panel>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <!-- Left-aligned, so the star column is only as wide as the title and the chip
+                                     sits right after it; a long title trims before the chip. -->
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" HorizontalAlignment="Left">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding Title}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <Border Grid.Column="1"
+                                            Classes="kind-chip"
+                                            Classes.sng="{Binding IsSng}">
+                                        <TextBlock Text="{Binding KindLabel}" />
+                                    </Border>
+                                </Grid>
+                                <!-- Artist · length · charter · size, or a loading note until the metadata is read. -->
                                 <TextBlock Classes="muted"
-                                           Text="{Binding Entry.RelativePath}"
+                                           Text="{Binding Details}"
                                            FontSize="11"
-                                           TextTrimming="PathSegmentEllipsis" />
+                                           TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <!-- Unsaved metadata changes. -->
                             <Ellipse Grid.Column="2"

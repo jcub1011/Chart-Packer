@@ -71,6 +71,22 @@
   <data name="LibraryListName" xml:space="preserve">
     <value>Songs</value>
   </data>
+  <data name="ListDetailSeparator" xml:space="preserve">
+    <value> · </value>
+    <comment>Between the artist, length, charter and size under each song in the library list.</comment>
+  </data>
+  <data name="KindSng" xml:space="preserve">
+    <value>SNG</value>
+    <comment>Chip after a .sng file's title in the library list.</comment>
+  </data>
+  <data name="KindFolder" xml:space="preserve">
+    <value>FOLDER</value>
+    <comment>Chip after a song folder's title in the library list.</comment>
+  </data>
+  <data name="MetadataLoading" xml:space="preserve">
+    <value>Metadata loading...</value>
+    <comment>Under a song in the library list until its metadata has been read.</comment>
+  </data>
   <data name="LibraryPrompt" xml:space="preserve">
     <value>Choose a folder to find .sng files and song folders</value>
   </data>
