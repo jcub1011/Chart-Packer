@@ -7,5 +7,8 @@ namespace ChartPacker.Services
     {
         /// <summary>Shows a picker for any number of files and returns their local paths, or none if cancelled.</summary>
         Task<IReadOnlyList<string>> PickFilesAsync(string title);
+
+        /// <summary>Shows a picker for one audio file (ogg, opus, mp3 or wav) and returns its local path, or <see langword="null"/> if cancelled.</summary>
+        Task<string?> PickAudioAsync(string title);
     }
 }

@@ -32,8 +32,8 @@ Goals:
 - Audio transcoding (e.g. Opus), image re-encoding (JPEG) and album-art resizing. Files are
   stored exactly as they are. See [§12 Future](#future).
 - Parsing or checking the *content* of `notes.chart`, `notes.mid`, audio, image or video files.
-  The one exception is reading the `[Song]` section of `notes.chart` as fallback metadata
-  (F1.4).
+  The exceptions are reading the `[Song]` section of `notes.chart` as fallback metadata
+  (F1.4), and decoding audio to play it (F7).
 - Editing charts, or managing, searching or scanning a song library beyond what batch
   processing needs.
 - Reading pre-version-1 `.sng` files ([sng-spec.md §9.1](sng-spec.md#reference-behaviour)).
@@ -56,8 +56,9 @@ Goals:
 ```txt
 Chart-Packer.slnx
 ├── ChartPacker/              Avalonia desktop app (MVVM)            (exists)
+├── ChartPacker.Audio/        Audio decoding, mixing and playback (F7)
 ├── ChartPacker.Core/         UI-free library: format, validation, pack/unpack pipelines
-└── ChartPacker.Core.Tests/   MSTest tests for Core
+└── ChartPacker.Core.Tests/   MSTest tests for Core and Audio
 ```
 
 ### 4.1 `ChartPacker.Core`
@@ -97,7 +98,7 @@ through `IProgress<T>`.
 | Constraint | How it is enforced |
 | ---------- | ------------------ |
 | AOT publish | `<PublishAot>true</PublishAot>` on `ChartPacker` (already set in the scaffold) |
-| AOT-safe library | `<IsAotCompatible>true</IsAotCompatible>` on `ChartPacker.Core`, which turns on the trim, AOT and single-file analyzers |
+| AOT-safe library | `<IsAotCompatible>true</IsAotCompatible>` on `ChartPacker.Core` and `ChartPacker.Audio`, which turns on the trim, AOT and single-file analyzers |
 | No warnings | Trim and AOT warnings (`IL2xxx`, `IL3xxx`) are **errors** in Release builds |
 | Compiled bindings only | `<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>`. Reflection bindings are not used. |
 | Source-generated MVVM | CommunityToolkit.Mvvm generators only. No reflection-based `INotifyPropertyChanged` helpers. |
@@ -114,6 +115,16 @@ through `IProgress<T>`.
 - Tests may use MSTest (via `MSTest.Sdk`) and Microsoft.Testing.Platform, opted into for
   `dotnet test` in `global.json`.
 - Image preview uses Avalonia's built-in Skia `Bitmap`.
+- The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
+  durations from file headers, for the library list's length when a song has no `song_length`.
+- `ChartPacker.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:
+  - `NVorbis` (MIT) to decode Vorbis, `NLayer` (MIT) to decode MPEG audio frames, and
+    `Concentus` (BSD) to decode Opus packets. All three are managed code. The Ogg Opus
+    container, the MP3 frame index and gapless trim, and WAV are read in-house.
+  - `ppy.SDL3-CS` (MIT, with SDL itself under zlib) for audio output on every platform. Only
+    SDL's audio subsystem is initialised. It ships SDL's native library for each RID, which
+    publishes beside the executable.
+  - `NVorbis` is a 1.0 release candidate: 0.10.x lands seeks hundreds of samples late.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.
 
@@ -394,6 +405,46 @@ Acceptance criteria:
 - **AC6.2** Extracting a single file produces bytes identical to what a full unpack gives for
   that file.
 
+### F7. Audio playback
+
+**Input:** the one song selected in the library, a `.sng` or a folder.
+
+Behaviour:
+
+1. **Tracks.** The song's audio tracks are its registered audio stems
+   ([sng-spec §8](sng-spec.md#filename-registry)) in any of `.ogg` (Vorbis), `.opus`, `.mp3` and
+   `.wav`, in stem order. The draft's changes apply: a track it removes isn't listed, and a track
+   it adds (marked `+`) plays from the file it will be copied from, so a change can be heard
+   before it's saved.
+2. **Playing.** Play, pause, stop, a seek bar, a volume slider, and **Preview** to play from
+   `preview_start_time` when the song sets one. Every track plays together, sample-aligned: each
+   step reads the same number of frames from every track, heard or not. Tracks at another sample
+   rate are resampled to the rate most tracks share. The sum is clipped.
+3. **Mute and solo.** Each track can be muted, or soloed; while any track is soloed only the
+   soloed tracks are heard. `preview.*`, a separate clip, starts muted.
+4. **Sync across formats.** Opus pre-skip and end trimming follow RFC 7845. An MP3's LAME tag
+   encoder delay and padding are trimmed, plus the decoder's 529-sample delay, as mpg123 and
+   FFmpeg do. Seeks are sample-exact: each decoder restarts before the target and discards up to
+   it.
+5. **Adding and removing tracks.** **Add track** lists every stem; one the song has already reads
+   "Replace". It picks one audio file, decodes a little of it to check that it's what its
+   extension says, and stages it as `<stem>.<ext>`, staging every other file of that stem, in any
+   format, for removal. Each track row has a remove button. These are file changes (F5 item 1,
+   Files): saved, discarded and shown in the file list the same way.
+6. **Files stay free.** Nothing is opened until the first play. Changing the selection, or
+   saving, stops playback and closes every file first, so saving can replace or delete them.
+7. **Failures.** A track that can't be opened or decoded says why on its row and stays silent;
+   the others play on. No audio device is reported without affecting the rest of the app.
+
+Acceptance criteria:
+
+- **AC7.1** A song whose tracks are in all four formats plays them in step: a signal present in
+  every track is heard once, not smeared.
+- **AC7.2** Seeking, muting, soloing and changing the selection while playing never leaves a
+  file open: the song can be saved straight away.
+- **AC7.3** Replacing `guitar.ogg` with an `.opus` file and saving leaves `guitar.opus` and no
+  `guitar.ogg`, in a `.sng` and in a folder.
+
 ---
 
 `<a id="validation-rules"></a>`
@@ -593,7 +644,7 @@ temp files and folders only. Two things enforce this:
 | --------- | -------- | ------------- |
 | **M1: Core** | `SngMask`, `SngReader`, `SngWriter`, `SongIni`, `FilenameRules`, `SngValidator` (full catalogue), tests. AOT analyzers on from the first commit. | Every Core test passes; zero AOT warnings; interop golden files pass |
 | **M2: Pack / Unpack / Validate UI** | App shell, F1–F3, settings, logging, `--self-test` | AC1.x–AC3.x pass; first footprint baselines recorded in §9 |
-| **M3: Inspector and metadata editor** | F5, F6 | AC5.x, AC6.x pass |
+| **M3: Inspector and metadata editor** | F5, F6, F7 | AC5.x, AC6.x, AC7.x pass |
 | **M4: Batch** | F4 | AC4.x pass |
 | **M5: Packaging and release** | Per-RID AOT builds: Windows zip, macOS `.app`/`.dmg`, Linux tarball or AppImage | CI builds all six RIDs. Native AOT can't cross-compile between operating systems, so there is one runner per OS (Windows, macOS, Linux). |
 

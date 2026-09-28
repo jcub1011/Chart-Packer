@@ -141,6 +141,29 @@
         <Style Selector="Button.icon:pointerover, Button.icon:focus-visible">
             <Setter Property="Opacity" Value="1" />
         </Style>
+
+        <!-- Playback: round transport buttons, and small M/S toggles that fill in with the accent when on. -->
+        <Style Selector="Button.transport">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.transport PathIcon">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+        </Style>
+        <Style Selector="ToggleButton.trackSwitch">
+            <Setter Property="MinWidth" Value="24" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
     </UserControl.Styles>
 
     <Panel>
@@ -323,6 +346,136 @@
                             </Button>
                         </StackPanel>
                     </Grid>
+
+                    <!-- The one selected song's audio tracks, played together and in step. A track
+                         can be muted, or soloed to hear it alone; added and removed tracks play as
+                         they will be once saved. -->
+                    <StackPanel IsVisible="{Binding ShowFiles}">
+                        <TextBlock Classes="section" Text="{Binding Player.TracksHeader}" />
+                        <TextBlock Classes="muted" Text="{x:Static res:Strings.NoTracks}" IsVisible="{Binding !Player.HasTracks}" />
+
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto"
+                              ColumnSpacing="8"
+                              Margin="0,0,0,6"
+                              IsVisible="{Binding Player.HasTracks}">
+                            <Button Grid.Column="0"
+                                    Classes="transport accent"
+                                    Command="{Binding Player.PlayPauseCommand}"
+                                    ToolTip.Tip="{Binding Player.PlayPauseToolTip}"
+                                    AutomationProperties.Name="{Binding Player.PlayPauseToolTip}">
+                                <Panel>
+                                    <PathIcon Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Player.IsPlaying}" />
+                                    <PathIcon Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Player.IsPlaying}" />
+                                </Panel>
+                            </Button>
+                            <Button Grid.Column="1"
+                                    Classes="transport"
+                                    Command="{Binding Player.StopCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.StopToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.StopToolTip}">
+                                <PathIcon Data="{StaticResource StopIconGeometry}" />
+                            </Button>
+                            <TextBlock Grid.Column="2"
+                                       Classes="muted"
+                                       VerticalAlignment="Center"
+                                       FontFeatures="tnum"
+                                       Text="{Binding Player.PositionText}" />
+                            <!-- Dragging the thumb seeks when it's let go; a click on the track seeks at once. -->
+                            <Slider x:Name="SeekSlider"
+                                    Grid.Column="3"
+                                    Minimum="0"
+                                    Maximum="{Binding Player.LengthSeconds}"
+                                    Value="{Binding Player.PositionSeconds}"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="{x:Static res:Strings.SeekName}" />
+                            <TextBlock Grid.Column="4"
+                                       Classes="muted"
+                                       VerticalAlignment="Center"
+                                       FontFeatures="tnum"
+                                       Text="{Binding Player.LengthText}" />
+                            <Button Grid.Column="5"
+                                    VerticalAlignment="Center"
+                                    Content="{x:Static res:Strings.JumpToPreviewButton}"
+                                    Command="{Binding Player.JumpToPreviewCommand}"
+                                    IsVisible="{Binding Player.HasPreviewStart}"
+                                    ToolTip.Tip="{x:Static res:Strings.JumpToPreviewToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.JumpToPreviewToolTip}" />
+                            <Slider Grid.Column="6"
+                                    Width="90"
+                                    Minimum="0"
+                                    Maximum="1"
+                                    Value="{Binding Player.Volume}"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="{x:Static res:Strings.VolumeName}"
+                                    AutomationProperties.Name="{x:Static res:Strings.VolumeName}" />
+                        </Grid>
+                        <TextBlock Classes="muted" Text="{x:Static res:Strings.OpeningAudio}" IsVisible="{Binding Player.IsOpening}" />
+                        <TextBlock Classes="error" Text="{Binding Player.Error}" IsVisible="{Binding Player.HasError}" />
+
+                        <ItemsControl ItemsSource="{Binding Player.Tracks}"
+                                      AutomationProperties.Name="{x:Static res:Strings.TracksListName}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:TrackRowViewModel">
+                                    <Grid ColumnDefinitions="14,Auto,Auto,*,Auto" ColumnSpacing="4" Margin="0,1">
+                                        <TextBlock Grid.Column="0"
+                                                   Classes="marker"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding Marker}" />
+                                        <ToggleButton Grid.Column="1"
+                                                      Classes="trackSwitch"
+                                                      Content="{x:Static res:Strings.MuteButton}"
+                                                      IsChecked="{Binding IsMuted}"
+                                                      ToolTip.Tip="{x:Static res:Strings.MuteToolTip}"
+                                                      AutomationProperties.Name="{x:Static res:Strings.MuteToolTip}" />
+                                        <ToggleButton Grid.Column="2"
+                                                      Classes="trackSwitch"
+                                                      Content="{x:Static res:Strings.SoloButton}"
+                                                      IsChecked="{Binding IsSolo}"
+                                                      ToolTip.Tip="{x:Static res:Strings.SoloToolTip}"
+                                                      AutomationProperties.Name="{x:Static res:Strings.SoloToolTip}" />
+                                        <StackPanel Grid.Column="3" Margin="6,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Text="{Binding Name}" />
+                                            <TextBlock Classes="error" Margin="0" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="4"
+                                                Classes="icon"
+                                                Padding="4"
+                                                VerticalAlignment="Center"
+                                                Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RemoveTrackCommand, FallbackValue={x:Null}}"
+                                                CommandParameter="{Binding}"
+                                                IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}"
+                                                ToolTip.Tip="{x:Static res:Strings.RemoveTrackToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.RemoveTrackToolTip}">
+                                            <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Classes="error" Text="{Binding TracksError}" IsVisible="{Binding HasTracksError}" />
+
+                        <!-- One entry per stem; a stem the song has already is replaced, in whatever format it was. -->
+                        <Button Classes="icon"
+                                Margin="10,4,0,0"
+                                IsVisible="{Binding CanEdit}"
+                                AutomationProperties.Name="{x:Static res:Strings.AddTrackButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                                <TextBlock Text="{x:Static res:Strings.AddTrackButton}" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding AddTrackOptions}">
+                                    <MenuFlyout.ItemContainerTheme>
+                                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:StemOption">
+                                            <Setter Property="Header" Value="{Binding Label}" />
+                                            <Setter Property="Command" Value="{Binding Command}" />
+                                        </ControlTheme>
+                                    </MenuFlyout.ItemContainerTheme>
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
 
                     <ItemsControl ItemsSource="{Binding Findings}"
                                   IsVisible="{Binding HasFindings}"

@@ -474,4 +474,96 @@
     <value>{0} can't be added: {1}</value>
     <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
+  <data name="TracksHeaderFormat" xml:space="preserve">
+    <value>Tracks ({0})</value>
+    <comment>{0} is how many audio tracks the song will have.</comment>
+  </data>
+  <data name="NoTracks" xml:space="preserve">
+    <value>No audio tracks.</value>
+  </data>
+  <data name="TracksListName" xml:space="preserve">
+    <value>Audio tracks</value>
+  </data>
+  <data name="PlayToolTip" xml:space="preserve">
+    <value>Play</value>
+  </data>
+  <data name="PauseToolTip" xml:space="preserve">
+    <value>Pause</value>
+  </data>
+  <data name="StopToolTip" xml:space="preserve">
+    <value>Stop and go back to the start</value>
+  </data>
+  <data name="JumpToPreviewToolTip" xml:space="preserve">
+    <value>Play from the preview start</value>
+  </data>
+  <data name="JumpToPreviewButton" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="SeekName" xml:space="preserve">
+    <value>Playback position</value>
+  </data>
+  <data name="VolumeName" xml:space="preserve">
+    <value>Volume</value>
+  </data>
+  <data name="MuteToolTip" xml:space="preserve">
+    <value>Mute this track</value>
+  </data>
+  <data name="SoloToolTip" xml:space="preserve">
+    <value>Play only the soloed tracks</value>
+  </data>
+  <data name="MuteButton" xml:space="preserve">
+    <value>M</value>
+    <comment>Short label for the mute toggle on a track row.</comment>
+  </data>
+  <data name="SoloButton" xml:space="preserve">
+    <value>S</value>
+    <comment>Short label for the solo toggle on a track row.</comment>
+  </data>
+  <data name="RemoveTrackToolTip" xml:space="preserve">
+    <value>Remove this track</value>
+  </data>
+  <data name="AddTrackButton" xml:space="preserve">
+    <value>Add track</value>
+  </data>
+  <data name="ReplaceTrackFormat" xml:space="preserve">
+    <value>Replace {0}</value>
+    <comment>{0} is the stem, e.g. "guitar".</comment>
+  </data>
+  <data name="PickTrackTitleFormat" xml:space="preserve">
+    <value>Choose the {0} track</value>
+    <comment>{0} is the stem, e.g. "guitar".</comment>
+  </data>
+  <data name="AudioFileTypeName" xml:space="preserve">
+    <value>Audio (ogg, opus, mp3, wav)</value>
+  </data>
+  <data name="TrackNotAudioFormat" xml:space="preserve">
+    <value>{0} isn't an ogg, opus, mp3 or wav file.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
+  <data name="TrackUnusableFormat" xml:space="preserve">
+    <value>{0} can't be used as a track: {1}</value>
+    <comment>{0} is the file name; {1} is the reason.</comment>
+  </data>
+  <data name="TrackUnplayableFormat" xml:space="preserve">
+    <value>Can't be played: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="SongAudioUnreadableFormat" xml:space="preserve">
+    <value>The song's audio can't be read: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="NoPlayableTracks" xml:space="preserve">
+    <value>None of the tracks can be played.</value>
+  </data>
+  <data name="AudioDeviceFailedFormat" xml:space="preserve">
+    <value>No audio output is available: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="PlaybackFailedFormat" xml:space="preserve">
+    <value>Playback stopped: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="OpeningAudio" xml:space="preserve">
+    <value>Opening audio…</value>
+  </data>
 </root>

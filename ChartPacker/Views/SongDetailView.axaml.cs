@@ -23,6 +23,20 @@ namespace ChartPacker.Views
             };
             NewKeyBox.AddHandler(PointerReleasedEvent, OnKeyBoxPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
             NewKeyBox.AddHandler(KeyDownEvent, OnKeyBoxKeyDown, RoutingStrategies.Tunnel);
+
+            // While the seek slider is held, by its thumb or its track, the position stops following
+            // playback; letting go seeks there. The slider handles these itself, hence handledEventsToo.
+            SeekSlider.AddHandler(PointerPressedEvent, (_, _) => Player?.BeginScrub(), RoutingStrategies.Tunnel, handledEventsToo: true);
+            SeekSlider.AddHandler(PointerReleasedEvent, (_, _) => EndScrub(), RoutingStrategies.Bubble, handledEventsToo: true);
+            SeekSlider.AddHandler(PointerCaptureLostEvent, (_, _) => EndScrub(), RoutingStrategies.Bubble, handledEventsToo: true);
+        }
+
+        private PlayerViewModel? Player => (DataContext as SongDetailViewModel)?.Player;
+
+        private void EndScrub()
+        {
+            if (Player is { IsScrubbing: true } player)
+                player.EndScrub();
         }
 
         /// <summary>Clicking away from a value's edit box keeps what was typed, like pressing Enter.</summary>

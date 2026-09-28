@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using ChartPacker.Audio.Decoding;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -35,6 +36,9 @@ namespace ChartPacker.ViewModels
     /// <summary>A structural problem found in a <c>.sng</c>.</summary>
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
 
+    /// <summary>An entry of the Add track menu: a stem, labelled to say whether choosing it replaces the song's track for it.</summary>
+    public sealed record StemOption(string Stem, string Label, IAsyncRelayCommand Command);
+
     /// <summary>
     /// The right panel: the album art and metadata of the songs selected in the library, editable
     /// for one song or for all of them at once, plus the file list when one song is selected. For a
@@ -46,6 +50,9 @@ namespace ChartPacker.ViewModels
     /// <see cref="MetadataDraftStore"/>, so they survive a change of selection. Nothing is written
     /// until <see cref="SaveCommand"/>, which re-reads each file and changes only the edited keys,
     /// the album art if it was changed, and the files added or removed.
+    /// <para>The one selected song's audio tracks, with the draft's added and removed tracks
+    /// applied, play in <see cref="Player"/>. It holds the files open while it plays, so it's
+    /// unloaded before saving.</para>
     /// </remarks>
     public partial class SongDetailViewModel : ViewModelBase
     {
@@ -76,12 +83,18 @@ namespace ChartPacker.ViewModels
         // Staged replacement images by source path.
         private Dictionary<string, StagedArt> _stagedArt = new(StringComparer.Ordinal);
 
-        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker)
+        // One command per stem for the Add track menu, whose labels change with the song's tracks.
+        private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
+
+        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker, PlayerViewModel player)
         {
             _drafts = drafts;
             _job = job;
             _imagePicker = imagePicker;
             _filePicker = filePicker;
+            Player = player;
+            foreach (string stem in AudioStems.Stems)
+                _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
             _job.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(JobViewModel.IsRunning))
@@ -94,6 +107,13 @@ namespace ChartPacker.ViewModels
         public AvaloniaList<FileRow> Files { get; } = new();
 
         public AvaloniaList<FindingRow> Findings { get; } = new();
+
+        /// <summary>Plays the one selected song's audio tracks.</summary>
+        public PlayerViewModel Player { get; }
+
+        /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
+        [ObservableProperty]
+        private IReadOnlyList<StemOption> _addTrackOptions = [];
 
         /// <summary>The song's name, or how many items are selected.</summary>
         [ObservableProperty]
@@ -163,11 +183,18 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasFilesError))]
         private string? _filesError;
 
+        /// <summary>Why the chosen file couldn't be added as a track.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasTracksError))]
+        private string? _tracksError;
+
         public bool HasArtImage => ArtImage is not null;
 
         public bool HasArtError => ArtError is not null;
 
         public bool HasFilesError => FilesError is not null;
+
+        public bool HasTracksError => TracksError is not null;
 
         /// <summary>A selected song has a staged album-art change.</summary>
         public bool IsArtChanged => _songs.Any(s => s.Item.Draft.AlbumArt is not null);
@@ -229,6 +256,9 @@ namespace ChartPacker.ViewModels
             using var cts = new CancellationTokenSource();
             _loadCts = cts;
 
+            // Playback is of what's shown, and holds its files open.
+            Player.Unload();
+
             _entries = entries;
             _songs = [];
             _loadNote = null;
@@ -251,6 +281,7 @@ namespace ChartPacker.ViewModels
             SaveError = null;
             ArtError = null;
             FilesError = null;
+            TracksError = null;
             CancelAdd();
             IsLoading = entries.Count > 0;
             RefreshState();
@@ -553,6 +584,81 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
         }
 
+        /// <summary>
+        /// Asks for an audio file and stages it as the selected song's <paramref name="stem"/>
+        /// track, stored as the stem with the file's extension. Every other file of the stem, in
+        /// any format, is staged for removal, so the song ends up with one track for it.
+        /// </summary>
+        private async Task AddTrackAsync(string stem)
+        {
+            var songs = _songs;
+            string? path = await _filePicker.PickAudioAsync(string.Format(CultureInfo.CurrentCulture, Strings.PickTrackTitleFormat, stem));
+            if (path is null || !ReferenceEquals(songs, _songs) || !CanChangeFiles())
+                return;
+
+            string fileName = Path.GetFileName(path);
+            string extension = Path.GetExtension(path).ToLowerInvariant();
+            TracksError = null;
+            if (!AudioStems.IsAudioExtension(extension))
+            {
+                TracksError = string.Format(CultureInfo.CurrentCulture, Strings.TrackNotAudioFormat, fileName);
+                return;
+            }
+
+            // Decoding a little of it now catches a file that isn't what its extension says.
+            var (length, problem) = await Task.Run(() =>
+            {
+                try
+                {
+                    AudioDecoder.Check(path);
+                    return (new FileInfo(path).Length, (string?)null);
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+                {
+                    return (0L, ex.Message);
+                }
+            });
+
+            if (!ReferenceEquals(songs, _songs) || !CanChangeFiles())
+                return;
+            if (problem is not null)
+            {
+                TracksError = string.Format(CultureInfo.CurrentCulture, Strings.TrackUnusableFormat, fileName, problem);
+                return;
+            }
+
+            string storedName = stem + extension;
+            var draft = songs[0].Item.Draft;
+            foreach (string added in SongTracks.FilesOfStem(draft.AddedFiles.Select(f => f.StoredName), stem))
+                draft.RevertFile(added);
+
+            // A stored file that differs only in case is still replaced, on a case-sensitive file system too.
+            foreach (string stored in SongTracks.FilesOfStem(_diskFiles.Select(f => f.Path), stem))
+            {
+                if (!stored.Equals(storedName, StringComparison.Ordinal))
+                    draft.RemoveFile(stored);
+            }
+
+            draft.AddFile(new AddedFile(storedName, path, length));
+            OnDraftsChanged();
+        }
+
+        /// <summary>Stages removing <paramref name="row"/>'s track, or drops it when it's one the draft adds.</summary>
+        [RelayCommand(CanExecute = nameof(CanChangeFiles))]
+        private void RemoveTrack(TrackRowViewModel? row)
+        {
+            if (row is null || !CanChangeFiles())
+                return;
+
+            var draft = _songs[0].Item.Draft;
+            if (row.Track.IsStaged)
+                draft.RevertFile(row.Track.StoredName);
+            else
+                draft.RemoveFile(row.Track.StoredName);
+            TracksError = null;
+            OnDraftsChanged();
+        }
+
         // Only committed changes count: text still in an edit box isn't a change yet.
         private bool CanSave() => CanEdit && HasDrafts && !_job.IsRunning;
 
@@ -567,6 +673,9 @@ namespace ChartPacker.ViewModels
             CancelAdd();
             IsSaving = true;
             SaveError = null;
+
+            // Playback holds the song's files open, which would stop them being replaced or deleted.
+            Player.Unload();
             try
             {
                 foreach (var song in dirty)
@@ -613,6 +722,7 @@ namespace ChartPacker.ViewModels
         {
             CancelAdd();
             FilesError = null;
+            TracksError = null;
             foreach (var song in _songs)
                 song.Item.Draft.Clear();
             OnDraftsChanged();
@@ -899,6 +1009,40 @@ namespace ChartPacker.ViewModels
 
             OnPropertyChanged(nameof(ShowNoFiles));
             OnPropertyChanged(nameof(FilesHeader));
+            RefreshTracks();
+        }
+
+        /// <summary>Gives the player the one selected song's tracks once its draft is applied, and labels the Add track menu to match.</summary>
+        private void RefreshTracks()
+        {
+            if (IsBulk || _entries.Count != 1)
+            {
+                Player.Unload();
+                AddTrackOptions = [];
+                return;
+            }
+
+            var song = _songs.Count == 1 ? _songs[0] : null;
+            var tracks = SongTracks.Resolve(_diskFiles.Select(f => f.Path), song?.Item.Draft);
+            Player.Load(_entries[0], tracks, song is null ? null : PreviewStart(song));
+
+            var stems = tracks.Select(t => t.Stem).ToHashSet(StringComparer.Ordinal);
+            AddTrackOptions = AudioStems.Stems
+                .Select(stem => new StemOption(
+                    stem,
+                    stems.Contains(stem) ? string.Format(CultureInfo.CurrentCulture, Strings.ReplaceTrackFormat, stem) : stem,
+                    _addTrackCommands[stem]))
+                .ToList();
+        }
+
+        /// <summary>Where the song's <c>preview_start_time</c>, drafted or stored, starts the preview.</summary>
+        private static TimeSpan? PreviewStart(EditableSong song)
+        {
+            string? value = song.Item.Draft.ApplyTo(song.Item.Original)
+                .FirstOrDefault(p => p.Key.Equals("preview_start_time", StringComparison.OrdinalIgnoreCase)).Value;
+            return long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long ms) && ms >= 0
+                ? TimeSpan.FromMilliseconds(ms)
+                : null;
         }
 
         private void AddImage(string hash, Bitmap bitmap)
@@ -1065,6 +1209,9 @@ namespace ChartPacker.ViewModels
             AddFilesCommand.NotifyCanExecuteChanged();
             RemoveFileCommand.NotifyCanExecuteChanged();
             RevertFileCommand.NotifyCanExecuteChanged();
+            RemoveTrackCommand.NotifyCanExecuteChanged();
+            foreach (var command in _addTrackCommands.Values)
+                command.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
                 row.RefreshCommands();
         }

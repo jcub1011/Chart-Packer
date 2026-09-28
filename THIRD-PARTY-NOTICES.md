@@ -48,6 +48,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
   Tags and the Clone Hero, Phase Shift, Frets on Fire X and Editor on Fire tag lists. No text is
   copied; the key descriptions are Chart-Packer's own.
 
+### Audio formats
+
+The containers and headers that `ChartPacker.Audio` reads itself are written from their
+specifications; no code from any implementation of them is used.
+
+- **Ogg:** [RFC 3533](https://www.rfc-editor.org/rfc/rfc3533), The Ogg Encapsulation Format
+  (`Decoding/OggPageReader.cs`).
+- **Ogg Opus:** [RFC 7845](https://www.rfc-editor.org/rfc/rfc7845), Ogg Encapsulation for the Opus
+  Audio Codec: the identification header, pre-skip, output gain, end trimming and seek pre-roll
+  (`Decoding/OpusSource.cs`).
+- **MPEG audio frames:** the frame header of ISO/IEC 11172-3 and 13818-3 (`Decoding/MpegFrame.cs`).
+- **Gapless MP3:** the Xing/Info frame and the
+  [LAME tag](http://gabriel.mp3-tech.org/mp3infotag.html)'s encoder delay and padding, and
+  [ID3v2](https://id3.org/id3v2.4.0-structure)'s tag header, to skip the tag
+  (`Decoding/Mp3Source.cs`).
+- **WAV:** the RIFF WAVE format, including `WAVE_FORMAT_EXTENSIBLE` (`Decoding/WavSource.cs`).
+
 ## Bundled libraries
 
 A release is a single native executable (.NET Native AOT) plus the native libraries below it
@@ -68,9 +85,19 @@ builds only) aren't part of a release and aren't listed.
 | [ANGLE](https://github.com/google/angle) (`Avalonia.Angle.Windows.Natives`) | 2.1.27548 | BSD 3-Clause | © 2018 The ANGLE Project Authors |
 | [Inter](https://github.com/rsms/inter) typeface, embedded in `Avalonia.Fonts.Inter` | — | SIL OFL 1.1 | © 2016 The Inter Project Authors |
 | [Ude](https://github.com/yinyue200/ude) (`Ude.NetStandard`), a dependency of ATL.NET | 1.2.0 | MPL 1.1 (or GPL 2.0+ / LGPL 2.1+) | The Ude and Mozilla contributors |
+| [NVorbis](https://github.com/NVorbis/NVorbis) | 1.0.0-rc.2 | MIT | © 2020 Andrew Ward |
+| [NLayer](https://github.com/naudio/NLayer) | 3.0.0 | MIT | © 2018 Mark Heath, Andrew Ward & Contributors |
+| [Concentus](https://github.com/lostromb/concentus) | 2.2.2 | BSD 3-Clause (the Opus license) | © Skype Limited, Xiph.Org Foundation, CSIRO, Microsoft Corporation and others |
+| [ppy/SDL3-CS](https://github.com/ppy/SDL3-CS) (`ppy.SDL3-CS`) | 2026.722.0 | MIT | © 2024 ppy Pty Ltd |
+| [SDL](https://github.com/libsdl-org/SDL), the native library in `ppy.SDL3-CS` | 3.5.0 | zlib | © 1997-2026 Sam Lantinga |
 
 ATL.NET reads audio durations in `ChartPacker.Core/Scanning/AudioLength.cs`, the library list's
 fallback when a song has no `song_length`.
+
+For audio playback (`ChartPacker.Audio`), NVorbis decodes Vorbis, NLayer decodes MPEG audio
+frames, and Concentus decodes Opus packets, all in managed code. SDL plays the mixed result; only
+its audio subsystem is used. Its native library (`SDL3.dll`, `libSDL3.so` or `libSDL3.dylib`)
+ships beside the executable.
 
 ### MIT License
 
@@ -253,3 +280,60 @@ Used unmodified, as a dependency of ATL.NET. Chart-Packer uses it under the
 [Mozilla Public License 1.1](https://www.mozilla.org/en-US/MPL/1.1/). The project may alternatively
 be used under the GNU GPL 2.0 or later, or the GNU LGPL 2.1 or later. Its source code is available
 from [yinyue200/ude](https://github.com/yinyue200/ude).
+
+### Concentus
+
+```
+Copyright (c) by various holding parties, including (but not limited to):
+Skype Limited, Xiph.Org Foundation, CSIRO, Microsoft Corporation,
+Jean-Marc Valin, Gregory Maxwell, Mark Borgerding, Timothy B. Terriberry,
+Logan Stromberg. All rights are reserved by their respective holders.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of Internet Society, IETF or IETF Trust, nor the
+   names of specific contributors, may be used to endorse or promote
+   products derived from this software without specific prior written
+   permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+### SDL
+
+```
+Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
+
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
+```

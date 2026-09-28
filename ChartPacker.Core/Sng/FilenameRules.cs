@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Globalization;
 using System.Text;
 using ChartPacker.Core.Resources;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Validation;
 
 namespace ChartPacker.Core.Sng;
@@ -113,9 +114,7 @@ public static class FilenameRules
 
         Add(["album", "background", "highway"], ["png", "jpg", "jpeg"]);
         Add(["video"], ["mp4", "avi", "webm", "vp8", "ogv", "mpeg"]);
-        Add(
-            ["guitar", "bass", "rhythm", "vocals", "vocals_1", "vocals_2", "drums", "drums_1", "drums_2", "drums_3", "drums_4", "keys", "song", "crowd", "preview"],
-            ["mp3", "ogg", "opus", "wav"]);
+        Add([.. AudioStems.Stems], [.. AudioStems.Extensions.Select(e => e.TrimStart('.'))]);
         return names;
     }
 

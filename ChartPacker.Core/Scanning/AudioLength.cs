@@ -16,8 +16,6 @@ namespace ChartPacker.Core.Scanning;
 /// </remarks>
 public static class AudioLength
 {
-    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase) { ".mp3", ".ogg", ".opus", ".wav" };
-
     static AudioLength()
     {
         // ATL writes the stack trace of every file it can't parse to the console by default.
@@ -25,11 +23,7 @@ public static class AudioLength
     }
 
     /// <summary>Whether <paramref name="name"/>, a path relative to the song folder, is an audio file that counts.</summary>
-    public static bool IsAudioFile(string name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        return !name.Contains('/') && AudioExtensions.Contains(Path.GetExtension(name));
-    }
+    public static bool IsAudioFile(string name) => AudioStems.IsAudioFile(name);
 
     /// <summary>The longest of the folder's audio files, in milliseconds.</summary>
     /// <param name="folder">The song folder.</param>

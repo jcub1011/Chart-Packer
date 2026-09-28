@@ -27,6 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ChartPacker.Audio\ChartPacker.Audio.csproj" />
     <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
   </ItemGroup>
 
