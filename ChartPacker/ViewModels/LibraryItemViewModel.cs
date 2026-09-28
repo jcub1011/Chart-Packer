@@ -28,6 +28,10 @@ namespace ChartPacker.ViewModels
 
         public bool HasAlbumArt => AlbumArt is not null;
 
+        public bool HasSize => SizeText is not null;
+
+        public bool HasLength => LengthText is not null;
+
         /// <summary>Maintained by <see cref="AlbumArtLoader"/>.</summary>
         internal AlbumArtState ArtState { get; set; }
 
@@ -46,9 +50,19 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private string _title = entry.DisplayName;
 
-        /// <summary>Artist, length, charter and size; a loading note until the metadata is read.</summary>
+        /// <summary>Artist and charter; a loading note until the metadata is read.</summary>
         [ObservableProperty]
         private string _details = Strings.MetadataLoading;
+
+        /// <summary>The song length, for the chip before the size chip; null until read or when unknown.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasLength))]
+        private string? _lengthText;
+
+        /// <summary>The file's or folder's total size, for the chip at the end of the detail line; null until read.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSize))]
+        private string? _sizeText;
 
         /// <summary>The album-art thumbnail, once <see cref="AlbumArtLoader"/> has read it. Owned by the loader.</summary>
         [ObservableProperty]
@@ -73,21 +87,24 @@ namespace ChartPacker.ViewModels
             {
                 Title = Entry.DisplayName;
                 Details = Entry.RelativePath;
+                LengthText = null;
+                SizeText = null;
                 return;
             }
 
             var headline = SongHeadline.From(draft?.ApplyTo(_summary.Pairs) ?? _summary.Pairs);
             Title = headline.Name ?? Entry.DisplayName;
 
-            var parts = new List<string>(4);
+            var parts = new List<string>(2);
             if (headline.Artist is { } artist)
                 parts.Add(artist);
-            if (headline.LengthMs is { } length)
-                parts.Add(MetadataTimes.FormatDuration(length));
             if (headline.Charter is { } charter)
                 parts.Add(charter);
-            parts.Add(ByteSizeFormatter.Format(_summary.TotalSize));
             Details = string.Join(Strings.ListDetailSeparator, parts);
+
+            // Without a song_length, the longest audio file stands in.
+            LengthText = (headline.LengthMs ?? _summary.FallbackLengthMs) is { } length ? MetadataTimes.FormatDuration(length) : null;
+            SizeText = ByteSizeFormatter.Format(_summary.TotalSize);
         }
     }
 }

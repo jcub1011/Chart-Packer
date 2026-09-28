@@ -8,4 +8,8 @@
   <ItemGroup>
     <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
+  </ItemGroup>
 </Project>

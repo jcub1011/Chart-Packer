@@ -22,4 +22,8 @@
       <PublicClass>false</PublicClass>
     </EmbeddedResource>
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="z440.atl.core" Version="7.18.0" />
+  </ItemGroup>
 </Project>

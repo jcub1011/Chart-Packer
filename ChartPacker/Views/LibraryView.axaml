@@ -52,26 +52,35 @@
             <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
         </Style>
 
-        <!-- The entry's kind after its title: neutral for a folder, accent for a .sng. -->
-        <Style Selector="Border.kind-chip">
+        <!-- Small right-aligned labels in a row: the entry's kind (accent for a .sng) and its size. -->
+        <Style Selector="Border.chip">
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="Padding" Value="4,0" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
             <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
         </Style>
-        <Style Selector="Border.kind-chip > TextBlock">
+        <Style Selector="Border.chip > TextBlock">
             <Setter Property="FontSize" Value="9" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Opacity" Value="0.7" />
         </Style>
-        <Style Selector="Border.kind-chip.sng">
+        <Style Selector="Border.chip.sng">
             <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
             <Setter Property="BorderBrush" Value="Transparent" />
         </Style>
-        <Style Selector="Border.kind-chip.sng > TextBlock">
+        <Style Selector="Border.chip.sng > TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Border.chip.folder">
+            <Setter Property="Background" Value="{DynamicResource FolderTintBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.chip.folder > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource FolderTextBrush}" />
             <Setter Property="Opacity" Value="1" />
         </Style>
     </UserControl.Styles>
@@ -167,26 +176,40 @@
                                            IsVisible="{Binding HasAlbumArt}" />
                                 </Panel>
                             </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <!-- Left-aligned, so the star column is only as wide as the title and the chip
-                                     sits right after it; a long title trims before the chip. -->
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" HorizontalAlignment="Left">
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding Title}"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <Border Grid.Column="1"
-                                            Classes="kind-chip"
-                                            Classes.sng="{Binding IsSng}">
-                                        <TextBlock Text="{Binding KindLabel}" />
-                                    </Border>
-                                </Grid>
-                                <!-- Artist · length · charter · size, or a loading note until the metadata is read. -->
-                                <TextBlock Classes="muted"
+                            <!-- Text on the left, chips on the right: the kind on the title line, the length and size on the detail line. -->
+                            <Grid Grid.Column="1"
+                                  ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="8" RowSpacing="2"
+                                  VerticalAlignment="Center">
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="{Binding Title}"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <Border Grid.Row="0" Grid.Column="1"
+                                        Classes="chip"
+                                        Classes.sng="{Binding IsSng}"
+                                        Classes.folder="{Binding !IsSng}">
+                                    <TextBlock Text="{Binding KindLabel}" />
+                                </Border>
+
+                                <!-- Artist · charter, or a loading note until the metadata is read. -->
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Classes="muted"
                                            Text="{Binding Details}"
                                            FontSize="11"
+                                           VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="1"
+                                            Orientation="Horizontal" Spacing="4"
+                                            HorizontalAlignment="Right">
+                                    <Border Classes="chip" IsVisible="{Binding HasLength}">
+                                        <TextBlock Text="{Binding LengthText}" />
+                                    </Border>
+                                    <Border Classes="chip" IsVisible="{Binding HasSize}">
+                                        <TextBlock Text="{Binding SizeText}" />
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
                             <!-- Unsaved metadata changes. -->
                             <Ellipse Grid.Column="2"
                                      Width="8" Height="8"
