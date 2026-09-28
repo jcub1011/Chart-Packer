@@ -21,6 +21,26 @@
         <Style Selector="TextBlock.message.error">
             <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
         </Style>
+
+        <!-- The summary line: flat, and clickable anywhere to expand or collapse. The padding is
+             cancelled by the margin, so the text sits where it would without the hover area. -->
+        <Style Selector="Button.header">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="-6,-4" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.header:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Button.header:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <Border BorderThickness="0,1,0,0"
@@ -28,38 +48,47 @@
             BorderBrush="{DynamicResource SubtleBorderBrush}"
             Padding="12,6">
         <DockPanel>
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                <Arc Grid.Column="0"
-                     Classes="spinner"
-                     Classes.active="{Binding IsRunning}"
-                     IsVisible="{Binding IsRunning}"
-                     Width="14" Height="14" StrokeThickness="2"
-                     VerticalAlignment="Center" />
-                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SummaryText}"
-                               FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" />
-                    <ProgressBar Value="{Binding Progress}"
-                                 Minimum="0" Maximum="100"
-                                 IsVisible="{Binding IsRunning}" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                    <ToggleButton IsChecked="{Binding IsExpanded}"
-                                  Content="{x:Static res:Strings.JobDetailsButton}"
-                                  AutomationProperties.Name="{x:Static res:Strings.JobDetailsButton}" />
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <!-- Not a tab stop: the Expand/Collapse button is the keyboard route to the same thing. -->
+                <Button Grid.Column="0"
+                        Classes="header"
+                        IsTabStop="False"
+                        Command="{Binding ToggleExpandedCommand}"
+                        ToolTip.Tip="{Binding ExpandButtonText}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                        <Arc Grid.Column="0"
+                             Classes="spinner"
+                             Classes.active="{Binding IsRunning}"
+                             IsVisible="{Binding IsRunning}"
+                             Width="14" Height="14" StrokeThickness="2"
+                             VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SummaryText}"
+                                       FontWeight="SemiBold"
+                                       Classes.muted="{Binding IsWaiting}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <ProgressBar Value="{Binding Progress}"
+                                         Minimum="0" Maximum="100"
+                                         IsVisible="{Binding IsRunning}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <Button Content="{x:Static res:Strings.CancelButton}"
                             Command="{Binding CancelCommand}"
                             IsVisible="{Binding IsRunning}"
                             AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
-                    <Button Content="{x:Static res:Strings.DismissButton}"
-                            Command="{Binding DismissCommand}"
-                            IsVisible="{Binding !IsRunning}"
-                            AutomationProperties.Name="{x:Static res:Strings.DismissButton}" />
+                    <!-- Fixed width, so the button doesn't change size between Expand and Collapse. -->
+                    <Button MinWidth="84"
+                            HorizontalContentAlignment="Center"
+                            Content="{Binding ExpandButtonText}"
+                            Command="{Binding ToggleExpandedCommand}"
+                            AutomationProperties.Name="{Binding ExpandButtonText}" />
                 </StackPanel>
             </Grid>
 
-            <ScrollViewer MaxHeight="220"
-                          Margin="0,8,0,0"
+            <!-- Fills the panel; MainWindow sizes the panel and lets the user resize it while expanded. -->
+            <ScrollViewer Margin="0,8,0,0"
                           HorizontalScrollBarVisibility="Disabled"
                           IsVisible="{Binding IsExpanded}">
                 <ItemsControl ItemsSource="{Binding Items}"

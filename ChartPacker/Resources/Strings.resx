@@ -268,17 +268,21 @@
     <value>Unpacked to {0}, but some files were left out (see below).</value>
     <comment>{0} is the folder written.</comment>
   </data>
-  <data name="JobDetailsButton" xml:space="preserve">
-    <value>Details</value>
+  <data name="JobWaiting" xml:space="preserve">
+    <value>Waiting for job…</value>
+    <comment>The results panel before any pack or unpack has run.</comment>
+  </data>
+  <data name="ExpandButton" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="CollapseButton" xml:space="preserve">
+    <value>Collapse</value>
   </data>
   <data name="JobResultsListName" xml:space="preserve">
     <value>Pack and unpack results</value>
   </data>
   <data name="CancelButton" xml:space="preserve">
     <value>Cancel</value>
-  </data>
-  <data name="DismissButton" xml:space="preserve">
-    <value>Dismiss</value>
   </data>
   <data name="FlatPackLabel" xml:space="preserve">
     <value>Pack into one folder (flat)</value>

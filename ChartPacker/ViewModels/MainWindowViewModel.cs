@@ -35,7 +35,7 @@ namespace ChartPacker.ViewModels
 
         public SongDetailViewModel Detail { get; }
 
-        /// <summary>The pack/unpack results panel, shown under both panels.</summary>
+        /// <summary>The pack/unpack results panel, always shown under both panels.</summary>
         public JobViewModel Job => Library.Job;
 
         /// <summary>Persisted width of the library panel. The view applies it on open and writes it back on close.</summary>
@@ -43,6 +43,13 @@ namespace ChartPacker.ViewModels
         {
             get => _settings.Settings.LibraryPaneWidth;
             set => _settings.Settings.LibraryPaneWidth = value;
+        }
+
+        /// <summary>Persisted height of the results panel while expanded. The view applies it on expand and writes it back on collapse and close.</summary>
+        public double JobPanelHeight
+        {
+            get => _settings.Settings.JobPanelHeight;
+            set => _settings.Settings.JobPanelHeight = value;
         }
 
         /// <summary>Some song has metadata changes that closing would lose.</summary>

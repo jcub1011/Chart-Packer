@@ -73,6 +73,9 @@ namespace ChartPacker.Services
             if (!double.IsFinite(settings.LibraryPaneWidth) || settings.LibraryPaneWidth < AppSettings.MinLibraryPaneWidth)
                 settings.LibraryPaneWidth = AppSettings.DefaultLibraryPaneWidth;
 
+            if (!double.IsFinite(settings.JobPanelHeight) || settings.JobPanelHeight < AppSettings.MinJobPanelHeight)
+                settings.JobPanelHeight = AppSettings.DefaultJobPanelHeight;
+
             settings.ScanMaxDepth = Math.Clamp(settings.ScanMaxDepth, 0, AppSettings.MaxScanMaxDepth);
 
             if (string.IsNullOrWhiteSpace(settings.LastFolder))

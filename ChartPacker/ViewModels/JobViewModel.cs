@@ -10,6 +10,7 @@ using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
+using ChartPacker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -42,11 +43,15 @@ namespace ChartPacker.ViewModels
     }
 
     /// <summary>
-    /// The results panel under the list: progress while a pack or unpack job runs, then a summary
-    /// and one row per item. It stays until dismissed or the next job starts.
+    /// The results panel along the bottom of the window. It is always shown: it waits for a job, shows
+    /// progress while a pack or unpack job runs, then a summary and one row per item until the next job.
     /// </summary>
+    /// <remarks>
+    /// Only the user expands or collapses the item rows; a job starting leaves them as they were.
+    /// </remarks>
     public partial class JobViewModel : ViewModelBase
     {
+        private readonly SettingsService _settings;
         private CancellationTokenSource? _cts;
         private JobKind _kind;
         private int _total;
@@ -55,28 +60,42 @@ namespace ChartPacker.ViewModels
         private int _failed;
         private bool _cancelled;
 
+        // A job has run (or is running) this session, so there's a summary to show.
+        private bool _hasRun;
+
+        public JobViewModel(SettingsService settings)
+        {
+            _settings = settings;
+            _isExpanded = settings.Settings.JobPanelExpanded;
+        }
+
         public AvaloniaList<JobItemRow> Items { get; } = new();
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
-        [NotifyCanExecuteChangedFor(nameof(DismissCommand))]
         private bool _isRunning;
 
+        /// <summary>The item rows are shown, and the panel can be resized.</summary>
         [ObservableProperty]
-        private bool _isVisible;
-
-        [ObservableProperty]
-        private bool _isExpanded = true;
+        private bool _isExpanded;
 
         private int Done => _succeeded + _skipped + _failed;
 
         /// <summary>Items finished, as a percentage.</summary>
         public double Progress => _total == 0 ? 0 : 100.0 * Done / _total;
 
+        public string ExpandButtonText => IsExpanded ? Strings.CollapseButton : Strings.ExpandButton;
+
+        /// <summary>No job has run yet, so the panel only says it's waiting.</summary>
+        public bool IsWaiting => !_hasRun;
+
         public string SummaryText
         {
             get
             {
+                if (!_hasRun)
+                    return Strings.JobWaiting;
+
                 if (IsRunning)
                 {
                     string running = _kind == JobKind.Pack ? Strings.JobPackingFormat : Strings.JobUnpackingFormat;
@@ -106,9 +125,8 @@ namespace ChartPacker.ViewModels
             _total = entries.Count;
             _succeeded = _skipped = _failed = 0;
             _cancelled = false;
+            _hasRun = true;
             Items.Clear();
-            IsVisible = true;
-            IsExpanded = true;
             IsRunning = true;
             RefreshState();
 
@@ -134,13 +152,13 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(IsRunning))]
         private void Cancel() => _cts?.Cancel();
 
-        private bool CanDismiss() => !IsRunning;
+        [RelayCommand]
+        private void ToggleExpanded() => IsExpanded = !IsExpanded;
 
-        [RelayCommand(CanExecute = nameof(CanDismiss))]
-        private void Dismiss()
+        partial void OnIsExpandedChanged(bool value)
         {
-            IsVisible = false;
-            Items.Clear();
+            _settings.Settings.JobPanelExpanded = value;
+            OnPropertyChanged(nameof(ExpandButtonText));
         }
 
         private void Add(JobKind kind, JobItemResult result)
@@ -189,6 +207,7 @@ namespace ChartPacker.ViewModels
         {
             OnPropertyChanged(nameof(Progress));
             OnPropertyChanged(nameof(SummaryText));
+            OnPropertyChanged(nameof(IsWaiting));
         }
     }
 }

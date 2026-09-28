@@ -25,7 +25,7 @@ namespace ChartPacker
                 var folderPicker = new AvaloniaFolderPickerService(() => window);
                 var confirmation = new AvaloniaConfirmationService(() => window);
                 var drafts = new MetadataDraftStore();
-                var job = new JobViewModel();
+                var job = new JobViewModel(settings);
 
                 window.DataContext = new MainWindowViewModel(
                     new LibraryViewModel(folderPicker, settings, drafts, job),
@@ -34,7 +34,7 @@ namespace ChartPacker
                     drafts,
                     confirmation);
 
-                // Subscribed after MainWindow's own Closing handler, which captures the splitter width first.
+                // Subscribed after MainWindow's own Closing handler, which captures the splitter positions first.
                 // It also runs when that handler cancels the close to ask about unsaved changes, which is harmless.
                 window.Closing += (_, _) => settings.Save();
 
