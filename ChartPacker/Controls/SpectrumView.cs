@@ -132,8 +132,8 @@ namespace ChartPacker.Controls
                 _peakBrushes = null;
             }
 
-            // Starting again starts from nothing, not from what was falling away from last time.
-            if (change.Property == IsActiveProperty && change.GetNewValue<bool>())
+            // Starting again, or being shown again, starts from nothing, not from what was falling away from last time.
+            if ((change.Property == IsActiveProperty || change.Property == IsVisibleProperty) && change.GetNewValue<bool>())
                 ResetBars();
 
             if (change.Property == IsActiveProperty || change.Property == SourceProperty || change.Property == IsVisibleProperty)

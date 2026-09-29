@@ -116,21 +116,21 @@ namespace ChartPacker.ViewModels
         /// <summary>The image to show, when the image is shown and every song has the same one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasImage))]
-        private Bitmap? _image;
+        public partial Bitmap? Image { get; set; }
 
         /// <summary>The video to show, when the video is shown and every song has the same one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasVideo))]
-        private VideoPlayback? _video;
+        public partial VideoPlayback? Video { get; set; }
 
         /// <summary>How the shown video lines up with the audio.</summary>
         [ObservableProperty]
-        private VideoTimeline _timeline = VideoTimeline.Default;
+        public partial VideoTimeline Timeline { get; set; } = VideoTimeline.Default;
 
         /// <summary>Shown instead of an image or video, e.g. "No background set" or "Backgrounds differ".</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasNote))]
-        private string? _note;
+        public partial string? Note { get; set; }
 
         /// <summary>The video is shown rather than the image. Only a choice when <see cref="HasBoth"/>.</summary>
         [ObservableProperty]
@@ -138,36 +138,36 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(IsVideoSelected))]
         [NotifyPropertyChangedFor(nameof(ShownKind))]
         [NotifyPropertyChangedFor(nameof(RemoveToolTip))]
-        private bool _showVideo = true;
+        public partial bool ShowVideo { get; set; } = true;
 
         /// <summary>The selection has a background image, so the Image toggle can show it.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasBoth))]
         [NotifyPropertyChangedFor(nameof(IsImageSelected))]
-        private bool _hasImageKind;
+        public partial bool HasImageKind { get; set; }
 
         /// <summary>The selection has a background video, so the Video toggle can show it.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasBoth))]
         [NotifyPropertyChangedFor(nameof(IsVideoSelected))]
-        private bool _hasVideoKind;
+        public partial bool HasVideoKind { get; set; }
 
         /// <summary>A selected song has a staged background change.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Marker))]
-        private bool _isChanged;
+        public partial bool IsChanged { get; set; }
 
         /// <summary>The tile's width over its height: the shown image's or video's, or <see cref="DefaultAspectRatio"/>.</summary>
         [ObservableProperty]
-        private double _aspectRatio = DefaultAspectRatio;
+        public partial double AspectRatio { get; set; } = DefaultAspectRatio;
 
         /// <summary>The shown background's stored name, e.g. <c>video.mp4</c>, when every song has the same one.</summary>
         [ObservableProperty]
-        private string? _shownFileName;
+        public partial string? ShownFileName { get; set; }
 
         /// <summary>The shown background's size, formatted, when it's known.</summary>
         [ObservableProperty]
-        private string? _shownFileSize;
+        public partial string? ShownFileSize { get; set; }
 
         public bool HasImage => Image is not null;
 

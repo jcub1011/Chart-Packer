@@ -37,7 +37,7 @@ namespace ChartPacker.ViewModels.Settings
         public IReadOnlyList<SettingsCategoryViewModel> Children { get; }
 
         [ObservableProperty]
-        private bool _isExpanded = true;
+        public partial bool IsExpanded { get; set; } = true;
     }
 
     /// <summary>The settings of one category, under its path as a heading.</summary>
@@ -84,19 +84,19 @@ namespace ChartPacker.ViewModels.Settings
         }
 
         [ObservableProperty]
-        private string _searchText = "";
+        public partial string SearchText { get; set; } = "";
 
         /// <summary>The category tree; while searching, only the categories with a match.</summary>
         [ObservableProperty]
-        private IReadOnlyList<SettingsCategoryViewModel> _categories = [];
+        public partial IReadOnlyList<SettingsCategoryViewModel> Categories { get; set; } = [];
 
         /// <summary>The category whose settings are shown, with its children's. "All settings" (or none) shows every category.</summary>
         [ObservableProperty]
-        private SettingsCategoryViewModel? _selectedCategory;
+        public partial SettingsCategoryViewModel? SelectedCategory { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasNoMatches))]
-        private IReadOnlyList<SettingsGroupViewModel> _groups = [];
+        public partial IReadOnlyList<SettingsGroupViewModel> Groups { get; set; } = [];
 
         public bool HasChanges => _session.HasChanges;
 

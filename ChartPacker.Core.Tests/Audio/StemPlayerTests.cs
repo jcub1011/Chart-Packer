@@ -206,6 +206,32 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void NothingIsHeardWhileNotCapturing()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        var heard = new float[2048];
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        player.CapturesHeard = false;
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        Assert.IsFalse(player.TryReadHeard(heard));
+
+        player.CapturesHeard = true;
+        Assert.IsFalse(player.TryReadHeard(heard), "Nothing was kept while it was off.");
+
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // A second has been heard in all: the window ends there, from what was played after it was turned on.
+        Assert.IsTrue(player.TryReadHeard(heard));
+        Assert.AreEqual((float)(Rate - 1) / (Rate * 10), heard[^1], 1e-6f);
+        Assert.AreEqual((float)(Rate - heard.Length) / (Rate * 10), heard[0], 1e-6f);
+    }
+
+    [TestMethod]
     public void AnOutputAtAnotherRateIsRefused()
     {
         var mixer = new StemMixer([KeyValuePair.Create("song", (IPcmSource)new FakeSource(44100, 2, 100, (_, _) => 0))]);

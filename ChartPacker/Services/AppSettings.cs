@@ -42,5 +42,11 @@ namespace ChartPacker.Services
 
         /// <summary>The audio player's master volume, from 0 to 1.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
+
+        /// <summary>Whether the player reads and draws waveforms. Off, no track is read ahead of playback.</summary>
+        public bool ShowWaveforms { get; set; } = true;
+
+        /// <summary>Whether the spectrum is drawn behind the details panel. Off, it isn't worked out at all.</summary>
+        public bool ShowSpectrum { get; set; } = true;
     }
 }

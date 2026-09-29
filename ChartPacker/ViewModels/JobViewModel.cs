@@ -66,18 +66,18 @@ namespace ChartPacker.ViewModels
         public JobViewModel(SettingsService settings)
         {
             _settings = settings;
-            _isExpanded = settings.Settings.JobPanelExpanded;
+            IsExpanded = settings.Settings.JobPanelExpanded;
         }
 
-        public AvaloniaList<JobItemRow> Items { get; } = new();
+        public AvaloniaList<JobItemRow> Items { get; } = [];
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
-        private bool _isRunning;
+        public partial bool IsRunning { get; set; }
 
         /// <summary>The item rows are shown, and the panel can be resized.</summary>
         [ObservableProperty]
-        private bool _isExpanded;
+        public partial bool IsExpanded { get; set; }
 
         private int Done => _succeeded + _skipped + _failed;
 

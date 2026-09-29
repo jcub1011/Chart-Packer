@@ -263,9 +263,10 @@
 
     <Panel>
         <!-- Behind everything, along the bottom of the panel: what's heard as a spectrum, whichever song is
-             playing, up to 128px tall. It stays put while the details scroll over it. -->
+             playing, up to 128px tall. It stays put while the details scroll over it. Hidden, it stops drawing. -->
         <ctl:SpectrumView VerticalAlignment="Bottom"
                           MaxHeight="128"
+                          IsVisible="{Binding Player.ShowSpectrum}"
                           IsActive="{Binding Player.IsPlaying}"
                           Source="{Binding Player}"
                           LowColor="{DynamicResource SpectrumLowColor}"
@@ -640,10 +641,12 @@
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip.Tip="{Binding Name}"
                                                    Text="{Binding Name}" />
-                                        <!-- The track's own waveform, faded while it isn't heard. It only shows; the seek bar above seeks. -->
+                                        <!-- The track's own waveform, faded while it isn't heard. It only shows; the seek bar above seeks.
+                                             Hidden while waveforms are off, leaving its column so the rows still line up. -->
                                         <ctl:WaveformView Grid.Column="4"
                                                           Classes="track"
                                                           Classes.unheard="{Binding !IsHeard}"
+                                                          IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).Player.ShowWaveforms, FallbackValue=True}"
                                                           Height="20"
                                                           VerticalAlignment="Center"
                                                           IsHitTestVisible="False"

@@ -39,6 +39,7 @@ public sealed class StemPlayer : IDisposable
 
     // What was written lately, for TryReadHeard. Written and read under _lock, with _mixedFrames.
     private readonly OutputTap _tap = new();
+    private bool _capturesHeard = true;
 
     /// <param name="mixer">What to play.</param>
     /// <param name="output">Where to play it, at <paramref name="mixer"/>'s rate. The player owns it.</param>
@@ -118,18 +119,37 @@ public sealed class StemPlayer : IDisposable
     }
 
     /// <summary>
+    /// Whether what's played is kept for <see cref="TryReadHeard"/>. Off, the playback thread doesn't keep it,
+    /// and once it's on again nothing is heard until enough has been played since.
+    /// </summary>
+    public bool CapturesHeard
+    {
+        get
+        {
+            lock (_lock)
+                return _capturesHeard;
+        }
+        set
+        {
+            lock (_lock)
+                _capturesHeard = value;
+        }
+    }
+
+    /// <summary>
     /// Copies the <paramref name="mono"/>.Length frames heard last, channels averaged: the mix as it leaves
     /// the mixer, before <see cref="Volume"/>.
     /// </summary>
     /// <returns>
     /// <see langword="false"/>, leaving <paramref name="mono"/> as it was, while nothing is playing, during a seek,
-    /// or until that much has been heard since the start or the last seek.
+    /// while <see cref="CapturesHeard"/> is off, or until that much has been heard since the start, the last seek
+    /// or it was turned on.
     /// </returns>
     public bool TryReadHeard(Span<float> mono)
     {
         lock (_lock)
         {
-            if (_disposed || !_playing || _pendingSeek is not null)
+            if (_disposed || !_playing || !_capturesHeard || _pendingSeek is not null)
                 return false;
             return _tap.TryRead(Math.Max(0, _mixedFrames - _output.QueuedFrames), mono);
         }
@@ -247,7 +267,8 @@ public sealed class StemPlayer : IDisposable
                     lock (_lock)
                     {
                         _output.Write(_chunk.AsSpan(0, frames * 2));
-                        _tap.Write(_chunk.AsSpan(0, frames * 2), _mixedFrames);
+                        if (_capturesHeard)
+                            _tap.Write(_chunk.AsSpan(0, frames * 2), _mixedFrames);
                         _mixedFrames += frames;
                     }
                 }

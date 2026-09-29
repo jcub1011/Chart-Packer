@@ -68,8 +68,8 @@ namespace ChartPacker.ViewModels
             };
             _albumArt = new AlbumArtLoader(path => _drafts.HasDrafts(path) ? _drafts.Get(path).AlbumArt : null);
             Job = job;
-            _scanDepth = settings.Settings.ScanMaxDepth;
-            _folderPath = settings.Settings.LastFolder;
+            ScanDepth = settings.Settings.ScanMaxDepth;
+            FolderPath = settings.Settings.LastFolder;
 
             OverwriteOptions =
             [
@@ -77,8 +77,8 @@ namespace ChartPacker.ViewModels
                 new(OverwritePolicy.Overwrite, Strings.OverwriteOverwrite),
                 new(OverwritePolicy.Rename, Strings.OverwriteRename),
             ];
-            _selectedOverwriteOption = OverwriteOptions.First(o => o.Value == settings.Settings.OverwritePolicy);
-            _flatPackOutput = settings.Settings.FlatPackOutput;
+            SelectedOverwriteOption = OverwriteOptions.First(o => o.Value == settings.Settings.OverwritePolicy);
+            FlatPackOutput = settings.Settings.FlatPackOutput;
 
             Selection = new SelectionModel<LibraryItemViewModel> { SingleSelect = false, Source = Entries };
             Selection.PropertyChanged += OnSelectionPropertyChanged;
@@ -113,7 +113,7 @@ namespace ChartPacker.ViewModels
 
         public PlayerViewModel Player { get; }
 
-        public AvaloniaList<LibraryItemViewModel> Entries { get; } = new();
+        public AvaloniaList<LibraryItemViewModel> Entries { get; } = [];
 
         /// <summary>The list's selection. Several items can be selected for Pack, Unpack and bulk metadata editing.</summary>
         public SelectionModel<LibraryItemViewModel> Selection { get; }
@@ -121,36 +121,36 @@ namespace ChartPacker.ViewModels
         public IReadOnlyList<OverwriteOption> OverwriteOptions { get; }
 
         [ObservableProperty]
-        private OverwriteOption _selectedOverwriteOption;
+        public partial OverwriteOption SelectedOverwriteOption { get; set; }
 
         /// <summary>Pack writes every .sng directly in the output folder. Unpack always mirrors.</summary>
         [ObservableProperty]
-        private bool _flatPackOutput;
+        public partial bool FlatPackOutput { get; set; }
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(RescanCommand))]
-        private string? _folderPath;
+        public partial string? FolderPath { get; set; }
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
-        private bool _isScanning;
+        public partial bool IsScanning { get; set; }
 
         [ObservableProperty]
-        private string? _errorMessage;
+        public partial string? ErrorMessage { get; set; }
 
         /// <summary>The selected items, in list order rather than the order they were clicked.</summary>
         [ObservableProperty]
-        private IReadOnlyList<SongEntry> _selectedEntries = [];
+        public partial IReadOnlyList<SongEntry> SelectedEntries { get; set; } = [];
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
-        private int _selectedCount;
+        public partial int SelectedCount { get; set; }
 
         /// <summary>Max scan depth. Nullable decimal to match <c>NumericUpDown.Value</c>.</summary>
         [ObservableProperty]
-        private decimal? _scanDepth;
+        public partial decimal? ScanDepth { get; set; }
 
         public int MaxScanDepth => AppSettings.MaxScanMaxDepth;
 

@@ -49,30 +49,30 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The song has metadata changes that haven't been saved.</summary>
         [ObservableProperty]
-        private bool _hasDrafts = hasDrafts;
+        public partial bool HasDrafts { get; set; } = hasDrafts;
 
         /// <summary>The song's name, or the file or folder name when it has none.</summary>
         [ObservableProperty]
-        private string _title = entry.DisplayName;
+        public partial string Title { get; set; } = entry.DisplayName;
 
         /// <summary>A loading note until the metadata is read, or the relative path when it couldn't be; otherwise empty.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ShowDetails))]
-        private string _details = Strings.MetadataLoading;
+        public partial string Details { get; set; } = Strings.MetadataLoading;
 
         /// <summary>The artist, without rich-text tags; null when there is none.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(BylinePrefix), nameof(ShowByline), nameof(ShowDetails))]
-        private string? _artist;
+        public partial string? Artist { get; set; }
 
         /// <summary>The charter with its rich-text tags left in, for the view to render; null when there is none.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(BylinePrefix), nameof(ShowByline), nameof(ShowDetails))]
-        private string? _charter;
+        public partial string? Charter { get; set; }
 
         /// <summary>This song is the one the player is playing, so the play button on its art shows a stop button.</summary>
         [ObservableProperty]
-        private bool _isPreviewing;
+        public partial bool IsPreviewing { get; set; }
 
         /// <summary>
         /// The plain text before the charter on the byline: the artist, with the separator when a charter
@@ -91,17 +91,17 @@ namespace ChartPacker.ViewModels
         /// <summary>The song length, for the chip before the size chip; null until read or when unknown.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasLength))]
-        private string? _lengthText;
+        public partial string? LengthText { get; set; }
 
         /// <summary>The file's or folder's total size, for the chip at the end of the detail line; null until read.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasSize))]
-        private string? _sizeText;
+        public partial string? SizeText { get; set; }
 
         /// <summary>The album-art thumbnail, once <see cref="AlbumArtLoader"/> has read it. Owned by the loader.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasAlbumArt))]
-        private Bitmap? _albumArt;
+        public partial Bitmap? AlbumArt { get; set; }
 
         /// <summary>Shows what was read from disk, or <see langword="null"/> when the song couldn't be read.</summary>
         public void SetSummary(SongSummary? summary, MetadataDraft? draft)

@@ -27,9 +27,10 @@ namespace ChartPacker.Services
             var packing = new SettingCategory("output.packing", Strings.SettingsCategoryPacking, output);
             var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
+            var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, output, packing, playback, audio],
+                [libraryCategory, scanning, output, packing, playback, audio, visualizers],
                 [
                     new IntegerSetting
                     {
@@ -94,6 +95,28 @@ namespace ChartPacker.Services
                         Format = volume => volume.ToString("P0", CultureInfo.CurrentCulture),
                         Get = () => player.Volume,
                         Set = volume => player.Volume = volume,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "playback.showWaveforms",
+                        Category = visualizers,
+                        Label = Strings.ShowWaveformsLabel,
+                        Description = Strings.ShowWaveformsDescription,
+                        Keywords = Words(Strings.ShowWaveformsKeywords),
+                        DefaultValue = true,
+                        Get = () => player.ShowWaveforms,
+                        Set = show => player.ShowWaveforms = show,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "playback.showSpectrum",
+                        Category = visualizers,
+                        Label = Strings.ShowSpectrumLabel,
+                        Description = Strings.ShowSpectrumDescription,
+                        Keywords = Words(Strings.ShowSpectrumKeywords),
+                        DefaultValue = true,
+                        Get = () => player.ShowSpectrum,
+                        Set = show => player.ShowSpectrum = show,
                     },
                 ]);
         }

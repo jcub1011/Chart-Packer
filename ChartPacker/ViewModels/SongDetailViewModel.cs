@@ -122,18 +122,18 @@ namespace ChartPacker.ViewModels
             };
         }
 
-        public AvaloniaList<MetadataRowViewModel> Metadata { get; } = new();
+        public AvaloniaList<MetadataRowViewModel> Metadata { get; } = [];
 
         /// <summary>The one selected song's files that aren't its album art, background, tracks, chart or song.ini.</summary>
-        public AvaloniaList<FileRow> Files { get; } = new();
+        public AvaloniaList<FileRow> Files { get; } = [];
 
         /// <summary>The one selected song's chart files: normally one, <c>notes.chart</c> or <c>notes.mid</c>.</summary>
-        public AvaloniaList<ChartRow> Charts { get; } = new();
+        public AvaloniaList<ChartRow> Charts { get; } = [];
 
         /// <summary>The one selected song's tracks that a staged change removes, and nothing replaces.</summary>
-        public AvaloniaList<RemovedTrackRow> RemovedTracks { get; } = new();
+        public AvaloniaList<RemovedTrackRow> RemovedTracks { get; } = [];
 
-        public AvaloniaList<FindingRow> Findings { get; } = new();
+        public AvaloniaList<FindingRow> Findings { get; } = [];
 
         /// <summary>Plays the one selected song's audio tracks.</summary>
         public PlayerViewModel Player { get; }
@@ -143,109 +143,109 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
         [ObservableProperty]
-        private IReadOnlyList<StemOption> _addTrackOptions = [];
+        public partial IReadOnlyList<StemOption> AddTrackOptions { get; set; } = [];
 
         /// <summary>The song's name and artist, as drafted, or how many items are selected.</summary>
         [ObservableProperty]
-        private string? _title;
+        public partial string? Title { get; set; }
 
         /// <summary>The one selected song's charter as drafted, with its rich-text tags left in for the view to render.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasCharter))]
-        private string? _charter;
+        public partial string? Charter { get; set; }
 
         /// <summary>The full path, or how many of each kind are selected.</summary>
         [ObservableProperty]
-        private string? _subtitle;
+        public partial string? Subtitle { get; set; }
 
         /// <summary>The one selected song's size on disk, formatted.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasSizeText))]
-        private string? _sizeText;
+        public partial string? SizeText { get; set; }
 
         [ObservableProperty]
-        private bool _isLoading;
+        public partial bool IsLoading { get; set; }
 
         [ObservableProperty]
-        private string? _errorMessage;
+        public partial string? ErrorMessage { get; set; }
 
         /// <summary>Why there is no metadata table, e.g. the folder has no song.ini.</summary>
         [ObservableProperty]
-        private string? _metadataNote;
+        public partial string? MetadataNote { get; set; }
 
         /// <summary>Why the metadata can't be edited, e.g. a selected .sng has structural errors.</summary>
         [ObservableProperty]
-        private string? _readOnlyNote;
+        public partial string? ReadOnlyNote { get; set; }
 
         /// <summary>More than one item is selected: only the merged metadata is shown.</summary>
         [ObservableProperty]
-        private bool _isBulk;
+        public partial bool IsBulk { get; set; }
 
         [ObservableProperty]
-        private bool _isSaving;
+        public partial bool IsSaving { get; set; }
 
         [ObservableProperty]
-        private string? _saveError;
+        public partial string? SaveError { get; set; }
 
         /// <summary>The new-row editor is open.</summary>
         [ObservableProperty]
-        private bool _isAdding;
+        public partial bool IsAdding { get; set; }
 
         [ObservableProperty]
-        private string _newKey = "";
+        public partial string NewKey { get; set; } = "";
 
         [ObservableProperty]
-        private string _newValue = "";
+        public partial string NewValue { get; set; } = "";
 
         [ObservableProperty]
-        private string? _newRowError;
+        public partial string? NewRowError { get; set; }
 
         /// <summary>Known keys to offer for a new row: every one the selection doesn't already use.</summary>
         [ObservableProperty]
-        private IReadOnlyList<KnownKey> _availableKeys = [];
+        public partial IReadOnlyList<KnownKey> AvailableKeys { get; set; } = [];
 
         /// <summary>The album art every selected song has once its draft is applied, or <see langword="null"/> when there's none to show.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasArtImage))]
         [NotifyPropertyChangedFor(nameof(ArtAspect))]
-        private Bitmap? _artImage;
+        public partial Bitmap? ArtImage { get; set; }
 
         /// <summary>Shown in the tile instead of an image, e.g. "Album art not set" or "Album art differs".</summary>
         [ObservableProperty]
-        private string? _artNote;
+        public partial string? ArtNote { get; set; }
 
         /// <summary>The shown album art's stored name, e.g. <c>album.png</c>, when it's known.</summary>
         [ObservableProperty]
-        private string? _artFileName;
+        public partial string? ArtFileName { get; set; }
 
         /// <summary>The shown album art's size, formatted, when it's known.</summary>
         [ObservableProperty]
-        private string? _artFileSize;
+        public partial string? ArtFileSize { get; set; }
 
         /// <summary>Why the chosen chart can't be used.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasChartError))]
-        private string? _chartError;
+        public partial string? ChartError { get; set; }
 
         /// <summary>Why the chosen replacement image can't be used.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasArtError))]
-        private string? _artError;
+        public partial string? ArtError { get; set; }
 
         /// <summary>Why the chosen background file can't be used.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasBackgroundError))]
-        private string? _backgroundError;
+        public partial string? BackgroundError { get; set; }
 
         /// <summary>Why some of the chosen files couldn't be added.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasFilesError))]
-        private string? _filesError;
+        public partial string? FilesError { get; set; }
 
         /// <summary>Why the chosen file couldn't be added as a track.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasTracksError))]
-        private string? _tracksError;
+        public partial string? TracksError { get; set; }
 
         public bool HasArtImage => ArtImage is not null;
 

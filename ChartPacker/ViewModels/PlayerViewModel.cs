@@ -30,9 +30,7 @@ namespace ChartPacker.ViewModels
         {
             _owner = owner;
             Track = track;
-
-            // The preview is a separate clip, not part of the song, so it's left out of the mix until asked for.
-            _isMuted = track.Stem == AudioStems.Preview;
+            IsMuted = track.Stem == AudioStems.Preview;
         }
 
         public SongTrack Track { get; }
@@ -45,35 +43,35 @@ namespace ChartPacker.ViewModels
         /// <summary>The track's file size, formatted; set by whoever knows the song's files.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasSize))]
-        private string? _size;
+        public partial string? Size { get; set; }
 
         public bool HasSize => Size is not null;
 
         [ObservableProperty]
-        private bool _isMuted;
+        public partial bool IsMuted { get; set; }
 
         /// <summary>While any track is soloed, only soloed tracks are heard. A track is muted or soloed, never both.</summary>
         [ObservableProperty]
-        private bool _isSolo;
+        public partial bool IsSolo { get; set; }
 
         /// <summary>How loud the track is in the mix, from 0 to 1. Remembered for the song until the app closes.</summary>
         [ObservableProperty]
-        private double _volume = 1;
+        public partial double Volume { get; set; } = 1;
 
         /// <summary>Why the track can't be played, once that's known.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasError))]
-        private string? _error;
+        public partial string? Error { get; set; }
 
         public bool HasError => Error is not null;
 
         /// <summary>The track's own waveform, at full level; empty until its audio has been read.</summary>
         [ObservableProperty]
-        private Waveform _waveform = Waveform.Empty;
+        public partial Waveform Waveform { get; set; } = Waveform.Empty;
 
         /// <summary>Whether the track is in the mix as it's switched now: soloed, or unmuted with nothing soloed, and not turned all the way down.</summary>
         [ObservableProperty]
-        private bool _isHeard = true;
+        public partial bool IsHeard { get; set; } = true;
 
         // Solo overrides mute in the mix, so having both on would read as if both applied. Turning
         // one on turns the other off.
@@ -159,23 +157,25 @@ namespace ChartPacker.ViewModels
         private SpectrumAnalyzer? _analyzer;
         private readonly float[] _heard = new float[SpectrumAnalyzer.FftSize];
 
-        /// <param name="settings">Where the master volume is kept between runs.</param>
+        /// <param name="settings">Where the master volume and which visualisers are shown are kept between runs.</param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
         public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput)
         {
             _settings = settings;
-            _volume = settings.Settings.MasterVolume;
+            Volume = settings.Settings.MasterVolume;
+            ShowWaveforms = settings.Settings.ShowWaveforms;
+            ShowSpectrum = settings.Settings.ShowSpectrum;
             _openOutput = openOutput;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
             _timer.Tick += (_, _) => RefreshPosition();
         }
 
-        public AvaloniaList<TrackRowViewModel> Tracks { get; } = new();
+        public AvaloniaList<TrackRowViewModel> Tracks { get; } = [];
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PlayPauseToolTip))]
         [NotifyPropertyChangedFor(nameof(ActiveEntry))]
-        private bool _isPlaying;
+        public partial bool IsPlaying { get; set; }
 
         /// <summary>What is heard from the selected tracks, as a waveform; empty until their audio has been read.</summary>
         [ObservableProperty]
@@ -183,37 +183,48 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(IsLengthKnown))]
         [NotifyPropertyChangedFor(nameof(LengthToolTip))]
         [NotifyPropertyChangedFor(nameof(TimelineSeconds))]
-        private Waveform _waveform = Waveform.Empty;
+        public partial Waveform Waveform { get; set; } = Waveform.Empty;
 
         /// <summary>The audio is being opened for the first play.</summary>
         [ObservableProperty]
-        private bool _isOpening;
+        public partial bool IsOpening { get; set; }
 
         /// <summary>Why playback isn't possible or stopped.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasError))]
-        private string? _error;
+        public partial string? Error { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PositionText))]
-        private double _positionSeconds;
+        public partial double PositionSeconds { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(LengthText))]
         [NotifyPropertyChangedFor(nameof(IsLengthKnown))]
         [NotifyPropertyChangedFor(nameof(LengthToolTip))]
         [NotifyPropertyChangedFor(nameof(TimelineSeconds))]
-        private double _lengthSeconds;
+        public partial double LengthSeconds { get; set; }
 
         /// <summary>The master volume, from 0 to 1. Kept in the settings, so it carries over to the next run.</summary>
         [ObservableProperty]
-        private double _volume;
+        public partial double Volume { get; set; }
+
+        /// <summary>
+        /// Whether the tracks' waveforms are read and shown. Off, no track is read ahead of playback, so the song's
+        /// length isn't known until it's played. Kept in the settings.
+        /// </summary>
+        [ObservableProperty]
+        public partial bool ShowWaveforms { get; set; }
+
+        /// <summary>Whether the spectrum of what's heard is worked out and shown. Kept in the settings.</summary>
+        [ObservableProperty]
+        public partial bool ShowSpectrum { get; set; }
 
         /// <summary>Where the song's <c>preview_start_time</c> puts the preview, if it sets one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasPreviewStart))]
         [NotifyCanExecuteChangedFor(nameof(JumpToPreviewCommand))]
-        private TimeSpan? _previewStart;
+        public partial TimeSpan? PreviewStart { get; set; }
 
         public bool HasTracks => Tracks.Count > 0;
 
@@ -319,7 +330,8 @@ namespace ChartPacker.ViewModels
             }
 
             RebuildWaveform();
-            StartPeaks(entry, [.. tracks.Where(t => !_peaks.ContainsKey(t) || _partialPeaks.Contains(t))]);
+            if (ShowWaveforms)
+                StartPeaks(entry, [.. tracks.Where(t => !_peaks.ContainsKey(t) || _partialPeaks.Contains(t))]);
             StartRequestedPreview(entry);
         }
 
@@ -380,7 +392,7 @@ namespace ChartPacker.ViewModels
         /// <summary>The spectrum of what's being heard, for the visualiser behind the details panel. On the UI thread.</summary>
         public bool TryReadSpectrum(Span<float> levels)
         {
-            if (_player is not { } player || !player.TryReadHeard(_heard))
+            if (!ShowSpectrum || _player is not { } player || !player.TryReadHeard(_heard))
                 return false;
 
             _analyzer ??= new SpectrumAnalyzer();
@@ -738,6 +750,31 @@ namespace ChartPacker.ViewModels
                 _player.Volume = (float)value;
         }
 
+        partial void OnShowWaveformsChanged(bool value)
+        {
+            _settings.Settings.ShowWaveforms = value;
+            if (!value)
+            {
+                // What was read goes, and nothing more is read or mixed until they're shown again.
+                CancelPeaks();
+                ClearPeaks();
+                foreach (var row in Tracks)
+                    row.Waveform = Waveform.Empty;
+            }
+            else if (_entry is { } entry && HasTracks)
+            {
+                // Tracks read before come back from StemPeaksCache.Shared at once.
+                StartPeaks(entry, [.. Tracks.Select(t => t.Track)]);
+            }
+        }
+
+        partial void OnShowSpectrumChanged(bool value)
+        {
+            _settings.Settings.ShowSpectrum = value;
+            if (_player is not null)
+                _player.CapturesHeard = value;
+        }
+
         // A change from the slider (a click on its track, or the keyboard) seeks; a drag seeks when it ends.
         partial void OnPositionSecondsChanged(double value)
         {
@@ -783,6 +820,7 @@ namespace ChartPacker.ViewModels
                 _audio = audio;
                 _player = player;
                 player.Volume = (float)Volume;
+                player.CapturesHeard = ShowSpectrum;
                 foreach (var row in Tracks)
                     ApplySwitches(row);
                 player.Stopped += OnPlayerStopped;

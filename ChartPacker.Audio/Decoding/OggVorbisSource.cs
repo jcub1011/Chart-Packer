@@ -33,6 +33,7 @@ public sealed class OggVorbisSource : IPcmSource
 
     private readonly Stream _stream;
     private readonly OggPageReader _ogg;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "Future extensibility.")]
     private readonly IPacketDecoder _decoder;
     private readonly int _firstAudioPage;
 

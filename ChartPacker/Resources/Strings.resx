@@ -791,4 +791,27 @@
     <value>volume sound loudness</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="SettingsCategoryVisualizers" xml:space="preserve">
+    <value>Visualizers</value>
+  </data>
+  <data name="ShowWaveformsLabel" xml:space="preserve">
+    <value>Show waveforms</value>
+  </data>
+  <data name="ShowWaveformsDescription" xml:space="preserve">
+    <value>Draw the song's and each track's waveform. When off, tracks aren't read ahead of playback, which saves work on slower computers. The song's length shows once it's played.</value>
+  </data>
+  <data name="ShowWaveformsKeywords" xml:space="preserve">
+    <value>waveform peaks visualizer visualiser performance slow</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="ShowSpectrumLabel" xml:space="preserve">
+    <value>Show spectrum</value>
+  </data>
+  <data name="ShowSpectrumDescription" xml:space="preserve">
+    <value>Draw the moving spectrum behind the details panel while a song plays. When off, it isn't worked out at all.</value>
+  </data>
+  <data name="ShowSpectrumKeywords" xml:space="preserve">
+    <value>spectrum analyzer analyser bars visualizer visualiser performance slow</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
 </root>

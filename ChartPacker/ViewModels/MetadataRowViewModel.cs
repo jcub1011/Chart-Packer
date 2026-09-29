@@ -32,25 +32,25 @@ namespace ChartPacker.ViewModels
         /// <summary>The value as stored, or <see langword="null"/> when the selected songs don't share one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsDistinct), nameof(DisplayValue), nameof(ToolTip), nameof(EditPlaceholder), nameof(ShowRichValue), nameof(ShowDistinct))]
-        private string? _value;
+        public partial string? Value { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove))]
         [NotifyCanExecuteChangedFor(nameof(BeginEditCommand), nameof(RemoveCommand), nameof(RevertCommand))]
-        private MetadataRowState _state;
+        public partial MetadataRowState State { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ShowRichValue), nameof(ShowDistinct))]
-        private bool _isEditing;
+        public partial bool IsEditing { get; set; }
 
         /// <summary>The text in the edit box: the stored value, or empty for a distinct row.</summary>
         [ObservableProperty]
-        private string _editText = "";
+        public partial string EditText { get; set; } = "";
 
         /// <summary>Why the edit box's text can't be committed.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasError))]
-        private string? _error;
+        public partial string? Error { get; set; }
 
         public bool IsDistinct => Value is null;
 
