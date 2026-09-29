@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using ChartPacker.Audio.Decoding;
+using ChartPacker.Ffmpeg;
 
 namespace ChartPacker.Core.Tests.Audio;
 
@@ -55,8 +56,32 @@ internal static class TestAudio
         return buffer[..(read * source.Channels)];
     }
 
-    public static IPcmSource OpenFixture(string name) =>
-        AudioDecoder.Open(new FileStream(Fixture(name), FileMode.Open, FileAccess.Read, FileShare.Read), name);
+    /// <summary>A fixture, decoded on <paramref name="backend"/>; see <see cref="RequireBackend"/>.</summary>
+    public static IPcmSource OpenFixture(string name, AudioBackend backend = AudioBackend.Managed)
+    {
+        RequireBackend(backend, name);
+        return AudioDecoder.Open(new FileStream(Fixture(name), FileMode.Open, FileAccess.Read, FileShare.Read), name, backend);
+    }
+
+    /// <summary>
+    /// Ends the test as inconclusive when <paramref name="backend"/> is FFmpeg and it can't decode the file called
+    /// <paramref name="name"/>: its libraries are fetched for development (see <c>build/ffmpeg</c>), not checked in.
+    /// </summary>
+    public static void RequireBackend(AudioBackend backend, string name)
+    {
+        if (backend != AudioBackend.Ffmpeg)
+            return;
+
+        string decoder = Path.GetExtension(name).ToLowerInvariant() switch
+        {
+            ".ogg" => "vorbis",
+            ".opus" => "opus",
+            ".mp3" => "mp3float",
+            _ => throw new ArgumentException($"'{name}' isn't decoded by FFmpeg.", nameof(name)),
+        };
+        if (!FfmpegAudioDecoder.IsAvailable(decoder))
+            Assert.Inconclusive(FfmpegLibrary.UnavailableReason ?? $"FFmpeg's libraries have no '{decoder}' decoder.");
+    }
 
     /// <summary>A WAV file of <paramref name="samples"/> (interleaved, in [-1, 1]) in the given sample format.</summary>
     /// <param name="format">1 for integer PCM, 3 for IEEE float.</param>

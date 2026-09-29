@@ -1,18 +1,19 @@
 using System.Buffers.Binary;
-using Concentus;
+using ChartPacker.Ffmpeg;
 using Concentus.Structs;
 
 namespace ChartPacker.Audio.Decoding;
 
 /// <summary>
 /// Decodes Ogg Opus: the container is read here, written from RFC 7845 (Ogg Encapsulation for the
-/// Opus Audio Codec), and the packets are decoded by
-/// <see href="https://github.com/lostromb/concentus">Concentus</see>.
+/// Opus Audio Codec), and the packets are decoded by FFmpeg's <c>opus</c> decoder or by
+/// <see href="https://github.com/lostromb/concentus">Concentus</see> (see <see cref="AudioBackend"/>).
 /// </summary>
 /// <remarks>
 /// <para>Opus always decodes at 48 kHz. Positions on the stream's timeline are granule positions
 /// (RFC 7845 §4): frame 0 of this source is the first sample after the header's pre-skip, and the
-/// last page's granule position trims the end.</para>
+/// last page's granule position trims the end. The pre-skip and the header's output gain are applied
+/// here, never by the decoder, so both decoders give the same timeline.</para>
 /// <para>A seek finds the last page that ends at least 160 ms before the target, decodes from
 /// there and discards up to the target (RFC 7845 §4.6), so the result is sample-exact.</para>
 /// </remarks>
@@ -29,8 +30,7 @@ public sealed class OpusSource : IPcmSource
 
     private readonly Stream _stream;
     private readonly OggPageReader _ogg;
-    private readonly IOpusDecoder? _decoder;
-    private readonly IOpusMultiStreamDecoder? _multiStreamDecoder;
+    private readonly IPacketDecoder _decoder;
     private readonly float _gain;
     private readonly int _firstAudioPage;
 
@@ -54,8 +54,15 @@ public sealed class OpusSource : IPcmSource
     private long _discardUntil;
     private bool _ended;
 
+    /// <param name="backend">What decodes the packets.</param>
     /// <exception cref="InvalidDataException">The stream isn't Ogg Opus this can decode.</exception>
-    public OpusSource(Stream stream)
+    /// <exception cref="InvalidOperationException"><paramref name="backend"/> is <see cref="AudioBackend.Ffmpeg"/>, and FFmpeg can't decode the stream.</exception>
+    public OpusSource(Stream stream, AudioBackend backend = AudioBackend.Auto)
+        : this(stream, backend, FfmpegAudioDecoder.IsAvailable)
+    {
+    }
+
+    internal OpusSource(Stream stream, AudioBackend backend, Func<string, bool> isAvailable)
     {
         ArgumentNullException.ThrowIfNull(stream);
         _stream = stream;
@@ -78,28 +85,26 @@ public sealed class OpusSource : IPcmSource
         // Output gain is in Q7.8 dB (§5.1).
         _gain = MathF.Pow(10, outputGain / (20f * 256f));
 
-        try
+        (int Streams, int Coupled, byte[] Table)? mapping = null;
+        if (mappingFamily == 0)
         {
-            if (mappingFamily == 0)
-            {
-                if (Channels > 2)
-                    throw new InvalidDataException("An Opus stream without a channel mapping has more than two channels.");
-                _decoder = OpusCodecFactory.CreateDecoder(Rate, Channels, null);
-            }
-            else
-            {
-                // §5.1.1: a mapping table follows for every other family.
-                if (head.Length < 21 + Channels)
-                    throw new InvalidDataException("The Opus channel mapping table is cut short.");
-                int streams = head[19];
-                int coupled = head[20];
-                byte[] mapping = head.Slice(21, Channels).ToArray();
-                _multiStreamDecoder = OpusCodecFactory.CreateMultiStreamDecoder(Rate, Channels, streams, coupled, mapping, null);
-            }
+            if (Channels > 2)
+                throw new InvalidDataException("An Opus stream without a channel mapping has more than two channels.");
         }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
+        else
         {
-            throw AudioDecoder.Damaged(ex);
+            // §5.1.1: a mapping table follows for every other family.
+            if (head.Length < 21 + Channels)
+                throw new InvalidDataException("The Opus channel mapping table is cut short.");
+            mapping = (head[19], head[20], head.Slice(21, Channels).ToArray());
+        }
+
+        // FFmpeg reads the whole header itself, mapping included. Its gain is zeroed, as it's applied here.
+        byte[]? ffmpegHead = null;
+        if (AudioDecoder.UsesFfmpeg(backend, DecoderName, Channels, isAvailable))
+        {
+            ffmpegHead = head.ToArray();
+            ffmpegHead.AsSpan(16, 2).Clear();
         }
 
         // §5.2: the comment header, which ends its page; audio starts on the next one.
@@ -131,8 +136,17 @@ public sealed class OpusSource : IPcmSource
         _end = _seekPoints.Count > 0 ? _seekPoints[^1].Granule : _origin;
 
         _pcm = new float[MaxPacketFrames * Channels];
+
+        // Made last, once nothing else can throw, so that a stream that isn't Opus leaves nothing to free.
+        IPacketDecoder? ffmpeg = ffmpegHead is not null
+            ? FfmpegPacketDecoder.Open(backend, DecoderName, Channels, ffmpegHead, trimsStart: false, errorsAreSilence: false)
+            : null;
+        _decoder = ffmpeg ?? new ConcentusDecoder(Channels, mapping);
         Rewind(_origin);
     }
+
+    /// <summary>FFmpeg's native Opus decoder.</summary>
+    internal const string DecoderName = "opus";
 
     public int SampleRate => Rate;
 
@@ -188,7 +202,11 @@ public sealed class OpusSource : IPcmSource
         Rewind(_origin + frame);
     }
 
-    public void Dispose() => _stream.Dispose();
+    public void Dispose()
+    {
+        _decoder.Dispose();
+        _stream.Dispose();
+    }
 
     /// <summary>Starts decoding far enough before the granule position <paramref name="target"/> to reach it exactly.</summary>
     private void Rewind(long target)
@@ -196,8 +214,7 @@ public sealed class OpusSource : IPcmSource
         _bufferFrames = 0;
         _ended = false;
         _discardUntil = target;
-        _decoder?.ResetState();
-        _multiStreamDecoder?.ResetState();
+        _decoder.Reset();
 
         // The last page ending a packet at or before the pre-roll point; failing that, the start.
         long from = target - PreRollFrames;
@@ -243,21 +260,7 @@ public sealed class OpusSource : IPcmSource
             return true;
         }
 
-        int frames;
-        try
-        {
-            frames = _decoder is not null
-                ? _decoder.Decode(packet, _pcm, MaxPacketFrames, false)
-                : _multiStreamDecoder!.DecodeMultistream(packet, _pcm, MaxPacketFrames, false);
-        }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
-        {
-            throw AudioDecoder.Damaged(ex);
-        }
-
-        if (frames < 0)
-            throw new InvalidDataException("An Opus packet couldn't be decoded.");
-
+        int frames = _decoder.Decode(packet, _pcm);
         _bufferOffset = 0;
         _bufferFrames = frames;
         _bufferPosition = _nextPosition;

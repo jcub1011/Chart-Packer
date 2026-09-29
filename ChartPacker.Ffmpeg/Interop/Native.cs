@@ -1,12 +1,23 @@
 using System.Runtime.InteropServices;
 
-namespace ChartPacker.Video.Interop;
+namespace ChartPacker.Ffmpeg.Interop;
 
 // Written from the public headers of FFmpeg 9.0 (libavformat 63, libavcodec 63, libavutil 61,
 // libswscale 10). Only the functions this project calls are bound, and the structs declare only
 // their leading fields, up to the last one read; the rest of each struct is FFmpeg's to allocate.
 // FfmpegLibrary refuses any other major version, since the layouts can change between them.
-// FFmpeg's own names are kept, so each binding reads like its header.
+// FFmpeg's own names are kept, so each binding reads like its header. Video uses avformat, avcodec
+// and swscale; audio only avcodec's decoders, given packets our own code has read.
+
+/// <summary>The leading fields of <c>AVCodec</c> (libavcodec/codec.h).</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct AVCodec
+{
+    public byte* name;
+    public byte* long_name;
+    public int type;
+    public int id;
+}
 
 /// <summary><c>AVRational</c>: a fraction.</summary>
 [StructLayout(LayoutKind.Sequential)]
@@ -124,10 +135,30 @@ internal unsafe struct AVFrame
     public int colorspace;
     public int chroma_location;
     public long best_effort_timestamp;
+    public void* metadata;
+    public int decode_error_flags;
+    public void* hw_frames_ctx;
+    public void* opaque_ref;
+    public nuint crop_top;
+    public nuint crop_bottom;
+    public nuint crop_left;
+    public nuint crop_right;
+    public void* private_ref;
+    public AVChannelLayout ch_layout;
 }
 
-/// <summary>The FFmpeg functions and constants used to decode a video.</summary>
-internal static unsafe partial class Ffmpeg
+/// <summary><c>AVChannelLayout</c> (libavutil/channel_layout.h), whose union is a 64-bit mask or a pointer.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct AVChannelLayout
+{
+    public int order;
+    public int nb_channels;
+    public ulong u;
+    public void* opaque;
+}
+
+/// <summary>The FFmpeg functions and constants used to decode video and audio.</summary>
+internal static unsafe partial class Native
 {
     public const string AvFormat = "avformat";
     public const string AvCodec = "avcodec";
@@ -143,6 +174,14 @@ internal static unsafe partial class Ffmpeg
     public const long NoPtsValue = long.MinValue;
     public const int TimeBase = 1_000_000;
     public const int MediaTypeVideo = 0;
+    public const int MediaTypeAudio = 1;
+
+    // libavutil/samplefmt.h: AV_SAMPLE_FMT_FLT and AV_SAMPLE_FMT_FLTP.
+    public const int SampleFormatFloat = 3;
+    public const int SampleFormatFloatPlanar = 8;
+
+    // libavcodec/defs.h: AV_INPUT_BUFFER_PADDING_SIZE, zeroed bytes every buffer given to a decoder must have after it.
+    public const int InputBufferPadding = 64;
     public const int PixelFormatBgra = 28;
     public const int SwsBilinear = 2;
     public const int SeekFlagBackward = 1;
@@ -155,6 +194,9 @@ internal static unsafe partial class Ffmpeg
     // AVERROR(EIO): EIO is 5 everywhere FFmpeg runs.
     public const int ErrorIo = -5;
 
+    // FFERRTAG('I','N','D','A'): AVERROR_INVALIDDATA.
+    public const int ErrorInvalidData = -('I' | ('N' << 8) | ('D' << 16) | ('A' << 24));
+
     /// <summary>AVERROR(EAGAIN): EAGAIN is 35 on macOS and 11 elsewhere.</summary>
     public static int ErrorAgain { get; } = OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() ? -35 : -11;
 
@@ -164,6 +206,9 @@ internal static unsafe partial class Ffmpeg
 
     [LibraryImport(AvUtil, EntryPoint = "av_malloc")]
     public static partial void* av_malloc(nuint size);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_mallocz")]
+    public static partial void* av_mallocz(nuint size);
 
     [LibraryImport(AvUtil, EntryPoint = "av_freep")]
     public static partial void av_freep(void* ptr);
@@ -221,6 +266,15 @@ internal static unsafe partial class Ffmpeg
     // libavcodec
     [LibraryImport(AvCodec, EntryPoint = "avcodec_version")]
     public static partial uint avcodec_version();
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_find_decoder_by_name", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial AVCodec* avcodec_find_decoder_by_name(string name);
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_parameters_alloc")]
+    public static partial AVCodecParameters* avcodec_parameters_alloc();
+
+    [LibraryImport(AvCodec, EntryPoint = "avcodec_parameters_free")]
+    public static partial void avcodec_parameters_free(AVCodecParameters** parameters);
 
     [LibraryImport(AvCodec, EntryPoint = "avcodec_alloc_context3")]
     public static partial void* avcodec_alloc_context3(void* codec);

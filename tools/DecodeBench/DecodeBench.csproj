@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Times the audio decoders with BenchmarkDotNet, and FFmpeg's for comparison (see RESULTS.md). Never shipped. -->
+  <!-- Times the audio decoders with BenchmarkDotNet, on each backend (see RESULTS.md). Never shipped. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- The FFmpeg reference decoder takes pointers. -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,8 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Brings FFmpeg's libraries with it, through ChartPacker.Ffmpeg. -->
     <ProjectReference Include="..\..\ChartPacker.Audio\ChartPacker.Audio.csproj" />
-    <!-- For FFmpeg's libraries, copied from it, and FfmpegLibrary's version check. -->
-    <ProjectReference Include="..\..\ChartPacker.Video\ChartPacker.Video.csproj" />
   </ItemGroup>
 </Project>

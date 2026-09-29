@@ -3,6 +3,11 @@
 Phase 1 of the faster-decoding work: how fast the app's managed decoders are, how much of a
 waveform read is decoding, and how fast FFmpeg's native decoders are on the same files.
 
+The tables below were taken with Phase 1's prototype, which had FFmpeg demux and decode each file
+itself (the `Ffmpeg` benchmark). The tool now runs every benchmark on both of the app's backends
+(`Backend` = `Managed` or `Ffmpeg`), and there's no separate `Ffmpeg` benchmark. See
+[Phase 2](#phase-2-ffmpeg-decodes-the-apps-audio) for what was built.
+
 ## Setup
 
 - **Machine:** Intel Core i9-9900K (8 cores, 16 threads), Windows 10 22H2, .NET SDK 10.0.401,
@@ -105,6 +110,39 @@ Suggested order, if you go ahead: **Opus first** (most used, low risk, about 2×
 (8×, after trying `ReadBits`), then **Vorbis** last (3×, highest risk). If about 2× on Opus isn't
 worth adding swresample and the new `ChartPacker.Ffmpeg` project, the alternative is the cheap
 fixes above, which help MP3 most and Opus hardly at all.
+
+## Phase 2: FFmpeg decodes the app's audio
+
+All three formats went to FFmpeg, through `ChartPacker.Ffmpeg`'s `FfmpegAudioDecoder`, for mono and
+stereo stems. Only packets go to FFmpeg, and the app's own container code keeps the timing, trims
+and seeks. The managed decoders stay as the fallback.
+
+**The three cheap fixes above were made:**
+
+- `ReadBits` reads up to 32 bits at once;
+- one MP3 frame buffer is reused;
+- one Ogg page buffer is reused.
+
+The managed output is **bit-identical** before and after: a SHA-256 of the decoded samples, on a
+straight read and after four seeks, for every fixture and two real Opus songs.
+
+**How closely the backends agree** (`DecoderTests.TheBackendsAgree`):
+
+| Format | Length and timing | Largest sample gap | SNR |
+|---|---|--:|--:|
+| Vorbis | same | 4.5e-7 | 131 dB |
+| MP3 | same | 1.1e-3, in the last 3 frames | 87–109 dB |
+| Opus fixtures | same (best lag 0) | 3.6e-4 (mono), 7.7e-2 (stereo) | 52–72 dB |
+| Real 6-minute Opus song | same (best lag 0) | 0.15; 0.01% of frames off by more than 1e-3 | 59.6 dB |
+
+FFmpeg's Opus decoder is a separate implementation from Concentus, and Opus is specified by the
+quality of what's decoded rather than by exact samples, so the two differ at about 60 dB below the
+signal. That's inaudible, and stems still line up.
+
+**Not measured after Phase 2.** The benchmarks weren't re-run, at the user's call. Phase 1 had
+already measured FFmpeg's decoders at about 2× (Opus), 3× (Vorbis) and 8× (MP3) the managed ones
+per core, and `ChartPacker.Audio` now feeds them the same packets. To measure it, run the commands
+under [Setup](#setup): each benchmark then has an `FFmpeg speed-up` column.
 
 ## Full results
 

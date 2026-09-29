@@ -1,6 +1,7 @@
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
 using ChartPacker.Core.Tests.Sng;
+using ChartPacker.Ffmpeg;
 using ChartPacker.Video;
 
 namespace ChartPacker.Core.Tests.Video;

@@ -7,6 +7,7 @@ namespace ChartPacker.Audio.Decoding;
 /// <see cref="MpegFrameDecoder"/>. <see cref="ReadBits"/> reads the frame after its header and
 /// CRC, most significant bit first.
 /// </summary>
+/// <remarks>One instance is loaded with each frame in turn, so its buffer is reused rather than allocated per frame.</remarks>
 internal sealed class MpegFrame : IMpegFrame
 {
     public const int HeaderLength = 4;
@@ -28,16 +29,15 @@ internal sealed class MpegFrame : IMpegFrame
 
     private static readonly int[] Version1Rates = [44100, 48000, 32000];
 
-    private readonly byte[] _data;
+    private byte[] _data = [];
+    private int _length;
     private int _bitPosition;
 
-    private MpegFrame(MpegFrameHeader header, byte[] data)
-    {
-        Header = header;
-        _data = data;
-    }
+    /// <summary>The frame loaded last. Nothing's read before the first <see cref="Load"/>.</summary>
+    public MpegFrameHeader Header { get; private set; } = null!;
 
-    public MpegFrameHeader Header { get; }
+    /// <summary>The whole frame, header included.</summary>
+    public ReadOnlySpan<byte> Data => _data.AsSpan(0, _length);
 
     public int SampleRate => Header.SampleRate;
 
@@ -101,14 +101,16 @@ internal sealed class MpegFrame : IMpegFrame
             HasCrc: (bytes[1] & 1) == 0, IsCopyrighted: ((bytes[3] >> 3) & 1) != 0);
     }
 
-    /// <summary>Reads the frame at <paramref name="offset"/>, whose header is <paramref name="header"/>.</summary>
-    public static MpegFrame Read(Stream stream, long offset, MpegFrameHeader header)
+    /// <summary>Loads the frame <paramref name="data"/>, whose header is <paramref name="header"/>, in place of the last.</summary>
+    public void Load(ReadOnlySpan<byte> data, MpegFrameHeader header)
     {
-        var frame = new MpegFrame(header, new byte[header.FrameLength]);
-        stream.Position = offset;
-        stream.ReadExactly(frame._data);
-        frame.Reset();
-        return frame;
+        if (_data.Length < data.Length)
+            _data = new byte[Math.Max(data.Length, _data.Length * 2)];
+
+        data.CopyTo(_data);
+        _length = data.Length;
+        Header = header;
+        Reset();
     }
 
     public void Reset() => _bitPosition = (HeaderLength + (HasCrc ? 2 : 0)) * 8;
@@ -117,18 +119,22 @@ internal sealed class MpegFrame : IMpegFrame
     {
         if (bitCount is < 0 or > 32)
             throw new ArgumentOutOfRangeException(nameof(bitCount));
-        if (_bitPosition + bitCount > _data.Length * 8)
+        if (_bitPosition + bitCount > _length * 8)
             throw new InvalidDataException("An MPEG frame ended early.");
+        if (bitCount == 0)
+            return 0;
 
-        int value = 0;
-        for (int i = 0; i < bitCount; i++)
-        {
-            int bit = (_data[_bitPosition >> 3] >> (7 - (_bitPosition & 7))) & 1;
-            value = (value << 1) | bit;
-            _bitPosition++;
-        }
+        // Up to 32 bits from any bit offset span at most five bytes: they're gathered into a
+        // 40-bit window, first byte highest, and the bits wanted are shifted out of it at once.
+        // NLayer reads every field and Huffman code through here, so a bit at a time is slow.
+        int index = _bitPosition >> 3;
+        ulong window = 0;
+        for (int i = index; i < index + 5; i++)
+            window = (window << 8) | (i < _length ? _data[i] : 0u);
 
-        return value;
+        int shift = 40 - (_bitPosition & 7) - bitCount;
+        _bitPosition += bitCount;
+        return (int)((window >> shift) & ((1UL << bitCount) - 1));
     }
 }
 

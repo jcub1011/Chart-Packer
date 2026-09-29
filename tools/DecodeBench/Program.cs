@@ -7,9 +7,10 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Order;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using ChartPacker.Audio.Decoding;
 using DecodeBench;
 
-// Times the app's audio decoders with BenchmarkDotNet, against FFmpeg's (see RESULTS.md):
+// Times the app's audio decoders with BenchmarkDotNet, on the managed and FFmpeg backends (see RESULTS.md):
 //
 //   dotnet run -c Release --project tools/DecodeBench -- [paths…] [--per-format K] [--iterations N] [--aot] [--list]
 //
@@ -58,8 +59,7 @@ if (stems.Count == 0)
 // Numbered in the order found, so two stems of the same shape are told apart without naming either.
 stems = stems.Select((s, i) => s with { Label = $"{s.Label} #{i + 1}" }).ToList();
 
-string? ffmpegProblem = FfmpegReference.UnavailableReason;
-PrintStems(stems, ffmpegProblem is null);
+var onFfmpeg = PrintStems(stems);
 if (list)
     return 0;
 
@@ -81,53 +81,53 @@ var config = ManualConfig.Create(DefaultConfig.Instance)
 if (aot)
     config = config.AddJob(job.WithRuntime(NativeAotRuntime.Net10_0).WithId("NativeAOT"));
 
-if (ffmpegProblem is not null)
-{
-    Console.WriteLine($"FFmpeg can't be used, so it isn't timed: {ffmpegProblem}");
-    config = config.AddFilter(new SimpleFilter(c => c.Descriptor.WorkloadMethod.Name != nameof(DecodeBenchmarks.Ffmpeg)));
-}
+// A stem FFmpeg can't decode is timed on the managed decoders alone.
+config = config.AddFilter(new SimpleFilter(c =>
+    (AudioBackend)c.Parameters[nameof(DecodeBenchmarks.Backend)]! != AudioBackend.Ffmpeg
+    || onFfmpeg.Contains((string)c.Parameters[nameof(DecodeBenchmarks.Audio)]!)));
 
 BenchmarkRunner.Run<DecodeBenchmarks>(config);
 return 0;
 
-// Each stem's shape, and what FFmpeg makes of it: its decoder, and how many frames it gives against the app's.
-static void PrintStems(List<StemLocation> stems, bool withFfmpeg)
+// Each stem's shape, and how many frames each backend decodes, which must match; the stems FFmpeg can decode.
+static HashSet<string> PrintStems(List<StemLocation> stems)
 {
-    Console.WriteLine("| Stem | Rate | Frames | FFmpeg decoder | FFmpeg format | FFmpeg frames |");
-    Console.WriteLine("|---|--:|--:|---|--:|--:|");
+    var onFfmpeg = new HashSet<string>(StringComparer.Ordinal);
+    Console.WriteLine("| Stem | Rate | Managed frames | FFmpeg frames |");
+    Console.WriteLine("|---|--:|--:|--:|");
     foreach (var location in stems)
     {
         using var stem = location.Open();
-        using var source = stem.OpenSource();
-        var buffer = new float[4096 * source.Channels];
-        long frames = 0;
-        int read;
-        while ((read = source.ReadFrames(buffer)) > 0)
-            frames += read;
-
-        string ffmpeg = "| - | - | - |";
-        if (withFfmpeg)
+        long managed = Count(stem, AudioBackend.Managed, out int rate);
+        string ffmpeg;
+        try
         {
-            try
-            {
-                using var decoder = FfmpegReference.Open(stem.OpenStream());
-                var first = decoder.Run(source.Channels);
-
-                // Each benchmark run rewinds; one that didn't land on the start would read less.
-                var second = decoder.Run(source.Channels);
-                string again = second.Frames == first.Frames ? "" : $" (rewound: {second.Frames})";
-                ffmpeg = $"| {decoder.Name} | {first.SampleFormat} | {first.Frames}{again} |";
-            }
-            catch (InvalidDataException ex)
-            {
-                ffmpeg = $"| failed: {ex.Message} | | |";
-            }
+            long frames = Count(stem, AudioBackend.Ffmpeg, out _);
+            ffmpeg = frames == managed ? $"{frames}" : $"{frames} (differs)";
+            onFfmpeg.Add(location.Label);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ffmpeg = $"not timed: {ex.Message}";
         }
 
-        Console.WriteLine($"| {location.Label} | {source.SampleRate} | {frames} {ffmpeg}");
+        Console.WriteLine($"| {location.Label} | {rate} | {managed} | {ffmpeg} |");
     }
 
     Console.WriteLine();
+    return onFfmpeg;
+}
+
+static long Count(OpenStem stem, AudioBackend backend, out int rate)
+{
+    using var source = stem.OpenSource(backend);
+    rate = source.SampleRate;
+    var buffer = new float[4096 * source.Channels];
+    long frames = 0;
+    int read;
+    while ((read = source.ReadFrames(buffer)) > 0)
+        frames += read;
+    return frames;
 }
 
 // The test fixtures, found from the working directory or the executable, whichever is in the repo.

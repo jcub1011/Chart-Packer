@@ -1,3 +1,4 @@
+using ChartPacker.Audio.Decoding;
 using ChartPacker.Audio.Waveforms;
 
 namespace ChartPacker.Core.Tests.Audio;
@@ -489,24 +490,28 @@ public sealed class WaveformPeaksTests
     }
 
     [TestMethod]
-    [DataRow("chirp-stereo-44100.ogg")]
-    [DataRow("chirp-stereo-48000.opus")]
-    [DataRow("chirp-mono-48000.opus")]
-    [DataRow("chirp-stereo-44100.mp3")]
-    public void ChunksOfRealAudioGiveThePeaksOfOneRead(string name)
+    [DataRow("chirp-stereo-44100.ogg", AudioBackend.Managed)]
+    [DataRow("chirp-stereo-48000.opus", AudioBackend.Managed)]
+    [DataRow("chirp-mono-48000.opus", AudioBackend.Managed)]
+    [DataRow("chirp-stereo-44100.mp3", AudioBackend.Managed)]
+    [DataRow("chirp-stereo-44100.ogg", AudioBackend.Ffmpeg)]
+    [DataRow("chirp-stereo-48000.opus", AudioBackend.Ffmpeg)]
+    [DataRow("chirp-mono-48000.opus", AudioBackend.Ffmpeg)]
+    [DataRow("chirp-stereo-44100.mp3", AudioBackend.Ffmpeg)]
+    public void ChunksOfRealAudioGiveThePeaksOfOneRead(string name, AudioBackend backend)
     {
         StemPeaks expected;
-        using (var source = TestAudio.OpenFixture(name))
+        using (var source = TestAudio.OpenFixture(name, backend))
             expected = WaveformPeaks.Compute(name, source);
 
         // A second in chunks of 7 buckets: every chunk but the first seeks.
         StemPeaksReader reader;
-        using (var source = TestAudio.OpenFixture(name))
+        using (var source = TestAudio.OpenFixture(name, backend))
             reader = new StemPeaksReader(name, source, chunkBuckets: 7);
         Assert.AreEqual(8, reader.ChunkCount);
         Parallel.For(0, reader.ChunkCount, i =>
         {
-            using var source = TestAudio.OpenFixture(name);
+            using var source = TestAudio.OpenFixture(name, backend);
             reader.ReadChunk(i, source);
         });
 

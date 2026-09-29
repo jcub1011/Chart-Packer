@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using ChartPacker.Video.Interop;
+using ChartPacker.Ffmpeg;
+using ChartPacker.Ffmpeg.Interop;
 
 namespace ChartPacker.Video;
 
@@ -41,53 +42,53 @@ public sealed unsafe class VideoDecoder : IDisposable
         try
         {
             _streamHandle = GCHandle.Alloc(stream);
-            byte* buffer = (byte*)Ffmpeg.av_malloc(IoBufferSize);
+            byte* buffer = (byte*)Native.av_malloc(IoBufferSize);
             if (buffer == null)
                 throw new OutOfMemoryException();
 
             delegate* unmanaged[Cdecl]<void*, long, int, long> seek = stream.CanSeek ? &Seek : null;
-            _io = Ffmpeg.avio_alloc_context(buffer, IoBufferSize, 0, (void*)GCHandle.ToIntPtr(_streamHandle), &Read, null, seek);
+            _io = Native.avio_alloc_context(buffer, IoBufferSize, 0, (void*)GCHandle.ToIntPtr(_streamHandle), &Read, null, seek);
             if (_io == null)
             {
-                Ffmpeg.av_freep(&buffer);
+                Native.av_freep(&buffer);
                 throw new OutOfMemoryException();
             }
 
-            _format = Ffmpeg.avformat_alloc_context();
+            _format = Native.avformat_alloc_context();
             if (_format == null)
                 throw new OutOfMemoryException();
             _format->pb = _io;
 
             AVFormatContext* format = _format;
-            int result = Ffmpeg.avformat_open_input(&format, null, null, null);
+            int result = Native.avformat_open_input(&format, null, null, null);
 
             // On failure the context is freed and set to null; the custom I/O is still ours.
             _format = format;
             Check(result, "The file isn't a video FFmpeg can read");
-            Check(Ffmpeg.avformat_find_stream_info(_format, null), "The video's streams couldn't be read");
+            Check(Native.avformat_find_stream_info(_format, null), "The video's streams couldn't be read");
 
             void* decoder = null;
-            _streamIndex = Ffmpeg.av_find_best_stream(_format, Ffmpeg.MediaTypeVideo, -1, -1, &decoder, 0);
+            _streamIndex = Native.av_find_best_stream(_format, Native.MediaTypeVideo, -1, -1, &decoder, 0);
             Check(_streamIndex, "The file has no video stream that can be decoded");
 
             AVStream* videoStream = _format->streams[_streamIndex];
             _timeBase = videoStream->time_base;
-            _startTime = videoStream->start_time == Ffmpeg.NoPtsValue ? 0 : videoStream->start_time;
+            _startTime = videoStream->start_time == Native.NoPtsValue ? 0 : videoStream->start_time;
 
-            _codec = Ffmpeg.avcodec_alloc_context3(decoder);
+            _codec = Native.avcodec_alloc_context3(decoder);
             if (_codec == null)
                 throw new OutOfMemoryException();
-            Check(Ffmpeg.avcodec_parameters_to_context(_codec, videoStream->codecpar), "The video's codec can't be set up");
+            Check(Native.avcodec_parameters_to_context(_codec, videoStream->codecpar), "The video's codec can't be set up");
 
             void* options = null;
-            Ffmpeg.av_dict_set(&options, "threads", "auto", 0);
-            result = Ffmpeg.avcodec_open2(_codec, decoder, &options);
-            Ffmpeg.av_dict_free(&options);
+            Native.av_dict_set(&options, "threads", "auto", 0);
+            result = Native.avcodec_open2(_codec, decoder, &options);
+            Native.av_dict_free(&options);
             Check(result, "The video's codec can't be opened");
 
-            _packet = Ffmpeg.av_packet_alloc();
-            _next = Ffmpeg.av_frame_alloc();
-            _kept = Ffmpeg.av_frame_alloc();
+            _packet = Native.av_packet_alloc();
+            _next = Native.av_frame_alloc();
+            _kept = Native.av_frame_alloc();
             if (_packet == null || _next == null || _kept == null)
                 throw new OutOfMemoryException();
 
@@ -165,28 +166,28 @@ public sealed unsafe class VideoDecoder : IDisposable
     public bool Next(out TimeSpan time)
     {
         ObjectDisposedException.ThrowIf(_codec == null, this);
-        Ffmpeg.av_frame_unref(_next);
+        Native.av_frame_unref(_next);
         _hasNext = false;
 
         while (true)
         {
-            int received = Ffmpeg.avcodec_receive_frame(_codec, _next);
+            int received = Native.avcodec_receive_frame(_codec, _next);
             if (received == 0)
             {
-                long timestamp = _next->best_effort_timestamp != Ffmpeg.NoPtsValue ? _next->best_effort_timestamp : _next->pts;
-                time = timestamp == Ffmpeg.NoPtsValue ? _lastTime : ToTime(timestamp);
+                long timestamp = _next->best_effort_timestamp != Native.NoPtsValue ? _next->best_effort_timestamp : _next->pts;
+                time = timestamp == Native.NoPtsValue ? _lastTime : ToTime(timestamp);
                 _lastTime = time;
                 _hasNext = true;
                 return true;
             }
 
-            if (received == Ffmpeg.ErrorEof)
+            if (received == Native.ErrorEof)
             {
                 time = _lastTime;
                 return false;
             }
 
-            if (received != Ffmpeg.ErrorAgain)
+            if (received != Native.ErrorAgain)
                 throw new InvalidDataException($"The video can't be decoded (FFmpeg error {received}).");
 
             if (_draining)
@@ -195,22 +196,22 @@ public sealed unsafe class VideoDecoder : IDisposable
                 return false;
             }
 
-            int read = Ffmpeg.av_read_frame(_format, _packet);
+            int read = Native.av_read_frame(_format, _packet);
             if (read < 0)
             {
                 // The end, or a read error: whatever the decoder still holds is let out.
                 _draining = true;
-                Ffmpeg.avcodec_send_packet(_codec, null);
+                Native.avcodec_send_packet(_codec, null);
                 continue;
             }
 
             if (_packet->stream_index == _streamIndex)
             {
                 // A damaged packet is skipped; the decoder carries on from the next one.
-                Ffmpeg.avcodec_send_packet(_codec, _packet);
+                Native.avcodec_send_packet(_codec, _packet);
             }
 
-            Ffmpeg.av_packet_unref(_packet);
+            Native.av_packet_unref(_packet);
         }
     }
 
@@ -223,7 +224,7 @@ public sealed unsafe class VideoDecoder : IDisposable
         AVFrame* kept = _kept;
         _kept = _next;
         _next = kept;
-        Ffmpeg.av_frame_unref(_next);
+        Native.av_frame_unref(_next);
         _hasNext = false;
         HasKept = true;
     }
@@ -244,8 +245,8 @@ public sealed unsafe class VideoDecoder : IDisposable
 
         if (_scaler == null || _scalerSource != source)
         {
-            Ffmpeg.sws_freeContext(_scaler);
-            _scaler = Ffmpeg.sws_getContext(source.Width, source.Height, source.Format, Width, Height, Ffmpeg.PixelFormatBgra, Ffmpeg.SwsBilinear, null, null, null);
+            Native.sws_freeContext(_scaler);
+            _scaler = Native.sws_getContext(source.Width, source.Height, source.Format, Width, Height, Native.PixelFormatBgra, Native.SwsBilinear, null, null, null);
             _scalerSource = source;
             if (_scaler == null)
                 return false;
@@ -255,7 +256,7 @@ public sealed unsafe class VideoDecoder : IDisposable
         {
             byte** dst = stackalloc byte*[4] { output, null, null, null };
             int* dstStride = stackalloc int[4] { Width * 4, 0, 0, 0 };
-            return Ffmpeg.sws_scale(_scaler, (byte**)_kept->data, _kept->linesize, 0, source.Height, dst, dstStride) > 0;
+            return Native.sws_scale(_scaler, (byte**)_kept->data, _kept->linesize, 0, source.Height, dst, dstStride) > 0;
         }
     }
 
@@ -268,12 +269,12 @@ public sealed unsafe class VideoDecoder : IDisposable
         ObjectDisposedException.ThrowIf(_codec == null, this);
 
         long target = _startTime + (long)(time.TotalSeconds * _timeBase.den / _timeBase.num);
-        if (Ffmpeg.av_seek_frame(_format, _streamIndex, target, Ffmpeg.SeekFlagBackward) < 0)
-            Ffmpeg.av_seek_frame(_format, _streamIndex, _startTime, Ffmpeg.SeekFlagBackward);
+        if (Native.av_seek_frame(_format, _streamIndex, target, Native.SeekFlagBackward) < 0)
+            Native.av_seek_frame(_format, _streamIndex, _startTime, Native.SeekFlagBackward);
 
-        Ffmpeg.avcodec_flush_buffers(_codec);
-        Ffmpeg.av_frame_unref(_next);
-        Ffmpeg.av_frame_unref(_kept);
+        Native.avcodec_flush_buffers(_codec);
+        Native.av_frame_unref(_next);
+        Native.av_frame_unref(_kept);
         _hasNext = false;
         HasKept = false;
         _draining = false;
@@ -284,51 +285,51 @@ public sealed unsafe class VideoDecoder : IDisposable
     {
         if (_scaler != null)
         {
-            Ffmpeg.sws_freeContext(_scaler);
+            Native.sws_freeContext(_scaler);
             _scaler = null;
         }
 
         if (_next != null)
         {
             AVFrame* frame = _next;
-            Ffmpeg.av_frame_free(&frame);
+            Native.av_frame_free(&frame);
             _next = null;
         }
 
         if (_kept != null)
         {
             AVFrame* frame = _kept;
-            Ffmpeg.av_frame_free(&frame);
+            Native.av_frame_free(&frame);
             _kept = null;
         }
 
         if (_packet != null)
         {
             AVPacket* packet = _packet;
-            Ffmpeg.av_packet_free(&packet);
+            Native.av_packet_free(&packet);
             _packet = null;
         }
 
         if (_codec != null)
         {
             void* codec = _codec;
-            Ffmpeg.avcodec_free_context(&codec);
+            Native.avcodec_free_context(&codec);
             _codec = null;
         }
 
         if (_format != null)
         {
             AVFormatContext* format = _format;
-            Ffmpeg.avformat_close_input(&format);
+            Native.avformat_close_input(&format);
             _format = null;
         }
 
         // The custom I/O isn't closed with the input; its buffer may have been replaced since.
         if (_io != null)
         {
-            Ffmpeg.av_freep(&_io->buffer);
+            Native.av_freep(&_io->buffer);
             AVIOContext* io = _io;
-            Ffmpeg.avio_context_free(&io);
+            Native.avio_context_free(&io);
             _io = null;
         }
 
@@ -348,11 +349,11 @@ public sealed unsafe class VideoDecoder : IDisposable
 
     private TimeSpan DurationOf(AVStream* stream)
     {
-        if (stream->duration > 0 && stream->duration != Ffmpeg.NoPtsValue && _timeBase.den != 0)
+        if (stream->duration > 0 && stream->duration != Native.NoPtsValue && _timeBase.den != 0)
             return TimeSpan.FromSeconds((double)stream->duration * _timeBase.num / _timeBase.den);
 
         long duration = _format->duration;
-        return duration > 0 && duration != Ffmpeg.NoPtsValue ? TimeSpan.FromSeconds((double)duration / Ffmpeg.TimeBase) : TimeSpan.Zero;
+        return duration > 0 && duration != Native.NoPtsValue ? TimeSpan.FromSeconds((double)duration / Native.TimeBase) : TimeSpan.Zero;
     }
 
     private static (int Width, int Height) FitWidth(int width, int height, int maxWidth)
@@ -376,11 +377,11 @@ public sealed unsafe class VideoDecoder : IDisposable
         {
             var stream = (Stream)GCHandle.FromIntPtr((IntPtr)opaque).Target!;
             int read = stream.Read(new Span<byte>(buffer, size));
-            return read == 0 ? Ffmpeg.ErrorEof : read;
+            return read == 0 ? Native.ErrorEof : read;
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or UnauthorizedAccessException)
         {
-            return Ffmpeg.ErrorIo;
+            return Native.ErrorIo;
         }
     }
 
@@ -390,21 +391,21 @@ public sealed unsafe class VideoDecoder : IDisposable
         try
         {
             var stream = (Stream)GCHandle.FromIntPtr((IntPtr)opaque).Target!;
-            if ((whence & Ffmpeg.SeekSize) != 0)
+            if ((whence & Native.SeekSize) != 0)
                 return stream.Length;
 
-            var origin = (whence & ~Ffmpeg.SeekForce) switch
+            var origin = (whence & ~Native.SeekForce) switch
             {
                 0 => SeekOrigin.Begin,
                 1 => SeekOrigin.Current,
                 2 => SeekOrigin.End,
                 _ => (SeekOrigin?)null,
             };
-            return origin is { } o ? stream.Seek(offset, o) : Ffmpeg.ErrorIo;
+            return origin is { } o ? stream.Seek(offset, o) : Native.ErrorIo;
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or NotSupportedException or ArgumentException)
         {
-            return Ffmpeg.ErrorIo;
+            return Native.ErrorIo;
         }
     }
 }

@@ -126,8 +126,8 @@ internal sealed class OpenStem(string name, SafeFileHandle? handle, Func<Stream>
     /// <summary>A new read-only stream over the file, as the app opens it.</summary>
     public Stream OpenStream() => open();
 
-    /// <summary>A new managed decoder over the file.</summary>
-    public IPcmSource OpenSource() => AudioDecoder.Open(OpenStream(), Name);
+    /// <summary>A new decoder over the file, on <paramref name="backend"/>.</summary>
+    public IPcmSource OpenSource(AudioBackend backend = AudioBackend.Managed) => AudioDecoder.Open(OpenStream(), Name, backend);
 
     public void Dispose() => handle?.Dispose();
 }

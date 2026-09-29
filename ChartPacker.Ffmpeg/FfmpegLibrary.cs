@@ -1,8 +1,8 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
-using ChartPacker.Video.Interop;
+using ChartPacker.Ffmpeg.Interop;
 
-namespace ChartPacker.Video;
+namespace ChartPacker.Ffmpeg;
 
 /// <summary>
 /// Finds FFmpeg's shared libraries beside the executable and checks they're the major version the
@@ -39,10 +39,10 @@ public static class FfmpegLibrary
         try
         {
             // Loaded in dependency order, so each finds the ones it links against.
-            return Check("libavutil", Ffmpeg.avutil_version(), Ffmpeg.AvUtilMajor)
-                ?? Check("libswscale", Ffmpeg.swscale_version(), Ffmpeg.SwScaleMajor)
-                ?? Check("libavcodec", Ffmpeg.avcodec_version(), Ffmpeg.AvCodecMajor)
-                ?? Check("libavformat", Ffmpeg.avformat_version(), Ffmpeg.AvFormatMajor);
+            return Check("libavutil", Native.avutil_version(), Native.AvUtilMajor)
+                ?? Check("libswscale", Native.swscale_version(), Native.SwScaleMajor)
+                ?? Check("libavcodec", Native.avcodec_version(), Native.AvCodecMajor)
+                ?? Check("libavformat", Native.avformat_version(), Native.AvFormatMajor);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
         {
@@ -57,10 +57,10 @@ public static class FfmpegLibrary
     {
         int major = libraryName switch
         {
-            Ffmpeg.AvUtil => Ffmpeg.AvUtilMajor,
-            Ffmpeg.SwScale => Ffmpeg.SwScaleMajor,
-            Ffmpeg.AvCodec => Ffmpeg.AvCodecMajor,
-            Ffmpeg.AvFormat => Ffmpeg.AvFormatMajor,
+            Native.AvUtil => Native.AvUtilMajor,
+            Native.SwScale => Native.SwScaleMajor,
+            Native.AvCodec => Native.AvCodecMajor,
+            Native.AvFormat => Native.AvFormatMajor,
             _ => -1,
         };
         if (major < 0)

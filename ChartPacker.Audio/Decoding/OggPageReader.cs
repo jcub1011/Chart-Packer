@@ -5,12 +5,15 @@ namespace ChartPacker.Audio.Decoding;
 /// <summary>One page of an Ogg logical stream (RFC 3533 §6).</summary>
 /// <param name="Offset">Where the page starts in the file.</param>
 /// <param name="BodyOffset">Where its body (the packet data) starts.</param>
-/// <param name="Granule">The granule position: for Opus, the sample count at the end of the last packet that ends on this page; -1 when none does.</param>
+/// <param name="Granule">The granule position: for Opus and Vorbis, the sample count at the end of the last packet that ends on this page; -1 when none does.</param>
 /// <param name="Lacing">The segment table: each packet is a run of 255s ended by a smaller value.</param>
 internal readonly record struct OggPage(long Offset, long BodyOffset, byte HeaderType, long Granule, byte[] Lacing)
 {
     /// <summary>The first packet on the page continues one from the page before.</summary>
     public bool IsContinued => (HeaderType & 0x01) != 0;
+
+    /// <summary>The page is the stream's last.</summary>
+    public bool IsEndOfStream => (HeaderType & 0x04) != 0;
 
     public int BodyLength => Lacing.Sum(l => (int)l);
 }
@@ -39,7 +42,10 @@ internal sealed class OggPageReader
     private int _pageIndex;
     private int _segment;
     private long _bodyPosition;
+
+    // The page being read's body, at the start of a buffer grown to the longest page rather than allocated for each.
     private byte[] _body = [];
+    private bool _isPageLoaded;
 
     /// <exception cref="InvalidDataException">The stream doesn't start with an Ogg page.</exception>
     public OggPageReader(Stream stream)
@@ -72,7 +78,7 @@ internal sealed class OggPageReader
             if (pageSerial == serial)
             {
                 _pages.Add(page);
-                if ((headerType & 0x04) != 0)
+                if (page.IsEndOfStream)
                     break; // End of stream; anything after it is a chained stream, not played.
             }
 
@@ -98,7 +104,7 @@ internal sealed class OggPageReader
         _pageIndex = pageIndex;
         _segment = 0;
         _packetLength = 0;
-        _body = [];
+        _isPageLoaded = false;
 
         // A packet that starts on an earlier page can't be put together, so its end is dropped.
         _dropping = pageIndex < _pages.Count && _pages[pageIndex].IsContinued;
@@ -120,7 +126,7 @@ internal sealed class OggPageReader
     {
         while (_pageIndex < _pages.Count)
         {
-            if (_body.Length == 0 && _segment == 0)
+            if (!_isPageLoaded)
                 LoadPage();
 
             var page = _pages[_pageIndex];
@@ -148,7 +154,7 @@ internal sealed class OggPageReader
 
             _pageIndex++;
             _segment = 0;
-            _body = [];
+            _isPageLoaded = false;
         }
 
         packet = default;
@@ -158,9 +164,11 @@ internal sealed class OggPageReader
     private void LoadPage()
     {
         var page = _pages[_pageIndex];
-        _body = new byte[page.BodyLength];
+        if (_body.Length < page.BodyLength)
+            _body = new byte[Math.Max(page.BodyLength, _body.Length * 2)];
         _stream.Position = page.BodyOffset;
-        _stream.ReadExactly(_body);
+        _stream.ReadExactly(_body.AsSpan(0, page.BodyLength));
+        _isPageLoaded = true;
         _bodyPosition = page.BodyOffset;
     }
 

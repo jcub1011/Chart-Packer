@@ -1,11 +1,13 @@
 using System.Buffers.Binary;
+using ChartPacker.Ffmpeg;
 using NLayer;
 
 namespace ChartPacker.Audio.Decoding;
 
 /// <summary>
-/// Decodes MPEG audio (MP3). The frames are found and indexed here, and each is decoded by
-/// <see href="https://github.com/naudio/NLayer">NLayer</see>'s frame decoder.
+/// Decodes MPEG audio (MP3). The frames are found and indexed here, and each is decoded by FFmpeg's
+/// float decoder for its layer or by <see href="https://github.com/naudio/NLayer">NLayer</see>'s frame
+/// decoder (see <see cref="AudioBackend"/>).
 /// </summary>
 /// <remarks>
 /// <para>The frame index makes seeking exact: decoding restarts a few frames before the target,
@@ -30,7 +32,7 @@ public sealed class Mp3Source : IPcmSource
     private const int MaxSyncSearch = 64 * 1024;
 
     private readonly Stream _stream;
-    private readonly MpegFrameDecoder _decoder = new();
+    private readonly IPacketDecoder _decoder;
     private readonly List<long> _frames = [];
     private readonly MpegFrameHeader _format;
     private readonly List<MpegFrameHeader> _headers = [];
@@ -40,6 +42,9 @@ public sealed class Mp3Source : IPcmSource
     private readonly long _length;
 
     private readonly float[] _pcm;
+
+    // The frame being decoded, read whole; grown to the longest frame, not allocated for each.
+    private byte[] _frameBytes = [];
     private int _bufferOffset;
     private int _bufferFrames;
     private int _nextFrame;
@@ -48,8 +53,15 @@ public sealed class Mp3Source : IPcmSource
     private long _bufferPosition;
     private long _discardUntil;
 
+    /// <param name="backend">What decodes the frames.</param>
     /// <exception cref="InvalidDataException">No MPEG audio frames were found.</exception>
-    public Mp3Source(Stream stream)
+    /// <exception cref="InvalidOperationException"><paramref name="backend"/> is <see cref="AudioBackend.Ffmpeg"/>, and FFmpeg can't decode the stream.</exception>
+    public Mp3Source(Stream stream, AudioBackend backend = AudioBackend.Auto)
+        : this(stream, backend, FfmpegAudioDecoder.IsAvailable)
+    {
+    }
+
+    internal Mp3Source(Stream stream, AudioBackend backend, Func<string, bool> isAvailable)
     {
         ArgumentNullException.ThrowIfNull(stream);
         _stream = stream;
@@ -76,7 +88,6 @@ public sealed class Mp3Source : IPcmSource
         }
 
         _format = first ?? throw new InvalidDataException("No MPEG audio frames were found.");
-        _decoder.StereoMode = StereoMode.Both;
         _pcm = new float[_format.SampleCount * _format.Channels];
 
         // The Xing/Info frame is silent; it isn't audio.
@@ -101,6 +112,12 @@ public sealed class Mp3Source : IPcmSource
             _length = decoded;
         }
 
+        // Made last, once nothing else can throw, so that a stream that isn't MP3 leaves nothing to free.
+        string decoder = DecoderName(_format.Layer);
+        IPacketDecoder? ffmpeg = AudioDecoder.UsesFfmpeg(backend, decoder, _format.Channels, isAvailable)
+            ? FfmpegPacketDecoder.Open(backend, decoder, _format.Channels, [], trimsStart: false, errorsAreSilence: true)
+            : null;
+        _decoder = ffmpeg ?? new NLayerDecoder();
         Rewind(0);
     }
 
@@ -148,7 +165,19 @@ public sealed class Mp3Source : IPcmSource
         Rewind(Math.Min(frame, _length));
     }
 
-    public void Dispose() => _stream.Dispose();
+    public void Dispose()
+    {
+        _decoder.Dispose();
+        _stream.Dispose();
+    }
+
+    /// <summary>FFmpeg's float decoder for <paramref name="layer"/>.</summary>
+    internal static string DecoderName(MpegLayer layer) => layer switch
+    {
+        MpegLayer.LayerI => "mp1float",
+        MpegLayer.LayerII => "mp2float",
+        _ => "mp3float",
+    };
 
     /// <summary>Restarts decoding far enough before output frame <paramref name="frame"/> to reach it exactly.</summary>
     private void Rewind(long frame)
@@ -167,21 +196,16 @@ public sealed class Mp3Source : IPcmSource
         if (_nextFrame >= _frames.Count)
             return false;
 
-        var frame = MpegFrame.Read(_stream, _frames[_nextFrame], _headers[_nextFrame]);
-        int samples;
-        try
-        {
-            samples = _decoder.DecodeFrame(frame, _pcm.AsSpan());
-        }
-        catch (Exception ex) when (AudioDecoder.IsDecoderFault(ex))
-        {
-            throw AudioDecoder.Damaged(ex);
-        }
-
+        var header = _headers[_nextFrame];
+        if (_frameBytes.Length < header.FrameLength)
+            _frameBytes = new byte[Math.Max(header.FrameLength, _frameBytes.Length * 2)];
+        var bytes = _frameBytes.AsSpan(0, header.FrameLength);
+        _stream.Position = _frames[_nextFrame];
+        _stream.ReadExactly(bytes);
+        int frames = _decoder.Decode(bytes, _pcm);
         _nextFrame++;
 
         // A frame that can't be decoded (its bit reservoir is missing after a seek, say) is silence.
-        int frames = samples / Channels;
         if (frames <= 0)
         {
             frames = _format.SampleCount;

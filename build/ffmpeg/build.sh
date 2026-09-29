@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the minimal LGPL FFmpeg that ChartPacker.Video loads, and copies its shared libraries into
-# ChartPacker.Video/runtimes/<rid>/native/, from where they ship beside the executable.
+# Builds the minimal LGPL FFmpeg that ChartPacker.Ffmpeg binds (for video and audio), and copies its
+# shared libraries into ChartPacker.Ffmpeg/runtimes/<rid>/native/, from where they ship beside the executable.
 #
 # Usage: build/ffmpeg/build.sh <rid>
 #   rid: win-x64, win-arm64 (cross-compiled with mingw-w64 / llvm-mingw from Linux or WSL),
@@ -9,14 +9,16 @@
 # Needs: git, make, a C compiler, nasm (x86-64 only), pkg-config.
 #
 # Only what the app plays is built: the demuxers of the registered video extensions (sng-spec §8)
-# and the decoders their videos use. Nothing GPL or non-free is enabled, so the result is LGPL 2.1+.
+# and the decoders their videos use, and the decoders of the registered audio formats (Vorbis, Opus,
+# MPEG audio), whose packets the app reads itself, so they need no demuxers. The Opus decoder needs
+# swresample. Nothing GPL or non-free is enabled, so the result is LGPL 2.1+.
 set -euo pipefail
 
 rid="${1:?usage: build.sh <rid>}"
 tag="n9.0"
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-out="$root/ChartPacker.Video/runtimes/$rid/native"
+out="$root/ChartPacker.Ffmpeg/runtimes/$rid/native"
 work="${FFMPEG_WORK:-$root/build/ffmpeg/.work}"
 src="$work/ffmpeg-$tag"
 
@@ -48,10 +50,10 @@ cd "$build"
   --enable-shared --disable-static \
   --disable-programs --disable-doc --disable-network --disable-autodetect --disable-debug \
   --disable-everything \
-  --disable-avdevice --disable-avfilter --disable-swresample \
-  --enable-avformat --enable-avcodec --enable-swscale \
+  --disable-avdevice --disable-avfilter \
+  --enable-avformat --enable-avcodec --enable-swscale --enable-swresample \
   --enable-demuxer=mov,avi,matroska,ogg,mpegps,mpegvideo,m4v,h264,hevc,ivf \
-  --enable-decoder=h264,hevc,vp8,vp9,theora,mpeg1video,mpeg2video,mpeg4,msmpeg4v1,msmpeg4v2,msmpeg4v3,mjpeg \
+  --enable-decoder=h264,hevc,vp8,vp9,theora,mpeg1video,mpeg2video,mpeg4,msmpeg4v1,msmpeg4v2,msmpeg4v3,mjpeg,vorbis,opus,mp1float,mp2float,mp3float \
   --enable-parser=h264,hevc,vp8,vp9,mpegvideo,mpeg4video,mjpeg \
   --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,vp9_superframe_split
 

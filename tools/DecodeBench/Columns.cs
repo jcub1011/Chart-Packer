@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using ChartPacker.Audio.Decoding;
 
 namespace DecodeBench;
 
@@ -44,23 +45,30 @@ internal sealed class DerivedColumn(string name, string legend, Func<Summary, Be
                     ? null
                     : $"{seconds[Stem(c)] / median:0}×"),
             new DerivedColumn("Decode share", "How much of the one-thread peaks read is the decode, from the medians", (summary, c) =>
-                c.Descriptor.WorkloadMethod.Name == nameof(DecodeBenchmarks.PeaksOneThread) ? Ratio(summary, c, nameof(DecodeBenchmarks.Decode), "0%") : null),
-            new DerivedColumn("FFmpeg speed-up", "The managed decode's median over FFmpeg's, each on one thread", (summary, c) =>
-                c.Descriptor.WorkloadMethod.Name == nameof(DecodeBenchmarks.Ffmpeg) ? Ratio(summary, c, nameof(DecodeBenchmarks.Decode), "0.0×") : null),
+                c.Descriptor.WorkloadMethod.Name == nameof(DecodeBenchmarks.PeaksOneThread)
+                    ? Ratio(summary, c, nameof(DecodeBenchmarks.Decode), Backend(c), "0%")
+                    : null),
+            new DerivedColumn("FFmpeg speed-up", "The same benchmark's median on the managed decoders over this one on FFmpeg's", (summary, c) =>
+                Backend(c) == AudioBackend.Ffmpeg
+                    ? Ratio(summary, c, c.Descriptor.WorkloadMethod.Name, AudioBackend.Managed, "0.0×")
+                    : null),
         ];
     }
 
     private static string Stem(BenchmarkCase benchmarkCase) => (string)benchmarkCase.Parameters[nameof(DecodeBenchmarks.Audio)]!;
 
+    private static AudioBackend Backend(BenchmarkCase benchmarkCase) => (AudioBackend)benchmarkCase.Parameters[nameof(DecodeBenchmarks.Backend)]!;
+
     /// <summary>The median in seconds, or null when it didn't run.</summary>
     private static double? Median(Summary summary, BenchmarkCase benchmarkCase) =>
         summary[benchmarkCase]?.ResultStatistics?.Median is { } nanoseconds ? nanoseconds / 1e9 : null;
 
-    /// <summary>The median of <paramref name="method"/> for the same stem and job, over this case's.</summary>
-    private static string? Ratio(Summary summary, BenchmarkCase benchmarkCase, string method, string format)
+    /// <summary>The median of <paramref name="method"/> on <paramref name="backend"/> for the same stem and job, over this case's.</summary>
+    private static string? Ratio(Summary summary, BenchmarkCase benchmarkCase, string method, AudioBackend backend, string format)
     {
         var other = summary.BenchmarksCases.FirstOrDefault(c =>
             c.Descriptor.WorkloadMethod.Name == method
+            && Backend(c) == backend
             && Stem(c) == Stem(benchmarkCase)
             && c.Job.DisplayInfo == benchmarkCase.Job.DisplayInfo);
         if (other is null || Median(summary, other) is not { } theirs || Median(summary, benchmarkCase) is not { } ours)

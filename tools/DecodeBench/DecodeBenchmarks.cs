@@ -5,8 +5,8 @@ using ChartPacker.Audio.Waveforms;
 namespace DecodeBench;
 
 /// <summary>
-/// Each stem read the ways the app reads it, and by FFmpeg's decoder for comparison. Every read but
-/// <see cref="Open"/> starts from an open source, rewound to the start, so opening isn't in its time.
+/// Each stem read the ways the app reads it, on each backend. Every read but <see cref="Open"/> starts from
+/// an open source, rewound to the start, so opening isn't in its time.
 /// </summary>
 public class DecodeBenchmarks
 {
@@ -15,12 +15,14 @@ public class DecodeBenchmarks
     private OpenStem? _stem;
     private IPcmSource? _source;
     private float[] _buffer = [];
-    private FfmpegReference.Decoder? _ffmpeg;
-    private int _channels;
 
     /// <summary>The stem's label, as the host found it; see <see cref="StemLocation"/>.</summary>
     [ParamsSource(nameof(Stems))]
     public string Audio { get; set; } = "";
+
+    /// <summary>What decodes the packets. The host leaves out FFmpeg when it can't be used.</summary>
+    [Params(AudioBackend.Managed, AudioBackend.Ffmpeg)]
+    public AudioBackend Backend { get; set; }
 
     public static IEnumerable<string> Stems() => StemLocation.FromEnvironment().Select(s => s.Label);
 
@@ -28,28 +30,22 @@ public class DecodeBenchmarks
     public void Setup()
     {
         _stem = StemLocation.FromEnvironment().Single(s => s.Label == Audio).Open();
-        _source = _stem.OpenSource();
-        _channels = _source.Channels;
-        _buffer = new float[4096 * _channels];
-
-        // Only the FFmpeg benchmark needs it, and the host leaves that out when FFmpeg can't be used.
-        if (FfmpegReference.UnavailableReason is null)
-            _ffmpeg = FfmpegReference.Open(_stem.OpenStream());
+        _source = _stem.OpenSource(Backend);
+        _buffer = new float[4096 * _source.Channels];
     }
 
     [GlobalCleanup]
     public void Cleanup()
     {
-        _ffmpeg?.Dispose();
         _source?.Dispose();
         _stem?.Dispose();
     }
 
-    /// <summary>Opening a decoder: the MP3 and Opus index scans, and NVorbis's setup.</summary>
+    /// <summary>Opening a decoder: the MP3 and Ogg index scans, and the decoder's setup.</summary>
     [Benchmark]
     public int Open()
     {
-        using var source = _stem!.OpenSource();
+        using var source = _stem!.OpenSource(Backend);
         return source.Channels;
     }
 
@@ -91,14 +87,10 @@ public class DecodeBenchmarks
             }
             else
             {
-                using var source = _stem!.OpenSource();
+                using var source = _stem!.OpenSource(Backend);
                 reader.ReadChunk(index, source);
             }
         });
         return reader.Finish();
     }
-
-    /// <summary>Decoding the whole stem with FFmpeg's decoder, on one thread, with the output thrown away.</summary>
-    [Benchmark]
-    public long Ffmpeg() => _ffmpeg!.Run(_channels).Frames;
 }

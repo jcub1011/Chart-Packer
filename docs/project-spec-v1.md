@@ -122,21 +122,33 @@ through `IProgress<T>`.
 - The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
   durations from file headers, for the library list's length when a song has no `song_length`.
 - `ChartPacker.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:
+  - FFmpeg's `vorbis`, `opus` and `mp1float`/`mp2float`/`mp3float` decoders, through
+    `ChartPacker.Ffmpeg`, for mono and stereo streams when the libraries have them. Decoding is
+    nearly all of a waveform read's time, and they're about 2× (Opus), 3× (Vorbis) and 8× (MP3)
+    faster per core than the managed decoders (`tools/DecodeBench/RESULTS.md`). Only packets go to
+    FFmpeg: the Ogg container, the MP3 frame index and gapless trim, and WAV are read in-house on
+    either decoder, so timing, trims and seeks are the same on both.
   - `NVorbis` (MIT) to decode Vorbis, `NLayer` (MIT) to decode MPEG audio frames, and
-    `Concentus` (BSD) to decode Opus packets. All three are managed code. The Ogg Opus
-    container, the MP3 frame index and gapless trim, and WAV are read in-house.
+    `Concentus` (BSD) to decode Opus packets, all managed code, when FFmpeg can't: its libraries
+    are missing or built for video alone, or the stream has more than two channels (FFmpeg
+    reorders those, and the mixer takes the order the managed decoders give).
   - `ppy.SDL3-CS` (MIT, with SDL itself under zlib) for audio output on every platform. Only
     SDL's audio subsystem is initialised. It ships SDL's native library for each RID, which
     publishes beside the executable.
   - `NVorbis` is a 1.0 release candidate: 0.10.x lands seeks hundreds of samples late.
 - `ChartPacker.Video` decodes background videos for the detail panel's background tile (F5). It
-  keeps native code out of Core, and has no packages. It binds, by hand with `[LibraryImport]`,
-  the few functions it needs from FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`
-  and `swscale`, LGPL 2.1+). No managed library decodes H.264, VP8/VP9, Theora and MPEG video.
-  LibVLC was considered, but it's far larger and doesn't fit the lockstep stem mixer.
+  keeps native code out of Core, and has no packages. No managed library decodes H.264, VP8/VP9,
+  Theora and MPEG video. LibVLC was considered, but it's far larger and doesn't fit the lockstep
+  stem mixer.
+- `ChartPacker.Ffmpeg` binds, by hand with `[LibraryImport]`, the few functions Video and Audio
+  need from FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`, `swscale` and
+  `swresample`, LGPL 2.1+), and has no packages. Audio uses it through a safe wrapper,
+  `FfmpegAudioDecoder`; Video calls the bindings directly.
   - The libraries are built by `build/ffmpeg/build.sh` with only the registered video formats'
-    demuxers and decoders, nothing GPL or non-free, and ship beside the executable like SDL's.
-    Without them the app still runs, and videos aren't previewed.
+    demuxers and decoders, the registered audio formats' decoders, and swresample (which the Opus
+    decoder needs), nothing GPL or non-free. They ship beside the executable like SDL's. Without
+    them the app still runs: videos aren't previewed, and audio is decoded by the managed
+    decoders.
   - The bindings are written for one major version of each library, which is checked at load.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.
@@ -460,8 +472,10 @@ Behaviour:
    soloed tracks are heard. `preview.*`, a separate clip, starts muted.
 4. **Sync across formats.** Opus pre-skip and end trimming follow RFC 7845. An MP3's LAME tag
    encoder delay and padding are trimmed, plus the decoder's 529-sample delay, as mpg123 and
-   FFmpeg do. Seeks are sample-exact: each decoder restarts before the target and discards up to
-   it.
+   FFmpeg do. Vorbis's start and end are trimmed by its granule positions (Vorbis I §A.2). Seeks
+   are sample-exact: each decoder restarts before the target and discards up to it. The trims
+   are made by the app's own container code, so a stream is the same length and lines up the
+   same whether FFmpeg or a managed decoder decodes its packets (§4).
 5. **Adding and removing tracks.** **Add track** lists every stem; one the song has already reads
    "Replace". It picks one audio file, decodes a little of it to check that it's what its
    extension says, and stages it as `<stem>.<ext>`, staging every other file of that stem, in any

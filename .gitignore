@@ -401,5 +401,5 @@ FodyWeavers.xsd
 *.sln.iml
 
 # FFmpeg shared libraries, built or fetched by build/ffmpeg
-ChartPacker.Video/runtimes/
+ChartPacker.Ffmpeg/runtimes/
 build/ffmpeg/.work/

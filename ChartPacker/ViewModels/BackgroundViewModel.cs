@@ -10,6 +10,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Ffmpeg;
 using ChartPacker.Formatting;
 using ChartPacker.Resources;
 using ChartPacker.Video;

@@ -16,6 +16,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The decoder tests simulate FFmpeg lacking a decoder, through an internal overload. -->
+    <InternalsVisibleTo Include="ChartPacker.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <!-- FFmpeg's audio decoders, used when its libraries are present. -->
+    <ProjectReference Include="..\ChartPacker.Ffmpeg\ChartPacker.Ffmpeg.csproj" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fetches a prebuilt LGPL FFmpeg 9.0 (BtbN/FFmpeg-Builds) for local development, and copies the
-# libraries ChartPacker.Video loads into ChartPacker.Video/runtimes/<rid>/native/.
+# libraries ChartPacker.Ffmpeg loads into ChartPacker.Ffmpeg/runtimes/<rid>/native/.
 #
 # Usage: build/ffmpeg/fetch-prebuilt.sh <rid>     rid: win-x64, win-arm64, linux-x64, linux-arm64
 #
@@ -19,7 +19,7 @@ case "$rid" in
 esac
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-out="$root/ChartPacker.Video/runtimes/$rid/native"
+out="$root/ChartPacker.Ffmpeg/runtimes/$rid/native"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

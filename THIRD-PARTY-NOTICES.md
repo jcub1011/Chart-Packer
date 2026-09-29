@@ -90,12 +90,13 @@ builds only) aren't part of a release and aren't listed.
 | [Concentus](https://github.com/lostromb/concentus) | 2.2.2 | BSD 3-Clause (the Opus license) | © Skype Limited, Xiph.Org Foundation, CSIRO, Microsoft Corporation and others |
 | [ppy/SDL3-CS](https://github.com/ppy/SDL3-CS) (`ppy.SDL3-CS`) | 2026.722.0 | MIT | © 2024 ppy Pty Ltd |
 | [SDL](https://github.com/libsdl-org/SDL), the native library in `ppy.SDL3-CS` | 3.5.0 | zlib | © 1997-2026 Sam Lantinga |
-| [FFmpeg](https://ffmpeg.org): `libavformat`, `libavcodec`, `libavutil`, `libswscale` | 9.0 | LGPL 2.1 or later | © 2000-2026 the FFmpeg developers |
+| [FFmpeg](https://ffmpeg.org): `libavformat`, `libavcodec`, `libavutil`, `libswscale`, `libswresample` | 9.0 | LGPL 2.1 or later | © 2000-2026 the FFmpeg developers |
 
 ATL.NET reads audio durations in `ChartPacker.Core/Scanning/AudioLength.cs`, the library list's
 fallback when a song has no `song_length`.
 
-For audio playback (`ChartPacker.Audio`), NVorbis decodes Vorbis, NLayer decodes MPEG audio
+For audio playback (`ChartPacker.Audio`), FFmpeg's decoders decode Vorbis, Opus and MPEG audio
+packets when its libraries are present. Otherwise NVorbis decodes Vorbis, NLayer decodes MPEG audio
 frames, and Concentus decodes Opus packets, all in managed code. SDL plays the mixed result; only
 its audio subsystem is used. Its native library (`SDL3.dll`, `libSDL3.so` or `libSDL3.dylib`)
 ships beside the executable.
@@ -345,15 +346,16 @@ freely, subject to the following restrictions:
 
 ### FFmpeg
 
-`avformat`, `avcodec`, `avutil` and `swscale`, from FFmpeg 9.0, ship as shared libraries beside
-the executable (`avcodec-63.dll`, `libavcodec.so.63` or `libavcodec.63.dylib`, and so on).
+`avformat`, `avcodec`, `avutil`, `swscale` and `swresample`, from FFmpeg 9.0, ship as shared
+libraries beside the executable (`avcodec-63.dll`, `libavcodec.so.63` or `libavcodec.63.dylib`, and
+so on). They decode background video, and audio packets.
 Chart-Packer uses them under the
 [GNU Lesser General Public License, version 2.1 or later](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html);
 no GPL or non-free parts of FFmpeg are enabled. They're built, unmodified, from the `n9.0` tag of
 the [FFmpeg source](https://git.ffmpeg.org/ffmpeg.git) by
 [build/ffmpeg/build.sh](build/ffmpeg/build.sh), which gives the full configure line. They can be
 replaced with any other build of the same major versions. Chart-Packer's bindings to them
-(`ChartPacker.Video/Interop/Ffmpeg.cs`) are written from FFmpeg's public headers; no FFmpeg code
+(`ChartPacker.Ffmpeg/Interop/Native.cs`) are written from FFmpeg's public headers; no FFmpeg code
 is copied.
 
 ```

@@ -41,4 +41,11 @@
       <PublicClass>true</PublicClass>
     </EmbeddedResource>
   </ItemGroup>
+
+  <!-- The language server's design-time build doesn't run CoreResGen, which is what adds the
+       generated Strings class to the compile; hand it the last build's copy. -->
+  <ItemGroup Condition="'$(DesignTimeBuild)' == 'true'">
+    <Compile Include="$(IntermediateOutputPath)Strings.Designer.cs"
+             Condition="Exists('$(IntermediateOutputPath)Strings.Designer.cs')" />
+  </ItemGroup>
 </Project>
