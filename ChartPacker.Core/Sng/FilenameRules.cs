@@ -101,7 +101,7 @@ public static class FilenameRules
 
     private static HashSet<string> BuildRegistry()
     {
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "notes.chart", "notes.mid" };
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ChartFiles.ChartName, ChartFiles.MidiName };
 
         void Add(string[] stems, string[] extensions)
         {

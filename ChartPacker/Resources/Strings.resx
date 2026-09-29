@@ -124,9 +124,9 @@
     <value>This song can't be read: {0}</value>
     <comment>{0} is the system error message.</comment>
   </data>
-  <data name="SubtitleFormat" xml:space="preserve">
-    <value>{0} · {1}</value>
-    <comment>{0} is the song's full path; {1} its total size, e.g. "6.2 MB".</comment>
+  <data name="TitleFormat" xml:space="preserve">
+    <value>{0} - {1}</value>
+    <comment>The detail panel's heading. {0} is the song's name; {1} its artist.</comment>
   </data>
   <data name="FindingsListName" xml:space="preserve">
     <value>Problems</value>
@@ -150,15 +150,15 @@
   <data name="SongIniTooLarge" xml:space="preserve">
     <value>song.ini is too large to read</value>
   </data>
-  <data name="FilesListName" xml:space="preserve">
-    <value>Files</value>
+  <data name="OtherFilesListName" xml:space="preserve">
+    <value>Other files</value>
   </data>
-  <data name="FilesHeaderFormat" xml:space="preserve">
-    <value>Files ({0:N0})</value>
-    <comment>{0} is the number of files.</comment>
+  <data name="OtherFilesHeaderFormat" xml:space="preserve">
+    <value>Other files ({0:N0})</value>
+    <comment>{0} is the number of files that aren't the album art, a background, a track, the chart or song.ini.</comment>
   </data>
-  <data name="NoFiles" xml:space="preserve">
-    <value>No files</value>
+  <data name="NoOtherFiles" xml:space="preserve">
+    <value>No other files</value>
   </data>
   <data name="SizeBytesFormat" xml:space="preserve">
     <value>{0:N0} B</value>
@@ -642,5 +642,56 @@
   </data>
   <data name="OpeningAudio" xml:space="preserve">
     <value>Opening audio…</value>
+  </data>
+  <data name="CharterToolTip" xml:space="preserve">
+    <value>Charter</value>
+  </data>
+  <data name="ReplaceTrackToolTip" xml:space="preserve">
+    <value>Replace this track</value>
+  </data>
+  <data name="RemovedTracksListName" xml:space="preserve">
+    <value>Removed tracks</value>
+  </data>
+  <data name="UndoRemoveTrackToolTip" xml:space="preserve">
+    <value>Keep this track</value>
+  </data>
+  <data name="ChartHeader" xml:space="preserve">
+    <value>Chart</value>
+  </data>
+  <data name="ChartsListName" xml:space="preserve">
+    <value>Chart files</value>
+  </data>
+  <data name="NoChart" xml:space="preserve">
+    <value>No chart. The song can't be played without notes.chart or notes.mid.</value>
+  </data>
+  <data name="ChartWillBeRemoved" xml:space="preserve">
+    <value>The chart will be removed. The song can't be played without notes.chart or notes.mid.</value>
+  </data>
+  <data name="AddChartButton" xml:space="preserve">
+    <value>Add chart</value>
+  </data>
+  <data name="ReplaceChartToolTip" xml:space="preserve">
+    <value>Replace the chart</value>
+  </data>
+  <data name="RemoveChartToolTip" xml:space="preserve">
+    <value>Delete the chart</value>
+  </data>
+  <data name="RevertChartToolTip" xml:space="preserve">
+    <value>Undo the change to the chart</value>
+  </data>
+  <data name="PickChartTitle" xml:space="preserve">
+    <value>Choose a chart</value>
+  </data>
+  <data name="ChartFileTypeFormat" xml:space="preserve">
+    <value>Charts ({0})</value>
+    <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi".</comment>
+  </data>
+  <data name="ChartNotSupportedFormat" xml:space="preserve">
+    <value>{0} isn't a .chart, .mid or .midi file.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
+  <data name="ChartUnreadableFormat" xml:space="preserve">
+    <value>{0} can't be read: {1}</value>
+    <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
 </root>

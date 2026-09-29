@@ -66,10 +66,20 @@ namespace ChartPacker.ViewModels
         /// <summary>Background images larger than this aren't read, as for album art.</summary>
         public const long MaxImageBytes = AlbumArt.DefaultMaxBytes;
 
-        // A 356px-wide tile at 2x scaling.
-        private const int DecodeWidth = 712;
+        /// <summary>The tile's shape while there's no image or video to take it from: the usual video shape.</summary>
+        public const double DefaultAspectRatio = 16.0 / 9.0;
+
+        // A 16:9 tile at its 512px-tall largest is 910px wide; this is that at 2x scaling.
+        private const int DecodeWidth = 1820;
+
+        // Video is decoded a frame at a time, so it's decoded smaller than a still.
+        private const int VideoDecodeWidth = 1280;
 
         private readonly Func<TimeSpan> _clock;
+
+        // The video whose frame size the tile has taken; read on the playback thread, so a frame
+        // doesn't post an update once it has.
+        private volatile VideoPlayback? _sizedVideo;
         private Dictionary<string, Bitmap> _images = [];
         private Dictionary<string, StagedBackground> _staged = new(StringComparer.Ordinal);
 
@@ -138,9 +148,27 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(Marker))]
         private bool _isChanged;
 
+        /// <summary>The tile's width over its height: the shown image's or video's, or <see cref="DefaultAspectRatio"/>.</summary>
+        [ObservableProperty]
+        private double _aspectRatio = DefaultAspectRatio;
+
+        /// <summary>The shown background's stored name, e.g. <c>video.mp4</c>, when every song has the same one.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasShownFileName))]
+        private string? _shownFileName;
+
+        /// <summary>The shown background's size, formatted, when it's known.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasShownFileSize))]
+        private string? _shownFileSize;
+
         public bool HasImage => Image is not null;
 
         public bool HasVideo => Video is not null;
+
+        public bool HasShownFileName => ShownFileName is not null;
+
+        public bool HasShownFileSize => ShownFileSize is not null;
 
         public bool HasNote => Note is not null;
 
@@ -194,6 +222,9 @@ namespace ChartPacker.ViewModels
             StopVideo();
             Image = null;
             Note = null;
+            AspectRatio = DefaultAspectRatio;
+            ShownFileName = null;
+            ShownFileSize = null;
             HasBoth = false;
             IsChanged = false;
             _lastVideoKey = null;
@@ -285,6 +316,9 @@ namespace ChartPacker.ViewModels
         /// <summary>Shows the kind <see cref="ShowVideo"/> picks, as <see cref="Refresh"/> last worked it out.</summary>
         private void Render()
         {
+            var shown = ShowVideo ? _videoSlot : _imageSlot;
+            ShowFileOf(ShownKind, shown);
+
             if (_imageSlot.State == SlotState.None && _videoSlot.State == SlotState.None)
             {
                 bool removing = _songs.Any(s => SongBackgrounds.Kinds.Any(k => s.Draft.GetBackground(k) is { IsRemoval: true }));
@@ -292,7 +326,6 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            var shown = ShowVideo ? _videoSlot : _imageSlot;
             if (shown.State == SlotState.Differs)
             {
                 ShowStill(null, Strings.BackgroundsDiffer);
@@ -323,6 +356,7 @@ namespace ChartPacker.ViewModels
                 StartVideo(source);
             Image = null;
             Note = Video?.Error is { } error ? string.Format(CultureInfo.CurrentCulture, Strings.VideoUnplayableFormat, error) : null;
+            TakeVideoSize();
         }
 
         /// <summary>Shows <paramref name="image"/> or <paramref name="note"/>, and no video.</summary>
@@ -331,15 +365,55 @@ namespace ChartPacker.ViewModels
             StopVideo();
             Image = image;
             Note = note;
+            AspectRatio = image is { Size: { Width: > 0, Height: > 0 } size } ? size.Width / size.Height : DefaultAspectRatio;
+        }
+
+        /// <summary>
+        /// Names the file of <paramref name="kind"/> that <paramref name="slot"/> shows, and its size:
+        /// the first song's, since every song has the same one. Nothing when the songs differ or have none.
+        /// </summary>
+        private void ShowFileOf(BackgroundKind kind, Slot slot)
+        {
+            string? name = null;
+            string? size = null;
+            if (slot.State == SlotState.Same && _songs.Count > 0)
+            {
+                var first = _songs[0];
+                if (first.Draft.GetBackground(kind)?.SourcePath is { } source)
+                {
+                    name = SongBackgrounds.StoredNameFor(kind, source);
+                    if (_staged.GetValueOrDefault(source) is { Error: null } staged)
+                        size = ByteSizeFormatter.Format((ulong)staged.Length);
+                }
+                else if (first.Stored.Of(kind) is { } stored)
+                {
+                    name = stored.StoredName;
+                    size = ByteSizeFormatter.Format((ulong)stored.Length);
+                }
+            }
+
+            ShownFileName = name;
+            ShownFileSize = size;
         }
 
         private void StartVideo(VideoSource source)
         {
             StopVideo();
-            var playback = new VideoPlayback(source.Open, DecodeWidth);
+            var playback = new VideoPlayback(source.Open, VideoDecodeWidth);
             playback.Changed += OnVideoChanged;
             _videoSource = source;
             Video = playback;
+            AspectRatio = DefaultAspectRatio;
+        }
+
+        /// <summary>Gives the tile the shown video's shape, once its frame size is known.</summary>
+        private void TakeVideoSize()
+        {
+            if (Video is { Width: > 0, Height: > 0 } playback)
+            {
+                AspectRatio = (double)playback.Width / playback.Height;
+                _sizedVideo = playback;
+            }
         }
 
         private void StopVideo()
@@ -356,17 +430,28 @@ namespace ChartPacker.ViewModels
             _videoSource = null;
         }
 
-        // Raised on the playback thread; only a failure changes what the tile says.
+        // Raised on the playback thread; only a failure, or learning the frame size, changes the tile.
         private void OnVideoChanged(object? sender, EventArgs e)
         {
-            if (sender is not VideoPlayback { Error: { } error } playback)
+            if (sender is not VideoPlayback playback)
                 return;
 
-            Dispatcher.UIThread.Post(() =>
+            if (playback.Error is { } error)
             {
-                if (ReferenceEquals(playback, Video))
-                    Note = string.Format(CultureInfo.CurrentCulture, Strings.VideoUnplayableFormat, error);
-            });
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (ReferenceEquals(playback, Video))
+                        Note = string.Format(CultureInfo.CurrentCulture, Strings.VideoUnplayableFormat, error);
+                });
+            }
+            else if (playback.Width > 0 && !ReferenceEquals(playback, _sizedVideo))
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (ReferenceEquals(playback, Video))
+                        TakeVideoSize();
+                });
+            }
         }
 
         private Slot Resolve(IReadOnlyList<BackgroundSong> songs, BackgroundKind kind)

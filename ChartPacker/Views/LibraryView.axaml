@@ -85,21 +85,7 @@
             <Setter Property="Height" Value="10" />
         </Style>
 
-        <!-- Small right-aligned labels in a row: the entry's kind (accent for a .sng) and its size. -->
-        <Style Selector="Border.chip">
-            <Setter Property="CornerRadius" Value="3" />
-            <Setter Property="Padding" Value="4,0" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-        </Style>
-        <Style Selector="Border.chip > TextBlock">
-            <Setter Property="FontSize" Value="9" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Opacity" Value="0.7" />
-        </Style>
+        <!-- The entry's kind is a chip in the accent for a .sng, or manila for a folder; Border.chip itself is in Theme.axaml. -->
         <Style Selector="Border.chip.sng">
             <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
             <Setter Property="BorderBrush" Value="Transparent" />

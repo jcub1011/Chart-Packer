@@ -183,6 +183,21 @@ public sealed class DraftWriterTests
     }
 
     [TestMethod]
+    public async Task FolderChartIsReplacedByTheOtherFormat()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        File.WriteAllBytes(Path.Combine(folder, "Notes.Chart"), [1]);
+        File.WriteAllBytes(Path.Combine(folder, "song.ogg"), [2]);
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("notes.mid", WriteSource([6, 6]), 2), ["Notes.Chart"]);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        CollectionAssert.AreEquivalent(new[] { "notes.mid", "song.ogg" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 6, 6 }, File.ReadAllBytes(Path.Combine(folder, "notes.mid")));
+    }
+
+    [TestMethod]
     public async Task FolderFileOnlyDraftDoesNotCreateASongIni()
     {
         string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;

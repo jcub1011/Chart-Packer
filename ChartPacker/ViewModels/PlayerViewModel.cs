@@ -41,6 +41,13 @@ namespace ChartPacker.ViewModels
         /// <summary><c>+</c> for a track a staged change adds, like an added file.</summary>
         public string? Marker => Track.IsStaged ? "+" : null;
 
+        /// <summary>The track's file size, formatted; set by whoever knows the song's files.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSize))]
+        private string? _size;
+
+        public bool HasSize => Size is not null;
+
         [ObservableProperty]
         private bool _isMuted;
 

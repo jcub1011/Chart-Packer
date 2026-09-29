@@ -131,6 +131,24 @@
             <Setter Property="Padding" Value="6,0" />
         </Style>
 
+        <!-- The tile's file name and size, in chips like the badge. Shown while the tile is hovered, or,
+             for the background's Image | Video switch beside its size, while focus is on it. -->
+        <Style Selector="Border.artInfo, StackPanel.artInfo">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Border.artTile:pointerover Border.artInfo, Border.artTile:pointerover StackPanel.artInfo, StackPanel.artInfo:focus-within">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.artInfo">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- Only the name gives way on a narrow tile; the size is always shown whole. -->
+        <Style Selector="TextBlock.artName">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
         <!-- The background tile's Image | Video switch: dark chips like the actions, the one shown in the accent. -->
         <Style Selector="ToggleButton.backgroundKind">
             <Setter Property="MinWidth" Value="0" />
@@ -230,237 +248,206 @@
 
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="20,16">
-                    <SelectableTextBlock FontSize="18"
-                                         FontWeight="SemiBold"
-                                         TextWrapping="Wrap"
-                                         Text="{Binding Title}" />
-                    <SelectableTextBlock Opacity="0.7"
-                                         FontSize="12"
-                                         Margin="0,2,0,0"
-                                         TextWrapping="Wrap"
-                                         Text="{Binding Subtitle}" />
+                    <!-- "Name - Artist", with the charter at the right; the path below, with the song's size at the right. -->
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <SelectableTextBlock Grid.Column="0"
+                                             FontSize="18"
+                                             FontWeight="SemiBold"
+                                             VerticalAlignment="Center"
+                                             TextWrapping="Wrap"
+                                             Text="{Binding Title}" />
+                        <!-- The charter can carry rich-text tags (colours, bold…), which are drawn rather than shown. -->
+                        <Border Grid.Column="1"
+                                Classes="chip large"
+                                MaxWidth="240"
+                                IsVisible="{Binding HasCharter}"
+                                ToolTip.Tip="{x:Static res:Strings.CharterToolTip}">
+                            <TextBlock Opacity="1"
+                                       TextTrimming="CharacterEllipsis"
+                                       ctl:RichTextMarkup.Text="{Binding Charter}" />
+                        </Border>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,2,0,0">
+                        <SelectableTextBlock Grid.Column="0"
+                                             Opacity="0.7"
+                                             FontSize="12"
+                                             VerticalAlignment="Center"
+                                             TextWrapping="Wrap"
+                                             Text="{Binding Subtitle}" />
+                        <Border Grid.Column="1" Classes="chip large" IsVisible="{Binding HasSizeText}">
+                            <TextBlock Text="{Binding SizeText}" />
+                        </Border>
+                    </Grid>
 
-                    <!-- Album art on the left and the background beside it, 16:9 at the art's height; it
-                         narrows with the panel. The one selected song's files are below them. -->
-                    <Grid ColumnSpacing="20" Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" MaxWidth="356" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Width="200" Spacing="6">
-                            <!-- The actions show while the pointer is over the tile, or focus is on one of them. -->
-                            <Border Classes="artTile"
-                                    Width="200" Height="200"
-                                    AutomationProperties.Name="{x:Static res:Strings.AlbumArtName}">
-                                <Panel>
-                                    <Image Source="{Binding ArtImage}"
-                                           Stretch="Uniform"
-                                           IsVisible="{Binding HasArtImage}" />
-                                    <TextBlock Classes="muted centered"
-                                               Margin="12"
-                                               VerticalAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               Text="{Binding ArtNote}"
-                                               IsVisible="{Binding !HasArtImage}" />
+                    <!-- Album art on the left and the background beside it, each in its own shape, as tall as
+                         lets both fit the panel's width, from 128 to 512px. -->
+                    <ctl:MediaRow Margin="0,16,0,0" ClipToBounds="True">
+                        <!-- The actions show while the pointer is over the tile, or focus is on one of them;
+                             the file's name and size while the pointer is over it. -->
+                        <Border Classes="artTile"
+                                ctl:MediaRow.AspectRatio="{Binding ArtAspect}"
+                                AutomationProperties.Name="{x:Static res:Strings.AlbumArtName}">
+                            <Panel>
+                                <Image Source="{Binding ArtImage}"
+                                       Stretch="Uniform"
+                                       IsVisible="{Binding HasArtImage}" />
+                                <TextBlock Classes="muted centered"
+                                           Margin="12"
+                                           VerticalAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding ArtNote}"
+                                           IsVisible="{Binding !HasArtImage}" />
 
+                                <!-- Docked in this order so the size and marker are sized first, and the name gets what's left. -->
+                                <DockPanel Margin="6" VerticalAlignment="Top">
+                                    <Border DockPanel.Dock="Right"
+                                            Classes="artBadge artInfo"
+                                            Margin="4,0,0,0"
+                                            IsVisible="{Binding HasArtFileSize}">
+                                        <TextBlock Classes="artInfo" Text="{Binding ArtFileSize}" />
+                                    </Border>
                                     <!-- Always shown while the art has a staged change, like an edited row's marker. -->
-                                    <Border Classes="artBadge"
-                                            HorizontalAlignment="Left"
-                                            VerticalAlignment="Top"
-                                            Margin="6"
+                                    <Border DockPanel.Dock="Left"
+                                            Classes="artBadge"
+                                            Margin="0,0,4,0"
                                             IsVisible="{Binding IsArtChanged}">
                                         <TextBlock Classes="marker" Text="{Binding ArtMarker}" />
                                     </Border>
+                                    <Border Classes="artBadge artInfo"
+                                            HorizontalAlignment="Left"
+                                            IsVisible="{Binding HasArtFileName}">
+                                        <TextBlock Classes="artInfo artName" Text="{Binding ArtFileName}" />
+                                    </Border>
+                                </DockPanel>
 
-                                    <StackPanel Classes="artActions"
-                                                Orientation="Horizontal"
-                                                Spacing="4"
-                                                Margin="6"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Bottom">
-                                        <!-- Hidden by Button.artAction:disabled unless there's a change to revert. -->
-                                        <Button Classes="artAction"
-                                                Command="{Binding RevertArtCommand}"
-                                                ToolTip.Tip="{x:Static res:Strings.RevertArtToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.RevertArtToolTip}">
-                                            <PathIcon Data="{StaticResource RevertIconGeometry}" />
-                                        </Button>
-                                        <Button Classes="artAction"
-                                                Command="{Binding ReplaceArtCommand}"
-                                                ToolTip.Tip="{x:Static res:Strings.ReplaceArtToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.ReplaceArtToolTip}">
-                                            <PathIcon Data="{StaticResource ImageAddIconGeometry}" />
-                                        </Button>
-                                        <Button Classes="artAction"
-                                                Command="{Binding RemoveArtCommand}"
-                                                ToolTip.Tip="{x:Static res:Strings.RemoveArtToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.RemoveArtToolTip}">
-                                            <PathIcon Data="{StaticResource TrashIconGeometry}" />
-                                        </Button>
-                                    </StackPanel>
-                                </Panel>
-                            </Border>
-                            <TextBlock Classes="error" Text="{Binding ArtError}" IsVisible="{Binding HasArtError}" />
-                        </StackPanel>
+                                <StackPanel Classes="artActions"
+                                            Orientation="Horizontal"
+                                            Spacing="4"
+                                            Margin="6"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom">
+                                    <!-- Hidden by Button.artAction:disabled unless there's a change to revert. -->
+                                    <Button Classes="artAction"
+                                            Command="{Binding RevertArtCommand}"
+                                            ToolTip.Tip="{x:Static res:Strings.RevertArtToolTip}"
+                                            AutomationProperties.Name="{x:Static res:Strings.RevertArtToolTip}">
+                                        <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                    </Button>
+                                    <Button Classes="artAction"
+                                            Command="{Binding ReplaceArtCommand}"
+                                            ToolTip.Tip="{x:Static res:Strings.ReplaceArtToolTip}"
+                                            AutomationProperties.Name="{x:Static res:Strings.ReplaceArtToolTip}">
+                                        <PathIcon Data="{StaticResource ImageAddIconGeometry}" />
+                                    </Button>
+                                    <Button Classes="artAction"
+                                            Command="{Binding RemoveArtCommand}"
+                                            ToolTip.Tip="{x:Static res:Strings.RemoveArtToolTip}"
+                                            AutomationProperties.Name="{x:Static res:Strings.RemoveArtToolTip}">
+                                        <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                    </Button>
+                                </StackPanel>
+                            </Panel>
+                        </Border>
 
                         <!-- The background video or image, or why there's none to show. Its actions show
                              like the art's; Delete removes the kind shown. -->
-                        <StackPanel Grid.Column="1" Spacing="6">
-                            <Border Classes="artTile"
-                                    Height="200"
-                                    AutomationProperties.Name="{x:Static res:Strings.BackgroundName}">
-                                <Panel>
-                                    <Image Source="{Binding Background.Image}"
-                                           Stretch="Uniform"
-                                           IsVisible="{Binding Background.HasImage}" />
-                                    <ctl:VideoFrameView Playback="{Binding Background.Video}"
-                                                        Timeline="{Binding Background.Timeline}"
-                                                        Clock="{Binding Background.Clock}"
-                                                        IsVisible="{Binding Background.HasVideo}" />
-                                    <StackPanel VerticalAlignment="Center"
-                                                Margin="12"
-                                                Spacing="6"
-                                                IsVisible="{Binding Background.HasNote}">
-                                        <PathIcon Width="28" Height="28"
-                                                  Opacity="0.4"
-                                                  HorizontalAlignment="Center"
-                                                  Data="{StaticResource BackgroundIconGeometry}" />
-                                        <TextBlock Classes="muted centered"
-                                                   TextWrapping="Wrap"
-                                                   Text="{Binding Background.Note}" />
-                                    </StackPanel>
+                        <Border Classes="artTile"
+                                ctl:MediaRow.AspectRatio="{Binding Background.AspectRatio}"
+                                AutomationProperties.Name="{x:Static res:Strings.BackgroundName}">
+                            <Panel>
+                                <Image Source="{Binding Background.Image}"
+                                       Stretch="Uniform"
+                                       IsVisible="{Binding Background.HasImage}" />
+                                <ctl:VideoFrameView Playback="{Binding Background.Video}"
+                                                    Timeline="{Binding Background.Timeline}"
+                                                    Clock="{Binding Background.Clock}"
+                                                    IsVisible="{Binding Background.HasVideo}" />
+                                <StackPanel VerticalAlignment="Center"
+                                            Margin="12"
+                                            Spacing="6"
+                                            IsVisible="{Binding Background.HasNote}">
+                                    <PathIcon Width="28" Height="28"
+                                              Opacity="0.4"
+                                              HorizontalAlignment="Center"
+                                              Data="{StaticResource BackgroundIconGeometry}" />
+                                    <TextBlock Classes="muted centered"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding Background.Note}" />
+                                </StackPanel>
 
-                                    <Border Classes="artBadge"
-                                            HorizontalAlignment="Left"
-                                            VerticalAlignment="Top"
-                                            Margin="6"
+                                <!-- Docked in this order so the size, switch and marker are sized first, and the name gets what's left. -->
+                                <DockPanel Margin="6" VerticalAlignment="Top">
+                                    <!-- The size, and the Image | Video switch when the selection has both. -->
+                                    <StackPanel DockPanel.Dock="Right"
+                                                Classes="artInfo"
+                                                Orientation="Horizontal"
+                                                Margin="4,0,0,0"
+                                                Spacing="4">
+                                        <Border Classes="artBadge"
+                                                VerticalAlignment="Center"
+                                                IsVisible="{Binding Background.HasShownFileSize}">
+                                            <TextBlock Classes="artInfo" Text="{Binding Background.ShownFileSize}" />
+                                        </Border>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="2"
+                                                    IsVisible="{Binding Background.HasBoth}">
+                                            <ToggleButton Classes="backgroundKind"
+                                                          IsChecked="{Binding Background.IsVideoSelected}"
+                                                          Content="{x:Static res:Strings.ShowBackgroundVideo}" />
+                                            <ToggleButton Classes="backgroundKind"
+                                                          IsChecked="{Binding Background.IsImageSelected}"
+                                                          Content="{x:Static res:Strings.ShowBackgroundImage}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Border DockPanel.Dock="Left"
+                                            Classes="artBadge"
+                                            Margin="0,0,4,0"
                                             IsVisible="{Binding Background.IsChanged}">
                                         <TextBlock Classes="marker" Text="{Binding Background.Marker}" />
                                     </Border>
+                                    <Border Classes="artBadge artInfo"
+                                            HorizontalAlignment="Left"
+                                            IsVisible="{Binding Background.HasShownFileName}">
+                                        <TextBlock Classes="artInfo artName" Text="{Binding Background.ShownFileName}" />
+                                    </Border>
+                                </DockPanel>
 
-                                    <!-- Only when the selection has both an image and a video. -->
-                                    <StackPanel Orientation="Horizontal"
-                                                Spacing="2"
-                                                Margin="6"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Top"
-                                                IsVisible="{Binding Background.HasBoth}">
-                                        <ToggleButton Classes="backgroundKind"
-                                                      IsChecked="{Binding Background.IsVideoSelected}"
-                                                      Content="{x:Static res:Strings.ShowBackgroundVideo}" />
-                                        <ToggleButton Classes="backgroundKind"
-                                                      IsChecked="{Binding Background.IsImageSelected}"
-                                                      Content="{x:Static res:Strings.ShowBackgroundImage}" />
-                                    </StackPanel>
-
-                                    <StackPanel Classes="artActions"
-                                                Orientation="Horizontal"
-                                                Spacing="4"
-                                                Margin="6"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Bottom">
-                                        <Button Classes="artAction"
-                                                Command="{Binding RevertBackgroundCommand}"
-                                                ToolTip.Tip="{x:Static res:Strings.RevertBackgroundToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.RevertBackgroundToolTip}">
-                                            <PathIcon Data="{StaticResource RevertIconGeometry}" />
-                                        </Button>
-                                        <Button Classes="artAction"
-                                                Command="{Binding ReplaceBackgroundCommand}"
-                                                ToolTip.Tip="{x:Static res:Strings.ReplaceBackgroundToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.ReplaceBackgroundToolTip}">
-                                            <PathIcon Data="{StaticResource ImageAddIconGeometry}" />
-                                        </Button>
-                                        <Button Classes="artAction"
-                                                Command="{Binding RemoveBackgroundCommand}"
-                                                ToolTip.Tip="{Binding Background.RemoveToolTip}"
-                                                AutomationProperties.Name="{Binding Background.RemoveToolTip}">
-                                            <PathIcon Data="{StaticResource TrashIconGeometry}" />
-                                        </Button>
-                                    </StackPanel>
-                                </Panel>
-                            </Border>
-                            <TextBlock Classes="error"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding BackgroundError}"
-                                       IsVisible="{Binding HasBackgroundError}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <StackPanel IsVisible="{Binding ShowFiles}" Margin="0,16,0,0">
-                        <TextBlock Classes="section" Margin="0,0,0,8" Text="{Binding FilesHeader}" />
-                        <TextBlock Classes="muted" Text="{x:Static res:Strings.NoFiles}" IsVisible="{Binding ShowNoFiles}" />
-                        <ItemsControl ItemsSource="{Binding Files}"
-                                      AutomationProperties.Name="{x:Static res:Strings.FilesListName}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:FileRow">
-                                    <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="0" Margin="0,1">
-                                        <TextBlock Grid.Column="0"
-                                                   Classes="marker"
-                                                   VerticalAlignment="Center"
-                                                   Text="{Binding Marker}" />
-                                        <TextBlock Grid.Column="1"
-                                                   Classes.removed="{Binding IsRemoved}"
-                                                   VerticalAlignment="Center"
-                                                   TextTrimming="PathSegmentEllipsis"
-                                                   ToolTip.Tip="{Binding Path}"
-                                                   Text="{Binding Path}" />
-                                        <TextBlock Grid.Column="2"
-                                                   Classes="muted"
-                                                   Classes.removed="{Binding IsRemoved}"
-                                                   Margin="16,0,0,0"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Right"
-                                                   Text="{Binding Size}" />
-
-                                        <!-- One action per row: remove a file (or drop an added one), or undo its removal.
-                                             Sized for a button, so the sizes line up on a row that has none (a folder's song.ini). -->
-                                        <Panel Grid.Column="3"
-                                               MinWidth="20"
-                                               Margin="4,0,0,0"
-                                               IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
-                                            <Button Classes="icon"
-                                                    Padding="4"
-                                                    VerticalAlignment="Center"
-                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RevertFileCommand, FallbackValue={x:Null}}"
-                                                    CommandParameter="{Binding}"
-                                                    IsVisible="{Binding CanRevert}"
-                                                    ToolTip.Tip="{x:Static res:Strings.RevertFileToolTip}"
-                                                    AutomationProperties.Name="{x:Static res:Strings.RevertFileToolTip}">
-                                                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
-                                            </Button>
-                                            <Button Classes="icon"
-                                                    Padding="4"
-                                                    VerticalAlignment="Center"
-                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RemoveFileCommand, FallbackValue={x:Null}}"
-                                                    CommandParameter="{Binding}"
-                                                    IsVisible="{Binding CanRemove}"
-                                                    ToolTip.Tip="{x:Static res:Strings.RemoveFileToolTip}"
-                                                    AutomationProperties.Name="{x:Static res:Strings.RemoveFileToolTip}">
-                                                <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
-                                            </Button>
-                                        </Panel>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Classes="error" Text="{Binding FilesError}" IsVisible="{Binding HasFilesError}" />
-                        <Button Classes="icon"
-                                Margin="10,4,0,0"
-                                Command="{Binding AddFilesCommand}"
-                                IsVisible="{Binding CanEdit}"
-                                AutomationProperties.Name="{x:Static res:Strings.AddFilesButton}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
-                                <TextBlock Text="{x:Static res:Strings.AddFilesButton}" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
+                                <StackPanel Classes="artActions"
+                                            Orientation="Horizontal"
+                                            Spacing="4"
+                                            Margin="6"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom">
+                                    <Button Classes="artAction"
+                                            Command="{Binding RevertBackgroundCommand}"
+                                            ToolTip.Tip="{x:Static res:Strings.RevertBackgroundToolTip}"
+                                            AutomationProperties.Name="{x:Static res:Strings.RevertBackgroundToolTip}">
+                                        <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                    </Button>
+                                    <Button Classes="artAction"
+                                            Command="{Binding ReplaceBackgroundCommand}"
+                                            ToolTip.Tip="{x:Static res:Strings.ReplaceBackgroundToolTip}"
+                                            AutomationProperties.Name="{x:Static res:Strings.ReplaceBackgroundToolTip}">
+                                        <PathIcon Data="{StaticResource ImageAddIconGeometry}" />
+                                    </Button>
+                                    <Button Classes="artAction"
+                                            Command="{Binding RemoveBackgroundCommand}"
+                                            ToolTip.Tip="{Binding Background.RemoveToolTip}"
+                                            AutomationProperties.Name="{Binding Background.RemoveToolTip}">
+                                        <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                    </Button>
+                                </StackPanel>
+                            </Panel>
+                        </Border>
+                    </ctl:MediaRow>
+                    <TextBlock Classes="error" Text="{Binding ArtError}" IsVisible="{Binding HasArtError}" />
+                    <TextBlock Classes="error" Text="{Binding BackgroundError}" IsVisible="{Binding HasBackgroundError}" />
 
                     <!-- The one selected song's audio tracks, played together and in step. A track
                          can be muted, or soloed to hear it alone; added and removed tracks play as
-                         they will be once saved. -->
-                    <StackPanel IsVisible="{Binding ShowFiles}">
+                         they will be once saved. A removed track stays listed, struck through, until
+                         it's kept after all or something replaces it. -->
+                    <StackPanel IsVisible="{Binding ShowSongFiles}" Grid.IsSharedSizeScope="True">
                         <!-- The master volume sits at the right of the header; each track has its own level in the mix below. -->
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
                             <TextBlock Grid.Column="0" Classes="section" Text="{Binding Player.TracksHeader}" />
@@ -537,31 +524,43 @@
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.OpeningAudio}" IsVisible="{Binding Player.IsOpening}" />
                         <TextBlock Classes="error" Text="{Binding Player.Error}" IsVisible="{Binding Player.HasError}" />
 
+                        <!-- The track rows and the removed-track rows share their column widths, so the names, sizes and buttons line up. -->
                         <ItemsControl ItemsSource="{Binding Player.Tracks}"
                                       AutomationProperties.Name="{x:Static res:Strings.TracksListName}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:TrackRowViewModel">
-                                    <Grid ColumnDefinitions="14,Auto,Auto,*,Auto,Auto" ColumnSpacing="4" Margin="0,1">
+                                    <Grid ColumnSpacing="4" Margin="0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSwitches" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSize" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackVolume" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackActions" />
+                                        </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0"
                                                    Classes="marker"
                                                    VerticalAlignment="Center"
                                                    Text="{Binding Marker}" />
-                                        <ToggleButton Grid.Column="1"
-                                                      Classes="trackSwitch"
-                                                      Content="{x:Static res:Strings.MuteButton}"
-                                                      IsChecked="{Binding IsMuted}"
-                                                      ToolTip.Tip="{x:Static res:Strings.MuteToolTip}"
-                                                      AutomationProperties.Name="{x:Static res:Strings.MuteToolTip}" />
-                                        <ToggleButton Grid.Column="2"
-                                                      Classes="trackSwitch"
-                                                      Content="{x:Static res:Strings.SoloButton}"
-                                                      IsChecked="{Binding IsSolo}"
-                                                      ToolTip.Tip="{x:Static res:Strings.SoloToolTip}"
-                                                      AutomationProperties.Name="{x:Static res:Strings.SoloToolTip}" />
-                                        <StackPanel Grid.Column="3" Margin="6,0,0,0" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                            <ToggleButton Classes="trackSwitch"
+                                                          Content="{x:Static res:Strings.MuteButton}"
+                                                          IsChecked="{Binding IsMuted}"
+                                                          ToolTip.Tip="{x:Static res:Strings.MuteToolTip}"
+                                                          AutomationProperties.Name="{x:Static res:Strings.MuteToolTip}" />
+                                            <ToggleButton Classes="trackSwitch"
+                                                          Content="{x:Static res:Strings.SoloButton}"
+                                                          IsChecked="{Binding IsSolo}"
+                                                          ToolTip.Tip="{x:Static res:Strings.SoloToolTip}"
+                                                          AutomationProperties.Name="{x:Static res:Strings.SoloToolTip}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center">
                                             <TextBlock TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Text="{Binding Name}" />
                                             <TextBlock Classes="error" Margin="0" Text="{Binding Error}" IsVisible="{Binding HasError}" />
                                         </StackPanel>
+                                        <Border Grid.Column="3" Classes="chip" Margin="4,0" IsVisible="{Binding HasSize}">
+                                            <TextBlock Text="{Binding Size}" />
+                                        </Border>
                                         <!-- How loud the track is in the mix; the master volume is in the header above. -->
                                         <Slider Grid.Column="4"
                                                 Width="90"
@@ -571,16 +570,70 @@
                                                 VerticalAlignment="Center"
                                                 ToolTip.Tip="{x:Static res:Strings.TrackVolumeName}"
                                                 AutomationProperties.Name="{x:Static res:Strings.TrackVolumeName}" />
+                                        <StackPanel Grid.Column="5"
+                                                    Orientation="Horizontal"
+                                                    VerticalAlignment="Center"
+                                                    IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
+                                            <!-- Replaces the stem's track, in whatever format it was, as Add track does. -->
+                                            <Button Classes="icon"
+                                                    Padding="4"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).ReplaceTrackCommand, FallbackValue={x:Null}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip.Tip="{x:Static res:Strings.ReplaceTrackToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.ReplaceTrackToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource ReplaceIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="icon"
+                                                    Padding="4"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RemoveTrackCommand, FallbackValue={x:Null}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RemoveTrackToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RemoveTrackToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <ItemsControl ItemsSource="{Binding RemovedTracks}"
+                                      IsVisible="{Binding HasRemovedTracks}"
+                                      AutomationProperties.Name="{x:Static res:Strings.RemovedTracksListName}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RemovedTrackRow">
+                                    <Grid ColumnSpacing="4" Margin="0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSwitches" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSize" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackVolume" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackActions" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="2"
+                                                   Classes="removed"
+                                                   Margin="6,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding Name}"
+                                                   Text="{Binding Name}" />
+                                        <Border Grid.Column="3" Classes="chip" Margin="4,0">
+                                            <TextBlock Classes="removed" Text="{Binding Size}" />
+                                        </Border>
                                         <Button Grid.Column="5"
                                                 Classes="icon"
                                                 Padding="4"
                                                 VerticalAlignment="Center"
-                                                Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RemoveTrackCommand, FallbackValue={x:Null}}"
+                                                HorizontalAlignment="Right"
+                                                Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).UndoRemoveTrackCommand, FallbackValue={x:Null}}"
                                                 CommandParameter="{Binding}"
                                                 IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}"
-                                                ToolTip.Tip="{x:Static res:Strings.RemoveTrackToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.RemoveTrackToolTip}">
-                                            <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                                ToolTip.Tip="{x:Static res:Strings.UndoRemoveTrackToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.UndoRemoveTrackToolTip}">
+                                            <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
                                         </Button>
                                     </Grid>
                                 </DataTemplate>
@@ -608,6 +661,149 @@
                                     </MenuFlyout.ItemContainerTheme>
                                 </MenuFlyout>
                             </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- The chart: notes.chart or notes.mid, replaced by choosing either kind. Without one the song can't be played. -->
+                    <StackPanel IsVisible="{Binding ShowSongFiles}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Classes="section" Text="{x:Static res:Strings.ChartHeader}" />
+                            <Panel Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,4" IsVisible="{Binding CanEdit}">
+                                <Button Classes="icon"
+                                        Padding="4"
+                                        Command="{Binding RevertChartCommand}"
+                                        IsVisible="{Binding IsChartChanged}"
+                                        ToolTip.Tip="{x:Static res:Strings.RevertChartToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.RevertChartToolTip}">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                </Button>
+                            </Panel>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Charts}"
+                                      AutomationProperties.Name="{x:Static res:Strings.ChartsListName}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ChartRow">
+                                    <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="4" Margin="0,1">
+                                        <TextBlock Grid.Column="0"
+                                                   Classes="marker"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding Marker}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes.removed="{Binding IsRemoved}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Text="{Binding Name}" />
+                                        <Border Grid.Column="2" Classes="chip" Margin="4,0">
+                                            <TextBlock Classes.removed="{Binding IsRemoved}" Text="{Binding Size}" />
+                                        </Border>
+                                        <!-- Sized for the buttons, so the sizes line up on a removed row, which has none. -->
+                                        <StackPanel Grid.Column="3"
+                                                    Orientation="Horizontal"
+                                                    MinWidth="44"
+                                                    VerticalAlignment="Center"
+                                                    IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
+                                            <Button Classes="icon"
+                                                    Padding="4"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).ChooseChartCommand, FallbackValue={x:Null}}"
+                                                    IsVisible="{Binding IsKept}"
+                                                    ToolTip.Tip="{x:Static res:Strings.ReplaceChartToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.ReplaceChartToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource ReplaceIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="icon"
+                                                    Padding="4"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RemoveChartCommand, FallbackValue={x:Null}}"
+                                                    IsVisible="{Binding IsKept}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RemoveChartToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RemoveChartToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel IsVisible="{Binding ShowChartMissing}">
+                            <TextBlock Classes="finding" TextWrapping="Wrap" Text="{Binding ChartMissingNote}" />
+                            <Button Classes="icon"
+                                    Margin="10,4,0,0"
+                                    Command="{Binding ChooseChartCommand}"
+                                    IsVisible="{Binding CanEdit}"
+                                    AutomationProperties.Name="{x:Static res:Strings.AddChartButton}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                                    <TextBlock Text="{x:Static res:Strings.AddChartButton}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Classes="error" Text="{Binding ChartError}" IsVisible="{Binding HasChartError}" />
+                    </StackPanel>
+
+                    <!-- Everything else in the song: files the other sections don't show, such as a highway image,
+                         a readme, or a second album.jpg beside the album.png that's used. -->
+                    <StackPanel IsVisible="{Binding ShowSongFiles}">
+                        <TextBlock Classes="section" Text="{Binding OtherFilesHeader}" />
+                        <TextBlock Classes="muted" Text="{x:Static res:Strings.NoOtherFiles}" IsVisible="{Binding ShowNoOtherFiles}" />
+                        <ItemsControl ItemsSource="{Binding Files}"
+                                      AutomationProperties.Name="{x:Static res:Strings.OtherFilesListName}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FileRow">
+                                    <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="4" Margin="0,1">
+                                        <TextBlock Grid.Column="0"
+                                                   Classes="marker"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding Marker}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes.removed="{Binding IsRemoved}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="PathSegmentEllipsis"
+                                                   ToolTip.Tip="{Binding Path}"
+                                                   Text="{Binding Path}" />
+                                        <Border Grid.Column="2" Classes="chip" Margin="4,0">
+                                            <TextBlock Classes.removed="{Binding IsRemoved}" Text="{Binding Size}" />
+                                        </Border>
+
+                                        <!-- One action per row: remove a file (or drop an added one), or undo its removal. -->
+                                        <Panel Grid.Column="3"
+                                               MinWidth="20"
+                                               IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
+                                            <Button Classes="icon"
+                                                    Padding="4"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RevertFileCommand, FallbackValue={x:Null}}"
+                                                    CommandParameter="{Binding}"
+                                                    IsVisible="{Binding CanRevert}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RevertFileToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RevertFileToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="icon"
+                                                    Padding="4"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).RemoveFileCommand, FallbackValue={x:Null}}"
+                                                    CommandParameter="{Binding}"
+                                                    IsVisible="{Binding CanRemove}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RemoveFileToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RemoveFileToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                            </Button>
+                                        </Panel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="error" Text="{Binding FilesError}" IsVisible="{Binding HasFilesError}" />
+                        <Button Classes="icon"
+                                Margin="10,4,0,0"
+                                Command="{Binding AddFilesCommand}"
+                                IsVisible="{Binding CanEdit}"
+                                AutomationProperties.Name="{x:Static res:Strings.AddFilesButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                                <TextBlock Text="{x:Static res:Strings.AddFilesButton}" />
+                            </StackPanel>
                         </Button>
                     </StackPanel>
 

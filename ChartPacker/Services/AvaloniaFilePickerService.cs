@@ -29,6 +29,11 @@ namespace ChartPacker.Services
             FileType(Strings.VideoFileTypeFormat, SongBackgrounds.VideoExtensions, VideoMimeTypes),
         ];
 
+        private static readonly FilePickerFileType[] Charts =
+        [
+            FileType(Strings.ChartFileTypeFormat, ChartFiles.Extensions, ["application/x-chart", "audio/midi"]),
+        ];
+
         public async Task<IReadOnlyList<string>> PickFilesAsync(string title)
         {
             if (topLevel() is not { } owner)
@@ -68,6 +73,21 @@ namespace ChartPacker.Services
                 Title = title,
                 AllowMultiple = false,
                 FileTypeFilter = Backgrounds,
+            });
+
+            return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        }
+
+        public async Task<string?> PickChartAsync(string title)
+        {
+            if (topLevel() is not { } owner)
+                return null;
+
+            var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = title,
+                AllowMultiple = false,
+                FileTypeFilter = Charts,
             });
 
             return files.Count > 0 ? files[0].TryGetLocalPath() : null;

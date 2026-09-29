@@ -16,5 +16,8 @@ namespace ChartPacker.Services
         /// returns its local path, or <see langword="null"/> if cancelled.
         /// </summary>
         Task<string?> PickBackgroundAsync(string title);
+
+        /// <summary>Shows a picker for one chart (.chart, .mid or .midi) and returns its local path, or <see langword="null"/> if cancelled.</summary>
+        Task<string?> PickChartAsync(string title);
     }
 }

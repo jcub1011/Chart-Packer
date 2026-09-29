@@ -102,6 +102,29 @@
         <Setter Property="Opacity" Value="0.55" />
     </Style>
 
+    <!-- Small right-aligned labels at the end of a line: a song's kind, length or size, or its charter.
+         "large" is for the detail panel's header lines. -->
+    <Style Selector="Border.chip">
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="Border.chip > TextBlock">
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+    <Style Selector="Border.chip.large">
+        <Setter Property="Padding" Value="6,1" />
+    </Style>
+    <Style Selector="Border.chip.large > TextBlock">
+        <Setter Property="FontSize" Value="11" />
+    </Style>
+
     <!-- An inline notice: accent-tinted, or red for an error. -->
     <Style Selector="Border.banner">
         <Setter Property="Padding" Value="8,5" />

@@ -33,6 +33,17 @@ namespace ChartPacker.ViewModels
         public bool IsAdded => Marker is not null;
     }
 
+    /// <summary>A chart file of the song, with its size already formatted.</summary>
+    /// <param name="Marker"><c>+</c> for a chart a staged change adds.</param>
+    /// <param name="IsRemoved">A staged change removes or replaces the file.</param>
+    public sealed record ChartRow(string Name, string Size, string? Marker = null, bool IsRemoved = false)
+    {
+        public bool IsKept => !IsRemoved;
+    }
+
+    /// <summary>A track a staged change removes, shown struck through so that its removal can be undone.</summary>
+    public sealed record RemovedTrackRow(string Name, string Size);
+
     /// <summary>A structural problem found in a <c>.sng</c>.</summary>
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
 
@@ -40,10 +51,10 @@ namespace ChartPacker.ViewModels
     public sealed record StemOption(string Stem, string Label, IAsyncRelayCommand Command);
 
     /// <summary>
-    /// The right panel: the album art and metadata of the songs selected in the library, editable
-    /// for one song or for all of them at once, plus the file list when one song is selected. For a
-    /// <c>.sng</c> all of it comes from the container; for a folder, from its <c>song.ini</c>, its
-    /// album-art file and a listing.
+    /// The right panel: the album art, background and metadata of the songs selected in the
+    /// library, editable for one song or for all of them at once, plus the tracks, the chart and
+    /// the other files when one song is selected. For a <c>.sng</c> all of it comes from the
+    /// container; for a folder, from its <c>song.ini</c> and a listing.
     /// </summary>
     /// <remarks>
     /// Edits go into each song's <see cref="MetadataDraft"/> in the shared
@@ -58,8 +69,8 @@ namespace ChartPacker.ViewModels
     {
         private const int BulkLoadParallelism = 4;
 
-        // A 200px tile at 2x scaling.
-        private const int ArtDecodeWidth = 400;
+        // A square tile at its 512px largest, at 2x scaling.
+        private const int ArtDecodeWidth = 1024;
 
         private readonly MetadataDraftStore _drafts;
         private readonly JobViewModel _job;
@@ -74,8 +85,11 @@ namespace ChartPacker.ViewModels
         // Why there's no metadata, from loading, e.g. the folder has no song.ini.
         private string? _loadNote;
 
-        // The one selected song's files as they are on disk; Files adds the staged art and file changes to them.
+        // The one selected song's files as they are on disk; the tracks, charts and other files add the staged changes to them.
         private IReadOnlyList<DiskFile> _diskFiles = [];
+
+        // The one selected song's total size on disk.
+        private ulong _totalSize;
 
         // Decoded album art by image hash: the first song's art, and every staged replacement.
         private Dictionary<string, Bitmap> _artImages = [];
@@ -110,7 +124,14 @@ namespace ChartPacker.ViewModels
 
         public AvaloniaList<MetadataRowViewModel> Metadata { get; } = new();
 
+        /// <summary>The one selected song's files that aren't its album art, background, tracks, chart or song.ini.</summary>
         public AvaloniaList<FileRow> Files { get; } = new();
+
+        /// <summary>The one selected song's chart files: normally one, <c>notes.chart</c> or <c>notes.mid</c>.</summary>
+        public AvaloniaList<ChartRow> Charts { get; } = new();
+
+        /// <summary>The one selected song's tracks that a staged change removes, and nothing replaces.</summary>
+        public AvaloniaList<RemovedTrackRow> RemovedTracks { get; } = new();
 
         public AvaloniaList<FindingRow> Findings { get; } = new();
 
@@ -124,13 +145,23 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private IReadOnlyList<StemOption> _addTrackOptions = [];
 
-        /// <summary>The song's name, or how many items are selected.</summary>
+        /// <summary>The song's name and artist, as drafted, or how many items are selected.</summary>
         [ObservableProperty]
         private string? _title;
 
-        /// <summary>The full path and total size, or how many of each kind are selected.</summary>
+        /// <summary>The one selected song's charter as drafted, with its rich-text tags left in for the view to render.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasCharter))]
+        private string? _charter;
+
+        /// <summary>The full path, or how many of each kind are selected.</summary>
         [ObservableProperty]
         private string? _subtitle;
+
+        /// <summary>The one selected song's size on disk, formatted.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSizeText))]
+        private string? _sizeText;
 
         [ObservableProperty]
         private bool _isLoading;
@@ -176,11 +207,27 @@ namespace ChartPacker.ViewModels
         /// <summary>The album art every selected song has once its draft is applied, or <see langword="null"/> when there's none to show.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasArtImage))]
+        [NotifyPropertyChangedFor(nameof(ArtAspect))]
         private Bitmap? _artImage;
 
         /// <summary>Shown in the tile instead of an image, e.g. "No album art" or "Album art differs".</summary>
         [ObservableProperty]
         private string? _artNote;
+
+        /// <summary>The shown album art's stored name, e.g. <c>album.png</c>, when it's known.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasArtFileName))]
+        private string? _artFileName;
+
+        /// <summary>The shown album art's size, formatted, when it's known.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasArtFileSize))]
+        private string? _artFileSize;
+
+        /// <summary>Why the chosen chart can't be used.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasChartError))]
+        private string? _chartError;
 
         /// <summary>Why the chosen replacement image can't be used.</summary>
         [ObservableProperty]
@@ -203,6 +250,19 @@ namespace ChartPacker.ViewModels
         private string? _tracksError;
 
         public bool HasArtImage => ArtImage is not null;
+
+        /// <summary>The art tile's width over its height: the shown image's, or square when there's none.</summary>
+        public double ArtAspect => ArtImage is { Size: { Width: > 0, Height: > 0 } size } ? size.Width / size.Height : 1;
+
+        public bool HasArtFileName => ArtFileName is not null;
+
+        public bool HasArtFileSize => ArtFileSize is not null;
+
+        public bool HasCharter => Charter is not null;
+
+        public bool HasSizeText => SizeText is not null;
+
+        public bool HasChartError => ChartError is not null;
 
         public bool HasArtError => ArtError is not null;
 
@@ -234,9 +294,21 @@ namespace ChartPacker.ViewModels
 
         public bool HasNewRowError => NewRowError is not null;
 
-        public bool ShowFiles => !IsBulk;
+        /// <summary>One song is selected, so its tracks, chart and other files are shown.</summary>
+        public bool ShowSongFiles => !IsBulk;
 
-        public bool ShowNoFiles => !IsBulk && Files.Count == 0;
+        public bool ShowNoOtherFiles => !IsBulk && Files.Count == 0;
+
+        public bool HasRemovedTracks => RemovedTracks.Count > 0;
+
+        /// <summary>The song will have no chart once its draft is saved.</summary>
+        public bool ShowChartMissing => !IsBulk && Charts.All(c => c.IsRemoved);
+
+        /// <summary>Why there's no chart: there's none, or a staged change removes it.</summary>
+        public string ChartMissingNote => Charts.Count > 0 ? Strings.ChartWillBeRemoved : Strings.NoChart;
+
+        /// <summary>The one selected song's chart has a staged change.</summary>
+        public bool IsChartChanged => Charts.Any(c => c.IsRemoved || c.Marker is not null);
 
         /// <summary>Every selected song was read and can be written back.</summary>
         public bool IsEditable => _songs.Count > 0 && _songs.Count == _entries.Count && ReadOnlyNote is null;
@@ -250,8 +322,8 @@ namespace ChartPacker.ViewModels
 
         public string MetadataHeader => string.Format(CultureInfo.CurrentCulture, Strings.MetadataHeaderFormat, Metadata.Count);
 
-        // Counts the files there will be once the staged changes are saved.
-        public string FilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.FilesHeaderFormat, Files.Count(f => !f.IsRemoved));
+        // Counts the other files there will be once the staged changes are saved.
+        public string OtherFilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.OtherFilesHeaderFormat, Files.Count(f => !f.IsRemoved));
 
         /// <summary>Why <paramref name="value"/> can't be stored, or <see langword="null"/> when it can.</summary>
         public static string? ValidateValue(string value) =>
@@ -280,9 +352,12 @@ namespace ChartPacker.ViewModels
             _songs = [];
             _loadNote = null;
             _diskFiles = [];
+            _totalSize = 0;
             ReleaseArt();
             Metadata.Clear();
             Files.Clear();
+            Charts.Clear();
+            RemovedTracks.Clear();
             Findings.Clear();
             Title = entries.Count switch
             {
@@ -291,7 +366,9 @@ namespace ChartPacker.ViewModels
                 _ => string.Format(CultureInfo.CurrentCulture, Strings.MultipleSelectedFormat, entries.Count),
             };
             IsBulk = entries.Count > 1;
+            Charter = null;
             Subtitle = null;
+            SizeText = null;
             MetadataNote = null;
             ReadOnlyNote = null;
             ErrorMessage = null;
@@ -300,6 +377,7 @@ namespace ChartPacker.ViewModels
             BackgroundError = null;
             FilesError = null;
             TracksError = null;
+            ChartError = null;
             CancelAdd();
             IsLoading = entries.Count > 0;
             RefreshState();
@@ -673,8 +751,8 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Stages removing <paramref name="row"/>'s file, or drops it when it's one the draft adds.
-        /// Removing the album art or a background in use removes every file of it; another file
-        /// with one of their names, such as an <c>album.jpg</c> beside the <c>album.png</c> shown,
+        /// Only other files are listed, so a file with an album-art or background name here is one
+        /// beside the file used, such as an <c>album.jpg</c> beside the <c>album.png</c> shown, and
         /// is removed on its own.
         /// </summary>
         [RelayCommand(CanExecute = nameof(CanChangeFiles))]
@@ -684,30 +762,10 @@ namespace ChartPacker.ViewModels
                 return;
 
             var draft = _songs[0].Item.Draft;
-            if (AlbumArt.IsAlbumArtName(row.Path) && (row.IsAdded || AlbumArt.Pick(_diskFiles, f => f.Path)?.Path == row.Path))
-            {
-                if (row.IsAdded)
-                    draft.RevertAlbumArt();
-                else
-                    draft.RemoveAlbumArt();
-                ArtError = null;
-            }
-            else if (SongBackgrounds.KindOfName(row.Path) is { } kind && (row.IsAdded || SongBackgrounds.Pick(_diskFiles, f => f.Path, kind)?.Path == row.Path))
-            {
-                if (row.IsAdded)
-                    draft.RevertBackground(kind);
-                else
-                    draft.RemoveBackground(kind);
-                BackgroundError = null;
-            }
-            else if (row.IsAdded)
-            {
+            if (row.IsAdded)
                 draft.RevertFile(row.Path);
-            }
             else
-            {
                 draft.RemoveFile(row.Path);
-            }
 
             OnDraftsChanged();
         }
@@ -817,6 +875,111 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
         }
 
+        /// <summary>Asks for an audio file to replace <paramref name="row"/>'s track with, as Add track does for its stem.</summary>
+        [RelayCommand(CanExecute = nameof(CanChangeFiles))]
+        private Task ReplaceTrackAsync(TrackRowViewModel? row) =>
+            row is null || !CanChangeFiles() ? Task.CompletedTask : AddTrackAsync(row.Track.Stem);
+
+        /// <summary>Keeps <paramref name="row"/>'s track after all, dropping its staged removal.</summary>
+        [RelayCommand(CanExecute = nameof(CanChangeFiles))]
+        private void UndoRemoveTrack(RemovedTrackRow? row)
+        {
+            if (row is null || !CanChangeFiles())
+                return;
+
+            _songs[0].Item.Draft.RevertFile(row.Name);
+            TracksError = null;
+            OnDraftsChanged();
+        }
+
+        /// <summary>
+        /// Asks for a <c>.chart</c> or MIDI file and stages it as the selected song's chart, stored as
+        /// <c>notes.chart</c> or <c>notes.mid</c>. Every other chart file is staged for removal, so the
+        /// song ends up with the one chosen.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanChangeFiles))]
+        private async Task ChooseChartAsync()
+        {
+            var songs = _songs;
+            string? path = await _filePicker.PickChartAsync(Strings.PickChartTitle);
+            if (path is null || !ReferenceEquals(songs, _songs) || !CanChangeFiles())
+                return;
+
+            string fileName = Path.GetFileName(path);
+            ChartError = null;
+            if (ChartFiles.StoredNameFor(path) is not { } storedName)
+            {
+                ChartError = string.Format(CultureInfo.CurrentCulture, Strings.ChartNotSupportedFormat, fileName);
+                return;
+            }
+
+            var (length, problem) = await Task.Run(() =>
+            {
+                try
+                {
+                    return (new FileInfo(path).Length, (string?)null);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    return (0L, ex.Message);
+                }
+            });
+
+            if (!ReferenceEquals(songs, _songs) || !CanChangeFiles())
+                return;
+            if (problem is not null)
+            {
+                ChartError = string.Format(CultureInfo.CurrentCulture, Strings.ChartUnreadableFormat, fileName, problem);
+                return;
+            }
+
+            var draft = songs[0].Item.Draft;
+            RevertAddedCharts(draft);
+
+            // Recorded as replaced by the add, so removing it (or reverting the chart) brings them back.
+            var replaced = ChartFiles.FilesOf(_diskFiles.Select(f => f.Path))
+                .Where(stored => !stored.Equals(storedName, StringComparison.Ordinal))
+                .ToList();
+
+            draft.AddFile(new AddedFile(storedName, path, length), replaced);
+            OnDraftsChanged();
+        }
+
+        private bool CanRemoveChart() => CanChangeFiles() && Charts.Any(c => c.IsKept);
+
+        /// <summary>Stages removing the selected song's chart: every chart file it has, and any chart a draft adds.</summary>
+        [RelayCommand(CanExecute = nameof(CanRemoveChart))]
+        private void RemoveChart()
+        {
+            var draft = _songs[0].Item.Draft;
+            RevertAddedCharts(draft);
+            foreach (string stored in ChartFiles.FilesOf(_diskFiles.Select(f => f.Path)))
+                draft.RemoveFile(stored);
+            ChartError = null;
+            OnDraftsChanged();
+        }
+
+        private bool CanRevertChart() => CanChangeFiles() && IsChartChanged;
+
+        /// <summary>Drops every staged change to the selected song's chart.</summary>
+        [RelayCommand(CanExecute = nameof(CanRevertChart))]
+        private void RevertChart()
+        {
+            var draft = _songs[0].Item.Draft;
+            RevertAddedCharts(draft);
+            foreach (string stored in ChartFiles.FilesOf(_diskFiles.Select(f => f.Path)))
+                draft.RevertFile(stored);
+            ChartError = null;
+            OnDraftsChanged();
+        }
+
+        /// <summary>Drops the charts <paramref name="draft"/> adds, which brings back the ones they replaced.</summary>
+        private static void RevertAddedCharts(MetadataDraft draft)
+        {
+            foreach (string added in ChartFiles.FilesOf(draft.AddedFiles.Select(f => f.StoredName)))
+                draft.RevertFile(added);
+        }
+
         // Only committed changes count: text still in an edit box isn't a change yet.
         private bool CanSave() => CanEdit && HasDrafts && !_job.IsRunning;
 
@@ -887,6 +1050,7 @@ namespace ChartPacker.ViewModels
             BackgroundError = null;
             FilesError = null;
             TracksError = null;
+            ChartError = null;
             foreach (var song in _songs)
                 song.Item.Draft.Clear();
             OnDraftsChanged();
@@ -943,6 +1107,7 @@ namespace ChartPacker.ViewModels
             _artImages = loaded.Art.Images;
             _stagedArt = loaded.Art.Staged;
             _diskFiles = loaded.Files;
+            _totalSize = loaded.TotalSize;
             Background.Apply(loaded.Backgrounds);
 
             // A staged image that can no longer be read (moved, say) is reported like a bad pick.
@@ -966,7 +1131,8 @@ namespace ChartPacker.ViewModels
             }
             else
             {
-                Subtitle = string.Format(CultureInfo.CurrentCulture, Strings.SubtitleFormat, _entries[0].FullPath, ByteSizeFormatter.Format(loaded.TotalSize));
+                Subtitle = _entries[0].FullPath;
+                SizeText = ByteSizeFormatter.Format(_totalSize);
             }
 
             Findings.AddRange(loaded.Findings);
@@ -1002,7 +1168,32 @@ namespace ChartPacker.ViewModels
 
             MetadataNote = _loadNote ?? (Metadata.Count == 0 ? Strings.NoMetadata : null);
             RefreshAvailableKeys();
+            RefreshHeadline();
             RefreshState();
+        }
+
+        /// <summary>
+        /// Titles the one selected song "name - artist", from its metadata as drafted, and picks out
+        /// its charter; without a name, the title is the file or folder name. A bulk selection keeps
+        /// its count as the title, and shows no charter.
+        /// </summary>
+        private void RefreshHeadline()
+        {
+            if (IsBulk || _songs.Count != 1 || _entries.Count != 1)
+            {
+                Charter = null;
+                return;
+            }
+
+            var song = _songs[0];
+            var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
+            Title = SongHeadline.From(pairs) switch
+            {
+                { Name: { } name, Artist: { } artist } => string.Format(CultureInfo.CurrentCulture, Strings.TitleFormat, name, artist),
+                { Name: { } name } => name,
+                _ => _entries[0].DisplayName,
+            };
+            Charter = SongHeadline.CharterMarkup(pairs);
         }
 
         /// <summary>
@@ -1133,6 +1324,7 @@ namespace ChartPacker.ViewModels
                 ArtNote = _songs.Any(s => s.Item.Draft.AlbumArt is { IsRemoval: true }) ? Strings.AlbumArtWillBeRemoved : Strings.NoAlbumArt;
             }
 
+            (ArtFileName, ArtFileSize) = keys is [not null] ? SharedArtFile() : (null, null);
             Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
             RebuildFiles();
             OnPropertyChanged(nameof(IsArtChanged));
@@ -1141,14 +1333,35 @@ namespace ChartPacker.ViewModels
             RefreshCommands();
         }
 
+        /// <summary>
+        /// The stored name and size of the album art every selected song shares: a staged image they
+        /// all have, or the one selected song's own file. Songs sharing stored art aren't listed, so
+        /// in a bulk selection only a staged image is named.
+        /// </summary>
+        private (string? Name, string? Size) SharedArtFile()
+        {
+            var sources = _songs.Select(s => s.Item.Draft.AlbumArt?.SourcePath).Distinct(StringComparer.Ordinal).ToList();
+            if (sources is [{ } source])
+            {
+                string? size = _stagedArt.TryGetValue(source, out var staged) && staged.Error is null ? ByteSizeFormatter.Format((ulong)staged.Length) : null;
+                return (AlbumArt.StoredNameFor(source), size);
+            }
+
+            if (sources is [null] && _songs.Count == 1 && AlbumArt.Pick(_diskFiles, f => f.Path) is { } file)
+                return (file.Path, ByteSizeFormatter.Format(file.Length));
+
+            return (null, null);
+        }
+
         /// <summary><paramref name="song"/> as the background tile needs it, with its video timeline as drafted.</summary>
         private static BackgroundSong BackgroundSongOf(EditableSong song) =>
             new(song.Entry, song.Item.Draft, song.Backgrounds, VideoTimeline.From(song.Item.Draft.ApplyTo(song.Item.Original)));
 
         /// <summary>
-        /// The one selected song's files, with the ones a staged change removes or replaces struck
-        /// through and the ones it adds marked. The album-art and background files follow their
-        /// changes; a folder's song.ini is edited as metadata, so it can't be removed.
+        /// The one selected song's chart files and other files, with the ones a staged change removes
+        /// or replaces struck through and the ones it adds marked. The album art, backgrounds and
+        /// tracks are shown in their own places, and a folder's song.ini is edited as metadata, so
+        /// none of them are other files; a second album-art or background file, not the one used, is.
         /// </summary>
         private void RebuildFiles()
         {
@@ -1157,34 +1370,59 @@ namespace ChartPacker.ViewModels
             var change = draft?.AlbumArt;
             bool isFolder = song is not null && song.Entry.Kind != SongEntryKind.SngFile;
 
+            bool IsRemoved(string path) =>
+                (change is not null && AlbumArt.IsAlbumArtName(path))
+                || (draft is not null && SongBackgrounds.KindOfName(path) is { } kind && draft.GetBackground(kind) is not null)
+                || (draft is not null && (draft.IsFileRemoved(path) || draft.IsFileAdded(path)));
+
+            // The files the art and background tiles show; any others of their names are other files.
+            string? art = AlbumArt.Pick(_diskFiles, f => f.Path)?.Path;
+            var backgrounds = SongBackgrounds.Kinds
+                .Select(k => SongBackgrounds.Pick(_diskFiles, f => f.Path, k)?.Path)
+                .OfType<string>()
+                .ToHashSet(StringComparer.Ordinal);
+            bool IsShownElsewhere(string path) =>
+                AudioStems.StemOf(path) is not null
+                || ChartFiles.IsChartName(path)
+                || path == art
+                || backgrounds.Contains(path)
+                || (isFolder && path.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase));
+
+            var charts = _diskFiles
+                .Where(f => ChartFiles.IsChartName(f.Path))
+                .Select(f => new ChartRow(f.Path, ByteSizeFormatter.Format(f.Length), IsRemoved: IsRemoved(f.Path)))
+                .ToList();
+            if (draft is not null)
+            {
+                charts.InsertRange(0, draft.AddedFiles
+                    .Where(f => ChartFiles.IsChartName(f.StoredName))
+                    .Select(f => new ChartRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+")));
+            }
+
+            // What's kept first, then what's going.
+            charts = [.. charts.OrderBy(c => c.IsRemoved)];
+            if (!charts.SequenceEqual(Charts))
+            {
+                Charts.Clear();
+                Charts.AddRange(charts);
+            }
+
             var rows = _diskFiles
+                .Where(f => !IsShownElsewhere(f.Path))
                 .Select(f =>
                 {
-                    bool removed = (change is not null && AlbumArt.IsAlbumArtName(f.Path))
-                        || (draft is not null && SongBackgrounds.KindOfName(f.Path) is { } kind && draft.GetBackground(kind) is not null)
-                        || (draft is not null && (draft.IsFileRemoved(f.Path) || draft.IsFileAdded(f.Path)));
-                    bool isSongIni = isFolder && f.Path.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase);
+                    bool removed = IsRemoved(f.Path);
                     return new FileRow(f.Path, ByteSizeFormatter.Format(f.Length),
-                        IsRemoved: removed, CanRemove: draft is not null && !removed && !isSongIni, CanRevert: draft is not null && removed);
+                        IsRemoved: removed, CanRemove: draft is not null && !removed, CanRevert: draft is not null && removed);
                 })
                 .ToList();
 
+            // Added tracks and charts are shown with the tracks and the chart; staged art and backgrounds on their tiles.
             if (draft is not null)
-                rows.AddRange(draft.AddedFiles.Select(f => new FileRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+", CanRemove: true)));
-
-            if (change?.SourcePath is { } source && AlbumArt.StoredNameFor(source) is { } name)
             {
-                string size = _stagedArt.TryGetValue(source, out var staged) && staged.Error is null ? ByteSizeFormatter.Format((ulong)staged.Length) : "";
-                rows.Add(new FileRow(name, size, Marker: "+", CanRemove: true));
-            }
-
-            foreach (var kind in SongBackgrounds.Kinds)
-            {
-                if (draft?.GetBackground(kind)?.SourcePath is { } backgroundSource && SongBackgrounds.StoredNameFor(kind, backgroundSource) is { } backgroundName)
-                {
-                    string size = Background.StagedAt(backgroundSource) is { Error: null } staged ? ByteSizeFormatter.Format((ulong)staged.Length) : "";
-                    rows.Add(new FileRow(backgroundName, size, Marker: "+", CanRemove: true));
-                }
+                rows.AddRange(draft.AddedFiles
+                    .Where(f => AudioStems.StemOf(f.StoredName) is null && !ChartFiles.IsChartName(f.StoredName))
+                    .Select(f => new FileRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+", CanRemove: true)));
             }
 
             if (!rows.SequenceEqual(Files))
@@ -1193,24 +1431,54 @@ namespace ChartPacker.ViewModels
                 Files.AddRange(rows);
             }
 
-            OnPropertyChanged(nameof(ShowNoFiles));
-            OnPropertyChanged(nameof(FilesHeader));
+            OnPropertyChanged(nameof(ShowNoOtherFiles));
+            OnPropertyChanged(nameof(OtherFilesHeader));
+            OnPropertyChanged(nameof(ShowChartMissing));
+            OnPropertyChanged(nameof(ChartMissingNote));
+            OnPropertyChanged(nameof(IsChartChanged));
             RefreshTracks();
         }
 
-        /// <summary>Gives the player the one selected song's tracks once its draft is applied, and labels the Add track menu to match.</summary>
+        /// <summary>
+        /// Gives the player the one selected song's tracks once its draft is applied, each with its
+        /// size; lists the tracks the draft removes without replacing; and labels the Add track menu to match.
+        /// </summary>
         private void RefreshTracks()
         {
             if (IsBulk || _entries.Count != 1)
             {
                 Player.Unload();
+                RemovedTracks.Clear();
+                OnPropertyChanged(nameof(HasRemovedTracks));
                 AddTrackOptions = [];
                 return;
             }
 
             var song = _songs.Count == 1 ? _songs[0] : null;
-            var tracks = SongTracks.Resolve(_diskFiles.Select(f => f.Path), song?.Item.Draft);
+            var draft = song?.Item.Draft;
+            var tracks = SongTracks.Resolve(_diskFiles.Select(f => f.Path), draft);
             Player.Load(_entries[0], tracks, song is null ? null : PreviewStartOf(song));
+            foreach (var row in Player.Tracks)
+                row.Size = TrackSize(row.Track, draft);
+
+            // A stem with a track staged to replace it isn't missing a track, so what it replaces isn't listed.
+            var stagedStems = draft?.AddedFiles.Select(f => AudioStems.StemOf(f.StoredName)).OfType<string>().ToHashSet(StringComparer.Ordinal) ?? [];
+            var removed = draft is null
+                ? []
+                : _diskFiles
+                    .Select(f => (File: f, Stem: AudioStems.StemOf(f.Path)))
+                    .Where(x => x.Stem is { } stem && draft.IsFileRemoved(x.File.Path) && !stagedStems.Contains(stem))
+                    .OrderBy(x => AudioStems.OrderOf(x.Stem!))
+                    .ThenBy(x => x.File.Path, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => new RemovedTrackRow(x.File.Path, ByteSizeFormatter.Format(x.File.Length)))
+                    .ToList();
+            if (!removed.SequenceEqual(RemovedTracks))
+            {
+                RemovedTracks.Clear();
+                RemovedTracks.AddRange(removed);
+            }
+
+            OnPropertyChanged(nameof(HasRemovedTracks));
 
             var stems = tracks.Select(t => t.Stem).ToHashSet(StringComparer.Ordinal);
             AddTrackOptions = AudioStems.Stems
@@ -1219,6 +1487,23 @@ namespace ChartPacker.ViewModels
                     stems.Contains(stem) ? string.Format(CultureInfo.CurrentCulture, Strings.ReplaceTrackFormat, stem) : stem,
                     _addTrackCommands[stem]))
                 .ToList();
+        }
+
+        /// <summary><paramref name="track"/>'s file size, formatted: the file to be added, or the one stored.</summary>
+        private string? TrackSize(SongTrack track, MetadataDraft? draft)
+        {
+            if (track.IsStaged)
+            {
+                foreach (var added in draft?.AddedFiles ?? [])
+                {
+                    if (added.StoredName.Equals(track.StoredName, StringComparison.OrdinalIgnoreCase))
+                        return ByteSizeFormatter.Format((ulong)added.Length);
+                }
+
+                return null;
+            }
+
+            return _diskFiles.FirstOrDefault(f => f.Path == track.StoredName) is { } file ? ByteSizeFormatter.Format(file.Length) : null;
         }
 
         /// <summary>Where the song's <c>preview_start_time</c>, drafted or stored, starts the preview.</summary>
@@ -1365,14 +1650,15 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasFindings));
             OnPropertyChanged(nameof(HasMetadataNote));
             OnPropertyChanged(nameof(HasReadOnlyNote));
-            OnPropertyChanged(nameof(ShowFiles));
-            OnPropertyChanged(nameof(ShowNoFiles));
+            OnPropertyChanged(nameof(ShowSongFiles));
+            OnPropertyChanged(nameof(ShowNoOtherFiles));
+            OnPropertyChanged(nameof(ShowChartMissing));
             OnPropertyChanged(nameof(IsEditable));
             OnPropertyChanged(nameof(CanEdit));
             OnPropertyChanged(nameof(ShowAddRow));
             OnPropertyChanged(nameof(HasDrafts));
             OnPropertyChanged(nameof(MetadataHeader));
-            OnPropertyChanged(nameof(FilesHeader));
+            OnPropertyChanged(nameof(OtherFilesHeader));
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
             OnPropertyChanged(nameof(IsBackgroundChanged));
@@ -1394,6 +1680,11 @@ namespace ChartPacker.ViewModels
             RemoveFileCommand.NotifyCanExecuteChanged();
             RevertFileCommand.NotifyCanExecuteChanged();
             RemoveTrackCommand.NotifyCanExecuteChanged();
+            ReplaceTrackCommand.NotifyCanExecuteChanged();
+            UndoRemoveTrackCommand.NotifyCanExecuteChanged();
+            ChooseChartCommand.NotifyCanExecuteChanged();
+            RemoveChartCommand.NotifyCanExecuteChanged();
+            RevertChartCommand.NotifyCanExecuteChanged();
             foreach (var command in _addTrackCommands.Values)
                 command.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
