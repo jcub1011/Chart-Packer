@@ -114,6 +114,10 @@ through `IProgress<T>`.
   it from other configurations).
 - Tests may use MSTest (via `MSTest.Sdk`) and Microsoft.Testing.Platform, opted into for
   `dotnet test` in `global.json`.
+- `tools/DecodeBench` times the audio decoders against FFmpeg's, and uses `BenchmarkDotNet`
+  (MIT) for warm-up, iterations and statistics, on the JIT and on Native AOT as the app ships.
+  It's a developer tool that's never shipped or referenced by the app, so the trim and AOT rule
+  below doesn't apply to it.
 - Image preview uses Avalonia's built-in Skia `Bitmap`.
 - The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
   durations from file headers, for the library list's length when a song has no `song_length`.
