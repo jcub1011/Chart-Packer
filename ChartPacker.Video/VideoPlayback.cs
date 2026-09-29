@@ -8,7 +8,9 @@ namespace ChartPacker.Video;
 /// <remarks>
 /// Moving forward decodes on from the last frame. Moving back, or far ahead (the first time asked
 /// for included), seeks to the keyframe before the time and decodes forward from it; the frames
-/// passed on the way aren't converted.
+/// passed on the way aren't converted. The clock running on while that happens is followed rather
+/// than sought again: a seek for a little later would land on the same keyframe and start over, so
+/// with keyframes far apart it would never catch up.
 /// </remarks>
 public sealed class VideoPlayback : IDisposable
 {
@@ -17,6 +19,9 @@ public sealed class VideoPlayback : IDisposable
 
     // A frame due within this of the time asked for counts as due: about half a frame at 60 fps.
     private static readonly TimeSpan Tolerance = TimeSpan.FromMilliseconds(8);
+
+    // Catching up for longer than this, in milliseconds, shows how far it has got meanwhile.
+    private const long PublishInterval = 100;
 
     private readonly Func<Stream> _open;
     private readonly int _maxWidth;
@@ -147,8 +152,12 @@ public sealed class VideoPlayback : IDisposable
         byte[] back = new byte[decoder.Width * decoder.Height * 4];
         TimeSpan keptTime = TimeSpan.Zero;
         TimeSpan nextTime = TimeSpan.Zero;
+
+        // The time last sought; the frames before it are on the way there, not a reason to seek again.
+        TimeSpan soughtTime = TimeSpan.Zero;
         bool hasNext = false;
         bool atEnd = false;
+        long publishedAt = Environment.TickCount64;
 
         while (!_stopping)
         {
@@ -162,19 +171,22 @@ public sealed class VideoPlayback : IDisposable
             var target = TimeSpan.FromTicks(ticks);
             var reached = hasNext ? nextTime : keptTime;
             bool behind = decoder.HasKept && target < keptTime - Tolerance;
-            bool far = target > reached + SeekAhead;
+            bool far = target > Later(reached, soughtTime) + SeekAhead;
 
             // A seek that found nothing to decode: try again from the new time.
             bool stuck = !decoder.HasKept && atEnd;
             if (behind || far || stuck)
             {
                 decoder.Seek(target);
+                soughtTime = target;
                 hasNext = false;
                 atEnd = false;
+                publishedAt = Environment.TickCount64;
             }
 
             // Decode on to the last frame due, keeping each one due; only that last one is converted.
             bool changed = false;
+            bool catchingUp = false;
             while (!_stopping)
             {
                 if (!hasNext)
@@ -197,9 +209,24 @@ public sealed class VideoPlayback : IDisposable
                 hasNext = false;
                 changed = true;
 
-                // A new time asked for meanwhile: start from it.
-                if (Interlocked.Read(ref _target) != ticks)
+                // A long way still to go: show this frame, then carry on.
+                if (Environment.TickCount64 - publishedAt >= PublishInterval)
+                {
+                    catchingUp = true;
                     break;
+                }
+
+                // A new time asked for meanwhile: follow it, unless it's back or far enough ahead to seek.
+                long latest = Interlocked.Read(ref _target);
+                if (latest != ticks)
+                {
+                    var moved = TimeSpan.FromTicks(latest);
+                    if (moved < keptTime - Tolerance || moved > Later(keptTime, soughtTime) + SeekAhead)
+                        break;
+
+                    ticks = latest;
+                    target = moved;
+                }
             }
 
             if (changed && decoder.CopyKept(back))
@@ -210,11 +237,14 @@ public sealed class VideoPlayback : IDisposable
                     _version++;
                 }
 
+                publishedAt = Environment.TickCount64;
                 Changed?.Invoke(this, EventArgs.Empty);
             }
 
-            if (Interlocked.Read(ref _target) == ticks)
+            if (!catchingUp && Interlocked.Read(ref _target) == ticks)
                 _wake.WaitOne();
         }
     }
+
+    private static TimeSpan Later(TimeSpan a, TimeSpan b) => a > b ? a : b;
 }
