@@ -26,7 +26,7 @@ public sealed record RichTextSpan(string Text, RichTextStyle Style);
 /// <list type="bullet">
 /// <item><c>b</c>, <c>i</c>, <c>u</c>, <c>s</c>, <c>color</c> and <c>br</c> are rendered.
 /// <c>color</c> takes <c>#RGB</c>, <c>#RGBA</c>, <c>#RRGGBB</c>, <c>#RRGGBBAA</c> or one of
-/// TextMeshPro's colour names, optionally in quotes.</item>
+/// TextMeshPro's colour names, optionally in quotes (a lone leading or trailing quote is tolerated).</item>
 /// <item>Closing tags end the most recent matching opening tag. An unclosed tag runs to the end.</item>
 /// <item>Other TextMeshPro tags (<c>size</c>, <c>font</c>, <c>sup</c>, …) are removed but not rendered.</item>
 /// <item>Anything else in angle brackets, like <c>&lt;3</c> or <c>&lt;unknown&gt;</c>, is ordinary text,
@@ -187,8 +187,8 @@ public static class RichText
     private static bool TryParseColor(ReadOnlySpan<char> value, out uint argb)
     {
         argb = 0;
-        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
-            value = value[1..^1];
+        // Quotes are optional, and charts in the wild often have only one, as in <color=#FF0000">.
+        value = value.Trim('"');
 
         if (value.IsEmpty)
             return false;

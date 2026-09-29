@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:conv="using:ChartPacker.Converters"
+             xmlns:ctl="using:ChartPacker.Controls"
              xmlns:res="using:ChartPacker.Resources"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="600"
              x:Class="ChartPacker.Views.LibraryView"
@@ -50,6 +51,38 @@
             <Setter Property="ClipToBounds" Value="True" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+        </Style>
+
+        <!-- Play/stop on the art: a dark round chip that shows while the tile is hovered, and stays while its song plays.
+             It is smaller than the tile so the rest of the tile still selects the row. -->
+        <Style Selector="Button.tilePlay">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="#CC000000" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Border.art-tile:pointerover Button.tilePlay, Button.tilePlay.active, Button.tilePlay:focus-visible">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.tilePlay:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F0000000" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.tilePlay:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.tilePlay PathIcon">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
         </Style>
 
         <!-- Small right-aligned labels in a row: the entry's kind (accent for a .sng) and its size. -->
@@ -174,6 +207,22 @@
                                     <Image Source="{Binding AlbumArt}"
                                            Stretch="UniformToFill"
                                            IsVisible="{Binding HasAlbumArt}" />
+                                    <Button Classes="tilePlay"
+                                            Classes.active="{Binding IsPreviewing}"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Command="{Binding $parent[ListBox].((vm:LibraryViewModel)DataContext).TogglePreviewCommand, FallbackValue={x:Null}}"
+                                            CommandParameter="{Binding}"
+                                            AutomationProperties.Name="{x:Static res:Strings.PlayToolTip}">
+                                        <Panel>
+                                            <PathIcon Data="{StaticResource PlayIconGeometry}"
+                                                      IsVisible="{Binding !IsPreviewing}"
+                                                      ToolTip.Tip="{x:Static res:Strings.PlayToolTip}" />
+                                            <PathIcon Data="{StaticResource StopIconGeometry}"
+                                                      IsVisible="{Binding IsPreviewing}"
+                                                      ToolTip.Tip="{x:Static res:Strings.StopToolTip}" />
+                                        </Panel>
+                                    </Button>
                                 </Panel>
                             </Border>
                             <!-- Text on the left, chips on the right: the kind on the title line, the length and size on the detail line. -->
@@ -192,13 +241,37 @@
                                     <TextBlock Text="{Binding KindLabel}" />
                                 </Border>
 
-                                <!-- Artist · charter, or a loading note until the metadata is read. -->
+                                <!-- Artist · charter, or a loading note until the metadata is read. The charter can carry
+                                     rich-text tags (colours, bold…), which are drawn rather than shown. -->
                                 <TextBlock Grid.Row="1" Grid.Column="0"
                                            Classes="muted"
                                            Text="{Binding Details}"
                                            FontSize="11"
                                            VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" />
+                                           TextTrimming="CharacterEllipsis"
+                                           IsVisible="{Binding ShowDetails}" />
+                                <Grid Grid.Row="1" Grid.Column="0"
+                                      ColumnDefinitions="Auto,Auto,*"
+                                      VerticalAlignment="Center"
+                                      IsVisible="{Binding ShowByline}">
+                                    <TextBlock Grid.Column="0"
+                                               Classes="muted"
+                                               Text="{Binding Artist}"
+                                               FontSize="11"
+                                               TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding HasArtist}" />
+                                    <TextBlock Grid.Column="1"
+                                               Classes="muted"
+                                               Text="{x:Static res:Strings.ListDetailSeparator}"
+                                               FontSize="11"
+                                               IsVisible="{Binding HasArtistAndCharter}" />
+                                    <TextBlock Grid.Column="2"
+                                               Classes="muted"
+                                               ctl:RichTextMarkup.Text="{Binding Charter}"
+                                               FontSize="11"
+                                               TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding HasCharter}" />
+                                </Grid>
                                 <StackPanel Grid.Row="1" Grid.Column="1"
                                             Orientation="Horizontal" Spacing="4"
                                             HorizontalAlignment="Right">

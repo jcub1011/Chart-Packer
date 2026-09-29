@@ -51,11 +51,21 @@ namespace ChartPacker.ViewModels
         // A job has written to disk since the last scan.
         private bool _outputsChanged;
 
-        public LibraryViewModel(IFolderPickerService folderPicker, SettingsService settings, MetadataDraftStore drafts, JobViewModel job)
+        // The item whose art shows a stop button, because it's the song being played.
+        private LibraryItemViewModel? _previewingItem;
+
+        /// <param name="player">Plays a song from the list's art buttons; the detail panel shows the same one.</param>
+        public LibraryViewModel(IFolderPickerService folderPicker, SettingsService settings, MetadataDraftStore drafts, JobViewModel job, PlayerViewModel player)
         {
             _folderPicker = folderPicker;
             _settings = settings;
             _drafts = drafts;
+            Player = player;
+            Player.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(PlayerViewModel.ActiveEntry))
+                    RefreshPreviewing();
+            };
             _albumArt = new AlbumArtLoader(path => _drafts.HasDrafts(path) ? _drafts.Get(path).AlbumArt : null);
             Job = job;
             _scanDepth = settings.Settings.ScanMaxDepth;
@@ -100,6 +110,8 @@ namespace ChartPacker.ViewModels
         }
 
         public JobViewModel Job { get; }
+
+        public PlayerViewModel Player { get; }
 
         public AvaloniaList<LibraryItemViewModel> Entries { get; } = new();
 
@@ -216,6 +228,42 @@ namespace ChartPacker.ViewModels
             RefreshOutput();
         }
 
+        /// <summary>
+        /// The play button on a song's art: stops the song if it is the one playing; otherwise shows the
+        /// song in the detail panel, which loads it into the player, and plays it from its preview start.
+        /// </summary>
+        [RelayCommand]
+        private void TogglePreview(LibraryItemViewModel? item)
+        {
+            if (item is null)
+                return;
+
+            if (Player.ActiveEntry == item.Entry)
+            {
+                Player.StopCommand.Execute(null);
+                return;
+            }
+
+            Player.RequestPreview(item.Entry);
+            int index = Entries.IndexOf(item);
+            if (index >= 0)
+                Selection.SelectedIndex = index;
+        }
+
+        /// <summary>Marks the item whose song is playing, and clears the one that was.</summary>
+        private void RefreshPreviewing()
+        {
+            var playing = Player.ActiveEntry is { } entry && _itemsByPath.TryGetValue(entry.FullPath, out var item) ? item : null;
+            if (ReferenceEquals(playing, _previewingItem))
+                return;
+
+            if (_previewingItem is not null)
+                _previewingItem.IsPreviewing = false;
+            _previewingItem = playing;
+            if (playing is not null)
+                playing.IsPreviewing = true;
+        }
+
         private bool CanRunJob() => SelectedCount > 0 && HasScanned && !IsScanning && !Job.IsRunning;
 
         [RelayCommand(CanExecute = nameof(CanRunJob))]
@@ -279,6 +327,7 @@ namespace ChartPacker.ViewModels
             Selection.Clear();
             Entries.Clear();
             _itemsByPath.Clear();
+            _previewingItem = null;
             _albumArt.Reset(itemsToken);
             ErrorMessage = null;
             IsScanning = true;
@@ -294,6 +343,7 @@ namespace ChartPacker.ViewModels
                 foreach (var item in items)
                     _itemsByPath[item.Entry.FullPath] = item;
                 Entries.AddRange(items);
+                RefreshPreviewing();
                 foreach (var item in items)
                     summaryQueue.Writer.TryWrite(item);
                 RefreshState();
@@ -394,6 +444,11 @@ namespace ChartPacker.ViewModels
 
             SelectedCount = Selection.Count;
             var selected = Selection.SelectedIndexes.Order().Select(i => Entries[i].Entry).ToList();
+
+            // Choosing anything else, once the song asked to be played is shown, withdraws the request.
+            if (Player.PreviewRequest is { } requested && !(selected.Count == 1 && selected[0] == requested))
+                Player.CancelPreviewRequest();
+
             if (!selected.SequenceEqual(SelectedEntries))
                 SelectedEntries = selected;
         }

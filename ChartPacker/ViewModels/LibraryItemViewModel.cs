@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Avalonia.Media.Imaging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -56,9 +55,35 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private string _title = entry.DisplayName;
 
-        /// <summary>Artist and charter; a loading note until the metadata is read.</summary>
+        /// <summary>A loading note until the metadata is read, or the relative path when it couldn't be; otherwise empty.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ShowDetails))]
         private string _details = Strings.MetadataLoading;
+
+        /// <summary>The artist, without rich-text tags; null when there is none.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasArtist), nameof(HasArtistAndCharter), nameof(ShowByline), nameof(ShowDetails))]
+        private string? _artist;
+
+        /// <summary>The charter with its rich-text tags left in, for the view to render; null when there is none.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasCharter), nameof(HasArtistAndCharter), nameof(ShowByline), nameof(ShowDetails))]
+        private string? _charter;
+
+        /// <summary>This song is the one the player is playing, so the play button on its art shows a stop button.</summary>
+        [ObservableProperty]
+        private bool _isPreviewing;
+
+        public bool HasArtist => Artist is not null;
+
+        public bool HasCharter => Charter is not null;
+
+        public bool HasArtistAndCharter => HasArtist && HasCharter;
+
+        /// <summary>The line shows the artist and charter rather than <see cref="Details"/>.</summary>
+        public bool ShowByline => HasArtist || HasCharter;
+
+        public bool ShowDetails => !ShowByline;
 
         /// <summary>The song length, for the chip before the size chip; null until read or when unknown.</summary>
         [ObservableProperty]
@@ -92,21 +117,20 @@ namespace ChartPacker.ViewModels
             if (_summary is null)
             {
                 Title = Entry.DisplayName;
+                Artist = null;
+                Charter = null;
                 Details = Entry.RelativePath;
                 LengthText = null;
                 SizeText = null;
                 return;
             }
 
-            var headline = SongHeadline.From(draft?.ApplyTo(_summary.Pairs) ?? _summary.Pairs);
+            var pairs = draft?.ApplyTo(_summary.Pairs) ?? _summary.Pairs;
+            var headline = SongHeadline.From(pairs);
             Title = headline.Name ?? Entry.DisplayName;
-
-            var parts = new List<string>(2);
-            if (headline.Artist is { } artist)
-                parts.Add(artist);
-            if (headline.Charter is { } charter)
-                parts.Add(charter);
-            Details = string.Join(Strings.ListDetailSeparator, parts);
+            Artist = headline.Artist;
+            Charter = SongHeadline.CharterMarkup(pairs);
+            Details = string.Empty;
 
             // Without a song_length, the longest audio file stands in.
             LengthText = (headline.LengthMs ?? _summary.FallbackLengthMs) is { } length ? MetadataTimes.FormatDuration(length) : null;

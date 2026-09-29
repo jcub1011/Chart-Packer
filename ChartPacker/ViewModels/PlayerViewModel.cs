@@ -3,15 +3,18 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Threading;
 using ChartPacker.Audio.Mixing;
 using ChartPacker.Audio.Playback;
+using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PreviewStartTime = ChartPacker.Core.Metadata.PreviewStart;
 
 namespace ChartPacker.ViewModels
 {
@@ -39,7 +42,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private bool _isMuted;
 
-        /// <summary>While any track is soloed, only soloed tracks are heard.</summary>
+        /// <summary>While any track is soloed, only soloed tracks are heard. A track is muted or soloed, never both.</summary>
         [ObservableProperty]
         private bool _isSolo;
 
@@ -50,9 +53,21 @@ namespace ChartPacker.ViewModels
 
         public bool HasError => Error is not null;
 
-        partial void OnIsMutedChanged(bool value) => _owner.ApplySwitches(this);
+        // Solo overrides mute in the mix, so having both on would read as if both applied. Turning
+        // one on turns the other off.
+        partial void OnIsMutedChanged(bool value)
+        {
+            if (value)
+                IsSolo = false;
+            _owner.ApplySwitches(this);
+        }
 
-        partial void OnIsSoloChanged(bool value) => _owner.ApplySwitches(this);
+        partial void OnIsSoloChanged(bool value)
+        {
+            if (value)
+                IsMuted = false;
+            _owner.ApplySwitches(this);
+        }
     }
 
     /// <summary>
@@ -61,6 +76,8 @@ namespace ChartPacker.ViewModels
     /// </summary>
     public sealed partial class PlayerViewModel : ViewModelBase, IDisposable
     {
+        private static readonly TimeSpan PeaksDelay = TimeSpan.FromMilliseconds(300);
+
         private readonly Func<int, IAudioOutput> _openOutput;
         private readonly DispatcherTimer _timer;
         private SongEntry? _entry;
@@ -72,6 +89,14 @@ namespace ChartPacker.ViewModels
 
         // Set while the position is being updated from playback rather than by the user.
         private bool _isUpdatingPosition;
+
+        // The waveform's per-track peaks, read on a background thread as the tracks are loaded; by stored name.
+        private readonly Dictionary<string, StemPeaks> _peaks = new(StringComparer.Ordinal);
+        private CancellationTokenSource? _peaksCts;
+        private Task? _peaksTask;
+
+        // A song the library asked to play, to be started when the detail view gives it its tracks.
+        private SongEntry? _previewRequest;
 
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
         public PlayerViewModel(Func<int, IAudioOutput> openOutput)
@@ -85,7 +110,12 @@ namespace ChartPacker.ViewModels
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PlayPauseToolTip))]
+        [NotifyPropertyChangedFor(nameof(ActiveEntry))]
         private bool _isPlaying;
+
+        /// <summary>What is heard from the selected tracks, as a waveform; empty until their audio has been read.</summary>
+        [ObservableProperty]
+        private Waveform _waveform = Waveform.Empty;
 
         /// <summary>The audio is being opened for the first play.</summary>
         [ObservableProperty]
@@ -116,6 +146,9 @@ namespace ChartPacker.ViewModels
 
         public bool HasTracks => Tracks.Count > 0;
 
+        /// <summary>The song that is playing, or <see langword="null"/> when nothing is.</summary>
+        public SongEntry? ActiveEntry => IsPlaying ? _entry : null;
+
         /// <summary>The seek slider is held; see <see cref="BeginScrub"/>.</summary>
         public bool IsScrubbing { get; private set; }
 
@@ -140,12 +173,20 @@ namespace ChartPacker.ViewModels
         {
             PreviewStart = previewStart;
             if (entry == _entry && tracks.SequenceEqual(Tracks.Select(t => t.Track)))
+            {
+                StartRequestedPreview(entry);
                 return;
+            }
 
             var switches = entry == _entry
                 ? Tracks.GroupBy(t => t.Track.Stem).ToDictionary(g => g.Key, g => (g.First().IsMuted, g.First().IsSolo))
                 : [];
 
+            // A request for another song is of no use once this one is shown.
+            if (entry != _previewRequest)
+                _previewRequest = null;
+
+            CancelPeaks();
             Close();
             _entry = entry;
             Tracks.Clear();
@@ -164,11 +205,31 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasTracks));
             OnPropertyChanged(nameof(TracksHeader));
             RefreshCommands();
+            StartPeaks(entry, [.. tracks]);
+            StartRequestedPreview(entry);
         }
+
+        /// <summary>
+        /// Asks for <paramref name="entry"/> to be played from its preview start: at once when its tracks are
+        /// shown, otherwise as soon as they are.
+        /// </summary>
+        public void RequestPreview(SongEntry entry)
+        {
+            _previewRequest = entry;
+            if (entry == _entry && HasTracks)
+                StartRequestedPreview(entry);
+        }
+
+        /// <summary>The song asked for with <see cref="RequestPreview"/> isn't wanted any more.</summary>
+        public void CancelPreviewRequest() => _previewRequest = null;
+
+        /// <summary>The song asked for with <see cref="RequestPreview"/> that hasn't started yet.</summary>
+        public SongEntry? PreviewRequest => _previewRequest;
 
         /// <summary>Stops playback, closes every file and forgets the song.</summary>
         public void Unload()
         {
+            CancelPeaks();
             Close();
             _entry = null;
             Tracks.Clear();
@@ -191,11 +252,13 @@ namespace ChartPacker.ViewModels
         public void Dispose()
         {
             _timer.Stop();
+            CancelPeaks();
             Close();
         }
 
         internal void ApplySwitches(TrackRowViewModel row)
         {
+            RebuildWaveform();
             if (_player is null)
                 return;
 
@@ -241,15 +304,123 @@ namespace ChartPacker.ViewModels
 
         /// <summary>Plays from the song's preview start.</summary>
         [RelayCommand(CanExecute = nameof(CanJumpToPreview))]
-        private async Task JumpToPreviewAsync()
+        private Task JumpToPreviewAsync() => StartFromPreviewAsync();
+
+        /// <summary>Plays from the preview start, or from the beginning when the song has none or it isn't inside the song.</summary>
+        private async Task StartFromPreviewAsync()
         {
-            if (PreviewStart is not { } start || await EnsureOpenAsync() is not { } player)
+            if (!CanPlay() || await EnsureOpenAsync() is not { } player)
                 return;
 
+            var start = PreviewStartTime.Resolve(PreviewStart, player.Length);
             player.Seek(start);
             SetPosition(start.TotalSeconds);
             player.Play();
             SetPlaying(player.IsPlaying);
+        }
+
+        private void StartRequestedPreview(SongEntry entry)
+        {
+            if (_previewRequest != entry)
+                return;
+
+            _previewRequest = null;
+            _ = StartFromPreviewAsync();
+        }
+
+        /// <summary>Reads the tracks' audio in the background for the waveform, a little after they are shown so that moving quickly through songs doesn't read each one.</summary>
+        private void StartPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks)
+        {
+            if (tracks.Count == 0)
+                return;
+
+            var cts = new CancellationTokenSource();
+            _peaksCts = cts;
+
+            // Taken now: the source is disposed by CancelPeaks, which can happen before the task starts.
+            var token = cts.Token;
+            _peaksTask = Task.Run(() => ReadPeaks(entry, tracks, token));
+        }
+
+        private void ReadPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Cancelled during the wait: nothing was opened.
+                if (cancellationToken.WaitHandle.WaitOne(PeaksDelay))
+                    return;
+
+                // Separate from the player's own sources, which are for the audio thread alone.
+                using var audio = SongAudio.Open(entry, tracks, cancellationToken);
+                foreach (var opened in audio.Tracks)
+                {
+                    if (opened.Source is not { } source)
+                        continue;
+
+                    var peaks = WaveformPeaks.Compute(opened.Track.StoredName, source, cancellationToken);
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            return;
+
+                        _peaks[peaks.Name] = peaks;
+                        RebuildWaveform();
+                    });
+                }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                // No waveform; the song still plays, and opening it says what is wrong.
+            }
+        }
+
+        /// <summary>
+        /// Stops reading the waveform and waits for the files to be let go, so that a save straight after
+        /// isn't blocked by them. The read checks for cancellation between short chunks, so it is quick.
+        /// </summary>
+        private void CancelPeaks()
+        {
+            var cts = _peaksCts;
+            var task = _peaksTask;
+            _peaksCts = null;
+            _peaksTask = null;
+
+            if (cts is not null)
+            {
+                cts.Cancel();
+                try
+                {
+                    task?.Wait(TimeSpan.FromSeconds(2));
+                }
+                catch (AggregateException)
+                {
+                }
+
+                cts.Dispose();
+            }
+
+            _peaks.Clear();
+            Waveform = Waveform.Empty;
+        }
+
+        /// <summary>Mixes the peaks read so far as the tracks are switched, the way the mixer would.</summary>
+        private void RebuildWaveform()
+        {
+            if (_peaks.Count == 0)
+            {
+                if (Waveform.Count > 0)
+                    Waveform = Waveform.Empty;
+                return;
+            }
+
+            var stems = new List<AudibleStem>(Tracks.Count);
+            foreach (var row in Tracks)
+            {
+                if (_peaks.TryGetValue(row.Name, out var peaks))
+                    stems.Add(new AudibleStem(peaks, row.IsMuted, row.IsSolo));
+            }
+
+            Waveform = WaveformPeaks.Mix(stems);
         }
 
         partial void OnIsOpeningChanged(bool value) => RefreshCommands();
@@ -316,6 +487,10 @@ namespace ChartPacker.ViewModels
                     ApplySwitches(row);
                 player.Stopped += OnPlayerStopped;
                 LengthSeconds = player.Length.TotalSeconds;
+
+                // A spot picked on the waveform before the first play.
+                if (PositionSeconds > 0)
+                    player.Seek(TimeSpan.FromSeconds(PositionSeconds));
                 return player;
             }
             finally

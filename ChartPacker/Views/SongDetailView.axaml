@@ -380,14 +380,18 @@
                                        VerticalAlignment="Center"
                                        FontFeatures="tnum"
                                        Text="{Binding Player.PositionText}" />
-                            <!-- Dragging the thumb seeks when it's let go; a click on the track seeks at once. -->
-                            <Slider x:Name="SeekSlider"
-                                    Grid.Column="3"
-                                    Minimum="0"
-                                    Maximum="{Binding Player.LengthSeconds}"
-                                    Value="{Binding Player.PositionSeconds}"
-                                    VerticalAlignment="Center"
-                                    AutomationProperties.Name="{x:Static res:Strings.SeekName}" />
+                            <!-- What is heard, as a waveform that changes with the mute and solo switches. Dragging seeks
+                                 when it's let go; a click seeks at once. -->
+                            <ctl:WaveformView x:Name="SeekBar"
+                                              Grid.Column="3"
+                                              Height="40"
+                                              Waveform="{Binding Player.Waveform}"
+                                              PositionSeconds="{Binding Player.PositionSeconds}"
+                                              LengthSeconds="{Binding Player.LengthSeconds}"
+                                              PlayedBrush="{DynamicResource AccentTextBrush}"
+                                              UnplayedBrush="{DynamicResource WaveformBrush}"
+                                              VerticalAlignment="Center"
+                                              AutomationProperties.Name="{x:Static res:Strings.SeekName}" />
                             <TextBlock Grid.Column="4"
                                        Classes="muted"
                                        VerticalAlignment="Center"

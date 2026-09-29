@@ -47,8 +47,26 @@ public sealed class RichTextTests
     [DataRow("#12AB3480", 0x8012AB34u)]
     [DataRow("\"yellow\"", 0xFFFFFF00u)]
     [DataRow("ORANGE", 0xFFFF8000u)]
+    [DataRow("#FF0000\"", 0xFFFF0000u)]
+    [DataRow("\"#FF0000", 0xFFFF0000u)]
     public void ParsesColorForms(string value, uint expected) =>
         Assert.AreEqual(expected, Parse($"<color={value}>x").Single().Style.Color);
+
+    [TestMethod]
+    public void RainbowNameWithStrayQuotesIsColoured()
+    {
+        const string text =
+            "<color=#ff0000\">M<color=#bf0240\">r<color=#800480\">D<color=#4005bf\">r<color=#0007ff\">u<color=#3306cc\">m" +
+            "<color=#660499\">m<color=#990366\">e<color=#cc0133\">r<color=#ff0000\">b<color=#bf0240\">o<color=#800480\">y" +
+            "<color=#4005bf\">9<color=#0007ff\">7";
+
+        var spans = Parse(text);
+        Assert.AreEqual("MrDrummerboy97", string.Concat(spans.Select(s => s.Text)));
+        Assert.HasCount(14, spans);
+        Assert.IsTrue(spans.All(s => s.Style.Color is not null));
+        Assert.AreEqual(0xFFFF0000u, spans[0].Style.Color);
+        Assert.IsTrue(RichText.HasMarkup(text));
+    }
 
     [TestMethod]
     [DataRow("<color=#GGG>x")]

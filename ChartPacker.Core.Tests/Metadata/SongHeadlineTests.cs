@@ -48,6 +48,21 @@ public sealed class SongHeadlineTests
     }
 
     [TestMethod]
+    public void CharterMarkupKeepsTheTags() =>
+        Assert.AreEqual("<color=#FF0000>Someone</color>", SongHeadline.CharterMarkup(Pairs(("charter", " <color=#FF0000>Someone</color> "))));
+
+    [TestMethod]
+    public void CharterMarkupFallsBackToFrets() =>
+        Assert.AreEqual("Legacy", SongHeadline.CharterMarkup(Pairs(("charter", "<b></b>"), ("frets", "Legacy"))));
+
+    [TestMethod]
+    public void CharterMarkupIsNullWithoutVisibleText()
+    {
+        Assert.IsNull(SongHeadline.CharterMarkup(Pairs(("charter", "<b></b>"))));
+        Assert.IsNull(SongHeadline.CharterMarkup([]));
+    }
+
+    [TestMethod]
     [DataRow("")]
     [DataRow("   ")]
     [DataRow("<b></b>")]

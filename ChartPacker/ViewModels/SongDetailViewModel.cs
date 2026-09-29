@@ -1024,7 +1024,7 @@ namespace ChartPacker.ViewModels
 
             var song = _songs.Count == 1 ? _songs[0] : null;
             var tracks = SongTracks.Resolve(_diskFiles.Select(f => f.Path), song?.Item.Draft);
-            Player.Load(_entries[0], tracks, song is null ? null : PreviewStart(song));
+            Player.Load(_entries[0], tracks, song is null ? null : PreviewStartOf(song));
 
             var stems = tracks.Select(t => t.Stem).ToHashSet(StringComparer.Ordinal);
             AddTrackOptions = AudioStems.Stems
@@ -1036,14 +1036,8 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Where the song's <c>preview_start_time</c>, drafted or stored, starts the preview.</summary>
-        private static TimeSpan? PreviewStart(EditableSong song)
-        {
-            string? value = song.Item.Draft.ApplyTo(song.Item.Original)
-                .FirstOrDefault(p => p.Key.Equals("preview_start_time", StringComparison.OrdinalIgnoreCase)).Value;
-            return long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long ms) && ms >= 0
-                ? TimeSpan.FromMilliseconds(ms)
-                : null;
-        }
+        private static TimeSpan? PreviewStartOf(EditableSong song) =>
+            PreviewStart.From(song.Item.Draft.ApplyTo(song.Item.Original));
 
         private void AddImage(string hash, Bitmap bitmap)
         {

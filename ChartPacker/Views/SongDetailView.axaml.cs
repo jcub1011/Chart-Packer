@@ -24,11 +24,9 @@ namespace ChartPacker.Views
             NewKeyBox.AddHandler(PointerReleasedEvent, OnKeyBoxPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
             NewKeyBox.AddHandler(KeyDownEvent, OnKeyBoxKeyDown, RoutingStrategies.Tunnel);
 
-            // While the seek slider is held, by its thumb or its track, the position stops following
-            // playback; letting go seeks there. The slider handles these itself, hence handledEventsToo.
-            SeekSlider.AddHandler(PointerPressedEvent, (_, _) => Player?.BeginScrub(), RoutingStrategies.Tunnel, handledEventsToo: true);
-            SeekSlider.AddHandler(PointerReleasedEvent, (_, _) => EndScrub(), RoutingStrategies.Bubble, handledEventsToo: true);
-            SeekSlider.AddHandler(PointerCaptureLostEvent, (_, _) => EndScrub(), RoutingStrategies.Bubble, handledEventsToo: true);
+            // While the waveform is held the position stops following playback; letting go seeks there.
+            SeekBar.ScrubStarted += (_, _) => Player?.BeginScrub();
+            SeekBar.ScrubEnded += (_, _) => EndScrub();
         }
 
         private PlayerViewModel? Player => (DataContext as SongDetailViewModel)?.Player;

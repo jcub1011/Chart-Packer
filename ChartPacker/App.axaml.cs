@@ -32,7 +32,7 @@ namespace ChartPacker
                 var player = new PlayerViewModel(rate => new SdlAudioOutput(rate));
 
                 window.DataContext = new MainWindowViewModel(
-                    new LibraryViewModel(folderPicker, settings, drafts, job),
+                    new LibraryViewModel(folderPicker, settings, drafts, job, player),
                     new SongDetailViewModel(drafts, job, imagePicker, filePicker, player),
                     settings,
                     drafts,
