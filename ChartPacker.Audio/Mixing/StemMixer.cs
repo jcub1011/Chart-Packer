@@ -8,6 +8,7 @@ public sealed class MixerStem
     private volatile bool _isMuted;
     private volatile bool _isSolo;
     private volatile string? _error;
+    private volatile float _volume = 1f;
 
     internal MixerStem(string name, StemReader reader)
     {
@@ -28,6 +29,13 @@ public sealed class MixerStem
     {
         get => _isSolo;
         set => _isSolo = value;
+    }
+
+    /// <summary>How loud the stem is in the mix, from 0 (silent) up; 1 leaves it as recorded.</summary>
+    public float Volume
+    {
+        get => _volume;
+        set => _volume = float.IsFinite(value) ? Math.Max(0f, value) : 1f;
     }
 
     /// <summary>Why the stem stopped playing, when its audio turned out to be damaged; it's silent from then on.</summary>
@@ -135,8 +143,9 @@ public sealed class StemMixer
             allEnded &= stem.Reader.IsEnded;
             if (anySolo ? stem.IsSolo : !stem.IsMuted)
             {
+                float volume = stem.Volume;
                 for (int i = 0; i < output.Length; i++)
-                    output[i] += scratch[i];
+                    output[i] += scratch[i] * volume;
             }
         }
 

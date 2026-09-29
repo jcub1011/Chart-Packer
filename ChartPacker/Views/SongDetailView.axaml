@@ -351,10 +351,28 @@
                          can be muted, or soloed to hear it alone; added and removed tracks play as
                          they will be once saved. -->
                     <StackPanel IsVisible="{Binding ShowFiles}">
-                        <TextBlock Classes="section" Text="{Binding Player.TracksHeader}" />
+                        <!-- The master volume sits at the right of the header; each track has its own level in the mix below. -->
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Classes="section" Text="{Binding Player.TracksHeader}" />
+                            <PathIcon Grid.Column="1"
+                                      Width="14" Height="14"
+                                      Opacity="0.7"
+                                      VerticalAlignment="Center"
+                                      IsVisible="{Binding Player.HasTracks}"
+                                      Data="{StaticResource VolumeIconGeometry}" />
+                            <Slider Grid.Column="2"
+                                    Width="90"
+                                    Minimum="0"
+                                    Maximum="1"
+                                    Value="{Binding Player.Volume}"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding Player.HasTracks}"
+                                    ToolTip.Tip="{x:Static res:Strings.VolumeName}"
+                                    AutomationProperties.Name="{x:Static res:Strings.VolumeName}" />
+                        </Grid>
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.NoTracks}" IsVisible="{Binding !Player.HasTracks}" />
 
-                        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto"
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto"
                               ColumnSpacing="8"
                               Margin="0,0,0,6"
                               IsVisible="{Binding Player.HasTracks}">
@@ -398,20 +416,13 @@
                                        FontFeatures="tnum"
                                        Text="{Binding Player.LengthText}" />
                             <Button Grid.Column="5"
-                                    VerticalAlignment="Center"
-                                    Content="{x:Static res:Strings.JumpToPreviewButton}"
+                                    Classes="transport"
                                     Command="{Binding Player.JumpToPreviewCommand}"
                                     IsVisible="{Binding Player.HasPreviewStart}"
                                     ToolTip.Tip="{x:Static res:Strings.JumpToPreviewToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.JumpToPreviewToolTip}" />
-                            <Slider Grid.Column="6"
-                                    Width="90"
-                                    Minimum="0"
-                                    Maximum="1"
-                                    Value="{Binding Player.Volume}"
-                                    VerticalAlignment="Center"
-                                    ToolTip.Tip="{x:Static res:Strings.VolumeName}"
-                                    AutomationProperties.Name="{x:Static res:Strings.VolumeName}" />
+                                    AutomationProperties.Name="{x:Static res:Strings.JumpToPreviewToolTip}">
+                                <PathIcon Data="{StaticResource PreviewIconGeometry}" />
+                            </Button>
                         </Grid>
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.OpeningAudio}" IsVisible="{Binding Player.IsOpening}" />
                         <TextBlock Classes="error" Text="{Binding Player.Error}" IsVisible="{Binding Player.HasError}" />
@@ -420,7 +431,7 @@
                                       AutomationProperties.Name="{x:Static res:Strings.TracksListName}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:TrackRowViewModel">
-                                    <Grid ColumnDefinitions="14,Auto,Auto,*,Auto" ColumnSpacing="4" Margin="0,1">
+                                    <Grid ColumnDefinitions="14,Auto,Auto,*,Auto,Auto" ColumnSpacing="4" Margin="0,1">
                                         <TextBlock Grid.Column="0"
                                                    Classes="marker"
                                                    VerticalAlignment="Center"
@@ -441,7 +452,16 @@
                                             <TextBlock TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Text="{Binding Name}" />
                                             <TextBlock Classes="error" Margin="0" Text="{Binding Error}" IsVisible="{Binding HasError}" />
                                         </StackPanel>
-                                        <Button Grid.Column="4"
+                                        <!-- How loud the track is in the mix; the master volume is in the header above. -->
+                                        <Slider Grid.Column="4"
+                                                Width="90"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Value="{Binding Volume}"
+                                                VerticalAlignment="Center"
+                                                ToolTip.Tip="{x:Static res:Strings.TrackVolumeName}"
+                                                AutomationProperties.Name="{x:Static res:Strings.TrackVolumeName}" />
+                                        <Button Grid.Column="5"
                                                 Classes="icon"
                                                 Padding="4"
                                                 VerticalAlignment="Center"

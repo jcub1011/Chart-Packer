@@ -12,6 +12,7 @@ using ChartPacker.Audio.Playback;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
+using ChartPacker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PreviewStartTime = ChartPacker.Core.Metadata.PreviewStart;
@@ -46,6 +47,10 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         private bool _isSolo;
 
+        /// <summary>How loud the track is in the mix, from 0 to 1. Remembered for the song until the app closes.</summary>
+        [ObservableProperty]
+        private double _volume = 1;
+
         /// <summary>Why the track can't be played, once that's known.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasError))]
@@ -66,6 +71,12 @@ namespace ChartPacker.ViewModels
         {
             if (value)
                 IsMuted = false;
+            _owner.ApplySwitches(this);
+        }
+
+        partial void OnVolumeChanged(double value)
+        {
+            _owner.RememberVolume(this);
             _owner.ApplySwitches(this);
         }
     }
@@ -98,9 +109,17 @@ namespace ChartPacker.ViewModels
         // A song the library asked to play, to be started when the detail view gives it its tracks.
         private SongEntry? _previewRequest;
 
+        // Each song's track volumes, by song path and stem, for as long as the app runs. Nothing is saved to disk.
+        private readonly Dictionary<(string Path, string Stem), double> _trackVolumes = [];
+
+        private readonly SettingsService _settings;
+
+        /// <param name="settings">Where the master volume is kept between runs.</param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
-        public PlayerViewModel(Func<int, IAudioOutput> openOutput)
+        public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput)
         {
+            _settings = settings;
+            _volume = settings.Settings.MasterVolume;
             _openOutput = openOutput;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
             _timer.Tick += (_, _) => RefreshPosition();
@@ -134,9 +153,9 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(LengthText))]
         private double _lengthSeconds;
 
-        /// <summary>From 0 to 1.</summary>
+        /// <summary>The master volume, from 0 to 1. Kept in the settings, so it carries over to the next run.</summary>
         [ObservableProperty]
-        private double _volume = 1;
+        private double _volume;
 
         /// <summary>Where the song's <c>preview_start_time</c> puts the preview, if it sets one.</summary>
         [ObservableProperty]
@@ -199,6 +218,9 @@ namespace ChartPacker.ViewModels
                     row.IsSolo = s.IsSolo;
                 }
 
+                if (_trackVolumes.TryGetValue((entry.FullPath, track.Stem), out double volume))
+                    row.Volume = volume;
+
                 Tracks.Add(row);
             }
 
@@ -256,6 +278,14 @@ namespace ChartPacker.ViewModels
             Close();
         }
 
+        /// <summary>Keeps <paramref name="row"/>'s volume for its song, so it is back when the song is shown again.</summary>
+        internal void RememberVolume(TrackRowViewModel row)
+        {
+            // The row is not yet in Tracks while it is being filled from what was remembered, when _entry is still the old song.
+            if (_entry is { } entry && Tracks.Contains(row))
+                _trackVolumes[(entry.FullPath, row.Track.Stem)] = row.Volume;
+        }
+
         internal void ApplySwitches(TrackRowViewModel row)
         {
             RebuildWaveform();
@@ -266,6 +296,7 @@ namespace ChartPacker.ViewModels
             {
                 stem.IsMuted = row.IsMuted;
                 stem.IsSolo = row.IsSolo;
+                stem.Volume = (float)row.Volume;
             }
         }
 
@@ -417,7 +448,7 @@ namespace ChartPacker.ViewModels
             foreach (var row in Tracks)
             {
                 if (_peaks.TryGetValue(row.Name, out var peaks))
-                    stems.Add(new AudibleStem(peaks, row.IsMuted, row.IsSolo));
+                    stems.Add(new AudibleStem(peaks, row.IsMuted, row.IsSolo, (float)row.Volume));
             }
 
             Waveform = WaveformPeaks.Mix(stems);
@@ -434,6 +465,7 @@ namespace ChartPacker.ViewModels
 
         partial void OnVolumeChanged(double value)
         {
+            _settings.Settings.MasterVolume = value;
             if (_player is not null)
                 _player.Volume = (float)value;
         }

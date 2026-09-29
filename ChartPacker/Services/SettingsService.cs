@@ -86,6 +86,10 @@ namespace ChartPacker.Services
 
             if (!Enum.IsDefined(settings.OverwritePolicy))
                 settings.OverwritePolicy = OverwritePolicy.Skip;
+
+            settings.MasterVolume = double.IsFinite(settings.MasterVolume)
+                ? Math.Clamp(settings.MasterVolume, 0, 1)
+                : AppSettings.DefaultMasterVolume;
         }
     }
 }

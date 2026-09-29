@@ -30,6 +30,39 @@ public sealed class StemMixerTests
     }
 
     [TestMethod]
+    public void AStemsVolumeScalesItInTheMix()
+    {
+        var mixer = Mixer(("guitar", Constant(0.2f)), ("bass", Constant(0.4f)));
+        mixer.Stems[1].Volume = 0.5f;
+
+        Assert.AreEqual(0.4f, Mix(mixer, 10)[0], 1e-6f);
+    }
+
+    [TestMethod]
+    public void AStemAtZeroVolumeIsSilentButKeepsTime()
+    {
+        var mixer = Mixer(("guitar", Ramp()), ("bass", Ramp()));
+        mixer.Stems[1].Volume = 0f;
+        Mix(mixer, 1000);
+
+        mixer.Stems[0].Volume = 0f;
+        mixer.Stems[1].Volume = 1f;
+
+        Assert.AreEqual(RampValue(1000), Mix(mixer, 1)[0], 1e-6f);
+    }
+
+    [TestMethod]
+    public void AVolumeThatIsNegativeOrNotANumberIsRepaired()
+    {
+        var stem = Mixer(("guitar", Constant(0.2f))).Stems[0];
+
+        stem.Volume = -1f;
+        Assert.AreEqual(0f, stem.Volume);
+        stem.Volume = float.NaN;
+        Assert.AreEqual(1f, stem.Volume);
+    }
+
+    [TestMethod]
     public void SoloedStemsAreTheOnlyOnesHeardEvenWhenMuted()
     {
         var mixer = Mixer(("guitar", Constant(0.2f)), ("bass", Constant(0.3f)), ("drums", Constant(0.1f)));

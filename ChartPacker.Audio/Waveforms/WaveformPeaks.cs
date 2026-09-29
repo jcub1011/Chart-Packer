@@ -23,8 +23,9 @@ public sealed class StemPeaks
     public int Count => Min.Count;
 }
 
-/// <summary>A stem's peaks with the switches that decide whether it's heard.</summary>
-public readonly record struct AudibleStem(StemPeaks Peaks, bool IsMuted, bool IsSolo);
+/// <summary>A stem's peaks with the switches that decide whether it's heard, and how loudly.</summary>
+/// <param name="Volume">The stem's level in the mix, as <see cref="Mixing.MixerStem.Volume"/>.</param>
+public readonly record struct AudibleStem(StemPeaks Peaks, bool IsMuted, bool IsSolo, float Volume = 1f);
 
 /// <summary>The peaks of everything that is heard, as drawn; see <see cref="WaveformPeaks.Mix"/>.</summary>
 public sealed class Waveform
@@ -151,10 +152,11 @@ public static class WaveformPeaks
             if (!(anySolo ? stem.IsSolo : !stem.IsMuted))
                 continue;
 
+            float volume = Math.Max(0f, stem.Volume);
             for (int i = 0; i < stem.Peaks.Count; i++)
             {
-                min[i] += stem.Peaks.Min[i];
-                max[i] += stem.Peaks.Max[i];
+                min[i] += stem.Peaks.Min[i] * volume;
+                max[i] += stem.Peaks.Max[i] * volume;
             }
         }
 

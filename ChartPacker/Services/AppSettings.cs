@@ -12,6 +12,7 @@ namespace ChartPacker.Services
         public const double MinJobPanelHeight = 80;
         public const int DefaultScanMaxDepth = 2;
         public const int MaxScanMaxDepth = 10;
+        public const double DefaultMasterVolume = 1;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
@@ -37,5 +38,8 @@ namespace ChartPacker.Services
 
         /// <summary>Whether Pack writes every .sng directly in the output folder instead of mirroring the scanned folder's layout.</summary>
         public bool FlatPackOutput { get; set; }
+
+        /// <summary>The audio player's master volume, from 0 to 1.</summary>
+        public double MasterVolume { get; set; } = DefaultMasterVolume;
     }
 }

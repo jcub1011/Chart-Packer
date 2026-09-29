@@ -496,14 +496,14 @@
   <data name="JumpToPreviewToolTip" xml:space="preserve">
     <value>Play from the preview start</value>
   </data>
-  <data name="JumpToPreviewButton" xml:space="preserve">
-    <value>Preview</value>
-  </data>
   <data name="SeekName" xml:space="preserve">
     <value>Playback position</value>
   </data>
   <data name="VolumeName" xml:space="preserve">
-    <value>Volume</value>
+    <value>Master volume</value>
+  </data>
+  <data name="TrackVolumeName" xml:space="preserve">
+    <value>Track volume in the mix</value>
   </data>
   <data name="MuteToolTip" xml:space="preserve">
     <value>Mute this track</value>

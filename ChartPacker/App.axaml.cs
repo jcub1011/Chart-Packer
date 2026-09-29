@@ -29,7 +29,7 @@ namespace ChartPacker
                 var confirmation = new AvaloniaConfirmationService(() => window);
                 var drafts = new MetadataDraftStore();
                 var job = new JobViewModel(settings);
-                var player = new PlayerViewModel(rate => new SdlAudioOutput(rate));
+                var player = new PlayerViewModel(settings, rate => new SdlAudioOutput(rate));
 
                 window.DataContext = new MainWindowViewModel(
                     new LibraryViewModel(folderPicker, settings, drafts, job, player),

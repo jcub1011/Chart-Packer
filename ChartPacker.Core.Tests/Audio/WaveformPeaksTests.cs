@@ -96,6 +96,15 @@ public sealed class WaveformPeaksTests
     }
 
     [TestMethod]
+    public void AStemsVolumeScalesItsPeaks()
+    {
+        var mix = WaveformPeaks.Mix([Stem(0.5f, muted: false) with { Volume = 0.5f }, Stem(0.25f, muted: false)]);
+
+        Assert.AreEqual(0.5f, mix.Max[0], 1e-6f);
+        Assert.AreEqual(-0.5f, mix.Min[0], 1e-6f);
+    }
+
+    [TestMethod]
     public void TheSumIsClipped()
     {
         var mix = WaveformPeaks.Mix([Stem(0.75f, muted: false), Stem(0.75f, muted: false)]);
