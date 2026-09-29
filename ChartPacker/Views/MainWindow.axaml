@@ -15,6 +15,7 @@
 
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
+        <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
     </Window.KeyBindings>
 
     <Grid x:Name="RootGrid">

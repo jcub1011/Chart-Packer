@@ -184,9 +184,20 @@ namespace ChartPacker.ViewModels
                 : string.Format(CultureInfo.CurrentCulture, Strings.SongCountFormat, Entries.Count);
 
         /// <summary>Where Pack and Unpack write: the chosen output folder, or else the scanned folder.</summary>
-        public string? EffectiveOutputFolder => _settings.Settings.OutputFolder ?? _scannedFolder ?? FolderPath;
+        public string? EffectiveOutputFolder => OutputFolder ?? _scannedFolder ?? FolderPath;
 
-        public bool HasCustomOutputFolder => _settings.Settings.OutputFolder is not null;
+        /// <summary>The chosen output folder, or <see langword="null"/> to write next to the scanned songs.</summary>
+        public string? OutputFolder
+        {
+            get => _settings.Settings.OutputFolder;
+            set
+            {
+                _settings.Settings.OutputFolder = value;
+                RefreshOutput();
+            }
+        }
+
+        public bool HasCustomOutputFolder => OutputFolder is not null;
 
         private bool CanBrowse() => !Job.IsRunning;
 
@@ -214,19 +225,14 @@ namespace ChartPacker.ViewModels
             if (path is null)
                 return;
 
-            _settings.Settings.OutputFolder = path;
-            RefreshOutput();
+            OutputFolder = path;
         }
 
         private bool CanResetOutput() => HasCustomOutputFolder && !Job.IsRunning;
 
         /// <summary>Goes back to writing next to the scanned songs.</summary>
         [RelayCommand(CanExecute = nameof(CanResetOutput))]
-        private void ResetOutput()
-        {
-            _settings.Settings.OutputFolder = null;
-            RefreshOutput();
-        }
+        private void ResetOutput() => OutputFolder = null;
 
         /// <summary>
         /// The play button on a song's art: stops the song if it is the one playing; otherwise shows the
@@ -470,6 +476,7 @@ namespace ChartPacker.ViewModels
 
         private void RefreshOutput()
         {
+            OnPropertyChanged(nameof(OutputFolder));
             OnPropertyChanged(nameof(EffectiveOutputFolder));
             OnPropertyChanged(nameof(HasCustomOutputFolder));
             ResetOutputCommand.NotifyCanExecuteChanged();

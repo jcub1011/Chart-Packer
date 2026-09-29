@@ -13,6 +13,7 @@ namespace ChartPacker.Services
         public const int DefaultScanMaxDepth = 2;
         public const int MaxScanMaxDepth = 10;
         public const double DefaultMasterVolume = 1;
+        public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
@@ -34,7 +35,7 @@ namespace ChartPacker.Services
 
         /// <summary>What Pack and Unpack do when an output already exists.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter<OverwritePolicy>))]
-        public OverwritePolicy OverwritePolicy { get; set; } = OverwritePolicy.Skip;
+        public OverwritePolicy OverwritePolicy { get; set; } = DefaultOverwritePolicy;
 
         /// <summary>Whether Pack writes every .sng directly in the output folder instead of mirroring the scanned folder's layout.</summary>
         public bool FlatPackOutput { get; set; }

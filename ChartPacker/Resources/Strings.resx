@@ -701,4 +701,94 @@
     <value>{0} can't be read: {1}</value>
     <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
+  <data name="SettingsButton" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsToolTip" xml:space="preserve">
+    <value>Settings (Ctrl+,)</value>
+  </data>
+  <data name="SettingsWindowTitle" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsSearchWatermark" xml:space="preserve">
+    <value>Search settings (Ctrl+E)</value>
+  </data>
+  <data name="SettingsAllCategories" xml:space="preserve">
+    <value>All settings</value>
+    <comment>The first entry in the Settings window's category tree; it shows every category.</comment>
+  </data>
+  <data name="SettingsCategoriesName" xml:space="preserve">
+    <value>Setting categories</value>
+    <comment>The accessible name of the category tree in the Settings window.</comment>
+  </data>
+  <data name="SettingsNoMatchesFormat" xml:space="preserve">
+    <value>No settings match "{0}".</value>
+    <comment>{0} is the search text.</comment>
+  </data>
+  <data name="SettingsResetToolTip" xml:space="preserve">
+    <value>Reset to default</value>
+  </data>
+  <data name="SettingsBrowseButton" xml:space="preserve">
+    <value>Browse…</value>
+  </data>
+  <data name="OkButton" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="ApplyButton" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="SettingsCategoryLibrary" xml:space="preserve">
+    <value>Library</value>
+  </data>
+  <data name="SettingsCategoryScanning" xml:space="preserve">
+    <value>Scanning</value>
+  </data>
+  <data name="SettingsCategoryOutput" xml:space="preserve">
+    <value>Output</value>
+  </data>
+  <data name="SettingsCategoryPacking" xml:space="preserve">
+    <value>Pack &amp; Unpack</value>
+  </data>
+  <data name="SettingsCategoryPlayback" xml:space="preserve">
+    <value>Playback</value>
+  </data>
+  <data name="SettingsCategoryAudio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="ScanDepthDescription" xml:space="preserve">
+    <value>How many folder levels below the chosen folder a scan searches. 0 searches only the folder itself.</value>
+  </data>
+  <data name="ScanDepthKeywords" xml:space="preserve">
+    <value>depth levels subfolders recursive</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="OutputFolderLabel" xml:space="preserve">
+    <value>Output folder</value>
+  </data>
+  <data name="OutputFolderDescription" xml:space="preserve">
+    <value>Where Pack and Unpack write.</value>
+  </data>
+  <data name="OutputFolderEmpty" xml:space="preserve">
+    <value>Next to the scanned songs</value>
+    <comment>Shown in place of a folder when none is chosen.</comment>
+  </data>
+  <data name="OutputFolderKeywords" xml:space="preserve">
+    <value>destination location directory save</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="OverwriteKeywords" xml:space="preserve">
+    <value>overwrite skip rename replace existing conflict</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="FlatPackKeywords" xml:space="preserve">
+    <value>flat mirror layout structure subfolders</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="VolumeDescription" xml:space="preserve">
+    <value>The overall volume of the audio player.</value>
+  </data>
+  <data name="VolumeKeywords" xml:space="preserve">
+    <value>volume sound loudness</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
 </root>

@@ -7,6 +7,7 @@ using ChartPacker.Core;
 using ChartPacker.Services;
 using ChartPacker.Video;
 using ChartPacker.ViewModels;
+using ChartPacker.ViewModels.Settings;
 using ChartPacker.Views;
 
 namespace ChartPacker
@@ -38,12 +39,18 @@ namespace ChartPacker
                 // FFmpeg is looked for now, off the UI thread, so the first video shown doesn't wait for it to load.
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);
 
+                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player);
+                var settingsWindow = new AvaloniaSettingsWindowService(
+                    () => window,
+                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player), settingsPicker, settings.Save));
+
                 window.DataContext = new MainWindowViewModel(
-                    new LibraryViewModel(folderPicker, settings, drafts, job, player),
+                    library,
                     new SongDetailViewModel(drafts, job, imagePicker, filePicker, player),
                     settings,
                     drafts,
-                    confirmation);
+                    confirmation,
+                    settingsWindow);
 
                 // Subscribed after MainWindow's own Closing handler, which captures the splitter positions first.
                 // It also runs when that handler cancels the close to ask about unsaved changes, which is harmless.

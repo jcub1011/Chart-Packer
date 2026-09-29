@@ -138,6 +138,14 @@
                         </Button>
                     </StackPanel>
                 </Border>
+                <Border Classes="toolbar-group">
+                    <Button Classes="tool"
+                            Command="{Binding OpenSettingsCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.SettingsToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.SettingsButton}">
+                        <ctl:LineIcon Data="{StaticResource SettingsStroke}" />
+                    </Button>
+                </Border>
             </StackPanel>
         </Grid>
     </Border>

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
@@ -10,19 +11,22 @@ namespace ChartPacker.ViewModels
         private readonly SettingsService _settings;
         private readonly MetadataDraftStore _drafts;
         private readonly IConfirmationService _confirmation;
+        private readonly ISettingsWindowService _settingsWindow;
 
         public MainWindowViewModel(
             LibraryViewModel library,
             SongDetailViewModel detail,
             SettingsService settings,
             MetadataDraftStore drafts,
-            IConfirmationService confirmation)
+            IConfirmationService confirmation,
+            ISettingsWindowService settingsWindow)
         {
             Library = library;
             Detail = detail;
             _settings = settings;
             _drafts = drafts;
             _confirmation = confirmation;
+            _settingsWindow = settingsWindow;
 
             Library.PropertyChanged += (_, e) =>
             {
@@ -51,6 +55,9 @@ namespace ChartPacker.ViewModels
             get => _settings.Settings.JobPanelHeight;
             set => _settings.Settings.JobPanelHeight = value;
         }
+
+        [RelayCommand]
+        private Task OpenSettingsAsync() => _settingsWindow.ShowAsync();
 
         /// <summary>Some song has metadata changes that closing would lose.</summary>
         public bool HasUnsavedDrafts => _drafts.DirtyCount > 0;

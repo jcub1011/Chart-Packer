@@ -19,7 +19,7 @@ public static class AudioLength
     static AudioLength()
     {
         // ATL writes the stack trace of every file it can't parse to the console by default.
-        Settings.OutputStacktracesToConsole = false;
+        ATL.Settings.OutputStacktracesToConsole = false;
     }
 
     /// <summary>Whether <paramref name="name"/>, a path relative to the song folder, is an audio file that counts.</summary>

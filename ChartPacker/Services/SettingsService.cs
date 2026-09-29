@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
-using ChartPacker.Core.Jobs;
 
 namespace ChartPacker.Services
 {
@@ -85,7 +84,7 @@ namespace ChartPacker.Services
                 settings.OutputFolder = null;
 
             if (!Enum.IsDefined(settings.OverwritePolicy))
-                settings.OverwritePolicy = OverwritePolicy.Skip;
+                settings.OverwritePolicy = AppSettings.DefaultOverwritePolicy;
 
             settings.MasterVolume = double.IsFinite(settings.MasterVolume)
                 ? Math.Clamp(settings.MasterVolume, 0, 1)

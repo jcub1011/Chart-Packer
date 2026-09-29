@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
@@ -31,7 +30,7 @@ namespace ChartPacker.Views
             // The splitter positions are view state, so they're applied and captured here rather than bound.
             Opened += (_, _) =>
             {
-                UseDarkTitleBar();
+                WindowChrome.UseDarkTitleBar(this);
                 RestoreLibraryPaneWidth();
                 ApplyJobPanelHeight();
             };
@@ -79,22 +78,6 @@ namespace ChartPacker.Views
             double height = Math.Clamp(vm.JobPanelHeight, AppSettings.MinJobPanelHeight, Math.Max(AppSettings.MinJobPanelHeight, available));
             JobRow.MinHeight = AppSettings.MinJobPanelHeight;
             JobRow.Height = new GridLength(height, GridUnitType.Pixel);
-        }
-
-        // DWMWA_USE_IMMERSIVE_DARK_MODE; Windows 10 20H1 and later. Older builds ignore it and keep a light title bar.
-        private const int DwmUseImmersiveDarkMode = 20;
-
-        [DllImport("dwmapi.dll")]
-        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
-
-        /// <summary>The app is dark only, but Avalonia leaves the Windows title bar light on Windows 10.</summary>
-        private void UseDarkTitleBar()
-        {
-            if (!OperatingSystem.IsWindows() || TryGetPlatformHandle() is not { } handle)
-                return;
-
-            int enabled = 1;
-            _ = DwmSetWindowAttribute(handle.Handle, DwmUseImmersiveDarkMode, ref enabled, sizeof(int));
         }
 
         // Set once the user has agreed to lose their unsaved metadata changes.

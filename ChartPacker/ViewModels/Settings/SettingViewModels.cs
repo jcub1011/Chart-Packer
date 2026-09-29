@@ -1,0 +1,221 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Threading.Tasks;
+using ChartPacker.Core.Settings;
+using ChartPacker.Services;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+
+namespace ChartPacker.ViewModels.Settings
+{
+    /// <summary>
+    /// One row in the Settings window: a staged <see cref="SettingEdit"/> shaped for its editor control.
+    /// Each subclass has a DataTemplate in <c>SettingsWindow.axaml</c>.
+    /// </summary>
+    public abstract partial class SettingViewModel : ObservableObject
+    {
+        private readonly SettingEdit _edit;
+
+        protected SettingViewModel(SettingEdit edit)
+        {
+            _edit = edit;
+            edit.PropertyChanged += OnEditPropertyChanged;
+        }
+
+        public string Label => _edit.Definition.Label;
+
+        public string Description => _edit.Definition.Description;
+
+        public bool HasDescription => Description.Length > 0;
+
+        /// <summary>Changed here but not yet applied.</summary>
+        public bool IsModified => _edit.IsModified;
+
+        public bool IsDefault => _edit.IsDefault;
+
+        private bool CanReset() => !IsDefault;
+
+        /// <summary>Stages the default; OK or Apply writes it.</summary>
+        [RelayCommand(CanExecute = nameof(CanReset))]
+        private void Reset() => _edit.ResetToDefault();
+
+        /// <summary>Raises the editor's own properties after the staged value changes.</summary>
+        protected abstract void OnValueChanged();
+
+        private void OnEditPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(SettingEdit<object>.Value):
+                    OnValueChanged();
+                    break;
+                case nameof(SettingEdit.IsModified):
+                    OnPropertyChanged(nameof(IsModified));
+                    break;
+                case nameof(SettingEdit.IsDefault):
+                    OnPropertyChanged(nameof(IsDefault));
+                    ResetCommand.NotifyCanExecuteChanged();
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Picks the editor for a setting by its kind. A new kind needs a case here and a DataTemplate.</summary>
+    public static class SettingEditorFactory
+    {
+        public static SettingViewModel Create(SettingEdit edit, IFolderPickerService folderPicker) => edit.Definition switch
+        {
+            ToggleSetting => new ToggleSettingViewModel((SettingEdit<bool>)edit),
+            IntegerSetting integer => new IntegerSettingViewModel((SettingEdit<int>)edit, integer),
+            RangeSetting range => new RangeSettingViewModel((SettingEdit<double>)edit, range),
+            FolderSetting folder => new FolderSettingViewModel((SettingEdit<string?>)edit, folder, folderPicker),
+            _ when edit is IChoiceEdit choice => new ChoiceSettingViewModel(edit, choice),
+            _ => throw new NotSupportedException($"No editor for setting '{edit.Definition.Id}' ({edit.Definition.GetType().Name})."),
+        };
+    }
+
+    /// <summary>An on/off setting, shown as a toggle switch.</summary>
+    public sealed class ToggleSettingViewModel : SettingViewModel
+    {
+        private readonly SettingEdit<bool> _edit;
+
+        public ToggleSettingViewModel(SettingEdit<bool> edit)
+            : base(edit)
+        {
+            _edit = edit;
+        }
+
+        public bool Value
+        {
+            get => _edit.Value;
+            set => _edit.Value = value;
+        }
+
+        protected override void OnValueChanged() => OnPropertyChanged(nameof(Value));
+    }
+
+    /// <summary>A whole number, shown as a spin box.</summary>
+    public sealed class IntegerSettingViewModel : SettingViewModel
+    {
+        private readonly SettingEdit<int> _edit;
+
+        public IntegerSettingViewModel(SettingEdit<int> edit, IntegerSetting definition)
+            : base(edit)
+        {
+            _edit = edit;
+            Minimum = definition.Minimum;
+            Maximum = definition.Maximum;
+        }
+
+        public decimal Minimum { get; }
+
+        public decimal Maximum { get; }
+
+        /// <summary>Nullable decimal to match <c>NumericUpDown.Value</c>.</summary>
+        public decimal? Value
+        {
+            get => _edit.Value;
+            set
+            {
+                if (value is { } number)
+                    _edit.Value = (int)Math.Clamp(Math.Round(number), int.MinValue, int.MaxValue);
+
+                // The box was cleared, or the value was clamped: show the staged value.
+                OnPropertyChanged(nameof(Value));
+            }
+        }
+
+        protected override void OnValueChanged() => OnPropertyChanged(nameof(Value));
+    }
+
+    /// <summary>A number in a range, shown as a slider and its formatted value.</summary>
+    public sealed class RangeSettingViewModel : SettingViewModel
+    {
+        private readonly SettingEdit<double> _edit;
+        private readonly RangeSetting _definition;
+
+        public RangeSettingViewModel(SettingEdit<double> edit, RangeSetting definition)
+            : base(edit)
+        {
+            _edit = edit;
+            _definition = definition;
+        }
+
+        public double Minimum => _definition.Minimum;
+
+        public double Maximum => _definition.Maximum;
+
+        public double SmallChange => _definition.SmallChange;
+
+        public double Value
+        {
+            get => _edit.Value;
+            set => _edit.Value = value;
+        }
+
+        public string ValueText => _definition.FormatValue(_edit.Value);
+
+        protected override void OnValueChanged()
+        {
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ValueText));
+        }
+    }
+
+    /// <summary>One of a fixed list, shown as a drop-down.</summary>
+    public sealed class ChoiceSettingViewModel : SettingViewModel
+    {
+        private readonly IChoiceEdit _choice;
+
+        public ChoiceSettingViewModel(SettingEdit edit, IChoiceEdit choice)
+            : base(edit)
+        {
+            _choice = choice;
+        }
+
+        public IReadOnlyList<string> Choices => _choice.ChoiceLabels;
+
+        public int SelectedIndex
+        {
+            get => _choice.SelectedIndex;
+            set => _choice.SelectedIndex = value;
+        }
+
+        protected override void OnValueChanged() => OnPropertyChanged(nameof(SelectedIndex));
+    }
+
+    /// <summary>A folder path, shown as its path (or what happens without one) and a Browse button.</summary>
+    public sealed partial class FolderSettingViewModel : SettingViewModel
+    {
+        private readonly SettingEdit<string?> _edit;
+        private readonly FolderSetting _definition;
+        private readonly IFolderPickerService _folderPicker;
+
+        public FolderSettingViewModel(SettingEdit<string?> edit, FolderSetting definition, IFolderPickerService folderPicker)
+            : base(edit)
+        {
+            _edit = edit;
+            _definition = definition;
+            _folderPicker = folderPicker;
+        }
+
+        public bool IsEmpty => _edit.Value is null;
+
+        public string DisplayText => _edit.Value ?? _definition.EmptyLabel ?? "";
+
+        [RelayCommand]
+        private async Task BrowseAsync()
+        {
+            var path = await _folderPicker.PickFolderAsync(_definition.PickerTitle ?? _definition.Label);
+            if (path is not null)
+                _edit.Value = path;
+        }
+
+        protected override void OnValueChanged()
+        {
+            OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(DisplayText));
+        }
+    }
+}
