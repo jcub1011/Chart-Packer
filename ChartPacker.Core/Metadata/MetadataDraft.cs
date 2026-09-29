@@ -1,3 +1,5 @@
+using ChartPacker.Core.Scanning;
+
 namespace ChartPacker.Core.Metadata;
 
 /// <summary>A pending change to one metadata key.</summary>
@@ -17,6 +19,14 @@ public readonly record struct AlbumArtChange(string? SourcePath)
     public bool IsRemoval => SourcePath is null;
 }
 
+/// <summary>A pending change to a song's background image or background video.</summary>
+/// <param name="SourcePath">The file to store as the background, or <see langword="null"/> when the background is to be removed.</param>
+public readonly record struct BackgroundChange(string? SourcePath)
+{
+    /// <summary>True when the background is to be removed.</summary>
+    public bool IsRemoval => SourcePath is null;
+}
+
 /// <summary>A file to add to a song.</summary>
 /// <param name="StoredName">The name to store it under, relative to the song.</param>
 /// <param name="SourcePath">The file to copy in.</param>
@@ -25,7 +35,7 @@ public readonly record struct AddedFile(string StoredName, string SourcePath, lo
 
 /// <summary>
 /// Unsaved changes to one song's metadata, held per key rather than as a copy of the metadata,
-/// plus any change to its album art and to its other files.
+/// plus any change to its album art, its background image and video, and its other files.
 /// </summary>
 /// <remarks>
 /// Keys and file names are matched ignoring case (sng-spec A7). Because only the changed keys are
@@ -44,17 +54,26 @@ public sealed class MetadataDraft
     // The removals an add made, by the added name, so that dropping the add drops them too.
     private readonly Dictionary<string, List<string>> _replacedBy = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>True when there are no pending changes, to the metadata, the album art or the files.</summary>
-    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasFileChanges;
+    /// <summary>True when there are no pending changes, to the metadata, the album art, the backgrounds or the files.</summary>
+    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasBackgroundChanges && !HasFileChanges;
 
-    /// <summary>True when a metadata key has a pending change. The album art and files don't count.</summary>
+    /// <summary>True when a metadata key has a pending change. The album art, backgrounds and files don't count.</summary>
     public bool HasMetadataChanges => _changes.Count > 0;
 
-    /// <summary>True when a file is to be removed or added. The album art doesn't count.</summary>
+    /// <summary>True when a file is to be removed or added. The album art and backgrounds don't count.</summary>
     public bool HasFileChanges => _removedFiles.Count > 0 || _addedFiles.Count > 0;
+
+    /// <summary>True when the background image or video has a pending change.</summary>
+    public bool HasBackgroundChanges => BackgroundImage is not null || BackgroundVideo is not null;
 
     /// <summary>The pending change to the album art, if there is one.</summary>
     public AlbumArtChange? AlbumArt { get; private set; }
+
+    /// <summary>The pending change to the background image, if there is one.</summary>
+    public BackgroundChange? BackgroundImage { get; private set; }
+
+    /// <summary>The pending change to the background video, if there is one.</summary>
+    public BackgroundChange? BackgroundVideo { get; private set; }
 
     /// <summary>The names of the files to remove, relative to the song.</summary>
     public IReadOnlyCollection<string> RemovedFiles => _removedFiles;
@@ -103,6 +122,30 @@ public sealed class MetadataDraft
 
     /// <summary>Forgets any change to the album art.</summary>
     public void RevertAlbumArt() => AlbumArt = null;
+
+    /// <summary>The pending change to the background of <paramref name="kind"/>, if there is one.</summary>
+    public BackgroundChange? GetBackground(BackgroundKind kind) => kind == BackgroundKind.Image ? BackgroundImage : BackgroundVideo;
+
+    /// <summary>Replaces the background of <paramref name="kind"/> with the file at <paramref name="sourcePath"/>, replacing any earlier change to it.</summary>
+    public void SetBackground(BackgroundKind kind, string sourcePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sourcePath);
+        SetBackgroundChange(kind, new BackgroundChange(sourcePath));
+    }
+
+    /// <summary>Marks the background of <paramref name="kind"/> for removal, replacing any earlier change to it.</summary>
+    public void RemoveBackground(BackgroundKind kind) => SetBackgroundChange(kind, new BackgroundChange(null));
+
+    /// <summary>Forgets any change to the background of <paramref name="kind"/>.</summary>
+    public void RevertBackground(BackgroundKind kind) => SetBackgroundChange(kind, null);
+
+    private void SetBackgroundChange(BackgroundKind kind, BackgroundChange? change)
+    {
+        if (kind == BackgroundKind.Image)
+            BackgroundImage = change;
+        else
+            BackgroundVideo = change;
+    }
 
     /// <summary>Stages <paramref name="file"/> to be added, replacing any earlier add under the same name.</summary>
     public void AddFile(AddedFile file)
@@ -191,6 +234,8 @@ public sealed class MetadataDraft
         _changes.Clear();
         _order.Clear();
         AlbumArt = null;
+        BackgroundImage = null;
+        BackgroundVideo = null;
         _removedFiles.Clear();
         _addedFiles.Clear();
         _replacedBy.Clear();

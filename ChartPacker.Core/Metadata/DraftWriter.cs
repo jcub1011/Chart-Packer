@@ -13,8 +13,8 @@ public static class DraftWriter
     /// applied. Every key and file the draft doesn't touch is carried over as stored.
     /// </summary>
     /// <remarks>
-    /// An album-art change removes every stored album-art file. An added file whose name is
-    /// already stored replaces it.
+    /// An album-art change removes every stored album-art file, and a background change every
+    /// stored file of its kind. An added file whose name is already stored replaces it.
     /// </remarks>
     /// <returns>The findings that stopped the write, or the rewritten file's findings.</returns>
     /// <exception cref="ArgumentException">An added file has the same name as the new album art.</exception>
@@ -41,6 +41,16 @@ public static class DraftWriter
                 add.Add(new SngSourceFile(AlbumArt.StoredNameFor(source)!, source, new FileInfo(source).Length));
         }
 
+        foreach (var kind in SongBackgrounds.Kinds)
+        {
+            if (draft.GetBackground(kind) is not { } background)
+                continue;
+
+            remove.UnionWith(read.Files.Select(f => f.Name).Where(n => SongBackgrounds.IsName(n, kind)));
+            if (background.SourcePath is { } source)
+                add.Add(new SngSourceFile(BackgroundStoredName(kind, source), source, new FileInfo(source).Length));
+        }
+
         // RewriteAsync refuses an add that clashes with a kept file, so a replaced file is removed first.
         var stored = read.Files.Select(f => f.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var file in draft.AddedFiles)
@@ -55,7 +65,7 @@ public static class DraftWriter
 
     /// <summary>
     /// Applies the draft to the song folder <paramref name="folder"/>: its metadata to
-    /// <paramref name="songIniPath"/>, then its album art, then its file changes.
+    /// <paramref name="songIniPath"/>, then its album art and backgrounds, then its file changes.
     /// </summary>
     /// <remarks>A draft without metadata changes never creates a <c>song.ini</c>.</remarks>
     /// <exception cref="ArgumentException">A file change names the <c>song.ini</c> or a path outside the folder.</exception>
@@ -72,7 +82,20 @@ public static class DraftWriter
             await SongIni.ApplyEditsAsync(songIniPath, draft, cancellationToken).ConfigureAwait(false);
         if (draft.AlbumArt is { } art)
             await AlbumArt.ApplyToFolderAsync(folder, art, cancellationToken).ConfigureAwait(false);
+        foreach (var kind in SongBackgrounds.Kinds)
+        {
+            if (draft.GetBackground(kind) is not { } background)
+                continue;
+
+            string? name = background.SourcePath is { } source ? BackgroundStoredName(kind, source) : null;
+            await FileSlot.ApplyToFolderAsync(folder, n => SongBackgrounds.IsName(n, kind), name, background.SourcePath, cancellationToken).ConfigureAwait(false);
+        }
+
         if (draft.HasFileChanges)
             await SongFolderFiles.ApplyAsync(folder, draft.RemovedFiles, draft.AddedFiles, cancellationToken).ConfigureAwait(false);
     }
+
+    private static string BackgroundStoredName(BackgroundKind kind, string source) =>
+        SongBackgrounds.StoredNameFor(kind, source)
+        ?? throw new ArgumentException($"'{source}' can't be a background {kind.ToString().ToLowerInvariant()}.", nameof(source));
 }

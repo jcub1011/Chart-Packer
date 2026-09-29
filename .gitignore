@@ -399,3 +399,7 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# FFmpeg shared libraries, built or fetched by build/ffmpeg
+ChartPacker.Video/runtimes/
+build/ffmpeg/.work/

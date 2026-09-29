@@ -8,10 +8,12 @@
   <ItemGroup>
     <ProjectReference Include="..\ChartPacker.Audio\ChartPacker.Audio.csproj" />
     <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <ProjectReference Include="..\ChartPacker.Video\ChartPacker.Video.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="Audio\Fixtures\*.ogg;Audio\Fixtures\*.opus;Audio\Fixtures\*.mp3" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Video\Fixtures\*.mp4;Video\Fixtures\*.webm" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

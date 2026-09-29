@@ -93,6 +93,12 @@ namespace ChartPacker.ViewModels
             _imagePicker = imagePicker;
             _filePicker = filePicker;
             Player = player;
+            Background = new BackgroundViewModel(() => Player.CurrentPosition);
+            Background.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(BackgroundViewModel.ShownKind))
+                    RemoveBackgroundCommand.NotifyCanExecuteChanged();
+            };
             foreach (string stem in AudioStems.Stems)
                 _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
             _job.PropertyChanged += (_, e) =>
@@ -110,6 +116,9 @@ namespace ChartPacker.ViewModels
 
         /// <summary>Plays the one selected song's audio tracks.</summary>
         public PlayerViewModel Player { get; }
+
+        /// <summary>The selected songs' background image or video, beside the album art.</summary>
+        public BackgroundViewModel Background { get; }
 
         /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
         [ObservableProperty]
@@ -178,6 +187,11 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasArtError))]
         private string? _artError;
 
+        /// <summary>Why the chosen background file can't be used.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasBackgroundError))]
+        private string? _backgroundError;
+
         /// <summary>Why some of the chosen files couldn't be added.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasFilesError))]
@@ -191,6 +205,8 @@ namespace ChartPacker.ViewModels
         public bool HasArtImage => ArtImage is not null;
 
         public bool HasArtError => ArtError is not null;
+
+        public bool HasBackgroundError => BackgroundError is not null;
 
         public bool HasFilesError => FilesError is not null;
 
@@ -256,8 +272,9 @@ namespace ChartPacker.ViewModels
             using var cts = new CancellationTokenSource();
             _loadCts = cts;
 
-            // Playback is of what's shown, and holds its files open.
+            // Playback is of what's shown, and holds its files open; so does the background video.
             Player.Unload();
+            Background.Unload();
 
             _entries = entries;
             _songs = [];
@@ -280,6 +297,7 @@ namespace ChartPacker.ViewModels
             ErrorMessage = null;
             SaveError = null;
             ArtError = null;
+            BackgroundError = null;
             FilesError = null;
             TracksError = null;
             CancelAdd();
@@ -298,6 +316,11 @@ namespace ChartPacker.ViewModels
                 .OfType<string>()
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
+            var stagedBackgrounds = entries
+                .SelectMany(e => SongBackgrounds.Kinds.Select(k => _drafts.Get(e.FullPath).GetBackground(k)?.SourcePath))
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
 
             try
             {
@@ -305,14 +328,30 @@ namespace ChartPacker.ViewModels
                     async () =>
                     {
                         var selection = entries.Count == 1 ? await LoadSingleAsync(entries[0], cts.Token) : await LoadBulkAsync(entries, cts.Token);
-                        return selection with { Art = await LoadArtAsync(selection.Songs, stagedSources, cts.Token) };
+                        var art = await LoadArtAsync(selection.Songs, stagedSources, cts.Token);
+                        try
+                        {
+                            var backgrounds = await BackgroundViewModel.LoadAsync(
+                                selection.Songs.Select(s => s.Pairs is null ? null : s.Entry).ToList(), stagedBackgrounds, cts.Token);
+                            return selection with { Art = art, Backgrounds = backgrounds };
+                        }
+                        catch
+                        {
+                            DisposeLater(art.Images.Values);
+                            throw;
+                        }
                     },
                     cts.Token);
 
                 if (_loadCts == cts)
+                {
                     Apply(loaded);
+                }
                 else
+                {
                     DisposeLater(loaded.Art.Images.Values);
+                    DisposeLater(loaded.Backgrounds.Images.Values);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -470,12 +509,98 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
         }
 
+        /// <summary>Asks for an image or video and stages it as every selected song's background of its kind.</summary>
+        [RelayCommand(CanExecute = nameof(CanEdit))]
+        private async Task ReplaceBackgroundAsync()
+        {
+            var songs = _songs;
+            string? path = await _filePicker.PickBackgroundAsync(Strings.PickBackgroundTitle);
+            if (path is null || !ReferenceEquals(songs, _songs) || !CanEdit)
+                return;
+
+            await StageBackgroundAsync(path);
+        }
+
+        /// <summary>
+        /// Reads the file at <paramref name="path"/> and, if it can be used, stages it as every
+        /// selected song's background image or video, as its extension says, and shows it.
+        /// </summary>
+        private async Task StageBackgroundAsync(string path)
+        {
+            var songs = _songs;
+            BackgroundError = null;
+            if (SongBackgrounds.KindOf(path) is not { } kind)
+            {
+                BackgroundError = Strings.BackgroundNotSupported;
+                return;
+            }
+
+            var (staged, bitmap) = await Task.Run(() => BackgroundViewModel.LoadStagedAsync(path, CancellationToken.None));
+
+            // The selection may have moved on while the file was read.
+            if (!ReferenceEquals(songs, _songs) || !CanEdit)
+            {
+                DisposeLater(bitmap is null ? [] : [bitmap]);
+                return;
+            }
+
+            if (staged.Error is not null)
+            {
+                DisposeLater(bitmap is null ? [] : [bitmap]);
+                BackgroundError = staged.Error;
+                return;
+            }
+
+            Background.AddStaged(path, staged, bitmap);
+            foreach (var song in _songs)
+                song.Item.Draft.SetBackground(kind, path);
+            Background.Show(kind);
+            OnDraftsChanged();
+        }
+
+        private bool CanRemoveBackground()
+        {
+            var kind = Background.ShownKind;
+            return CanEdit && _songs.Any(s => Background.EffectiveKey(BackgroundSongOf(s), kind) is not null);
+        }
+
+        /// <summary>Stages removing the shown kind of background, image or video, from every selected song.</summary>
+        [RelayCommand(CanExecute = nameof(CanRemoveBackground))]
+        private void RemoveBackground()
+        {
+            var kind = Background.ShownKind;
+            BackgroundError = null;
+            foreach (var song in _songs)
+                song.Item.Draft.RemoveBackground(kind);
+            OnDraftsChanged();
+        }
+
+        private bool CanRevertBackground() => IsBackgroundChanged && CanEdit;
+
+        /// <summary>A selected song has a staged background change.</summary>
+        public bool IsBackgroundChanged => _songs.Any(s => s.Item.Draft.HasBackgroundChanges);
+
+        /// <summary>Drops the staged background changes, of both kinds, of every selected song.</summary>
+        [RelayCommand(CanExecute = nameof(CanRevertBackground))]
+        private void RevertBackground()
+        {
+            BackgroundError = null;
+            foreach (var song in _songs)
+            {
+                foreach (var kind in SongBackgrounds.Kinds)
+                    song.Item.Draft.RevertBackground(kind);
+            }
+
+            OnDraftsChanged();
+        }
+
         // Files are shown, and so changed, only when one song is selected.
         private bool CanChangeFiles() => CanEdit && !IsBulk && _songs.Count == 1;
 
         /// <summary>
         /// Asks for files and stages adding them to the selected song, each under its own name. A
-        /// file named like album art is staged as the album art instead.
+        /// file named like album art, a background image or a background video is staged as that
+        /// instead, so it replaces the song's other files of the kind.
         /// </summary>
         [RelayCommand(CanExecute = nameof(CanChangeFiles))]
         private async Task AddFilesAsync()
@@ -489,12 +614,19 @@ namespace ChartPacker.ViewModels
             bool isSng = song.Entry.Kind == SongEntryKind.SngFile;
             var errors = new List<string>();
             string? art = null;
+            var backgrounds = new List<string>();
             foreach (string path in paths)
             {
                 string name = Path.GetFileName(path);
                 if (AlbumArt.IsAlbumArtName(name))
                 {
                     art = path;
+                    continue;
+                }
+
+                if (SongBackgrounds.KindOfName(name) is not null)
+                {
+                    backgrounds.Add(path);
                     continue;
                 }
 
@@ -533,6 +665,10 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
             if (art is not null)
                 await StageArtAsync(art);
+
+            // One of each kind: the last chosen, as when choosing a background twice.
+            foreach (string background in backgrounds.GroupBy(p => SongBackgrounds.KindOf(p)).Select(g => g.Last()))
+                await StageBackgroundAsync(background);
         }
 
         /// <summary>Stages removing <paramref name="row"/>'s file, or drops it when it's one the draft adds.</summary>
@@ -550,6 +686,14 @@ namespace ChartPacker.ViewModels
                 else
                     draft.RemoveAlbumArt();
                 ArtError = null;
+            }
+            else if (SongBackgrounds.KindOfName(row.Path) is { } kind)
+            {
+                if (row.IsAdded)
+                    draft.RevertBackground(kind);
+                else
+                    draft.RemoveBackground(kind);
+                BackgroundError = null;
             }
             else if (row.IsAdded)
             {
@@ -575,6 +719,11 @@ namespace ChartPacker.ViewModels
             {
                 draft.RevertAlbumArt();
                 ArtError = null;
+            }
+            else if (SongBackgrounds.KindOfName(row.Path) is { } kind)
+            {
+                draft.RevertBackground(kind);
+                BackgroundError = null;
             }
             else
             {
@@ -673,11 +822,14 @@ namespace ChartPacker.ViewModels
             IsSaving = true;
             SaveError = null;
 
-            // Playback holds the song's files open, which would stop them being replaced or deleted.
+            // Playback holds the song's files open, which would stop them being replaced or deleted;
+            // so does the background video.
             Player.Unload();
+            Background.Unload();
             try
             {
                 await Player.WhenFilesClosedAsync();
+                await Background.WhenClosedAsync();
 
                 foreach (var song in dirty)
                 {
@@ -722,6 +874,7 @@ namespace ChartPacker.ViewModels
         private void Discard()
         {
             CancelAdd();
+            BackgroundError = null;
             FilesError = null;
             TracksError = null;
             foreach (var song in _songs)
@@ -773,19 +926,25 @@ namespace ChartPacker.ViewModels
         private void Apply(LoadedSelection loaded)
         {
             _songs = loaded.Songs
-                .Select((s, i) => (Song: s, ArtHash: loaded.Art.DiskHashes[i]))
+                .Select((s, i) => (Song: s, ArtHash: loaded.Art.DiskHashes[i], Backgrounds: loaded.Backgrounds.Stored.ElementAtOrDefault(i) ?? StoredBackgrounds.None))
                 .Where(x => x.Song.Pairs is not null)
-                .Select(x => new EditableSong(x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath)), x.Song.SongIniPath, x.ArtHash))
+                .Select(x => new EditableSong(x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath)), x.Song.SongIniPath, x.ArtHash, x.Backgrounds))
                 .ToList();
             _artImages = loaded.Art.Images;
             _stagedArt = loaded.Art.Staged;
             _diskFiles = loaded.Files;
+            Background.Apply(loaded.Backgrounds);
 
             // A staged image that can no longer be read (moved, say) is reported like a bad pick.
             ArtError = _songs
                 .Select(s => s.Item.Draft.AlbumArt?.SourcePath)
                 .OfType<string>()
                 .Select(p => _stagedArt.GetValueOrDefault(p)?.Error)
+                .FirstOrDefault(e => e is not null);
+            BackgroundError = _songs
+                .SelectMany(s => SongBackgrounds.Kinds.Select(k => s.Item.Draft.GetBackground(k)?.SourcePath))
+                .OfType<string>()
+                .Select(p => Background.StagedAt(p)?.Error)
                 .FirstOrDefault(e => e is not null);
             ReadOnlyNote = loaded.Songs.Select(s => s.ReadOnlyReason).FirstOrDefault(r => r is not null);
             _loadNote = loaded.MetadataNote;
@@ -964,16 +1123,22 @@ namespace ChartPacker.ViewModels
                 ArtNote = _songs.Any(s => s.Item.Draft.AlbumArt is { IsRemoval: true }) ? Strings.AlbumArtWillBeRemoved : Strings.NoAlbumArt;
             }
 
+            Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
             RebuildFiles();
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
+            OnPropertyChanged(nameof(IsBackgroundChanged));
             RefreshCommands();
         }
 
+        /// <summary><paramref name="song"/> as the background tile needs it, with its video timeline as drafted.</summary>
+        private static BackgroundSong BackgroundSongOf(EditableSong song) =>
+            new(song.Entry, song.Item.Draft, song.Backgrounds, VideoTimeline.From(song.Item.Draft.ApplyTo(song.Item.Original)));
+
         /// <summary>
         /// The one selected song's files, with the ones a staged change removes or replaces struck
-        /// through and the ones it adds marked. The album-art files follow the art change; a
-        /// folder's song.ini is edited as metadata, so it can't be removed.
+        /// through and the ones it adds marked. The album-art and background files follow their
+        /// changes; a folder's song.ini is edited as metadata, so it can't be removed.
         /// </summary>
         private void RebuildFiles()
         {
@@ -986,6 +1151,7 @@ namespace ChartPacker.ViewModels
                 .Select(f =>
                 {
                     bool removed = (change is not null && AlbumArt.IsAlbumArtName(f.Path))
+                        || (draft is not null && SongBackgrounds.KindOfName(f.Path) is { } kind && draft.GetBackground(kind) is not null)
                         || (draft is not null && (draft.IsFileRemoved(f.Path) || draft.IsFileAdded(f.Path)));
                     bool isSongIni = isFolder && f.Path.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase);
                     return new FileRow(f.Path, ByteSizeFormatter.Format(f.Length),
@@ -1000,6 +1166,15 @@ namespace ChartPacker.ViewModels
             {
                 string size = _stagedArt.TryGetValue(source, out var staged) && staged.Error is null ? ByteSizeFormatter.Format((ulong)staged.Length) : "";
                 rows.Add(new FileRow(name, size, Marker: "+", CanRemove: true));
+            }
+
+            foreach (var kind in SongBackgrounds.Kinds)
+            {
+                if (draft?.GetBackground(kind)?.SourcePath is { } backgroundSource && SongBackgrounds.StoredNameFor(kind, backgroundSource) is { } backgroundName)
+                {
+                    string size = Background.StagedAt(backgroundSource) is { Error: null } staged ? ByteSizeFormatter.Format((ulong)staged.Length) : "";
+                    rows.Add(new FileRow(backgroundName, size, Marker: "+", CanRemove: true));
+                }
             }
 
             if (!rows.SequenceEqual(Files))
@@ -1190,6 +1365,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(FilesHeader));
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
+            OnPropertyChanged(nameof(IsBackgroundChanged));
             RefreshCommands();
         }
 
@@ -1201,6 +1377,9 @@ namespace ChartPacker.ViewModels
             ReplaceArtCommand.NotifyCanExecuteChanged();
             RemoveArtCommand.NotifyCanExecuteChanged();
             RevertArtCommand.NotifyCanExecuteChanged();
+            ReplaceBackgroundCommand.NotifyCanExecuteChanged();
+            RemoveBackgroundCommand.NotifyCanExecuteChanged();
+            RevertBackgroundCommand.NotifyCanExecuteChanged();
             AddFilesCommand.NotifyCanExecuteChanged();
             RemoveFileCommand.NotifyCanExecuteChanged();
             RevertFileCommand.NotifyCanExecuteChanged();
@@ -1214,7 +1393,8 @@ namespace ChartPacker.ViewModels
         /// <summary>A selected song whose metadata was read, with its draft.</summary>
         /// <param name="SongIniPath">For a folder, the song.ini to edit (which may not exist yet).</param>
         /// <param name="DiskArtHash">The hash of its album art as stored, or <see langword="null"/> when it has none that could be read.</param>
-        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath, string? DiskArtHash);
+        /// <param name="Backgrounds">Its background image and video as stored.</param>
+        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath, string? DiskArtHash, StoredBackgrounds Backgrounds);
 
         /// <summary>A file of the one selected song, as stored.</summary>
         private sealed record DiskFile(string Path, ulong Length);
@@ -1245,6 +1425,9 @@ namespace ChartPacker.ViewModels
         {
             /// <summary>Filled in after the metadata by <see cref="LoadArtAsync"/>.</summary>
             public LoadedArt Art { get; init; } = new([], [], []);
+
+            /// <summary>Filled in after the metadata by <see cref="BackgroundViewModel.LoadAsync"/>.</summary>
+            public LoadedBackgrounds Backgrounds { get; init; } = LoadedBackgrounds.Empty;
         }
     }
 }

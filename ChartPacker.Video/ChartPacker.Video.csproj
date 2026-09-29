@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- The FFmpeg bindings take pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+  </ItemGroup>
+
+  <!-- FFmpeg's shared libraries, built by build/ffmpeg (see its README), ship beside the
+       executable like SDL's. Without them the app still runs; videos just aren't previewed. -->
+  <ItemGroup>
+    <None Include="runtimes\$(NETCoreSdkPortableRuntimeIdentifier)\native\*"
+          Condition="'$(RuntimeIdentifier)' == ''"
+          Link="%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="runtimes\$(RuntimeIdentifier)\native\*"
+          Condition="'$(RuntimeIdentifier)' != ''"
+          Link="%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,5 +1,6 @@
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Metadata;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
 using ChartPacker.Core.Validation;
 
@@ -73,6 +74,94 @@ public sealed class DraftWriterTests
     }
 
     [TestMethod]
+    public async Task SngBackgroundImageChangeReplacesEveryVariantAndKeepsTheVideo()
+    {
+        string sng = await CreateSngAsync([P("name", "A")], ("background.jpg", [1]), ("background.png", [2]), ("video.mp4", [3]), ("notes.chart", [4]));
+        string image = Path.Combine(_root.FullName, "Sky.JPEG");
+        File.WriteAllBytes(image, [8, 8]);
+        var draft = new MetadataDraft();
+        draft.SetBackground(BackgroundKind.Image, image);
+
+        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+
+        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
+        var after = SngReader.Read(sng);
+        CollectionAssert.AreEquivalent(new[] { "background.jpeg", "video.mp4", "notes.chart" }, after.Files.Select(f => f.Name).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 8, 8 }, Extract(sng, after, "background.jpeg"));
+        CollectionAssert.AreEqual(new byte[] { 3 }, Extract(sng, after, "video.mp4"));
+    }
+
+    [TestMethod]
+    public async Task SngArtBackgroundAndFileChangesAreSavedTogether()
+    {
+        string sng = await CreateSngAsync([P("name", "A")], ("album.jpg", [1]), ("background.png", [2]), ("video.webm", [3]), ("notes.chart", [4]));
+        string art = WriteNamedSource("cover.png", [5]);
+        string video = WriteNamedSource("clip.mp4", [6, 6]);
+        var draft = new MetadataDraft();
+        draft.SetAlbumArt(art);
+        draft.SetBackground(BackgroundKind.Video, video);
+        draft.RemoveBackground(BackgroundKind.Image);
+        draft.AddFile(new AddedFile("guitar.ogg", WriteSource([7]), 1));
+
+        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+
+        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
+        var after = SngReader.Read(sng);
+        CollectionAssert.AreEquivalent(new[] { "album.png", "video.mp4", "notes.chart", "guitar.ogg" }, after.Files.Select(f => f.Name).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 6, 6 }, Extract(sng, after, "video.mp4"));
+    }
+
+    [TestMethod]
+    public async Task SngMetadataOnlyDraftKeepsTheBackgrounds()
+    {
+        string sng = await CreateSngAsync([P("name", "A")], ("background.png", [1]), ("video.mp4", [2]));
+        var draft = new MetadataDraft();
+        draft.Set("name", "B");
+
+        await DraftWriter.SaveSngAsync(sng, draft);
+
+        CollectionAssert.AreEqual(new[] { "background.png", "video.mp4" }, SngReader.Read(sng).Files.Select(f => f.Name).ToArray());
+    }
+
+    [TestMethod]
+    public async Task FolderBackgroundChangesTouchOnlyTheirKind()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        File.WriteAllBytes(Path.Combine(folder, "background.jpg"), [1]);
+        File.WriteAllBytes(Path.Combine(folder, "Video.MP4"), [2]);
+        File.WriteAllBytes(Path.Combine(folder, "video.avi"), [3]);
+        File.WriteAllBytes(Path.Combine(folder, "notes.chart"), [4]);
+        string sub = Directory.CreateDirectory(Path.Combine(folder, "extras")).FullName;
+        File.WriteAllBytes(Path.Combine(sub, "video.mp4"), [5]);
+        string image = WriteNamedSource("sky.png", [9]);
+        var draft = new MetadataDraft();
+        draft.SetBackground(BackgroundKind.Image, image);
+        draft.RemoveBackground(BackgroundKind.Video);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        CollectionAssert.AreEquivalent(new[] { "background.png", "notes.chart" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "background.png")));
+        Assert.IsTrue(File.Exists(Path.Combine(sub, "video.mp4")));
+    }
+
+    [TestMethod]
+    public async Task FolderBackgroundCanBeReplacedByItsOwnFile()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string own = Path.Combine(folder, "video.webm");
+        File.WriteAllBytes(own, [1, 2]);
+        File.WriteAllBytes(Path.Combine(folder, "video.mp4"), [3]);
+        var draft = new MetadataDraft();
+        draft.SetBackground(BackgroundKind.Video, own);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        CollectionAssert.AreEquivalent(new[] { "video.webm" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 1, 2 }, File.ReadAllBytes(own));
+    }
+
+    [TestMethod]
     public async Task FolderFileChangesAreApplied()
     {
         string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
@@ -111,6 +200,13 @@ public sealed class DraftWriterTests
     private string WriteSource(byte[] data)
     {
         string path = Path.Combine(_root.FullName, Guid.NewGuid().ToString("N"));
+        File.WriteAllBytes(path, data);
+        return path;
+    }
+
+    private string WriteNamedSource(string name, byte[] data)
+    {
+        string path = Path.Combine(Directory.CreateDirectory(Path.Combine(_root.FullName, Guid.NewGuid().ToString("N"))).FullName, name);
         File.WriteAllBytes(path, data);
         return path;
     }

@@ -3,4 +3,5 @@
   <Project Path="ChartPacker.Audio/ChartPacker.Audio.csproj" />
   <Project Path="ChartPacker.Core/ChartPacker.Core.csproj" />
   <Project Path="ChartPacker.Core.Tests/ChartPacker.Core.Tests.csproj" />
+  <Project Path="ChartPacker.Video/ChartPacker.Video.csproj" />
 </Solution>

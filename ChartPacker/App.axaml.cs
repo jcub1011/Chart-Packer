@@ -1,9 +1,11 @@
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core;
 using ChartPacker.Services;
+using ChartPacker.Video;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
 
@@ -32,6 +34,9 @@ namespace ChartPacker
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
                 var audio = new SdlAudio();
                 var player = new PlayerViewModel(settings, audio.Open);
+
+                // FFmpeg is looked for now, off the UI thread, so the first video shown doesn't wait for it to load.
+                _ = Task.Run(() => FfmpegLibrary.IsAvailable);
 
                 window.DataContext = new MainWindowViewModel(
                     new LibraryViewModel(folderPicker, settings, drafts, job, player),

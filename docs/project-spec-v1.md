@@ -125,6 +125,15 @@ through `IProgress<T>`.
     SDL's audio subsystem is initialised. It ships SDL's native library for each RID, which
     publishes beside the executable.
   - `NVorbis` is a 1.0 release candidate: 0.10.x lands seeks hundreds of samples late.
+- `ChartPacker.Video` decodes background videos for the detail panel's background tile (F5). It
+  keeps native code out of Core, and has no packages. It binds, by hand with `[LibraryImport]`,
+  the few functions it needs from FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`
+  and `swscale`, LGPL 2.1+). No managed library decodes H.264, VP8/VP9, Theora and MPEG video.
+  LibVLC was considered, but it's far larger and doesn't fit the lockstep stem mixer.
+  - The libraries are built by `build/ffmpeg/build.sh` with only the registered video formats'
+    demuxers and decoders, nothing GPL or non-free, and ship beside the executable like SDL's.
+    Without them the app still runs, and videos aren't previewed.
+  - The bindings are written for one major version of each library, which is checked at load.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.
 
@@ -321,8 +330,8 @@ Behaviour:
    - Time values are edited in milliseconds. Unset difficulties (`diff_* = -1`) stay hidden, and
      adding one edits its stored value.
    - **Album art.** A tile at the top of the panel shows the album art. Hovering it shows icon
-     buttons in its bottom-right corner: replace (a png, jpg or jpeg up to 16 MB) and remove. With
-     one song selected, its file list sits to the right of the tile.
+     buttons in its bottom-right corner: replace (a png, jpg or jpeg up to 16 MB) and remove. The
+     background tile sits to its right, and with one song selected, its file list is below them.
      - An art change is staged in the draft like a metadata edit. The tile is marked `*` and gets a
        revert button. The file list strikes through the `album.*` files it removes and marks the
        one it adds `+`. The library thumbnail shows the staged image, or no art, before saving.
@@ -334,6 +343,28 @@ Behaviour:
        metadata (item 5): the new image is masked with the existing mask. In a folder the old files
        are deleted permanently, and a folder without a `song.ini` doesn't get one for an art-only
        change.
+   - **Background.** A 16:9 tile beside the art shows the background video (`video.mp4`, `.avi`,
+     `.webm`, `.vp8`, `.ogv` or `.mpeg`) or background image (`background.png`, `.jpg` or `.jpeg`),
+     or "No background set". A song can have both, as games play the video when video
+     backgrounds are on and the image otherwise. Then the video is shown first, and an
+     **Image | Video** switch on the tile picks which one is shown.
+     - Hovering shows the same buttons as the art: new (one picker for every image and video
+       type; the file's extension decides which kind it replaces), remove (the kind shown) and,
+       while there's a change, revert. Changes are staged in the draft like the art's, with the
+       same `*` marker and struck-through and `+` rows in the file list. Names of either kind
+       added through **Add files** go through the same change.
+     - The video follows the audio player: it shows the frame due at the player's position,
+       shifted by `video_start_time`, held at `video_end_time` (or the end), and looped from the
+       start when `video_loop` is true. A `.sng`'s video is decoded straight out of the
+       container, without extracting it.
+     - With several items selected, each kind is shown when every song's is identical, and
+       "Backgrounds differ" otherwise. Images are compared by SHA-256. Videos are compared by
+       length first, and by SHA-256 only when every length is the same. New and Remove apply to
+       all of them.
+     - Saving replaces, or removes, every top-level file of the changed kind only, the way the
+       art is saved. Nothing is written before then.
+     - Video needs FFmpeg's libraries beside the executable (§4). Without them the tile says
+       "Video preview unavailable", and new and remove still work.
    - **Files.** With one song selected, **Add files** under the file list picks any number of
      files, and each row has a remove button. Changes are staged in the draft like the art, so they
      survive a change of selection, and **Discard** or closing without saving drops them.
@@ -391,8 +422,9 @@ Behaviour:
    - *Extract selected…* (the same safety rules as F2)
    - *Extract all* (runs F2)
    - *Copy details*
-5. **Preview:** album, background and highway images are shown in the app. Other files show
-   their size and a hex view of the first bytes.
+5. **Preview:** album, background and highway images are shown in the app, and the background
+   video plays in the detail panel's background tile (F5). Other files show their size and a hex
+   view of the first bytes.
 6. **Findings panel:** the F3 report inline, with each finding linked to the row or field it
    refers to.
 7. **Layout view:** a bar showing the section and file byte ranges to scale, so gaps and

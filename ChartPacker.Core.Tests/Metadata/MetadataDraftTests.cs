@@ -1,4 +1,5 @@
 using ChartPacker.Core.Metadata;
+using ChartPacker.Core.Scanning;
 
 namespace ChartPacker.Core.Tests.Metadata;
 
@@ -157,6 +158,61 @@ public sealed class MetadataDraftTests
         draft.Clear();
 
         Assert.IsNull(draft.AlbumArt);
+        Assert.IsTrue(draft.IsEmpty);
+    }
+
+    [TestMethod]
+    public void BackgroundChangeMakesTheDraftDirtyWithoutOtherChanges()
+    {
+        var draft = new MetadataDraft();
+        draft.SetBackground(BackgroundKind.Video, @"C:\src\clip.webm");
+
+        Assert.IsFalse(draft.IsEmpty);
+        Assert.IsTrue(draft.HasBackgroundChanges);
+        Assert.IsFalse(draft.HasMetadataChanges);
+        Assert.IsFalse(draft.HasFileChanges);
+        Assert.IsNull(draft.AlbumArt);
+        Assert.AreEqual(new BackgroundChange(@"C:\src\clip.webm"), draft.BackgroundVideo);
+        Assert.AreEqual(draft.BackgroundVideo, draft.GetBackground(BackgroundKind.Video));
+        Assert.IsNull(draft.BackgroundImage);
+    }
+
+    [TestMethod]
+    public void BackgroundKindsAreChangedIndependently()
+    {
+        var draft = new MetadataDraft();
+        draft.SetBackground(BackgroundKind.Image, "bg.png");
+        draft.RemoveBackground(BackgroundKind.Video);
+        draft.SetAlbumArt("cover.png");
+
+        draft.RevertBackground(BackgroundKind.Image);
+
+        Assert.IsNull(draft.BackgroundImage);
+        Assert.IsTrue(draft.BackgroundVideo is { IsRemoval: true });
+        Assert.AreEqual(new AlbumArtChange("cover.png"), draft.AlbumArt);
+    }
+
+    [TestMethod]
+    public void RemoveBackgroundReplacesAnEarlierReplacement()
+    {
+        var draft = new MetadataDraft();
+        draft.SetBackground(BackgroundKind.Image, "bg.png");
+
+        draft.RemoveBackground(BackgroundKind.Image);
+
+        Assert.IsTrue(draft.BackgroundImage is { IsRemoval: true });
+    }
+
+    [TestMethod]
+    public void ClearForgetsTheBackgroundChanges()
+    {
+        var draft = new MetadataDraft();
+        draft.SetBackground(BackgroundKind.Image, "bg.png");
+        draft.RemoveBackground(BackgroundKind.Video);
+
+        draft.Clear();
+
+        Assert.IsFalse(draft.HasBackgroundChanges);
         Assert.IsTrue(draft.IsEmpty);
     }
 

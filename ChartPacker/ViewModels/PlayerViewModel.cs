@@ -180,6 +180,12 @@ namespace ChartPacker.ViewModels
         /// <summary>The seek slider is held; see <see cref="BeginScrub"/>.</summary>
         public bool IsScrubbing { get; private set; }
 
+        /// <summary>
+        /// Where playback is right now, read from the player rather than <see cref="PositionSeconds"/>, which
+        /// only moves on a timer; or, while scrubbing or before the first play, where the seek bar is.
+        /// </summary>
+        public TimeSpan CurrentPosition => _player is { } player && !IsScrubbing ? player.Position : TimeSpan.FromSeconds(Math.Max(0, PositionSeconds));
+
         public string TracksHeader => string.Format(CultureInfo.CurrentCulture, Strings.TracksHeaderFormat, Tracks.Count);
 
         public bool HasError => Error is not null;

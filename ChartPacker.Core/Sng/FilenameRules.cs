@@ -112,8 +112,8 @@ public static class FilenameRules
             }
         }
 
-        Add(["album", "background", "highway"], ["png", "jpg", "jpeg"]);
-        Add(["video"], ["mp4", "avi", "webm", "vp8", "ogv", "mpeg"]);
+        Add(["album", SongBackgrounds.ImageStem, "highway"], [.. SongBackgrounds.ImageExtensions.Select(e => e.TrimStart('.'))]);
+        Add([SongBackgrounds.VideoStem], [.. SongBackgrounds.VideoExtensions.Select(e => e.TrimStart('.'))]);
         Add([.. AudioStems.Stems], [.. AudioStems.Extensions.Select(e => e.TrimStart('.'))]);
         return names;
     }

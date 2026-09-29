@@ -450,6 +450,83 @@
     <value>That image is too large. Album art can be up to {0}.</value>
     <comment>{0} is the size limit, e.g. "16 MB".</comment>
   </data>
+  <data name="BackgroundName" xml:space="preserve">
+    <value>Background</value>
+    <comment>Automation name of the background tile beside the album art.</comment>
+  </data>
+  <data name="NoBackground" xml:space="preserve">
+    <value>No background set</value>
+  </data>
+  <data name="BackgroundsDiffer" xml:space="preserve">
+    <value>Backgrounds differ</value>
+    <comment>In the background tile when the selected songs don't all have the same image or video.</comment>
+  </data>
+  <data name="BackgroundImageUnreadable" xml:space="preserve">
+    <value>Background image can't be shown</value>
+    <comment>In the background tile when the image can't be decoded.</comment>
+  </data>
+  <data name="BackgroundWillBeRemoved" xml:space="preserve">
+    <value>Background will be removed</value>
+  </data>
+  <data name="VideoPreviewUnavailableFormat" xml:space="preserve">
+    <value>Video preview unavailable
+{0}</value>
+    <comment>In the background tile when FFmpeg isn't installed beside the app. {0} is the video's file name.</comment>
+  </data>
+  <data name="VideoUnplayableFormat" xml:space="preserve">
+    <value>This video can't be shown: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="ShowBackgroundImage" xml:space="preserve">
+    <value>Image</value>
+    <comment>Toggle on the background tile that shows the background image.</comment>
+  </data>
+  <data name="ShowBackgroundVideo" xml:space="preserve">
+    <value>Video</value>
+    <comment>Toggle on the background tile that shows the background video.</comment>
+  </data>
+  <data name="ReplaceBackgroundToolTip" xml:space="preserve">
+    <value>Set a background image or video…</value>
+  </data>
+  <data name="RemoveBackgroundImageToolTip" xml:space="preserve">
+    <value>Remove the background image</value>
+  </data>
+  <data name="RemoveBackgroundVideoToolTip" xml:space="preserve">
+    <value>Remove the background video</value>
+  </data>
+  <data name="RevertBackgroundToolTip" xml:space="preserve">
+    <value>Undo the changes to the background</value>
+  </data>
+  <data name="PickBackgroundTitle" xml:space="preserve">
+    <value>Choose a background image or video</value>
+  </data>
+  <data name="BackgroundFileTypeFormat" xml:space="preserve">
+    <value>Backgrounds ({0})</value>
+    <comment>A file-picker filter. {0} is the extensions, e.g. "png, jpg, mp4".</comment>
+  </data>
+  <data name="ImageFileTypeFormat" xml:space="preserve">
+    <value>Images ({0})</value>
+    <comment>A file-picker filter. {0} is the extensions.</comment>
+  </data>
+  <data name="VideoFileTypeFormat" xml:space="preserve">
+    <value>Videos ({0})</value>
+    <comment>A file-picker filter. {0} is the extensions.</comment>
+  </data>
+  <data name="BackgroundNotSupported" xml:space="preserve">
+    <value>That file isn't a png, jpg or jpeg image, or an mp4, avi, webm, vp8, ogv or mpeg video.</value>
+  </data>
+  <data name="BackgroundUnreadableFormat" xml:space="preserve">
+    <value>That file can't be used: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="BackgroundImageTooLargeFormat" xml:space="preserve">
+    <value>That image is too large. A background image can be up to {0}.</value>
+    <comment>{0} is the size limit, e.g. "16 MB".</comment>
+  </data>
+  <data name="VideoUnusableFormat" xml:space="preserve">
+    <value>That video can't be used: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
   <data name="AddFilesButton" xml:space="preserve">
     <value>Add files</value>
   </data>
