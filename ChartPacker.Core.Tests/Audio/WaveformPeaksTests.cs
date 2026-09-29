@@ -355,6 +355,191 @@ public sealed class WaveformPeaksTests
         Assert.AreEqual(0.06, whole.ReadSeconds, 1e-9);
     }
 
+    [TestMethod]
+    [DataRow(Rate, 10000, 7)]
+    [DataRow(Rate, 10000, 100)]
+    [DataRow(Rate, 10001, 100)]
+    [DataRow(Rate, 9999, 100)]
+    [DataRow(Rate, 100, 100)]
+    [DataRow(44100, 3 * 44100, 20)]
+    [DataRow(48000, (2 * 48000) + 1, 13)]
+    [DataRow(22050, 22050, 3)]
+    public void ChunksReadInAnyOrderGiveTheSamePeaksAsOneRead(int rate, int frames, int chunkBuckets)
+    {
+        var expected = WaveformPeaks.Compute("x", Wavy(rate, frames));
+
+        var reader = new StemPeaksReader("x", Wavy(rate, frames), chunkBuckets: chunkBuckets);
+        for (int i = reader.ChunkCount - 1; i >= 0; i--)
+            reader.ReadChunk(i, Wavy(rate, frames));
+
+        AssertSamePeaks(expected, reader.Finish());
+    }
+
+    [TestMethod]
+    public void ChunksReadSideBySideGiveTheSamePeaksAsOneRead()
+    {
+        var expected = WaveformPeaks.Compute("x", Wavy(44100, 20 * 44100));
+
+        var reader = new StemPeaksReader("x", Wavy(44100, 20 * 44100), chunkBuckets: 50);
+        Parallel.For(0, reader.ChunkCount, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i => reader.ReadChunk(i, Wavy(44100, 20 * 44100)));
+
+        Assert.AreEqual(20, reader.ChunkCount);
+        AssertSamePeaks(expected, reader.Finish());
+    }
+
+    [TestMethod]
+    public void AStemOfUnknownLengthIsOneChunk()
+    {
+        static TestAudio.FakeSource Source() => new(Rate, 1, 10000, (_, _) => 0.5f) { LengthFrames = -1 };
+        var reader = new StemPeaksReader("x", Source(), chunkBuckets: 7);
+
+        Assert.AreEqual(1, reader.ChunkCount);
+        reader.ReadChunk(0, Source());
+        AssertSamePeaks(WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f)), reader.Finish());
+    }
+
+    [TestMethod]
+    public void SnapshotsOfChunksShowOnlyWhatIsReadFromTheStart()
+    {
+        // Five chunks of 100 buckets, 2000 frames: each is one read, followed by a snapshot, before its last bucket is done.
+        var snapshots = new List<StemPeaks>();
+        static TestAudio.FakeSource Source() => new(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f);
+        var reader = new StemPeaksReader("x", Source(), snapshots.Add, TimeSpan.Zero, chunkBuckets: 100);
+
+        foreach (int i in new[] { 0, 2, 1, 4, 3 })
+            reader.ReadChunk(i, Source());
+
+        // Chunk 2 adds nothing while chunk 1 isn't read, nor chunk 4 while 3 isn't.
+        CollectionAssert.AreEqual(new[] { 99, 100, 199, 300, 399 }, snapshots.Select(s => s.ReadCount).ToArray());
+        foreach (var snapshot in snapshots)
+        {
+            Assert.AreEqual(500, snapshot.Count);
+            Assert.IsTrue(snapshot.Max.Take(snapshot.ReadCount).All(v => v == 0.5f), "What it says was read was.");
+            Assert.IsTrue(snapshot.Max.Skip(snapshot.ReadCount).All(v => v == 0f), "What hasn't been read from the start is silent.");
+        }
+
+        AssertSamePeaks(WaveformPeaks.Compute("x", Source()), reader.Finish());
+    }
+
+    [TestMethod]
+    public void ADamagedChunkIsSilentAndTheChunksAfterItAreKept()
+    {
+        static TestAudio.FakeSource Source() => new(Rate, 1, 6000, (_, _) => 0.5f);
+        var reader = new StemPeaksReader("x", Source(), chunkBuckets: 100);
+
+        reader.ReadChunk(0, Source());
+        reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 6000, (_, _) => 0.5f) { IsDamaged = true });
+        reader.ReadChunk(2, Source());
+        var peaks = reader.Finish();
+
+        Assert.AreEqual(300, peaks.Count);
+        Assert.IsTrue(peaks.Max.Take(100).All(v => v == 0.5f));
+        Assert.IsTrue(peaks.Max.Skip(100).Take(100).All(v => v == 0f));
+        Assert.IsTrue(peaks.Max.Skip(200).All(v => v == 0.5f));
+    }
+
+    [TestMethod]
+    public void TheLastChunkReadsOnPastTheLengthTheSourceSaid()
+    {
+        // It says 6000 frames, three chunks of 100 buckets, but has 10000.
+        static TestAudio.FakeSource Source() => new(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f) { LengthFrames = 6000 };
+        var reader = new StemPeaksReader("x", Source(), chunkBuckets: 100);
+
+        Assert.AreEqual(3, reader.ChunkCount);
+        for (int i = 0; i < reader.ChunkCount; i++)
+            reader.ReadChunk(i, Source());
+
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f));
+        var peaks = reader.Finish();
+        AssertSamePeaks(expected, peaks);
+        Assert.AreEqual(expected.SizeBytes, peaks.SizeBytes);
+    }
+
+    [TestMethod]
+    public void ChunksEndWhereTheAudioDoesWhenTheSourceIsShorterThanItSaid()
+    {
+        static TestAudio.FakeSource Source() => new(Rate, 1, 1000, (_, _) => 0.5f) { LengthFrames = 5000 };
+        var reader = new StemPeaksReader("x", Source(), chunkBuckets: 40);
+        for (int i = 0; i < reader.ChunkCount; i++)
+            reader.ReadChunk(i, Source());
+
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 1000, (_, _) => 0.5f));
+        var peaks = reader.Finish();
+        AssertSamePeaks(expected, peaks);
+        Assert.AreEqual(expected.SizeBytes, peaks.SizeBytes);
+    }
+
+    [TestMethod]
+    public void CancellationStopsAChunk()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var reader = new StemPeaksReader("x", new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f), chunkBuckets: 100);
+
+        Assert.ThrowsExactly<OperationCanceledException>(() => reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f), cts.Token));
+    }
+
+    [TestMethod]
+    public void AChunkIsReadOnlyOnce()
+    {
+        var reader = new StemPeaksReader("x", new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f), chunkBuckets: 100);
+        reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f));
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f)));
+    }
+
+    [TestMethod]
+    [DataRow("chirp-stereo-44100.ogg")]
+    [DataRow("chirp-stereo-48000.opus")]
+    [DataRow("chirp-mono-48000.opus")]
+    [DataRow("chirp-stereo-44100.mp3")]
+    public void ChunksOfRealAudioGiveThePeaksOfOneRead(string name)
+    {
+        StemPeaks expected;
+        using (var source = TestAudio.OpenFixture(name))
+            expected = WaveformPeaks.Compute(name, source);
+
+        // A second in chunks of 7 buckets: every chunk but the first seeks.
+        StemPeaksReader reader;
+        using (var source = TestAudio.OpenFixture(name))
+            reader = new StemPeaksReader(name, source, chunkBuckets: 7);
+        Assert.AreEqual(8, reader.ChunkCount);
+        Parallel.For(0, reader.ChunkCount, i =>
+        {
+            using var source = TestAudio.OpenFixture(name);
+            reader.ReadChunk(i, source);
+        });
+
+        // A seek lands within rounding of a straight read.
+        AssertSamePeaks(expected, reader.Finish(), 2e-3f);
+    }
+
+    private static void AssertSamePeaks(StemPeaks expected, StemPeaks actual, float delta = 0f)
+    {
+        Assert.AreEqual(expected.Count, actual.Count);
+        Assert.AreEqual(actual.Count, actual.ReadCount);
+        AssertClose(expected.Min, actual.Min, delta, "Min");
+        AssertClose(expected.Max, actual.Max, delta, "Max");
+        AssertClose(expected.Rms, actual.Rms, delta, "Rms");
+
+        // The samples for mixing, which two of a stem mixed are made from.
+        var expectedMix = WaveformPeaks.Mix([new AudibleStem(expected, false, false, 0.5f), new AudibleStem(expected, false, false, 0.5f)]);
+        var actualMix = WaveformPeaks.Mix([new AudibleStem(actual, false, false, 0.5f), new AudibleStem(actual, false, false, 0.5f)]);
+        AssertClose(expectedMix.Max, actualMix.Max, delta, "Mixed max");
+        AssertClose(expectedMix.Rms, actualMix.Rms, delta, "Mixed loudness");
+    }
+
+    private static void AssertClose(IReadOnlyList<float> expected, IReadOnlyList<float> actual, float delta, string what)
+    {
+        Assert.AreEqual(expected.Count, actual.Count, what);
+        for (int i = 0; i < expected.Count; i++)
+            Assert.AreEqual(expected[i], actual[i], delta, $"{what} of bucket {i}.");
+    }
+
+    // Stereo, with something different in every bucket.
+    private static TestAudio.FakeSource Wavy(int rate, int frames) =>
+        new(rate, 2, frames, (n, c) => (float)(0.8 * Math.Sin((n * (c == 0 ? 0.013 : 0.029)) + (n / 5000.0))));
+
     // The first progress snapshot of a stem ten seconds long: part read, 500 buckets long.
     private static StemPeaks FirstSnapshot()
     {

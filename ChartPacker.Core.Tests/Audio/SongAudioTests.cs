@@ -89,6 +89,46 @@ public sealed class SongAudioTests
     }
 
     [TestMethod]
+    public void AnotherSourceOfATrackReadsTheSameAudioOnAnotherThread()
+    {
+        byte[] song = Wav(20000, 8000, 2, (n, c) => (c == 0 ? 1 : -1) * (n % 100) / 200f);
+        var builder = new SngBuilder();
+        builder.AddFile("song.wav", Masked(builder, song));
+        var entry = WriteSng(builder);
+
+        using (var audio = SongAudio.Open(entry, [Track("song.wav")]))
+        {
+            float[] expected = ReadAll(audio.Tracks[0].Source!);
+
+            // Two more sources over the same handle, read at once.
+            var reads = Enumerable.Range(0, 2).Select(_ => Task.Run(() =>
+            {
+                using var source = audio.OpenSource(audio.Tracks[0].Track);
+                return ReadAll(source);
+            })).ToArray();
+            Task.WaitAll(reads);
+
+            foreach (var read in reads)
+                CollectionAssert.AreEqual(expected, read.Result);
+        }
+
+        File.Delete(entry.FullPath);
+    }
+
+    [TestMethod]
+    public void AnotherSourceOfATrackThatIsntInTheSngCantBeOpened()
+    {
+        var builder = new SngBuilder();
+        builder.AddFile("guitar.wav", Masked(builder, Wav(100, 8000, 1, (_, _) => 0.1f)));
+        var entry = WriteSng(builder);
+
+        using var audio = SongAudio.Open(entry, [Track("guitar.wav"), Track("drums.wav")]);
+
+        audio.OpenSource(audio.Tracks[0].Track).Dispose();
+        Assert.ThrowsExactly<FileNotFoundException>(() => audio.OpenSource(audio.Tracks[1].Track));
+    }
+
+    [TestMethod]
     public void AMissingSngFailsToOpen()
     {
         var entry = new SongEntry(SongEntryKind.SngFile, Path.Combine(_root.FullName, "Missing.sng"), "Missing.sng", "Missing");

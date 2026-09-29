@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Collections;
 using ChartPacker.Audio.Decoding;
 
@@ -150,12 +149,14 @@ public static class WaveformPeaks
 
     private const int TicksPerBucket = SignalRate / BucketsPerSecond;
 
-    private const int ChunkFrames = 4096;
+    // How many frames are decoded at a time.
+    internal const int ChunkFrames = 4096;
 
     /// <summary>Reads <paramref name="source"/> from where it is to its end.</summary>
     /// <remarks>
     /// A stem whose audio turns out to be damaged keeps the peaks read before that point. The source
-    /// isn't disposed, and mustn't be in use elsewhere: sources aren't thread-safe.
+    /// isn't disposed, and mustn't be in use elsewhere: sources aren't thread-safe. It's read on one
+    /// thread; <see cref="StemPeaksReader"/> reads a stem in chunks on several.
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public static StemPeaks Compute(string name, IPcmSource source, CancellationToken cancellationToken = default) =>
@@ -174,99 +175,10 @@ public static class WaveformPeaks
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public static StemPeaks Compute(string name, IPcmSource source, Action<StemPeaks>? progress, TimeSpan progressInterval, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(source);
-
-        int rate = source.SampleRate;
-        int channels = source.Channels;
-        long length = source.LengthFrames;
-
-        // As long as the whole stem when that's known, so they're filled rather than grown; see Put.
-        var min = new float[Count(length, BucketsPerSecond, rate)];
-        var max = new float[min.Length];
-        var rms = new float[min.Length];
-        var signal = new Half[Count(length, SignalRate, rate)];
-        var buffer = new float[ChunkFrames * channels];
-
-        long frame = 0;
-        int bucket = 0;
-        long nextBoundary = Boundary(1, rate);
-        int tick = 0;
-        long nextTick = TickFrame(0, rate);
-        float low = 0, high = 0;
-        double squares = 0;
-        int bucketFrames = 0;
-        bool started = false;
-
-        var clock = progress is not null && length >= 0 ? Stopwatch.StartNew() : null;
-
-        try
-        {
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                int frames = source.ReadFrames(buffer);
-                if (frames <= 0)
-                    break;
-
-                for (int n = 0; n < frames; n++)
-                {
-                    while (frame >= nextBoundary)
-                    {
-                        Put(ref min, bucket, low);
-                        Put(ref max, bucket, high);
-                        Put(ref rms, bucket, RootMeanSquare(squares, bucketFrames));
-                        low = high = 0;
-                        squares = 0;
-                        bucketFrames = 0;
-                        bucket++;
-                        nextBoundary = Boundary(bucket + 1, rate);
-                    }
-
-                    float sum = 0;
-                    for (int c = 0; c < channels; c++)
-                        sum += buffer[(n * channels) + c];
-                    float sample = sum / channels;
-
-                    // Below SignalRate, one frame is the first at or after several ticks.
-                    while (frame >= nextTick)
-                    {
-                        Put(ref signal, tick, (Half)sample);
-                        tick++;
-                        nextTick = TickFrame(tick, rate);
-                    }
-
-                    if (sample < low)
-                        low = sample;
-                    if (sample > high)
-                        high = sample;
-                    squares += (double)sample * sample;
-                    bucketFrames++;
-                    started = true;
-                    frame++;
-                }
-
-                if (clock is not null && clock.Elapsed >= progressInterval)
-                {
-                    progress!(new StemPeaks(name, min, max, rms, signal, Math.Max(bucket, Count(length, BucketsPerSecond, rate)), bucket, tick));
-                    clock.Restart();
-                }
-            }
-        }
-        catch (InvalidDataException)
-        {
-            // Damaged audio: what was read stands.
-        }
-
-        if (started)
-        {
-            Put(ref min, bucket, low);
-            Put(ref max, bucket, high);
-            Put(ref rms, bucket, RootMeanSquare(squares, bucketFrames));
-            bucket++;
-        }
-
-        return new StemPeaks(name, Trim(min, bucket), Trim(max, bucket), Trim(rms, bucket), Trim(signal, tick), bucket, bucket, tick);
+        // One chunk, as long as the stem.
+        var reader = new StemPeaksReader(name, source, progress, progressInterval, int.MaxValue);
+        reader.ReadChunk(0, source, cancellationToken);
+        return reader.Finish();
     }
 
     /// <summary>
@@ -363,30 +275,15 @@ public static class WaveformPeaks
         return new Waveform(peaks.Min, peaks.Max, peaks.Rms, peaks.ReadBuckets);
     }
 
-    private static float RootMeanSquare(double squares, int count) => count <= 0 ? 0f : (float)Math.Sqrt(squares / count);
-
-    /// <summary>Sets <paramref name="array"/>[<paramref name="index"/>], the next to be read, growing it first when it's full.</summary>
-    /// <remarks>
-    /// Growing gives a new array, so a snapshot of the old one keeps it to itself: only what's past the snapshot is
-    /// ever written, and after growing, nothing is written to the old array at all.
-    /// </remarks>
-    private static void Put<T>(ref T[] array, int index, T value)
-    {
-        if (index == array.Length)
-            Array.Resize(ref array, Math.Max(256, array.Length * 2));
-        array[index] = value;
-    }
-
-    /// <summary>The first <paramref name="count"/> of <paramref name="array"/>: itself when that's all of it.</summary>
-    private static T[] Trim<T>(T[] array, int count) => array.Length == count ? array : array.AsSpan(0, count).ToArray();
+    internal static float RootMeanSquare(double squares, int count) => count <= 0 ? 0f : (float)Math.Sqrt(squares / count);
 
     /// <summary>How many of a grid's <paramref name="perSecond"/> steps a second have a frame of <paramref name="frames"/> at <paramref name="rate"/>.</summary>
-    private static int Count(long frames, int perSecond, int rate) =>
+    internal static int Count(long frames, int perSecond, int rate) =>
         frames <= 0 ? 0 : (int)(((frames - 1) * perSecond / rate) + 1);
 
     /// <summary>The first frame of bucket <paramref name="bucket"/> at <paramref name="rate"/>.</summary>
-    private static long Boundary(int bucket, int rate) => (((long)bucket * rate) + BucketsPerSecond - 1) / BucketsPerSecond;
+    internal static long Boundary(int bucket, int rate) => (((long)bucket * rate) + BucketsPerSecond - 1) / BucketsPerSecond;
 
     /// <summary>The frame sampled for tick <paramref name="tick"/> at <paramref name="rate"/>: the first at or after it.</summary>
-    private static long TickFrame(long tick, int rate) => ((tick * rate) + SignalRate - 1) / SignalRate;
+    internal static long TickFrame(long tick, int rate) => ((tick * rate) + SignalRate - 1) / SignalRate;
 }

@@ -17,18 +17,25 @@ public sealed record OpenedTrack(SongTrack Track, IPcmSource? Source, string? Er
 /// <remarks>
 /// Every file is opened for reading only, sharing reads, so nothing can replace or delete it
 /// until this is disposed: dispose it before saving the song. All of a <c>.sng</c>'s tracks read
-/// through one handle.
+/// through one handle. Each source is read by one thread at a time, but separate sources, including
+/// those of <see cref="OpenSource"/>, may be read on separate threads.
 /// </remarks>
 public sealed class SongAudio : IDisposable
 {
     private const int BufferSize = 64 * 1024;
 
+    private readonly SongEntry _entry;
     private readonly SafeFileHandle? _sngHandle;
+    private readonly Dictionary<string, SngFileEntry>? _stored;
+    private readonly ReadOnlyMemory<byte> _mask;
     private readonly List<OpenedTrack> _tracks;
 
-    private SongAudio(SafeFileHandle? sngHandle, List<OpenedTrack> tracks)
+    private SongAudio(SongEntry entry, SafeFileHandle? sngHandle, Dictionary<string, SngFileEntry>? stored, ReadOnlyMemory<byte> mask, List<OpenedTrack> tracks)
     {
+        _entry = entry;
         _sngHandle = sngHandle;
+        _stored = stored;
+        _mask = mask;
         _tracks = tracks;
     }
 
@@ -80,7 +87,21 @@ public sealed class SongAudio : IDisposable
             throw;
         }
 
-        return new SongAudio(handle, opened);
+        return new SongAudio(entry, handle, stored, mask, opened);
+    }
+
+    /// <summary>
+    /// Opens another decoder for <paramref name="track"/>, apart from the one in <see cref="Tracks"/>, so that the
+    /// two can be read on separate threads. The caller disposes it, before this.
+    /// </summary>
+    /// <exception cref="InvalidDataException">The track isn't audio this can decode.</exception>
+    /// <exception cref="IOException">The track's file can't be read, or isn't in the <c>.sng</c>.</exception>
+    /// <exception cref="UnauthorizedAccessException">The track's file can't be read.</exception>
+    /// <exception cref="ObjectDisposedException">This has been disposed.</exception>
+    public IPcmSource OpenSource(SongTrack track)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+        return OpenDecoder(_entry, track, _sngHandle, _stored, _mask.Span);
     }
 
     public void Dispose()
@@ -94,28 +115,34 @@ public sealed class SongAudio : IDisposable
     {
         try
         {
-            Stream stream;
-            if (track.StagedSourcePath is { } source)
-            {
-                stream = OpenFile(source);
-            }
-            else if (entry.Kind == SongEntryKind.SngFile)
-            {
-                if (handle is null || stored is null || !stored.TryGetValue(track.StoredName, out var file))
-                    return new OpenedTrack(track, null, "The file isn't in the .sng any more.");
-                stream = new BufferedStream(new SngEntryStream(handle, file, mask), BufferSize);
-            }
-            else
-            {
-                stream = OpenFile(Path.Combine(entry.FullPath, track.StoredName));
-            }
-
-            return new OpenedTrack(track, AudioDecoder.Open(stream, track.StoredName), null);
+            return new OpenedTrack(track, OpenDecoder(entry, track, handle, stored, mask), null);
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
         {
             return new OpenedTrack(track, null, ex.Message);
         }
+    }
+
+    private static IPcmSource OpenDecoder(SongEntry entry, SongTrack track, SafeFileHandle? handle, Dictionary<string, SngFileEntry>? stored, ReadOnlySpan<byte> mask)
+    {
+        Stream stream;
+        if (track.StagedSourcePath is { } source)
+        {
+            stream = OpenFile(source);
+        }
+        else if (entry.Kind == SongEntryKind.SngFile)
+        {
+            if (handle is null || stored is null || !stored.TryGetValue(track.StoredName, out var file))
+                throw new FileNotFoundException("The file isn't in the .sng any more.");
+            ObjectDisposedException.ThrowIf(handle.IsClosed, handle);
+            stream = new BufferedStream(new SngEntryStream(handle, file, mask), BufferSize);
+        }
+        else
+        {
+            stream = OpenFile(Path.Combine(entry.FullPath, track.StoredName));
+        }
+
+        return AudioDecoder.Open(stream, track.StoredName);
     }
 
     private static FileStream OpenFile(string path) =>
