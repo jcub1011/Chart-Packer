@@ -35,7 +35,31 @@ The result is LGPL 2.1+ and a few MB per RID.
 | `linux-x64`, `linux-arm64` | That platform |
 | `osx-x64`, `osx-arm64` | macOS with Xcode's command-line tools |
 
-It needs `git`, `make`, `pkg-config`, a C compiler and, for x86-64, `nasm`.
+It needs `git`, `make`, `pkg-config`, a C compiler and, for x86-64, `nasm`. The script checks for
+these before it starts. Git Bash has none of them, so it can't build FFmpeg.
+
+The build runs in `build/ffmpeg/.work`. When the repo's path has a space in it, such as
+`C:\Users\First Last\...`, it runs in `/tmp/chartpacker-ffmpeg` instead, because FFmpeg's configure
+won't build from such a path. Set `FFMPEG_WORK` to choose another place.
+
+### On Windows, with WSL
+
+1. Install a distribution, once, from PowerShell: `wsl --install -d Ubuntu`.
+2. In Ubuntu, install the tools and the mingw-w64 cross-compiler, once:
+
+   ```
+   sudo apt update && sudo apt install -y git make pkg-config nasm mingw-w64
+   ```
+
+3. Build from the repo, which WSL sees under `/mnt/c`:
+
+   ```
+   cd "/mnt/c/Users/<you>/source/repos/Chart-Packer"
+   build/ffmpeg/build.sh win-x64
+   ```
+
+   It takes a few minutes. The libraries it copies into `ChartPacker.Ffmpeg/runtimes/win-x64/native/`
+   replace whatever was there, including a `fetch-prebuilt.sh` download.
 
 ## For development: `fetch-prebuilt.sh <rid>`
 
