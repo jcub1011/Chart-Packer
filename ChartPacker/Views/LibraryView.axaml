@@ -250,28 +250,14 @@
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis"
                                            IsVisible="{Binding ShowDetails}" />
-                                <Grid Grid.Row="1" Grid.Column="0"
-                                      ColumnDefinitions="Auto,Auto,*"
-                                      VerticalAlignment="Center"
-                                      IsVisible="{Binding ShowByline}">
-                                    <TextBlock Grid.Column="0"
-                                               Classes="muted"
-                                               Text="{Binding Artist}"
-                                               FontSize="11"
-                                               TextTrimming="CharacterEllipsis"
-                                               IsVisible="{Binding HasArtist}" />
-                                    <TextBlock Grid.Column="1"
-                                               Classes="muted"
-                                               Text="{x:Static res:Strings.ListDetailSeparator}"
-                                               FontSize="11"
-                                               IsVisible="{Binding HasArtistAndCharter}" />
-                                    <TextBlock Grid.Column="2"
-                                               Classes="muted"
-                                               ctl:RichTextMarkup.Text="{Binding Charter}"
-                                               FontSize="11"
-                                               TextTrimming="CharacterEllipsis"
-                                               IsVisible="{Binding HasCharter}" />
-                                </Grid>
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Classes="muted"
+                                           ctl:RichTextMarkup.Prefix="{Binding BylinePrefix}"
+                                           ctl:RichTextMarkup.Text="{Binding Charter}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           IsVisible="{Binding ShowByline}" />
                                 <StackPanel Grid.Row="1" Grid.Column="1"
                                             Orientation="Horizontal" Spacing="4"
                                             HorizontalAlignment="Right">

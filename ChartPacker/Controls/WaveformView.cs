@@ -42,6 +42,12 @@ namespace ChartPacker.Controls
 
         private bool _isScrubbing;
 
+        // Each column's levels, worked out again only when the waveform, the width or the duration
+        // changes, and not as the playhead moves.
+        private (double Low, double High)[] _columnPeaks = [];
+        private Waveform? _columnPeaksWaveform;
+        private double _columnPeaksDuration;
+
         static WaveformView()
         {
             AffectsRender<WaveformView>(WaveformProperty, PositionSecondsProperty, LengthSecondsProperty, PlayedBrushProperty, UnplayedBrushProperty);
@@ -106,17 +112,14 @@ namespace ChartPacker.Controls
             double played = duration > 0 ? Math.Clamp(PositionSeconds / duration, 0, 1) : 0;
             double middle = height / 2;
             int columns = Math.Max(1, (int)((width + BarGap) / (BarWidth + BarGap)));
-            var waveform = Waveform;
+            var peaks = ColumnPeaks(Waveform, columns, duration);
 
             for (int column = 0; column < columns; column++)
             {
                 double x = column * (BarWidth + BarGap);
                 double from = (double)column / columns;
                 double to = (double)(column + 1) / columns;
-
-                double low = 0, high = 0;
-                if (waveform is not null && duration > 0)
-                    (low, high) = Peak(waveform, from * duration, to * duration);
+                var (low, high) = peaks[column];
 
                 double top = middle - (high * middle);
                 double bottom = middle - (low * middle);
@@ -130,6 +133,25 @@ namespace ChartPacker.Controls
                 var brush = (from + to) / 2 <= played ? PlayedBrush : UnplayedBrush;
                 context.DrawRectangle(brush, null, new RoundedRect(new Rect(x, top, BarWidth, bottom - top), 1));
             }
+        }
+
+        /// <summary>The lowest and highest level of each of <paramref name="columns"/> columns across <paramref name="duration"/>.</summary>
+        private (double Low, double High)[] ColumnPeaks(Waveform? waveform, int columns, double duration)
+        {
+            if (_columnPeaks.Length == columns && ReferenceEquals(waveform, _columnPeaksWaveform) && duration == _columnPeaksDuration)
+                return _columnPeaks;
+
+            var peaks = new (double Low, double High)[columns];
+            if (waveform is not null && duration > 0)
+            {
+                for (int column = 0; column < columns; column++)
+                    peaks[column] = Peak(waveform, (double)column / columns * duration, (double)(column + 1) / columns * duration);
+            }
+
+            _columnPeaks = peaks;
+            _columnPeaksWaveform = waveform;
+            _columnPeaksDuration = duration;
+            return peaks;
         }
 
         /// <summary>The lowest and highest level between two times.</summary>

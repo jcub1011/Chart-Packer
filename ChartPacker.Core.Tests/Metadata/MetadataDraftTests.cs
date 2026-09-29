@@ -233,5 +233,62 @@ public sealed class MetadataDraftTests
         Assert.IsEmpty(draft.AddedFiles);
     }
 
+    [TestMethod]
+    public void RevertingAReplacingAddBringsBackWhatItReplaced()
+    {
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("guitar.ogg", "x.ogg", 1), ["guitar.mp3"]);
+        Assert.IsTrue(draft.IsFileRemoved("guitar.mp3"));
+
+        draft.RevertFile("guitar.ogg");
+
+        Assert.IsFalse(draft.IsFileRemoved("guitar.mp3"));
+        Assert.IsTrue(draft.IsEmpty);
+    }
+
+    [TestMethod]
+    public void RevertingAReplacingAddKeepsARemovalMadeBeforeIt()
+    {
+        var draft = new MetadataDraft();
+        draft.RemoveFile("guitar.mp3");
+        draft.AddFile(new AddedFile("guitar.ogg", "x.ogg", 1), ["GUITAR.mp3"]);
+
+        draft.RevertFile("guitar.ogg");
+
+        CollectionAssert.AreEqual(new[] { "guitar.mp3" }, draft.RemovedFiles.ToArray());
+        Assert.IsEmpty(draft.AddedFiles);
+    }
+
+    [TestMethod]
+    public void RevertingAReplacingAddKeepsARemovalAskedForAfterIt()
+    {
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("guitar.ogg", "x.ogg", 1), ["guitar.mp3"]);
+        draft.RevertFile("guitar.mp3");
+        draft.RemoveFile("guitar.mp3");
+
+        draft.RevertFile("guitar.ogg");
+
+        CollectionAssert.AreEqual(new[] { "guitar.mp3" }, draft.RemovedFiles.ToArray());
+    }
+
+    [TestMethod]
+    public void ReplacingAStemAgainLeavesOneRemoval()
+    {
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("guitar.ogg", "x.ogg", 1), ["guitar.mp3"]);
+
+        // As adding a track does: the stem's earlier add goes first.
+        draft.RevertFile("guitar.ogg");
+        draft.AddFile(new AddedFile("guitar.opus", "y.opus", 2), ["guitar.mp3"]);
+
+        CollectionAssert.AreEqual(new[] { "guitar.mp3" }, draft.RemovedFiles.ToArray());
+        CollectionAssert.AreEqual(new[] { new AddedFile("guitar.opus", "y.opus", 2) }, draft.AddedFiles.ToArray());
+
+        draft.RevertFile("guitar.opus");
+
+        Assert.IsTrue(draft.IsEmpty);
+    }
+
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
 }

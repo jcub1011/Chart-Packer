@@ -62,26 +62,29 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The artist, without rich-text tags; null when there is none.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasArtist), nameof(HasArtistAndCharter), nameof(ShowByline), nameof(ShowDetails))]
+        [NotifyPropertyChangedFor(nameof(BylinePrefix), nameof(ShowByline), nameof(ShowDetails))]
         private string? _artist;
 
         /// <summary>The charter with its rich-text tags left in, for the view to render; null when there is none.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasCharter), nameof(HasArtistAndCharter), nameof(ShowByline), nameof(ShowDetails))]
+        [NotifyPropertyChangedFor(nameof(BylinePrefix), nameof(ShowByline), nameof(ShowDetails))]
         private string? _charter;
 
         /// <summary>This song is the one the player is playing, so the play button on its art shows a stop button.</summary>
         [ObservableProperty]
         private bool _isPreviewing;
 
-        public bool HasArtist => Artist is not null;
-
-        public bool HasCharter => Charter is not null;
-
-        public bool HasArtistAndCharter => HasArtist && HasCharter;
+        /// <summary>
+        /// The plain text before the charter on the byline: the artist, with the separator when a charter
+        /// follows. The line is one text, so a long one is cut short with an ellipsis as a whole.
+        /// </summary>
+        public string? BylinePrefix =>
+            Artist is null ? null
+            : Charter is null ? Artist
+            : Artist + Strings.ListDetailSeparator;
 
         /// <summary>The line shows the artist and charter rather than <see cref="Details"/>.</summary>
-        public bool ShowByline => HasArtist || HasCharter;
+        public bool ShowByline => Artist is not null || Charter is not null;
 
         public bool ShowDetails => !ShowByline;
 

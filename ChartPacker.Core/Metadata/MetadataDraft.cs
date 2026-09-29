@@ -41,6 +41,9 @@ public sealed class MetadataDraft
     private readonly HashSet<string> _removedFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<AddedFile> _addedFiles = [];
 
+    // The removals an add made, by the added name, so that dropping the add drops them too.
+    private readonly Dictionary<string, List<string>> _replacedBy = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>True when there are no pending changes, to the metadata, the album art or the files.</summary>
     public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasFileChanges;
 
@@ -114,21 +117,58 @@ public sealed class MetadataDraft
             _addedFiles.Add(file);
     }
 
+    /// <summary>
+    /// Stages <paramref name="file"/> to be added in place of the files <paramref name="replaces"/>,
+    /// which are marked for removal. Reverting the add unmarks them again, except those that were
+    /// already marked before it.
+    /// </summary>
+    public void AddFile(AddedFile file, IEnumerable<string> replaces)
+    {
+        ArgumentNullException.ThrowIfNull(replaces);
+        AddFile(file);
+
+        foreach (string name in replaces)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(name);
+            if (!_removedFiles.Add(name))
+                continue;
+
+            if (!_replacedBy.TryGetValue(file.StoredName, out var replaced))
+                _replacedBy[file.StoredName] = replaced = [];
+            replaced.Add(name);
+        }
+    }
+
     /// <summary>Marks the file <paramref name="name"/> for removal.</summary>
     public void RemoveFile(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         _removedFiles.Add(name);
+
+        // Asked for in its own right, so it outlasts any add that also removed it.
+        ForgetReplaced(name);
     }
 
-    /// <summary>Forgets any removal or add of the file <paramref name="name"/>.</summary>
+    /// <summary>
+    /// Forgets any removal or add of the file <paramref name="name"/>. Forgetting an add also
+    /// forgets the removals it made; see <see cref="AddFile(AddedFile, IEnumerable{string})"/>.
+    /// </summary>
     public void RevertFile(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
-        _removedFiles.Remove(name);
+        if (_removedFiles.Remove(name))
+            ForgetReplaced(name);
+
         int index = FindAdded(name);
         if (index >= 0)
+        {
             _addedFiles.RemoveAt(index);
+            if (_replacedBy.Remove(name, out var replaced))
+            {
+                foreach (string removed in replaced)
+                    _removedFiles.Remove(removed);
+            }
+        }
     }
 
     /// <summary>Whether the file <paramref name="name"/> is marked for removal.</summary>
@@ -153,6 +193,7 @@ public sealed class MetadataDraft
         AlbumArt = null;
         _removedFiles.Clear();
         _addedFiles.Clear();
+        _replacedBy.Clear();
     }
 
     /// <summary>Gets the pending change to <paramref name="key"/>, if there is one.</summary>
@@ -202,6 +243,13 @@ public sealed class MetadataDraft
 
     private int FindAdded(string name) =>
         _addedFiles.FindIndex(f => f.StoredName.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Stops any add counting <paramref name="name"/> among the removals it made.</summary>
+    private void ForgetReplaced(string name)
+    {
+        foreach (var replaced in _replacedBy.Values)
+            replaced.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
 
     private void Record(MetadataChange change)
     {

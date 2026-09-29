@@ -633,13 +633,12 @@ namespace ChartPacker.ViewModels
                 draft.RevertFile(added);
 
             // A stored file that differs only in case is still replaced, on a case-sensitive file system too.
-            foreach (string stored in SongTracks.FilesOfStem(_diskFiles.Select(f => f.Path), stem))
-            {
-                if (!stored.Equals(storedName, StringComparison.Ordinal))
-                    draft.RemoveFile(stored);
-            }
+            // Recorded as replaced by the add, so removing the added track brings them back.
+            var replaced = SongTracks.FilesOfStem(_diskFiles.Select(f => f.Path), stem)
+                .Where(stored => !stored.Equals(storedName, StringComparison.Ordinal))
+                .ToList();
 
-            draft.AddFile(new AddedFile(storedName, path, length));
+            draft.AddFile(new AddedFile(storedName, path, length), replaced);
             OnDraftsChanged();
         }
 
@@ -678,6 +677,8 @@ namespace ChartPacker.ViewModels
             Player.Unload();
             try
             {
+                await Player.WhenFilesClosedAsync();
+
                 foreach (var song in dirty)
                 {
                     string? error;

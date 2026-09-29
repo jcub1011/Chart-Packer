@@ -8,19 +8,24 @@ public sealed class StemPeaks
     internal StemPeaks(string name, float[] min, float[] max)
     {
         Name = name;
-        Min = min;
-        Max = max;
+        MinBuckets = min;
+        MaxBuckets = max;
     }
 
     public string Name { get; }
 
     /// <summary>The lowest sample of each bucket, at most 0. Channels are averaged.</summary>
-    public IReadOnlyList<float> Min { get; }
+    public IReadOnlyList<float> Min => MinBuckets;
 
     /// <summary>The highest sample of each bucket, at least 0.</summary>
-    public IReadOnlyList<float> Max { get; }
+    public IReadOnlyList<float> Max => MaxBuckets;
 
-    public int Count => Min.Count;
+    public int Count => MinBuckets.Length;
+
+    // The same buckets as arrays, so that mixing indexes them directly.
+    internal float[] MinBuckets { get; }
+
+    internal float[] MaxBuckets { get; }
 }
 
 /// <summary>A stem's peaks with the switches that decide whether it's heard, and how loudly.</summary>
@@ -153,10 +158,12 @@ public static class WaveformPeaks
                 continue;
 
             float volume = Math.Max(0f, stem.Volume);
-            for (int i = 0; i < stem.Peaks.Count; i++)
+            float[] stemMin = stem.Peaks.MinBuckets;
+            float[] stemMax = stem.Peaks.MaxBuckets;
+            for (int i = 0; i < stemMin.Length; i++)
             {
-                min[i] += stem.Peaks.Min[i] * volume;
-                max[i] += stem.Peaks.Max[i] * volume;
+                min[i] += stemMin[i] * volume;
+                max[i] += stemMax[i] * volume;
             }
         }
 

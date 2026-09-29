@@ -235,6 +235,14 @@ public sealed class OpusSource : IPcmSource
         if (!_ogg.TryReadPacket(out var packet))
             return false;
 
+        // An empty packet holds no samples on the granule timeline (see PacketFrames); decoding it
+        // would conceal a lost packet instead, adding audio that isn't there.
+        if (packet.IsEmpty)
+        {
+            _bufferFrames = 0;
+            return true;
+        }
+
         int frames;
         try
         {

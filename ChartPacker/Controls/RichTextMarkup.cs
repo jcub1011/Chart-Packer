@@ -11,15 +11,23 @@ namespace ChartPacker.Controls
     /// in a <see cref="TextBlock"/> with the formatting applied. See <see cref="RichText"/> for the
     /// supported tags.
     /// </summary>
+    /// <remarks>
+    /// <see cref="PrefixProperty">Prefix</see> is plain text shown before the markup, unformatted, so a line
+    /// mixing the two is one text and is trimmed as a whole.
+    /// </remarks>
     /// <example><c>&lt;SelectableTextBlock ctl:RichTextMarkup.Text="{Binding Value}" /&gt;</c></example>
     public sealed class RichTextMarkup
     {
         public static readonly AttachedProperty<string?> TextProperty =
             AvaloniaProperty.RegisterAttached<RichTextMarkup, TextBlock, string?>("Text");
 
+        public static readonly AttachedProperty<string?> PrefixProperty =
+            AvaloniaProperty.RegisterAttached<RichTextMarkup, TextBlock, string?>("Prefix");
+
         static RichTextMarkup()
         {
-            TextProperty.Changed.AddClassHandler<TextBlock>((block, e) => Apply(block, e.NewValue as string));
+            TextProperty.Changed.AddClassHandler<TextBlock>((block, _) => Apply(block));
+            PrefixProperty.Changed.AddClassHandler<TextBlock>((block, _) => Apply(block));
         }
 
         private RichTextMarkup()
@@ -30,10 +38,17 @@ namespace ChartPacker.Controls
 
         public static void SetText(TextBlock block, string? value) => block.SetValue(TextProperty, value);
 
-        private static void Apply(TextBlock block, string? text)
+        public static string? GetPrefix(TextBlock block) => block.GetValue(PrefixProperty);
+
+        public static void SetPrefix(TextBlock block, string? value) => block.SetValue(PrefixProperty, value);
+
+        private static void Apply(TextBlock block)
         {
             var inlines = new InlineCollection();
-            foreach (RichTextSpan span in RichText.Parse(text ?? string.Empty))
+            if (GetPrefix(block) is { Length: > 0 } prefix)
+                inlines.Add(new Run(prefix));
+
+            foreach (RichTextSpan span in RichText.Parse(GetText(block) ?? string.Empty))
             {
                 if (span.Text == "\n")
                 {

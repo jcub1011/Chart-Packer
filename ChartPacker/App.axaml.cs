@@ -29,7 +29,9 @@ namespace ChartPacker
                 var confirmation = new AvaloniaConfirmationService(() => window);
                 var drafts = new MetadataDraftStore();
                 var job = new JobViewModel(settings);
-                var player = new PlayerViewModel(settings, rate => new SdlAudioOutput(rate));
+                // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
+                var audio = new SdlAudio();
+                var player = new PlayerViewModel(settings, audio.Open);
 
                 window.DataContext = new MainWindowViewModel(
                     new LibraryViewModel(folderPicker, settings, drafts, job, player),
@@ -43,7 +45,11 @@ namespace ChartPacker
                 window.Closing += (_, _) => settings.Save();
 
                 // Stops playback and closes the audio device and the song's files.
-                desktop.Exit += (_, _) => player.Dispose();
+                desktop.Exit += (_, _) =>
+                {
+                    player.Dispose();
+                    audio.Dispose();
+                };
 
                 desktop.MainWindow = window;
             }

@@ -147,6 +147,19 @@ public sealed class DecoderTests
     }
 
     [TestMethod]
+    public void AnEmptyOpusPacketAddsNoAudio()
+    {
+        byte[] original = File.ReadAllBytes(TestAudio.Fixture("chirp-stereo-48000.opus"));
+        byte[] withEmpty = WithEmptyPacketAfterPage(original, 3);
+
+        using var expected = AudioDecoder.Open(new MemoryStream(original), "song.opus");
+        using var actual = AudioDecoder.Open(new MemoryStream(withEmpty), "song.opus");
+
+        Assert.AreEqual(expected.LengthFrames, actual.LengthFrames);
+        CollectionAssert.AreEqual(TestAudio.ReadAll(expected), TestAudio.ReadAll(actual));
+    }
+
+    [TestMethod]
     public void CheckAcceptsAudioAndRejectsOtherFiles()
     {
         AudioDecoder.Check(TestAudio.Fixture("chirp-stereo-44100.mp3"));
@@ -155,6 +168,35 @@ public sealed class DecoderTests
         File.WriteAllText(fake, "not audio");
         Assert.ThrowsExactly<InvalidDataException>(() => AudioDecoder.Check(fake));
         File.Delete(fake); // Check closed it.
+    }
+
+    /// <summary>
+    /// <paramref name="ogg"/> with a zero-length packet added at the end of the first page, from
+    /// <paramref name="fromPage"/> on, that ends a packet. The CRC isn't redone: the reader doesn't check it.
+    /// </summary>
+    private static byte[] WithEmptyPacketAfterPage(byte[] ogg, int fromPage)
+    {
+        int offset = 0;
+        for (int page = 0; offset < ogg.Length; page++)
+        {
+            int segments = ogg[offset + 26];
+            int bodyLength = 0;
+            for (int i = 0; i < segments; i++)
+                bodyLength += ogg[offset + 27 + i];
+            int tableEnd = offset + 27 + segments;
+
+            // A last lacing value under 255 ends a packet on this page, so an empty one can follow it.
+            if (page >= fromPage && segments is > 0 and < 255 && ogg[tableEnd - 1] < 255)
+            {
+                byte[] result = [.. ogg[..tableEnd], 0, .. ogg[tableEnd..]];
+                result[offset + 26]++;
+                return result;
+            }
+
+            offset = tableEnd + bodyLength;
+        }
+
+        throw new InvalidOperationException("No page to add an empty packet to.");
     }
 
     /// <summary>A memory stream that records being disposed.</summary>
