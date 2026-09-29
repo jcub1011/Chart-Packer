@@ -67,6 +67,14 @@ namespace ChartPacker.ViewModels
 
         public bool HasError => Error is not null;
 
+        /// <summary>The track's own waveform, at full level; empty until its audio has been read.</summary>
+        [ObservableProperty]
+        private Waveform _waveform = Waveform.Empty;
+
+        /// <summary>Whether the track is in the mix as it's switched now: soloed, or unmuted with nothing soloed, and not turned all the way down.</summary>
+        [ObservableProperty]
+        private bool _isHeard = true;
+
         // Solo overrides mute in the mix, so having both on would read as if both applied. Turning
         // one on turns the other off.
         partial void OnIsMutedChanged(bool value)
@@ -174,6 +182,7 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(LengthText))]
         [NotifyPropertyChangedFor(nameof(IsLengthKnown))]
         [NotifyPropertyChangedFor(nameof(LengthToolTip))]
+        [NotifyPropertyChangedFor(nameof(TimelineSeconds))]
         private Waveform _waveform = Waveform.Empty;
 
         /// <summary>The audio is being opened for the first play.</summary>
@@ -193,6 +202,7 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(LengthText))]
         [NotifyPropertyChangedFor(nameof(IsLengthKnown))]
         [NotifyPropertyChangedFor(nameof(LengthToolTip))]
+        [NotifyPropertyChangedFor(nameof(TimelineSeconds))]
         private double _lengthSeconds;
 
         /// <summary>The master volume, from 0 to 1. Kept in the settings, so it carries over to the next run.</summary>
@@ -233,9 +243,15 @@ namespace ChartPacker.ViewModels
         /// </summary>
         public bool IsLengthKnown => LengthSeconds > 0 || Waveform.Count > 0;
 
+        /// <summary>
+        /// How long the song is, in the same way as <see cref="LengthText"/>, or 0 while that isn't known. Every
+        /// track's waveform is laid out across it, so they share one time axis.
+        /// </summary>
+        public double TimelineSeconds => Math.Max(0, LengthSeconds > 0 ? LengthSeconds : Waveform.Seconds);
+
         /// <summary>How long the song is, or a placeholder while that isn't known yet; see <see cref="IsLengthKnown"/>.</summary>
         public string LengthText => IsLengthKnown
-            ? MetadataTimes.FormatDuration((long)(Math.Max(0, LengthSeconds > 0 ? LengthSeconds : Waveform.Seconds) * 1000))
+            ? MetadataTimes.FormatDuration((long)(TimelineSeconds * 1000))
             : Strings.LengthPending;
 
         /// <summary>Why there's no length yet, while there isn't; otherwise no tool tip.</summary>
@@ -284,9 +300,13 @@ namespace ChartPacker.ViewModels
                 if (_trackVolumes.TryGetValue((entry.FullPath, track.Stem), out double volume))
                     row.Volume = volume;
 
+                if (_peaks.TryGetValue(track, out var known))
+                    row.Waveform = WaveformPeaks.Of(known);
+
                 Tracks.Add(row);
             }
 
+            RefreshHeard();
             OnPropertyChanged(nameof(HasTracks));
             OnPropertyChanged(nameof(TracksHeader));
             RefreshCommands();
@@ -357,7 +377,7 @@ namespace ChartPacker.ViewModels
             _player?.Seek(TimeSpan.FromSeconds(PositionSeconds));
         }
 
-        /// <summary>The spectrum of what's being heard, for the library's visualiser. On the UI thread.</summary>
+        /// <summary>The spectrum of what's being heard, for the visualiser behind the details panel. On the UI thread.</summary>
         public bool TryReadSpectrum(Span<float> levels)
         {
             if (_player is not { } player || !player.TryReadHeard(_heard))
@@ -387,6 +407,7 @@ namespace ChartPacker.ViewModels
         internal void ApplySwitches(TrackRowViewModel row)
         {
             ScheduleWaveformRebuild();
+            RefreshHeard();
             if (_player is null)
                 return;
 
@@ -396,6 +417,14 @@ namespace ChartPacker.ViewModels
                 stem.IsSolo = row.IsSolo;
                 stem.Volume = (float)row.Volume;
             }
+        }
+
+        /// <summary>Marks each track heard or not, the way the mixer and <see cref="WaveformPeaks.Mix"/> decide it.</summary>
+        private void RefreshHeard()
+        {
+            bool anySolo = Tracks.Any(t => t.IsSolo);
+            foreach (var row in Tracks)
+                row.IsHeard = (anySolo ? row.IsSolo : !row.IsMuted) && row.Volume > 0;
         }
 
         private bool CanPlay() => HasTracks && !IsOpening;
@@ -517,9 +546,14 @@ namespace ChartPacker.ViewModels
                         if (keys[track] is { } key)
                             StemPeaksCache.Shared.Add(key, peaks);
                     }
-                    catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException)
+                    catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
                     {
-                        // This track has no waveform, or the read was stopped; the other tracks carry on.
+                        // The read was stopped; the other tracks carry on.
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+                    {
+                        // This track has no waveform, and what was read of it goes, so the mix isn't left waiting on it; the other tracks carry on.
+                        ForgetPeaks(track, cancellationToken);
                     }
                 });
             }
@@ -542,6 +576,22 @@ namespace ChartPacker.ViewModels
                     _partialPeaks.Remove(track);
                 else
                     _partialPeaks.Add(track);
+
+                foreach (var row in Tracks.Where(r => Equals(r.Track, track)))
+                    row.Waveform = WaveformPeaks.Of(peaks);
+                ScheduleWaveformRebuild();
+            });
+
+        /// <summary>Drops what was read of <paramref name="track"/>, whose read failed, unless the read has been stopped; from any thread.</summary>
+        private void ForgetPeaks(SongTrack track, CancellationToken cancellationToken) =>
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (cancellationToken.IsCancellationRequested || !_peaks.Remove(track))
+                    return;
+
+                _partialPeaks.Remove(track);
+                foreach (var row in Tracks.Where(r => Equals(r.Track, track)))
+                    row.Waveform = Waveform.Empty;
                 ScheduleWaveformRebuild();
             });
 

@@ -267,6 +267,102 @@ public sealed class WaveformPeaksTests
         Assert.AreEqual(0, snapshots.Count);
     }
 
+    [TestMethod]
+    public void EachBucketHoldsTheRootMeanSquareOfItsSamples()
+    {
+        // A square wave is as loud as its peaks; a sine is 1/√2 of them.
+        Assert.AreEqual(0.5f, Stem(0.5f, muted: false).Peaks.Rms[0], 1e-6f);
+
+        var sine = Sine(48000, 100, 0.5, 0).Peaks;
+        Assert.IsTrue(sine.Rms.All(v => Math.Abs(v - (0.5 / Math.Sqrt(2))) < 1e-3), $"The loudness ran from {sine.Rms.Min()} to {sine.Rms.Max()}.");
+    }
+
+    [TestMethod]
+    public void TheLoudnessOfSummedStemsIsThatOfTheSum()
+    {
+        var inPhase = WaveformPeaks.Mix([Stem(0.25f, muted: false), Stem(0.5f, muted: false)]);
+        var outOfPhase = WaveformPeaks.Mix([Sine(48000, 100, 0.5, 0), Sine(48000, 100, 0.5, Math.PI)]);
+
+        Assert.AreEqual(0.75f, inPhase.Rms[0], 1e-6f);
+        Assert.IsTrue(outOfPhase.Rms.All(v => v < 1e-3f), $"The mix's loudness reached {outOfPhase.Rms.Max()}.");
+    }
+
+    [TestMethod]
+    public void AStemsVolumeScalesItsLoudness()
+    {
+        var alone = WaveformPeaks.Mix([Stem(0.5f, muted: false) with { Volume = 0.5f }, Stem(0.25f, muted: true)]);
+        var mixed = WaveformPeaks.Mix([Stem(0.5f, muted: false) with { Volume = 0.5f }, Stem(0.25f, muted: false)]);
+
+        Assert.AreEqual(0.25f, alone.Rms[0], 1e-6f);
+        Assert.AreEqual(0.5f, mixed.Rms[0], 1e-6f);
+    }
+
+    [TestMethod]
+    public void SnapshotsSayHowMuchWasReadAndTheResultIsAllRead()
+    {
+        var snapshots = new List<StemPeaks>();
+        var source = new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f);
+
+        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero);
+
+        int read = 0;
+        foreach (var snapshot in snapshots)
+        {
+            Assert.IsTrue(snapshot.ReadCount > read && snapshot.ReadCount < snapshot.Count, $"{snapshot.ReadCount} of {snapshot.Count} read.");
+            Assert.IsTrue(snapshot.Max.Take(snapshot.ReadCount).All(v => v == 0.5f), "What it says was read was.");
+            Assert.IsTrue(snapshot.Rms.Skip(snapshot.ReadCount).All(v => v == 0f), "What hasn't been read is silent.");
+            read = snapshot.ReadCount;
+        }
+
+        Assert.AreEqual(peaks.Count, peaks.ReadCount);
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f));
+        CollectionAssert.AreEqual(expected.Rms.ToArray(), peaks.Rms.ToArray());
+    }
+
+    [TestMethod]
+    public void TheMixIsKnownAsFarAsTheHeardStemReadLeastFar()
+    {
+        var reading = new AudibleStem(FirstSnapshot(), false, false);
+        var done = Stem(0.25f, muted: false, frames: 20);
+
+        // A stem read to its end is known all the way, though it's shorter.
+        Assert.AreEqual(reading.Peaks.ReadCount, WaveformPeaks.Mix([reading, done]).ReadCount);
+
+        // What isn't heard doesn't hold it back...
+        var muted = WaveformPeaks.Mix([reading with { IsMuted = true }, done]);
+        Assert.AreEqual(muted.Count, muted.ReadCount);
+
+        // ...unless nothing is.
+        Assert.AreEqual(reading.Peaks.ReadCount, WaveformPeaks.Mix([reading with { IsMuted = true }, done with { IsMuted = true }]).ReadCount);
+        Assert.AreEqual(0, Waveform.Empty.ReadCount);
+    }
+
+    [TestMethod]
+    public void OfGivesTheStemAloneAsFarAsItWasRead()
+    {
+        var snapshot = FirstSnapshot();
+        var peaks = Stem(0.5f, muted: false, frames: 60).Peaks;
+
+        var partial = WaveformPeaks.Of(snapshot);
+        var whole = WaveformPeaks.Of(peaks);
+
+        Assert.AreEqual(snapshot.Count, partial.Count);
+        Assert.AreEqual(snapshot.ReadCount, partial.ReadCount);
+        CollectionAssert.AreEqual(snapshot.Max.ToArray(), partial.Max.ToArray());
+        Assert.AreEqual(3, whole.ReadCount);
+        CollectionAssert.AreEqual(peaks.Min.ToArray(), whole.Min.ToArray());
+        CollectionAssert.AreEqual(peaks.Rms.ToArray(), whole.Rms.ToArray());
+        Assert.AreEqual(0.06, whole.ReadSeconds, 1e-9);
+    }
+
+    // The first progress snapshot of a stem ten seconds long: part read, 500 buckets long.
+    private static StemPeaks FirstSnapshot()
+    {
+        var snapshots = new List<StemPeaks>();
+        WaveformPeaks.Compute("reading", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 2 == 0 ? 0.5f : -0.5f), snapshots.Add, TimeSpan.Zero);
+        return snapshots[0];
+    }
+
     // One second of a sine of `amplitude` at `hz`, starting at `phase`.
     private static AudibleStem Sine(int rate, double hz, double amplitude, double phase) =>
         new(

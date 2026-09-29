@@ -239,9 +239,20 @@
             <Setter Property="Width" Value="12" />
             <Setter Property="Height" Value="12" />
         </Style>
+        <!-- A track's waveform fades while the track isn't heard, as the mix's waveform leaves it out. -->
+        <Style Selector="ctl|WaveformView.track">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ctl|WaveformView.track.unheard">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
         <Style Selector="ToggleButton.trackSwitch">
             <Setter Property="MinWidth" Value="24" />
-            <Setter Property="Height" Value="22" />
+            <Setter Property="Height" Value="20" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -251,6 +262,16 @@
     </UserControl.Styles>
 
     <Panel>
+        <!-- Behind everything, along the bottom of the panel: what's heard as a spectrum, whichever song is
+             playing, up to 128px tall. It stays put while the details scroll over it. -->
+        <ctl:SpectrumView VerticalAlignment="Bottom"
+                          MaxHeight="128"
+                          IsActive="{Binding Player.IsPlaying}"
+                          Source="{Binding Player}"
+                          LowColor="{DynamicResource SpectrumLowColor}"
+                          MiddleColor="{DynamicResource SpectrumMiddleColor}"
+                          HighColor="{DynamicResource SpectrumHighColor}" />
+
         <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Margin="24"
@@ -324,8 +345,8 @@
                     </Grid>
 
                     <!-- Album art on the left and the background beside it, each in its own shape, as tall as
-                         lets both fit the panel's width, up to 512px, with a caption below each. -->
-                    <ctl:MediaRow Margin="0,16,0,0" FooterHeight="32" ClipToBounds="True">
+                         lets both fit the panel's width, up to 312px, with a caption below each. -->
+                    <ctl:MediaRow Margin="0,16,0,0" MaxRowHeight="312" FooterHeight="32" ClipToBounds="True">
                         <!-- The file's name, and its size in a chip, under the tile; a - for each when there's none.
                              The actions show over the image while the pointer is over it, or focus is on one of them. -->
                         <DockPanel ctl:MediaRow.AspectRatio="{Binding ArtAspect}">
@@ -495,6 +516,10 @@
                          they will be once saved. A removed track stays listed, struck through, until
                          it's kept after all or something replaces it. -->
                     <StackPanel IsVisible="{Binding ShowSongFiles}" Grid.IsSharedSizeScope="True">
+                        <!-- Fluent gives a slider a tall row of its own; the volume sliders fit the compact track rows instead. -->
+                        <StackPanel.Resources>
+                            <x:Double x:Key="SliderHorizontalHeight">20</x:Double>
+                        </StackPanel.Resources>
                         <!-- The master volume sits at the right of the header; each track has its own level in the mix below. -->
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
                             <TextBlock Grid.Column="0" Classes="section" Text="{Binding Player.TracksHeader}" />
@@ -572,17 +597,20 @@
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.OpeningAudio}" IsVisible="{Binding Player.IsOpening}" />
                         <TextBlock Classes="error" Text="{Binding Player.Error}" IsVisible="{Binding Player.HasError}" />
 
-                        <!-- The track rows and the removed-track rows share their column widths, so the names, sizes and buttons line up. -->
+                        <!-- The track rows and the removed-track rows share their column widths, so the sizes, names,
+                             waveforms and buttons line up: every column but the waveform's is shared, so each track's
+                             waveform starts and ends at the same place, on the one time axis of the song's length. -->
                         <ItemsControl ItemsSource="{Binding Player.Tracks}"
                                       AutomationProperties.Name="{x:Static res:Strings.TracksListName}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:TrackRowViewModel">
-                                    <Grid ColumnSpacing="4" Margin="0,1">
+                                    <Grid ColumnSpacing="6" RowDefinitions="Auto,Auto">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="14" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSwitches" />
-                                            <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSize" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackName" />
+                                            <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackVolume" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackActions" />
                                         </Grid.ColumnDefinitions>
@@ -602,15 +630,30 @@
                                                           ToolTip.Tip="{x:Static res:Strings.SoloToolTip}"
                                                           AutomationProperties.Name="{x:Static res:Strings.SoloToolTip}" />
                                         </StackPanel>
-                                        <StackPanel Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Text="{Binding Name}" />
-                                            <TextBlock Classes="error" Margin="0" Text="{Binding Error}" IsVisible="{Binding HasError}" />
-                                        </StackPanel>
-                                        <Border Grid.Column="3" Classes="chip" Margin="4,0" IsVisible="{Binding HasSize}">
+                                        <Border Grid.Column="2" Classes="chip" HorizontalAlignment="Left" IsVisible="{Binding HasSize}">
                                             <TextBlock Text="{Binding Size}" />
                                         </Border>
+                                        <!-- Capped, so one long name doesn't squeeze every track's waveform. -->
+                                        <TextBlock Grid.Column="3"
+                                                   MaxWidth="160"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding Name}"
+                                                   Text="{Binding Name}" />
+                                        <!-- The track's own waveform, faded while it isn't heard. It only shows; the seek bar above seeks. -->
+                                        <ctl:WaveformView Grid.Column="4"
+                                                          Classes="track"
+                                                          Classes.unheard="{Binding !IsHeard}"
+                                                          Height="20"
+                                                          VerticalAlignment="Center"
+                                                          IsHitTestVisible="False"
+                                                          Waveform="{Binding Waveform}"
+                                                          PositionSeconds="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).Player.PositionSeconds, Mode=OneWay, FallbackValue=0}"
+                                                          LengthSeconds="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).Player.TimelineSeconds, FallbackValue=0}"
+                                                          PlayedBrush="{DynamicResource AccentTextBrush}"
+                                                          UnplayedBrush="{DynamicResource WaveformBrush}" />
                                         <!-- How loud the track is in the mix; the master volume is in the header above. -->
-                                        <Slider Grid.Column="4"
+                                        <Slider Grid.Column="5"
                                                 Width="90"
                                                 Minimum="0"
                                                 Maximum="1"
@@ -618,7 +661,7 @@
                                                 VerticalAlignment="Center"
                                                 ToolTip.Tip="{x:Static res:Strings.TrackVolumeName}"
                                                 AutomationProperties.Name="{x:Static res:Strings.TrackVolumeName}" />
-                                        <StackPanel Grid.Column="5"
+                                        <StackPanel Grid.Column="6"
                                                     Orientation="Horizontal"
                                                     VerticalAlignment="Center"
                                                     IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
@@ -642,6 +685,14 @@
                                                 <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
                                             </Button>
                                         </StackPanel>
+                                        <!-- Below the row, so a long reason doesn't make the waveform taller. -->
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="2"
+                                                   Grid.ColumnSpan="5"
+                                                   Classes="error"
+                                                   Margin="0,0,0,2"
+                                                   Text="{Binding Error}"
+                                                   IsVisible="{Binding HasError}" />
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -652,26 +703,28 @@
                                       AutomationProperties.Name="{x:Static res:Strings.RemovedTracksListName}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:RemovedTrackRow">
-                                    <Grid ColumnSpacing="4" Margin="0,1">
+                                    <!-- As tall as a track row, which its switches and slider set, so the list keeps its rhythm. -->
+                                    <Grid ColumnSpacing="6" MinHeight="20">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="14" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSwitches" />
-                                            <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSize" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="TrackName" />
+                                            <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackVolume" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackActions" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="2"
+                                        <Border Grid.Column="2" Classes="chip" HorizontalAlignment="Left">
+                                            <TextBlock Classes="removed" Text="{Binding Size}" />
+                                        </Border>
+                                        <TextBlock Grid.Column="3"
                                                    Classes="removed"
-                                                   Margin="6,0,0,0"
+                                                   MaxWidth="160"
                                                    VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip.Tip="{Binding Name}"
                                                    Text="{Binding Name}" />
-                                        <Border Grid.Column="3" Classes="chip" Margin="4,0">
-                                            <TextBlock Classes="removed" Text="{Binding Size}" />
-                                        </Border>
-                                        <Button Grid.Column="5"
+                                        <Button Grid.Column="6"
                                                 Classes="icon"
                                                 Padding="4"
                                                 VerticalAlignment="Center"

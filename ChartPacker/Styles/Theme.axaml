@@ -16,9 +16,11 @@
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
         <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
         <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
-        <!-- The spectrum behind the playing song in the library: faint accent bars with brighter caps. -->
-        <SolidColorBrush x:Key="SpectrumBrush" Color="#308B5CF6" />
-        <SolidColorBrush x:Key="SpectrumPeakBrush" Color="#80C4B5FD" />
+        <!-- The spectrum behind the details panel while a song plays: a shade for each bar, stepped from rose at
+             the bass through a periwinkle near the accent to orchid at the treble. SpectrumView sets how faint. -->
+        <Color x:Key="SpectrumLowColor">#F2587A</Color>
+        <Color x:Key="SpectrumMiddleColor">#6E8BF7</Color>
+        <Color x:Key="SpectrumHighColor">#E27BF2</Color>
         <!-- Manila folder, for the FOLDER chip in the library list. -->
         <SolidColorBrush x:Key="FolderTintBrush" Color="#40E4C98F" />
         <SolidColorBrush x:Key="FolderTextBrush" Color="#F0DBAE" />

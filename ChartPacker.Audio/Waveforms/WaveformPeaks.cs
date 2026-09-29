@@ -6,23 +6,26 @@ namespace ChartPacker.Audio.Waveforms;
 
 /// <summary>
 /// One stem's loudness over time: the lowest and highest sample in each <see cref="WaveformPeaks.BucketsPerSecond"/>th
-/// of a second, and the stem itself sampled <see cref="WaveformPeaks.SignalRate"/> times a second for mixing.
+/// of a second and how loud it is on average, and the stem itself sampled <see cref="WaveformPeaks.SignalRate"/>
+/// times a second for mixing.
 /// </summary>
 public sealed class StemPeaks
 {
     // The arrays may be longer than what has been read, and a progress snapshot's are still being filled past
     // it: only the first readBuckets and readTicks are ever looked at, and the reader never writes those again.
-    internal StemPeaks(string name, float[] min, float[] max, Half[] signal, int count, int readBuckets, int readTicks)
+    internal StemPeaks(string name, float[] min, float[] max, float[] rms, Half[] signal, int count, int readBuckets, int readTicks)
     {
         Name = name;
         MinBuckets = min;
         MaxBuckets = max;
+        RmsBuckets = rms;
         Signal = signal;
         Count = count;
         ReadBuckets = readBuckets;
         ReadTicks = readTicks;
-        Min = readBuckets == count && min.Length == count ? min : new ReadSoFar(min, readBuckets, count);
-        Max = readBuckets == count && max.Length == count ? max : new ReadSoFar(max, readBuckets, count);
+        Min = ReadSoFar.Of(min, readBuckets, count);
+        Max = ReadSoFar.Of(max, readBuckets, count);
+        Rms = ReadSoFar.Of(rms, readBuckets, count);
     }
 
     public string Name { get; }
@@ -33,15 +36,29 @@ public sealed class StemPeaks
     /// <summary>The highest sample of each bucket, at least 0.</summary>
     public IReadOnlyList<float> Max { get; }
 
+    /// <summary>
+    /// The root mean square of each bucket's samples, from 0 to 1: how loud it sounds, where <see cref="Max"/>
+    /// is how far its loudest sample reaches.
+    /// </summary>
+    public IReadOnlyList<float> Rms { get; }
+
     public int Count { get; }
 
+    /// <summary>
+    /// How many of the buckets have been read: <see cref="Count"/> once the read is done, and fewer in a
+    /// progress snapshot, where the rest are silent because they haven't been read yet.
+    /// </summary>
+    public int ReadCount => ReadBuckets;
+
     /// <summary>Roughly how much memory the peaks take.</summary>
-    public long SizeBytes => ((long)(MinBuckets.Length + MaxBuckets.Length) * sizeof(float)) + ((long)Signal.Length * 2);
+    public long SizeBytes => ((long)(MinBuckets.Length + MaxBuckets.Length + RmsBuckets.Length) * sizeof(float)) + ((long)Signal.Length * 2);
 
     // The same buckets as arrays, so that mixing indexes them directly; those from ReadBuckets on are silent.
     internal float[] MinBuckets { get; }
 
     internal float[] MaxBuckets { get; }
+
+    internal float[] RmsBuckets { get; }
 
     internal int ReadBuckets { get; }
 
@@ -55,6 +72,10 @@ public sealed class StemPeaks
     /// <summary>The first <c>read</c> values of an array being filled, then silence up to <c>count</c>.</summary>
     private sealed class ReadSoFar(float[] values, int read, int count) : IReadOnlyList<float>
     {
+        /// <summary><paramref name="values"/> itself when it's all read and as long as it should be, else a view of what's read.</summary>
+        public static IReadOnlyList<float> Of(float[] values, int read, int count) =>
+            read == count && values.Length == count ? values : new ReadSoFar(values, read, count);
+
         public int Count => count;
 
         public float this[int index]
@@ -84,12 +105,14 @@ public readonly record struct AudibleStem(StemPeaks Peaks, bool IsMuted, bool Is
 /// <summary>The peaks of everything that is heard, as drawn; see <see cref="WaveformPeaks.Mix"/>.</summary>
 public sealed class Waveform
 {
-    public static readonly Waveform Empty = new([], []);
+    public static readonly Waveform Empty = new([], [], [], 0);
 
-    internal Waveform(float[] min, float[] max)
+    internal Waveform(IReadOnlyList<float> min, IReadOnlyList<float> max, IReadOnlyList<float> rms, int readCount)
     {
         Min = min;
         Max = max;
+        Rms = rms;
+        ReadCount = readCount;
     }
 
     /// <summary>The lowest level of each bucket, from -1 to 0.</summary>
@@ -98,10 +121,22 @@ public sealed class Waveform
     /// <summary>The highest level of each bucket, from 0 to 1.</summary>
     public IReadOnlyList<float> Max { get; }
 
+    /// <summary>How loud each bucket is, as the root mean square of its level, from 0 to 1.</summary>
+    public IReadOnlyList<float> Rms { get; }
+
     public int Count => Min.Count;
+
+    /// <summary>
+    /// How many buckets, from the start, are known: all of them once every stem in it has been read, and
+    /// until then no further than the stem read least far. The rest are silent for now.
+    /// </summary>
+    public int ReadCount { get; }
 
     /// <summary>How much time the buckets cover.</summary>
     public double Seconds => (double)Count / WaveformPeaks.BucketsPerSecond;
+
+    /// <summary>How much time the known buckets cover; see <see cref="ReadCount"/>.</summary>
+    public double ReadSeconds => (double)ReadCount / WaveformPeaks.BucketsPerSecond;
 }
 
 /// <summary>Summarises stems into peaks for drawing a waveform, and combines them the way the mixer does.</summary>
@@ -149,6 +184,7 @@ public static class WaveformPeaks
         // As long as the whole stem when that's known, so they're filled rather than grown; see Put.
         var min = new float[Count(length, BucketsPerSecond, rate)];
         var max = new float[min.Length];
+        var rms = new float[min.Length];
         var signal = new Half[Count(length, SignalRate, rate)];
         var buffer = new float[ChunkFrames * channels];
 
@@ -158,6 +194,8 @@ public static class WaveformPeaks
         int tick = 0;
         long nextTick = TickFrame(0, rate);
         float low = 0, high = 0;
+        double squares = 0;
+        int bucketFrames = 0;
         bool started = false;
 
         var clock = progress is not null && length >= 0 ? Stopwatch.StartNew() : null;
@@ -177,7 +215,10 @@ public static class WaveformPeaks
                     {
                         Put(ref min, bucket, low);
                         Put(ref max, bucket, high);
+                        Put(ref rms, bucket, RootMeanSquare(squares, bucketFrames));
                         low = high = 0;
+                        squares = 0;
+                        bucketFrames = 0;
                         bucket++;
                         nextBoundary = Boundary(bucket + 1, rate);
                     }
@@ -199,13 +240,15 @@ public static class WaveformPeaks
                         low = sample;
                     if (sample > high)
                         high = sample;
+                    squares += (double)sample * sample;
+                    bucketFrames++;
                     started = true;
                     frame++;
                 }
 
                 if (clock is not null && clock.Elapsed >= progressInterval)
                 {
-                    progress!(new StemPeaks(name, min, max, signal, Math.Max(bucket, Count(length, BucketsPerSecond, rate)), bucket, tick));
+                    progress!(new StemPeaks(name, min, max, rms, signal, Math.Max(bucket, Count(length, BucketsPerSecond, rate)), bucket, tick));
                     clock.Restart();
                 }
             }
@@ -219,23 +262,25 @@ public static class WaveformPeaks
         {
             Put(ref min, bucket, low);
             Put(ref max, bucket, high);
+            Put(ref rms, bucket, RootMeanSquare(squares, bucketFrames));
             bucket++;
         }
 
-        return new StemPeaks(name, Trim(min, bucket), Trim(max, bucket), Trim(signal, tick), bucket, bucket, tick);
+        return new StemPeaks(name, Trim(min, bucket), Trim(max, bucket), Trim(rms, bucket), Trim(signal, tick), bucket, bucket, tick);
     }
 
     /// <summary>
     /// The peaks of the stems that are heard, mixed as the mixer does: if any stem is soloed only the soloed
     /// ones are heard, muted or not; otherwise the unmuted ones are. The stems' samples are summed and
-    /// clipped to [-1, 1], and each bucket holds the lowest and highest of the sum.
+    /// clipped to [-1, 1], and each bucket holds the lowest and highest of the sum, and its root mean square.
     /// </summary>
     /// <remarks>
     /// It covers the longest stem, muted or not, so muting doesn't change how much time is shown. One stem
     /// heard alone gives its own peaks. Several are summed from their <see cref="SignalRate"/> samples, which
     /// fall at the same instants in every stem, so the sum is the mix's at those instants: it can miss the
     /// sharpest peaks between them, which is the safe way round for a picture, where adding the stems' peaks
-    /// would overstate every bucket.
+    /// would overstate every bucket. It is known as far as the heard stem read least far, or with nothing
+    /// heard, as far as any stem has been read; see <see cref="Waveform.ReadCount"/>.
     /// </remarks>
     public static Waveform Mix(IReadOnlyList<AudibleStem> stems)
     {
@@ -244,19 +289,28 @@ public static class WaveformPeaks
         int count = stems.Select(s => s.Peaks.Count).DefaultIfEmpty(0).Max();
         var min = new float[count];
         var max = new float[count];
+        var rms = new float[count];
 
         bool anySolo = stems.Any(s => s.IsSolo);
         var heard = stems.Where(s => (anySolo ? s.IsSolo : !s.IsMuted) && s.Volume > 0).ToList();
+
+        // A stem read to its end is known all the way, even when it's shorter than the others.
+        int readCount = (heard.Count > 0 ? heard : stems)
+            .Select(s => s.Peaks.ReadBuckets == s.Peaks.Count ? count : s.Peaks.ReadBuckets)
+            .DefaultIfEmpty(0)
+            .Min();
 
         if (heard.Count == 1)
         {
             float volume = heard[0].Volume;
             float[] stemMin = heard[0].Peaks.MinBuckets;
             float[] stemMax = heard[0].Peaks.MaxBuckets;
+            float[] stemRms = heard[0].Peaks.RmsBuckets;
             for (int i = 0; i < heard[0].Peaks.ReadBuckets; i++)
             {
                 min[i] = Math.Clamp(stemMin[i] * volume, -1f, 0f);
                 max[i] = Math.Clamp(stemMax[i] * volume, 0f, 1f);
+                rms[i] = Math.Clamp(stemRms[i] * volume, 0f, 1f);
             }
         }
         else if (heard.Count > 1)
@@ -266,15 +320,20 @@ public static class WaveformPeaks
             {
                 sum.Clear();
                 int first = b * TicksPerBucket;
+
+                // The loudness is of the ticks some stem reaches: a bucket the stems end part way through isn't quieter for it.
+                int covered = 0;
                 foreach (var stem in heard)
                 {
                     Half[] stemSignal = stem.Peaks.Signal;
                     int end = Math.Min(stem.Peaks.ReadTicks, first + TicksPerBucket);
                     for (int k = first; k < end; k++)
                         sum[k - first] += (float)stemSignal[k] * stem.Volume;
+                    covered = Math.Max(covered, end - first);
                 }
 
                 float low = 0, high = 0;
+                double squares = 0;
                 foreach (float value in sum)
                 {
                     float clipped = Math.Clamp(value, -1f, 1f);
@@ -282,15 +341,29 @@ public static class WaveformPeaks
                         low = clipped;
                     if (clipped > high)
                         high = clipped;
+                    squares += (double)clipped * clipped;
                 }
 
                 min[b] = low;
                 max[b] = high;
+                rms[b] = RootMeanSquare(squares, covered);
             }
         }
 
-        return new Waveform(min, max);
+        return new Waveform(min, max, rms, Math.Min(readCount, count));
     }
+
+    /// <summary>
+    /// <paramref name="peaks"/> on their own, at full level, as <see cref="Mix"/> would give them heard alone. They
+    /// aren't copied, so this is cheap enough to do for each progress snapshot.
+    /// </summary>
+    public static Waveform Of(StemPeaks peaks)
+    {
+        ArgumentNullException.ThrowIfNull(peaks);
+        return new Waveform(peaks.Min, peaks.Max, peaks.Rms, peaks.ReadBuckets);
+    }
+
+    private static float RootMeanSquare(double squares, int count) => count <= 0 ? 0f : (float)Math.Sqrt(squares / count);
 
     /// <summary>Sets <paramref name="array"/>[<paramref name="index"/>], the next to be read, growing it first when it's full.</summary>
     /// <remarks>
