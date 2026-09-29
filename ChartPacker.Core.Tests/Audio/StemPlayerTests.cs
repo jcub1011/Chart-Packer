@@ -163,6 +163,49 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void WhatIsHeardLagsWhatIsQueued()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        var heard = new float[2048];
+
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        Assert.IsFalse(player.TryReadHeard(heard), "Nothing has been heard yet.");
+
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // Half a second has been heard: the window ends there, however much more is queued.
+        Assert.IsTrue(player.TryReadHeard(heard));
+        Assert.AreEqual((float)((Rate / 2) - 1) / (Rate * 10), heard[^1], 1e-6f);
+        Assert.AreEqual((float)((Rate / 2) - heard.Length) / (Rate * 10), heard[0], 1e-6f);
+    }
+
+    [TestMethod]
+    public void NothingIsHeardWhilePausedOrJustAfterASeek()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        var heard = new float[2048];
+        player.Play();
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        player.Pause();
+        Assert.IsFalse(player.TryReadHeard(heard));
+
+        player.Play();
+        player.Seek(TimeSpan.FromSeconds(4));
+        WaitUntil(() => output.Clears > 0 && output.QueuedFrames >= QueueTarget);
+        Assert.IsFalse(player.TryReadHeard(heard), "Nothing has been heard since the seek.");
+
+        output.Drain(heard.Length);
+        Assert.IsTrue(player.TryReadHeard(heard));
+        Assert.AreEqual(4f / 10, heard[0], 1e-4f);
+    }
+
+    [TestMethod]
     public void AnOutputAtAnotherRateIsRefused()
     {
         var mixer = new StemMixer([KeyValuePair.Create("song", (IPcmSource)new FakeSource(44100, 2, 100, (_, _) => 0))]);

@@ -183,6 +183,12 @@
                     <DataTemplate x:DataType="vm:LibraryItemViewModel">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10"
                               ToolTip.Tip="{Binding Entry.FullPath}">
+                            <!-- Behind the playing song, what's heard as a spectrum. -->
+                            <ctl:SpectrumView Grid.ColumnSpan="3"
+                                              IsActive="{Binding IsPreviewing}"
+                                              Source="{Binding $parent[ListBox].((vm:LibraryViewModel)DataContext).Player, FallbackValue={x:Null}}"
+                                              BarBrush="{DynamicResource SpectrumBrush}"
+                                              PeakBrush="{DynamicResource SpectrumPeakBrush}" />
                             <!-- Album art, or the kind glyph when there's none (or it hasn't loaded yet). -->
                             <Border Grid.Column="0" Classes="art-tile">
                                 <Panel>

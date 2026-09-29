@@ -9,6 +9,7 @@ using Avalonia.Collections;
 using Avalonia.Threading;
 using ChartPacker.Audio.Mixing;
 using ChartPacker.Audio.Playback;
+using ChartPacker.Audio.Spectrum;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -93,10 +94,16 @@ namespace ChartPacker.ViewModels
     /// Plays the selected song's audio tracks together, in step, with each track muted or soloed
     /// as asked. Nothing is opened until the first play; <see cref="Unload"/> closes every file.
     /// </summary>
-    public sealed partial class PlayerViewModel : ViewModelBase, IDisposable
+    public sealed partial class PlayerViewModel : ViewModelBase, IDisposable, ISpectrumSource
     {
         private static readonly TimeSpan PeaksDelay = TimeSpan.FromMilliseconds(300);
         private static readonly TimeSpan FilesClosedTimeout = TimeSpan.FromSeconds(2);
+
+        // How often a track being read shows what has been read of it.
+        private static readonly TimeSpan PeaksProgressInterval = TimeSpan.FromMilliseconds(250);
+
+        // Tracks are read side by side, leaving a core for the interface and playback.
+        private static readonly int ReadParallelism = Math.Max(1, Environment.ProcessorCount - 1);
 
         private readonly Func<int, IAudioOutput> _openOutput;
         private readonly DispatcherTimer _timer;
@@ -113,6 +120,9 @@ namespace ChartPacker.ViewModels
         // The waveform's per-track peaks, read on a background thread as the tracks are loaded. By track, so a
         // staged file replacing one of the same name is read afresh.
         private readonly Dictionary<SongTrack, StemPeaks> _peaks = [];
+
+        // The tracks whose peaks cover only what had been read when their read stopped, to be read again.
+        private readonly HashSet<SongTrack> _partialPeaks = [];
         private CancellationTokenSource? _peaksCts;
         private Task? _peaksTask;
 
@@ -122,6 +132,13 @@ namespace ChartPacker.ViewModels
         // A waveform rebuild has been posted and not run yet.
         private bool _isWaveformRebuildPending;
 
+        // A waveform is being mixed in the background, and another was asked for while it was.
+        private bool _isWaveformMixing;
+        private bool _isWaveformRemixNeeded;
+
+        // Moved on whenever the waveform is cleared, so that a mix begun before then is dropped rather than shown.
+        private int _waveformGeneration;
+
         // A song the library asked to play, to be started when the detail view gives it its tracks.
         private SongEntry? _previewRequest;
 
@@ -129,6 +146,10 @@ namespace ChartPacker.ViewModels
         private readonly Dictionary<(string Path, string Stem), double> _trackVolumes = [];
 
         private readonly SettingsService _settings;
+
+        // For TryReadSpectrum, made when it's first asked for.
+        private SpectrumAnalyzer? _analyzer;
+        private readonly float[] _heard = new float[SpectrumAnalyzer.FftSize];
 
         /// <param name="settings">Where the master volume is kept between runs.</param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
@@ -150,6 +171,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>What is heard from the selected tracks, as a waveform; empty until their audio has been read.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
         private Waveform _waveform = Waveform.Empty;
 
         /// <summary>The audio is being opened for the first play.</summary>
@@ -201,7 +223,11 @@ namespace ChartPacker.ViewModels
 
         public string PositionText => MetadataTimes.FormatDuration((long)(Math.Max(0, PositionSeconds) * 1000));
 
-        public string LengthText => MetadataTimes.FormatDuration((long)(Math.Max(0, LengthSeconds) * 1000));
+        /// <summary>
+        /// How long the song is: as the player has it once the audio is open, and until then as far as the
+        /// waveform reaches, the way the waveform itself is laid out before the first play.
+        /// </summary>
+        public string LengthText => MetadataTimes.FormatDuration((long)(Math.Max(0, LengthSeconds > 0 ? LengthSeconds : Waveform.Seconds) * 1000));
 
         public string PlayPauseToolTip => IsPlaying ? Strings.PauseToolTip : Strings.PlayToolTip;
 
@@ -253,11 +279,15 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(TracksHeader));
             RefreshCommands();
 
-            // Only the tracks that weren't shown before are read; the others keep their peaks.
+            // Only the tracks that weren't shown before, or weren't read to the end, are read; the others keep their peaks.
             foreach (var gone in _peaks.Keys.Except(tracks).ToList())
+            {
                 _peaks.Remove(gone);
+                _partialPeaks.Remove(gone);
+            }
+
             RebuildWaveform();
-            StartPeaks(entry, [.. tracks.Where(t => !_peaks.ContainsKey(t))]);
+            StartPeaks(entry, [.. tracks.Where(t => !_peaks.ContainsKey(t) || _partialPeaks.Contains(t))]);
             StartRequestedPreview(entry);
         }
 
@@ -315,11 +345,23 @@ namespace ChartPacker.ViewModels
             _player?.Seek(TimeSpan.FromSeconds(PositionSeconds));
         }
 
+        /// <summary>The spectrum of what's being heard, for the library's visualiser. On the UI thread.</summary>
+        public bool TryReadSpectrum(Span<float> levels)
+        {
+            if (_player is not { } player || !player.TryReadHeard(_heard))
+                return false;
+
+            _analyzer ??= new SpectrumAnalyzer();
+            _analyzer.Analyze(_heard, player.Mixer.OutputRate, levels);
+            return true;
+        }
+
         public void Dispose()
         {
             _timer.Stop();
             CancelPeaks();
             Close();
+            _waveformGeneration++;
         }
 
         /// <summary>Keeps <paramref name="row"/>'s volume for its song, so it is back when the song is shown again.</summary>
@@ -404,7 +446,11 @@ namespace ChartPacker.ViewModels
             _ = StartFromPreviewAsync();
         }
 
-        /// <summary>Reads the tracks' audio in the background for the waveform, a little after they are shown so that moving quickly through songs doesn't read each one.</summary>
+        /// <summary>
+        /// Finds the tracks' peaks for the waveform in the background: from <see cref="StemPeaksCache.Shared"/> at once,
+        /// or else by reading their audio, a little after they are shown so that moving quickly through songs doesn't
+        /// read each one.
+        /// </summary>
         private void StartPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks)
         {
             if (tracks.Count == 0)
@@ -422,34 +468,70 @@ namespace ChartPacker.ViewModels
         {
             try
             {
+                // Each key is taken before its file is read, so what's kept under it is never older than the file it names.
+                var keys = new Dictionary<SongTrack, StemPeaksKey?>();
+                foreach (var track in tracks)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var key = StemPeaksCache.KeyOf(entry, track);
+                    if (key is { } found && StemPeaksCache.Shared.TryGet(found, out var cached))
+                        ShowPeaks(track, cached, isComplete: true, cancellationToken);
+                    else
+                        keys[track] = key;
+                }
+
                 // Cancelled during the wait: nothing was opened.
-                if (cancellationToken.WaitHandle.WaitOne(PeaksDelay))
+                if (keys.Count == 0 || cancellationToken.WaitHandle.WaitOne(PeaksDelay))
                     return;
 
                 // Separate from the player's own sources, which are for the audio thread alone.
-                using var audio = SongAudio.Open(entry, tracks, cancellationToken);
-                foreach (var opened in audio.Tracks)
+                using var audio = SongAudio.Open(entry, [.. keys.Keys], cancellationToken);
+
+                // Every track at once, each source read by one thread only; the longest first, so it isn't the last to start.
+                var readable = audio.Tracks.Where(t => t.Source is not null).OrderByDescending(t => t.Source!.LengthFrames).ToList();
+                var options = new ParallelOptions { CancellationToken = cancellationToken, MaxDegreeOfParallelism = ReadParallelism };
+                Parallel.ForEach(readable, options, opened =>
                 {
-                    if (opened.Source is not { } source)
-                        continue;
-
                     var track = opened.Track;
-                    var peaks = WaveformPeaks.Compute(track.StoredName, source, cancellationToken);
-                    Dispatcher.UIThread.Post(() =>
+                    try
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                            return;
-
-                        _peaks[track] = peaks;
-                        ScheduleWaveformRebuild();
-                    });
-                }
+                        var peaks = WaveformPeaks.Compute(
+                            track.StoredName,
+                            opened.Source!,
+                            partial => ShowPeaks(track, partial, isComplete: false, cancellationToken),
+                            PeaksProgressInterval,
+                            cancellationToken);
+                        ShowPeaks(track, peaks, isComplete: true, cancellationToken);
+                        if (keys[track] is { } key)
+                            StemPeaksCache.Shared.Add(key, peaks);
+                    }
+                    catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException)
+                    {
+                        // This track has no waveform, or the read was stopped; the other tracks carry on.
+                    }
+                });
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException)
             {
                 // No waveform; the song still plays, and opening it says what is wrong.
             }
         }
+
+        /// <summary>Shows <paramref name="peaks"/> for <paramref name="track"/> unless the read has been stopped; from any thread.</summary>
+        /// <param name="isComplete">Whether they're all of the track, rather than as much as has been read.</param>
+        private void ShowPeaks(SongTrack track, StemPeaks peaks, bool isComplete, CancellationToken cancellationToken) =>
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
+                _peaks[track] = peaks;
+                if (isComplete)
+                    _partialPeaks.Remove(track);
+                else
+                    _partialPeaks.Add(track);
+                ScheduleWaveformRebuild();
+            });
 
         /// <summary>
         /// Stops reading the waveform, without waiting: opening a file can't be interrupted, so the read may hold
@@ -481,6 +563,8 @@ namespace ChartPacker.ViewModels
         private void ClearPeaks()
         {
             _peaks.Clear();
+            _partialPeaks.Clear();
+            _waveformGeneration++;
             Waveform = Waveform.Empty;
         }
 
@@ -504,8 +588,16 @@ namespace ChartPacker.ViewModels
             _isWaveformRebuildPending = false;
             if (_peaks.Count == 0)
             {
+                _waveformGeneration++;
                 if (Waveform.Count > 0)
                     Waveform = Waveform.Empty;
+                return;
+            }
+
+            // One mix at a time: one asked for meanwhile is made when it's done, from the switches as they are then.
+            if (_isWaveformMixing)
+            {
+                _isWaveformRemixNeeded = true;
                 return;
             }
 
@@ -516,7 +608,33 @@ namespace ChartPacker.ViewModels
                     stems.Add(new AudibleStem(peaks, row.IsMuted, row.IsSolo, (float)row.Volume));
             }
 
-            Waveform = WaveformPeaks.Mix(stems);
+            _ = MixWaveformAsync(stems);
+        }
+
+        /// <summary>
+        /// Mixes <paramref name="stems"/> on a background thread, since several long ones take a while, and shows
+        /// the waveform unless it has been cleared meanwhile. On the UI thread.
+        /// </summary>
+        private async Task MixWaveformAsync(List<AudibleStem> stems)
+        {
+            _isWaveformMixing = true;
+            int generation = _waveformGeneration;
+            try
+            {
+                var waveform = await Task.Run(() => WaveformPeaks.Mix(stems));
+                if (generation == _waveformGeneration)
+                    Waveform = waveform;
+            }
+            finally
+            {
+                _isWaveformMixing = false;
+            }
+
+            if (_isWaveformRemixNeeded)
+            {
+                _isWaveformRemixNeeded = false;
+                RebuildWaveform();
+            }
         }
 
         partial void OnIsOpeningChanged(bool value) => RefreshCommands();

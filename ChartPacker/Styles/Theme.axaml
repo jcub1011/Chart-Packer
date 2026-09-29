@@ -16,6 +16,9 @@
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
         <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
         <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
+        <!-- The spectrum behind the playing song in the library: faint accent bars with brighter caps. -->
+        <SolidColorBrush x:Key="SpectrumBrush" Color="#308B5CF6" />
+        <SolidColorBrush x:Key="SpectrumPeakBrush" Color="#80C4B5FD" />
         <!-- Manila folder, for the FOLDER chip in the library list. -->
         <SolidColorBrush x:Key="FolderTintBrush" Color="#40E4C98F" />
         <SolidColorBrush x:Key="FolderTextBrush" Color="#F0DBAE" />
