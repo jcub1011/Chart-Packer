@@ -153,6 +153,14 @@ public sealed class AlbumArtTests
         Assert.AreEqual(expected, AlbumArt.IsAlbumArtName(name));
 
     [TestMethod]
+    public void PickPrefersPngThenJpgThenJpeg()
+    {
+        Assert.AreEqual("ALBUM.png", AlbumArt.Pick(["album.jpeg", "album.jpg", "art/album.png", "ALBUM.png"], n => n));
+        Assert.AreEqual("Album.JPG", AlbumArt.Pick(["album.jpeg", "Album.JPG"], n => n));
+        Assert.IsNull(AlbumArt.Pick(["art/album.png", "notes.chart"], n => n));
+    }
+
+    [TestMethod]
     public async Task ReplacingInAFolderLeavesOnlyTheNewImage()
     {
         string folder = CreateFolder(("Album.JPG", Jpg), ("album.jpeg", Jpg), ("notes.chart", [1]));

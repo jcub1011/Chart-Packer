@@ -92,11 +92,15 @@ public static class AlbumArt
     }
 
     /// <summary>The first of <paramref name="items"/> whose name is the most preferred album-art name.</summary>
-    private static T? Pick<T>(IReadOnlyList<T> items, Func<T, string> name) where T : class
+    public static T? Pick<T>(IEnumerable<T> items, Func<T, string> name) where T : class
     {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(name);
+
+        var list = items as IReadOnlyList<T> ?? items.ToList();
         foreach (string candidate in Names)
         {
-            foreach (T item in items)
+            foreach (T item in list)
             {
                 if (name(item).Equals(candidate, StringComparison.OrdinalIgnoreCase))
                     return item;

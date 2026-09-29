@@ -671,7 +671,12 @@ namespace ChartPacker.ViewModels
                 await StageBackgroundAsync(background);
         }
 
-        /// <summary>Stages removing <paramref name="row"/>'s file, or drops it when it's one the draft adds.</summary>
+        /// <summary>
+        /// Stages removing <paramref name="row"/>'s file, or drops it when it's one the draft adds.
+        /// Removing the album art or a background in use removes every file of it; another file
+        /// with one of their names, such as an <c>album.jpg</c> beside the <c>album.png</c> shown,
+        /// is removed on its own.
+        /// </summary>
         [RelayCommand(CanExecute = nameof(CanChangeFiles))]
         private void RemoveFile(FileRow? row)
         {
@@ -679,7 +684,7 @@ namespace ChartPacker.ViewModels
                 return;
 
             var draft = _songs[0].Item.Draft;
-            if (AlbumArt.IsAlbumArtName(row.Path))
+            if (AlbumArt.IsAlbumArtName(row.Path) && (row.IsAdded || AlbumArt.Pick(_diskFiles, f => f.Path)?.Path == row.Path))
             {
                 if (row.IsAdded)
                     draft.RevertAlbumArt();
@@ -687,7 +692,7 @@ namespace ChartPacker.ViewModels
                     draft.RemoveAlbumArt();
                 ArtError = null;
             }
-            else if (SongBackgrounds.KindOfName(row.Path) is { } kind)
+            else if (SongBackgrounds.KindOfName(row.Path) is { } kind && (row.IsAdded || SongBackgrounds.Pick(_diskFiles, f => f.Path, kind)?.Path == row.Path))
             {
                 if (row.IsAdded)
                     draft.RevertBackground(kind);
@@ -714,8 +719,13 @@ namespace ChartPacker.ViewModels
             if (row is null || !row.CanRevert || !CanChangeFiles())
                 return;
 
+            // A file removed on its own is put back on its own, leaving any art or background change.
             var draft = _songs[0].Item.Draft;
-            if (AlbumArt.IsAlbumArtName(row.Path))
+            if (draft.IsFileRemoved(row.Path))
+            {
+                draft.RevertFile(row.Path);
+            }
+            else if (AlbumArt.IsAlbumArtName(row.Path))
             {
                 draft.RevertAlbumArt();
                 ArtError = null;

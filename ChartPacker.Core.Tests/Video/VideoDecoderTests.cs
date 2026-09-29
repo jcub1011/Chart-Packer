@@ -145,6 +145,30 @@ public sealed class VideoDecoderTests
     }
 
     [TestMethod]
+    [DataRow("tiny.mp4")]
+    [DataRow("tiny.webm")]
+    public async Task PlaybackShowsAFarFirstTime(string name)
+    {
+        // Far enough in that the first request seeks rather than decoding from the start.
+        using var published = new SemaphoreSlim(0);
+        var playback = new VideoPlayback(() => File.OpenRead(Path.Combine(Fixtures, name)), 720);
+        playback.Changed += (_, _) => published.Release();
+
+        playback.RequestTime(TimeSpan.FromSeconds(1.8));
+        int version = 0;
+        byte[] bgra = new byte[64 * 36 * 4];
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!playback.TryCopyFrame(bgra, ref version) && DateTime.UtcNow < deadline)
+            await published.WaitAsync(TimeSpan.FromMilliseconds(200));
+
+        Assert.IsNull(playback.Error);
+        Assert.IsGreaterThan(0, version);
+
+        playback.Dispose();
+        await playback.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [TestMethod]
     public async Task PlaybackReportsAFileThatIsNotAVideo()
     {
         var playback = new VideoPlayback(() => new MemoryStream([1, 2, 3, 4]), 720);

@@ -6,8 +6,9 @@ namespace ChartPacker.Video;
 /// <see cref="TryCopyFrame"/>. The video is opened on that thread, so nothing here blocks.
 /// </summary>
 /// <remarks>
-/// Moving forward decodes on from the last frame. Moving back, or far ahead, seeks to the keyframe
-/// before the time and decodes forward from it; the frames passed on the way aren't converted.
+/// Moving forward decodes on from the last frame. Moving back, or far ahead (the first time asked
+/// for included), seeks to the keyframe before the time and decodes forward from it; the frames
+/// passed on the way aren't converted.
 /// </remarks>
 public sealed class VideoPlayback : IDisposable
 {
@@ -160,7 +161,12 @@ public sealed class VideoPlayback : IDisposable
 
             var target = TimeSpan.FromTicks(ticks);
             var reached = hasNext ? nextTime : keptTime;
-            if (decoder.HasKept && (target < keptTime - Tolerance || target > reached + SeekAhead))
+            bool behind = decoder.HasKept && target < keptTime - Tolerance;
+            bool far = target > reached + SeekAhead;
+
+            // A seek that found nothing to decode: try again from the new time.
+            bool stuck = !decoder.HasKept && atEnd;
+            if (behind || far || stuck)
             {
                 decoder.Seek(target);
                 hasNext = false;
