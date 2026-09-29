@@ -573,6 +573,13 @@
   <data name="JumpToPreviewToolTip" xml:space="preserve">
     <value>Play from the preview start</value>
   </data>
+  <data name="LengthPending" xml:space="preserve">
+    <value>–:––</value>
+    <comment>Shown in place of the song's length in the player until it's known.</comment>
+  </data>
+  <data name="LengthPendingToolTip" xml:space="preserve">
+    <value>The length shows once the song's audio has been read.</value>
+  </data>
   <data name="SeekName" xml:space="preserve">
     <value>Playback position</value>
   </data>

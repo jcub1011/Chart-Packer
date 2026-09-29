@@ -172,6 +172,8 @@ namespace ChartPacker.ViewModels
         /// <summary>What is heard from the selected tracks, as a waveform; empty until their audio has been read.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(LengthText))]
+        [NotifyPropertyChangedFor(nameof(IsLengthKnown))]
+        [NotifyPropertyChangedFor(nameof(LengthToolTip))]
         private Waveform _waveform = Waveform.Empty;
 
         /// <summary>The audio is being opened for the first play.</summary>
@@ -189,6 +191,8 @@ namespace ChartPacker.ViewModels
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(LengthText))]
+        [NotifyPropertyChangedFor(nameof(IsLengthKnown))]
+        [NotifyPropertyChangedFor(nameof(LengthToolTip))]
         private double _lengthSeconds;
 
         /// <summary>The master volume, from 0 to 1. Kept in the settings, so it carries over to the next run.</summary>
@@ -224,10 +228,18 @@ namespace ChartPacker.ViewModels
         public string PositionText => MetadataTimes.FormatDuration((long)(Math.Max(0, PositionSeconds) * 1000));
 
         /// <summary>
-        /// How long the song is: as the player has it once the audio is open, and until then as far as the
+        /// The song's length is known: from the player once the audio is open, and until then from how far the
         /// waveform reaches, the way the waveform itself is laid out before the first play.
         /// </summary>
-        public string LengthText => MetadataTimes.FormatDuration((long)(Math.Max(0, LengthSeconds > 0 ? LengthSeconds : Waveform.Seconds) * 1000));
+        public bool IsLengthKnown => LengthSeconds > 0 || Waveform.Count > 0;
+
+        /// <summary>How long the song is, or a placeholder while that isn't known yet; see <see cref="IsLengthKnown"/>.</summary>
+        public string LengthText => IsLengthKnown
+            ? MetadataTimes.FormatDuration((long)(Math.Max(0, LengthSeconds > 0 ? LengthSeconds : Waveform.Seconds) * 1000))
+            : Strings.LengthPending;
+
+        /// <summary>Why there's no length yet, while there isn't; otherwise no tool tip.</summary>
+        public string? LengthToolTip => IsLengthKnown ? null : Strings.LengthPendingToolTip;
 
         public string PlayPauseToolTip => IsPlaying ? Strings.PauseToolTip : Strings.PlayToolTip;
 

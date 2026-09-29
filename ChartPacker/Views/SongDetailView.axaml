@@ -558,7 +558,8 @@
                                        Classes="muted"
                                        VerticalAlignment="Center"
                                        FontFeatures="tnum"
-                                       Text="{Binding Player.LengthText}" />
+                                       Text="{Binding Player.LengthText}"
+                                       ToolTip.Tip="{Binding Player.LengthToolTip}" />
                             <Button Grid.Column="5"
                                     Classes="transport"
                                     Command="{Binding Player.JumpToPreviewCommand}"
