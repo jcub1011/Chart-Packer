@@ -210,18 +210,16 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(ArtAspect))]
         private Bitmap? _artImage;
 
-        /// <summary>Shown in the tile instead of an image, e.g. "No album art" or "Album art differs".</summary>
+        /// <summary>Shown in the tile instead of an image, e.g. "Album art not set" or "Album art differs".</summary>
         [ObservableProperty]
         private string? _artNote;
 
         /// <summary>The shown album art's stored name, e.g. <c>album.png</c>, when it's known.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasArtFileName))]
         private string? _artFileName;
 
         /// <summary>The shown album art's size, formatted, when it's known.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasArtFileSize))]
         private string? _artFileSize;
 
         /// <summary>Why the chosen chart can't be used.</summary>
@@ -253,10 +251,6 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The art tile's width over its height: the shown image's, or square when there's none.</summary>
         public double ArtAspect => ArtImage is { Size: { Width: > 0, Height: > 0 } size } ? size.Width / size.Height : 1;
-
-        public bool HasArtFileName => ArtFileName is not null;
-
-        public bool HasArtFileSize => ArtFileSize is not null;
 
         public bool HasCharter => Charter is not null;
 

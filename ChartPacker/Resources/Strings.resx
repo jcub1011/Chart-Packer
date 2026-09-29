@@ -411,7 +411,7 @@
     <comment>Automation name of the album-art tile in the detail panel.</comment>
   </data>
   <data name="NoAlbumArt" xml:space="preserve">
-    <value>No album art</value>
+    <value>Album art not set</value>
   </data>
   <data name="AlbumArtDiffers" xml:space="preserve">
     <value>Album art differs</value>
@@ -477,13 +477,13 @@
     <value>This video can't be shown: {0}</value>
     <comment>{0} is the reason.</comment>
   </data>
-  <data name="ShowBackgroundImage" xml:space="preserve">
-    <value>Image</value>
-    <comment>Toggle on the background tile that shows the background image.</comment>
+  <data name="ShowBackgroundImageToolTip" xml:space="preserve">
+    <value>Show the background image</value>
+    <comment>Tooltip of the image toggle on the background tile's caption.</comment>
   </data>
-  <data name="ShowBackgroundVideo" xml:space="preserve">
-    <value>Video</value>
-    <comment>Toggle on the background tile that shows the background video.</comment>
+  <data name="ShowBackgroundVideoToolTip" xml:space="preserve">
+    <value>Show the background video</value>
+    <comment>Tooltip of the video toggle on the background tile's caption.</comment>
   </data>
   <data name="ReplaceBackgroundToolTip" xml:space="preserve">
     <value>Set a background image or video…</value>

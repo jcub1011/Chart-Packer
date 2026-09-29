@@ -139,9 +139,17 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(RemoveToolTip))]
         private bool _showVideo = true;
 
-        /// <summary>The selection has an image and a video, so either can be shown.</summary>
+        /// <summary>The selection has a background image, so the Image toggle can show it.</summary>
         [ObservableProperty]
-        private bool _hasBoth;
+        [NotifyPropertyChangedFor(nameof(HasBoth))]
+        [NotifyPropertyChangedFor(nameof(IsImageSelected))]
+        private bool _hasImageKind;
+
+        /// <summary>The selection has a background video, so the Video toggle can show it.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasBoth))]
+        [NotifyPropertyChangedFor(nameof(IsVideoSelected))]
+        private bool _hasVideoKind;
 
         /// <summary>A selected song has a staged background change.</summary>
         [ObservableProperty]
@@ -154,35 +162,32 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The shown background's stored name, e.g. <c>video.mp4</c>, when every song has the same one.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasShownFileName))]
         private string? _shownFileName;
 
         /// <summary>The shown background's size, formatted, when it's known.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasShownFileSize))]
         private string? _shownFileSize;
 
         public bool HasImage => Image is not null;
 
         public bool HasVideo => Video is not null;
 
-        public bool HasShownFileName => ShownFileName is not null;
-
-        public bool HasShownFileSize => ShownFileSize is not null;
-
         public bool HasNote => Note is not null;
+
+        /// <summary>The selection has an image and a video, so either can be shown.</summary>
+        public bool HasBoth => HasImageKind && HasVideoKind;
 
         /// <summary>The Image toggle: on while the image is shown. Turning it off does nothing; turning Video on does.</summary>
         public bool IsImageSelected
         {
-            get => !ShowVideo;
+            get => !ShowVideo && HasImageKind;
             set => Select(BackgroundKind.Image, value);
         }
 
         /// <summary>The Video toggle: on while the video is shown. Turning it off does nothing; turning Image on does.</summary>
         public bool IsVideoSelected
         {
-            get => ShowVideo;
+            get => ShowVideo && HasVideoKind;
             set => Select(BackgroundKind.Video, value);
         }
 
@@ -225,7 +230,8 @@ namespace ChartPacker.ViewModels
             AspectRatio = DefaultAspectRatio;
             ShownFileName = null;
             ShownFileSize = null;
-            HasBoth = false;
+            HasImageKind = false;
+            HasVideoKind = false;
             IsChanged = false;
             _lastVideoKey = null;
             _preferredKind = null;
@@ -266,7 +272,8 @@ namespace ChartPacker.ViewModels
             _imageSlot = Resolve(songs, BackgroundKind.Image);
             _videoSlot = Resolve(songs, BackgroundKind.Video);
             IsChanged = songs.Any(s => s.Draft.HasBackgroundChanges);
-            HasBoth = _imageSlot.State != SlotState.None && _videoSlot.State != SlotState.None;
+            HasImageKind = _imageSlot.State != SlotState.None;
+            HasVideoKind = _videoSlot.State != SlotState.None;
 
             // The video comes first: when it's new, or when it's the only kind there is.
             _isRefreshing = true;
