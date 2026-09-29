@@ -24,16 +24,17 @@ namespace ChartPacker.ViewModels
     /// <param name="Detail">What happened, e.g. where it was written or why it was skipped.</param>
     /// <param name="Status">How it ended.</param>
     /// <param name="Messages">The item's warnings and errors. Info findings are left out.</param>
-    public sealed record JobItemRow(string Name, string Detail, JobItemStatus Status, IReadOnlyList<JobMessageRow> Messages)
+    /// <param name="IsCanceled">The job was cancelled before this item finished, so it has no result.</param>
+    public sealed record JobItemRow(string Name, string Detail, JobItemStatus Status, IReadOnlyList<JobMessageRow> Messages, bool IsCanceled = false)
     {
-        public bool IsFailed => Status == JobItemStatus.Failed;
+        public bool IsFailed => Status == JobItemStatus.Failed && !IsCanceled;
 
         /// <summary>Finished, but with something the user should look at.</summary>
         public bool IsAttention => Status is JobItemStatus.Skipped or JobItemStatus.SucceededWithWarnings or JobItemStatus.CompletedWithErrors;
 
         public bool HasMessages => Messages.Count > 0;
 
-        public string Glyph => Status switch
+        public string Glyph => IsCanceled ? "⊘" : Status switch
         {
             JobItemStatus.Succeeded => "✓",
             JobItemStatus.SucceededWithWarnings or JobItemStatus.CompletedWithErrors => "!",
@@ -42,16 +43,54 @@ namespace ChartPacker.ViewModels
         };
     }
 
+    /// <summary>One group of rows in the progress window, e.g. everything that was skipped.</summary>
+    /// <param name="titleFormat">The heading's format; <c>{0}</c> is the number of rows.</param>
+    public sealed class JobResultGroup(string titleFormat) : ViewModelBase
+    {
+        public AvaloniaList<JobItemRow> Rows { get; } = [];
+
+        /// <summary>The heading, with the number of rows.</summary>
+        public string Title => string.Format(CultureInfo.CurrentCulture, TitleFormat, Rows.Count);
+
+        public bool HasRows => Rows.Count > 0;
+
+        internal string TitleFormat
+        {
+            get;
+            set
+            {
+                field = value;
+                OnPropertyChanged(nameof(Title));
+            }
+        } = titleFormat;
+
+        internal void Add(JobItemRow row)
+        {
+            Rows.Add(row);
+            Refresh();
+        }
+
+        internal void Clear()
+        {
+            Rows.Clear();
+            Refresh();
+        }
+
+        private void Refresh()
+        {
+            OnPropertyChanged(nameof(Title));
+            OnPropertyChanged(nameof(HasRows));
+        }
+    }
+
     /// <summary>
-    /// The results panel along the bottom of the window. It is always shown: it waits for a job, shows
-    /// progress while a pack or unpack job runs, then a summary and one row per item until the next job.
+    /// The pack/unpack job: the summary line along the bottom of the window and the progress window it
+    /// opens. It waits for a job, shows progress while a pack or unpack job runs, then a summary and one
+    /// row per item, grouped by outcome, until the next job.
     /// </summary>
-    /// <remarks>
-    /// Only the user expands or collapses the item rows; a job starting leaves them as they were.
-    /// </remarks>
     public partial class JobViewModel : ViewModelBase
     {
-        private readonly SettingsService _settings;
+        private readonly IJobProgressWindowService _details;
         private CancellationTokenSource? _cts;
         private JobKind _kind;
         private int _total;
@@ -63,28 +102,27 @@ namespace ChartPacker.ViewModels
         // A job has run (or is running) this session, so there's a summary to show.
         private bool _hasRun;
 
-        public JobViewModel(SettingsService settings)
+        public JobViewModel(IJobProgressWindowService details)
         {
-            _settings = settings;
-            IsExpanded = settings.Settings.JobPanelExpanded;
+            _details = details;
         }
 
-        public AvaloniaList<JobItemRow> Items { get; } = [];
+        /// <summary>Items that were packed or unpacked, including those with warnings or left-out files.</summary>
+        public JobResultGroup Completed { get; } = new(Strings.JobGroupPackedFormat);
+
+        public JobResultGroup Skipped { get; } = new(Strings.JobGroupSkippedFormat);
+
+        /// <summary>Items that failed, and those a cancelled job never finished.</summary>
+        public JobResultGroup Failed { get; } = new(Strings.JobGroupFailedFormat);
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
         public partial bool IsRunning { get; set; }
 
-        /// <summary>The item rows are shown, and the panel can be resized.</summary>
-        [ObservableProperty]
-        public partial bool IsExpanded { get; set; }
-
         private int Done => _succeeded + _skipped + _failed;
 
         /// <summary>Items finished, as a percentage.</summary>
         public double Progress => _total == 0 ? 0 : 100.0 * Done / _total;
-
-        public string ExpandButtonText => IsExpanded ? Strings.CollapseButton : Strings.ExpandButton;
 
         /// <summary>No job has run yet, so the panel only says it's waiting.</summary>
         public bool IsWaiting => !_hasRun;
@@ -126,7 +164,10 @@ namespace ChartPacker.ViewModels
             _succeeded = _skipped = _failed = 0;
             _cancelled = false;
             _hasRun = true;
-            Items.Clear();
+            Completed.TitleFormat = kind == JobKind.Pack ? Strings.JobGroupPackedFormat : Strings.JobGroupUnpackedFormat;
+            Completed.Clear();
+            Skipped.Clear();
+            Failed.Clear();
             IsRunning = true;
             RefreshState();
 
@@ -140,6 +181,7 @@ namespace ChartPacker.ViewModels
             catch (OperationCanceledException)
             {
                 _cancelled = true;
+                AddCanceled(kind, entries);
             }
             finally
             {
@@ -153,13 +195,7 @@ namespace ChartPacker.ViewModels
         private void Cancel() => _cts?.Cancel();
 
         [RelayCommand]
-        private void ToggleExpanded() => IsExpanded = !IsExpanded;
-
-        partial void OnIsExpandedChanged(bool value)
-        {
-            _settings.Settings.JobPanelExpanded = value;
-            OnPropertyChanged(nameof(ExpandButtonText));
-        }
+        private void ShowDetails() => _details.Show(this);
 
         private void Add(JobKind kind, JobItemResult result)
         {
@@ -181,8 +217,26 @@ namespace ChartPacker.ViewModels
                 .Select(f => new JobMessageRow($"{f.RuleId}: {f.Message}", f.Severity == Severity.Error))
                 .ToList();
 
-            Items.Add(new JobItemRow(result.Entry.DisplayName, Describe(kind, result), result.Status, messages));
+            var row = new JobItemRow(result.Entry.DisplayName, Describe(kind, result), result.Status, messages);
+            JobResultGroup group = result.Status switch
+            {
+                JobItemStatus.Skipped => Skipped,
+                JobItemStatus.Failed => Failed,
+                _ => Completed,
+            };
+            group.Add(row);
             RefreshState();
+        }
+
+        /// <summary>
+        /// Adds a row for each item the job didn't finish. Results arrive in entry order, one per finished
+        /// item, so those are the ones after the first <see cref="Done"/>.
+        /// </summary>
+        private void AddCanceled(JobKind kind, IReadOnlyList<SongEntry> entries)
+        {
+            string detail = kind == JobKind.Pack ? Strings.JobCanceledPack : Strings.JobCanceledUnpack;
+            foreach (SongEntry entry in entries.Skip(Done))
+                Failed.Add(new JobItemRow(entry.DisplayName, detail, JobItemStatus.Failed, [], IsCanceled: true));
         }
 
         private static string Describe(JobKind kind, JobItemResult result) => result.Status switch

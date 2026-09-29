@@ -49,13 +49,6 @@ namespace ChartPacker.ViewModels
             set => _settings.Settings.LibraryPaneWidth = value;
         }
 
-        /// <summary>Persisted height of the results panel while expanded. The view applies it on expand and writes it back on collapse and close.</summary>
-        public double JobPanelHeight
-        {
-            get => _settings.Settings.JobPanelHeight;
-            set => _settings.Settings.JobPanelHeight = value;
-        }
-
         [RelayCommand]
         private Task OpenSettingsAsync() => _settingsWindow.ShowAsync();
 

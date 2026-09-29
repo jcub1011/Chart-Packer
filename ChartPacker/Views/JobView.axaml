@@ -4,25 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:res="using:ChartPacker.Resources"
-             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="240"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="40"
              x:Class="ChartPacker.Views.JobView"
              x:DataType="vm:JobViewModel">
 
     <UserControl.Styles>
-        <Style Selector="TextBlock.status.attention">
-            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
-        </Style>
-        <Style Selector="TextBlock.status.failed">
-            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
-        </Style>
-        <Style Selector="TextBlock.message">
-            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
-        </Style>
-        <Style Selector="TextBlock.message.error">
-            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
-        </Style>
-
-        <!-- The summary line: flat, and clickable anywhere to expand or collapse. The padding is
+        <!-- The summary line: flat, and clickable anywhere to open the progress window. The padding is
              cancelled by the margin, so the text sits where it would without the hover area. -->
         <Style Selector="Button.header">
             <Setter Property="Background" Value="Transparent" />
@@ -47,86 +34,43 @@
             Background="{DynamicResource SurfaceBrush}"
             BorderBrush="{DynamicResource SubtleBorderBrush}"
             Padding="12,6">
-        <DockPanel>
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                <!-- Not a tab stop: the Expand/Collapse button is the keyboard route to the same thing. -->
-                <Button Grid.Column="0"
-                        Classes="header"
-                        IsTabStop="False"
-                        Command="{Binding ToggleExpandedCommand}"
-                        ToolTip.Tip="{Binding ExpandButtonText}">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                        <Arc Grid.Column="0"
-                             Classes="spinner"
-                             Classes.active="{Binding IsRunning}"
-                             IsVisible="{Binding IsRunning}"
-                             Width="14" Height="14" StrokeThickness="2"
-                             VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding SummaryText}"
-                                       FontWeight="SemiBold"
-                                       Classes.muted="{Binding IsWaiting}"
-                                       TextTrimming="CharacterEllipsis" />
-                            <ProgressBar Value="{Binding Progress}"
-                                         Minimum="0" Maximum="100"
-                                         IsVisible="{Binding IsRunning}" />
-                        </StackPanel>
-                    </Grid>
-                </Button>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <Button Content="{x:Static res:Strings.CancelButton}"
-                            Command="{Binding CancelCommand}"
-                            IsVisible="{Binding IsRunning}"
-                            AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
-                    <!-- Fixed width, so the button doesn't change size between Expand and Collapse. -->
-                    <Button MinWidth="84"
-                            HorizontalContentAlignment="Center"
-                            Content="{Binding ExpandButtonText}"
-                            Command="{Binding ToggleExpandedCommand}"
-                            AutomationProperties.Name="{Binding ExpandButtonText}" />
-                </StackPanel>
-            </Grid>
-
-            <!-- Fills the panel; MainWindow sizes the panel and lets the user resize it while expanded. -->
-            <ScrollViewer Margin="0,8,0,0"
-                          HorizontalScrollBarVisibility="Disabled"
-                          IsVisible="{Binding IsExpanded}">
-                <ItemsControl ItemsSource="{Binding Items}"
-                              AutomationProperties.Name="{x:Static res:Strings.JobResultsListName}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:JobItemRow">
-                            <Grid ColumnDefinitions="20,Auto,*" ColumnSpacing="8" Margin="0,3">
-                                <TextBlock Grid.Column="0"
-                                           Classes="status"
-                                           Classes.attention="{Binding IsAttention}"
-                                           Classes.failed="{Binding IsFailed}"
-                                           FontWeight="Bold"
-                                           Text="{Binding Glyph}" />
-                                <TextBlock Grid.Column="1"
-                                           FontWeight="SemiBold"
-                                           MaxWidth="280"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip.Tip="{Binding Name}"
-                                           Text="{Binding Name}" />
-                                <StackPanel Grid.Column="2">
-                                    <SelectableTextBlock Opacity="0.8" TextWrapping="Wrap" Text="{Binding Detail}" />
-                                    <ItemsControl ItemsSource="{Binding Messages}" IsVisible="{Binding HasMessages}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:JobMessageRow">
-                                                <TextBlock Classes="message"
-                                                           Classes.error="{Binding IsError}"
-                                                           FontSize="12"
-                                                           TextWrapping="Wrap"
-                                                           Text="{Binding Text}" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </DockPanel>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <!-- Not a tab stop: the Details button is the keyboard route to the same thing. -->
+            <Button Grid.Column="0"
+                    Classes="header"
+                    IsTabStop="False"
+                    Command="{Binding ShowDetailsCommand}"
+                    ToolTip.Tip="{x:Static res:Strings.JobDetailsToolTip}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <Arc Grid.Column="0"
+                         Classes="spinner"
+                         Classes.active="{Binding IsRunning}"
+                         IsVisible="{Binding IsRunning}"
+                         Width="14" Height="14" StrokeThickness="2"
+                         VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SummaryText}"
+                                   FontWeight="SemiBold"
+                                   Classes.muted="{Binding IsWaiting}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <ProgressBar Value="{Binding Progress}"
+                                     Minimum="0" Maximum="100"
+                                     IsVisible="{Binding IsRunning}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Content="{x:Static res:Strings.CancelButton}"
+                        Command="{Binding CancelCommand}"
+                        IsVisible="{Binding IsRunning}"
+                        AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                <Button MinWidth="84"
+                        HorizontalContentAlignment="Center"
+                        Content="{x:Static res:Strings.JobDetailsButton}"
+                        Command="{Binding ShowDetailsCommand}"
+                        ToolTip.Tip="{x:Static res:Strings.JobDetailsToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.JobDetailsToolTip}" />
+            </StackPanel>
+        </Grid>
     </Border>
 </UserControl>

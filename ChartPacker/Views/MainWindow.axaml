@@ -20,11 +20,9 @@
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <!-- Toolbar (0), panels (1), splitter (2), results (3). MainWindow.axaml.cs indexes these
-                 and sizes the results row: its own height while collapsed, the user's while expanded. -->
+            <!-- Toolbar (0), panels (1), job summary line (2). -->
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="160" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -48,16 +46,8 @@
 
         <ContentControl Grid.Row="1" Grid.Column="2" Content="{Binding Detail}" />
 
-        <!-- Pack/unpack results, always under both panels. Resizable only while expanded. -->
-        <GridSplitter Grid.Row="2"
-                      Grid.Column="0"
-                      Grid.ColumnSpan="3"
-                      ResizeDirection="Rows"
-                      Height="4"
-                      Background="{DynamicResource SubtleBorderBrush}"
-                      IsVisible="{Binding Job.IsExpanded}" />
-
-        <ContentControl Grid.Row="3"
+        <!-- Pack/unpack summary, always under both panels. Clicking it opens the progress window. -->
+        <ContentControl Grid.Row="2"
                         Grid.Column="0"
                         Grid.ColumnSpan="3"
                         Content="{Binding Job}" />

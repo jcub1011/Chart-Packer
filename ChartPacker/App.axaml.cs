@@ -31,7 +31,7 @@ namespace ChartPacker
                 var filePicker = new AvaloniaFilePickerService(() => window);
                 var confirmation = new AvaloniaConfirmationService(() => window);
                 var drafts = new MetadataDraftStore();
-                var job = new JobViewModel(settings);
+                var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window));
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
                 var audio = new SdlAudio();
                 var player = new PlayerViewModel(settings, audio.Open);

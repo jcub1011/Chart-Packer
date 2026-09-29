@@ -29,36 +29,65 @@ This builds FFmpeg from the `n9.0` tag with only what the app needs, and nothing
 
 The result is LGPL 2.1+ and a few MB per RID.
 
+`build/publish.ps1` offers to run this for its RID when the libraries are missing or have no
+swresample. Pass `-Yes` to run it, and install what it needs, without being asked.
+
 | RID | Where to run it |
 | --- | --- |
-| `win-x64`, `win-arm64` | Linux or WSL, with `mingw-w64` (`x86_64-w64-mingw32-gcc`) or llvm-mingw (`aarch64-w64-mingw32-clang`) |
+| `win-x64`, `win-arm64` | Natively in MSYS2 (UCRT64 shell for `win-x64`, CLANGARM64 on an ARM PC for `win-arm64`), or cross-compiled on Linux or WSL with `mingw-w64` (`x86_64-w64-mingw32-gcc`) or llvm-mingw (`aarch64-w64-mingw32-clang`) |
 | `linux-x64`, `linux-arm64` | That platform |
 | `osx-x64`, `osx-arm64` | macOS with Xcode's command-line tools |
 
 It needs `git`, `make`, `pkg-config`, a C compiler and, for x86-64, `nasm`. The script checks for
-these before it starts. Git Bash has none of them, so it can't build FFmpeg.
+these before it starts. If any are missing, it shows the command that installs them and asks
+before running it. It uses pacman on MSYS2; apt, dnf or pacman on Linux; and `xcode-select` and
+Homebrew on macOS. Pass `--yes` (`build.sh --yes <rid>`) to install without being asked. Without a
+terminal, it prints the command and stops.
+
+Git Bash can't install a compiler. FFmpeg's `configure` is a POSIX shell script that needs GNU make
+and a GCC or Clang toolchain, and MSYS2 is the standard way to get those on Windows. So when you run
+a Windows RID from Git Bash, the script runs itself again in MSYS2. If MSYS2 isn't in `C:\msys64`
+(or `MSYS2_ROOT`), it offers to install it with winget first.
 
 The build runs in `build/ffmpeg/.work`. When the repo's path has a space in it, such as
 `C:\Users\First Last\...`, it runs in `/tmp/chartpacker-ffmpeg` instead, because FFmpeg's configure
 won't build from such a path. Set `FFMPEG_WORK` to choose another place.
 
+### On Windows, with MSYS2
+
+From Git Bash, or from MSYS2's UCRT64 shell:
+
+```
+cd "/c/Users/<you>/source/repos/Chart-Packer"
+build/ffmpeg/build.sh win-x64
+```
+
+The first run offers to install MSYS2 (`winget install MSYS2.MSYS2`). Then, in MSYS2's UCRT64 shell,
+it offers to install the toolchain:
+
+```
+pacman -S --needed git make diffutils mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-nasm
+```
+
+`configure` is slow under MSYS2, so the build takes several minutes. The DLLs are linked with
+`-static`, so they need nothing from MSYS2 at run time. The script checks each DLL's imports, and
+stops if one needs a toolchain DLL such as `libwinpthread-1.dll`. Don't run it
+from the plain MSYS shell, whose binaries need `msys-2.0.dll`.
+
+For `win-arm64`, it builds in the CLANGARM64 shell, which needs an ARM PC. You can also
+cross-compile it from WSL with llvm-mingw.
+
 ### On Windows, with WSL
 
 1. Install a distribution, once, from PowerShell: `wsl --install -d Ubuntu`.
-2. In Ubuntu, install the tools and the mingw-w64 cross-compiler, once:
-
-   ```
-   sudo apt update && sudo apt install -y git make pkg-config nasm mingw-w64
-   ```
-
-3. Build from the repo, which WSL sees under `/mnt/c`:
+2. Build from the repo, which WSL sees under `/mnt/c`:
 
    ```
    cd "/mnt/c/Users/<you>/source/repos/Chart-Packer"
    build/ffmpeg/build.sh win-x64
    ```
 
-   It takes a few minutes. The libraries it copies into `ChartPacker.Ffmpeg/runtimes/win-x64/native/`
+   The first run offers to install the tools and the mingw-w64 cross-compiler with apt. It takes a few minutes. The libraries it copies into `ChartPacker.Ffmpeg/runtimes/win-x64/native/`
    replace whatever was there, including a `fetch-prebuilt.sh` download.
 
 ## For development: `fetch-prebuilt.sh <rid>`

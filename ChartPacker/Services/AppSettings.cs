@@ -8,8 +8,6 @@ namespace ChartPacker.Services
     {
         public const double DefaultLibraryPaneWidth = 320;
         public const double MinLibraryPaneWidth = 200;
-        public const double DefaultJobPanelHeight = 200;
-        public const double MinJobPanelHeight = 80;
         public const int DefaultScanMaxDepth = 2;
         public const int MaxScanMaxDepth = 10;
         public const double DefaultMasterVolume = 1;
@@ -17,12 +15,6 @@ namespace ChartPacker.Services
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
-
-        /// <summary>Whether the job results panel at the bottom is expanded. Only the user changes it; a job never does.</summary>
-        public bool JobPanelExpanded { get; set; }
-
-        /// <summary>Height of the job results panel while expanded, in device-independent pixels.</summary>
-        public double JobPanelHeight { get; set; } = DefaultJobPanelHeight;
 
         /// <summary>How many folder levels below the picked folder the library scan searches.</summary>
         public int ScanMaxDepth { get; set; } = DefaultScanMaxDepth;

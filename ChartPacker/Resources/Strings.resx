@@ -288,11 +288,43 @@
     <value>Waiting for job…</value>
     <comment>The results panel before any pack or unpack has run.</comment>
   </data>
-  <data name="ExpandButton" xml:space="preserve">
-    <value>Expand</value>
+  <data name="JobDetailsButton" xml:space="preserve">
+    <value>Details</value>
   </data>
-  <data name="CollapseButton" xml:space="preserve">
-    <value>Collapse</value>
+  <data name="JobDetailsToolTip" xml:space="preserve">
+    <value>Show details</value>
+  </data>
+  <data name="JobProgressWindowTitle" xml:space="preserve">
+    <value>Job progress</value>
+  </data>
+  <data name="JobGroupPackedFormat" xml:space="preserve">
+    <value>Packed ({0:N0})</value>
+    <comment>{0} is the number of items.</comment>
+  </data>
+  <data name="JobGroupUnpackedFormat" xml:space="preserve">
+    <value>Unpacked ({0:N0})</value>
+    <comment>{0} is the number of items.</comment>
+  </data>
+  <data name="JobGroupSkippedFormat" xml:space="preserve">
+    <value>Skipped ({0:N0})</value>
+    <comment>{0} is the number of items.</comment>
+  </data>
+  <data name="JobGroupFailedFormat" xml:space="preserve">
+    <value>Failed or canceled ({0:N0})</value>
+    <comment>{0} is the number of items.</comment>
+  </data>
+  <data name="JobGroupEmpty" xml:space="preserve">
+    <value>None</value>
+    <comment>Shown in a progress window group with no items.</comment>
+  </data>
+  <data name="JobCanceledPack" xml:space="preserve">
+    <value>Canceled before it was packed.</value>
+  </data>
+  <data name="JobCanceledUnpack" xml:space="preserve">
+    <value>Canceled before it was unpacked.</value>
+  </data>
+  <data name="CloseButton" xml:space="preserve">
+    <value>Close</value>
   </data>
   <data name="JobResultsListName" xml:space="preserve">
     <value>Pack and unpack results</value>
