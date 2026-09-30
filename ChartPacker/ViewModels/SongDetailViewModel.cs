@@ -11,6 +11,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ChartPacker.Audio.Decoding;
 using ChartPacker.Core.Ini;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -872,9 +873,8 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            // An offset was set against the vocals being replaced.
-            Lyrics.AddSource(path, source);
-            songs[0].Item.Draft.SetVocals(path);
+            // The draft keeps the source as read, so saving writes the vocals shown. An offset was set against the vocals being replaced.
+            songs[0].Item.Draft.SetVocals(source);
             songs[0].Item.Draft.SetVocalsOffset(0);
             OnDraftsChanged();
         }
@@ -1646,7 +1646,7 @@ namespace ChartPacker.ViewModels
         /// <summary>Whether the one selected song will have a vocals audio track once its draft is saved.</summary>
         private bool HasVocalStem() =>
             _songs is [var song] && !IsBulk
-            && SongTracks.Resolve(_diskFiles.Select(f => f.Path), song.Item.Draft).Any(t => t.Stem.StartsWith("vocals", StringComparison.OrdinalIgnoreCase));
+            && SongTracks.Resolve(_diskFiles.Select(f => f.Path), song.Item.Draft).Any(t => LibraryContentFilters.StemGroupOf(t.Stem) == LibraryStems.Vocals);
 
         /// <summary>
         /// The one selected song's chart files and other files, with the ones a staged change removes

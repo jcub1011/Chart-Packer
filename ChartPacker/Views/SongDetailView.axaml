@@ -880,6 +880,7 @@
                         <Border Classes="artTile" Height="120" AutomationProperties.Name="{x:Static res:Strings.LyricsHeader}">
                             <Panel>
                                 <ctl:LyricLaneView Scene="{Binding Lyrics.Scene}"
+                                                   TimeShift="{Binding Lyrics.TimeShift}"
                                                    Clock="{Binding Lyrics.Clock}"
                                                    IsHitTestVisible="False"
                                                    IsVisible="{Binding Lyrics.HasLyrics}" />

@@ -19,11 +19,21 @@ public sealed record VocalPart(string TrackName, IReadOnlyList<VocalNote> Notes,
 /// <summary>A chart's vocal tracks, and the tempo map that places them.</summary>
 public sealed record VocalChart(TempoMap Tempo, IReadOnlyList<VocalPart> Parts)
 {
-    /// <summary>The part the lyrics are shown from: <c>PART VOCALS</c>, otherwise the first harmony.</summary>
-    public VocalPart? Main => Parts.FirstOrDefault(p => p.TrackName.Equals(VocalReader.VocalsTrackName, StringComparison.OrdinalIgnoreCase)) ?? Parts.FirstOrDefault();
+    /// <summary>
+    /// The part the lyrics are shown from: the first of <c>PART VOCALS</c> and the harmonies, in that
+    /// order, with lyrics; otherwise the first with notes. An empty <c>PART VOCALS</c>, as a template
+    /// leaves, gives way to a harmony that has them.
+    /// </summary>
+    public VocalPart? Main => Parts.FirstOrDefault(p => p.Lyrics.Count > 0) ?? Parts.FirstOrDefault(p => p.Notes.Count > 0) ?? Parts.FirstOrDefault();
 
     /// <summary>Whether any vocal track has a lyric or a note.</summary>
     public bool HasVocals => Parts.Any(p => p.Lyrics.Count > 0 || p.Notes.Count > 0);
+
+    /// <summary>The tick of the first note, lyric or phrase of any vocal track; <see langword="null"/> when there's none.</summary>
+    public long? FirstTick => Parts
+        .SelectMany(p => p.Notes.Select(n => n.Tick).Concat(p.Lyrics.Select(l => l.Tick)).Concat(p.Phrases.Select(f => f.Tick)))
+        .Select(t => (long?)t)
+        .Min();
 }
 
 /// <summary>A lyric as it's shown, with the chart's symbols (Rock Band and Clone Hero conventions) worked out.</summary>
@@ -96,13 +106,17 @@ public static class VocalReader
         trackName is not null && TrackNames.Contains(trackName.Trim(), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Reads the vocal tracks of the chart <paramref name="bytes"/>, stored as <paramref name="storedName"/>.</summary>
+    /// <param name="tempo">
+    /// The chart's tempo map, when it's been read already: a <c>.chart</c>'s is otherwise read with the
+    /// whole chart. A MIDI file's is read from its tracks either way.
+    /// </param>
     /// <exception cref="ArgumentException"><paramref name="storedName"/> isn't a chart's name.</exception>
     /// <exception cref="ChartFormatException">The chart is malformed.</exception>
-    public static VocalChart Read(byte[] bytes, string storedName)
+    public static VocalChart Read(byte[] bytes, string storedName, TempoMap? tempo = null)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         ArgumentNullException.ThrowIfNull(storedName);
-        return ChartReader.IsMidi(storedName) ? ReadMidi(bytes) : ReadChart(bytes);
+        return ChartReader.IsMidi(storedName) ? ReadMidi(bytes) : ReadChart(bytes, tempo);
     }
 
     /// <summary>
@@ -173,9 +187,9 @@ public static class VocalReader
 
     private static bool IsLyricEvent(string text) => text.StartsWith("lyric ", StringComparison.OrdinalIgnoreCase);
 
-    private static VocalChart ReadChart(byte[] bytes)
+    private static VocalChart ReadChart(byte[] bytes, TempoMap? tempo)
     {
-        var tempo = ChartReader.Read(bytes, ChartFiles.ChartName).Tempo;
+        tempo ??= ChartReader.Read(bytes, ChartFiles.ChartName).Tempo;
         var lines = ChartTextReader.Sections(ChartTextReader.Decode(bytes))
             .Where(s => s.Name.Equals("Events", StringComparison.OrdinalIgnoreCase))
             .SelectMany(s => s.Lines);

@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using ChartPacker.Core.Charts;
-using ChartPacker.Core.Scanning;
 
 namespace ChartPacker.Core.Merging;
 
@@ -31,22 +30,34 @@ public static class VocalsEditor
     /// <param name="target">The chart to change.</param>
     /// <param name="targetName">Its stored name, <c>notes.chart</c> or <c>notes.mid</c>.</param>
     /// <param name="targetMetadata">The song's metadata, for its <c>delay</c>.</param>
-    /// <param name="source">The chart to take the vocals from.</param>
+    /// <param name="source">The chart to take the vocals from, with its vocals as read.</param>
     /// <param name="offset">How much later than in <paramref name="source"/> the vocals are sung.</param>
     /// <exception cref="ArgumentException"><paramref name="targetName"/> isn't a chart's name.</exception>
     /// <exception cref="ChartFormatException">
-    /// A chart is malformed, <paramref name="offset"/> would move the vocals before the start of the
-    /// song, or the result didn't check out.
+    /// A chart is malformed, the vocals would start before the song does, or the result didn't check out.
     /// </exception>
-    public static VocalsEditResult Apply(byte[] target, string targetName, IReadOnlyList<KeyValuePair<string, string>> targetMetadata, MidiChart? source, TimeSpan offset = default)
+    public static VocalsEditResult Apply(byte[] target, string targetName, IReadOnlyList<KeyValuePair<string, string>> targetMetadata, VocalsSource? source, TimeSpan offset = default)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(targetName);
         ArgumentNullException.ThrowIfNull(targetMetadata);
 
-        return Edit(target, targetName, targetMetadata, offset, _ => source is null
-            ? null
-            : new Placement(source.Midi, VocalReader.Read(source.Midi, ChartFiles.MidiName), source.Delay + offset));
+        var read = Read(target, targetName, targetMetadata);
+        return Edit(target, targetName, read, source is null ? null : new Placement(source.Chart.Midi, source.Vocals, source.Chart.Delay + offset));
+    }
+
+    /// <summary>
+    /// When the first event of <paramref name="vocals"/>, sung <paramref name="vocalsDelay"/> later than
+    /// their ticks say, is sung against a chart whose delay is <paramref name="targetDelay"/>: in song
+    /// time from that chart's first tick. Negative when it's before the song starts, where saving
+    /// can't put it. <see langword="null"/> when there are no vocal events.
+    /// </summary>
+    public static TimeSpan? StartOf(VocalChart vocals, TimeSpan vocalsDelay, TimeSpan targetDelay)
+    {
+        ArgumentNullException.ThrowIfNull(vocals);
+        return vocals.FirstTick is { } first
+            ? TimeSpan.FromSeconds(vocals.Tempo.SecondsAt(first)) + (vocalsDelay - targetDelay)
+            : null;
     }
 
     /// <summary>Moves the vocals <paramref name="target"/> has by <paramref name="offset"/> of song time, later when positive.</summary>
@@ -64,44 +75,49 @@ public static class VocalsEditor
         ArgumentNullException.ThrowIfNull(targetName);
         ArgumentNullException.ThrowIfNull(targetMetadata);
 
-        var vocals = VocalReader.Read(target, targetName);
-        if (offset == TimeSpan.Zero || !vocals.HasVocals)
+        if (offset == TimeSpan.Zero)
+            return new VocalsEditResult(target, false);
+
+        var read = Read(target, targetName, targetMetadata);
+        var vocals = VocalReader.Read(target, targetName, read.Chart.Tempo);
+        if (!vocals.HasVocals)
             return new VocalsEditResult(target, false);
 
         // The chart's own vocals, placed as though its delay were later by the offset.
-        return Edit(target, targetName, targetMetadata, offset, delay => new Placement(ChartReader.IsMidi(targetName) ? target : null, vocals, delay + offset));
+        return Edit(target, targetName, read, new Placement(ChartReader.IsMidi(targetName) ? target : null, vocals, read.Delay + offset));
     }
 
-    /// <summary>Gives <paramref name="target"/> the vocals <paramref name="placementOf"/> makes from its delay; none when it makes none.</summary>
-    private static VocalsEditResult Edit(
-        byte[] target, string targetName, IReadOnlyList<KeyValuePair<string, string>> targetMetadata, TimeSpan offset, Func<TimeSpan, Placement?> placementOf)
+    /// <summary>The chart to change as read, with what reads it and its delay.</summary>
+    private static ReadChart Read(byte[] target, string targetName, IReadOnlyList<KeyValuePair<string, string>> targetMetadata)
     {
         var options = ChartReadOptions.From(targetMetadata);
-        var before = ChartReader.Read(target, targetName, options);
-        var delay = SongChartSettings.DelayOf(targetMetadata, before);
-        var placement = placementOf(delay);
-        if (placement is not null && offset < TimeSpan.Zero)
-            EnsureInSong(placement, delay, offset);
+        var chart = ChartReader.Read(target, targetName, options);
+        return new ReadChart(chart, options, SongChartSettings.DelayOf(targetMetadata, chart));
+    }
+
+    /// <summary>Gives <paramref name="target"/>, as <paramref name="read"/>, the vocals <paramref name="placement"/> places; none when it's <see langword="null"/>.</summary>
+    private static VocalsEditResult Edit(byte[] target, string targetName, ReadChart read, Placement? placement)
+    {
+        if (placement is not null)
+            EnsureInSong(placement, read.Delay);
 
         var result = ChartReader.IsMidi(targetName)
-            ? new VocalsEditResult(ApplyMidi(target, placement, delay), false)
-            : ApplyText(target, before.Tempo, placement, delay);
+            ? new VocalsEditResult(ApplyMidi(target, placement, read.Delay), false)
+            : ApplyText(target, read.Chart.Tempo, placement, read.Delay);
 
-        Check(before, ChartReader.Read(result.Bytes, targetName, options));
+        Check(read.Chart, ChartReader.Read(result.Bytes, targetName, read.Options));
         return result;
     }
 
     /// <summary>
-    /// Throws when moving the vocals earlier by <paramref name="offset"/> would put their first event
-    /// before the start of the song, where it would land on the first tick with whatever else did.
+    /// Throws when the vocals' first event would be sung before the start of the song, where it would
+    /// land on the first tick with whatever else did: moved too far earlier, or taken from a song
+    /// whose delay is shorter than this one's.
     /// </summary>
-    private static void EnsureInSong(Placement placement, TimeSpan delay, TimeSpan offset)
+    private static void EnsureInSong(Placement placement, TimeSpan delay)
     {
-        var ticks = placement.Vocals.Parts
-            .SelectMany(p => p.Notes.Select(n => n.Tick).Concat(p.Lyrics.Select(l => l.Tick)).Concat(p.Phrases.Select(f => f.Tick)))
-            .ToList();
-        if (ticks.Count > 0 && placement.Vocals.Tempo.SecondsAt(ticks.Min()) + (placement.Delay - delay).TotalSeconds < 0)
-            throw new ChartFormatException($"Moving the vocals {-offset.TotalMilliseconds:0} ms earlier would put them before the start of the song.");
+        if (StartOf(placement.Vocals, placement.Delay, delay) is { } start && start < TimeSpan.Zero)
+            throw new ChartFormatException($"The vocals would start {Math.Ceiling(-start.TotalMilliseconds):0} ms before the song does.");
     }
 
     /// <summary>Throws when anything but the vocals changed; they aren't read as instruments, so the instruments must read the same.</summary>
@@ -272,4 +288,7 @@ public static class VocalsEditor
     /// <param name="Midi">The MIDI file they're in, for a MIDI chart; <see langword="null"/> when they're a <c>.chart</c>'s own.</param>
     /// <param name="Delay">How much later than their ticks say they're sung.</param>
     private sealed record Placement(byte[]? Midi, VocalChart Vocals, TimeSpan Delay);
+
+    /// <summary>The chart to change, read with <paramref name="Options"/>, and its <c>delay</c>.</summary>
+    private sealed record ReadChart(ChartDocument Chart, ChartReadOptions Options, TimeSpan Delay);
 }

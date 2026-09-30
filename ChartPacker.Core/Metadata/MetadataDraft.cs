@@ -29,11 +29,17 @@ public readonly record struct BackgroundChange(string? SourcePath)
 }
 
 /// <summary>A pending change to a song's vocals: its chart's <c>PART VOCALS</c> and harmonies.</summary>
-/// <param name="SourcePath">The chart or <c>.sng</c> to take the vocals from, or <see langword="null"/> when the vocals are to be removed.</param>
-public readonly record struct VocalsChange(string? SourcePath)
+/// <param name="Source">
+/// The chart or <c>.sng</c> to take the vocals from, as it was read when it was chosen, or
+/// <see langword="null"/> when the vocals are to be removed. Saving writes these vocals, not the file's.
+/// </param>
+public readonly record struct VocalsChange(Merging.VocalsSource? Source)
 {
+    /// <summary>Where the vocals come from, or <see langword="null"/> when they're to be removed.</summary>
+    public string? SourcePath => Source?.FilePath;
+
     /// <summary>True when the vocals are to be removed.</summary>
-    public bool IsRemoval => SourcePath is null;
+    public bool IsRemoval => Source is null;
 }
 
 /// <summary>A file to add to a song.</summary>
@@ -204,11 +210,11 @@ public sealed class MetadataDraft
         VocalsOffset = 0;
     }
 
-    /// <summary>Replaces the chart's vocals with those of the chart or <c>.sng</c> at <paramref name="sourcePath"/>, replacing any earlier vocals change.</summary>
-    public void SetVocals(string sourcePath)
+    /// <summary>Replaces the chart's vocals with those of <paramref name="source"/>, replacing any earlier vocals change.</summary>
+    public void SetVocals(Merging.VocalsSource source)
     {
-        ArgumentException.ThrowIfNullOrEmpty(sourcePath);
-        Vocals = new VocalsChange(sourcePath);
+        ArgumentNullException.ThrowIfNull(source);
+        Vocals = new VocalsChange(source);
     }
 
     /// <summary>Marks the chart's vocals for removal, replacing any earlier vocals change.</summary>

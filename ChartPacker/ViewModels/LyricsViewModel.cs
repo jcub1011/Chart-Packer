@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using ChartPacker.Controls;
 using ChartPacker.Core.Charts;
@@ -22,6 +23,8 @@ namespace ChartPacker.ViewModels
     /// What's drawn is the chart <see cref="VocalsEditor"/> makes from the draft's vocals change,
     /// read back, so it's what saving writes. The offset moves every syllable by the same song time,
     /// so it's drawn by moving the lane rather than rewriting the chart for every step of a drag.
+    /// Vocals that would start before the song does are read back moved later just enough to fit,
+    /// and the lane moved back by as much, so none are drawn stacked on the first tick.
     /// The row shows while the song has a vocals track to sing along to, vocals in its chart, or a
     /// change to them to undo.
     /// </remarks>
@@ -45,11 +48,14 @@ namespace ChartPacker.ViewModels
         private VocalChart? _shown;
         private TimeSpan _delay;
 
+        // How much later than the change places them _shown was built, so they fit in the song; the lane takes it back off.
+        private TimeSpan _lead;
+
+        // When the first vocal event is sung before the offset, from the chart's first tick; saving needs it at or after zero.
+        private TimeSpan? _start;
+
         // Set while the offset is changed from here, so that doesn't read as the user changing it.
         private bool _isSyncing;
-
-        // The charts vocals were chosen from, by path, read once.
-        private readonly Dictionary<string, VocalsSource> _sources = new(StringComparer.Ordinal);
 
         /// <summary>Raised when the offset is set in the draft of the song shown.</summary>
         public event EventHandler? OffsetChanged;
@@ -65,6 +71,10 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(NudgeCommand))]
         [NotifyCanExecuteChangedFor(nameof(RevertOffsetCommand))]
         public partial LyricScene? Scene { get; set; }
+
+        /// <summary>How much later than <see cref="Scene"/> says the lane draws the vocals: the offset, less any lead they were built with.</summary>
+        [ObservableProperty]
+        public partial TimeSpan TimeShift { get; set; }
 
         /// <summary>Shown in the lane instead of the vocals, e.g. "No lyrics" or "Lyrics will be removed".</summary>
         [ObservableProperty]
@@ -130,9 +140,6 @@ namespace ChartPacker.ViewModels
 
         public string ReplaceToolTip => HasLyrics ? Strings.LyricsReplaceToolTip : Strings.LyricsAddToolTip;
 
-        /// <summary>Keeps <paramref name="source"/>, read for <paramref name="path"/>, so showing its vocals doesn't read it again.</summary>
-        public void AddSource(string path, VocalsSource source) => _sources[path] = source;
-
         /// <summary>Forgets the song and its chart, so the next <see cref="Refresh"/> reads it afresh, as after saving.</summary>
         public void Unload()
         {
@@ -174,7 +181,7 @@ namespace ChartPacker.ViewModels
             else
             {
                 // Only the offset may have changed, as when the draft's offsets are cleared.
-                BuildScene();
+                ApplyOffset();
             }
 
             RefreshState();
@@ -198,7 +205,7 @@ namespace ChartPacker.ViewModels
                 return;
 
             song.Draft.SetVocalsOffset((int)Math.Round(Math.Clamp(value ?? 0, int.MinValue, int.MaxValue)));
-            BuildScene();
+            ApplyOffset();
             RefreshState();
             OffsetChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -225,7 +232,10 @@ namespace ChartPacker.ViewModels
             _bytes = null;
             _builtKey = null;
             _shown = null;
+            _lead = TimeSpan.Zero;
+            _start = null;
             Scene = null;
+            TimeShift = TimeSpan.Zero;
             Warning = null;
             Problem = null;
             SourceName = null;
@@ -272,10 +282,11 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// What a build depends on besides the chart: the vocals change, and the <c>delay</c> and
-        /// <c>pro_drums</c> that place and read it. Not the offset, which <see cref="BuildScene"/> applies.
+        /// <c>pro_drums</c> that place and read it. Not the offset, which <see cref="ApplyOffset"/> applies.
+        /// The source counts by identity, so choosing the same file again reads its vocals afresh.
         /// </summary>
         private static string BuildKey(HighwaySong song) =>
-            string.Join('|', song.Draft.Vocals switch { null => "=", { SourcePath: null } => "-", { SourcePath: { } path } => "+" + path },
+            string.Join('|', song.Draft.Vocals switch { null => "=", { Source: null } => "-", { Source: { } source } => $"+{source.FilePath}#{RuntimeHelpers.GetHashCode(source)}" },
                 First(song.Metadata, "delay"), ChartReadOptions.From(song.Metadata).ProDrums);
 
         private static string? First(IReadOnlyList<KeyValuePair<string, string>> pairs, string key) =>
@@ -291,30 +302,32 @@ namespace ChartPacker.ViewModels
             _builtKey = BuildKey(song);
             var change = song.Draft.Vocals;
             var metadata = song.Metadata;
-            var cached = change?.SourcePath is { } path ? _sources.GetValueOrDefault(path) : null;
 
             Built result;
             try
             {
-                result = await Task.Run(async () =>
+                result = await Task.Run(() =>
                 {
-                    var options = ChartReadOptions.From(metadata);
-                    var original = VocalReader.Read(bytes, name);
+                    // Changing the vocals leaves the tempo map and the delay as they are, so one read serves for both.
+                    var chart = ChartReader.Read(bytes, name, ChartReadOptions.From(metadata));
+                    var delay = SongChartSettings.DelayOf(metadata, chart);
+                    var original = VocalReader.Read(bytes, name, chart.Tempo);
                     if (change is null)
-                        return new Built(original, original, SongChartSettings.DelayOf(metadata, ChartReader.Read(bytes, name, options)), false, null, null);
+                        return new Built(original, original, delay, TimeSpan.Zero, VocalsEditor.StartOf(original, delay, delay), false, null);
 
                     try
                     {
-                        var source = change.Value.SourcePath is { } from ? cached ?? await VocalsSource.LoadAsync(from) : null;
-                        var edited = VocalsEditor.Apply(bytes, name, metadata, source?.Chart);
-                        var shown = VocalReader.Read(edited.Bytes, name);
-                        var delay = SongChartSettings.DelayOf(metadata, ChartReader.Read(edited.Bytes, name, options));
-                        return new Built(original, shown, delay, edited.LyricsOnly, source, null);
+                        // Vocals that would start before the song are built later just enough to fit, as saving can't place them.
+                        var source = change.Value.Source;
+                        var start = source is null ? null : VocalsEditor.StartOf(source.Vocals, source.Chart.Delay, delay);
+                        var lead = start is { } early && early < TimeSpan.Zero ? TimeSpan.FromMilliseconds(Math.Ceiling(-early.TotalMilliseconds)) : TimeSpan.Zero;
+                        var edited = VocalsEditor.Apply(bytes, name, metadata, source, lead);
+                        return new Built(original, VocalReader.Read(edited.Bytes, name, chart.Tempo), delay, lead, start, edited.LyricsOnly, null);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         // ChartFormatException is an IOException: the vocals chosen can't go in this chart.
-                        return new Built(original, null, TimeSpan.Zero, false, null, ex.Message);
+                        return new Built(original, null, delay, TimeSpan.Zero, null, false, ex.Message);
                     }
                 });
             }
@@ -323,7 +336,9 @@ namespace ChartPacker.ViewModels
                 if (version == _version)
                 {
                     _shown = null;
+                    _start = null;
                     Scene = null;
+                    Problem = null;
                     ChartHasVocals = false;
                     Note = string.Format(CultureInfo.CurrentCulture, Strings.LyricsUnreadableFormat, ex.Message);
                 }
@@ -335,15 +350,15 @@ namespace ChartPacker.ViewModels
             if (version != _version || _song is null)
                 return;
 
-            if (change?.SourcePath is { } chosen && result.Source is { } loaded)
-                _sources[chosen] = loaded;
-
             ChartHasVocals = result.Original.HasVocals;
             Warning = result.LyricsOnly ? Strings.LyricsChartKeepsWordsOnly : null;
             SourceName = change?.SourcePath is { } picked ? Path.GetFileName(picked) : result.Original.HasVocals ? name : null;
             _shown = result.Shown is { HasVocals: true } shownVocals ? shownVocals : null;
             _delay = result.Delay;
+            _lead = result.Lead;
+            _start = result.Start;
             BuildScene();
+            ApplyOffset();
             Note = result.Error is { } error ? string.Format(CultureInfo.CurrentCulture, Strings.LyricsChangeFailedFormat, error)
                 : Scene is not null ? null
                 : change is { IsRemoval: true } ? Strings.LyricsWillBeRemoved
@@ -351,40 +366,31 @@ namespace ChartPacker.ViewModels
             RefreshState();
         }
 
-        /// <summary>Draws the vocals shown, moved by the draft's offset; says so when that moves them before the start.</summary>
+        /// <summary>Draws the vocals shown, as the draft's change places them; the offset is <see cref="ApplyOffset"/>'s.</summary>
         private void BuildScene()
         {
-            if (_shown?.Main is not { } part)
-            {
-                Scene = null;
-                Problem = null;
-                return;
-            }
-
-            int offset = _song?.Draft.VocalsOffset ?? 0;
-            var scene = new LyricScene(part, _shown.Tempo, _delay + TimeSpan.FromMilliseconds(offset));
-            Scene = scene.IsEmpty ? null : scene;
-
-            // Saving places each event by its tick, which can't go before the first; see VocalsEditor.
-            Problem = offset < 0 && FirstSeconds(_shown) + (offset / 1000.0) < 0
-                ? string.Format(CultureInfo.CurrentCulture, Strings.LyricsOffsetBeforeStartFormat, -offset)
-                : null;
+            var scene = _shown?.Main is { } part ? new LyricScene(part, _shown.Tempo, _delay) : null;
+            Scene = scene is { IsEmpty: false } ? scene : null;
         }
 
-        /// <summary>When the first event of any vocal track is, in song time from the first tick.</summary>
-        private static double FirstSeconds(VocalChart vocals)
+        /// <summary>Moves the lane by the draft's offset; says so when that puts the vocals before the start.</summary>
+        private void ApplyOffset()
         {
-            long first = vocals.Parts
-                .SelectMany(p => p.Notes.Select(n => n.Tick).Concat(p.Lyrics.Select(l => l.Tick)).Concat(p.Phrases.Select(f => f.Tick)))
-                .DefaultIfEmpty()
-                .Min();
-            return vocals.Tempo.SecondsAt(first);
+            int offset = _song?.Draft.VocalsOffset ?? 0;
+            TimeShift = TimeSpan.FromMilliseconds(offset) - _lead;
+
+            // Saving places each event by its tick, which can't go before the first; see VocalsEditor.
+            double startsAt = _shown is not null && _start is { } start ? start.TotalMilliseconds + offset : 0;
+            Problem = startsAt < 0
+                ? string.Format(CultureInfo.CurrentCulture, Strings.LyricsOffsetBeforeStartFormat, Math.Ceiling(-startsAt))
+                : null;
         }
 
         /// <param name="Original">The vocals of the chart as it is.</param>
         /// <param name="Shown">The vocals it will have once the change is saved, or <see langword="null"/> when it can't be made.</param>
-        /// <param name="Source">The chart the vocals were chosen from, read for this build.</param>
+        /// <param name="Lead">How much later than the change places them <paramref name="Shown"/> was built.</param>
+        /// <param name="Start">When their first event is sung, from the chart's first tick, before the offset.</param>
         /// <param name="Error">Why the change can't be made.</param>
-        private sealed record Built(VocalChart Original, VocalChart? Shown, TimeSpan Delay, bool LyricsOnly, VocalsSource? Source, string? Error);
+        private sealed record Built(VocalChart Original, VocalChart? Shown, TimeSpan Delay, TimeSpan Lead, TimeSpan? Start, bool LyricsOnly, string? Error);
     }
 }

@@ -160,14 +160,16 @@ public static class ChartToMidi
         if (VocalReader.ChartVocals(lines, resolution) is not var (lyrics, phrases))
             return null;
 
+        // The phrases first, so at a tick one phrase ends, the next starts, then its first lyric is sung.
         var messages = new List<MidiMessage> { MidiMessage.Text(0, 0x03, VocalReader.VocalsTrackName) };
-        foreach (var lyric in lyrics)
-            messages.Add(MidiMessage.Text(lyric.Tick, 0x05, lyric.Text));
         foreach (var phrase in phrases)
         {
             messages.Add(MidiMessage.NoteOn(phrase.Tick, VocalPhrasePitch));
             messages.Add(MidiMessage.NoteOff(phrase.Tick + phrase.Length, VocalPhrasePitch));
         }
+
+        foreach (var lyric in lyrics)
+            messages.Add(MidiMessage.Text(lyric.Tick, 0x05, lyric.Text));
 
         return messages;
     }

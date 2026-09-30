@@ -57,9 +57,34 @@ public sealed class VocalsEditorTests
         byte[] source = new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART VOCALS").Note(960, 60).Meta(960, 0x05, Latin1("hi")).Build();
 
         // The source plays 250 ms later than its ticks; the target 500 ms later, so the lyric moves a quarter-second earlier.
-        var result = VocalsEditor.Apply(target, "notes.mid", [KeyValuePair.Create("delay", "500")], new MidiChart(source, TimeSpan.FromMilliseconds(250), ChartReadOptions.Default));
+        var result = VocalsEditor.Apply(target, "notes.mid", [KeyValuePair.Create("delay", "500")], Source(new MidiChart(source, TimeSpan.FromMilliseconds(250), ChartReadOptions.Default)));
 
         Assert.AreEqual(720, VocalReader.Read(result.Bytes, "notes.mid").Main!.Lyrics.Single().Tick);
+    }
+
+    [TestMethod]
+    public void VocalsFromASongWithAShorterDelayCantStartBeforeTheSong()
+    {
+        byte[] target = new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART GUITAR").Note(0, 96).Build();
+        // A tenth of a second in, where the target's half-second delay has no tick for it.
+        byte[] source = new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART VOCALS").Note(96, 60).Meta(96, 0x05, Latin1("hi")).Build();
+        KeyValuePair<string, string>[] delayed = [KeyValuePair.Create("delay", "500")];
+
+        Assert.ThrowsExactly<ChartFormatException>(() => VocalsEditor.Apply(target, "notes.mid", delayed, Chart(source)));
+
+        var result = VocalsEditor.Apply(target, "notes.mid", delayed, Chart(source), TimeSpan.FromMilliseconds(500));
+        Assert.AreEqual(96, VocalReader.Read(result.Bytes, "notes.mid").Main!.Lyrics.Single().Tick);
+    }
+
+    [TestMethod]
+    public void StartOfIsTheFirstEventInTheTargetsSongTime()
+    {
+        // Two beats at 120 BPM, then a beat at 60 BPM: tick 1440 is two seconds in.
+        byte[] midi = new MidiBuilder().Track("tempo").Tempo(0, 120).Tempo(960, 60).Track("PART VOCALS").Note(1440, 60).Build();
+        var vocals = VocalReader.Read(midi, "notes.mid");
+
+        Assert.AreEqual(TimeSpan.FromSeconds(1.5), VocalsEditor.StartOf(vocals, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(750)));
+        Assert.IsNull(VocalsEditor.StartOf(VocalReader.Read(new MidiBuilder().Track("PART GUITAR").Note(0, 96).Build(), "notes.mid"), TimeSpan.Zero, TimeSpan.Zero));
     }
 
     [TestMethod]
@@ -240,7 +265,9 @@ public sealed class VocalsEditorTests
         Assert.AreEqual(720, VocalReader.Read(result.Bytes, "notes.mid").Main!.Lyrics.Single().Tick);
     }
 
-    private static MidiChart Chart(byte[] midi) => new(midi, TimeSpan.Zero, ChartReadOptions.Default);
+    private static VocalsSource Chart(byte[] midi) => Source(new MidiChart(midi, TimeSpan.Zero, ChartReadOptions.Default));
+
+    private static VocalsSource Source(MidiChart chart) => new("source.mid", chart, VocalReader.Read(chart.Midi, "notes.mid"));
 
     private static byte[] Latin1(string text) => Encoding.Latin1.GetBytes(text);
 

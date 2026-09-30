@@ -157,8 +157,8 @@ public static class DraftWriter
         var vocalsOffset = TimeSpan.FromMilliseconds(draft.VocalsOffset);
         if (draft.Vocals is { } vocals)
         {
-            var source = vocals.SourcePath is { } path ? await VocalsSource.LoadAsync(path, cancellationToken).ConfigureAwait(false) : null;
-            bytes = VocalsEditor.Apply(bytes, name, pairs, source?.Chart, vocalsOffset).Bytes;
+            // The source as it was read when chosen, so what's saved is what was shown.
+            bytes = VocalsEditor.Apply(bytes, name, pairs, vocals.Source, vocalsOffset).Bytes;
         }
         else if (draft.HasVocalsOffset)
         {

@@ -784,8 +784,8 @@
     <value>Reset the lyrics offset</value>
   </data>
   <data name="LyricsOffsetBeforeStartFormat" xml:space="preserve">
-    <value>Moving the lyrics {0} ms earlier would put them before the start of the song, so it can't be saved.</value>
-    <comment>{0} is a number of milliseconds.</comment>
+    <value>The lyrics would start {0} ms before the song does, so this can't be saved. Move them at least that much later.</value>
+    <comment>{0} is a number of milliseconds: how much later the lyrics must move to start with the song.</comment>
   </data>
   <data name="PickLyricsTitle" xml:space="preserve">
     <value>Choose a chart or .sng to take the lyrics from</value>

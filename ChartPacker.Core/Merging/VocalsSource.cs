@@ -5,10 +5,15 @@ using ChartPacker.Core.Sng;
 
 namespace ChartPacker.Core.Merging;
 
-/// <summary>A chart to take vocals from, for <see cref="VocalsEditor"/>.</summary>
+/// <summary>A chart to take vocals from, for <see cref="VocalsEditor"/>, as it was read.</summary>
+/// <remarks>
+/// A draft keeps the source it was given, and saving writes these vocals rather than reading the
+/// file again, so what's saved is what was shown even when the file has changed since.
+/// </remarks>
+/// <param name="FilePath">The chart or <c>.sng</c> it was read from.</param>
 /// <param name="Chart">Its chart as a MIDI file, placed against its song's audio.</param>
 /// <param name="Vocals">Its vocal tracks.</param>
-public sealed record VocalsSource(MidiChart Chart, VocalChart Vocals)
+public sealed record VocalsSource(string FilePath, MidiChart Chart, VocalChart Vocals)
 {
     /// <summary>
     /// Reads the vocals of <paramref name="path"/>: a <c>.sng</c>, whose chart and metadata it holds,
@@ -52,7 +57,7 @@ public sealed record VocalsSource(MidiChart Chart, VocalChart Vocals)
             throw new ChartFormatException($"'{Path.GetFileName(path)}' is too large to read.");
 
         var (chart, _) = MidiChart.Load(bytes, chartName, pairs);
-        return new VocalsSource(chart, VocalReader.Read(chart.Midi, ChartFiles.MidiName));
+        return new VocalsSource(path, chart, VocalReader.Read(chart.Midi, ChartFiles.MidiName));
     }
 
     private static async Task<IReadOnlyList<KeyValuePair<string, string>>> SiblingIniAsync(string chartPath, CancellationToken cancellationToken)

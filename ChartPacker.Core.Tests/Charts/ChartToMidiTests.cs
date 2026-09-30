@@ -175,6 +175,59 @@ public sealed class ChartToMidiTests
             ChartReaderTests.Notes(midi, ChartInstrument.Drums, ChartDifficulty.Hard));
     }
 
+    [TestMethod]
+    public void LyricsOutsideLatin1KeepTheirText()
+    {
+        byte[] chart = Chart("""
+            [Events]
+            {
+              192 = E "phrase_start"
+              192 = E "lyric 愛"
+              288 = E "lyric café"
+              384 = E "phrase_end"
+            }
+            """);
+
+        var vocals = VocalReader.Read(ChartToMidi.Convert(chart).Midi, "notes.mid");
+
+        CollectionAssert.AreEqual(new[] { "愛", "café" }, vocals.Main!.Lyrics.Select(l => l.Text).ToArray());
+    }
+
+    [TestMethod]
+    public void TextInLatin1IsWrittenAsLatin1()
+    {
+        CollectionAssert.AreEqual(new byte[] { 0xFF, 0x05, 2, (byte)'e', 0xE9 }, MidiMessage.Text(0, 0x05, "eé").Bytes);
+        CollectionAssert.AreEqual(new byte[] { 0xFF, 0x05, 3, 0xE6, 0x84, 0x9B }, MidiMessage.Text(0, 0x05, "愛").Bytes);
+    }
+
+    [TestMethod]
+    public void APhraseStartsBeforeItsFirstLyric()
+    {
+        byte[] chart = Chart("""
+            [Events]
+            {
+              192 = E "phrase_start"
+              192 = E "lyric Hel-"
+              288 = E "phrase_end"
+              288 = E "phrase_start"
+              288 = E "lyric lo"
+              384 = E "phrase_end"
+            }
+            """);
+        byte[] midi = ChartToMidi.Convert(chart).Midi;
+
+        var (_, _, chunks) = MidiFile.ReadChunks(midi);
+        var events = chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.ReadEvents(midi, c)).First(e => MidiFile.NameOf(midi, e) == "PART VOCALS");
+        string Kind(MidiEvent e) => MidiFile.TextOf(midi, e, 0x05) is { } lyric ? lyric
+            : e.Kind == 0x90 ? "on"
+            : e.Kind == 0x80 ? "off"
+            : "other";
+
+        CollectionAssert.AreEqual(
+            new[] { "on", "Hel-", "off", "on", "lo", "off" },
+            events.Where(e => e.Tick > 0).Select(Kind).Where(k => k != "other").ToArray());
+    }
+
     private static byte[] Chart(string tracks) => Encoding.UTF8.GetBytes($$"""
         [Song]
         {

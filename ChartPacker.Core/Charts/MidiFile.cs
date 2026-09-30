@@ -30,6 +30,29 @@ internal static class MidiFile
 {
     public const int EndOfTrack = 0x2F;
 
+    // Throws on bytes that aren't UTF-8, so text that isn't is read as Latin-1 instead.
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+    /// <summary>
+    /// The bytes of a text event: Latin-1, as MIDI text has long been written, when every character
+    /// is in it; otherwise UTF-8, so no character is lost.
+    /// </summary>
+    public static byte[] EncodeText(string text) =>
+        text.All(c => c <= 'ÿ') ? Encoding.Latin1.GetBytes(text) : Encoding.UTF8.GetBytes(text);
+
+    /// <summary>A text event's text: UTF-8 when its bytes are, otherwise Latin-1. ASCII reads the same either way.</summary>
+    public static string DecodeText(ReadOnlySpan<byte> bytes)
+    {
+        try
+        {
+            return StrictUtf8.GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            return Encoding.Latin1.GetString(bytes);
+        }
+    }
+
     /// <summary>The header's fields and every chunk, in file order.</summary>
     /// <exception cref="ChartFormatException">The file isn't a Standard MIDI File, or uses SMPTE timing.</exception>
     public static (int Format, int Division, List<MidiChunk> Chunks) ReadChunks(byte[] bytes)
@@ -143,13 +166,13 @@ internal static class MidiFile
         return bytes.AsSpan(pos, length);
     }
 
-    /// <summary>A text meta event's text, or <see langword="null"/> for any other event.</summary>
+    /// <summary>A text meta event's text, or <see langword="null"/> for any other event; see <see cref="DecodeText"/>.</summary>
     public static string? TextOf(byte[] bytes, MidiEvent e, int type)
     {
         if (!e.IsMeta)
             return null;
         var (t, start, length) = MetaOf(bytes, e);
-        return t == type ? Encoding.Latin1.GetString(bytes, start, length) : null;
+        return t == type ? DecodeText(bytes.AsSpan(start, length)) : null;
     }
 
     /// <summary>The name of the track, from its first track-name event.</summary>

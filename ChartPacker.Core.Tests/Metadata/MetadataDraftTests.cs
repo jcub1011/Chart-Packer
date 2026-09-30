@@ -1,6 +1,8 @@
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Core.Tests.Charts;
 
 namespace ChartPacker.Core.Tests.Metadata;
 
@@ -229,9 +231,12 @@ public sealed class MetadataDraftTests
     public void VocalsChangeMakesTheDraftDirtyAndEditsTheChart()
     {
         var draft = new MetadataDraft();
+        var source = Source("other.mid");
 
-        draft.SetVocals("other.mid");
+        draft.SetVocals(source);
 
+        Assert.AreSame(source, draft.Vocals!.Value.Source);
+        Assert.AreEqual("other.mid", draft.Vocals.Value.SourcePath);
         Assert.IsFalse(draft.IsEmpty);
         Assert.IsTrue(draft.HasChartEdits);
         Assert.IsFalse(draft.HasChartOffsets);
@@ -270,7 +275,7 @@ public sealed class MetadataDraftTests
     public void ClearForgetsTheVocalsChange()
     {
         var draft = new MetadataDraft();
-        draft.SetVocals("other.mid");
+        draft.SetVocals(Source("other.mid"));
 
         draft.Clear();
 
@@ -290,7 +295,8 @@ public sealed class MetadataDraftTests
         draft.RemoveFile("video.mp4");
         draft.AddFile(new AddedFile("guitar.opus", "g.opus", 1), ["guitar.ogg"]);
         draft.SetChartOffset(track, 40);
-        draft.SetVocals("other.mid");
+        var source = Source("other.mid");
+        draft.SetVocals(source);
 
         var clone = draft.Clone();
         draft.Set("album", "B");
@@ -306,7 +312,7 @@ public sealed class MetadataDraftTests
         CollectionAssert.AreEqual(new[] { "video.mp4" }, clone.RemovedFiles.ToArray());
         Assert.IsEmpty(clone.AddedFiles);
         CollectionAssert.AreEqual(new[] { KeyValuePair.Create(track, 40) }, clone.ChartOffsets.ToArray());
-        Assert.AreEqual(new VocalsChange("other.mid"), clone.Vocals);
+        Assert.AreEqual(new VocalsChange(source), clone.Vocals);
 
         // Reverting the clone's add brought back only its own copy of the file it replaced.
         CollectionAssert.AreEquivalent(new[] { "video.mp4", "guitar.ogg" }, draft.RemovedFiles.ToArray());
@@ -459,4 +465,10 @@ public sealed class MetadataDraftTests
     }
 
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
+
+    private static VocalsSource Source(string path)
+    {
+        byte[] midi = new MidiBuilder().Track("PART VOCALS").Note(0, 60).Build();
+        return new VocalsSource(path, new MidiChart(midi, TimeSpan.Zero, ChartReadOptions.Default), VocalReader.Read(midi, "notes.mid"));
+    }
 }

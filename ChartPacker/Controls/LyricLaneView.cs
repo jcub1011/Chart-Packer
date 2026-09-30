@@ -94,9 +94,10 @@ namespace ChartPacker.Controls
     /// Draws a vocal part as a karaoke strip: time runs right to left past a line near the left edge,
     /// the notes are bars at their pitch, and the words run along the bottom, lit as they're sung.
     /// Each frame the screen is drawn it reads <see cref="Clock"/>, so the lane follows the audio
-    /// whether it's playing, paused or being dragged.
+    /// whether it's playing, paused or being dragged. <see cref="TimeShift"/> moves the whole part in
+    /// time without the scene being built again.
     /// </summary>
-    /// <example><c>&lt;ctl:LyricLaneView Scene="{Binding Lyrics.Scene}" Clock="{Binding Lyrics.Clock}" /&gt;</c></example>
+    /// <example><c>&lt;ctl:LyricLaneView Scene="{Binding Lyrics.Scene}" Clock="{Binding Lyrics.Clock}" TimeShift="{Binding Lyrics.TimeShift}" /&gt;</c></example>
     public sealed class LyricLaneView : Control
     {
         public static readonly StyledProperty<LyricScene?> SceneProperty =
@@ -104,6 +105,9 @@ namespace ChartPacker.Controls
 
         public static readonly StyledProperty<Func<TimeSpan>?> ClockProperty =
             AvaloniaProperty.Register<LyricLaneView, Func<TimeSpan>?>(nameof(Clock));
+
+        public static readonly StyledProperty<TimeSpan> TimeShiftProperty =
+            AvaloniaProperty.Register<LyricLaneView, TimeSpan>(nameof(TimeShift));
 
         public static readonly StyledProperty<double> WindowSecondsProperty =
             AvaloniaProperty.Register<LyricLaneView, double>(nameof(WindowSeconds), 4);
@@ -143,7 +147,7 @@ namespace ChartPacker.Controls
 
         static LyricLaneView()
         {
-            AffectsRender<LyricLaneView>(SceneProperty, WindowSecondsProperty);
+            AffectsRender<LyricLaneView>(SceneProperty, TimeShiftProperty, WindowSecondsProperty);
         }
 
         /// <summary>The part to draw, or <see langword="null"/> for none.</summary>
@@ -158,6 +162,13 @@ namespace ChartPacker.Controls
         {
             get => GetValue(ClockProperty);
             set => SetValue(ClockProperty, value);
+        }
+
+        /// <summary>How much later than <see cref="Scene"/> says the part is drawn; earlier when negative.</summary>
+        public TimeSpan TimeShift
+        {
+            get => GetValue(TimeShiftProperty);
+            set => SetValue(TimeShiftProperty, value);
         }
 
         /// <summary>How much of the song shows ahead of the now line, in seconds.</summary>
@@ -188,7 +199,8 @@ namespace ChartPacker.Controls
             if (Scene is not { IsEmpty: false } scene || bounds.Width <= 0 || bounds.Height <= 0)
                 return;
 
-            double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
+            // Drawing the part later is drawing it at an earlier moment of the scene's own time.
+            double now = ((Clock?.Invoke() ?? TimeSpan.Zero) - TimeShift).TotalSeconds;
             double nowX = bounds.Width * NowFraction;
             double perSecond = (bounds.Width - nowX) / Math.Max(0.5, WindowSeconds);
             double X(double time) => nowX + ((time - now) * perSecond);

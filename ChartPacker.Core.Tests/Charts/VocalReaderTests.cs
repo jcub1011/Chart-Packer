@@ -64,6 +64,52 @@ public sealed class VocalReaderTests
     }
 
     [TestMethod]
+    public void AnEmptyVocalsTrackGivesWayToAHarmonyWithLyrics()
+    {
+        byte[] midi = new MidiBuilder()
+            .Track("PART VOCALS")
+            .Track("HARM1").Note(0, 60).Meta(0, 0x05, Encoding.Latin1.GetBytes("hey"))
+            .Build();
+
+        Assert.AreEqual("HARM1", VocalReader.Read(midi, "notes.mid").Main!.TrackName);
+    }
+
+    [TestMethod]
+    public void VocalsWithLyricsAreShownBeforeHarmonies()
+    {
+        byte[] midi = new MidiBuilder()
+            .Track("HARM1").Note(0, 60).Meta(0, 0x05, Encoding.Latin1.GetBytes("oh"))
+            .Track("PART VOCALS").Note(0, 64).Meta(0, 0x05, Encoding.Latin1.GetBytes("hey"))
+            .Build();
+
+        Assert.AreEqual("PART VOCALS", VocalReader.Read(midi, "notes.mid").Main!.TrackName);
+    }
+
+    [TestMethod]
+    public void FirstTickIsTheEarliestEventOfAnyPart()
+    {
+        byte[] midi = new MidiBuilder()
+            .Track("PART VOCALS").Note(480, 60).Meta(600, 0x05, Encoding.Latin1.GetBytes("hey"))
+            .Track("HARM1").Note(240, 105, 480)
+            .Build();
+
+        Assert.AreEqual(240L, VocalReader.Read(midi, "notes.mid").FirstTick);
+        Assert.IsNull(VocalReader.Read(new MidiBuilder().Track("PART VOCALS").Build(), "notes.mid").FirstTick);
+    }
+
+    [TestMethod]
+    public void MidiLyricsAreReadAsUtf8WhenTheyAreAndLatin1Otherwise()
+    {
+        byte[] midi = new MidiBuilder()
+            .Track("PART VOCALS")
+            .Note(0, 60).Meta(0, 0x05, [0xC3, 0xA9])
+            .Note(480, 60).Meta(480, 0x05, [0xE9])
+            .Build();
+
+        CollectionAssert.AreEqual(new[] { "é", "é" }, VocalReader.Read(midi, "notes.mid").Main!.Lyrics.Select(l => l.Text).ToArray());
+    }
+
+    [TestMethod]
     public void MidiWithoutVocalsHasNone()
     {
         byte[] midi = new MidiBuilder().Track("PART GUITAR").Note(0, 96).Track("PART VOCALS").Build();

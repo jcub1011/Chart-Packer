@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Text;
 
 namespace ChartPacker.Core.Charts;
 
@@ -33,7 +32,8 @@ internal readonly record struct MidiMessage(long Tick, byte[] Bytes)
         return new MidiMessage(tick, buffer.ToArray());
     }
 
-    public static MidiMessage Text(long tick, byte type, string text) => Meta(tick, type, Encoding.Latin1.GetBytes(text));
+    /// <summary>A text meta event; see <see cref="MidiFile.EncodeText"/>.</summary>
+    public static MidiMessage Text(long tick, byte type, string text) => Meta(tick, type, MidiFile.EncodeText(text));
 
     /// <summary>A Phase Shift sysex event: <c>'P' 'S' 0 0</c>, the difficulty, the kind and on or off.</summary>
     public static MidiMessage PhaseShift(long tick, int difficulty, int kind, bool on) =>

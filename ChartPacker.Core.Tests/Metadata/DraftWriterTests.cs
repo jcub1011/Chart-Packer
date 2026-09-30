@@ -1,5 +1,6 @@
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
+using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
@@ -304,7 +305,7 @@ public sealed class DraftWriterTests
         File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
         string source = WriteNamedSource("notes.mid", VocalsMidi("hey"));
         var draft = new MetadataDraft();
-        draft.SetVocals(source);
+        draft.SetVocals(await VocalsSource.LoadAsync(source));
 
         await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
 
@@ -325,7 +326,7 @@ public sealed class DraftWriterTests
         string source = WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960));
         File.WriteAllText(Path.Combine(Path.GetDirectoryName(source)!, "song.ini"), "[song]\ndelay = 500\n");
         var draft = new MetadataDraft();
-        draft.SetVocals(source);
+        draft.SetVocals(await VocalsSource.LoadAsync(source));
 
         await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
 
@@ -354,7 +355,7 @@ public sealed class DraftWriterTests
         string chart = Path.Combine(folder, "notes.mid");
         File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
         var draft = new MetadataDraft();
-        draft.SetVocals(WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960)));
+        draft.SetVocals(await VocalsSource.LoadAsync(WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960))));
         draft.SetVocalsOffset(250);
 
         await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
@@ -385,21 +386,44 @@ public sealed class DraftWriterTests
     }
 
     [TestMethod]
-    public async Task FolderVocalsFromAMissingSourceWriteNothing()
+    public async Task FolderVocalsAreTheSourceAsItWasChosen()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string chart = Path.Combine(folder, "notes.mid");
+        File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
+        string source = WriteNamedSource("notes.mid", VocalsMidi("hey"));
+        var draft = new MetadataDraft();
+        draft.SetVocals(await VocalsSource.LoadAsync(source));
+        File.WriteAllBytes(source, VocalsMidi("changed"));
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        Assert.AreEqual("hey", VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Text);
+    }
+
+    [TestMethod]
+    public async Task FolderVocalsThatStartBeforeTheSongWriteNothing()
     {
         string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
         string chart = Path.Combine(folder, "notes.mid");
         File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
         string songIni = Path.Combine(folder, SongIni.FileName);
-        File.WriteAllText(songIni, "[song]\nname = A\n");
+        File.WriteAllText(songIni, "[song]\nname = A\ndelay = 500\n");
         var draft = new MetadataDraft();
         draft.Set("name", "B");
-        draft.SetVocals(Path.Combine(_root.FullName, "gone", "notes.mid"));
+        // Sung at the very start of a song without a delay, which is before this one's chart starts.
+        draft.SetVocals(await VocalsSource.LoadAsync(WriteNamedSource("notes.mid", VocalsMidi("hey"))));
 
-        await Assert.ThrowsAsync<IOException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft));
+        await Assert.ThrowsAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft));
 
-        Assert.AreEqual("[song]\nname = A\n", File.ReadAllText(songIni));
+        Assert.AreEqual("[song]\nname = A\ndelay = 500\n", File.ReadAllText(songIni));
         CollectionAssert.AreEqual(ChartReaderTests.SampleMidi(), File.ReadAllBytes(chart));
+    }
+
+    [TestMethod]
+    public async Task AMissingVocalsSourceCantBeRead()
+    {
+        await Assert.ThrowsAsync<IOException>(() => VocalsSource.LoadAsync(Path.Combine(_root.FullName, "gone", "notes.mid")));
     }
 
     private static byte[] VocalsMidi(string lyric, long tick = 0) => new MidiBuilder()
