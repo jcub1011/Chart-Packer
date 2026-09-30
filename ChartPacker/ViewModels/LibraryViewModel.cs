@@ -9,6 +9,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Controls.Selection;
+using Avalonia.Threading;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -27,15 +28,34 @@ namespace ChartPacker.ViewModels
     /// Scanning only happens on an explicit <see cref="RescanCommand"/>. Picking a folder, changing
     /// the depth or launching the app never scans; the list is flagged as out of date instead.
     /// The same goes for a pack or unpack job, which changes what's on disk.
+    /// <para>
+    /// <see cref="Entries"/> is what the list shows: the scanned songs that pass <see cref="Filter"/>'s
+    /// search and filters, in its sort order.
+    /// </para>
     /// </remarks>
     public partial class LibraryViewModel : ViewModelBase
     {
         private const int SummaryParallelism = 4;
 
+        // Metadata arrives a song at a time; re-sorting for each would redo the list hundreds of times.
+        private static readonly TimeSpan MetadataApplyDelay = TimeSpan.FromMilliseconds(250);
+
         private readonly IFolderPickerService _folderPicker;
         private readonly SettingsService _settings;
         private readonly MetadataDraftStore _drafts;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
+
+        // Every scanned song, in scan order, whether or not it passes the filters.
+        private readonly List<LibraryItemViewModel> _allItems = [];
+
+        // Re-applies the query once metadata has stopped arriving for a moment.
+        private readonly DispatcherTimer _applyTimer;
+
+        // An ApplyQuery is posted to run as soon as the UI is idle.
+        private bool _applyPosted;
+
+        // Entries is being rebuilt; the selection is put back together afterwards.
+        private bool _syncingSelection;
         private CancellationTokenSource? _scanCts;
 
         private readonly AlbumArtLoader _albumArt;
@@ -80,6 +100,11 @@ namespace ChartPacker.ViewModels
             SelectedOverwriteOption = OverwriteOptions.First(o => o.Value == settings.Settings.OverwritePolicy);
             FlatPackOutput = settings.Settings.FlatPackOutput;
 
+            Filter = new LibraryFilterViewModel(settings);
+            Filter.QueryChanged += () => ScheduleApply(immediate: true);
+            _applyTimer = new DispatcherTimer(MetadataApplyDelay, DispatcherPriority.Background, (_, _) => ApplyQuery());
+            _applyTimer.Stop();
+
             Selection = new SelectionModel<LibraryItemViewModel> { SingleSelect = false, Source = Entries };
             Selection.PropertyChanged += OnSelectionPropertyChanged;
 
@@ -113,6 +138,10 @@ namespace ChartPacker.ViewModels
 
         public PlayerViewModel Player { get; }
 
+        /// <summary>The search box and the sort and filter flyout.</summary>
+        public LibraryFilterViewModel Filter { get; }
+
+        /// <summary>The songs the list shows: those that pass the filters, sorted.</summary>
         public AvaloniaList<LibraryItemViewModel> Entries { get; } = [];
 
         /// <summary>The list's selection. Several items can be selected for Pack, Unpack and bulk metadata editing.</summary>
@@ -170,18 +199,29 @@ namespace ChartPacker.ViewModels
         public bool HasError => ErrorMessage is not null;
 
         /// <summary>Only when the empty result is for the folder shown; after switching folders the stale banner speaks instead.</summary>
-        public bool ShowEmpty => HasScanned && ScannedFolderIsSelected && !IsScanning && !HasError && Entries.Count == 0;
+        public bool ShowEmpty => HasScanned && ScannedFolderIsSelected && !IsScanning && !HasError && _allItems.Count == 0;
 
-        public bool ShowCenteredSpinner => IsScanning && Entries.Count == 0;
+        public bool ShowCenteredSpinner => IsScanning && _allItems.Count == 0;
+
+        /// <summary>Songs were found, but the search or filters hide every one.</summary>
+        public bool ShowNoMatches => HasScanned && !HasError && _allItems.Count > 0 && Entries.Count == 0;
+
+        /// <summary>The search box and filter button, once there's a list to narrow down.</summary>
+        public bool ShowFilterBar => HasScanned;
 
         /// <summary>The bottom status line; hidden while a centered state (spinner, empty, error) says it instead.</summary>
-        public bool ShowStatus => HasScanned && !HasError && Entries.Count > 0;
+        public bool ShowStatus => HasScanned && !HasError && _allItems.Count > 0;
 
-        public string StatusText => IsScanning
-            ? string.Format(CultureInfo.CurrentCulture, Strings.ScanningCountFormat, Entries.Count)
-            : Entries.Count == 1
+        /// <summary>The song count, or "shown/total" while the search or a filter may hide some.</summary>
+        public string StatusText => (IsScanning, Filter.Query.IsFiltering) switch
+        {
+            (true, true) => string.Format(CultureInfo.CurrentCulture, Strings.ScanningFilteredCountFormat, Entries.Count, _allItems.Count),
+            (true, false) => string.Format(CultureInfo.CurrentCulture, Strings.ScanningCountFormat, _allItems.Count),
+            (false, true) => string.Format(CultureInfo.CurrentCulture, Strings.FilteredSongCountFormat, Entries.Count, _allItems.Count),
+            _ => _allItems.Count == 1
                 ? Strings.SongCountOne
-                : string.Format(CultureInfo.CurrentCulture, Strings.SongCountFormat, Entries.Count);
+                : string.Format(CultureInfo.CurrentCulture, Strings.SongCountFormat, _allItems.Count),
+        };
 
         /// <summary>Where Pack and Unpack write: the chosen output folder, or else the scanned folder.</summary>
         public string? EffectiveOutputFolder => OutputFolder ?? _scannedFolder ?? FolderPath;
@@ -332,6 +372,7 @@ namespace ChartPacker.ViewModels
             _outputsChanged = false;
             Selection.Clear();
             Entries.Clear();
+            _allItems.Clear();
             _itemsByPath.Clear();
             _previewingItem = null;
             _albumArt.Reset(itemsToken);
@@ -347,8 +388,17 @@ namespace ChartPacker.ViewModels
                     return;
                 var items = batch.Select(e => new LibraryItemViewModel(e, _drafts.HasDrafts(e.FullPath))).ToList();
                 foreach (var item in items)
+                {
                     _itemsByPath[item.Entry.FullPath] = item;
-                Entries.AddRange(items);
+                    item.FactsChanged += OnItemFactsChanged;
+                }
+                _allItems.AddRange(items);
+
+                // In scan order with nothing hidden, the new songs simply go on the end.
+                if (Filter.Query.KeepsScanOrder && !IsApplyPending)
+                    Entries.AddRange(items);
+                else
+                    ScheduleApply(immediate: false);
                 RefreshPreviewing();
                 foreach (var item in items)
                     summaryQueue.Writer.TryWrite(item);
@@ -441,13 +491,81 @@ namespace ChartPacker.ViewModels
         /// <summary>The song's unsaved changes, without creating an empty draft for every listed song.</summary>
         private MetadataDraft? DraftFor(string path) => _drafts.HasDrafts(path) ? _drafts.Get(path) : null;
 
+        private bool IsApplyPending => _applyPosted || _applyTimer.IsEnabled;
+
+        /// <summary>
+        /// Re-applies the query soon: when the UI is next idle, or after <see cref="MetadataApplyDelay"/>
+        /// for changes that come in bursts.
+        /// </summary>
+        private void ScheduleApply(bool immediate)
+        {
+            if (_applyPosted)
+                return;
+
+            if (immediate)
+            {
+                _applyTimer.Stop();
+                _applyPosted = true;
+                Dispatcher.UIThread.Post(ApplyQuery, DispatcherPriority.Background);
+            }
+            else if (!_applyTimer.IsEnabled)
+            {
+                _applyTimer.Start();
+            }
+        }
+
+        private void OnItemFactsChanged(LibraryItemViewModel item)
+        {
+            // Nothing can move or hide while every song shows in scan order. Items from an earlier scan don't count.
+            if (!Filter.Query.KeepsScanOrder && _itemsByPath.TryGetValue(item.Entry.FullPath, out var current) && ReferenceEquals(current, item))
+                ScheduleApply(immediate: false);
+        }
+
+        /// <summary>Rebuilds <see cref="Entries"/> from the query, keeping the selected songs that still show selected.</summary>
+        /// <remarks>Selected songs the filters now hide are deselected, so Pack and Unpack only act on songs that can be seen.</remarks>
+        private void ApplyQuery()
+        {
+            _applyPosted = false;
+            _applyTimer.Stop();
+
+            var visible = Filter.Query.Apply(_allItems, item => item.Facts);
+            if (!visible.SequenceEqual(Entries))
+            {
+                var selected = Selection.SelectedItems.OfType<LibraryItemViewModel>().ToHashSet();
+                _syncingSelection = true;
+                try
+                {
+                    Entries.Clear();
+                    Entries.AddRange(visible);
+                    for (int i = 0; i < visible.Count; i++)
+                    {
+                        if (selected.Contains(visible[i]))
+                            Selection.Select(i);
+                    }
+                }
+                finally
+                {
+                    _syncingSelection = false;
+                }
+
+                SyncSelection();
+            }
+
+            RefreshState();
+        }
+
         private void OnSelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             // SelectionModel never raises Count. SelectedIndexes covers every change except a
             // source reset, which raises SelectedItem instead.
-            if (e.PropertyName is not (nameof(Selection.SelectedIndexes) or nameof(Selection.SelectedItem)))
+            if (_syncingSelection || e.PropertyName is not (nameof(Selection.SelectedIndexes) or nameof(Selection.SelectedItem)))
                 return;
 
+            SyncSelection();
+        }
+
+        private void SyncSelection()
+        {
             SelectedCount = Selection.Count;
             var selected = Selection.SelectedIndexes.Order().Select(i => Entries[i].Entry).ToList();
 
@@ -468,6 +586,8 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(ShowEmpty));
             OnPropertyChanged(nameof(ShowCenteredSpinner));
+            OnPropertyChanged(nameof(ShowNoMatches));
+            OnPropertyChanged(nameof(ShowFilterBar));
             OnPropertyChanged(nameof(ShowStatus));
             OnPropertyChanged(nameof(StatusText));
             RefreshOutput();

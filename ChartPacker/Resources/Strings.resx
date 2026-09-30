@@ -846,4 +846,113 @@
     <value>spectrum analyzer analyser bars visualizer visualiser performance slow</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="FilteredSongCountFormat" xml:space="preserve">
+    <value>{0:N0}/{1:N0} songs</value>
+    <comment>{0} is the number of songs shown, {1} the number found. Shown while a search or filter hides some.</comment>
+  </data>
+  <data name="ScanningFilteredCountFormat" xml:space="preserve">
+    <value>Scanning… {0:N0}/{1:N0} songs</value>
+    <comment>{0} is the number of songs shown so far, {1} the number found so far.</comment>
+  </data>
+  <data name="SearchWatermark" xml:space="preserve">
+    <value>Search title, artist or file name</value>
+  </data>
+  <data name="SearchName" xml:space="preserve">
+    <value>Search songs</value>
+    <comment>Accessible name of the library search box.</comment>
+  </data>
+  <data name="FilterToolTip" xml:space="preserve">
+    <value>Sort and filter</value>
+  </data>
+  <data name="NoMatches" xml:space="preserve">
+    <value>No songs match your search or filters</value>
+  </data>
+  <data name="ClearFilters" xml:space="preserve">
+    <value>Clear filters</value>
+    <comment>Button under the "no matches" note; clears the search and every filter.</comment>
+  </data>
+  <data name="ResetFilters" xml:space="preserve">
+    <value>Reset filters</value>
+    <comment>Button in the sort and filter flyout; the search and sort are kept.</comment>
+  </data>
+  <data name="SortByLabel" xml:space="preserve">
+    <value>Sort by</value>
+  </data>
+  <data name="SortDescendingToolTip" xml:space="preserve">
+    <value>Reverse the order</value>
+  </data>
+  <data name="SortScanOrder" xml:space="preserve">
+    <value>Scan order</value>
+    <comment>Sorts the list in the order the scan found the songs.</comment>
+  </data>
+  <data name="FilterTypeLabel" xml:space="preserve">
+    <value>Type</value>
+    <comment>Heading of the type checkboxes in the filter flyout.</comment>
+  </data>
+  <data name="FilterTextLabel" xml:space="preserve">
+    <value>Contains</value>
+    <comment>Heading of the text filters in the filter flyout.</comment>
+  </data>
+  <data name="FilterRangeLabel" xml:space="preserve">
+    <value>Range</value>
+    <comment>Heading of the min/max filters in the filter flyout.</comment>
+  </data>
+  <data name="FilterMinWatermark" xml:space="preserve">
+    <value>Min</value>
+  </data>
+  <data name="FilterMaxWatermark" xml:space="preserve">
+    <value>Max</value>
+  </data>
+  <data name="FilterRangeSeparator" xml:space="preserve">
+    <value>–</value>
+    <comment>Between the min and max boxes of a range filter.</comment>
+  </data>
+  <data name="FilterLengthUnit" xml:space="preserve">
+    <value>min</value>
+    <comment>Unit after the song length range: minutes.</comment>
+  </data>
+  <data name="FilterSizeUnit" xml:space="preserve">
+    <value>MB</value>
+    <comment>Unit after the size range: megabytes.</comment>
+  </data>
+  <data name="FilterOnlyUnsaved" xml:space="preserve">
+    <value>Only songs with unsaved changes</value>
+  </data>
+  <data name="FieldTitle" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="FieldArtist" xml:space="preserve">
+    <value>Artist</value>
+  </data>
+  <data name="FieldAlbum" xml:space="preserve">
+    <value>Album</value>
+  </data>
+  <data name="FieldGenre" xml:space="preserve">
+    <value>Genre</value>
+  </data>
+  <data name="FieldCharter" xml:space="preserve">
+    <value>Charter</value>
+  </data>
+  <data name="FieldYear" xml:space="preserve">
+    <value>Year</value>
+  </data>
+  <data name="FieldLength" xml:space="preserve">
+    <value>Length</value>
+  </data>
+  <data name="FieldSize" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="FieldType" xml:space="preserve">
+    <value>Type</value>
+    <comment>Whether a song is a .sng file or a folder.</comment>
+  </data>
+  <data name="FieldFileName" xml:space="preserve">
+    <value>File name</value>
+  </data>
+  <data name="FilterKindSng" xml:space="preserve">
+    <value>.sng files</value>
+  </data>
+  <data name="FilterKindFolder" xml:space="preserve">
+    <value>Song folders</value>
+  </data>
 </root>

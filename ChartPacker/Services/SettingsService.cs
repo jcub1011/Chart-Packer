@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using ChartPacker.Core.Library;
 
 namespace ChartPacker.Services
 {
@@ -82,6 +83,9 @@ namespace ChartPacker.Services
 
             if (!Enum.IsDefined(settings.OverwritePolicy))
                 settings.OverwritePolicy = AppSettings.DefaultOverwritePolicy;
+
+            if (!Enum.IsDefined(settings.LibrarySortField))
+                settings.LibrarySortField = LibrarySortField.ScanOrder;
 
             settings.MasterVolume = double.IsFinite(settings.MasterVolume)
                 ? Math.Clamp(settings.MasterVolume, 0, 1)

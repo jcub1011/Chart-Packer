@@ -1,4 +1,6 @@
+using System;
 using Avalonia.Media.Imaging;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Formatting;
@@ -19,6 +21,12 @@ namespace ChartPacker.ViewModels
         private volatile bool _isRealized;
 
         public SongEntry Entry { get; } = entry;
+
+        /// <summary>What the list's search, filters and sort look at, with unsaved changes applied.</summary>
+        public LibrarySongFacts Facts { get; private set; } = LibrarySongFacts.For(entry, hasDrafts);
+
+        /// <summary><see cref="Facts"/> changed, so the song may now sort or filter differently.</summary>
+        public event Action<LibraryItemViewModel>? FactsChanged;
 
         public bool IsSng => Entry.Kind == SongEntryKind.SngFile;
 
@@ -125,6 +133,7 @@ namespace ChartPacker.ViewModels
                 Details = Entry.RelativePath;
                 LengthText = null;
                 SizeText = null;
+                SetFacts(LibrarySongFacts.For(Entry, HasDrafts));
                 return;
             }
 
@@ -138,6 +147,18 @@ namespace ChartPacker.ViewModels
             // Without a song_length, the longest audio file stands in.
             LengthText = (headline.LengthMs ?? _summary.FallbackLengthMs) is { } length ? MetadataTimes.FormatDuration(length) : null;
             SizeText = ByteSizeFormatter.Format(_summary.TotalSize);
+            SetFacts(LibrarySongFacts.From(Entry, pairs, _summary.TotalSize, _summary.FallbackLengthMs, HasDrafts));
+        }
+
+        partial void OnHasDraftsChanged(bool value) => SetFacts(Facts with { HasDrafts = value });
+
+        private void SetFacts(LibrarySongFacts facts)
+        {
+            if (facts == Facts)
+                return;
+
+            Facts = facts;
+            FactsChanged?.Invoke(this);
         }
     }
 }

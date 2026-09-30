@@ -34,8 +34,8 @@ Goals:
 - Parsing or checking the *content* of `notes.chart`, `notes.mid`, audio, image or video files.
   The exceptions are reading the `[Song]` section of `notes.chart` as fallback metadata
   (F1.4), and decoding audio to play it (F7).
-- Editing charts, or managing, searching or scanning a song library beyond what batch
-  processing needs.
+- Editing charts, or managing or scanning a song library beyond what batch processing needs.
+  Finding songs in the scanned list is covered by [F8](#f8-library-search-sort-and-filter).
 - Reading pre-version-1 `.sng` files ([sng-spec.md §9.1](sng-spec.md#reference-behaviour)).
 - A command-line interface. The Core library is designed so one can be added later.
 
@@ -495,6 +495,41 @@ Acceptance criteria:
 - **AC7.3** Replacing `guitar.ogg` with an `.opus` file and saving leaves `guitar.opus` and no
   `guitar.ogg`, in a `.sng` and in a folder.
 
+### F8. Library search, sort and filter
+
+**Input:** the songs found by the last scan.
+
+Behaviour:
+
+1. **Search.** A search box above the list (Ctrl+F; Escape clears it) shows only songs where every
+   word typed appears in the file or folder name, the title or the artist. Matching ignores case
+   and accents.
+2. **Sort.** A flyout from the filter button sorts by scan order (the default), title, artist,
+   album, genre, charter, year, length, size, type (`.sng` files first) or file name, either
+   way. Songs without the value sort last in both directions, and ties keep scan order. The sort
+   is remembered (§8); the search and filters start empty each launch.
+3. **Filters.** The same flyout filters by type (`.sng` files, song folders), text contained in
+   the title, artist, album, genre or charter, a year, length (minutes) and size (MB) range, and
+   having unsaved changes. Every filter must pass. A song without the filtered value doesn't
+   pass. The button shows how many filters are on; **Reset filters** turns them all off.
+4. **Unsaved changes count.** Values come from the metadata with the song's draft applied, so an
+   edit re-sorts and re-filters the list before it's saved. The year is the first four-digit
+   number in `year`, which handles Clone Hero's `", 2004"`.
+5. **While scanning.** Songs join the list as their metadata is read. The list is re-sorted and
+   re-filtered at most a few times a second.
+6. **Selection.** A selected song the filters hide is deselected, so Pack and Unpack only act on
+   songs that can be seen. Selected songs that still show stay selected.
+7. **Counts.** While the search or a filter is on, the status line reads `shown/total songs`.
+   When nothing matches, the list says so, with a button that clears the search and filters.
+
+Acceptance criteria:
+
+- **AC8.1** Searching for an artist shows only that artist's songs, and the status reads
+  `n/total songs`. Clearing the search shows every song again, in the chosen sort.
+- **AC8.2** Sorting by year in either direction lists songs without a year last.
+- **AC8.3** Selecting three songs and then filtering one of them out leaves two selected, and
+  Pack acts on those two.
+
 ---
 
 `<a id="validation-rules"></a>`
@@ -649,6 +684,7 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | Verify after write | On |
 | Batch parallelism | Half the logical cores, at least 1 |
 | Theme | Follow OS |
+| Library sort ([F8](#f8-library-search-sort-and-filter)) | Scan order, first to last |
 
 ## 9. Non-functional requirements
 

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using ChartPacker.Core.Jobs;
+using ChartPacker.Core.Library;
 
 namespace ChartPacker.Services
 {
@@ -31,6 +32,13 @@ namespace ChartPacker.Services
 
         /// <summary>Whether Pack writes every .sng directly in the output folder instead of mirroring the scanned folder's layout.</summary>
         public bool FlatPackOutput { get; set; }
+
+        /// <summary>What the library list is sorted by.</summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<LibrarySortField>))]
+        public LibrarySortField LibrarySortField { get; set; }
+
+        /// <summary>Whether the library list is sorted from last to first.</summary>
+        public bool LibrarySortDescending { get; set; }
 
         /// <summary>The audio player's master volume, from 0 to 1.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
