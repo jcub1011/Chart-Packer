@@ -59,6 +59,22 @@ public sealed class SongFolderListingTests
     }
 
     [TestMethod]
+    public void StampedListingMatchesListingAndCarriesWriteTimes()
+    {
+        string chart = Write("notes.chart", 42);
+        Write("stems/Guitar.ogg", 7);
+        var written = new DateTime(2024, 5, 6, 7, 8, 9, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(chart, written);
+
+        var stamped = SongFolderListing.ListStamped(_root.FullName);
+
+        CollectionAssert.AreEqual(
+            SongFolderListing.List(_root.FullName).ToArray(),
+            stamped.Select(f => new FolderFileEntry(f.RelativePath, f.Length)).ToArray());
+        Assert.AreEqual(written, stamped.Single(f => f.RelativePath == "notes.chart").LastWriteTimeUtc);
+    }
+
+    [TestMethod]
     public void EmptyFolderListsNothing() => Assert.IsEmpty(SongFolderListing.List(_root.FullName));
 
     [TestMethod]

@@ -1353,4 +1353,265 @@
   <data name="MergePreviewNote" xml:space="preserve">
     <value>This is a preview of the merged song. Offsets set on its note highway are applied when it's merged; everything else can be edited once it's merged.</value>
   </data>
+  <data name="DedupButton" xml:space="preserve">
+    <value>Deduplicate</value>
+  </data>
+  <data name="DedupToolTip" xml:space="preserve">
+    <value>Find duplicate copies of songs across the whole library, and different charts of the same song, and move the copies you don't need to the trash. Needs an up-to-date scan.</value>
+  </data>
+  <data name="DedupWindowTitle" xml:space="preserve">
+    <value>Deduplicate library</value>
+  </data>
+  <data name="SettingsCategoryDuplicates" xml:space="preserve">
+    <value>Duplicates</value>
+  </data>
+  <data name="DedupKeepLabel" xml:space="preserve">
+    <value>Keep by default</value>
+  </data>
+  <data name="DedupKeepSng" xml:space="preserve">
+    <value>The .sng</value>
+  </data>
+  <data name="DedupKeepFolder" xml:space="preserve">
+    <value>The folder</value>
+  </data>
+  <data name="DedupKeepDescription" xml:space="preserve">
+    <value>Which copy Deduplicate keeps by default when a song is in the library both as a folder and as a .sng. You can still choose another copy in each group.</value>
+  </data>
+  <data name="DedupKeepKeywords" xml:space="preserve">
+    <value>duplicate dedupe deduplicate keep prefer sng folder copy</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="DedupPhaseReadingFormat" xml:space="preserve">
+    <value>Reading songs… {0:N0} of {1:N0}</value>
+    <comment>{0} is the number of songs read so far, {1} the number to read.</comment>
+  </data>
+  <data name="DedupPhaseComparingFormat" xml:space="preserve">
+    <value>Comparing possible duplicates… {0:N0} of {1:N0} ({2} read)</value>
+    <comment>{0} is the number of candidate groups compared, {1} the number to compare, {2} a size such as "1.2 GB".</comment>
+  </data>
+  <data name="DedupPhaseMatchingFormat" xml:space="preserve">
+    <value>Matching charts… {0:N0} of {1:N0} ({2} read)</value>
+    <comment>{0} is the number of candidate groups compared, {1} the number to compare, {2} a size such as "1.2 GB".</comment>
+  </data>
+  <data name="DedupAnalysisFailedFormat" xml:space="preserve">
+    <value>The songs couldn't be compared: {0}</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="DedupTabExactFormat" xml:space="preserve">
+    <value>Exact duplicates ({0:N0})</value>
+    <comment>{0} is the number of groups.</comment>
+  </data>
+  <data name="DedupTabSameChartFormat" xml:space="preserve">
+    <value>Same chart ({0:N0})</value>
+    <comment>{0} is the number of groups.</comment>
+  </data>
+  <data name="DedupTabMergeFormat" xml:space="preserve">
+    <value>Merge candidates ({0:N0})</value>
+    <comment>{0} is the number of groups.</comment>
+  </data>
+  <data name="DedupExactDescription" xml:space="preserve">
+    <value>Every file and all the metadata match, so deleting a copy loses nothing. One copy in each group is kept.</value>
+  </data>
+  <data name="DedupSameChartDescription" xml:space="preserve">
+    <value>The chart is the same, but the metadata or other files differ. Check what's different, then delete group by group, or open a group in Merge to compare and combine its metadata and files.</value>
+  </data>
+  <data name="DedupMergeDescription" xml:space="preserve">
+    <value>The same artist and title, with different charts. Merge them into one new .sng; once it's made, you can delete the charts it came from.</value>
+  </data>
+  <data name="DedupNoExact" xml:space="preserve">
+    <value>No exact duplicates were found.</value>
+  </data>
+  <data name="DedupNoSameChart" xml:space="preserve">
+    <value>No copies of the same chart were found.</value>
+  </data>
+  <data name="DedupNoMerge" xml:space="preserve">
+    <value>No songs with more than one chart were found.</value>
+  </data>
+  <data name="DedupSkippedFormat" xml:space="preserve">
+    <value>{0:N0} songs couldn't be compared</value>
+    <comment>{0} is the number of songs.</comment>
+  </data>
+  <data name="DedupSkippedLineFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is a song's path, {1} why it couldn't be compared.</comment>
+  </data>
+  <data name="DedupSkipDamaged" xml:space="preserve">
+    <value>the .sng is damaged</value>
+  </data>
+  <data name="DedupSkipIniTooLarge" xml:space="preserve">
+    <value>its song.ini is too large to read</value>
+  </data>
+  <data name="DedupSkipChanged" xml:space="preserve">
+    <value>it changed while it was being compared</value>
+  </data>
+  <data name="DedupSkipUnreadableFormat" xml:space="preserve">
+    <value>it can't be read ({0})</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="DedupKeep" xml:space="preserve">
+    <value>Keep</value>
+  </data>
+  <data name="DedupDelete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="DedupMarkAll" xml:space="preserve">
+    <value>Mark all duplicates</value>
+  </data>
+  <data name="DedupDeleteMarkedFormat" xml:space="preserve">
+    <value>Delete marked ({0:N0})…</value>
+    <comment>{0} is the number of marked rows.</comment>
+  </data>
+  <data name="DedupDeleteSourcesFormat" xml:space="preserve">
+    <value>Delete merged sources ({0:N0})…</value>
+    <comment>{0} is the number of marked rows.</comment>
+  </data>
+  <data name="DedupOpenInMerge" xml:space="preserve">
+    <value>Open in Merge…</value>
+  </data>
+  <data name="DedupMergedIntoFormat" xml:space="preserve">
+    <value>Merged into {0}. It's kept; mark the sources it came from to delete them.</value>
+    <comment>{0} is the merged .sng's path.</comment>
+  </data>
+  <data name="DedupMergeCheckFailedFormat" xml:space="preserve">
+    <value>The merged song can't be read back, so none of its sources can be deleted: {0}</value>
+    <comment>{0} is the problem.</comment>
+  </data>
+  <data name="DedupTitleFormat" xml:space="preserve">
+    <value>{0} – {1}</value>
+    <comment>{0} is the artist, {1} the title.</comment>
+  </data>
+  <data name="DedupKindSng" xml:space="preserve">
+    <value>.sng</value>
+  </data>
+  <data name="DedupKindFolder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="DedupMemberDetailFormat" xml:space="preserve">
+    <value>{0} · {1} · modified {2}</value>
+    <comment>{0} is ".sng" or "Folder", {1} a size, {2} a date.</comment>
+  </data>
+  <data name="DedupCharterFormat" xml:space="preserve">
+    <value>charted by {0}</value>
+    <comment>{0} is the charter.</comment>
+  </data>
+  <data name="DedupCopiesFormat" xml:space="preserve">
+    <value>and {0:N0} identical copies, kept or deleted with it</value>
+    <comment>{0} is the number of other copies.</comment>
+  </data>
+  <data name="DedupOtherVersionsFormat" xml:space="preserve">
+    <value>{0:N0} other copies of this chart differ and aren't deleted with it</value>
+    <comment>{0} is the number of copies whose metadata or other files differ from the one shown.</comment>
+  </data>
+  <data name="DedupTagSuffix" xml:space="preserve">
+    <value>Download copy</value>
+  </data>
+  <data name="DedupTagUnsaved" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="DedupTagExtrasFormat" xml:space="preserve">
+    <value>{0:N0} files a .sng can't hold</value>
+    <comment>{0} is the number of files.</comment>
+  </data>
+  <data name="DedupDiffReference" xml:space="preserve">
+    <value>Others are compared with this copy.</value>
+  </data>
+  <data name="DedupDiffComparing" xml:space="preserve">
+    <value>Comparing…</value>
+  </data>
+  <data name="DedupDiffFailedFormat" xml:space="preserve">
+    <value>Couldn't compare: {0}</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="DedupDiffMetadataFormat" xml:space="preserve">
+    <value>Metadata differs: {0}</value>
+    <comment>{0} is a list of metadata keys.</comment>
+  </data>
+  <data name="DedupDiffFilesDifferFormat" xml:space="preserve">
+    <value>Different: {0}</value>
+    <comment>{0} is a list of file names.</comment>
+  </data>
+  <data name="DedupDiffOnlyHereFormat" xml:space="preserve">
+    <value>Only in this copy: {0}</value>
+    <comment>{0} is a list of file names.</comment>
+  </data>
+  <data name="DedupDiffMissingFormat" xml:space="preserve">
+    <value>Missing here: {0}</value>
+    <comment>{0} is a list of file names.</comment>
+  </data>
+  <data name="DedupDiffIdenticalFormat" xml:space="preserve">
+    <value>{0:N0} files identical</value>
+    <comment>{0} is the number of files.</comment>
+  </data>
+  <data name="DedupDiffNone" xml:space="preserve">
+    <value>No differences found.</value>
+  </data>
+  <data name="DedupTrashRecycleBin" xml:space="preserve">
+    <value>Recycle Bin</value>
+  </data>
+  <data name="DedupTrashTrash" xml:space="preserve">
+    <value>Trash</value>
+  </data>
+  <data name="DedupTrashUnsupported" xml:space="preserve">
+    <value>Deleting is turned off: this system has no trash the app can move files to.</value>
+  </data>
+  <data name="DedupConfirmTitle" xml:space="preserve">
+    <value>Delete duplicates</value>
+  </data>
+  <data name="DedupConfirmFormat" xml:space="preserve">
+    <value>Move {0:N0} songs ({1}) to the {2}?
+
+Each one is checked first. Anything that has changed since it was compared, or whose kept copy is missing, is left alone.</value>
+    <comment>{0} is the number of songs, {1} their size, {2} "Recycle Bin" or "Trash".</comment>
+  </data>
+  <data name="DedupConfirmButtonFormat" xml:space="preserve">
+    <value>Move to {0}</value>
+    <comment>{0} is "Recycle Bin" or "Trash".</comment>
+  </data>
+  <data name="DedupDeleting" xml:space="preserve">
+    <value>Moving copies to the trash…</value>
+  </data>
+  <data name="DedupStop" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="DedupPlanInvalidFormat" xml:space="preserve">
+    <value>Nothing was deleted: {0}</value>
+    <comment>{0} is the problem.</comment>
+  </data>
+  <data name="DedupLogFailedFormat" xml:space="preserve">
+    <value>Nothing more was deleted: the deletion log can't be written ({0}).</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="DedupResultTrashedFormat" xml:space="preserve">
+    <value>Moved to the {0}</value>
+    <comment>{0} is "Recycle Bin" or "Trash".</comment>
+  </data>
+  <data name="DedupResultPermanent" xml:space="preserve">
+    <value>Deleted permanently: Windows couldn't recycle it and you agreed</value>
+  </data>
+  <data name="DedupResultFailedFormat" xml:space="preserve">
+    <value>Failed: {0}</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="DedupResultKeeperMissing" xml:space="preserve">
+    <value>Skipped: the copy being kept is gone</value>
+  </data>
+  <data name="DedupResultKeeperChanged" xml:space="preserve">
+    <value>Skipped: the copy being kept has changed since it was compared</value>
+  </data>
+  <data name="DedupResultVictimMissing" xml:space="preserve">
+    <value>Skipped: it's already gone</value>
+  </data>
+  <data name="DedupResultVictimChanged" xml:space="preserve">
+    <value>Skipped: it has changed since it was compared</value>
+  </data>
+  <data name="DedupResultUnsaved" xml:space="preserve">
+    <value>Skipped: it has unsaved changes</value>
+  </data>
+  <data name="DedupResultDeclined" xml:space="preserve">
+    <value>Kept: you chose not to delete it permanently</value>
+  </data>
+  <data name="DedupResultSummaryFormat" xml:space="preserve">
+    <value>{0:N0} moved to the {1}, {2:N0} deleted permanently, {3:N0} skipped or failed</value>
+    <comment>{0}, {2} and {3} are counts, {1} is "Recycle Bin" or "Trash".</comment>
+  </data>
 </root>

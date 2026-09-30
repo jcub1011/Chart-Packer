@@ -5,6 +5,12 @@ namespace ChartPacker.Core.Scanning;
 /// <param name="Length">Size in bytes.</param>
 public sealed record FolderFileEntry(string RelativePath, long Length);
 
+/// <summary>A file inside a song folder, with the time it was last written.</summary>
+/// <param name="RelativePath">Path from the song folder, with <c>/</c> separators.</param>
+/// <param name="Length">Size in bytes.</param>
+/// <param name="LastWriteTimeUtc">When the file was last written.</param>
+public sealed record FolderFileStamp(string RelativePath, long Length, DateTime LastWriteTimeUtc);
+
 /// <summary>Lists every file in a song folder, including files in subfolders.</summary>
 public static class SongFolderListing
 {
@@ -29,7 +35,15 @@ public static class SongFolderListing
     }
 
     /// <inheritdoc cref="ListAsync"/>
-    public static IReadOnlyList<FolderFileEntry> List(string folder, CancellationToken cancellationToken = default)
+    public static IReadOnlyList<FolderFileEntry> List(string folder, CancellationToken cancellationToken = default) =>
+        [.. Enumerate(folder, cancellationToken).Select(f => new FolderFileEntry(f.Relative, f.File.Length))];
+
+    /// <summary>Lists the files under <paramref name="folder"/> like <see cref="List"/>, with their write times.</summary>
+    /// <inheritdoc cref="ListAsync" path="/exception"/>
+    public static IReadOnlyList<FolderFileStamp> ListStamped(string folder, CancellationToken cancellationToken = default) =>
+        [.. Enumerate(folder, cancellationToken).Select(f => new FolderFileStamp(f.Relative, f.File.Length, f.File.LastWriteTimeUtc))];
+
+    private static List<(string Relative, FileInfo File)> Enumerate(string folder, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folder);
 
@@ -37,17 +51,17 @@ public static class SongFolderListing
         if (!root.Exists)
             throw new DirectoryNotFoundException($"The folder '{root.FullName}' doesn't exist.");
 
-        var files = new List<FolderFileEntry>();
+        var files = new List<(string Relative, FileInfo File)>();
         foreach (FileInfo file in root.EnumerateFiles("*", Options))
         {
             if ((files.Count & 255) == 0)
                 cancellationToken.ThrowIfCancellationRequested();
 
             string relative = Path.GetRelativePath(root.FullName, file.FullName).Replace(Path.DirectorySeparatorChar, '/');
-            files.Add(new FolderFileEntry(relative, file.Length));
+            files.Add((relative, file));
         }
 
-        files.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.RelativePath, b.RelativePath));
+        files.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Relative, b.Relative));
         return files;
     }
 }

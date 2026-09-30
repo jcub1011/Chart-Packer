@@ -13,7 +13,7 @@ namespace ChartPacker.Services
         /// <param name="entries">The songs to merge, in the order their columns are shown.</param>
         /// <param name="outputFolder">Where the merged <c>.sng</c> goes.</param>
         /// <param name="policy">What to do when it already exists.</param>
-        /// <returns>True when a song was merged.</returns>
-        Task<bool> ShowAsync(IReadOnlyList<SongEntry> entries, string outputFolder, OverwritePolicy policy);
+        /// <returns>The merged <c>.sng</c>, or <see langword="null"/> when nothing was merged.</returns>
+        Task<string?> ShowAsync(IReadOnlyList<SongEntry> entries, string outputFolder, OverwritePolicy policy);
     }
 }

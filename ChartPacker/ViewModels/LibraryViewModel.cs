@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Controls.Selection;
 using Avalonia.Threading;
+using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -23,7 +24,7 @@ namespace ChartPacker.ViewModels
     /// <summary>An overwrite policy as offered in the policy picker.</summary>
     public sealed record OverwriteOption(OverwritePolicy Value, string Label);
 
-    /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge.</summary>
+    /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Deduplicate.</summary>
     /// <remarks>
     /// Scanning only happens on an explicit <see cref="RescanCommand"/>. Picking a folder, changing
     /// the depth or launching the app never scans; the list is flagged as out of date instead.
@@ -44,6 +45,7 @@ namespace ChartPacker.ViewModels
         private readonly SettingsService _settings;
         private readonly MetadataDraftStore _drafts;
         private readonly IMergeWindowService _mergeWindow;
+        private readonly IDedupWindowService _dedupWindow;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
         // Every scanned song, in scan order, whether or not it passes the filters.
@@ -77,12 +79,21 @@ namespace ChartPacker.ViewModels
 
         /// <param name="player">Plays a song from the list's art buttons; the detail panel shows the same one.</param>
         /// <param name="mergeWindow">Shows the Merge window for the selected songs.</param>
-        public LibraryViewModel(IFolderPickerService folderPicker, SettingsService settings, MetadataDraftStore drafts, JobViewModel job, PlayerViewModel player, IMergeWindowService mergeWindow)
+        /// <param name="dedupWindow">Shows the Deduplicate window for the whole library.</param>
+        public LibraryViewModel(
+            IFolderPickerService folderPicker,
+            SettingsService settings,
+            MetadataDraftStore drafts,
+            JobViewModel job,
+            PlayerViewModel player,
+            IMergeWindowService mergeWindow,
+            IDedupWindowService dedupWindow)
         {
             _folderPicker = folderPicker;
             _settings = settings;
             _drafts = drafts;
             _mergeWindow = mergeWindow;
+            _dedupWindow = dedupWindow;
             Player = player;
             Player.PropertyChanged += (_, e) =>
             {
@@ -167,6 +178,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
+        [NotifyCanExecuteChangedFor(nameof(DeduplicateCommand))]
         public partial bool IsScanning { get; set; }
 
         [ObservableProperty]
@@ -241,6 +253,13 @@ namespace ChartPacker.ViewModels
         }
 
         public bool HasCustomOutputFolder => OutputFolder is not null;
+
+        /// <summary>Which copy the Deduplicate window keeps by default when a song is both a folder and a .sng.</summary>
+        public DedupKindPreference DedupKeepPreference
+        {
+            get => _settings.Settings.DedupKeepPreference;
+            set => _settings.Settings.DedupKeepPreference = value;
+        }
 
         private bool CanBrowse() => !Job.IsRunning;
 
@@ -343,11 +362,56 @@ namespace ChartPacker.ViewModels
             if (EffectiveOutputFolder is not { } destination)
                 return;
 
-            if (await _mergeWindow.ShowAsync(SelectedEntries, destination, SelectedOverwriteOption.Value))
+            if (await _mergeWindow.ShowAsync(SelectedEntries, destination, SelectedOverwriteOption.Value) is not null)
             {
                 _outputsChanged = true;
                 RefreshState();
             }
+        }
+
+        /// <remarks>
+        /// Needs an up-to-date list: after a pack, the new .sng files aren't listed until a rescan, and
+        /// deciding what to delete from an old list is riskier.
+        /// </remarks>
+        private bool CanDeduplicate() => HasScanned && !IsScanning && !Job.IsRunning && !IsStale && _allItems.Count > 1;
+
+        /// <summary>Opens the Deduplicate window, which finds duplicate songs across the whole library and deletes the copies marked.</summary>
+        [RelayCommand(CanExecute = nameof(CanDeduplicate))]
+        private async Task DeduplicateAsync()
+        {
+            if (EffectiveOutputFolder is not { } destination)
+                return;
+
+            // The detail panel lets go of the song it shows, so its files can be deleted.
+            Selection.Clear();
+
+            var result = await _dedupWindow.ShowAsync(new DedupRequest([.. _allItems.Select(i => i.Entry)], destination, SelectedOverwriteOption.Value));
+            RemoveEntries(result.RemovedPaths);
+            if (result.OutputsChanged)
+                _outputsChanged = true;
+            RefreshState();
+        }
+
+        /// <summary>Takes songs that no longer exist out of the list, without a rescan.</summary>
+        private void RemoveEntries(IReadOnlyCollection<string> paths)
+        {
+            if (paths.Count == 0)
+                return;
+
+            foreach (string path in paths)
+            {
+                if (!_itemsByPath.Remove(path, out var item))
+                    continue;
+
+                item.FactsChanged -= OnItemFactsChanged;
+                _allItems.Remove(item);
+                Entries.Remove(item);
+                if (ReferenceEquals(_previewingItem, item))
+                    _previewingItem = null;
+            }
+
+            _drafts.DiscardMissing();
+            SyncSelection();
         }
 
         partial void OnSelectedOverwriteOptionChanged(OverwriteOption value) => _settings.Settings.OverwritePolicy = value.Value;
@@ -630,6 +694,7 @@ namespace ChartPacker.ViewModels
             PackCommand.NotifyCanExecuteChanged();
             UnpackCommand.NotifyCanExecuteChanged();
             MergeCommand.NotifyCanExecuteChanged();
+            DeduplicateCommand.NotifyCanExecuteChanged();
         }
     }
 }

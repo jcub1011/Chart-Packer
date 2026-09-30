@@ -278,6 +278,9 @@ namespace ChartPacker.ViewModels
 
         public bool HasResult => ResultText is not null;
 
+        /// <summary>The merged <c>.sng</c>, once a song is merged.</summary>
+        public string? MergedPath { get; private set; }
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasWarnings))]
         public partial IReadOnlyList<string> Warnings { get; set; } = [];
@@ -498,6 +501,7 @@ namespace ChartPacker.ViewModels
             try
             {
                 var result = await SongMerger.MergeAsync(plan, outputFolder, policy, video, _cts.Token);
+                MergedPath = result.OutputPath;
                 ResultText = string.Format(CultureInfo.CurrentCulture, Strings.MergeDoneFormat, result.OutputPath);
                 Warnings = [.. result.Warnings.Select(Describe), .. result.PackFindings.Select(f => f.Message)];
                 IsDone = true;

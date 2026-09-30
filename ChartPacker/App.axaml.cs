@@ -1,5 +1,8 @@
+using System;
+using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ChartPacker.Audio.Playback;
@@ -41,8 +44,17 @@ namespace ChartPacker
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);
 
                 var videoProbe = new FfmpegVideoDurationProbe();
-                var mergeWindow = new AvaloniaMergeWindowService(() => window, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe);
-                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player, mergeWindow);
+                // A Merge window belongs to whichever window opens it: the main window, or the Deduplicate window.
+                Func<Func<Window?>, IMergeWindowService> mergeWindowFor = owner =>
+                    new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe);
+                var dedupWindow = new AvaloniaDedupWindowService(
+                    () => window,
+                    drafts,
+                    settings,
+                    player,
+                    mergeWindowFor,
+                    Path.Combine(UserConfigPaths.ConfigFolder, "dedup-log.jsonl"));
+                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
                     settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway), settingsPicker, settings.Save));

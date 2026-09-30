@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
@@ -23,6 +24,7 @@ namespace ChartPacker.Services
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
+            var duplicates = new SettingCategory("library.dedup", Strings.SettingsCategoryDuplicates, libraryCategory);
             var output = new SettingCategory("output", Strings.SettingsCategoryOutput);
             var packing = new SettingCategory("output.packing", Strings.SettingsCategoryPacking, output);
             var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
@@ -30,7 +32,7 @@ namespace ChartPacker.Services
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, output, packing, playback, audio, visualizers],
+                [libraryCategory, scanning, duplicates, output, packing, playback, audio, visualizers],
                 [
                     new IntegerSetting
                     {
@@ -44,6 +46,22 @@ namespace ChartPacker.Services
                         Maximum = AppSettings.MaxScanMaxDepth,
                         Get = () => library.ScanDepth is { } depth ? (int)depth : AppSettings.DefaultScanMaxDepth,
                         Set = depth => library.ScanDepth = depth,
+                    },
+                    new ChoiceSetting<DedupKindPreference>
+                    {
+                        Id = "library.dedupKeep",
+                        Category = duplicates,
+                        Label = Strings.DedupKeepLabel,
+                        Description = Strings.DedupKeepDescription,
+                        Keywords = Words(Strings.DedupKeepKeywords),
+                        DefaultValue = AppSettings.DefaultDedupKeepPreference,
+                        Choices =
+                        [
+                            new SettingChoice<DedupKindPreference>(DedupKindPreference.PreferSng, Strings.DedupKeepSng),
+                            new SettingChoice<DedupKindPreference>(DedupKindPreference.PreferFolder, Strings.DedupKeepFolder),
+                        ],
+                        Get = () => library.DedupKeepPreference,
+                        Set = preference => library.DedupKeepPreference = preference,
                     },
                     new FolderSetting
                     {

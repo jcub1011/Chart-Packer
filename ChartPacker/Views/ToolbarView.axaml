@@ -76,6 +76,17 @@
                                 <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.MergeButton}" />
                             </StackPanel>
                         </Button>
+                        <Button Classes="labelled"
+                                Margin="2,0,0,0"
+                                Command="{Binding Library.DeduplicateCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.DedupToolTip}"
+                                ToolTip.ShowOnDisabled="True"
+                                AutomationProperties.Name="{x:Static res:Strings.DedupButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ctl:LineIcon Data="{StaticResource DedupStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DedupButton}" />
+                            </StackPanel>
+                        </Button>
                         <ComboBox Width="132"
                                   Margin="6,0,0,0"
                                   VerticalAlignment="Center"

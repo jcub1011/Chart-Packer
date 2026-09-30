@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Library;
 
@@ -14,6 +15,7 @@ namespace ChartPacker.Services
         public const int MaxScanMaxDepth = 10;
         public const double DefaultMasterVolume = 1;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
+        public const DedupKindPreference DefaultDedupKeepPreference = DedupKindPreference.PreferSng;
         public const double DefaultHighwayNoteSpeed = 1;
         public const double MinHighwayNoteSpeed = 0.5;
         public const double MaxHighwayNoteSpeed = 3;
@@ -36,6 +38,10 @@ namespace ChartPacker.Services
 
         /// <summary>Whether Pack writes every .sng directly in the output folder instead of mirroring the scanned folder's layout.</summary>
         public bool FlatPackOutput { get; set; }
+
+        /// <summary>Which copy the Deduplicate window keeps by default when a song is both a folder and a .sng.</summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<DedupKindPreference>))]
+        public DedupKindPreference DedupKeepPreference { get; set; } = DefaultDedupKeepPreference;
 
         /// <summary>What the library list is sorted by.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter<LibrarySortField>))]

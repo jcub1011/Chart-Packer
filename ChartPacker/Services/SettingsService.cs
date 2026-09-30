@@ -84,6 +84,9 @@ namespace ChartPacker.Services
             if (!Enum.IsDefined(settings.OverwritePolicy))
                 settings.OverwritePolicy = AppSettings.DefaultOverwritePolicy;
 
+            if (!Enum.IsDefined(settings.DedupKeepPreference))
+                settings.DedupKeepPreference = AppSettings.DefaultDedupKeepPreference;
+
             if (!Enum.IsDefined(settings.LibrarySortField))
                 settings.LibrarySortField = LibrarySortField.ScanOrder;
 

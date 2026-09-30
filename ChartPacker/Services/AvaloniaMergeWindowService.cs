@@ -30,10 +30,10 @@ namespace ChartPacker.Services
         IFilePickerService filePicker,
         IVideoDurationProbe video) : IMergeWindowService
     {
-        public async Task<bool> ShowAsync(IReadOnlyList<SongEntry> entries, string outputFolder, OverwritePolicy policy)
+        public async Task<string?> ShowAsync(IReadOnlyList<SongEntry> entries, string outputFolder, OverwritePolicy policy)
         {
             if (owner() is not { } window)
-                return false;
+                return null;
 
             if (mainPlayer.StopCommand.CanExecute(null))
                 mainPlayer.StopCommand.Execute(null);
@@ -56,7 +56,7 @@ namespace ChartPacker.Services
             mainHighway.ReloadSettings();
 
             // However the window was closed, a song may already have been merged.
-            return viewModel.IsDone;
+            return viewModel.MergedPath;
         }
 
         /// <summary>The preview never runs a job, so there's no progress to show.</summary>
