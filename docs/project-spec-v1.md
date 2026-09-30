@@ -512,14 +512,30 @@ Behaviour:
    the title, artist, album, genre or charter, a year, length (minutes) and size (MB) range, and
    having unsaved changes. Every filter must pass. A song without the filtered value doesn't
    pass. The button shows how many filters are on; **Reset filters** turns them all off.
-4. **Unsaved changes count.** Values come from the metadata with the song's draft applied, so an
-   edit re-sorts and re-filters the list before it's saved. The year is the first four-digit
-   number in `year`, which handles Clone Hero's `", 2004"`.
-5. **While scanning.** Songs join the list as their metadata is read. The list is re-sorted and
-   re-filtered at most a few times a second.
-6. **Selection.** A selected song the filters hide is deselected, so Pack and Unpack only act on
+4. **Content filters.** The flyout also filters by what the song has, with a chip per item that
+   cycles **Either** (off), **Includes** and **Excludes**; right-clicking a chip puts it straight
+   back to Either:
+   - **Instruments**: every chart part in the MIDI part catalogue, from guitar to dance, that has
+     at least one note, so a template's empty tracks don't count.
+   - **Difficulties**: Easy, Medium, Hard and Expert, having notes on any part.
+   - **Audio stems**: song, guitar, rhythm, bass, keys, drums (`drums` and `drums_1`–`drums_4`),
+     vocals (`vocals`, `vocals_1`, `vocals_2`), crowd and preview.
+   - **Backgrounds and art**: a background video, a background image, album art.
+
+   A song with any excluded item doesn't pass. The first three groups each have an **All** /
+   **Any** switch for their included items: All needs every one, Any needs at least one. So
+   "only these" is the wanted items included and the rest excluded. Each group, and each
+   background or art chip, counts as one filter.
+5. **Unsaved changes count.** Values come from the metadata with the song's draft applied, so an
+   edit re-sorts and re-filters the list before it's saved. The same goes for the stems,
+   backgrounds and album art a draft adds or removes. A chart a draft adds hasn't been read, so
+   its instruments and difficulties aren't known until it's saved. The year is the first
+   four-digit number in `year`, which handles Clone Hero's `", 2004"`.
+6. **While scanning.** Songs join the list as their metadata and chart are read. The list is
+   re-sorted and re-filtered at most a few times a second.
+7. **Selection.** A selected song the filters hide is deselected, so Pack and Unpack only act on
    songs that can be seen. Selected songs that still show stay selected.
-7. **Counts.** While the search or a filter is on, the status line reads `shown/total songs`.
+8. **Counts.** While the search or a filter is on, the status line reads `shown/total songs`.
    When nothing matches, the list says so, with a button that clears the search and filters.
 
 Acceptance criteria:
@@ -529,6 +545,11 @@ Acceptance criteria:
 - **AC8.2** Sorting by year in either direction lists songs without a year last.
 - **AC8.3** Selecting three songs and then filtering one of them out leaves two selected, and
   Pack acts on those two.
+- **AC8.4** Setting Drums to Includes and Vocals to Excludes, with All, shows only songs whose
+  chart has drum notes and no vocal notes. Switching Instruments to Any with Guitar and Bass
+  included shows songs with either part.
+- **AC8.5** Adding a background video to a song without saving it takes the song out of the list
+  while Video is set to Excludes.
 
 ---
 

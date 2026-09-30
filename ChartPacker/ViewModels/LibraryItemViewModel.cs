@@ -147,7 +147,7 @@ namespace ChartPacker.ViewModels
             // Without a song_length, the longest audio file stands in.
             LengthText = (headline.LengthMs ?? _summary.FallbackLengthMs) is { } length ? MetadataTimes.FormatDuration(length) : null;
             SizeText = ByteSizeFormatter.Format(_summary.TotalSize);
-            SetFacts(LibrarySongFacts.From(Entry, pairs, _summary.TotalSize, _summary.FallbackLengthMs, HasDrafts));
+            SetFacts(LibrarySongFacts.From(Entry, _summary, draft, HasDrafts));
         }
 
         partial void OnHasDraftsChanged(bool value) => SetFacts(Facts with { HasDrafts = value });

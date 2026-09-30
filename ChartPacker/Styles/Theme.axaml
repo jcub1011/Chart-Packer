@@ -14,6 +14,9 @@
         <SolidColorBrush x:Key="AccentTintBrush" Color="#408B5CF6" />
         <SolidColorBrush x:Key="AccentTextBrush" Color="#C4B5FD" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
+        <!-- Something left out, e.g. a filter chip set to Excludes: the rose of the spectrum's bass. -->
+        <SolidColorBrush x:Key="ExcludeTintBrush" Color="#40F2587A" />
+        <SolidColorBrush x:Key="ExcludeTextBrush" Color="#FDA4AF" />
         <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
         <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
         <!-- The spectrum behind the details panel while a song plays: a shade for each bar, stepped from rose at

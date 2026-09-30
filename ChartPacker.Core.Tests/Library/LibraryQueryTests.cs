@@ -6,10 +6,38 @@ namespace ChartPacker.Core.Tests.Library;
 [TestClass]
 public sealed class LibraryQueryTests
 {
-    private static readonly LibrarySongFacts Alpha = new(SongEntryKind.SngFile, "alpha_file", "Alpha", "Beyoncé", "First Album", "Pop", "Charter One", 2004, 180_000, 10_000_000);
-    private static readonly LibrarySongFacts Bravo = new(SongEntryKind.SongFolder, "bravo_folder", "Bravo", "The Band", "Second", "Rock", "Charter Two", 1999, 240_000, 50_000_000, HasDrafts: true);
+    private static readonly LibrarySongFacts Alpha = new(SongEntryKind.SngFile, "alpha_file", "Alpha", "Beyoncé", "First Album", "Pop", "Charter One", 2004, 180_000, 10_000_000)
+    {
+        Instruments = LibraryInstruments.Guitar | LibraryInstruments.Drums,
+        Difficulties = LibraryDifficulties.Hard | LibraryDifficulties.Expert,
+        Stems = LibraryStems.Song | LibraryStems.Guitar | LibraryStems.Drums,
+        HasVideo = true,
+        HasImage = false,
+        HasAlbumArt = true,
+    };
+
+    private static readonly LibrarySongFacts Bravo = new(SongEntryKind.SongFolder, "bravo_folder", "Bravo", "The Band", "Second", "Rock", "Charter Two", 1999, 240_000, 50_000_000, HasDrafts: true)
+    {
+        Instruments = LibraryInstruments.Guitar | LibraryInstruments.Vocals,
+        Difficulties = LibraryDifficulties.Expert,
+        Stems = LibraryStems.Song,
+        HasVideo = false,
+        HasImage = true,
+        HasAlbumArt = false,
+    };
+
+    // Not read yet, so its chart, files and assets aren't known.
     private static readonly LibrarySongFacts Charlie = new(SongEntryKind.SngFile, "charlie_file");
-    private static readonly LibrarySongFacts Delta = new(SongEntryKind.SongFolder, "delta_folder", "alpha two", "Another", Year: 2010, SizeBytes: 1_000);
+
+    private static readonly LibrarySongFacts Delta = new(SongEntryKind.SongFolder, "delta_folder", "alpha two", "Another", Year: 2010, SizeBytes: 1_000)
+    {
+        Instruments = LibraryInstruments.Bass,
+        Difficulties = LibraryDifficulties.Easy,
+        Stems = LibraryStems.Song | LibraryStems.Bass,
+        HasVideo = false,
+        HasImage = false,
+        HasAlbumArt = true,
+    };
 
     private static readonly LibrarySongFacts[] All = [Alpha, Bravo, Charlie, Delta];
 
@@ -105,6 +133,68 @@ public sealed class LibraryQueryTests
         };
 
         Assert.AreEqual(5, query.ActiveFilterCount);
+    }
+
+    [TestMethod]
+    public void InstrumentsNeedEveryIncludedPartOrAnyOfThem()
+    {
+        const LibraryInstruments guitarDrums = LibraryInstruments.Guitar | LibraryInstruments.Drums;
+
+        CollectionAssert.AreEqual(new[] { Alpha, Bravo }, Apply(new() { Instruments = new(LibraryInstruments.Guitar, LibraryInstruments.None) }));
+        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { Instruments = new(guitarDrums, LibraryInstruments.None, SetMatch.All) }));
+        CollectionAssert.AreEqual(new[] { Alpha, Bravo }, Apply(new() { Instruments = new(guitarDrums, LibraryInstruments.None, SetMatch.Any) }));
+    }
+
+    [TestMethod]
+    public void ExcludedItemsHideSongsWithThemAndSongsNotReadYet()
+    {
+        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { Instruments = new(LibraryInstruments.None, LibraryInstruments.Vocals) }));
+        CollectionAssert.AreEqual(new[] { Delta }, Apply(new() { Difficulties = new(LibraryDifficulties.None, LibraryDifficulties.Expert) }));
+    }
+
+    [TestMethod]
+    public void IncludedAndExcludedItemsCombine() =>
+        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { Instruments = new(LibraryInstruments.Guitar, LibraryInstruments.Vocals) }));
+
+    [TestMethod]
+    public void FiltersByDifficultiesAndStems()
+    {
+        CollectionAssert.AreEqual(new[] { Alpha, Bravo }, Apply(new() { Difficulties = new(LibraryDifficulties.Expert, LibraryDifficulties.None) }));
+        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { Stems = new(LibraryStems.Drums | LibraryStems.Bass, LibraryStems.None, SetMatch.Any) }));
+
+        // Only the song stem: it included, every other excluded.
+        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { Stems = new(LibraryStems.Song, ~LibraryStems.Song) }));
+    }
+
+    [TestMethod]
+    public void FiltersByBackgroundsAndAlbumArt()
+    {
+        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { Video = FilterPresence.Includes }));
+        CollectionAssert.AreEqual(new[] { Bravo, Delta }, Apply(new() { Video = FilterPresence.Excludes }));
+        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { BackgroundImage = FilterPresence.Includes }));
+        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { AlbumArt = FilterPresence.Includes }));
+        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { AlbumArt = FilterPresence.Excludes }));
+    }
+
+    [TestMethod]
+    public void ContentFiltersThatAreOffKeepSongsNotReadYet() =>
+        CollectionAssert.AreEqual(All, Apply(new() { Instruments = new(LibraryInstruments.None, LibraryInstruments.None, SetMatch.Any), Video = FilterPresence.Either }));
+
+    [TestMethod]
+    public void CountsEachContentFilterOnce()
+    {
+        var query = new LibraryQuery
+        {
+            Instruments = new(LibraryInstruments.Guitar | LibraryInstruments.Bass, LibraryInstruments.Vocals),
+            Difficulties = new(LibraryDifficulties.None, LibraryDifficulties.Easy),
+            Stems = new(LibraryStems.Drums, LibraryStems.None),
+            Video = FilterPresence.Includes,
+            BackgroundImage = FilterPresence.Excludes,
+            AlbumArt = FilterPresence.Includes,
+        };
+
+        Assert.AreEqual(6, query.ActiveFilterCount);
+        Assert.AreEqual(0, new LibraryQuery { Instruments = new(LibraryInstruments.None, LibraryInstruments.None, SetMatch.Any) }.ActiveFilterCount);
     }
 
     [TestMethod]

@@ -14,6 +14,23 @@
         <conv:EntryKindToIconConverter x:Key="EntryKindToIcon"
                                        SngFile="{StaticResource SngIconGeometry}"
                                        SongFolder="{StaticResource FolderIconGeometry}" />
+
+        <!-- A content filter chip: clicking it cycles Either, Includes and Excludes; right-clicking puts it back to Either. -->
+        <DataTemplate x:Key="FilterChipTemplate" x:DataType="vm:FilterChipViewModel">
+            <Button Classes="filterChip"
+                    Classes.includes="{Binding IsIncluded}"
+                    Classes.excludes="{Binding IsExcluded}"
+                    Command="{Binding CycleCommand}"
+                    ctl:RightClick.Command="{Binding ResetCommand}"
+                    ToolTip.Tip="{Binding ToolTip}"
+                    AutomationProperties.Name="{Binding AutomationName}">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                    <ctl:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsIncluded}" />
+                    <ctl:LineIcon Data="{StaticResource ClearStroke}" IsVisible="{Binding IsExcluded}" />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -143,6 +160,46 @@
             <Setter Property="Minimum" Value="0" />
             <Setter Property="MinWidth" Value="0" />
         </Style>
+
+        <!-- Content filter chips: plain for Either, the accent for Includes, rose for Excludes. -->
+        <Style Selector="Button.filterChip">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Button.filterChip ctl|LineIcon">
+            <Setter Property="StrokeThickness" Value="1.75" />
+            <Setter Property="Margin" Value="-3,0,0,0" />
+        </Style>
+        <Style Selector="Button.filterChip.includes">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="Button.filterChip.includes /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="Button.filterChip.excludes">
+            <Setter Property="Foreground" Value="{DynamicResource ExcludeTextBrush}" />
+        </Style>
+        <Style Selector="Button.filterChip.excludes /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ExcludeTintBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ExcludeTextBrush}" />
+        </Style>
+
+        <!-- A chip group's All | Any switch: radio buttons, so one is always picked, drawn as small toggles. -->
+        <Style Selector="RadioButton.match">
+            <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="8,1" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </UserControl.Styles>
 
     <DockPanel>
@@ -228,7 +285,7 @@
                         <Button.Flyout>
                             <Flyout Placement="BottomEdgeAlignedRight">
                                 <ScrollViewer MaxHeight="560" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Width="300" Spacing="14" Margin="2">
+                                    <StackPanel Width="340" Spacing="14" Margin="2">
                                         <StackPanel Classes="filter-section">
                                             <TextBlock Classes="caption" Text="{x:Static res:Strings.SortByLabel}" />
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
@@ -312,6 +369,58 @@
                                                                PlaceholderText="{x:Static res:Strings.FilterMaxWatermark}" />
                                                 <TextBlock Grid.Row="2" Grid.Column="4" Classes="label muted" Text="{x:Static res:Strings.FilterSizeUnit}" />
                                             </Grid>
+                                        </StackPanel>
+
+                                        <!-- What the chart and files have. A group's included chips must all be there, or
+                                             just one with Any; an excluded chip must never be. -->
+                                        <ItemsControl ItemsSource="{Binding Filter.ChipGroups}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Spacing="14" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:FilterChipGroupViewModel">
+                                                    <StackPanel Classes="filter-section">
+                                                        <DockPanel>
+                                                            <StackPanel DockPanel.Dock="Right"
+                                                                        Orientation="Horizontal"
+                                                                        Spacing="2"
+                                                                        AutomationProperties.Name="{Binding MatchName}">
+                                                                <RadioButton Classes="match"
+                                                                             Content="{x:Static res:Strings.FilterMatchAll}"
+                                                                             IsChecked="{Binding MatchAll}"
+                                                                             ToolTip.Tip="{x:Static res:Strings.FilterMatchAllToolTip}"
+                                                                             AutomationProperties.Name="{x:Static res:Strings.FilterMatchAllToolTip}" />
+                                                                <RadioButton Classes="match"
+                                                                             Content="{x:Static res:Strings.FilterMatchAny}"
+                                                                             IsChecked="{Binding MatchAny}"
+                                                                             ToolTip.Tip="{x:Static res:Strings.FilterMatchAnyToolTip}"
+                                                                             AutomationProperties.Name="{x:Static res:Strings.FilterMatchAnyToolTip}" />
+                                                            </StackPanel>
+                                                            <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding Label}" />
+                                                        </DockPanel>
+                                                        <ItemsControl ItemsSource="{Binding Chips}" ItemTemplate="{StaticResource FilterChipTemplate}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <StackPanel Classes="filter-section">
+                                            <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterAssetsLabel}" />
+                                            <ItemsControl ItemsSource="{Binding Filter.AssetChips}" ItemTemplate="{StaticResource FilterChipTemplate}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                            </ItemsControl>
                                         </StackPanel>
 
                                         <CheckBox Content="{x:Static res:Strings.FilterOnlyUnsaved}" IsChecked="{Binding Filter.OnlyUnsaved}" />

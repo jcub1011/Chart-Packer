@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 
@@ -17,7 +18,16 @@ namespace ChartPacker.Core.Library;
 /// <param name="LengthMs">The song length, or the longest audio file's when it has none.</param>
 /// <param name="SizeBytes">The file's size, or the total of the folder's files.</param>
 /// <param name="HasDrafts">The song has metadata changes that haven't been saved.</param>
-/// <remarks>Every metadata value is <see langword="null"/> when it's unset or hasn't been read yet.</remarks>
+/// <param name="Instruments">The parts its chart has notes for.</param>
+/// <param name="Difficulties">The difficulties its chart has notes for, on any part.</param>
+/// <param name="Stems">The groups of its audio stems.</param>
+/// <param name="HasVideo">It has a background video.</param>
+/// <param name="HasImage">It has a background image.</param>
+/// <param name="HasAlbumArt">It has album art.</param>
+/// <remarks>
+/// Every metadata value is <see langword="null"/> when it's unset or hasn't been read yet. The chart,
+/// file and asset values are <see langword="null"/> when they haven't been read or can't be.
+/// </remarks>
 public sealed partial record LibrarySongFacts(
     SongEntryKind Kind,
     string FileName,
@@ -29,7 +39,13 @@ public sealed partial record LibrarySongFacts(
     int? Year = null,
     long? LengthMs = null,
     ulong? SizeBytes = null,
-    bool HasDrafts = false)
+    bool HasDrafts = false,
+    LibraryInstruments? Instruments = null,
+    LibraryDifficulties? Difficulties = null,
+    LibraryStems? Stems = null,
+    bool? HasVideo = null,
+    bool? HasImage = null,
+    bool? HasAlbumArt = null)
 {
     private const string AlbumKey = "album";
     private const string GenreKey = "genre";
@@ -67,6 +83,61 @@ public sealed partial record LibrarySongFacts(
             headline.LengthMs ?? fallbackLengthMs,
             totalSize,
             hasDrafts);
+    }
+
+    /// <summary>
+    /// The facts for <paramref name="entry"/> given its <paramref name="summary"/>, with
+    /// <paramref name="draft"/> applied: its metadata, and the stems, backgrounds, album art and
+    /// chart it adds or removes.
+    /// </summary>
+    /// <remarks>A chart the draft adds hasn't been read, so its instruments and difficulties aren't known.</remarks>
+    public static LibrarySongFacts From(SongEntry entry, SongSummary summary, MetadataDraft? draft, bool hasDrafts)
+    {
+        ArgumentNullException.ThrowIfNull(summary);
+
+        var names = summary.StoredNames;
+        var pairs = draft?.ApplyTo(summary.Pairs) ?? summary.Pairs;
+        var chart = ChartOf(summary, draft);
+        var stems = SongTracks.Resolve(names, draft)
+            .Aggregate(LibraryStems.None, (all, track) => all | LibraryContentFilters.StemGroupOf(track.Stem));
+
+        return From(entry, pairs, summary.TotalSize, summary.FallbackLengthMs, hasDrafts) with
+        {
+            Instruments = chart?.Instruments,
+            Difficulties = chart?.Difficulties,
+            Stems = stems,
+            HasVideo = HasFile(names, draft, n => SongBackgrounds.IsName(n, BackgroundKind.Video), draft?.BackgroundVideo?.IsRemoval),
+            HasImage = HasFile(names, draft, n => SongBackgrounds.IsName(n, BackgroundKind.Image), draft?.BackgroundImage?.IsRemoval),
+            HasAlbumArt = HasFile(names, draft, AlbumArt.IsAlbumArtName, draft?.AlbumArt?.IsRemoval),
+        };
+    }
+
+    /// <summary>What the chart the song ends up with has; <see langword="null"/> when that isn't known.</summary>
+    private static ChartContents? ChartOf(SongSummary summary, MetadataDraft? draft)
+    {
+        if (draft is null)
+            return summary.Chart;
+
+        return DraftChart.Of(draft, summary.StoredNames) switch
+        {
+            null => ChartContents.None,
+            { StagedPath: null } kept when kept.Name.Equals(ChartReader.Pick(summary.StoredNames), StringComparison.OrdinalIgnoreCase) => summary.Chart,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Whether the song has a file <paramref name="isName"/> matches once the draft is saved. A draft
+    /// that replaces or removes the slot (<paramref name="slotRemoval"/> set) decides on its own;
+    /// otherwise the stored files it doesn't remove count, and so do the ones it adds.
+    /// </summary>
+    private static bool HasFile(IReadOnlyList<string> storedNames, MetadataDraft? draft, Func<string, bool> isName, bool? slotRemoval)
+    {
+        if (slotRemoval is { } removal)
+            return !removal;
+
+        return storedNames.Any(n => isName(n) && draft?.IsFileRemoved(n) != true)
+            || (draft?.AddedFiles.Any(f => isName(f.StoredName)) ?? false);
     }
 
     /// <summary>The first standalone four-digit number in <paramref name="value"/>, e.g. 2004 from <c>", 2004"</c> or <c>"2004-05-01"</c>.</summary>

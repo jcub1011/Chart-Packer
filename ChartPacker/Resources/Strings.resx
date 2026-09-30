@@ -924,6 +924,88 @@
   <data name="FilterOnlyUnsaved" xml:space="preserve">
     <value>Only songs with unsaved changes</value>
   </data>
+  <data name="FilterInstrumentsLabel" xml:space="preserve">
+    <value>Instruments</value>
+    <comment>Heading of the instrument filter chips: the parts the chart has notes for.</comment>
+  </data>
+  <data name="FilterDifficultiesLabel" xml:space="preserve">
+    <value>Difficulties</value>
+    <comment>Heading of the difficulty filter chips: the difficulties any part of the chart has notes for.</comment>
+  </data>
+  <data name="FilterStemsLabel" xml:space="preserve">
+    <value>Audio stems</value>
+    <comment>Heading of the audio stem filter chips.</comment>
+  </data>
+  <data name="FilterAssetsLabel" xml:space="preserve">
+    <value>Backgrounds and art</value>
+    <comment>Heading of the video, background image and album art filter chips.</comment>
+  </data>
+  <data name="FilterMatchAll" xml:space="preserve">
+    <value>All</value>
+    <comment>Segmented button: a song must have every included item of the group.</comment>
+  </data>
+  <data name="FilterMatchAny" xml:space="preserve">
+    <value>Any</value>
+    <comment>Segmented button: a song must have at least one included item of the group.</comment>
+  </data>
+  <data name="FilterMatchAllToolTip" xml:space="preserve">
+    <value>Songs must have every included item</value>
+  </data>
+  <data name="FilterMatchAnyToolTip" xml:space="preserve">
+    <value>Songs must have at least one included item</value>
+  </data>
+  <data name="FilterMatchName" xml:space="preserve">
+    <value>{0}: match</value>
+    <comment>{0} is the group heading, e.g. Instruments. Accessible name of the All/Any buttons.</comment>
+  </data>
+  <data name="FilterChipEither" xml:space="preserve">
+    <value>Either</value>
+    <comment>State of a filter chip: songs are shown whether or not they have it.</comment>
+  </data>
+  <data name="FilterChipIncludes" xml:space="preserve">
+    <value>Includes</value>
+    <comment>State of a filter chip: only songs that have it are shown.</comment>
+  </data>
+  <data name="FilterChipExcludes" xml:space="preserve">
+    <value>Excludes</value>
+    <comment>State of a filter chip: only songs that don't have it are shown.</comment>
+  </data>
+  <data name="FilterChipStateFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is the item, e.g. Guitar; {1} is its state, e.g. Includes. Tooltip and accessible name of a filter chip.</comment>
+  </data>
+  <data name="FilterChipHint" xml:space="preserve">
+    <value>Click to cycle Either, Includes and Excludes; right-click to reset</value>
+    <comment>Second line of a filter chip's tooltip.</comment>
+  </data>
+  <data name="FilterStemSong" xml:space="preserve">
+    <value>Song</value>
+    <comment>The main audio stem, song.ogg.</comment>
+  </data>
+  <data name="FilterStemVocals" xml:space="preserve">
+    <value>Vocals</value>
+    <comment>The vocals stems, vocals.ogg and vocals_1/_2.ogg.</comment>
+  </data>
+  <data name="FilterStemCrowd" xml:space="preserve">
+    <value>Crowd</value>
+    <comment>The crowd stem, crowd.ogg.</comment>
+  </data>
+  <data name="FilterStemPreview" xml:space="preserve">
+    <value>Preview</value>
+    <comment>The preview clip, preview.ogg.</comment>
+  </data>
+  <data name="FilterAssetVideo" xml:space="preserve">
+    <value>Video</value>
+    <comment>Filter chip: the song has a background video.</comment>
+  </data>
+  <data name="FilterAssetImage" xml:space="preserve">
+    <value>Image</value>
+    <comment>Filter chip: the song has a background image.</comment>
+  </data>
+  <data name="FilterAssetAlbumArt" xml:space="preserve">
+    <value>Album art</value>
+    <comment>Filter chip: the song has album art.</comment>
+  </data>
   <data name="FieldTitle" xml:space="preserve">
     <value>Title</value>
   </data>

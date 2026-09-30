@@ -25,7 +25,9 @@ public enum LibrarySortField
 /// <summary>A search, a set of filters and a sort order for the library list.</summary>
 /// <remarks>
 /// Every filter must pass for a song to show. A filter on a value the song doesn't have (it's unset,
-/// or hasn't been read yet) fails. Text is matched ignoring case and accents.
+/// or hasn't been read yet) fails. Text is matched ignoring case and accents. A set filter, such as
+/// <see cref="Instruments"/>, rejects a song with any excluded item, then needs every included item
+/// or at least one of them, as its <see cref="SetMatch"/> says.
 /// </remarks>
 public sealed record LibraryQuery
 {
@@ -70,6 +72,21 @@ public sealed record LibraryQuery
     /// <summary>Only songs with metadata changes that haven't been saved.</summary>
     public bool OnlyUnsaved { get; init; }
 
+    /// <summary>The parts the chart must or mustn't have notes for.</summary>
+    public SetFilter<LibraryInstruments> Instruments { get; init; }
+
+    /// <summary>The difficulties the chart must or mustn't have notes for, on any part.</summary>
+    public SetFilter<LibraryDifficulties> Difficulties { get; init; }
+
+    /// <summary>The audio stems the song must or mustn't have.</summary>
+    public SetFilter<LibraryStems> Stems { get; init; }
+
+    public FilterPresence Video { get; init; }
+
+    public FilterPresence BackgroundImage { get; init; }
+
+    public FilterPresence AlbumArt { get; init; }
+
     /// <summary>How many filters narrow the list; the search isn't counted. A range counts once.</summary>
     public int ActiveFilterCount =>
         (IncludeSng && IncludeFolders ? 0 : 1)
@@ -81,7 +98,13 @@ public sealed record LibraryQuery
         + (YearMin is not null || YearMax is not null ? 1 : 0)
         + (LengthMinMs is not null || LengthMaxMs is not null ? 1 : 0)
         + (SizeMinBytes is not null || SizeMaxBytes is not null ? 1 : 0)
-        + (OnlyUnsaved ? 1 : 0);
+        + (OnlyUnsaved ? 1 : 0)
+        + (Instruments.IsActive ? 1 : 0)
+        + (Difficulties.IsActive ? 1 : 0)
+        + (Stems.IsActive ? 1 : 0)
+        + (Video != FilterPresence.Either ? 1 : 0)
+        + (BackgroundImage != FilterPresence.Either ? 1 : 0)
+        + (AlbumArt != FilterPresence.Either ? 1 : 0);
 
     /// <summary>The search or a filter may hide songs.</summary>
     public bool IsFiltering => ActiveFilterCount > 0 || !string.IsNullOrWhiteSpace(Search);
@@ -187,7 +210,13 @@ public sealed record LibraryQuery
             && ContainsFilter(facts.Charter, CharterContains)
             && InRange(facts.Year, YearMin, YearMax)
             && InRange(facts.LengthMs, LengthMinMs, LengthMaxMs)
-            && InRange(facts.SizeBytes, SizeMinBytes, SizeMaxBytes);
+            && InRange(facts.SizeBytes, SizeMinBytes, SizeMaxBytes)
+            && Instruments.Matches(facts.Instruments)
+            && Difficulties.Matches(facts.Difficulties)
+            && Stems.Matches(facts.Stems)
+            && LibraryContentFilters.PresenceMatches(Video, facts.HasVideo)
+            && LibraryContentFilters.PresenceMatches(BackgroundImage, facts.HasImage)
+            && LibraryContentFilters.PresenceMatches(AlbumArt, facts.HasAlbumArt);
     }
 
     private static bool ContainsFilter(string? value, string? filter) =>

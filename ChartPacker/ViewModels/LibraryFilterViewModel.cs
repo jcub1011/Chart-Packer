@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Library;
+using ChartPacker.Core.Merging;
 using ChartPacker.Resources;
 using ChartPacker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -47,6 +49,33 @@ namespace ChartPacker.ViewModels
                 new(LibrarySortField.Type, Strings.FieldType),
                 new(LibrarySortField.FileName, Strings.FieldFileName),
             ];
+            Instruments = new FilterChipGroupViewModel(
+                Strings.FilterInstrumentsLabel,
+                MidiPartCatalog.Known.Select(p => (ChartLabels.PartName(p), (int)ChartContents.FlagOf(p.Id))),
+                OnChipChanged);
+            Difficulties = new FilterChipGroupViewModel(
+                Strings.FilterDifficultiesLabel,
+                Enum.GetValues<ChartDifficulty>().Select(d => (ChartLabels.DifficultyName(d), 1 << (int)d)),
+                OnChipChanged);
+            Stems = new FilterChipGroupViewModel(
+                Strings.FilterStemsLabel,
+                [
+                    (Strings.FilterStemSong, (int)LibraryStems.Song),
+                    (Strings.InstrumentGuitar, (int)LibraryStems.Guitar),
+                    (Strings.InstrumentRhythm, (int)LibraryStems.Rhythm),
+                    (Strings.InstrumentBass, (int)LibraryStems.Bass),
+                    (Strings.InstrumentKeys, (int)LibraryStems.Keys),
+                    (Strings.InstrumentDrums, (int)LibraryStems.Drums),
+                    (Strings.FilterStemVocals, (int)LibraryStems.Vocals),
+                    (Strings.FilterStemCrowd, (int)LibraryStems.Crowd),
+                    (Strings.FilterStemPreview, (int)LibraryStems.Preview),
+                ],
+                OnChipChanged);
+            VideoChip = new FilterChipViewModel(Strings.FilterAssetVideo, 0, OnChipChanged);
+            ImageChip = new FilterChipViewModel(Strings.FilterAssetImage, 0, OnChipChanged);
+            AlbumArtChip = new FilterChipViewModel(Strings.FilterAssetAlbumArt, 0, OnChipChanged);
+            AssetChips = [VideoChip, ImageChip, AlbumArtChip];
+
             SelectedSortOption = SortOptions.First(o => o.Value == settings.Settings.LibrarySortField);
             SortDescending = settings.Settings.LibrarySortDescending;
             Query = Build();
@@ -117,6 +146,27 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool OnlyUnsaved { get; set; }
 
+        /// <summary>The parts the chart has notes for.</summary>
+        public FilterChipGroupViewModel Instruments { get; }
+
+        /// <summary>The difficulties any part of the chart has notes for.</summary>
+        public FilterChipGroupViewModel Difficulties { get; }
+
+        /// <summary>The audio stems, grouped: Drums is every drums stem, and so on.</summary>
+        public FilterChipGroupViewModel Stems { get; }
+
+        /// <summary>The set groups, in the order the flyout shows them.</summary>
+        public IReadOnlyList<FilterChipGroupViewModel> ChipGroups => [Instruments, Difficulties, Stems];
+
+        public FilterChipViewModel VideoChip { get; }
+
+        public FilterChipViewModel ImageChip { get; }
+
+        public FilterChipViewModel AlbumArtChip { get; }
+
+        /// <summary>The video, background image and album art chips.</summary>
+        public IReadOnlyList<FilterChipViewModel> AssetChips { get; }
+
         /// <summary>How many filters are narrowing the list, for the badge on the filter button.</summary>
         public int ActiveFilterCount => Query.ActiveFilterCount;
 
@@ -144,6 +194,10 @@ namespace ChartPacker.ViewModels
                 SizeMin = null;
                 SizeMax = null;
                 OnlyUnsaved = false;
+                foreach (var group in ChipGroups)
+                    group.Clear();
+                foreach (var chip in AssetChips)
+                    chip.State = FilterPresence.Either;
             });
         }
 
@@ -176,6 +230,12 @@ namespace ChartPacker.ViewModels
             if (e.PropertyName == nameof(SearchText))
                 base.OnPropertyChanged(new PropertyChangedEventArgs(nameof(HasSearch)));
 
+            if (!_suspendRebuild)
+                Rebuild();
+        }
+
+        private void OnChipChanged()
+        {
             if (!_suspendRebuild)
                 Rebuild();
         }
@@ -228,6 +288,12 @@ namespace ChartPacker.ViewModels
             SizeMinBytes = Scale<ulong>(SizeMin, BytesPerMegabyte),
             SizeMaxBytes = Scale<ulong>(SizeMax, BytesPerMegabyte),
             OnlyUnsaved = OnlyUnsaved,
+            Instruments = new((LibraryInstruments)Instruments.Included, (LibraryInstruments)Instruments.Excluded, Instruments.Match),
+            Difficulties = new((LibraryDifficulties)Difficulties.Included, (LibraryDifficulties)Difficulties.Excluded, Difficulties.Match),
+            Stems = new((LibraryStems)Stems.Included, (LibraryStems)Stems.Excluded, Stems.Match),
+            Video = VideoChip.State,
+            BackgroundImage = ImageChip.State,
+            AlbumArt = AlbumArtChip.State,
         };
 
         private static int? ToInt(decimal? value) => value is { } v ? (int)Math.Round(v) : null;

@@ -325,7 +325,7 @@ namespace ChartPacker.ViewModels
 
             foreach (var part in analysis.Parts)
             {
-                var row = Choice(PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), i => RatingOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut);
+                var row = Choice(ChartLabels.PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), i => RatingOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut);
                 var with = analysis.SourcesWith(part.Id);
                 if (with.Count == 1)
                     row.Select(with[0]);
@@ -697,7 +697,7 @@ namespace ChartPacker.ViewModels
             return string.Format(CultureInfo.CurrentCulture, format, TrackName(warning.TrackName), ChartLabels.DifficultyName(warning.Difficulty));
         }
 
-        private static string TrackName(string track) => MidiPartCatalog.PartOf(track) is { IsKnown: true } part ? PartName(part) : track;
+        private static string TrackName(string track) => MidiPartCatalog.PartOf(track) is { IsKnown: true } part ? ChartLabels.PartName(part) : track;
 
         private static string FormatOf(MergeChartFormat format) => format switch
         {
@@ -728,28 +728,5 @@ namespace ChartPacker.ViewModels
 
         private static string StemsOf(MergeSource source) =>
             source.AudioFiles.Count == 0 ? Strings.MergeStemsNone : string.Join(", ", source.AudioFiles);
-
-        private static string PartName(MidiPart part) => part.Id switch
-        {
-            "guitar" => Strings.InstrumentGuitar,
-            "guitar_coop" => Strings.InstrumentGuitarCoop,
-            "rhythm" => Strings.InstrumentRhythm,
-            "bass" => Strings.InstrumentBass,
-            "drums" => Strings.InstrumentDrums,
-            "keys" => Strings.InstrumentKeys,
-            "pro_keys" => Strings.MergePartProKeys,
-            "vocals" => Strings.MergePartVocals,
-            "harmonies" => Strings.MergePartHarmonies,
-            "pro_guitar" => Strings.MergePartProGuitar,
-            "pro_guitar_22" => Strings.MergePartProGuitar22,
-            "pro_bass" => Strings.MergePartProBass,
-            "pro_bass_22" => Strings.MergePartProBass22,
-            "guitar_ghl" => Strings.InstrumentGhlGuitar,
-            "bass_ghl" => Strings.InstrumentGhlBass,
-            "rhythm_ghl" => Strings.MergePartGhlRhythm,
-            "guitar_coop_ghl" => Strings.MergePartGhlCoop,
-            "dance" => Strings.MergePartDance,
-            _ => part.TrackNames[0],
-        };
     }
 }
