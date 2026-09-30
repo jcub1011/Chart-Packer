@@ -100,6 +100,9 @@ namespace ChartPacker.Controls
         public static readonly StyledProperty<IReadOnlyList<Waveform?>?> WaveformsProperty =
             AvaloniaProperty.Register<NoteHighwayView, IReadOnlyList<Waveform?>?>(nameof(Waveforms));
 
+        public static readonly StyledProperty<bool> AreNotesOutlinedProperty =
+            AvaloniaProperty.Register<NoteHighwayView, bool>(nameof(AreNotesOutlined));
+
         // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it.
         private const double StrikeFraction = 0.87;
 
@@ -142,6 +145,9 @@ namespace ChartPacker.Controls
         private static readonly Color WhiteFretColor = Color.FromRgb(0xF2, 0xF2, 0xF4);
         private static readonly Color BlackFretColor = Color.FromRgb(0x2A, 0x2A, 0x32);
 
+        // A black fret's tail, and its edge when outlined, which its own colour would leave unseen on the dark highway.
+        private static readonly Color BlackFretEdgeColor = Color.FromRgb(0x8A, 0x8A, 0x96);
+
         private static readonly Color Green = Color.FromRgb(0x2E, 0xC4, 0x4E);
         private static readonly Color Red = Color.FromRgb(0xEE, 0x3B, 0x3B);
         private static readonly Color Yellow = Color.FromRgb(0xFF, 0xD8, 0x2E);
@@ -161,7 +167,7 @@ namespace ChartPacker.Controls
 
         static NoteHighwayView()
         {
-            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty);
+            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty, AreNotesOutlinedProperty);
         }
 
         /// <summary>The highways to draw, or <see langword="null"/> for none.</summary>
@@ -193,6 +199,16 @@ namespace ChartPacker.Controls
         {
             get => GetValue(WaveformsProperty);
             set => SetValue(WaveformsProperty, value);
+        }
+
+        /// <summary>
+        /// Whether the notes are drawn as outlines in their colours, with nothing filled in, so the waveform behind
+        /// them shows through and a note can be lined up with the sound it's played to.
+        /// </summary>
+        public bool AreNotesOutlined
+        {
+            get => GetValue(AreNotesOutlinedProperty);
+            set => SetValue(AreNotesOutlinedProperty, value);
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -289,7 +305,7 @@ namespace ChartPacker.Controls
                 context.FillRectangle(RailBrush, new Rect(bounds.Right - 2, 0, 2, railEnd));
 
                 DrawStrikeBar(context, lane, bounds, laneWidth, strike, gem, hits);
-                DrawNotes(context, lane, bounds, laneWidth, gem, now, from, to, y);
+                DrawNotes(context, lane, bounds, laneWidth, gem, now, from, to, y, AreNotesOutlined);
             }
 
             DrawLabel(context, lane.Label, bounds, strike + (gem * 0.9));
@@ -346,7 +362,8 @@ namespace ChartPacker.Controls
             }
         }
 
-        private void DrawNotes(DrawingContext context, HighwayLane lane, Rect bounds, double laneWidth, double gem, double now, double from, double to, Func<double, double> y)
+        /// <param name="outlined">Whether each note is drawn as its outline only, so what's behind it shows through.</param>
+        private void DrawNotes(DrawingContext context, HighwayLane lane, Rect bounds, double laneWidth, double gem, double now, double from, double to, Func<double, double> y, bool outlined)
         {
             int first = LowerBound(lane.Starts, from - lane.MaxLength);
             int last = LowerBound(lane.Starts, to + 0.001);
@@ -358,7 +375,7 @@ namespace ChartPacker.Controls
                 // A sustain's tail is eaten from the strike line as it's held.
                 var note = lane.Notes[i];
                 if (lane.Ends[i] > lane.Starts[i] && lane.Ends[i] > now && note.Lane >= 0)
-                    DrawTail(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(Math.Min(lane.Ends[i], to)), y(Math.Max(lane.Starts[i], now)));
+                    DrawTail(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(Math.Min(lane.Ends[i], to)), y(Math.Max(lane.Starts[i], now)), outlined);
             }
 
             foreach (bool bars in (ReadOnlySpan<bool>)[true, false])
@@ -370,30 +387,34 @@ namespace ChartPacker.Controls
                     if (lane.Starts[i] < now || (note.Lane == ChartNote.OpenLane) != bars)
                         continue;
 
-                    DrawGem(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(lane.Starts[i]), gem);
+                    DrawGem(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(lane.Starts[i]), gem, outlined);
                 }
             }
         }
 
-        private void DrawTail(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double top, double bottom)
+        private void DrawTail(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double top, double bottom, bool outlined)
         {
             if (bottom <= top)
                 return;
 
             double center = bounds.X + ((Column(lane, note.Lane) + 0.5) * laneWidth);
             double width = Math.Max(3, laneWidth * 0.2);
-            var tailColor = lane.Kind == ChartInstrumentKind.SixFret && note.Lane >= 3 ? Color.FromRgb(0x8A, 0x8A, 0x96) : color;
-            context.DrawRectangle(Brush(WithAlpha(tailColor, 0xCC)), OutlinePen, new Rect(center - (width / 2), top, width, bottom - top), 1, 1);
+            var tailColor = IsBlackFret(lane, note) ? BlackFretEdgeColor : color;
+            var tail = new Rect(center - (width / 2), top, width, bottom - top);
+            if (outlined)
+                context.DrawRectangle(null, Pen(tailColor, 1), tail.Deflate(0.5), 1, 1);
+            else
+                context.DrawRectangle(Brush(WithAlpha(tailColor, 0xCC)), OutlinePen, tail, 1, 1);
         }
 
-        private void DrawGem(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double at, double gem)
+        private void DrawGem(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double at, double gem, bool outlined)
         {
             if (note.Lane == ChartNote.OpenLane)
             {
                 // An open note or a kick: a flat bar across the highway.
                 double barHeight = Math.Max(4, gem * 0.45);
                 var bar = new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight);
-                DrawFlat(context, bar, color);
+                DrawFlat(context, bar, color, outlined: outlined);
                 if ((note.Flags & NoteFlags.DoubleKick) != 0)
                     context.DrawRectangle(null, Pen(WhiteFretColor, 1), bar.Deflate(1.5), 1, 1);
                 return;
@@ -402,12 +423,15 @@ namespace ChartPacker.Controls
             var rect = GemRect(bounds, laneWidth, Column(lane, note.Lane), at, gem);
 
             // Six-fret: a black fret played with a white one covers its top half.
-            if (lane.Kind == ChartInstrumentKind.SixFret && note.Lane >= 3 && lane.SharesColumn.Contains((note.Tick, note.Lane % 3)))
+            if (IsBlackFret(lane, note) && lane.SharesColumn.Contains((note.Tick, note.Lane % 3)))
                 rect = rect.WithHeight(rect.Height / 2);
+
+            // Outlined, a black fret's own colour would be lost on the dark highway, so it's drawn in grey.
+            var edge = outlined && IsBlackFret(lane, note) ? BlackFretEdgeColor : color;
 
             if ((note.Flags & NoteFlags.Cymbal) != 0)
             {
-                DrawCymbal(context, rect, color);
+                DrawCymbal(context, rect, edge, outlined);
                 return;
             }
 
@@ -415,32 +439,46 @@ namespace ChartPacker.Controls
             {
                 // A tap: dark, with the lane's colour as its border and a mark in the middle.
                 double radius = CornerOf(rect);
-                context.DrawRectangle(TapBodyBrush, Pen(color, 2), rect.Deflate(1), radius, radius);
-                context.FillRectangle(Brush(color), Mark(rect), 1f);
+                context.DrawRectangle(outlined ? null : TapBodyBrush, Pen(edge, 2), rect.Deflate(1), radius, radius);
+                if (outlined)
+                    context.DrawRectangle(null, Pen(edge, 1), Mark(rect).Deflate(0.5), 1, 1);
+                else
+                    context.FillRectangle(Brush(color), Mark(rect), 1f);
                 return;
             }
 
-            DrawFlat(context, rect, color, lane.Kind == ChartInstrumentKind.SixFret && note.Lane >= 3 ? Color.FromRgb(0xC8, 0xC8, 0xD0) : null);
+            DrawFlat(context, rect, edge, IsBlackFret(lane, note) ? Color.FromRgb(0xC8, 0xC8, 0xD0) : null, outlined);
 
             // A hammer-on: a white mark across the face.
             if ((note.Flags & NoteFlags.Hopo) != 0)
-                context.FillRectangle(HopoMarkBrush, Mark(rect), 1f);
+            {
+                if (outlined)
+                    context.DrawRectangle(null, Pen(WhiteFretColor, 1), Mark(rect).Deflate(0.5), 1, 1);
+                else
+                    context.FillRectangle(HopoMarkBrush, Mark(rect), 1f);
+            }
         }
 
         /// <summary>
         /// A flat gem: its face in the colour over a darker lower edge, like a key seen from the front,
-        /// with a thin dark outline so it reads over any background.
+        /// with a thin dark outline so it reads over any background. Outlined, only its edge is drawn, in the colour.
         /// </summary>
-        private void DrawFlat(DrawingContext context, Rect rect, Color color, Color? outline = null)
+        private void DrawFlat(DrawingContext context, Rect rect, Color color, Color? outline = null, bool outlined = false)
         {
             double radius = CornerOf(rect);
+            if (outlined)
+            {
+                context.DrawRectangle(null, Pen(color, 1.5), rect.Deflate(0.75), radius, radius);
+                return;
+            }
+
             context.DrawRectangle(Brush(Darken(color, 0.38)), null, rect, radius, radius);
             context.DrawRectangle(Brush(color), null, rect.WithHeight(rect.Height * 0.72), radius, radius);
             context.DrawRectangle(null, outline is { } light ? Pen(light, 1) : OutlinePen, rect, radius, radius);
         }
 
-        /// <summary>A cymbal: a flat hexagon, pointed at the sides, in two tones like a gem.</summary>
-        private void DrawCymbal(DrawingContext context, Rect rect, Color color)
+        /// <summary>A cymbal: a flat hexagon, pointed at the sides, in two tones like a gem; outlined, only its edge in the colour.</summary>
+        private void DrawCymbal(DrawingContext context, Rect rect, Color color, bool outlined)
         {
             double point = Math.Min(rect.Height * 0.6, rect.Width * 0.25);
             var hexagon = new StreamGeometry();
@@ -453,6 +491,12 @@ namespace ChartPacker.Controls
                 g.LineTo(new Point(rect.Right - point, rect.Bottom));
                 g.LineTo(new Point(rect.X + point, rect.Bottom));
                 g.EndFigure(true);
+            }
+
+            if (outlined)
+            {
+                context.DrawGeometry(null, Pen(color, 1.5), hexagon);
+                return;
             }
 
             using (context.PushGeometryClip(hexagon))
@@ -503,6 +547,8 @@ namespace ChartPacker.Controls
         /// <summary>The column a lane is drawn in: six-fret's black and white frets share three.</summary>
         private static int Column(HighwayLane lane, int noteLane) =>
             lane.Kind == ChartInstrumentKind.SixFret ? noteLane % 3 : Math.Min(noteLane, lane.LaneCount - 1);
+
+        private static bool IsBlackFret(HighwayLane lane, ChartNote note) => lane.Kind == ChartInstrumentKind.SixFret && note.Lane >= 3;
 
         private static Color TargetColor(HighwayLane lane, int column) => lane.Kind switch
         {

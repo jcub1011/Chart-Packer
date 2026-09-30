@@ -450,6 +450,11 @@
         <Style Selector="ctl|WaveformView.track.unheard">
             <Setter Property="Opacity" Value="0.35" />
         </Style>
+        <!-- While the highway's options are open, its notes are drawn as outlines, so the waveform behind them shows
+             and a note can be lined up with its sound as offsets are set. -->
+        <Style Selector="ctl|NoteHighwayView.tuning">
+            <Setter Property="AreNotesOutlined" Value="True" />
+        </Style>
         <Style Selector="ToggleButton.trackSwitch">
             <Setter Property="MinWidth" Value="24" />
             <Setter Property="Height" Value="20" />
@@ -657,7 +662,9 @@
                                                  offsets are set; short of room it shrinks and scrolls instead. -->
                                             <Flyout Placement="BottomEdgeAlignedRight"
                                                     PlacementConstraintAdjustment="SlideX, FlipX, ResizeY"
-                                                    FlyoutPresenterClasses="highwayFlyout">
+                                                    FlyoutPresenterClasses="highwayFlyout"
+                                                    Opened="OnHighwayOptionsOpened"
+                                                    Closed="OnHighwayOptionsClosed">
                                                 <!-- Focusable, so a click on its empty space or a label (or Enter in an offset box) can take
                                                      focus from the offset box without closing the flyout. -->
                                                 <StackPanel Classes="highwayOptions"
@@ -790,7 +797,8 @@
                                                         Clock="{Binding Background.Clock}"
                                                         IsVisible="{Binding Background.HasVideo}" />
                                     <!-- The chart's notes over whatever the background is, as a game draws them. -->
-                                    <ctl:NoteHighwayView Scene="{Binding Highway.Scene}"
+                                    <ctl:NoteHighwayView x:Name="HighwayView"
+                                                         Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
                                                          Waveforms="{Binding Highway.LaneWaveforms}"

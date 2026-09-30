@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -60,6 +61,11 @@ namespace ChartPacker.Views
             if (sender is StackPanel panel && e.Source is Visual source && source.FindAncestorOfType<TextBox>(includeSelf: true) is null)
                 panel.Focus(NavigationMethod.Pointer);
         }
+
+        /// <summary>While the highway options are open, the notes are drawn as outlines so the waveform behind them shows as offsets are set.</summary>
+        private void OnHighwayOptionsOpened(object? sender, EventArgs e) => HighwayView.Classes.Set("tuning", true);
+
+        private void OnHighwayOptionsClosed(object? sender, EventArgs e) => HighwayView.Classes.Set("tuning", false);
 
         /// <summary>
         /// Choosing a difficulty in an instrument's flyout closes it. The flyout is a popup of its own,
