@@ -42,7 +42,7 @@ public static class AudioLength
             try
             {
                 using var stream = new FileStream(Path.Combine(folder, file.RelativePath), FileMode.Open, FileAccess.Read, FileShare.Read);
-                longest = Max(longest, Measure(stream, file.RelativePath));
+                longest = Max(longest, MeasureMs(stream, file.RelativePath));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -72,7 +72,7 @@ public static class AudioLength
             try
             {
                 using var stream = new SngEntryStream(sng, file, header.Mask.Span);
-                longest = Max(longest, Measure(stream, file.Name));
+                longest = Max(longest, MeasureMs(stream, file.Name));
             }
             catch (Exception ex) when (ex is IOException or ArgumentOutOfRangeException)
             {
@@ -84,7 +84,7 @@ public static class AudioLength
     }
 
     /// <summary>The stream's duration in whole milliseconds, or <see langword="null"/> when it isn't known.</summary>
-    private static long? Measure(Stream stream, string name)
+    internal static long? MeasureMs(Stream stream, string name)
     {
         double ms;
         try

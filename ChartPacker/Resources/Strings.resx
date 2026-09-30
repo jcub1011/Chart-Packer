@@ -389,6 +389,15 @@
   <data name="RemoveRowToolTip" xml:space="preserve">
     <value>Remove this row</value>
   </data>
+  <data name="AutoSetLengthToolTip" xml:space="preserve">
+    <value>Set each song's length to its longest part (the chart's last note, the longest audio track or the background video) plus 1 second</value>
+  </data>
+  <data name="AutoSetLengthButton" xml:space="preserve">
+    <value>Auto-set song length</value>
+  </data>
+  <data name="AutoSetLengthFailedFormat" xml:space="preserve">
+    <value>Couldn't work out the length of {0} song(s); they were left as they are.</value>
+  </data>
   <data name="ValueEmpty" xml:space="preserve">
     <value>Enter a value, or remove the row instead.</value>
   </data>

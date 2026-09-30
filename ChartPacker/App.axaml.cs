@@ -47,7 +47,7 @@ namespace ChartPacker
 
                 window.DataContext = new MainWindowViewModel(
                     library,
-                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway),
+                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, new FfmpegVideoDurationProbe()),
                     settings,
                     drafts,
                     confirmation,

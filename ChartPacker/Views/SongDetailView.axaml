@@ -1147,6 +1147,13 @@
                                                 Margin="4,0,0,0"
                                                 IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
                                         <Button Classes="icon"
+                                                Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).AutoSetSongLengthCommand}"
+                                                IsVisible="{Binding IsSongLength}"
+                                                ToolTip.Tip="{x:Static res:Strings.AutoSetLengthToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.AutoSetLengthButton}">
+                                            <PathIcon Width="12" Height="12" Data="{StaticResource AutoLengthIconGeometry}" />
+                                        </Button>
+                                        <Button Classes="icon"
                                                 Command="{Binding RevertCommand}"
                                                 IsVisible="{Binding IsChanged}"
                                                 ToolTip.Tip="{x:Static res:Strings.RevertRowToolTip}"
@@ -1216,16 +1223,33 @@
                         </Grid>
                         <TextBlock Classes="error" Text="{Binding NewRowError}" IsVisible="{Binding HasNewRowError}" />
                     </StackPanel>
-                    <Button Classes="icon"
-                            Margin="10,4,0,0"
-                            Command="{Binding BeginAddCommand}"
-                            IsVisible="{Binding ShowAddRow}"
-                            AutomationProperties.Name="{x:Static res:Strings.AddRowButton}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
-                            <TextBlock Text="{x:Static res:Strings.AddRowButton}" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" Margin="10,4,0,0" Spacing="8">
+                        <Button Classes="icon"
+                                Command="{Binding BeginAddCommand}"
+                                IsVisible="{Binding ShowAddRow}"
+                                AutomationProperties.Name="{x:Static res:Strings.AddRowButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                                <TextBlock Text="{x:Static res:Strings.AddRowButton}" />
+                            </StackPanel>
+                        </Button>
+                        <!-- With no song_length row there's no row button, so Auto Set is offered here; it adds the row. -->
+                        <Button Classes="icon"
+                                Command="{Binding AutoSetSongLengthCommand}"
+                                IsVisible="{Binding ShowAutoSetLengthFallback}"
+                                ToolTip.Tip="{x:Static res:Strings.AutoSetLengthToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.AutoSetLengthButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource AutoLengthIconGeometry}" />
+                                <TextBlock Text="{x:Static res:Strings.AutoSetLengthButton}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Classes="muted"
+                               Margin="14,4,0,0"
+                               TextWrapping="Wrap"
+                               Text="{Binding AutoLengthNote}"
+                               IsVisible="{Binding HasAutoLengthNote}" />
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>

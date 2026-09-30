@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Text;
@@ -28,6 +29,9 @@ namespace ChartPacker.ViewModels
         public string? KeyDescription => KnownKeys.TryGet(Key, out var known) ? known.Description : null;
 
         public bool HasKeyDescription => KeyDescription is not null;
+
+        /// <summary>The row is <c>song_length</c>, which can be worked out from the song's files.</summary>
+        public bool IsSongLength => Key.Equals(SongDetailViewModel.SongLengthKey, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>The value as stored, or <see langword="null"/> when the selected songs don't share one.</summary>
         [ObservableProperty]

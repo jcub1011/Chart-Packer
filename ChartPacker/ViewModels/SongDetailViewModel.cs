@@ -69,6 +69,8 @@ namespace ChartPacker.ViewModels
     {
         private const int BulkLoadParallelism = 4;
 
+        internal const string SongLengthKey = "song_length";
+
         // A square tile at its 512px largest, at 2x scaling.
         private const int ArtDecodeWidth = 1024;
 
@@ -76,6 +78,7 @@ namespace ChartPacker.ViewModels
         private readonly JobViewModel _job;
         private readonly IImagePickerService _imagePicker;
         private readonly IFilePickerService _filePicker;
+        private readonly IVideoDurationProbe _videoProbe;
         private CancellationTokenSource? _loadCts;
 
         // What's shown: the selection, and the songs among it whose metadata could be read.
@@ -100,12 +103,13 @@ namespace ChartPacker.ViewModels
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
 
-        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker, PlayerViewModel player, HighwayViewModel highway)
+        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker, PlayerViewModel player, HighwayViewModel highway, IVideoDurationProbe videoProbe)
         {
             _drafts = drafts;
             _job = job;
             _imagePicker = imagePicker;
             _filePicker = filePicker;
+            _videoProbe = videoProbe;
             Player = player;
             Background = new BackgroundViewModel(() => Player.CurrentPosition);
             Background.PropertyChanged += (_, e) =>
@@ -316,6 +320,21 @@ namespace ChartPacker.ViewModels
 
         public bool ShowAddRow => CanEdit && !IsAdding;
 
+        /// <summary>No selected song has a <c>song_length</c> row, so Auto Set is offered beside Add row instead.</summary>
+        public bool ShowAutoSetLengthFallback => CanEdit && !Metadata.Any(r => r.IsSongLength);
+
+        /// <summary>The songs' lengths are being worked out.</summary>
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AutoSetSongLengthCommand))]
+        public partial bool IsAutoSettingLength { get; set; }
+
+        /// <summary>How many songs Auto Set couldn't find a length for.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasAutoLengthNote))]
+        public partial string? AutoLengthNote { get; set; }
+
+        public bool HasAutoLengthNote => AutoLengthNote is not null;
+
         /// <summary>A selected song has unsaved changes.</summary>
         public bool HasDrafts => _songs.Any(s => !s.Item.Draft.IsEmpty);
 
@@ -378,6 +397,7 @@ namespace ChartPacker.ViewModels
             FilesError = null;
             TracksError = null;
             ChartError = null;
+            AutoLengthNote = null;
             CancelAdd();
             IsLoading = entries.Count > 0;
             RefreshState();
@@ -451,7 +471,7 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Ends editing on every row but <paramref name="row"/>, dropping text that wasn't committed.</summary>
-        internal void CancelOtherEdits(MetadataRowViewModel row)
+        internal void CancelOtherEdits(MetadataRowViewModel? row)
         {
             foreach (var other in Metadata)
             {
@@ -475,6 +495,64 @@ namespace ChartPacker.ViewModels
         internal void RevertKey(string key)
         {
             BulkMetadata.Revert(Items(), key);
+            OnDraftsChanged();
+        }
+
+        private bool CanAutoSetLength() => CanEdit && !IsAutoSettingLength;
+
+        /// <summary>
+        /// Sets each selected song's <c>song_length</c> to its own length: the longest of its chart's
+        /// last note, its audio and its background video, plus a second. Songs whose length can't be
+        /// found are left as they are.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanAutoSetLength))]
+        private async Task AutoSetSongLengthAsync()
+        {
+            CancelOtherEdits(null);
+            CancelAdd();
+            AutoLengthNote = null;
+
+            // Drafts live on the UI thread, so each song's inputs are taken here.
+            var songs = _songs;
+            var inputs = songs.Select(s => (s.Entry, s.Item.Draft, Pairs: s.Item.Draft.ApplyTo(s.Item.Original))).ToList();
+            var lengths = new long?[inputs.Count];
+
+            IsAutoSettingLength = true;
+            try
+            {
+                var options = new ParallelOptions { MaxDegreeOfParallelism = BulkLoadParallelism };
+                await Task.Run(() => Parallel.For(0, inputs.Count, options, i =>
+                {
+                    var (entry, draft, pairs) = inputs[i];
+                    try
+                    {
+                        lengths[i] = SongLengthEstimator.Estimate(entry, draft, pairs, _videoProbe).SongLengthMs;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // The song can't be listed: it's counted as not found below.
+                    }
+                }));
+            }
+            finally
+            {
+                IsAutoSettingLength = false;
+            }
+
+            // The selection may have moved on while the files were read.
+            if (!ReferenceEquals(songs, _songs) || !CanEdit)
+                return;
+
+            // Each song gets its own length, unlike an edit typed into the row.
+            for (int i = 0; i < songs.Count; i++)
+            {
+                if (lengths[i] is { } ms)
+                    BulkMetadata.Set([songs[i].Item], SongLengthKey, ms.ToString(CultureInfo.InvariantCulture));
+            }
+
+            int missed = lengths.Count(l => l is null);
+            if (missed > 0)
+                AutoLengthNote = string.Format(CultureInfo.CurrentCulture, Strings.AutoSetLengthFailedFormat, missed);
             OnDraftsChanged();
         }
 
@@ -1172,6 +1250,7 @@ namespace ChartPacker.ViewModels
                 Metadata.RemoveAt(Metadata.Count - 1);
 
             MetadataNote = _loadNote ?? (Metadata.Count == 0 ? Strings.NoMetadata : null);
+            OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
             RefreshAvailableKeys();
             RefreshHeadline();
             RefreshState();
@@ -1668,6 +1747,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(IsEditable));
             OnPropertyChanged(nameof(CanEdit));
             OnPropertyChanged(nameof(ShowAddRow));
+            OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
             OnPropertyChanged(nameof(HasDrafts));
             OnPropertyChanged(nameof(MetadataHeader));
             OnPropertyChanged(nameof(OtherFilesHeader));
@@ -1682,6 +1762,7 @@ namespace ChartPacker.ViewModels
             SaveCommand.NotifyCanExecuteChanged();
             DiscardCommand.NotifyCanExecuteChanged();
             BeginAddCommand.NotifyCanExecuteChanged();
+            AutoSetSongLengthCommand.NotifyCanExecuteChanged();
             ReplaceArtCommand.NotifyCanExecuteChanged();
             RemoveArtCommand.NotifyCanExecuteChanged();
             RevertArtCommand.NotifyCanExecuteChanged();
