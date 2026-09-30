@@ -339,6 +339,29 @@ public sealed class WaveformPeaksTests
     }
 
     [TestMethod]
+    public void ThePeakIsOfWhatHasBeenReadOnly()
+    {
+        var snapshots = new List<StemPeaks>();
+        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n >= 9000 ? 0.75f : -0.25f), snapshots.Add, TimeSpan.Zero);
+        var snapshot = snapshots[0];
+
+        Assert.IsLessThan(snapshot.Count, snapshot.ReadCount);
+        Assert.AreEqual(0.25f, snapshot.Peak);
+        Assert.AreEqual(0.25f, WaveformPeaks.Of(snapshot).Peak);
+        Assert.AreEqual(0.75f, peaks.Peak);
+        Assert.AreEqual(0.75f, WaveformPeaks.Of(peaks).Peak);
+        Assert.AreEqual(0f, Waveform.Empty.Peak);
+    }
+
+    [TestMethod]
+    public void TheMixsPeakIsOfWhatIsHeard()
+    {
+        Assert.AreEqual(0.75f, WaveformPeaks.Mix([Stem(0.25f, muted: false), Stem(0.5f, muted: false)]).Peak, 1e-3f);
+        Assert.AreEqual(0.25f, WaveformPeaks.Mix([Stem(0.25f, muted: false), Stem(0.5f, muted: true)]).Peak, 1e-3f);
+        Assert.AreEqual(0.25f, WaveformPeaks.Mix([Stem(0.5f, muted: false) with { Volume = 0.5f }]).Peak, 1e-3f);
+    }
+
+    [TestMethod]
     public void OfGivesTheStemAloneAsFarAsItWasRead()
     {
         var snapshot = FirstSnapshot();

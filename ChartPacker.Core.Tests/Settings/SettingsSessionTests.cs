@@ -158,6 +158,48 @@ public sealed class SettingsSessionTests
     }
 
     [TestMethod]
+    public void AChainOfRequirementsLocksEverythingAfterTheFirstThatIsOff()
+    {
+        bool a = true, b = true, c = true;
+        var session = new SettingsSession(new SettingsCatalog(
+            [Category],
+            [
+                // Listed before what they require, so the chain is wired in the order most likely to miss a change.
+                new ToggleSetting { Id = "a", Category = Category, Label = "A", RequiresId = "b", DefaultValue = true, Get = () => a, Set = v => a = v },
+                new ToggleSetting { Id = "b", Category = Category, Label = "B", RequiresId = "c", DefaultValue = true, Get = () => b, Set = v => b = v },
+                new ToggleSetting { Id = "c", Category = Category, Label = "C", DefaultValue = true, Get = () => c, Set = v => c = v },
+            ]));
+        var editA = session.Edits.Single(e => e.Definition.Id == "a");
+        var editB = session.Edits.Single(e => e.Definition.Id == "b");
+        var editC = (SettingEdit<bool>)session.Edits.Single(e => e.Definition.Id == "c");
+
+        editC.Value = false;
+
+        Assert.IsFalse(editB.IsEnabled);
+        Assert.IsFalse(editA.IsEnabled);
+
+        editC.Value = true;
+
+        Assert.IsTrue(editB.IsEnabled);
+        Assert.IsTrue(editA.IsEnabled);
+    }
+
+    [TestMethod]
+    public void ARequirementLockedFromTheStartLocksWhatRequiresIt()
+    {
+        bool a = true, b = true, c = false;
+        var session = new SettingsSession(new SettingsCatalog(
+            [Category],
+            [
+                new ToggleSetting { Id = "a", Category = Category, Label = "A", RequiresId = "b", DefaultValue = true, Get = () => a, Set = v => a = v },
+                new ToggleSetting { Id = "b", Category = Category, Label = "B", RequiresId = "c", DefaultValue = true, Get = () => b, Set = v => b = v },
+                new ToggleSetting { Id = "c", Category = Category, Label = "C", DefaultValue = true, Get = () => c, Set = v => c = v },
+            ]));
+
+        Assert.IsFalse(session.Edits.Single(e => e.Definition.Id == "a").IsEnabled);
+    }
+
+    [TestMethod]
     public void ApplyWithNoChangesWritesNothing()
     {
         var session = new SettingsSession(Catalog());

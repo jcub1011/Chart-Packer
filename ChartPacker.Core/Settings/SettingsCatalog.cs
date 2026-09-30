@@ -17,7 +17,7 @@ public sealed class SettingsCatalog
     /// <param name="definitions">Every setting, in display order within its category.</param>
     /// <exception cref="ArgumentException">
     /// An id is used twice, a category or parent isn't listed (or is listed after its children), or a setting
-    /// requires one that isn't a listed toggle, or itself.
+    /// requires one that isn't a listed toggle, or requires itself, directly or through others.
     /// </exception>
     public SettingsCatalog(IEnumerable<SettingCategory> categories, IEnumerable<SettingDefinition> definitions)
     {
@@ -65,6 +65,17 @@ public sealed class SettingsCatalog
             var required = all.FirstOrDefault(d => d.Id == definition.RequiresId);
             if (required is not ToggleSetting || ReferenceEquals(required, definition))
                 throw new ArgumentException($"Setting '{definition.Id}' requires '{definition.RequiresId}', which isn't another listed toggle.", nameof(definitions));
+        }
+
+        // A chain of requirements that comes back round would lock itself for good once any of it is off.
+        foreach (var definition in all.Where(d => d.RequiresId is not null))
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal) { definition.Id };
+            for (var id = definition.RequiresId; id is not null; id = all.First(d => d.Id == id).RequiresId)
+            {
+                if (!seen.Add(id))
+                    throw new ArgumentException($"Setting '{definition.Id}' requires itself through '{definition.RequiresId}'.", nameof(definitions));
+            }
         }
 
         RootCategories = roots;

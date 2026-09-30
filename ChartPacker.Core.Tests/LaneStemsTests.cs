@@ -9,60 +9,75 @@ public sealed class LaneStemsTests
     [TestMethod]
     public void AnInstrumentIsDrawnOverItsOwnStem()
     {
-        Assert.AreEqual("guitar", LaneStems.Pick(LaneStems.For(ChartInstrument.Guitar), ["song", "guitar", "bass"], null));
-        Assert.AreEqual("keys", LaneStems.Pick(LaneStems.For(ChartInstrument.Keys), ["song", "keys"], null));
+        CollectionAssert.AreEqual(new[] { "guitar" }, Pick(ChartInstrument.Guitar, ["song", "guitar", "bass"]));
+        CollectionAssert.AreEqual(new[] { "keys" }, Pick(ChartInstrument.Keys, ["song", "keys"]));
     }
 
     [TestMethod]
     public void WithoutAStemOfItsOwnTheSongIsUsed()
     {
-        Assert.AreEqual("song", LaneStems.Pick(LaneStems.For(ChartInstrument.Keys), ["song", "guitar"], null));
+        CollectionAssert.AreEqual(new[] { "song" }, Pick(ChartInstrument.Keys, ["song", "guitar"]));
     }
 
     [TestMethod]
     public void WithNeitherThereIsNothingToDraw()
     {
-        Assert.IsNull(LaneStems.Pick(LaneStems.For(ChartInstrument.Keys), ["guitar", "drums"], null));
-        Assert.IsNull(LaneStems.Pick(LaneStems.For(ChartInstrument.Guitar), [], null));
+        Assert.AreEqual(0, Pick(ChartInstrument.Keys, ["guitar", "drums"]).Count);
+        Assert.AreEqual(0, Pick(ChartInstrument.Guitar, []).Count);
     }
 
     [TestMethod]
     public void BassFallsBackToRhythmBeforeTheSong()
     {
-        Assert.AreEqual("bass", LaneStems.Pick(LaneStems.For(ChartInstrument.Bass), ["song", "rhythm", "bass"], null));
-        Assert.AreEqual("rhythm", LaneStems.Pick(LaneStems.For(ChartInstrument.Bass), ["song", "rhythm"], null));
+        CollectionAssert.AreEqual(new[] { "bass" }, Pick(ChartInstrument.Bass, ["song", "rhythm", "bass"]));
+        CollectionAssert.AreEqual(new[] { "rhythm" }, Pick(ChartInstrument.Bass, ["song", "rhythm"]));
     }
 
     [TestMethod]
-    public void DrumsFallBackToTheirSplitStems()
+    public void TheWholeDrumStemIsPreferredToTheSplitOnes()
     {
-        Assert.AreEqual("drums", LaneStems.Pick(LaneStems.For(ChartInstrument.Drums), ["song", "drums_1", "drums"], null));
-        Assert.AreEqual("drums_1", LaneStems.Pick(LaneStems.For(ChartInstrument.Drums), ["song", "drums_2", "drums_1"], null));
+        CollectionAssert.AreEqual(new[] { "drums" }, Pick(ChartInstrument.Drums, ["song", "drums_1", "drums"]));
+    }
+
+    [TestMethod]
+    public void SplitDrumStemsAreAllDrawnTogether()
+    {
+        CollectionAssert.AreEqual(new[] { "drums_1", "drums_2", "drums_3", "drums_4" }, Pick(ChartInstrument.Drums, ["song", "drums_4", "drums_2", "drums_1", "drums_3"]));
+        CollectionAssert.AreEqual(new[] { "drums_1", "drums_3" }, Pick(ChartInstrument.Drums, ["drums_3", "drums_1"]));
     }
 
     [TestMethod]
     public void VocalsPreferTheLead()
     {
-        Assert.AreEqual("vocals_1", LaneStems.Pick(LaneStems.Vocals, ["song", "vocals_2", "vocals_1"], null));
-        Assert.AreEqual("vocals", LaneStems.Pick(LaneStems.Vocals, ["vocals_1", "vocals"], null));
+        CollectionAssert.AreEqual(new[] { "vocals_1" }, LaneStems.Pick(LaneStems.Vocals, ["song", "vocals_2", "vocals_1"], null).ToList());
+        CollectionAssert.AreEqual(new[] { "vocals" }, LaneStems.Pick(LaneStems.Vocals, ["vocals_1", "vocals"], null).ToList());
     }
 
     [TestMethod]
     public void AChosenStemIsUsedWhenTheSongHasIt()
     {
-        Assert.AreEqual("drums", LaneStems.Pick(LaneStems.For(ChartInstrument.Guitar), ["song", "guitar", "drums"], "drums"));
+        CollectionAssert.AreEqual(new[] { "drums" }, Pick(ChartInstrument.Guitar, ["song", "guitar", "drums"], "drums"));
+    }
+
+    [TestMethod]
+    public void AChosenSplitStemIsDrawnOnItsOwn()
+    {
+        CollectionAssert.AreEqual(new[] { "drums_2" }, Pick(ChartInstrument.Drums, ["drums_1", "drums_2", "drums_3"], "drums_2"));
     }
 
     [TestMethod]
     public void AChosenStemTheSongNoLongerHasFallsBackToTheLanesOwn()
     {
-        Assert.AreEqual("guitar", LaneStems.Pick(LaneStems.For(ChartInstrument.Guitar), ["song", "guitar"], "drums"));
+        CollectionAssert.AreEqual(new[] { "guitar" }, Pick(ChartInstrument.Guitar, ["song", "guitar"], "drums"));
     }
 
     [TestMethod]
     public void ThePreviewIsNeverPicked()
     {
-        Assert.IsNull(LaneStems.Pick(LaneStems.For(ChartInstrument.Guitar), ["preview"], null));
-        Assert.IsNull(LaneStems.Pick(LaneStems.For(ChartInstrument.Guitar), ["preview"], "preview"));
+        Assert.AreEqual(0, Pick(ChartInstrument.Guitar, ["preview"]).Count);
+        Assert.AreEqual(0, Pick(ChartInstrument.Guitar, ["preview"], "preview").Count);
     }
+
+    private static List<string> Pick(ChartInstrument instrument, string[] available, string? chosen = null) =>
+        [.. LaneStems.Pick(LaneStems.For(instrument), available, chosen)];
 }

@@ -25,6 +25,7 @@ public sealed class StemPeaks
         Min = ReadSoFar.Of(min, readBuckets, count);
         Max = ReadSoFar.Of(max, readBuckets, count);
         Rms = ReadSoFar.Of(rms, readBuckets, count);
+        Peak = PeakOf(min, max, readBuckets);
     }
 
     public string Name { get; }
@@ -49,6 +50,9 @@ public sealed class StemPeaks
     /// </summary>
     public int ReadCount => ReadBuckets;
 
+    /// <summary>How far the loudest sample read so far reaches, from 0 to 1, either side of silence.</summary>
+    public float Peak { get; }
+
     /// <summary>Roughly how much memory the peaks take.</summary>
     public long SizeBytes => ((long)(MinBuckets.Length + MaxBuckets.Length + RmsBuckets.Length) * sizeof(float)) + ((long)Signal.Length * 2);
 
@@ -67,6 +71,15 @@ public sealed class StemPeaks
     internal Half[] Signal { get; }
 
     internal int ReadTicks { get; }
+
+    /// <summary>How far the first <paramref name="read"/> buckets of <paramref name="min"/> and <paramref name="max"/> reach.</summary>
+    internal static float PeakOf(float[] min, float[] max, int read)
+    {
+        float peak = 0;
+        for (int i = 0; i < read; i++)
+            peak = Math.Max(peak, Math.Max(-min[i], max[i]));
+        return peak;
+    }
 
     /// <summary>The first <c>read</c> values of an array being filled, then silence up to <c>count</c>.</summary>
     private sealed class ReadSoFar(float[] values, int read, int count) : IReadOnlyList<float>
@@ -104,14 +117,15 @@ public readonly record struct AudibleStem(StemPeaks Peaks, bool IsMuted, bool Is
 /// <summary>The peaks of everything that is heard, as drawn; see <see cref="WaveformPeaks.Mix"/>.</summary>
 public sealed class Waveform
 {
-    public static readonly Waveform Empty = new([], [], [], 0);
+    public static readonly Waveform Empty = new([], [], [], 0, 0);
 
-    internal Waveform(IReadOnlyList<float> min, IReadOnlyList<float> max, IReadOnlyList<float> rms, int readCount)
+    internal Waveform(IReadOnlyList<float> min, IReadOnlyList<float> max, IReadOnlyList<float> rms, int readCount, float peak)
     {
         Min = min;
         Max = max;
         Rms = rms;
         ReadCount = readCount;
+        Peak = peak;
     }
 
     /// <summary>The lowest level of each bucket, from -1 to 0.</summary>
@@ -130,6 +144,9 @@ public sealed class Waveform
     /// until then no further than the stem read least far. The rest are silent for now.
     /// </summary>
     public int ReadCount { get; }
+
+    /// <summary>How far the loudest of the known buckets reaches, from 0 to 1, either side of silence.</summary>
+    public float Peak { get; }
 
     /// <summary>How much time the buckets cover.</summary>
     public double Seconds => (double)Count / WaveformPeaks.BucketsPerSecond;
@@ -262,7 +279,8 @@ public static class WaveformPeaks
             }
         }
 
-        return new Waveform(min, max, rms, Math.Min(readCount, count));
+        readCount = Math.Min(readCount, count);
+        return new Waveform(min, max, rms, readCount, StemPeaks.PeakOf(min, max, readCount));
     }
 
     /// <summary>
@@ -272,7 +290,7 @@ public static class WaveformPeaks
     public static Waveform Of(StemPeaks peaks)
     {
         ArgumentNullException.ThrowIfNull(peaks);
-        return new Waveform(peaks.Min, peaks.Max, peaks.Rms, peaks.ReadBuckets);
+        return new Waveform(peaks.Min, peaks.Max, peaks.Rms, peaks.ReadBuckets, peaks.Peak);
     }
 
     internal static float RootMeanSquare(double squares, int count) => count <= 0 ? 0f : (float)Math.Sqrt(squares / count);

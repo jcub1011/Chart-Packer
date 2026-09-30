@@ -25,21 +25,24 @@ public abstract class SettingEdit : INotifyPropertyChanged
     /// <summary>The toggle this setting only applies while it's on, if it has one; see <see cref="SettingDefinition.RequiresId"/>.</summary>
     public SettingDefinition? Requirement { get; private set; }
 
-    /// <summary>Whether the setting can be changed: it has no <see cref="Requirement"/>, or that's staged on.</summary>
+    /// <summary>
+    /// Whether the setting can be changed: it has no <see cref="Requirement"/>, or that's staged on and can be
+    /// changed itself, so a chain of requirements locks everything after the first that's off.
+    /// </summary>
     public bool IsEnabled { get; private set; } = true;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    /// <summary>Makes this setting follow <paramref name="requirement"/>'s staged value: enabled only while it's on.</summary>
+    /// <summary>Makes this setting follow <paramref name="requirement"/> as staged: enabled only while it's on and enabled itself.</summary>
     internal void Require(SettingEdit<bool> requirement)
     {
         Requirement = requirement.Definition;
         requirement.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(SettingEdit<bool>.Value))
-                SetEnabled(requirement.Value);
+            if (e.PropertyName is nameof(SettingEdit<bool>.Value) or nameof(IsEnabled))
+                SetEnabled(requirement.Value && requirement.IsEnabled);
         };
-        SetEnabled(requirement.Value);
+        SetEnabled(requirement.Value && requirement.IsEnabled);
     }
 
     private void SetEnabled(bool isEnabled)

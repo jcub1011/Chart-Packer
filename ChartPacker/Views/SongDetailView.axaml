@@ -729,8 +729,8 @@
                                                                     <ComboBox Grid.Column="6"
                                                                               HorizontalAlignment="Stretch"
                                                                               VerticalAlignment="Center"
-                                                                              ItemsSource="{Binding WaveformOptions}"
-                                                                              SelectedIndex="{Binding WaveformIndex}"
+                                                                              ItemsSource="{Binding WaveformPicker.Options}"
+                                                                              SelectedIndex="{Binding WaveformPicker.Index}"
                                                                               IsEnabled="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).Player.AreLaneWaveformsShown, FallbackValue=False}"
                                                                               ToolTip.Tip="{x:Static res:Strings.LaneWaveformPickerToolTip}"
                                                                               AutomationProperties.Name="{x:Static res:Strings.LaneWaveformName}">
@@ -890,8 +890,8 @@
                                             <StackPanel Spacing="6" AutomationProperties.Name="{x:Static res:Strings.LaneWaveformOptionsName}">
                                                 <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.LaneWaveformName}" />
                                                 <ComboBox MinWidth="180"
-                                                          ItemsSource="{Binding Lyrics.WaveformOptions}"
-                                                          SelectedIndex="{Binding Lyrics.WaveformIndex}"
+                                                          ItemsSource="{Binding Lyrics.WaveformPicker.Options}"
+                                                          SelectedIndex="{Binding Lyrics.WaveformPicker.Index}"
                                                           IsEnabled="{Binding Player.AreLaneWaveformsShown}"
                                                           ToolTip.Tip="{x:Static res:Strings.LaneWaveformPickerToolTip}"
                                                           AutomationProperties.Name="{x:Static res:Strings.LaneWaveformName}">

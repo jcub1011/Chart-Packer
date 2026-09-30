@@ -1192,6 +1192,10 @@
     <value>Auto (none)</value>
     <comment>The waveform picker's first option when the song has no track for the lane.</comment>
   </data>
+  <data name="LaneWaveformTrackSeparator" xml:space="preserve">
+    <value> + </value>
+    <comment>Between the names of the tracks drawn together in the waveform picker's first option, e.g. "Auto (drums_1.ogg + drums_2.ogg)".</comment>
+  </data>
   <data name="HighwayFootnote" xml:space="preserve">
     <value>Offsets are rounded to the nearest chart tick and written to the chart when you save.</value>
   </data>

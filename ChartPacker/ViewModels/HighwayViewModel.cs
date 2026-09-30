@@ -83,27 +83,37 @@ namespace ChartPacker.ViewModels
         // The instrument of each of the scene's highways, in order.
         private List<ChartInstrument> _laneInstruments = [];
 
+        // The stems each of the scene's highways draws the waveform of, in order; empty while none are drawn.
+        private List<IReadOnlyList<string>> _laneStems = [];
+
+        // Plays the song, has read its tracks' waveforms, and says whether they're drawn.
+        private readonly PlayerViewModel _player;
+
         /// <param name="player">Plays the song, and has read its tracks' waveforms.</param>
         public HighwayViewModel(SettingsService settings, PlayerViewModel player)
         {
             _settings = settings;
-            Player = player;
+            _player = player;
             Clock = () => player.CurrentPosition;
             IsEnabled = settings.Settings.ShowNoteHighway;
             NoteSpeed = settings.Settings.HighwayNoteSpeed;
-            player.TrackWaveformsChanged += (_, _) => RefreshWaveforms();
+            player.TrackWaveformsChanged += (_, e) =>
+            {
+                // More read of a track only changes what's drawn, and only for the highways drawing it.
+                if (e.Stems is null)
+                    RefreshWaveforms();
+                else if (e.Touches(_laneStems.SelectMany(s => s)))
+                    RefreshLaneWaveforms();
+            };
             player.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(PlayerViewModel.AreLaneWaveformsShown))
-                    RefreshWaveforms();
+                    RefreshLaneWaveforms();
             };
         }
 
         /// <summary>Raised when an offset is set in the draft of the song shown.</summary>
         public event EventHandler? OffsetsChanged;
-
-        /// <summary>The player whose tracks' waveforms are drawn, and which says whether they are.</summary>
-        public PlayerViewModel Player { get; }
 
         /// <summary>Where the audio is.</summary>
         public Func<TimeSpan> Clock { get; }
@@ -257,6 +267,7 @@ namespace ChartPacker.ViewModels
             Rows.Clear();
             Scene = null;
             _laneInstruments = [];
+            _laneStems = [];
             LaneWaveforms = null;
             Problem = null;
             Note = note;
@@ -478,21 +489,27 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void RefreshWaveforms()
         {
-            // The player is given the song's tracks after the highway is given the song; until then they're another song's.
-            bool hasTracks = _song is { } song && song.Entry == Player.LoadedEntry;
-            var chosen = _song is { } shown ? _waveformStems.GetValueOrDefault(shown.Entry.FullPath) : null;
-            var tracks = hasTracks ? Player.Tracks.Select(t => t.Track).ToList() : [];
-
-            bool wasSyncing = _isSyncing;
-            _isSyncing = true;
+            // The song's stems once for every row: only which is each row's own differs.
+            var stems = LaneWaveformChoice.StemsOf(LaneWaveformChoice.TracksOf(_player, _song?.Entry));
+            var chosen = ChosenStems();
             foreach (var row in Rows)
-                row.SyncWaveforms(LaneWaveformChoice.OptionsFor(tracks, LaneStems.For(row.Instrument)), chosen?.GetValueOrDefault(row.Instrument));
-            _isSyncing = wasSyncing;
+                row.WaveformPicker.Sync(LaneWaveformChoice.OptionsFor(stems, LaneStems.For(row.Instrument)), chosen?.GetValueOrDefault(row.Instrument));
 
-            LaneWaveforms = hasTracks && Player.AreLaneWaveformsShown && Scene is not null
-                ? [.. _laneInstruments.Select(i => LaneWaveformChoice.Resolve(Player, LaneStems.For(i), chosen?.GetValueOrDefault(i)))]
-                : null;
+            RefreshLaneWaveforms();
         }
+
+        /// <summary>Picks the waveform drawn behind each highway, as the pickers stand: none unless lane waveforms are shown and the player has this song's tracks.</summary>
+        private void RefreshLaneWaveforms()
+        {
+            var chosen = ChosenStems();
+            bool isShown = LaneWaveformChoice.HasTracksOf(_player, _song?.Entry) && _player.AreLaneWaveformsShown && Scene is not null;
+            _laneStems = isShown ? [.. _laneInstruments.Select(i => LaneWaveformChoice.StemsFor(_player, LaneStems.For(i), chosen?.GetValueOrDefault(i)))] : [];
+            LaneWaveforms = isShown ? [.. _laneStems.Select(stems => LaneWaveformChoice.Resolve(_player, stems))] : null;
+        }
+
+        /// <summary>The tracks picked in place of the instruments' own for the song shown, if any were.</summary>
+        private Dictionary<ChartInstrument, string>? ChosenStems() =>
+            _song is { } song ? _waveformStems.GetValueOrDefault(song.Entry.FullPath) : null;
 
         internal void OnRowWaveformChanged(HighwayRowViewModel row)
         {
@@ -501,11 +518,11 @@ namespace ChartPacker.ViewModels
 
             if (!_waveformStems.TryGetValue(song.Entry.FullPath, out var chosen))
                 _waveformStems[song.Entry.FullPath] = chosen = [];
-            if (row.WaveformStem is { } stem)
+            if (row.WaveformPicker.Stem is { } stem)
                 chosen[row.Instrument] = stem;
             else
                 chosen.Remove(row.Instrument);
-            RefreshWaveforms();
+            RefreshLaneWaveforms();
         }
 
         internal void OnRowChecked(HighwayRowViewModel row)
@@ -579,6 +596,7 @@ namespace ChartPacker.ViewModels
             Difficulties = [.. difficulties.Select(d => new DifficultyOption(d, ChartLabels.DifficultyName(d)))];
             DifficultyIndex = Math.Max(0, IndexOf(difficulty));
             IsChecked = isChecked;
+            WaveformPicker = new LaneWaveformPickerViewModel(() => owner.OnRowWaveformChanged(this));
         }
 
         public ChartInstrument Instrument { get; }
@@ -610,15 +628,8 @@ namespace ChartPacker.ViewModels
 
         public ChartTrackKey Key => new(Instrument, Difficulty);
 
-        /// <summary>The tracks the highway's waveform can be drawn from, the instrument's own first.</summary>
-        [ObservableProperty]
-        public partial IReadOnlyList<WaveformOption> WaveformOptions { get; set; } = [];
-
-        [ObservableProperty]
-        public partial int WaveformIndex { get; set; }
-
-        /// <summary>The stem picked for the waveform, or <see langword="null"/> for the instrument's own.</summary>
-        public string? WaveformStem => WaveformIndex >= 0 && WaveformIndex < WaveformOptions.Count ? WaveformOptions[WaveformIndex].Stem : null;
+        /// <summary>Which track the highway's waveform is drawn from: the instrument's own, or another picked for this song.</summary>
+        public LaneWaveformPickerViewModel WaveformPicker { get; }
 
         /// <summary>Adds the milliseconds <paramref name="amount"/> gives, e.g. <c>-10</c>, to the offset.</summary>
         [RelayCommand(CanExecute = nameof(CanEdit))]
@@ -659,14 +670,6 @@ namespace ChartPacker.ViewModels
             Offset = offsets.GetValueOrDefault(Key);
         }
 
-        /// <summary>Shows <paramref name="options"/> in the waveform picker, with <paramref name="chosen"/> picked, or the instrument's own when the song hasn't that track.</summary>
-        internal void SyncWaveforms(IReadOnlyList<WaveformOption> options, string? chosen)
-        {
-            if (!options.SequenceEqual(WaveformOptions))
-                WaveformOptions = options;
-            WaveformIndex = LaneWaveformChoice.IndexOf(options, chosen);
-        }
-
         private int IndexOf(ChartDifficulty difficulty)
         {
             for (int i = 0; i < _difficulties.Count; i++)
@@ -684,13 +687,6 @@ namespace ChartPacker.ViewModels
         {
             if (value >= 0)
                 _owner.OnRowDifficultyChanged(this);
-        }
-
-        partial void OnWaveformIndexChanged(int value)
-        {
-            // A new list of options clears the picker's selection first.
-            if (value >= 0)
-                _owner.OnRowWaveformChanged(this);
         }
 
         // No limit of its own, as a chart can be off by any amount; only what the offset, in whole milliseconds, can hold.

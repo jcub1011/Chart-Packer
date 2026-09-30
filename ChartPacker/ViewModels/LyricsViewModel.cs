@@ -63,24 +63,35 @@ namespace ChartPacker.ViewModels
         // The track picked for the lane's waveform in place of the vocals, for each song, by its path. Never saved.
         private readonly Dictionary<string, string> _waveformStems = new(StringComparer.Ordinal);
 
+        // The stems the lane draws the waveform of; empty while it draws none.
+        private IReadOnlyList<string> _laneStems = [];
+
+        // Plays the song, has read its tracks' waveforms, and says whether they're drawn.
+        private readonly PlayerViewModel _player;
+
         /// <param name="player">Plays the song, and has read its tracks' waveforms.</param>
         public LyricsViewModel(PlayerViewModel player)
         {
-            Player = player;
+            _player = player;
             Clock = () => player.CurrentPosition;
-            player.TrackWaveformsChanged += (_, _) => RefreshWaveform();
+            WaveformPicker = new LaneWaveformPickerViewModel(OnWaveformPicked);
+            player.TrackWaveformsChanged += (_, e) =>
+            {
+                // More read of a track only changes what's drawn, and only when the lane draws it.
+                if (e.Stems is null)
+                    RefreshWaveform();
+                else if (e.Touches(_laneStems))
+                    RefreshLaneWaveform();
+            };
             player.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(PlayerViewModel.AreLaneWaveformsShown))
-                    RefreshWaveform();
+                    RefreshLaneWaveform();
             };
         }
 
         /// <summary>Raised when the offset is set in the draft of the song shown.</summary>
         public event EventHandler? OffsetChanged;
-
-        /// <summary>The player whose tracks' waveforms are drawn, and which says whether they are.</summary>
-        public PlayerViewModel Player { get; }
 
         /// <summary>Where the audio is.</summary>
         public Func<TimeSpan> Clock { get; }
@@ -89,12 +100,8 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial Waveform? Waveform { get; private set; }
 
-        /// <summary>The tracks the lane's waveform can be drawn from, the vocals' own first.</summary>
-        [ObservableProperty]
-        public partial IReadOnlyList<WaveformOption> WaveformOptions { get; private set; } = [];
-
-        [ObservableProperty]
-        public partial int WaveformIndex { get; set; }
+        /// <summary>Which track the lane's waveform is drawn from: the vocals' own, or another picked for this song.</summary>
+        public LaneWaveformPickerViewModel WaveformPicker { get; }
 
         /// <summary>What's drawn, or <see langword="null"/> when there are no vocals to show.</summary>
         [ObservableProperty]
@@ -245,44 +252,36 @@ namespace ChartPacker.ViewModels
             OffsetChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        partial void OnWaveformIndexChanged(int value)
+        private void OnWaveformPicked()
         {
-            // A new list of options clears the picker's selection first.
-            if (_isSyncing || value < 0 || _song is not { } song)
+            if (_song is not { } song)
                 return;
 
-            if (value < WaveformOptions.Count && WaveformOptions[value].Stem is { } stem)
+            if (WaveformPicker.Stem is { } stem)
                 _waveformStems[song.Entry.FullPath] = stem;
             else
                 _waveformStems.Remove(song.Entry.FullPath);
-            RefreshWaveform();
+            RefreshLaneWaveform();
         }
 
-        /// <summary>
-        /// Brings the waveform picker up to date with the song's tracks, and picks the waveform drawn behind the vocals:
-        /// none unless lane waveforms are shown and the player has this song's tracks.
-        /// </summary>
+        /// <summary>Brings the waveform picker up to date with the song's tracks, and picks the waveform drawn behind the vocals.</summary>
         private void RefreshWaveform()
         {
-            // The player is given the song's tracks after the lane is given the song; until then they're another song's.
-            bool hasTracks = _song is { } song && song.Entry == Player.LoadedEntry;
-            string? chosen = _song is { } shown ? _waveformStems.GetValueOrDefault(shown.Entry.FullPath) : null;
-            var options = LaneWaveformChoice.OptionsFor(hasTracks ? [.. Player.Tracks.Select(t => t.Track)] : [], LaneStems.Vocals);
-
-            _isSyncing = true;
-            try
-            {
-                if (!options.SequenceEqual(WaveformOptions))
-                    WaveformOptions = options;
-                WaveformIndex = LaneWaveformChoice.IndexOf(options, chosen);
-            }
-            finally
-            {
-                _isSyncing = false;
-            }
-
-            Waveform = hasTracks && Player.AreLaneWaveformsShown ? LaneWaveformChoice.Resolve(Player, LaneStems.Vocals, chosen) : null;
+            var stems = LaneWaveformChoice.StemsOf(LaneWaveformChoice.TracksOf(_player, _song?.Entry));
+            WaveformPicker.Sync(LaneWaveformChoice.OptionsFor(stems, LaneStems.Vocals), ChosenStem());
+            RefreshLaneWaveform();
         }
+
+        /// <summary>Picks the waveform drawn behind the vocals, as the picker stands: none unless lane waveforms are shown and the player has this song's tracks.</summary>
+        private void RefreshLaneWaveform()
+        {
+            bool isShown = LaneWaveformChoice.HasTracksOf(_player, _song?.Entry) && _player.AreLaneWaveformsShown;
+            _laneStems = isShown ? LaneWaveformChoice.StemsFor(_player, LaneStems.Vocals, ChosenStem()) : [];
+            Waveform = isShown ? LaneWaveformChoice.Resolve(_player, _laneStems) : null;
+        }
+
+        /// <summary>The track picked in place of the vocals for the song shown, if one was.</summary>
+        private string? ChosenStem() => _song is { } song ? _waveformStems.GetValueOrDefault(song.Entry.FullPath) : null;
 
         /// <summary>Shows the draft's offset in the box, without that counting as the user setting it.</summary>
         private void SyncOffset()

@@ -197,8 +197,7 @@ namespace ChartPacker.Controls
                 double grown = Grown(column, columns, duration, edge);
                 var (low, high, rms) = levels[column];
 
-                // Never past the peaks: a square wave is as loud as its peaks, and no louder.
-                double loud = Math.Min(rms * LaneWaveformPainter.RmsGain, Math.Max(-low, high)) * grown;
+                double loud = WaveformLevels.Loudness(low, high, rms) * grown;
                 DrawBar(context, column, columns, played, middle, loud, loud);
             }
         }
@@ -304,7 +303,7 @@ namespace ChartPacker.Controls
             {
                 for (int column = 0; column < columns; column++)
                 {
-                    var (low, high, rms) = LaneWaveformPainter.Levels(waveform, (double)column / columns * duration, (double)(column + 1) / columns * duration);
+                    var (low, high, rms) = WaveformLevels.Of(waveform, (double)column / columns * duration, (double)(column + 1) / columns * duration);
                     levels[column] = new Column(low, high, rms);
                 }
             }

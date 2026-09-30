@@ -96,6 +96,24 @@ namespace ChartPacker.ViewModels
         }
     }
 
+    /// <summary>What <see cref="PlayerViewModel.TrackWaveformsChanged"/> is about.</summary>
+    public sealed class TrackWaveformsChangedEventArgs : EventArgs
+    {
+        /// <summary>The tracks shown changed, so every waveform may have.</summary>
+        public static readonly TrackWaveformsChangedEventArgs Tracks = new(null);
+
+        public TrackWaveformsChangedEventArgs(IReadOnlySet<string>? stems) => Stems = stems;
+
+        /// <summary>
+        /// The stems whose waveforms more has been read of, or which were dropped, with the tracks as they were;
+        /// <see langword="null"/> when the tracks shown changed.
+        /// </summary>
+        public IReadOnlySet<string>? Stems { get; }
+
+        /// <summary>Whether any of <paramref name="stems"/> may have a different waveform now.</summary>
+        public bool Touches(IEnumerable<string> stems) => Stems is not { } changed || stems.Any(changed.Contains);
+    }
+
     /// <summary>
     /// Plays the selected song's audio tracks together, in step, with each track muted or soloed
     /// as asked. Nothing is opened until the first play; <see cref="Unload"/> closes every file.
@@ -144,6 +162,13 @@ namespace ChartPacker.ViewModels
 
         // Moved on whenever the waveform is cleared, so that a mix begun before then is dropped rather than shown.
         private int _waveformGeneration;
+
+        // The stems whose waveforms have changed since TrackWaveformsChanged was last raised, and the timer that raises it for them.
+        private readonly HashSet<string> _changedWaveformStems = new(StringComparer.OrdinalIgnoreCase);
+        private IDisposable? _waveformsChangedTimer;
+
+        // The waveforms of several stems drawn together behind one lane, by the stems, with the peaks each was mixed from.
+        private readonly Dictionary<string, (StemPeaks[] From, Waveform Mix)> _laneMixes = new(StringComparer.OrdinalIgnoreCase);
 
         // A song the library asked to play, to be started when the detail view gives it its tracks.
         private SongEntry? _previewRequest;
@@ -248,15 +273,60 @@ namespace ChartPacker.ViewModels
         /// <summary>The song whose tracks are shown, playing or not.</summary>
         public SongEntry? LoadedEntry => _entry;
 
-        /// <summary>Raised when the tracks shown change, or what's been read of one of their waveforms does.</summary>
-        public event EventHandler? TrackWaveformsChanged;
+        /// <summary>
+        /// Raised at once when the tracks shown change, and while their waveforms are read, at most every
+        /// <see cref="PeaksProgressInterval"/> for the stems read further since; see <see cref="TrackWaveformsChangedEventArgs"/>.
+        /// </summary>
+        public event EventHandler<TrackWaveformsChangedEventArgs>? TrackWaveformsChanged;
 
         /// <summary>The waveform of the first track shown of <paramref name="stem"/>, or <see langword="null"/> when there's no such track.</summary>
         public Waveform? WaveformOfStem(string stem) =>
-            Tracks.FirstOrDefault(t => t.Track.Stem.Equals(stem, StringComparison.OrdinalIgnoreCase))?.Waveform;
+            RowOfStem(stem)?.Waveform;
 
-        /// <summary>Takes up the settings again, as after another player sharing them changed them.</summary>
-        public void ReloadSettings() => ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
+        /// <summary>
+        /// The waveform of <paramref name="stems"/> heard together at full level, as far as they've been read: one's own,
+        /// or the mix of several, as of a split drum kit. <see langword="null"/> when none of them is shown.
+        /// </summary>
+        public Waveform? LaneWaveformOf(IReadOnlyList<string> stems)
+        {
+            ArgumentNullException.ThrowIfNull(stems);
+            if (stems.Count <= 1)
+                return stems.Count == 0 ? null : WaveformOfStem(stems[0]);
+
+            var peaks = new List<StemPeaks>(stems.Count);
+            foreach (var stem in stems)
+            {
+                if (RowOfStem(stem) is { } row && _peaks.TryGetValue(row.Track, out var read))
+                    peaks.Add(read);
+            }
+
+            if (peaks.Count == 0)
+                return RowOfStem(stems[0])?.Waveform;
+
+            // Mixed again only once one of them has been read further, as a mix of several long stems takes a while.
+            string key = string.Join('|', stems);
+            if (_laneMixes.TryGetValue(key, out var known) && known.From.SequenceEqual(peaks))
+                return known.Mix;
+
+            var mix = WaveformPeaks.Mix([.. peaks.Select(p => new AudibleStem(p, IsMuted: false, IsSolo: false))]);
+            _laneMixes[key] = ([.. peaks], mix);
+            return mix;
+        }
+
+        private TrackRowViewModel? RowOfStem(string stem) =>
+            Tracks.FirstOrDefault(t => t.Track.Stem.Equals(stem, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// Takes up the settings again, as after another player sharing them changed them: the master volume, and
+        /// which visualisers are shown.
+        /// </summary>
+        public void ReloadSettings()
+        {
+            Volume = _settings.Settings.MasterVolume;
+            ShowWaveforms = _settings.Settings.ShowWaveforms;
+            ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
+            ShowSpectrum = _settings.Settings.ShowSpectrum;
+        }
 
         /// <summary>The song that is playing, or <see langword="null"/> when nothing is.</summary>
         public SongEntry? ActiveEntry => IsPlaying ? _entry : null;
@@ -360,7 +430,7 @@ namespace ChartPacker.ViewModels
             }
 
             RebuildWaveform();
-            TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
+            RaiseTracksChanged();
             if (ShowWaveforms)
                 StartPeaks(entry, [.. tracks.Where(t => !_peaks.ContainsKey(t) || _partialPeaks.Contains(t))]);
             StartRequestedPreview(entry);
@@ -408,7 +478,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasTracks));
             OnPropertyChanged(nameof(TracksHeader));
             RefreshCommands();
-            TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
+            RaiseTracksChanged();
         }
 
         /// <summary>The seek slider is held: the position stops following playback until <see cref="EndScrub"/>.</summary>
@@ -435,6 +505,8 @@ namespace ChartPacker.ViewModels
         public void Dispose()
         {
             _timer.Stop();
+            _waveformsChangedTimer?.Dispose();
+            _waveformsChangedTimer = null;
             CancelPeaks();
             Close();
             _waveformGeneration++;
@@ -647,7 +719,7 @@ namespace ChartPacker.ViewModels
                 foreach (var row in Tracks.Where(r => Equals(r.Track, track)))
                     row.Waveform = WaveformPeaks.Of(peaks);
                 ScheduleWaveformRebuild();
-                TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
+                ScheduleWaveformChanged(track.Stem);
             });
 
         /// <summary>Drops what was read of <paramref name="track"/>, whose read failed, unless the read has been stopped; from any thread.</summary>
@@ -661,8 +733,34 @@ namespace ChartPacker.ViewModels
                 foreach (var row in Tracks.Where(r => Equals(r.Track, track)))
                     row.Waveform = Waveform.Empty;
                 ScheduleWaveformRebuild();
-                TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
+                ScheduleWaveformChanged(track.Stem);
             });
+
+        /// <summary>Tells the lanes the tracks shown changed, now; any waveform changes pending are part of that.</summary>
+        private void RaiseTracksChanged()
+        {
+            _waveformsChangedTimer?.Dispose();
+            _waveformsChangedTimer = null;
+            _changedWaveformStems.Clear();
+            _laneMixes.Clear();
+            TrackWaveformsChanged?.Invoke(this, TrackWaveformsChangedEventArgs.Tracks);
+        }
+
+        /// <summary>
+        /// Tells the lanes <paramref name="stem"/>'s waveform changed, along with any others that do meanwhile, a moment
+        /// from now: with several tracks being read, their snapshots would otherwise redraw the lanes many times a second.
+        /// </summary>
+        private void ScheduleWaveformChanged(string stem)
+        {
+            _changedWaveformStems.Add(stem);
+            _waveformsChangedTimer ??= DispatcherTimer.RunOnce(() =>
+            {
+                _waveformsChangedTimer = null;
+                var stems = new HashSet<string>(_changedWaveformStems, StringComparer.OrdinalIgnoreCase);
+                _changedWaveformStems.Clear();
+                TrackWaveformsChanged?.Invoke(this, new TrackWaveformsChangedEventArgs(stems));
+            }, PeaksProgressInterval, DispatcherPriority.Background);
+        }
 
         /// <summary>
         /// Stops reading the waveform, without waiting: opening a file can't be interrupted, so the read may hold
@@ -695,6 +793,7 @@ namespace ChartPacker.ViewModels
         {
             _peaks.Clear();
             _partialPeaks.Clear();
+            _laneMixes.Clear();
             _waveformGeneration++;
             Waveform = Waveform.Empty;
         }
@@ -794,7 +893,7 @@ namespace ChartPacker.ViewModels
                 ClearPeaks();
                 foreach (var row in Tracks)
                     row.Waveform = Waveform.Empty;
-                TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
+                RaiseTracksChanged();
             }
             else if (_entry is { } entry && HasTracks)
             {

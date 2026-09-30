@@ -97,6 +97,32 @@ public sealed class SettingsCatalogTests
     }
 
     [TestMethod]
+    public void RequiringItselfThroughAnotherThrows()
+    {
+        Assert.ThrowsExactly<ArgumentException>(() => new SettingsCatalog(
+            [Library],
+            [
+                new ToggleSetting { Id = "a", Category = Library, Label = "A", RequiresId = "b", DefaultValue = false, Get = () => false, Set = _ => { } },
+                new ToggleSetting { Id = "b", Category = Library, Label = "B", RequiresId = "c", DefaultValue = false, Get = () => false, Set = _ => { } },
+                new ToggleSetting { Id = "c", Category = Library, Label = "C", RequiresId = "a", DefaultValue = false, Get = () => false, Set = _ => { } },
+            ]));
+    }
+
+    [TestMethod]
+    public void AChainOfRequirementsIsAllowed()
+    {
+        var catalog = new SettingsCatalog(
+            [Library],
+            [
+                new ToggleSetting { Id = "a", Category = Library, Label = "A", RequiresId = "b", DefaultValue = false, Get = () => false, Set = _ => { } },
+                new ToggleSetting { Id = "b", Category = Library, Label = "B", RequiresId = "c", DefaultValue = false, Get = () => false, Set = _ => { } },
+                new ToggleSetting { Id = "c", Category = Library, Label = "C", DefaultValue = false, Get = () => false, Set = _ => { } },
+            ]);
+
+        Assert.HasCount(3, catalog.Definitions);
+    }
+
+    [TestMethod]
     public void DuplicateCategoryIdThrows()
     {
         Assert.ThrowsExactly<ArgumentException>(() => new SettingsCatalog(
