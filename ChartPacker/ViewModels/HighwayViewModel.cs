@@ -26,19 +26,17 @@ namespace ChartPacker.ViewModels
 
     /// <summary>
     /// The note highway drawn over the background tile: the one selected song's chart, as its draft
-    /// would save it, with up to <see cref="MaxLanes"/> instruments chosen, each at its own difficulty.
+    /// would save it, with a highway for each of its instruments, each at its own difficulty.
     /// </summary>
     /// <remarks>
     /// Offsets are edited per instrument difficulty straight into the song's <see cref="MetadataDraft"/>,
     /// and <see cref="OffsetsChanged"/> tells the details panel so. What's drawn is the chart
     /// <see cref="ChartShifter"/> makes from the draft, read back, so it's exactly what saving writes.
-    /// Which instruments and difficulties are shown, and the note speed, are app settings.
+    /// Every instrument is shown until it's unchecked, which lasts for that song until the app closes.
+    /// Which difficulties are shown, and the note speed, are app settings.
     /// </remarks>
     public sealed partial class HighwayViewModel(SettingsService settings, Func<TimeSpan> clock) : ViewModelBase
     {
-        /// <summary>The most highways shown at once.</summary>
-        public const int MaxLanes = 4;
-
         // How far ahead of the strike line the highway shows at the normal note speed, in seconds.
         private const double BaseLookAhead = 1.4;
         private HighwaySong? _song;
@@ -57,8 +55,19 @@ namespace ChartPacker.ViewModels
         // Bumped for each load and rebuild, so only the latest one is applied.
         private int _version;
 
+        // What the latest rebuild was of, so a draft change that touches neither doesn't rebuild.
+        private Dictionary<ChartTrackKey, int>? _builtOffsets;
+        private bool _builtProDrums;
+
+        // One rebuild runs at a time; changes while it runs make one more, of the draft as it is then.
+        private bool _rebuilding;
+        private bool _rebuildPending;
+
         // Set while the rows are changed from here, so that doesn't read as the user changing them.
         private bool _isSyncing;
+
+        // The instruments unchecked for each song, by its path. Never saved.
+        private readonly Dictionary<string, HashSet<ChartInstrument>> _hidden = new(StringComparer.Ordinal);
 
         /// <summary>Raised when an offset is set in the draft of the song shown.</summary>
         public event EventHandler? OffsetsChanged;
@@ -88,6 +97,10 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasNote))]
         public partial string? Note { get; set; }
+
+        /// <summary>Whether the offsets can be changed; not while the song is saved, or when it can't be.</summary>
+        [ObservableProperty]
+        public partial bool CanEditOffsets { get; set; }
 
         /// <summary>A problem with the offsets: they can't be applied, or they change notes' markings.</summary>
         [ObservableProperty]
@@ -133,33 +146,53 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            // The chart a draft adds replaces the stored one; a stored one the draft removes is gone.
-            var added = song.Draft.AddedFiles.Where(f => ChartFiles.IsChartName(f.StoredName)).Cast<AddedFile?>().LastOrDefault();
-            string? name = added?.StoredName ?? ChartReader.Pick(song.StoredFiles.Where(f => !song.Draft.IsFileRemoved(f)));
-            if (name is null)
+            if (DraftChart.Of(song.Draft, song.StoredFiles) is not { } chart)
             {
                 Clear(Strings.HighwayNoChart);
                 return;
             }
 
-            string key = added?.SourcePath ?? $"{song.Entry.FullPath}|{name}";
+            string key = chart.StagedPath ?? $"{song.Entry.FullPath}|{chart.Name}";
             if (key != _sourceKey)
             {
                 Clear(null);
                 _sourceKey = key;
-                _ = LoadAsync(song.Entry, name, added?.SourcePath, key);
+                _ = LoadAsync(song.Entry, chart, key);
             }
             else if (_bytes is not null)
             {
-                _ = RebuildAsync();
+                // Most draft changes are to metadata, of which only the delay changes what's drawn.
+                if (IsBuiltFor(song))
+                    RefreshDelay();
+                else
+                    RequestRebuild();
             }
 
             RefreshState();
         }
 
+        /// <summary>Takes up the settings again, as after another highway sharing them changed them: whether it's shown, the speed and the difficulties.</summary>
+        public void ReloadSettings()
+        {
+            IsEnabled = settings.Settings.ShowNoteHighway;
+            NoteSpeed = settings.Settings.HighwayNoteSpeed;
+            if (_original is { } chart)
+            {
+                BuildRows(chart);
+                SyncRows();
+                BuildScene();
+            }
+        }
+
         partial void OnIsEnabledChanged(bool value) => settings.Settings.ShowNoteHighway = value;
 
         partial void OnNoteSpeedChanged(double value) => settings.Settings.HighwayNoteSpeed = value;
+
+        partial void OnCanEditOffsetsChanged(bool value)
+        {
+            foreach (var row in Rows)
+                row.OnCanEditChanged();
+        }
 
         private void Clear(string? note)
         {
@@ -170,6 +203,7 @@ namespace ChartPacker.ViewModels
             _original = null;
             _originalOf = null;
             _shown = null;
+            _builtOffsets = null;
             Rows.Clear();
             Scene = null;
             Problem = null;
@@ -177,15 +211,13 @@ namespace ChartPacker.ViewModels
             RefreshState();
         }
 
-        private async Task LoadAsync(SongEntry entry, string name, string? sourcePath, string key)
+        private async Task LoadAsync(SongEntry entry, DraftChart chart, string key)
         {
             int version = _version;
             byte[]? bytes;
             try
             {
-                bytes = await Task.Run(async () => sourcePath is not null
-                    ? await File.ReadAllBytesAsync(sourcePath)
-                    : await SongFile.ReadAsync(entry, name, ChartReader.MaxBytes));
+                bytes = await Task.Run(() => chart.ReadAsync(entry));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -203,8 +235,56 @@ namespace ChartPacker.ViewModels
             }
 
             _bytes = bytes;
-            _chartName = name;
-            await RebuildAsync();
+            _chartName = chart.Name;
+            RequestRebuild();
+        }
+
+        /// <summary>Whether what's shown, or the rebuild under way, is of <paramref name="song"/>'s offsets and <c>pro_drums</c>.</summary>
+        private bool IsBuiltFor(HighwaySong song)
+        {
+            var offsets = song.Draft.ChartOffsets;
+            return _builtOffsets is { } built
+                && _builtProDrums == ChartReadOptions.From(song.Metadata).ProDrums
+                && built.Count == offsets.Count
+                && built.All(p => offsets.TryGetValue(p.Key, out int ms) && ms == p.Value);
+        }
+
+        /// <summary>Draws the chart shown against the song's <c>delay</c> as drafted now.</summary>
+        private void RefreshDelay()
+        {
+            if (_song is not { } song || _original is not { } original)
+                return;
+
+            var delay = SongChartSettings.DelayOf(song.Metadata, original);
+            if (delay != _delay)
+            {
+                _delay = delay;
+                BuildScene();
+            }
+        }
+
+        private void RequestRebuild()
+        {
+            _rebuildPending = true;
+            if (!_rebuilding)
+                _ = RebuildWhilePendingAsync();
+        }
+
+        private async Task RebuildWhilePendingAsync()
+        {
+            _rebuilding = true;
+            try
+            {
+                while (_rebuildPending)
+                {
+                    _rebuildPending = false;
+                    await RebuildAsync();
+                }
+            }
+            finally
+            {
+                _rebuilding = false;
+            }
         }
 
         /// <summary>Reads the chart with the draft's offsets applied, off the UI thread, then shows it.</summary>
@@ -216,6 +296,8 @@ namespace ChartPacker.ViewModels
             int version = ++_version;
             var offsets = new Dictionary<ChartTrackKey, int>(song.Draft.ChartOffsets);
             var options = ChartReadOptions.From(song.Metadata);
+            _builtOffsets = offsets;
+            _builtProDrums = options.ProDrums;
             var cached = _originalOf is { } of && ReferenceEquals(of.Bytes, bytes) && of.ProDrums == options.ProDrums ? _original : null;
 
             (ChartDocument Original, ChartDocument Shown, string? Problem) result;
@@ -250,11 +332,12 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            if (version != _version || !ReferenceEquals(song, _song))
+            // A different chart, or none, bumps the version; the song's metadata may have moved on since.
+            if (version != _version || _song is not { } current)
                 return;
 
             _shown = result.Shown;
-            _delay = SongChartSettings.DelayOf(song.Metadata, result.Original);
+            _delay = SongChartSettings.DelayOf(current.Metadata, result.Original);
             Problem = result.Problem;
             Note = null;
             if (!ReferenceEquals(result.Original, _original))
@@ -270,33 +353,25 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// A row per instrument: those last chosen checked, or the first four when none of them are
-        /// in this chart; each at the difficulty last chosen for it, or the nearest the chart has.
+        /// A row per instrument, checked unless it was unchecked for this song; each at the difficulty
+        /// last chosen for it, or the nearest the chart has.
         /// </summary>
         private void BuildRows(ChartDocument chart)
         {
-            var available = chart.Instruments;
-            var preferred = (settings.Settings.HighwayInstruments ?? [])
-                .Select(n => Enum.TryParse<ChartInstrument>(n, out var i) ? i : (ChartInstrument?)null)
-                .OfType<ChartInstrument>()
-                .ToHashSet();
-            var chosen = available.Where(preferred.Contains).Take(MaxLanes).ToHashSet();
-            if (chosen.Count == 0)
-                chosen = [.. available.Take(MaxLanes)];
+            var hidden = _song is { } song ? _hidden.GetValueOrDefault(song.Entry.FullPath) : null;
 
             _isSyncing = true;
             Rows.Clear();
-            foreach (var instrument in available)
+            foreach (var instrument in chart.Instruments)
             {
                 var difficulties = chart.DifficultiesOf(instrument);
                 var wanted = settings.Settings.HighwayDifficulties?.GetValueOrDefault(instrument.ToString()) is { } saved
                     && Enum.TryParse<ChartDifficulty>(saved, out var d) ? d : ChartDifficulty.Expert;
                 var difficulty = difficulties.Contains(wanted) ? wanted : difficulties.OrderBy(x => Math.Abs((int)x - (int)wanted)).ThenByDescending(x => x).First();
-                Rows.Add(new HighwayRowViewModel(this, instrument, difficulties, difficulty, chosen.Contains(instrument)));
+                Rows.Add(new HighwayRowViewModel(this, instrument, difficulties, difficulty, hidden?.Contains(instrument) != true));
             }
 
             _isSyncing = false;
-            RefreshCanCheck();
         }
 
         /// <summary>Brings each row's offset and difficulty labels up to date with the draft.</summary>
@@ -320,7 +395,7 @@ namespace ChartPacker.ViewModels
             }
 
             var lanes = new List<HighwayLane>();
-            foreach (var row in Rows.Where(r => r.IsChecked).Take(MaxLanes))
+            foreach (var row in Rows.Where(r => r.IsChecked))
             {
                 if (!chart.Tracks.TryGetValue(row.Key, out var track))
                     continue;
@@ -340,17 +415,15 @@ namespace ChartPacker.ViewModels
 
         internal void OnRowChecked(HighwayRowViewModel row)
         {
-            if (_isSyncing)
+            if (_isSyncing || _song is not { } song)
                 return;
 
-            // Instruments this chart doesn't have stay chosen for the songs that do.
-            var available = Rows.Select(r => r.Instrument).ToHashSet();
-            settings.Settings.HighwayInstruments =
-            [
-                .. (settings.Settings.HighwayInstruments ?? []).Where(n => !Enum.TryParse<ChartInstrument>(n, out var i) || !available.Contains(i)),
-                .. Rows.Where(r => r.IsChecked).Select(r => r.Instrument.ToString()),
-            ];
-            RefreshCanCheck();
+            if (!_hidden.TryGetValue(song.Entry.FullPath, out var hidden))
+                _hidden[song.Entry.FullPath] = hidden = [];
+            if (row.IsChecked)
+                hidden.Remove(row.Instrument);
+            else
+                hidden.Add(row.Instrument);
             BuildScene();
         }
 
@@ -370,16 +443,18 @@ namespace ChartPacker.ViewModels
             if (_isSyncing || _song is not { } song)
                 return;
 
+            // The box is disabled then; this puts back a value that got in anyway.
+            if (!CanEditOffsets)
+            {
+                SyncRows();
+                return;
+            }
+
             song.Draft.SetChartOffset(row.Key, milliseconds);
             SyncRows();
+            RequestRebuild();
+            RefreshState();
             OffsetsChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void RefreshCanCheck()
-        {
-            int count = Rows.Count(r => r.IsChecked);
-            foreach (var row in Rows)
-                row.CanCheck = row.IsChecked || count < MaxLanes;
         }
 
         private void RefreshState()
@@ -390,28 +465,8 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ToggleToolTip));
         }
 
-        internal static string InstrumentName(ChartInstrument instrument) => instrument switch
-        {
-            ChartInstrument.Guitar => Strings.InstrumentGuitar,
-            ChartInstrument.Bass => Strings.InstrumentBass,
-            ChartInstrument.Drums => Strings.InstrumentDrums,
-            ChartInstrument.Keys => Strings.InstrumentKeys,
-            ChartInstrument.Rhythm => Strings.InstrumentRhythm,
-            ChartInstrument.GuitarCoop => Strings.InstrumentGuitarCoop,
-            ChartInstrument.GhlGuitar => Strings.InstrumentGhlGuitar,
-            _ => Strings.InstrumentGhlBass,
-        };
-
-        internal static string DifficultyName(ChartDifficulty difficulty) => difficulty switch
-        {
-            ChartDifficulty.Easy => Strings.DifficultyEasy,
-            ChartDifficulty.Medium => Strings.DifficultyMedium,
-            ChartDifficulty.Hard => Strings.DifficultyHard,
-            _ => Strings.DifficultyExpert,
-        };
-
         private static string TrackName(ChartTrackKey key) =>
-            string.Format(CultureInfo.CurrentCulture, Strings.HighwayTrackFormat, DifficultyName(key.Difficulty), InstrumentName(key.Instrument));
+            string.Format(CultureInfo.CurrentCulture, Strings.HighwayTrackFormat, ChartLabels.DifficultyName(key.Difficulty), ChartLabels.InstrumentName(key.Instrument));
     }
 
     /// <summary>An instrument in the highway's options: whether it's shown, at which difficulty, and that difficulty's offset.</summary>
@@ -425,8 +480,8 @@ namespace ChartPacker.ViewModels
             _owner = owner;
             _difficulties = difficulties;
             Instrument = instrument;
-            Name = HighwayViewModel.InstrumentName(instrument);
-            Difficulties = [.. difficulties.Select(d => new DifficultyOption(d, HighwayViewModel.DifficultyName(d)))];
+            Name = ChartLabels.InstrumentName(instrument);
+            Difficulties = [.. difficulties.Select(d => new DifficultyOption(d, ChartLabels.DifficultyName(d)))];
             DifficultyIndex = Math.Max(0, IndexOf(difficulty));
             IsChecked = isChecked;
         }
@@ -445,10 +500,6 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool IsChecked { get; set; }
 
-        /// <summary>False while unchecked with <see cref="HighwayViewModel.MaxLanes"/> others checked.</summary>
-        [ObservableProperty]
-        public partial bool CanCheck { get; set; } = true;
-
         /// <summary>The picked difficulty's offset in milliseconds, later when positive.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasOffset))]
@@ -457,28 +508,40 @@ namespace ChartPacker.ViewModels
 
         public bool HasOffset => Offset is { } offset && offset != 0;
 
+        /// <summary>Whether the offset can be changed; see <see cref="HighwayViewModel.CanEditOffsets"/>.</summary>
+        public bool CanEdit => _owner.CanEditOffsets;
+
         public ChartDifficulty Difficulty => _difficulties[Math.Clamp(DifficultyIndex, 0, _difficulties.Count - 1)];
 
         public ChartTrackKey Key => new(Instrument, Difficulty);
 
         /// <summary>Adds the milliseconds <paramref name="amount"/> gives, e.g. <c>-10</c>, to the offset.</summary>
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         private void Nudge(string? amount)
         {
             if (int.TryParse(amount, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int ms))
                 Offset = (Offset ?? 0) + ms;
         }
 
-        [RelayCommand(CanExecute = nameof(HasOffset))]
+        private bool CanRevertOffset() => HasOffset && CanEdit;
+
+        [RelayCommand(CanExecute = nameof(CanRevertOffset))]
         private void RevertOffset() => Offset = 0;
+
+        internal void OnCanEditChanged()
+        {
+            OnPropertyChanged(nameof(CanEdit));
+            NudgeCommand.NotifyCanExecuteChanged();
+            RevertOffsetCommand.NotifyCanExecuteChanged();
+        }
 
         /// <summary>Shows <paramref name="offsets"/>: the picked difficulty's in the box, and each difficulty's in its label.</summary>
         internal void Sync(IReadOnlyDictionary<ChartTrackKey, int> offsets)
         {
             var options = _difficulties
                 .Select(d => new DifficultyOption(d, offsets.TryGetValue(new ChartTrackKey(Instrument, d), out int ms)
-                    ? string.Format(CultureInfo.CurrentCulture, Strings.HighwayDifficultyOffsetFormat, HighwayViewModel.DifficultyName(d), ms)
-                    : HighwayViewModel.DifficultyName(d)))
+                    ? string.Format(CultureInfo.CurrentCulture, Strings.HighwayDifficultyOffsetFormat, ChartLabels.DifficultyName(d), ms)
+                    : ChartLabels.DifficultyName(d)))
                 .ToList();
             if (!options.SequenceEqual(Difficulties))
             {

@@ -974,7 +974,7 @@
     <value>This song has no chart to show</value>
   </data>
   <data name="HighwayInstrumentsHeader" xml:space="preserve">
-    <value>Instruments, up to 4</value>
+    <value>Instruments</value>
   </data>
   <data name="HighwayOffsetName" xml:space="preserve">
     <value>Offset</value>

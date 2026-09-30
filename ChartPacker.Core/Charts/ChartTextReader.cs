@@ -93,7 +93,7 @@ internal static class ChartTextReader
         var tracks = new Dictionary<ChartTrackKey, NoteTrack>();
         foreach (var (key, events) in trackEvents)
         {
-            var track = BuildTrack(key.Instrument, events, hopoThreshold, fiveLane);
+            var track = BuildTrack(key, events, hopoThreshold, fiveLane);
             if (track.Notes.Count > 0)
                 tracks[key] = track;
         }
@@ -101,7 +101,7 @@ internal static class ChartTextReader
         return new ChartDocument(tempo, tracks, offset, fiveLane);
     }
 
-    private static NoteTrack BuildTrack(ChartInstrument instrument, List<ChartEvent> events, long hopoThreshold, bool fiveLane)
+    private static NoteTrack BuildTrack(ChartTrackKey key, List<ChartEvent> events, long hopoThreshold, bool fiveLane)
     {
         var starPower = events
             .Where(e => e.Type == "S" && e.Args.Length >= 1 && e.Args[0] == 2)
@@ -113,16 +113,18 @@ internal static class ChartTextReader
         var markers = notes.GroupBy(e => e.Tick).ToDictionary(g => g.Key, g => g.Select(e => e.Args[0]).ToHashSet());
         long LengthOf(ChartEvent e) => e.Args.Length >= 2 ? Math.Max(0, e.Args[1]) : 0;
 
-        switch (ChartInstruments.KindOf(instrument))
+        switch (ChartInstruments.KindOf(key.Instrument))
         {
             case ChartInstrumentKind.Drums:
             {
                 var gems = new List<(Gem, NoteFlags)>();
                 foreach (var e in notes)
                 {
+                    // A double kick is an Expert+ note, as in MIDI; on any other difficulty it isn't played.
                     int lane = e.Args[0] switch
                     {
-                        0 or 32 => ChartNote.OpenLane,
+                        0 => ChartNote.OpenLane,
+                        32 when key.Difficulty == ChartDifficulty.Expert => ChartNote.OpenLane,
                         >= 1 and <= 4 => (int)e.Args[0] - 1,
                         5 when fiveLane => 4,
                         _ => int.MinValue,

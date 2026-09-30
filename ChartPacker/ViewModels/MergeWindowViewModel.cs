@@ -175,8 +175,8 @@ namespace ChartPacker.ViewModels
         MetadataDraftStore previewDrafts) : ViewModelBase
     {
 
-        // The source of each part the preview was staged with, so offsets set for one song's part go when another's is chosen.
-        private Dictionary<string, int> _previewedParts = [];
+        // The plan the preview was staged with, which its highway's offsets were set against.
+        private SongMergePlan? _previewed;
         private SongMergeAnalysis? _analysis;
         private CancellationTokenSource? _cts;
 
@@ -406,7 +406,7 @@ namespace ChartPacker.ViewModels
             if (Parts.Any(p => p.NeedsChoice) || !Parts.Any(p => p.Selected?.Source is not null))
                 return null;
 
-            return new SongMergePlan(
+            var plan = new SongMergePlan(
                 analysis,
                 baseSource,
                 Parts.Where(p => p.Selected?.Source is not null).ToDictionary(p => p.Key!, p => p.Selected!.Source!.Value),
@@ -414,8 +414,36 @@ namespace ChartPacker.ViewModels
                 audio,
                 Assets[0].Selected?.Source,
                 Assets[1].Selected?.Source,
-                Assets[2].Selected?.Source,
-                _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? new Dictionary<ChartTrackKey, int>(previewDrafts.Get(folder).ChartOffsets) : null);
+                Assets[2].Selected?.Source);
+
+            // Checked here, not only when the preview is next staged, so a merge straight after a change can't take them.
+            var offsets = PreviewOffsets().Where(p => OffsetApplies(p.Key, plan)).ToDictionary(p => p.Key, p => p.Value);
+            return offsets.Count > 0 ? plan with { ChartOffsets = offsets } : plan;
+        }
+
+        /// <summary>The offsets set on the preview's highway, against <see cref="_previewed"/>.</summary>
+        private IReadOnlyDictionary<ChartTrackKey, int> PreviewOffsets() =>
+            _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? previewDrafts.Get(folder).ChartOffsets : new Dictionary<ChartTrackKey, int>();
+
+        /// <summary>
+        /// Whether an offset set on the preview still lines <paramref name="key"/> up in <paramref name="plan"/>:
+        /// its part comes from the same song as when it was set, against the same audio and the same base
+        /// chart, whose tempo map and <c>delay</c> the notes are placed by.
+        /// </summary>
+        private bool OffsetApplies(ChartTrackKey key, SongMergePlan plan)
+        {
+            if (_previewed is not { } previewed || previewed.BaseSource != plan.BaseSource || previewed.AudioSource != plan.AudioSource)
+                return false;
+
+            foreach (var part in plan.Analysis.Parts.Where(p => MidiPartCatalog.InstrumentsOf(p).Contains(key.Instrument)))
+            {
+                bool was = previewed.Parts.TryGetValue(part.Id, out int before);
+                bool now = plan.Parts.TryGetValue(part.Id, out int after);
+                if (was != now || before != after)
+                    return false;
+            }
+
+            return true;
         }
 
         private void Refresh()
@@ -586,7 +614,7 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            ForgetOffsetsOfChangedParts(plan);
+            ForgetStaleOffsets(plan);
             string signature = Signature(plan);
             if (signature == _previewedPlan && PreviewMessage is null)
                 return;
@@ -609,7 +637,7 @@ namespace ChartPacker.ViewModels
                 PreviewWarnings = [.. warnings.Select(Describe)];
                 PreviewMessage = null;
                 _previewedPlan = signature;
-                _previewedParts = new Dictionary<string, int>(plan.Parts);
+                _previewed = plan;
                 await Preview.ShowAsync([new SongEntry(SongEntryKind.SongFolder, _previewFolder, ".", name)]);
             }
             catch (OperationCanceledException)
@@ -632,25 +660,18 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Drops the highway offsets of every part now taken from another song, or left out: they were
-        /// set to line that song's chart up with the audio, and mean nothing for another's.
+        /// Drops the highway offsets that no longer apply to <paramref name="plan"/>: those of a part now
+        /// taken from another song, or left out, and all of them when the audio or base chart changed.
+        /// They were set to line the chart as it was up with the audio as it was.
         /// </summary>
-        private void ForgetOffsetsOfChangedParts(SongMergePlan plan)
+        private void ForgetStaleOffsets(SongMergePlan plan)
         {
             if (_previewFolder is not { } folder || !previewDrafts.HasDrafts(folder))
                 return;
 
             var draft = previewDrafts.Get(folder);
-            foreach (var part in plan.Analysis.Parts)
-            {
-                bool was = _previewedParts.TryGetValue(part.Id, out int before);
-                bool now = plan.Parts.TryGetValue(part.Id, out int after);
-                if (!was || (now && before == after))
-                    continue;
-
-                foreach (var key in draft.ChartOffsets.Keys.Where(k => MidiPartCatalog.InstrumentsOf(part).Contains(k.Instrument)).ToList())
-                    draft.SetChartOffset(key, 0);
-            }
+            foreach (var key in draft.ChartOffsets.Keys.Where(k => !OffsetApplies(k, plan)).ToList())
+                draft.SetChartOffset(key, 0);
         }
 
         /// <summary>What a plan takes from where, to tell whether the preview already shows it; the offsets aren't part of it, as the preview shows them itself.</summary>
@@ -673,18 +694,10 @@ namespace ChartPacker.ViewModels
                 ChartMergeIssue.NotesChanged => Strings.MergeIssueNotesChangedFormat,
                 _ => Strings.MergeIssueNotesLostFormat,
             };
-            return string.Format(CultureInfo.CurrentCulture, format, TrackName(warning.TrackName), DifficultyName(warning.Difficulty));
+            return string.Format(CultureInfo.CurrentCulture, format, TrackName(warning.TrackName), ChartLabels.DifficultyName(warning.Difficulty));
         }
 
         private static string TrackName(string track) => MidiPartCatalog.PartOf(track) is { IsKnown: true } part ? PartName(part) : track;
-
-        private static string DifficultyName(ChartDifficulty difficulty) => difficulty switch
-        {
-            ChartDifficulty.Easy => Strings.DifficultyEasy,
-            ChartDifficulty.Medium => Strings.DifficultyMedium,
-            ChartDifficulty.Hard => Strings.DifficultyHard,
-            _ => Strings.DifficultyExpert,
-        };
 
         private static string FormatOf(MergeChartFormat format) => format switch
         {

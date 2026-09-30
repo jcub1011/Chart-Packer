@@ -81,6 +81,9 @@ namespace ChartPacker.ViewModels
         private readonly IVideoDurationProbe _videoProbe;
         private CancellationTokenSource? _loadCts;
 
+        // Cancels Auto Set song_length when the selection changes under it.
+        private CancellationTokenSource? _autoLengthCts;
+
         // What's shown: the selection, and the songs among it whose metadata could be read.
         private IReadOnlyList<SongEntry> _entries = [];
         private IReadOnlyList<EditableSong> _songs = [];
@@ -118,7 +121,7 @@ namespace ChartPacker.ViewModels
                     RemoveBackgroundCommand.NotifyCanExecuteChanged();
             };
             Highway = highway;
-            Highway.OffsetsChanged += (_, _) => OnDraftsChanged();
+            Highway.OffsetsChanged += (_, _) => OnOffsetsChanged();
             foreach (string stem in AudioStems.Stems)
                 _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
             _job.PropertyChanged += (_, e) =>
@@ -365,6 +368,7 @@ namespace ChartPacker.ViewModels
         public async Task ShowAsync(IReadOnlyList<SongEntry> entries)
         {
             _loadCts?.Cancel();
+            _autoLengthCts?.Cancel();
             using var cts = new CancellationTokenSource();
             _loadCts = cts;
 
@@ -518,35 +522,46 @@ namespace ChartPacker.ViewModels
             CancelAdd();
             AutoLengthNote = null;
 
-            // Drafts live on the UI thread, so each song's inputs are taken here.
+            // Drafts live on the UI thread and can change while the files are read, so each is copied here.
             var songs = _songs;
-            var inputs = songs.Select(s => (s.Entry, s.Item.Draft, Pairs: s.Item.Draft.ApplyTo(s.Item.Original))).ToList();
+            var inputs = songs.Select(s => (s.Entry, Draft: s.Item.Draft.Clone(), Pairs: s.Item.Draft.ApplyTo(s.Item.Original))).ToList();
             var lengths = new long?[inputs.Count];
 
+            using var cts = new CancellationTokenSource();
+            _autoLengthCts = cts;
             IsAutoSettingLength = true;
             try
             {
-                var options = new ParallelOptions { MaxDegreeOfParallelism = BulkLoadParallelism };
+                var options = new ParallelOptions { MaxDegreeOfParallelism = BulkLoadParallelism, CancellationToken = cts.Token };
                 await Task.Run(() => Parallel.For(0, inputs.Count, options, i =>
                 {
                     var (entry, draft, pairs) = inputs[i];
                     try
                     {
-                        lengths[i] = SongLengthEstimator.Estimate(entry, draft, pairs, _videoProbe).SongLengthMs;
+                        lengths[i] = SongLengthEstimator.Estimate(entry, draft, pairs, _videoProbe, cts.Token).SongLengthMs;
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         // The song can't be listed: it's counted as not found below.
                     }
+                    catch (OperationCanceledException)
+                    {
+                        // Thrown here it would come out wrapped; the token is checked below instead.
+                    }
                 }));
+            }
+            catch (OperationCanceledException)
+            {
             }
             finally
             {
+                if (ReferenceEquals(_autoLengthCts, cts))
+                    _autoLengthCts = null;
                 IsAutoSettingLength = false;
             }
 
             // The selection may have moved on while the files were read.
-            if (!ReferenceEquals(songs, _songs) || !CanEdit)
+            if (cts.IsCancellationRequested || !ReferenceEquals(songs, _songs) || !CanEdit)
                 return;
 
             // Each song gets its own length, unlike an edit typed into the row.
@@ -820,6 +835,9 @@ namespace ChartPacker.ViewModels
                     continue;
                 }
 
+                // Offsets were set against the chart being replaced.
+                if (ChartFiles.IsChartName(name))
+                    song.Item.Draft.ClearChartOffsets();
                 song.Item.Draft.AddFile(new AddedFile(name, path, length));
             }
 
@@ -1184,6 +1202,18 @@ namespace ChartPacker.ViewModels
                 _drafts.NotifyChanged(song.Entry.FullPath);
             RebuildRows();
             RefreshArt();
+        }
+
+        /// <summary>
+        /// The highway set an offset, and redraws itself. Nothing else shown depends on the offsets,
+        /// so this is lighter than <see cref="OnDraftsChanged"/>, as it runs for every step of a drag.
+        /// </summary>
+        private void OnOffsetsChanged()
+        {
+            foreach (var song in _songs)
+                _drafts.NotifyChanged(song.Entry.FullPath);
+            OnPropertyChanged(nameof(IsChartChanged));
+            RefreshState();
         }
 
         private void Apply(LoadedSelection loaded)
@@ -1760,6 +1790,9 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
             OnPropertyChanged(nameof(IsBackgroundChanged));
+
+            // A preview's offsets stay editable, as they're what it's for.
+            Highway.CanEditOffsets = _songs.Count == 1 && !IsBulk && !IsSaving && (ReadOnlyNote is null || ReadOnlyNote == PreviewNote);
             RefreshCommands();
         }
 

@@ -117,6 +117,31 @@ public sealed class ChartReaderTests
     }
 
     [TestMethod]
+    public void ChartDoubleKickIsOnlyAnExpertNote()
+    {
+        byte[] chart = Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [ExpertDrums]
+            {
+              0 = N 32 0
+            }
+            [HardDrums]
+            {
+              0 = N 32 0
+              96 = N 1 0
+            }
+            """);
+
+        var read = ChartReader.Read(chart, "notes.chart");
+
+        CollectionAssert.AreEqual(new[] { new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.DoubleKick) }, Notes(read, ChartInstrument.Drums));
+        CollectionAssert.AreEqual(new[] { new ChartNote(96, 0, 0, NoteFlags.None) }, Notes(read, ChartInstrument.Drums, ChartDifficulty.Hard));
+    }
+
+    [TestMethod]
     public void ChartSixFretHasWhiteBlackAndOpen()
     {
         var notes = Notes(ChartReader.Read(Encoding.UTF8.GetBytes(Chart), "notes.chart"), ChartInstrument.GhlGuitar);

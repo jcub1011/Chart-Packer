@@ -145,27 +145,18 @@ public static class DraftWriter
         if (!draft.HasChartOffsets)
             return (adds, null);
 
-        int added = adds.FindLastIndex(f => ChartFiles.IsChartName(f.StoredName));
-        string name;
-        byte[] bytes;
-        if (added >= 0)
-        {
-            name = adds[added].StoredName;
-            bytes = await File.ReadAllBytesAsync(adds[added].SourcePath, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            name = ChartReader.Pick(stored.Where(n => !draft.IsFileRemoved(n)))
-                ?? throw new ChartFormatException("The song has no chart to move the notes of.");
-            bytes = await SongFile.ReadAsync(entry, name, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false)
-                ?? throw new ChartFormatException($"'{name}' is too large to change.");
-        }
+        var chart = DraftChart.Of(draft, stored)
+            ?? throw new ChartFormatException("The song has no chart to move the notes of.");
+        string name = chart.Name;
+        byte[] bytes = await chart.ReadAsync(entry, cancellationToken).ConfigureAwait(false)
+            ?? throw new ChartFormatException($"'{name}' is too large to change.");
 
         var shifted = ChartShifter.Shift(bytes, name, draft.ChartOffsets, ChartReadOptions.From(pairs));
         string temp = Path.Combine(Path.GetTempPath(), $"chartpacker-{Guid.NewGuid():N}{Path.GetExtension(name)}");
         await File.WriteAllBytesAsync(temp, shifted.Bytes, cancellationToken).ConfigureAwait(false);
 
         var add = new AddedFile(name, temp, shifted.Bytes.Length);
+        int added = chart.StagedPath is null ? -1 : adds.FindLastIndex(f => ChartFiles.IsChartName(f.StoredName));
         if (added >= 0)
             adds[added] = add;
         else

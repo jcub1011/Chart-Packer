@@ -226,6 +226,40 @@ public sealed class MetadataDraftTests
     }
 
     [TestMethod]
+    public void CloneCopiesEveryChangeAndNeitherSeesTheOthersLaterOnes()
+    {
+        var track = new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert);
+        var draft = new MetadataDraft();
+        draft.Set("name", "A");
+        draft.Remove("artist");
+        draft.SetAlbumArt("cover.png");
+        draft.SetBackground(BackgroundKind.Video, "clip.webm");
+        draft.RemoveFile("video.mp4");
+        draft.AddFile(new AddedFile("guitar.opus", "g.opus", 1), ["guitar.ogg"]);
+        draft.SetChartOffset(track, 40);
+
+        var clone = draft.Clone();
+        draft.Set("album", "B");
+        draft.RevertBackground(BackgroundKind.Video);
+        draft.AddFile(new AddedFile("notes.mid", "n.mid", 1));
+        draft.SetChartOffset(track, 0);
+        clone.RevertFile("guitar.opus");
+
+        CollectionAssert.AreEqual(new[] { "name", "artist" }, clone.Keys.ToArray());
+        Assert.AreEqual(new AlbumArtChange("cover.png"), clone.AlbumArt);
+        Assert.AreEqual(new BackgroundChange("clip.webm"), clone.BackgroundVideo);
+        CollectionAssert.AreEqual(new[] { "video.mp4" }, clone.RemovedFiles.ToArray());
+        Assert.IsEmpty(clone.AddedFiles);
+        CollectionAssert.AreEqual(new[] { KeyValuePair.Create(track, 40) }, clone.ChartOffsets.ToArray());
+
+        // Reverting the clone's add brought back only its own copy of the file it replaced.
+        CollectionAssert.AreEquivalent(new[] { "video.mp4", "guitar.ogg" }, draft.RemovedFiles.ToArray());
+        CollectionAssert.AreEqual(new[] { "name", "artist", "album" }, draft.Keys.ToArray());
+        Assert.IsNull(draft.BackgroundVideo);
+        Assert.IsFalse(draft.HasChartOffsets);
+    }
+
+    [TestMethod]
     public void ClearForgetsTheBackgroundChanges()
     {
         var draft = new MetadataDraft();

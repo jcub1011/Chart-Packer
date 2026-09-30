@@ -512,8 +512,7 @@
                                                                 <Grid ColumnDefinitions="110,140,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                                                                     <CheckBox Grid.Column="0"
                                                                               Content="{Binding Name}"
-                                                                              IsChecked="{Binding IsChecked}"
-                                                                              IsEnabled="{Binding CanCheck}" />
+                                                                              IsChecked="{Binding IsChecked}" />
                                                                     <ComboBox Grid.Column="1"
                                                                               HorizontalAlignment="Stretch"
                                                                               VerticalAlignment="Center"
@@ -532,6 +531,7 @@
                                                                                    ShowButtonSpinner="False"
                                                                                    VerticalAlignment="Center"
                                                                                    Value="{Binding Offset}"
+                                                                                   IsEnabled="{Binding CanEdit}"
                                                                                    Increment="1"
                                                                                    Minimum="-2147483648"
                                                                                    Maximum="2147483647"

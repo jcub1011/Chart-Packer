@@ -266,6 +266,28 @@ public sealed class MetadataDraft
         _chartOffsets.Clear();
     }
 
+    /// <summary>A copy of every change, which later changes to either draft don't reach.</summary>
+    /// <remarks>For work off the UI thread, which a draft the user can still change mustn't be read by.</remarks>
+    public MetadataDraft Clone()
+    {
+        var copy = new MetadataDraft
+        {
+            AlbumArt = AlbumArt,
+            BackgroundImage = BackgroundImage,
+            BackgroundVideo = BackgroundVideo,
+        };
+        copy._order.AddRange(_order);
+        foreach (var (key, change) in _changes)
+            copy._changes[key] = change;
+        copy._removedFiles.UnionWith(_removedFiles);
+        copy._addedFiles.AddRange(_addedFiles);
+        foreach (var (name, replaced) in _replacedBy)
+            copy._replacedBy[name] = [.. replaced];
+        foreach (var (track, milliseconds) in _chartOffsets)
+            copy._chartOffsets[track] = milliseconds;
+        return copy;
+    }
+
     /// <summary>Gets the pending change to <paramref name="key"/>, if there is one.</summary>
     public bool TryGetChange(string key, out MetadataChange change)
     {

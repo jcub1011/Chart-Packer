@@ -263,6 +263,22 @@ public sealed class DraftWriterTests
     }
 
     [TestMethod]
+    public async Task FolderChartOffsetsRefuseAnAddedChartOverTheLimit()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string source = Path.Combine(_root.FullName, "huge.mid");
+        using (var stream = File.Create(source))
+            stream.SetLength(ChartReader.MaxBytes + 1);
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("notes.mid", source, ChartReader.MaxBytes + 1));
+        draft.SetChartOffset(ExpertGuitar, 250);
+
+        await Assert.ThrowsExactlyAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft));
+
+        Assert.IsEmpty(Directory.GetFiles(folder));
+    }
+
+    [TestMethod]
     public async Task SngChartOffsetsRewriteTheStoredChart()
     {
         byte[] midi = ChartReaderTests.SampleMidi();

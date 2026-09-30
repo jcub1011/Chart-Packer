@@ -59,12 +59,6 @@ namespace ChartPacker.Services
         /// <summary>How fast the highway's notes fall, as a multiple of the normal speed.</summary>
         public double HighwayNoteSpeed { get; set; } = DefaultHighwayNoteSpeed;
 
-        /// <summary>
-        /// The instruments last chosen for the highway, by <c>ChartInstrument</c> name, including ones
-        /// the song on show didn't have. <see langword="null"/> shows the first four a chart has.
-        /// </summary>
-        public List<string>? HighwayInstruments { get; set; }
-
         /// <summary>The difficulty last chosen for each instrument, by name. An instrument not listed shows Expert.</summary>
         public Dictionary<string, string>? HighwayDifficulties { get; set; }
     }

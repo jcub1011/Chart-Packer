@@ -147,6 +147,34 @@ public sealed class ChartToMidiTests
         CollectionAssert.AreEqual(new long[] { 192, 0 }, notes.Select(n => n.Length).ToArray());
     }
 
+    [TestMethod]
+    public void DoubleKickBelowExpertIsNoNoteEitherSide()
+    {
+        byte[] chart = Chart("""
+            [ExpertDrums]
+            {
+              0 = N 32 0
+              192 = N 1 0
+            }
+            [HardDrums]
+            {
+              0 = N 32 0
+              192 = N 1 0
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart);
+        var midi = ChartReader.Read(conversion.Midi, "notes.mid");
+
+        Assert.IsEmpty(conversion.Warnings);
+        CollectionAssert.AreEqual(
+            new[] { new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.DoubleKick), new ChartNote(192, 0, 0, NoteFlags.None) },
+            ChartReaderTests.Notes(midi, ChartInstrument.Drums));
+        CollectionAssert.AreEqual(
+            new[] { new ChartNote(192, 0, 0, NoteFlags.None) },
+            ChartReaderTests.Notes(midi, ChartInstrument.Drums, ChartDifficulty.Hard));
+    }
+
     private static byte[] Chart(string tracks) => Encoding.UTF8.GetBytes($$"""
         [Song]
         {

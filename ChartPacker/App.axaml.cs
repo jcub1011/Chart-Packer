@@ -41,7 +41,7 @@ namespace ChartPacker
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);
 
                 var videoProbe = new FfmpegVideoDurationProbe();
-                var mergeWindow = new AvaloniaMergeWindowService(() => window, drafts, settings, audio.Open, player, imagePicker, filePicker, videoProbe);
+                var mergeWindow = new AvaloniaMergeWindowService(() => window, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe);
                 var library = new LibraryViewModel(folderPicker, settings, drafts, job, player, mergeWindow);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,

@@ -441,15 +441,21 @@ namespace ChartPacker.Controls
 
         private void DrawLabel(DrawingContext context, string label, Rect bounds, double top)
         {
+            double width = Math.Max(1, bounds.Width - 4);
             if (!_labels.TryGetValue(label, out var text))
             {
                 text = new FormattedText(label, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), 10.5, LabelBrush)
                 {
-                    MaxTextWidth = Math.Max(1, bounds.Width - 4),
+                    MaxTextWidth = width,
                     MaxLineCount = 1,
                     Trimming = TextTrimming.CharacterEllipsis,
                 };
                 _labels[label] = text;
+            }
+            else if (text.MaxTextWidth != width)
+            {
+                // The highway is as wide as the view and the number of lanes allow, which both change.
+                text.MaxTextWidth = width;
             }
 
             // Below the strike bar when there's room, otherwise at the top.

@@ -102,24 +102,19 @@ public static class SongLengthEstimator
 
     private static long? ChartEnd(SongEntry entry, MetadataDraft draft, IReadOnlyList<KeyValuePair<string, string>> pairs, IReadOnlyList<string> stored, CancellationToken cancellationToken)
     {
-        // The chart the song will play: the last one staged, otherwise the one stored (as DraftWriter picks it).
-        var staged = draft.AddedFiles.LastOrDefault(f => ChartFiles.IsChartName(f.StoredName));
-        string? name = staged.StoredName ?? ChartReader.Pick(stored.Where(n => !draft.IsFileRemoved(n)));
-        if (name is null)
+        if (DraftChart.Of(draft, stored) is not { } picked)
             return null;
 
         try
         {
-            byte[]? bytes = staged.StoredName is not null
-                ? ReadStaged(staged.SourcePath)
-                : SongFile.ReadAsync(entry, name, ChartReader.MaxBytes, cancellationToken).GetAwaiter().GetResult();
+            byte[]? bytes = picked.ReadAsync(entry, cancellationToken).GetAwaiter().GetResult();
             if (bytes is null)
                 return null;
 
             var options = ChartReadOptions.From(pairs);
             var chart = draft.HasChartOffsets
-                ? ChartShifter.Shift(bytes, name, draft.ChartOffsets, options).Document
-                : ChartReader.Read(bytes, name, options);
+                ? ChartShifter.Shift(bytes, picked.Name, draft.ChartOffsets, options).Document
+                : ChartReader.Read(bytes, picked.Name, options);
             return LastNoteEndMs(chart, SongChartSettings.DelayOf(pairs, chart));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -185,7 +180,4 @@ public static class SongLengthEstimator
         stagedPath is not null
             ? new FileStream(stagedPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 64 * 1024)
             : SongFile.OpenRead(entry, storedName, cancellationToken);
-
-    private static byte[]? ReadStaged(string path) =>
-        new FileInfo(path).Length > ChartReader.MaxBytes ? null : File.ReadAllBytes(path);
 }

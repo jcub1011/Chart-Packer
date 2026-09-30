@@ -17,6 +17,7 @@ namespace ChartPacker.Services
     /// <param name="settings">The settings the preview's player and highway share with the main ones.</param>
     /// <param name="openOutput">Opens an audio device, for the preview's own player.</param>
     /// <param name="mainPlayer">The main window's player, stopped while the preview can play.</param>
+    /// <param name="mainHighway">The main window's highway, which takes up the settings the preview's changed.</param>
     /// <param name="video">Reads background video lengths, for the merged song's <c>song_length</c>.</param>
     public sealed class AvaloniaMergeWindowService(
         Func<Window?> owner,
@@ -24,6 +25,7 @@ namespace ChartPacker.Services
         SettingsService settings,
         Func<int, IAudioOutput> openOutput,
         PlayerViewModel mainPlayer,
+        HighwayViewModel mainHighway,
         IImagePickerService imagePicker,
         IFilePickerService filePicker,
         IVideoDurationProbe video) : IMergeWindowService
@@ -51,6 +53,7 @@ namespace ChartPacker.Services
             _ = viewModel.LoadAsync();
             await dialog.ShowDialog(window);
             await viewModel.ShutdownAsync();
+            mainHighway.ReloadSettings();
 
             // However the window was closed, a song may already have been merged.
             return viewModel.IsDone;
