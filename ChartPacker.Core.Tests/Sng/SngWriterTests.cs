@@ -5,7 +5,7 @@ namespace ChartPacker.Core.Tests.Sng;
 [TestClass]
 public sealed class SngWriterTests
 {
-    private static readonly byte[] ExampleMask = Enumerable.Range(0x10, 16).Select(b => (byte)b).ToArray();
+    private static readonly byte[] ExampleMask = [.. Enumerable.Range(0x10, 16).Select(b => (byte)b)];
 
     private DirectoryInfo _root = null!;
 

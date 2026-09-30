@@ -61,5 +61,5 @@ public sealed class LibrarySongFactsTests
         Assert.AreEqual(new LibrarySongFacts(SongEntryKind.SngFile, "song", HasDrafts: true), LibrarySongFacts.For(Entry, true));
 
     private static List<KeyValuePair<string, string>> Pairs(params (string Key, string Value)[] pairs) =>
-        pairs.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList();
+        [.. pairs.Select(p => KeyValuePair.Create(p.Key, p.Value))];
 }

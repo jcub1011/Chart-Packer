@@ -27,6 +27,25 @@ namespace ChartPacker.Views
             // While the waveform is held the position stops following playback; letting go seeks there.
             SeekBar.ScrubStarted += (_, _) => Player?.BeginScrub();
             SeekBar.ScrubEnded += (_, _) => EndScrub();
+
+            AddHandler(PointerPressedEvent, OnPointerPressedAnywhere, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
+
+        /// <summary>
+        /// A click outside the focused edit box takes focus from it, so it commits as it does when focus
+        /// moves to another control. Clicks on empty space and labels otherwise leave the box focused.
+        /// Runs after the clicked control's own handling, so a click that already moved focus is left alone.
+        /// </summary>
+        private void OnPointerPressedAnywhere(object? sender, PointerPressedEventArgs e)
+        {
+            if (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is not TextBox box
+                || !this.IsVisualAncestorOf(box))
+                return;
+
+            if (e.Source is Visual source && (source == box || box.IsVisualAncestorOf(source)))
+                return;
+
+            Focus();
         }
 
         private PlayerViewModel? Player => (DataContext as SongDetailViewModel)?.Player;

@@ -218,7 +218,7 @@ public sealed class AlbumArtTests
     /// <summary>The builder stores data as given, so it's masked here to be stored the way a real .sng would.</summary>
     private static byte[] Masked(SngBuilder builder, byte[] data)
     {
-        byte[] copy = data.ToArray();
+        byte[] copy = [.. data];
         SngMask.Apply(copy, builder.Mask);
         return copy;
     }

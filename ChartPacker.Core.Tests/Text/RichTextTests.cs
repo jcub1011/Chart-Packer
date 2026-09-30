@@ -126,5 +126,5 @@ public sealed class RichTextTests
             Parse("<noparse><b>not bold</b></noparse><b>bold"));
     }
 
-    private static RichTextSpan[] Parse(string text) => RichText.Parse(text).ToArray();
+    private static RichTextSpan[] Parse(string text) => [.. RichText.Parse(text)];
 }

@@ -83,5 +83,5 @@ public sealed class SongHeadlineTests
         Assert.IsNull(SongHeadline.From(Pairs(("song_length", value))).LengthMs);
 
     private static List<KeyValuePair<string, string>> Pairs(params (string Key, string Value)[] pairs) =>
-        pairs.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList();
+        [.. pairs.Select(p => KeyValuePair.Create(p.Key, p.Value))];
 }

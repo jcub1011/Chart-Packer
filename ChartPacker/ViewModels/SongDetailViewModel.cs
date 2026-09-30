@@ -1081,7 +1081,7 @@ namespace ChartPacker.ViewModels
 
         partial void OnIsSavingChanged(bool value) => RefreshState();
 
-        private List<MetadataItem> Items() => _songs.Select(s => s.Item).ToList();
+        private List<MetadataItem> Items() => [.. _songs.Select(s => s.Item)];
 
         private void OnDraftsChanged()
         {

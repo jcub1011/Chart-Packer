@@ -57,7 +57,7 @@ if (stems.Count == 0)
 }
 
 // Numbered in the order found, so two stems of the same shape are told apart without naming either.
-stems = stems.Select((s, i) => s with { Label = $"{s.Label} #{i + 1}" }).ToList();
+stems = [.. stems.Select((s, i) => s with { Label = $"{s.Label} #{i + 1}" })];
 
 var onFfmpeg = PrintStems(stems);
 if (list)

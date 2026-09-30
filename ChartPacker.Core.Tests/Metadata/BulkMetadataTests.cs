@@ -172,7 +172,7 @@ public sealed class BulkMetadataTests
     }
 
     private static MetadataItem[] Items(params KeyValuePair<string, string>[][] originals) =>
-        originals.Select(o => new MetadataItem(o, new MetadataDraft())).ToArray();
+        [.. originals.Select(o => new MetadataItem(o, new MetadataDraft()))];
 
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
 }

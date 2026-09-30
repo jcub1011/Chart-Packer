@@ -50,16 +50,15 @@ internal sealed record StemLocation(string Label, string Path, string? Entry, do
     {
         if (Directory.Exists(path))
         {
-            return Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
+            return [.. Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .SelectMany(FromFile)
                 .GroupBy(stem => stem.Format)
-                .SelectMany(group => group.OrderByDescending(stem => stem.Seconds).Take(perFormat))
-                .ToList();
+                .SelectMany(group => group.OrderByDescending(stem => stem.Seconds).Take(perFormat))];
         }
 
         if (File.Exists(path))
-            return FromFile(path).ToList();
+            return [.. FromFile(path)];
 
         throw new FileNotFoundException($"'{path}' doesn't exist.");
     }

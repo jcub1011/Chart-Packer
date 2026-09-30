@@ -180,7 +180,7 @@ public sealed class SongLibraryScannerTests
     }
 
     private string[] RelativePaths(int maxDepth) =>
-        SongLibraryScanner.Enumerate(_root.FullName, maxDepth).Select(e => e.RelativePath).ToArray();
+        [.. SongLibraryScanner.Enumerate(_root.FullName, maxDepth).Select(e => e.RelativePath)];
 
     private static string P(string relative) => relative.Replace('/', Path.DirectorySeparatorChar);
 

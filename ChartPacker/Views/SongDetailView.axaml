@@ -8,7 +8,10 @@
              xmlns:meta="using:ChartPacker.Core.Metadata"
              mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
              x:Class="ChartPacker.Views.SongDetailView"
-             x:DataType="vm:SongDetailViewModel">
+             x:DataType="vm:SongDetailViewModel"
+             Focusable="True"
+             FocusAdorner="{x:Null}">
+    <!-- Focusable so a click on empty space can take focus from an edit box, which commits it. -->
 
     <UserControl.Styles>
         <Style Selector="TextBlock.section">
@@ -563,11 +566,20 @@
                                     AutomationProperties.Name="{x:Static res:Strings.StopToolTip}">
                                 <PathIcon Data="{StaticResource StopIconGeometry}" />
                             </Button>
-                            <TextBlock Grid.Column="2"
-                                       Classes="muted"
-                                       VerticalAlignment="Center"
-                                       FontFeatures="tnum"
-                                       Text="{Binding Player.PositionText}" />
+                            <!-- A hidden copy of the length holds the column at its widest, so the waveform
+                                 doesn't shift as the position gains a digit (9:59 to 10:00). -->
+                            <Panel Grid.Column="2" VerticalAlignment="Center">
+                                <TextBlock Classes="muted"
+                                           FontFeatures="tnum"
+                                           Opacity="0"
+                                           IsHitTestVisible="False"
+                                           AutomationProperties.AccessibilityView="Raw"
+                                           Text="{Binding Player.LengthText}" />
+                                <TextBlock Classes="muted"
+                                           HorizontalAlignment="Right"
+                                           FontFeatures="tnum"
+                                           Text="{Binding Player.PositionText}" />
+                            </Panel>
                             <!-- What is heard, as a waveform that changes with the mute and solo switches. Dragging seeks
                                  when it's let go; a click seeks at once. -->
                             <ctl:WaveformView x:Name="SeekBar"
