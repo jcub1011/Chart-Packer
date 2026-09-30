@@ -655,6 +655,109 @@
                     <TextBlock Classes="error" Text="{Binding ArtError}" IsVisible="{Binding HasArtError}" />
                     <TextBlock Classes="error" Text="{Binding BackgroundError}" IsVisible="{Binding HasBackgroundError}" />
 
+                    <!-- The one selected song's vocals as a karaoke lane, in step with the audio, shown while it has
+                         a vocals track or vocals in its chart. Captioned and edited like the art: the actions show
+                         over the lane while the pointer is over it, or focus is on one of them. -->
+                    <DockPanel Margin="0,16,0,0" IsVisible="{Binding Lyrics.IsVisible}">
+                        <!-- The name, which gives way on a narrow panel, then the offset at the right, as the highway's
+                             instruments have in their flyout. -->
+                        <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
+                            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="6">
+                                <TextBlock Grid.Column="0"
+                                           Classes="marker"
+                                           Text="{Binding Lyrics.Marker}"
+                                           IsVisible="{Binding Lyrics.IsChanged}" />
+                                <TextBlock Grid.Column="1" Classes="artName" Text="{x:Static res:Strings.LyricsHeader}" />
+                                <TextBlock Grid.Column="2"
+                                           Classes="artName muted"
+                                           Text="{Binding Lyrics.SourceName, TargetNullValue='-'}"
+                                           ToolTip.Tip="{Binding Lyrics.SourceName}" />
+                                <TextBlock Grid.Column="3"
+                                           Classes="finding"
+                                           MaxWidth="260"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="{Binding Lyrics.Warning}"
+                                           ToolTip.Tip="{Binding Lyrics.Warning}"
+                                           IsVisible="{Binding Lyrics.HasWarning}" />
+                                <StackPanel Grid.Column="4"
+                                            Orientation="Horizontal"
+                                            Spacing="6"
+                                            IsVisible="{Binding Lyrics.HasLyrics}">
+                                    <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                                   Width="72"
+                                                   ShowButtonSpinner="False"
+                                                   VerticalAlignment="Center"
+                                                   Value="{Binding Lyrics.Offset}"
+                                                   IsEnabled="{Binding Lyrics.CanNudge}"
+                                                   Increment="1"
+                                                   Minimum="-2147483648"
+                                                   Maximum="2147483647"
+                                                   FormatString="+0;-0;0"
+                                                   ToolTip.Tip="{x:Static res:Strings.LyricsOffsetToolTip}"
+                                                   AutomationProperties.Name="{x:Static res:Strings.LyricsOffsetName}" />
+                                    <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <Button Classes="nudge" Content="-10" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="-10" />
+                                        <Button Classes="nudge" Content="-1" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="-1" />
+                                        <Button Classes="nudge" Content="+1" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="1" />
+                                        <Button Classes="nudge" Content="+10" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="10" />
+                                    </StackPanel>
+                                    <Button Classes="nudge"
+                                            Command="{Binding Lyrics.RevertOffsetCommand}"
+                                            ToolTip.Tip="{x:Static res:Strings.LyricsRevertOffsetToolTip}"
+                                            AutomationProperties.Name="{x:Static res:Strings.LyricsRevertOffsetToolTip}">
+                                        <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="artTile" Height="120" AutomationProperties.Name="{x:Static res:Strings.LyricsHeader}">
+                            <Panel>
+                                <ctl:LyricLaneView Scene="{Binding Lyrics.Scene}"
+                                                   Clock="{Binding Lyrics.Clock}"
+                                                   IsHitTestVisible="False"
+                                                   IsVisible="{Binding Lyrics.HasLyrics}" />
+                                <TextBlock Classes="muted centered"
+                                           VerticalAlignment="Center"
+                                           Margin="12"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding Lyrics.Note}"
+                                           IsVisible="{Binding Lyrics.HasNote}" />
+
+                                <Panel Classes="artOverlay" IsVisible="{Binding CanEdit}">
+                                    <Border Classes="artDim" />
+                                    <Viewbox Margin="12" Stretch="Uniform" StretchDirection="DownOnly">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <!-- Hidden by Button.artAction.revert:disabled unless there's a change to undo. -->
+                                            <Button Classes="artAction revert"
+                                                    Command="{Binding RevertLyricsCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.LyricsRevertToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.LyricsRevertToolTip}">
+                                                <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="artAction"
+                                                    Command="{Binding ReplaceLyricsCommand}"
+                                                    ToolTip.Tip="{Binding Lyrics.ReplaceToolTip}"
+                                                    AutomationProperties.Name="{Binding Lyrics.ReplaceToolTip}">
+                                                <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="artAction"
+                                                    Command="{Binding RemoveLyricsCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.LyricsRemoveToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.LyricsRemoveToolTip}">
+                                                <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Viewbox>
+                                </Panel>
+                            </Panel>
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Classes="error" Text="{Binding LyricsError}" IsVisible="{Binding HasLyricsError}" />
+                    <TextBlock Classes="error" Text="{Binding Lyrics.Problem}" IsVisible="{Binding Lyrics.HasProblem}" />
+
                     <!-- The one selected song's audio tracks, played together and in step. A track
                          can be muted, or soloed to hear it alone; added and removed tracks play as
                          they will be once saved. A removed track stays listed, struck through, until

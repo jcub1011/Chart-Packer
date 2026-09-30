@@ -7,7 +7,27 @@ namespace ChartPacker.Core.Merging;
 /// <param name="Midi">The MIDI file.</param>
 /// <param name="Delay">How much later than its ticks say the chart plays: song.ini's <c>delay</c>, or a <c>.chart</c>'s <c>Offset</c>.</param>
 /// <param name="Options">How its notes are read: <c>pro_drums</c>.</param>
-public sealed record MidiChart(byte[] Midi, TimeSpan Delay, ChartReadOptions Options);
+public sealed record MidiChart(byte[] Midi, TimeSpan Delay, ChartReadOptions Options)
+{
+    /// <summary>
+    /// The chart <paramref name="bytes"/>, stored as <paramref name="chartName"/>, as a MIDI file to
+    /// merge from: a <c>.chart</c> converted, with its delay and <c>pro_drums</c> worked out from the
+    /// song's metadata <paramref name="pairs"/>.
+    /// </summary>
+    /// <returns>The chart, and the conversion when it was a <c>.chart</c>.</returns>
+    /// <exception cref="ChartFormatException">The chart is malformed, or can't be written as MIDI.</exception>
+    internal static (MidiChart Chart, ChartConversion? Conversion) Load(byte[] bytes, string chartName, IReadOnlyList<KeyValuePair<string, string>> pairs)
+    {
+        var options = ChartReadOptions.From(pairs);
+        var original = ChartReader.Read(bytes, chartName, options);
+        var delay = SongChartSettings.DelayOf(pairs, original);
+        if (ChartFiles.StoredNameFor(chartName) != ChartFiles.ChartName)
+            return (new MidiChart(bytes, delay, options), null);
+
+        var conversion = ChartToMidi.Convert(bytes, options);
+        return (new MidiChart(conversion.Midi, delay, new ChartReadOptions(conversion.ProDrums)), conversion);
+    }
+}
 
 /// <summary>A merged MIDI file.</summary>
 /// <param name="Midi">The MIDI file.</param>
@@ -47,21 +67,14 @@ public static class MidiMerger
         foreach (var (source, part) in parts.OrderBy(p => MidiPartCatalog.OrderOf(p.Part)).ThenBy(p => p.Part.Id, StringComparer.Ordinal))
         {
             var file = ReferenceEquals(source, baseChart) ? baseFile : Parse(source.Midi);
-            Func<long, long> map = file.Tempo.SameAs(baseFile.Tempo) && source.Delay == baseChart.Delay
-                ? tick => tick
-                : tick => Retime(tick, file.Tempo, source.Delay, baseFile.Tempo, baseChart.Delay);
+            var map = MapOf(file.Tempo, source.Delay, baseFile.Tempo, baseChart.Delay);
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var track in file.Tracks)
             {
                 if (track.Name is not { } name || !part.Has(name) || !seen.Add(name))
                     continue;
-
-                var messages = track.Events
-                    .Where(e => !IsTempoOrEnd(source.Midi, e))
-                    .Select(e => MidiMessage.Of(source.Midi, e) with { Tick = IsName(source.Midi, e) ? 0 : map(e.Tick) })
-                    .ToList();
-                placed.Add(new PlacedTrack(name, messages, source, map));
+                placed.Add(new PlacedTrack(name, Place(source.Midi, track.Events, map), source, map));
             }
         }
 
@@ -128,6 +141,26 @@ public static class MidiMerger
         double placed = Math.Round(to.TickAt(seconds), MidpointRounding.AwayFromZero);
         return placed <= 0 ? 0 : (long)placed;
     }
+
+    /// <summary>
+    /// Moves ticks of <paramref name="from"/> to the ticks of <paramref name="to"/> that play at the same
+    /// moment; see <see cref="Retime"/>. Tick for tick when the tempo maps and delays are the same.
+    /// </summary>
+    internal static Func<long, long> MapOf(TempoMap from, TimeSpan fromDelay, TempoMap to, TimeSpan toDelay) =>
+        from.SameAs(to) && fromDelay == toDelay
+            ? tick => tick
+            : tick => Retime(tick, from, fromDelay, to, toDelay);
+
+    /// <summary>
+    /// The track <paramref name="events"/> of <paramref name="midi"/> as messages for another file:
+    /// placed by <paramref name="map"/>, the track's name at the start, and its tempo, time-signature
+    /// and end-of-track events left out.
+    /// </summary>
+    internal static List<MidiMessage> Place(byte[] midi, List<MidiEvent> events, Func<long, long> map) =>
+        events
+            .Where(e => !IsTempoOrEnd(midi, e))
+            .Select(e => MidiMessage.Of(midi, e) with { Tick = IsName(midi, e) ? 0 : map(e.Tick) })
+            .ToList();
 
     private static byte[] Build(int division, List<byte[]> structural, List<PlacedTrack> placed) =>
         MidiWriter.WriteFile(division, [.. structural, .. placed.Select(t => MidiWriter.Track(t.Messages))]);

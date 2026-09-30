@@ -739,6 +739,69 @@
     <value>{0} can't be read: {1}</value>
     <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
+  <data name="LyricsHeader" xml:space="preserve">
+    <value>Lyrics</value>
+  </data>
+  <data name="NoLyrics" xml:space="preserve">
+    <value>No lyrics</value>
+  </data>
+  <data name="LyricsWillBeRemoved" xml:space="preserve">
+    <value>Lyrics will be removed</value>
+  </data>
+  <data name="LyricsNoChart" xml:space="preserve">
+    <value>No chart to hold lyrics</value>
+  </data>
+  <data name="LyricsUnreadableFormat" xml:space="preserve">
+    <value>The lyrics can't be read: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="LyricsChangeFailedFormat" xml:space="preserve">
+    <value>The chosen lyrics can't be used: {0}</value>
+    <comment>{0} is the reason.</comment>
+  </data>
+  <data name="LyricsChartKeepsWordsOnly" xml:space="preserve">
+    <value>A .chart keeps only the words, so the notes and harmonies are left out.</value>
+  </data>
+  <data name="LyricsAddToolTip" xml:space="preserve">
+    <value>Add lyrics from another chart…</value>
+  </data>
+  <data name="LyricsReplaceToolTip" xml:space="preserve">
+    <value>Replace the lyrics with another chart's…</value>
+  </data>
+  <data name="LyricsRemoveToolTip" xml:space="preserve">
+    <value>Remove the lyrics</value>
+  </data>
+  <data name="LyricsRevertToolTip" xml:space="preserve">
+    <value>Undo the changes to the lyrics</value>
+  </data>
+  <data name="LyricsOffsetName" xml:space="preserve">
+    <value>Lyrics offset</value>
+  </data>
+  <data name="LyricsOffsetToolTip" xml:space="preserve">
+    <value>Moves the lyrics and vocal notes later (positive) or earlier (negative). Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, a tenth with Ctrl. Saving rewrites the chart.</value>
+  </data>
+  <data name="LyricsRevertOffsetToolTip" xml:space="preserve">
+    <value>Reset the lyrics offset</value>
+  </data>
+  <data name="LyricsOffsetBeforeStartFormat" xml:space="preserve">
+    <value>Moving the lyrics {0} ms earlier would put them before the start of the song, so it can't be saved.</value>
+    <comment>{0} is a number of milliseconds.</comment>
+  </data>
+  <data name="PickLyricsTitle" xml:space="preserve">
+    <value>Choose a chart or .sng to take the lyrics from</value>
+  </data>
+  <data name="LyricsSourceFileTypeFormat" xml:space="preserve">
+    <value>Charts and songs ({0})</value>
+    <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi, sng".</comment>
+  </data>
+  <data name="LyricsSourceUnreadableFormat" xml:space="preserve">
+    <value>{0} can't be read: {1}</value>
+    <comment>{0} is the file name; {1} is the reason.</comment>
+  </data>
+  <data name="LyricsSourceHasNoneFormat" xml:space="preserve">
+    <value>{0} has no lyrics or vocal notes.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
   <data name="SettingsButton" xml:space="preserve">
     <value>Settings</value>
   </data>

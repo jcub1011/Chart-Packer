@@ -11,6 +11,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ChartPacker.Audio.Decoding;
 using ChartPacker.Core.Ini;
+using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
@@ -122,6 +123,15 @@ namespace ChartPacker.ViewModels
             };
             Highway = highway;
             Highway.OffsetsChanged += (_, _) => OnOffsetsChanged();
+            Lyrics = new LyricsViewModel(() => Player.CurrentPosition);
+            Lyrics.OffsetChanged += (_, _) => OnOffsetsChanged();
+
+            // What the lyrics commands can do depends on what the lyrics row has read, which comes later.
+            Lyrics.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(LyricsViewModel.HasLyrics) or nameof(LyricsViewModel.HasChart) or nameof(LyricsViewModel.IsChanged))
+                    RefreshLyricsCommands();
+            };
             foreach (string stem in AudioStems.Stems)
                 _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
             _job.PropertyChanged += (_, e) =>
@@ -152,6 +162,9 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The note highway over the background, for the one selected song's chart.</summary>
         public HighwayViewModel Highway { get; }
+
+        /// <summary>The lyrics row under the album art, for the one selected song's vocals.</summary>
+        public LyricsViewModel Lyrics { get; }
 
         /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
         [ObservableProperty]
@@ -255,6 +268,11 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasBackgroundError))]
         public partial string? BackgroundError { get; set; }
 
+        /// <summary>Why the chosen chart's lyrics can't be used.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasLyricsError))]
+        public partial string? LyricsError { get; set; }
+
         /// <summary>Why some of the chosen files couldn't be added.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasFilesError))]
@@ -279,6 +297,8 @@ namespace ChartPacker.ViewModels
         public bool HasArtError => ArtError is not null;
 
         public bool HasBackgroundError => BackgroundError is not null;
+
+        public bool HasLyricsError => LyricsError is not null;
 
         public bool HasFilesError => FilesError is not null;
 
@@ -376,6 +396,7 @@ namespace ChartPacker.ViewModels
             Player.Unload();
             Background.Unload();
             Highway.Unload();
+            Lyrics.Unload();
 
             _entries = entries;
             _songs = [];
@@ -404,6 +425,7 @@ namespace ChartPacker.ViewModels
             SaveError = null;
             ArtError = null;
             BackgroundError = null;
+            LyricsError = null;
             FilesError = null;
             TracksError = null;
             ChartError = null;
@@ -771,6 +793,80 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
         }
 
+        // Lyrics go in the chart, so like the chart they're changed only when one song is selected, and it has one.
+        private bool CanReplaceLyrics() => CanChangeFiles() && Lyrics.HasChart;
+
+        /// <summary>
+        /// Asks for a chart or <c>.sng</c> and stages its vocals, <c>PART VOCALS</c> and the harmonies,
+        /// as the selected song's; adding them when it has none.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanReplaceLyrics))]
+        private async Task ReplaceLyricsAsync()
+        {
+            var songs = _songs;
+            string? path = await _filePicker.PickLyricsSourceAsync(Strings.PickLyricsTitle);
+            if (path is null || !ReferenceEquals(songs, _songs) || !CanReplaceLyrics())
+                return;
+
+            string fileName = Path.GetFileName(path);
+            LyricsError = null;
+            VocalsSource source;
+            try
+            {
+                source = await Task.Run(() => VocalsSource.LoadAsync(path));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // ChartFormatException is an IOException: the chart is malformed.
+                if (ReferenceEquals(songs, _songs))
+                    LyricsError = string.Format(CultureInfo.CurrentCulture, Strings.LyricsSourceUnreadableFormat, fileName, ex.Message);
+                return;
+            }
+
+            // The selection may have moved on while the chart was read.
+            if (!ReferenceEquals(songs, _songs) || !CanReplaceLyrics())
+                return;
+            if (!source.Vocals.HasVocals)
+            {
+                LyricsError = string.Format(CultureInfo.CurrentCulture, Strings.LyricsSourceHasNoneFormat, fileName);
+                return;
+            }
+
+            // An offset was set against the vocals being replaced.
+            Lyrics.AddSource(path, source);
+            songs[0].Item.Draft.SetVocals(path);
+            songs[0].Item.Draft.SetVocalsOffset(0);
+            OnDraftsChanged();
+        }
+
+        private bool CanRemoveLyrics() => CanChangeFiles() && Lyrics.HasLyrics;
+
+        /// <summary>Stages removing the selected song's vocals; or, when they're ones a change adds to a chart without any, drops that change.</summary>
+        [RelayCommand(CanExecute = nameof(CanRemoveLyrics))]
+        private void RemoveLyrics()
+        {
+            var draft = _songs[0].Item.Draft;
+            LyricsError = null;
+            if (Lyrics.ChartHasVocals)
+                draft.RemoveVocals();
+            else
+                draft.RevertVocals();
+            draft.SetVocalsOffset(0);
+            OnDraftsChanged();
+        }
+
+        private bool CanRevertLyrics() => CanChangeFiles() && Lyrics.IsChanged;
+
+        /// <summary>Drops the staged changes to the selected song's vocals: others in their place, and their offset.</summary>
+        [RelayCommand(CanExecute = nameof(CanRevertLyrics))]
+        private void RevertLyrics()
+        {
+            LyricsError = null;
+            _songs[0].Item.Draft.RevertVocals();
+            _songs[0].Item.Draft.SetVocalsOffset(0);
+            OnDraftsChanged();
+        }
+
         // Files are shown, and so changed, only when one song is selected.
         private bool CanChangeFiles() => CanEdit && !IsBulk && _songs.Count == 1;
 
@@ -835,9 +931,12 @@ namespace ChartPacker.ViewModels
                     continue;
                 }
 
-                // Offsets were set against the chart being replaced.
+                // Offsets and a vocals change were set against the chart being replaced.
                 if (ChartFiles.IsChartName(name))
+                {
                     song.Item.Draft.ClearChartOffsets();
+                    song.Item.Draft.RevertVocals();
+                }
                 song.Item.Draft.AddFile(new AddedFile(name, path, length));
             }
 
@@ -1038,8 +1137,9 @@ namespace ChartPacker.ViewModels
             var draft = songs[0].Item.Draft;
             RevertAddedCharts(draft);
 
-            // Offsets were set against the chart being replaced.
+            // Offsets and a vocals change were set against the chart being replaced.
             draft.ClearChartOffsets();
+            draft.RevertVocals();
 
             // Recorded as replaced by the add, so removing it (or reverting the chart) brings them back.
             var replaced = ChartFiles.FilesOf(_diskFiles.Select(f => f.Path))
@@ -1059,6 +1159,7 @@ namespace ChartPacker.ViewModels
             var draft = _songs[0].Item.Draft;
             RevertAddedCharts(draft);
             draft.ClearChartOffsets();
+            draft.RevertVocals();
             foreach (string stored in ChartFiles.FilesOf(_diskFiles.Select(f => f.Path)))
                 draft.RemoveFile(stored);
             ChartError = null;
@@ -1067,13 +1168,14 @@ namespace ChartPacker.ViewModels
 
         private bool CanRevertChart() => CanChangeFiles() && IsChartChanged;
 
-        /// <summary>Drops every staged change to the selected song's chart, its offsets too.</summary>
+        /// <summary>Drops every staged change to the selected song's chart, its offsets and vocals too.</summary>
         [RelayCommand(CanExecute = nameof(CanRevertChart))]
         private void RevertChart()
         {
             var draft = _songs[0].Item.Draft;
             RevertAddedCharts(draft);
             draft.ClearChartOffsets();
+            draft.RevertVocals();
             foreach (string stored in ChartFiles.FilesOf(_diskFiles.Select(f => f.Path)))
                 draft.RevertFile(stored);
             ChartError = null;
@@ -1155,6 +1257,7 @@ namespace ChartPacker.ViewModels
         {
             CancelAdd();
             BackgroundError = null;
+            LyricsError = null;
             FilesError = null;
             TracksError = null;
             ChartError = null;
@@ -1205,7 +1308,7 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// The highway set an offset, and redraws itself. Nothing else shown depends on the offsets,
+        /// The highway or the lyrics set an offset, and redraw themselves. Nothing else shown depends on the offsets,
         /// so this is lighter than <see cref="OnDraftsChanged"/>, as it runs for every step of a drag.
         /// </summary>
         private void OnOffsetsChanged()
@@ -1447,6 +1550,7 @@ namespace ChartPacker.ViewModels
             (ArtFileName, ArtFileSize) = keys is [not null] ? SharedArtFile() : (null, null);
             Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
             Highway.Refresh(HighwaySongOf());
+            Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
             RebuildFiles();
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
@@ -1483,6 +1587,11 @@ namespace ChartPacker.ViewModels
             _songs is [var song] && !IsBulk
                 ? new HighwaySong(song.Entry, song.Item.Draft, song.Item.Draft.ApplyTo(song.Item.Original), [.. _diskFiles.Select(f => f.Path)])
                 : null;
+
+        /// <summary>Whether the one selected song will have a vocals audio track once its draft is saved.</summary>
+        private bool HasVocalStem() =>
+            _songs is [var song] && !IsBulk
+            && SongTracks.Resolve(_diskFiles.Select(f => f.Path), song.Item.Draft).Any(t => t.Stem.StartsWith("vocals", StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
         /// The one selected song's chart files and other files, with the ones a staged change removes
@@ -1793,6 +1902,9 @@ namespace ChartPacker.ViewModels
 
             // A preview's offsets stay editable, as they're what it's for.
             Highway.CanEditOffsets = _songs.Count == 1 && !IsBulk && !IsSaving && (ReadOnlyNote is null || ReadOnlyNote == PreviewNote);
+
+            // Not in a preview: the merge doesn't take the lyrics' offset.
+            Lyrics.CanEditOffset = CanChangeFiles();
             RefreshCommands();
         }
 
@@ -1817,10 +1929,18 @@ namespace ChartPacker.ViewModels
             ChooseChartCommand.NotifyCanExecuteChanged();
             RemoveChartCommand.NotifyCanExecuteChanged();
             RevertChartCommand.NotifyCanExecuteChanged();
+            RefreshLyricsCommands();
             foreach (var command in _addTrackCommands.Values)
                 command.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
                 row.RefreshCommands();
+        }
+
+        private void RefreshLyricsCommands()
+        {
+            ReplaceLyricsCommand.NotifyCanExecuteChanged();
+            RemoveLyricsCommand.NotifyCanExecuteChanged();
+            RevertLyricsCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>A selected song whose metadata was read, with its draft.</summary>

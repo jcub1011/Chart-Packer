@@ -226,6 +226,59 @@ public sealed class MetadataDraftTests
     }
 
     [TestMethod]
+    public void VocalsChangeMakesTheDraftDirtyAndEditsTheChart()
+    {
+        var draft = new MetadataDraft();
+
+        draft.SetVocals("other.mid");
+
+        Assert.IsFalse(draft.IsEmpty);
+        Assert.IsTrue(draft.HasChartEdits);
+        Assert.IsFalse(draft.HasChartOffsets);
+        Assert.IsFalse(draft.HasFileChanges);
+
+        draft.RemoveVocals();
+
+        Assert.AreEqual(new VocalsChange(null), draft.Vocals);
+        Assert.IsTrue(draft.Vocals!.Value.IsRemoval);
+
+        draft.RevertVocals();
+
+        Assert.IsTrue(draft.IsEmpty);
+    }
+
+    [TestMethod]
+    public void VocalsOffsetMakesTheDraftDirtyAndGoesWithTheChartOffsets()
+    {
+        var draft = new MetadataDraft();
+
+        draft.SetVocalsOffset(-20);
+
+        Assert.IsFalse(draft.IsEmpty);
+        Assert.IsTrue(draft.HasVocalsOffset);
+        Assert.IsTrue(draft.HasChartEdits);
+        Assert.IsFalse(draft.HasChartOffsets);
+        Assert.AreEqual(-20, draft.Clone().VocalsOffset);
+
+        draft.ClearChartOffsets();
+
+        Assert.AreEqual(0, draft.VocalsOffset);
+        Assert.IsTrue(draft.IsEmpty);
+    }
+
+    [TestMethod]
+    public void ClearForgetsTheVocalsChange()
+    {
+        var draft = new MetadataDraft();
+        draft.SetVocals("other.mid");
+
+        draft.Clear();
+
+        Assert.IsNull(draft.Vocals);
+        Assert.IsTrue(draft.IsEmpty);
+    }
+
+    [TestMethod]
     public void CloneCopiesEveryChangeAndNeitherSeesTheOthersLaterOnes()
     {
         var track = new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert);
@@ -237,9 +290,11 @@ public sealed class MetadataDraftTests
         draft.RemoveFile("video.mp4");
         draft.AddFile(new AddedFile("guitar.opus", "g.opus", 1), ["guitar.ogg"]);
         draft.SetChartOffset(track, 40);
+        draft.SetVocals("other.mid");
 
         var clone = draft.Clone();
         draft.Set("album", "B");
+        draft.RemoveVocals();
         draft.RevertBackground(BackgroundKind.Video);
         draft.AddFile(new AddedFile("notes.mid", "n.mid", 1));
         draft.SetChartOffset(track, 0);
@@ -251,6 +306,7 @@ public sealed class MetadataDraftTests
         CollectionAssert.AreEqual(new[] { "video.mp4" }, clone.RemovedFiles.ToArray());
         Assert.IsEmpty(clone.AddedFiles);
         CollectionAssert.AreEqual(new[] { KeyValuePair.Create(track, 40) }, clone.ChartOffsets.ToArray());
+        Assert.AreEqual(new VocalsChange("other.mid"), clone.Vocals);
 
         // Reverting the clone's add brought back only its own copy of the file it replaced.
         CollectionAssert.AreEquivalent(new[] { "video.mp4", "guitar.ogg" }, draft.RemovedFiles.ToArray());

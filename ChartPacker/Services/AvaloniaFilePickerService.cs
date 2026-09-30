@@ -34,6 +34,11 @@ namespace ChartPacker.Services
             FileType(Strings.ChartFileTypeFormat, ChartFiles.Extensions, ["application/x-chart", "audio/midi"]),
         ];
 
+        private static readonly FilePickerFileType[] LyricsSources =
+        [
+            FileType(Strings.LyricsSourceFileTypeFormat, [.. ChartFiles.Extensions, ".sng"], ["application/x-chart", "audio/midi"]),
+        ];
+
         public async Task<IReadOnlyList<string>> PickFilesAsync(string title)
         {
             if (topLevel() is not { } owner)
@@ -78,7 +83,11 @@ namespace ChartPacker.Services
             return files.Count > 0 ? files[0].TryGetLocalPath() : null;
         }
 
-        public async Task<string?> PickChartAsync(string title)
+        public Task<string?> PickChartAsync(string title) => PickOneAsync(title, Charts);
+
+        public Task<string?> PickLyricsSourceAsync(string title) => PickOneAsync(title, LyricsSources);
+
+        private async Task<string?> PickOneAsync(string title, IReadOnlyList<FilePickerFileType> types)
         {
             if (topLevel() is not { } owner)
                 return null;
@@ -87,7 +96,7 @@ namespace ChartPacker.Services
             {
                 Title = title,
                 AllowMultiple = false,
-                FileTypeFilter = Charts,
+                FileTypeFilter = types,
             });
 
             return files.Count > 0 ? files[0].TryGetLocalPath() : null;

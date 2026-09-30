@@ -1,12 +1,13 @@
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
+using ChartPacker.Core.Merging;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
 using ChartPacker.Core.Validation;
 
 namespace ChartPacker.Core.Metadata;
 
-/// <summary>Writes a song's <see cref="MetadataDraft"/>: its metadata, album art, file changes and chart offsets.</summary>
+/// <summary>Writes a song's <see cref="MetadataDraft"/>: its metadata, album art, file changes, chart vocals and chart offsets.</summary>
 public static class DraftWriter
 {
     /// <summary>
@@ -15,14 +16,14 @@ public static class DraftWriter
     /// </summary>
     /// <remarks>
     /// An album-art change removes every stored album-art file, and a background change every
-    /// stored file of its kind. An added file whose name is already stored replaces it. Chart
-    /// offsets are applied to the chart the song ends up with, added or stored.
+    /// stored file of its kind. An added file whose name is already stored replaces it. A vocals
+    /// change, then the chart offsets, are applied to the chart the song ends up with, added or stored.
     /// </remarks>
     /// <returns>The findings that stopped the write, or the rewritten file's findings.</returns>
     /// <exception cref="ArgumentException">An added file has the same name as the new album art.</exception>
     /// <exception cref="IOException">
     /// A file can't be read or written, or an added file changed size; or, as a
-    /// <see cref="ChartFormatException"/>, the chart offsets can't be applied to the chart.
+    /// <see cref="ChartFormatException"/>, the vocals or chart offsets can't be applied to the chart.
     /// </exception>
     /// <exception cref="UnauthorizedAccessException">Access to a file is denied.</exception>
     /// <exception cref="OperationCanceledException">The write was cancelled.</exception>
@@ -85,7 +86,7 @@ public static class DraftWriter
     /// <exception cref="ArgumentException">A file change names the <c>song.ini</c> or a path outside the folder.</exception>
     /// <exception cref="IOException">
     /// A file can't be read, written or deleted; or, as a <see cref="ChartFormatException"/>, the
-    /// chart offsets can't be applied to the chart, in which case nothing was written.
+    /// vocals or chart offsets can't be applied to the chart, in which case nothing was written.
     /// </exception>
     /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
     /// <exception cref="OperationCanceledException">The write was cancelled.</exception>
@@ -95,10 +96,10 @@ public static class DraftWriter
         ArgumentException.ThrowIfNullOrWhiteSpace(songIniPath);
         ArgumentNullException.ThrowIfNull(draft);
 
-        // The moved chart is worked out before anything is written, so a chart it can't be applied to changes nothing.
+        // The changed chart is worked out before anything is written, so a chart it can't be applied to changes nothing.
         IReadOnlyList<KeyValuePair<string, string>> pairs = [];
         IReadOnlySet<string> stored = new HashSet<string>();
-        if (draft.HasChartOffsets)
+        if (draft.HasChartEdits)
         {
             var read = File.Exists(songIniPath) ? await SongIni.ReadAsync(songIniPath, cancellationToken).ConfigureAwait(false) : null;
             pairs = draft.ApplyTo(read?.Pairs ?? []);
@@ -132,30 +133,45 @@ public static class DraftWriter
     }
 
     /// <summary>
-    /// The draft's added files, plus, when it has chart offsets, the chart the song ends up with
-    /// once they're applied: written to a temp file that replaces the chart's add or its stored file.
+    /// The draft's added files, plus, when it changes the chart's vocals or has chart offsets, the chart
+    /// the song ends up with once they're applied: written to a temp file that replaces the chart's add
+    /// or its stored file.
     /// </summary>
-    /// <param name="pairs">The song's metadata once the draft is applied, for <c>pro_drums</c>.</param>
+    /// <param name="pairs">The song's metadata once the draft is applied, for <c>delay</c> and <c>pro_drums</c>.</param>
     /// <param name="stored">The names of the song's stored files.</param>
     /// <returns>The adds, and the temp file to delete once they're written, if there is one.</returns>
     private static async Task<(IReadOnlyList<AddedFile> Adds, string? Temp)> AddsWithShiftedChartAsync(
         MetadataDraft draft, IReadOnlyList<KeyValuePair<string, string>> pairs, IReadOnlySet<string> stored, SongEntry entry, CancellationToken cancellationToken)
     {
         var adds = draft.AddedFiles.ToList();
-        if (!draft.HasChartOffsets)
+        if (!draft.HasChartEdits)
             return (adds, null);
 
         var chart = DraftChart.Of(draft, stored)
-            ?? throw new ChartFormatException("The song has no chart to move the notes of.");
+            ?? throw new ChartFormatException("The song has no chart to change.");
         string name = chart.Name;
         byte[] bytes = await chart.ReadAsync(entry, cancellationToken).ConfigureAwait(false)
             ?? throw new ChartFormatException($"'{name}' is too large to change.");
 
-        var shifted = ChartShifter.Shift(bytes, name, draft.ChartOffsets, ChartReadOptions.From(pairs));
-        string temp = Path.Combine(Path.GetTempPath(), $"chartpacker-{Guid.NewGuid():N}{Path.GetExtension(name)}");
-        await File.WriteAllBytesAsync(temp, shifted.Bytes, cancellationToken).ConfigureAwait(false);
+        // The vocals first: they're placed by song time, and moving notes leaves the vocal tracks alone.
+        var vocalsOffset = TimeSpan.FromMilliseconds(draft.VocalsOffset);
+        if (draft.Vocals is { } vocals)
+        {
+            var source = vocals.SourcePath is { } path ? await VocalsSource.LoadAsync(path, cancellationToken).ConfigureAwait(false) : null;
+            bytes = VocalsEditor.Apply(bytes, name, pairs, source?.Chart, vocalsOffset).Bytes;
+        }
+        else if (draft.HasVocalsOffset)
+        {
+            bytes = VocalsEditor.Shift(bytes, name, pairs, vocalsOffset).Bytes;
+        }
 
-        var add = new AddedFile(name, temp, shifted.Bytes.Length);
+        if (draft.HasChartOffsets)
+            bytes = ChartShifter.Shift(bytes, name, draft.ChartOffsets, ChartReadOptions.From(pairs)).Bytes;
+
+        string temp = Path.Combine(Path.GetTempPath(), $"chartpacker-{Guid.NewGuid():N}{Path.GetExtension(name)}");
+        await File.WriteAllBytesAsync(temp, bytes, cancellationToken).ConfigureAwait(false);
+
+        var add = new AddedFile(name, temp, bytes.Length);
         int added = chart.StagedPath is null ? -1 : adds.FindLastIndex(f => ChartFiles.IsChartName(f.StoredName));
         if (added >= 0)
             adds[added] = add;

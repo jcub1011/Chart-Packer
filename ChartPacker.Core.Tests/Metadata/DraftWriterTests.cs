@@ -296,6 +296,117 @@ public sealed class DraftWriterTests
         CollectionAssert.AreEqual(new byte[] { 4 }, Extract(sng, after, "song.ogg"));
     }
 
+    [TestMethod]
+    public async Task FolderVocalsAreTakenFromAnotherChart()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string chart = Path.Combine(folder, "notes.mid");
+        File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
+        string source = WriteNamedSource("notes.mid", VocalsMidi("hey"));
+        var draft = new MetadataDraft();
+        draft.SetVocals(source);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        byte[] saved = File.ReadAllBytes(chart);
+        CollectionAssert.AreEqual(new[] { "notes.mid" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreEqual("hey", VocalReader.Read(saved, "notes.mid").Main!.Lyrics.Single().Text);
+        CollectionAssert.AreEqual(
+            ChartReaderTests.Notes(ChartReader.Read(ChartReaderTests.SampleMidi(), "notes.mid"), ChartInstrument.Guitar),
+            ChartReaderTests.Notes(ChartReader.Read(saved, "notes.mid"), ChartInstrument.Guitar));
+    }
+
+    [TestMethod]
+    public async Task FolderVocalsSourceBesideASongIniIsPlacedByItsDelay()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string chart = Path.Combine(folder, "notes.mid");
+        File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
+        string source = WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960));
+        File.WriteAllText(Path.Combine(Path.GetDirectoryName(source)!, "song.ini"), "[song]\ndelay = 500\n");
+        var draft = new MetadataDraft();
+        draft.SetVocals(source);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        // Half a second later, at 120 BPM and 480 ticks a beat.
+        Assert.AreEqual(1440, VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Tick);
+    }
+
+    [TestMethod]
+    public async Task FolderVocalsOffsetMovesTheStoredVocals()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string chart = Path.Combine(folder, "notes.mid");
+        File.WriteAllBytes(chart, VocalsMidi("hey", tick: 960));
+        var draft = new MetadataDraft();
+        draft.SetVocalsOffset(-500);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        Assert.AreEqual(480, VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Tick);
+    }
+
+    [TestMethod]
+    public async Task FolderVocalsOffsetMovesVocalsTakenFromAnotherChart()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string chart = Path.Combine(folder, "notes.mid");
+        File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
+        var draft = new MetadataDraft();
+        draft.SetVocals(WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960)));
+        draft.SetVocalsOffset(250);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        Assert.AreEqual(1200, VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Tick);
+    }
+
+    [TestMethod]
+    public async Task SngVocalsAreRemovedAndOffsetsAppliedTogether()
+    {
+        byte[] midi = new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART GUITAR").Note(0, 96)
+            .Track("PART VOCALS").Note(0, 60).Meta(0, 0x05, [0x68, 0x69])
+            .Build();
+        string sng = await CreateSngAsync([P("name", "A")], ("notes.mid", midi), ("song.ogg", [4]));
+        var draft = new MetadataDraft();
+        draft.RemoveVocals();
+        draft.SetChartOffset(ExpertGuitar, 250);
+
+        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+
+        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
+        var after = SngReader.Read(sng);
+        byte[] saved = Extract(sng, after, "notes.mid");
+        Assert.IsEmpty(VocalReader.Read(saved, "notes.mid").Parts);
+        Assert.AreEqual(240, ChartReaderTests.Notes(ChartReader.Read(saved, "notes.mid"), ChartInstrument.Guitar)[0].Tick);
+    }
+
+    [TestMethod]
+    public async Task FolderVocalsFromAMissingSourceWriteNothing()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string chart = Path.Combine(folder, "notes.mid");
+        File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
+        string songIni = Path.Combine(folder, SongIni.FileName);
+        File.WriteAllText(songIni, "[song]\nname = A\n");
+        var draft = new MetadataDraft();
+        draft.Set("name", "B");
+        draft.SetVocals(Path.Combine(_root.FullName, "gone", "notes.mid"));
+
+        await Assert.ThrowsAsync<IOException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft));
+
+        Assert.AreEqual("[song]\nname = A\n", File.ReadAllText(songIni));
+        CollectionAssert.AreEqual(ChartReaderTests.SampleMidi(), File.ReadAllBytes(chart));
+    }
+
+    private static byte[] VocalsMidi(string lyric, long tick = 0) => new MidiBuilder()
+        .Track("tempo").Tempo(0, 120)
+        .Track("PART VOCALS").Note(tick, 60).Meta(tick, 0x05, System.Text.Encoding.Latin1.GetBytes(lyric))
+        .Build();
+
     private static readonly ChartTrackKey ExpertGuitar = new(ChartInstrument.Guitar, ChartDifficulty.Expert);
 
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);

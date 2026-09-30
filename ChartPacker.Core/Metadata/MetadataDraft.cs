@@ -28,6 +28,14 @@ public readonly record struct BackgroundChange(string? SourcePath)
     public bool IsRemoval => SourcePath is null;
 }
 
+/// <summary>A pending change to a song's vocals: its chart's <c>PART VOCALS</c> and harmonies.</summary>
+/// <param name="SourcePath">The chart or <c>.sng</c> to take the vocals from, or <see langword="null"/> when the vocals are to be removed.</param>
+public readonly record struct VocalsChange(string? SourcePath)
+{
+    /// <summary>True when the vocals are to be removed.</summary>
+    public bool IsRemoval => SourcePath is null;
+}
+
 /// <summary>A file to add to a song.</summary>
 /// <param name="StoredName">The name to store it under, relative to the song.</param>
 /// <param name="SourcePath">The file to copy in.</param>
@@ -36,7 +44,7 @@ public readonly record struct AddedFile(string StoredName, string SourcePath, lo
 
 /// <summary>
 /// Unsaved changes to one song's metadata, held per key rather than as a copy of the metadata,
-/// plus any change to its album art, its background image and video, and its other files.
+/// plus any change to its album art, its background image and video, its other files, and its chart's vocals and timing.
 /// </summary>
 /// <remarks>
 /// Keys and file names are matched ignoring case (sng-spec A7). Because only the changed keys are
@@ -57,8 +65,8 @@ public sealed class MetadataDraft
 
     private readonly Dictionary<ChartTrackKey, int> _chartOffsets = [];
 
-    /// <summary>True when there are no pending changes, to the metadata, the album art, the backgrounds, the files or the chart's timing.</summary>
-    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasBackgroundChanges && !HasFileChanges && !HasChartOffsets;
+    /// <summary>True when there are no pending changes, to the metadata, the album art, the backgrounds, the files or the chart's vocals or timing.</summary>
+    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasBackgroundChanges && !HasFileChanges && !HasChartEdits;
 
     /// <summary>True when a metadata key has a pending change. The album art, backgrounds and files don't count.</summary>
     public bool HasMetadataChanges => _changes.Count > 0;
@@ -68,6 +76,24 @@ public sealed class MetadataDraft
 
     /// <summary>True when some of the chart's notes are to be moved.</summary>
     public bool HasChartOffsets => _chartOffsets.Count > 0;
+
+    /// <summary>True when the chart's vocals are to be moved.</summary>
+    public bool HasVocalsOffset => VocalsOffset != 0;
+
+    /// <summary>True when saving rewrites the chart the song ends up with: to move some of its notes, or to change or move its vocals.</summary>
+    public bool HasChartEdits => HasChartOffsets || Vocals is not null || HasVocalsOffset;
+
+    /// <summary>
+    /// How far to move the chart's vocals, in milliseconds, later when positive: the vocals it has,
+    /// or those a <see cref="Vocals"/> change gives it. Saving rewrites the chart; see <see cref="Merging.VocalsEditor"/>.
+    /// </summary>
+    public int VocalsOffset { get; private set; }
+
+    /// <summary>
+    /// The pending change to the chart's vocals, if there is one. Saving applies it to the chart the
+    /// song ends up with; see <see cref="Merging.VocalsEditor"/>.
+    /// </summary>
+    public VocalsChange? Vocals { get; private set; }
 
     /// <summary>
     /// How far to move each instrument difficulty's notes, in milliseconds, later when positive.
@@ -168,8 +194,28 @@ public sealed class MetadataDraft
             _chartOffsets[track] = milliseconds;
     }
 
-    /// <summary>Forgets every chart offset, as when the chart they were set for is replaced or removed.</summary>
-    public void ClearChartOffsets() => _chartOffsets.Clear();
+    /// <summary>Moves the chart's vocals by <paramref name="milliseconds"/>, replacing any earlier offset for them; zero forgets it.</summary>
+    public void SetVocalsOffset(int milliseconds) => VocalsOffset = milliseconds;
+
+    /// <summary>Forgets every chart offset, the vocals' too, as when the chart they were set for is replaced or removed.</summary>
+    public void ClearChartOffsets()
+    {
+        _chartOffsets.Clear();
+        VocalsOffset = 0;
+    }
+
+    /// <summary>Replaces the chart's vocals with those of the chart or <c>.sng</c> at <paramref name="sourcePath"/>, replacing any earlier vocals change.</summary>
+    public void SetVocals(string sourcePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sourcePath);
+        Vocals = new VocalsChange(sourcePath);
+    }
+
+    /// <summary>Marks the chart's vocals for removal, replacing any earlier vocals change.</summary>
+    public void RemoveVocals() => Vocals = new VocalsChange(null);
+
+    /// <summary>Forgets any change to the chart's vocals.</summary>
+    public void RevertVocals() => Vocals = null;
 
     /// <summary>Stages <paramref name="file"/> to be added, replacing any earlier add under the same name.</summary>
     public void AddFile(AddedFile file)
@@ -260,6 +306,8 @@ public sealed class MetadataDraft
         AlbumArt = null;
         BackgroundImage = null;
         BackgroundVideo = null;
+        Vocals = null;
+        VocalsOffset = 0;
         _removedFiles.Clear();
         _addedFiles.Clear();
         _replacedBy.Clear();
@@ -275,6 +323,8 @@ public sealed class MetadataDraft
             AlbumArt = AlbumArt,
             BackgroundImage = BackgroundImage,
             BackgroundVideo = BackgroundVideo,
+            Vocals = Vocals,
+            VocalsOffset = VocalsOffset,
         };
         copy._order.AddRange(_order);
         foreach (var (key, change) in _changes)

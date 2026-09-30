@@ -221,21 +221,11 @@ public sealed class SongMergeAnalysis
                 return source;
             }
 
-            var options = ChartReadOptions.From(source.Pairs);
-            var original = ChartReader.Read(bytes, chartName, options);
-            var delay = SongChartSettings.DelayOf(source.Pairs, original);
-            if (ChartFiles.StoredNameFor(chartName) == ChartFiles.ChartName)
-            {
-                var conversion = ChartToMidi.Convert(bytes, options);
-                source.Format = MergeChartFormat.Chart;
-                source.Chart = new MidiChart(conversion.Midi, delay, new ChartReadOptions(conversion.ProDrums));
+            var (chart, conversion) = MidiChart.Load(bytes, chartName, source.Pairs);
+            source.Format = conversion is null ? MergeChartFormat.Midi : MergeChartFormat.Chart;
+            source.Chart = chart;
+            if (conversion is not null)
                 source.ConversionWarnings = conversion.Warnings;
-            }
-            else
-            {
-                source.Format = MergeChartFormat.Midi;
-                source.Chart = new MidiChart(bytes, delay, options);
-            }
 
             source.Parts = PartsOf(source.Chart, source);
         }

@@ -146,7 +146,7 @@ public static class ChartToMidi
         var messages = new List<MidiMessage> { MidiMessage.Text(0, 0x03, "EVENTS") };
         foreach (string line in lines)
         {
-            if (TextEvent(line) is not var (tick, text) || IsVocalEvent(text))
+            if (VocalReader.TextEvent(line) is not var (tick, text) || VocalReader.IsChartVocalEvent(text))
                 continue;
             messages.Add(MidiMessage.Text(tick, 0x01, text.StartsWith('[') ? text : $"[{text}]"));
         }
@@ -157,65 +157,19 @@ public static class ChartToMidi
     /// <summary>The lyrics, as lyric events inside phrase markers; <see langword="null"/> when there are none.</summary>
     private static List<MidiMessage>? Vocals(List<string> lines, int resolution)
     {
-        var events = lines.Select(TextEvent).OfType<(long Tick, string Text)>().Where(e => IsVocalEvent(e.Text)).OrderBy(e => e.Tick).ToList();
-        if (!events.Any(e => e.Text.StartsWith("lyric ", StringComparison.OrdinalIgnoreCase)))
+        if (VocalReader.ChartVocals(lines, resolution) is not var (lyrics, phrases))
             return null;
 
-        var messages = new List<MidiMessage> { MidiMessage.Text(0, 0x03, "PART VOCALS") };
-        long? phraseStart = null;
-        long lastTick = 0;
-        void EndPhrase(long tick)
+        var messages = new List<MidiMessage> { MidiMessage.Text(0, 0x03, VocalReader.VocalsTrackName) };
+        foreach (var lyric in lyrics)
+            messages.Add(MidiMessage.Text(lyric.Tick, 0x05, lyric.Text));
+        foreach (var phrase in phrases)
         {
-            if (phraseStart is { } start)
-            {
-                messages.Add(MidiMessage.NoteOn(start, VocalPhrasePitch));
-                messages.Add(MidiMessage.NoteOff(Math.Max(start + 1, tick), VocalPhrasePitch));
-            }
-
-            phraseStart = null;
+            messages.Add(MidiMessage.NoteOn(phrase.Tick, VocalPhrasePitch));
+            messages.Add(MidiMessage.NoteOff(phrase.Tick + phrase.Length, VocalPhrasePitch));
         }
 
-        foreach (var (tick, text) in events)
-        {
-            if (text.Equals("phrase_start", StringComparison.OrdinalIgnoreCase))
-            {
-                EndPhrase(tick);
-                phraseStart = tick;
-            }
-            else if (text.Equals("phrase_end", StringComparison.OrdinalIgnoreCase))
-            {
-                EndPhrase(tick);
-            }
-            else
-            {
-                messages.Add(MidiMessage.Text(tick, 0x05, text["lyric ".Length..].Trim()));
-            }
-
-            lastTick = tick;
-        }
-
-        EndPhrase(lastTick + resolution);
         return messages;
-    }
-
-    private static bool IsVocalEvent(string text) =>
-        text.StartsWith("lyric ", StringComparison.OrdinalIgnoreCase)
-        || text.Equals("phrase_start", StringComparison.OrdinalIgnoreCase)
-        || text.Equals("phrase_end", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>A line <c>tick = E text</c>, with the quotes around the text removed.</summary>
-    private static (long Tick, string Text)? TextEvent(string line)
-    {
-        int equals = line.IndexOf('=');
-        if (equals < 0 || !long.TryParse(line.AsSpan(0, equals).Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long tick))
-            return null;
-
-        string rest = line[(equals + 1)..].Trim();
-        if (rest.Length < 2 || char.ToUpperInvariant(rest[0]) != 'E' || !char.IsWhiteSpace(rest[1]))
-            return null;
-
-        string text = rest[1..].Trim().Trim('"').Trim();
-        return text.Length == 0 ? null : (tick, text);
     }
 
     private static List<MidiMessage> Part(ChartInstrument instrument, Dictionary<ChartDifficulty, List<string>> difficulties, bool fiveLane, bool pro)
@@ -345,7 +299,7 @@ public static class ChartToMidi
 
             foreach (string line in lines)
             {
-                if (TextEvent(line) is not var (tick, text))
+                if (VocalReader.TextEvent(line) is not var (tick, text))
                     continue;
                 if (text.Equals("solo", StringComparison.OrdinalIgnoreCase))
                     Shared(difficulty, MidiLayout.SoloPitch, tick, tick, sharedFrom);
