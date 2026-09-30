@@ -35,6 +35,7 @@ namespace ChartPacker
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
                 var audio = new SdlAudio();
                 var player = new PlayerViewModel(settings, audio.Open);
+                var highway = new HighwayViewModel(settings, () => player.CurrentPosition);
 
                 // FFmpeg is looked for now, off the UI thread, so the first video shown doesn't wait for it to load.
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);
@@ -42,11 +43,11 @@ namespace ChartPacker
                 var library = new LibraryViewModel(folderPicker, settings, drafts, job, player);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
-                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player), settingsPicker, settings.Save));
+                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway), settingsPicker, settings.Save));
 
                 window.DataContext = new MainWindowViewModel(
                     library,
-                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player),
+                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway),
                     settings,
                     drafts,
                     confirmation,

@@ -955,4 +955,113 @@
   <data name="FilterKindFolder" xml:space="preserve">
     <value>Song folders</value>
   </data>
+  <data name="HighwayToggleToolTip" xml:space="preserve">
+    <value>Show the chart's notes over the background, in time with the audio</value>
+  </data>
+  <data name="HighwayOptionsName" xml:space="preserve">
+    <value>Note highway options</value>
+  </data>
+  <data name="HighwayNoChartToolTip" xml:space="preserve">
+    <value>This song has no chart to show</value>
+  </data>
+  <data name="HighwayInstrumentsHeader" xml:space="preserve">
+    <value>Instruments, up to 4</value>
+  </data>
+  <data name="HighwayOffsetName" xml:space="preserve">
+    <value>Offset</value>
+  </data>
+  <data name="HighwayOffsetUnit" xml:space="preserve">
+    <value>ms</value>
+    <comment>Milliseconds, after the offset box.</comment>
+  </data>
+  <data name="HighwayOffsetToolTip" xml:space="preserve">
+    <value>Moves this difficulty's notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
+  </data>
+  <data name="HighwayNudgeFormat" xml:space="preserve">
+    <value>{0:+0;-0} ms</value>
+    <comment>A nudge button: {0} is the milliseconds added, with its sign.</comment>
+  </data>
+  <data name="HighwayRevertOffsetToolTip" xml:space="preserve">
+    <value>Reset this offset</value>
+  </data>
+  <data name="HighwayNoteSpeedLabel" xml:space="preserve">
+    <value>Note speed</value>
+  </data>
+  <data name="HighwayNoteSpeedDescription" xml:space="preserve">
+    <value>How fast notes fall down the note highway over the background.</value>
+  </data>
+  <data name="HighwayNoteSpeedKeywords" xml:space="preserve">
+    <value>highway scroll speed hyperspeed notes chart falling</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="ShowHighwayLabel" xml:space="preserve">
+    <value>Show note highway</value>
+  </data>
+  <data name="ShowHighwayDescription" xml:space="preserve">
+    <value>Draw the chart's notes falling over the background tile, in time with the audio. Choose the instruments from the button next to the Image and Video switch.</value>
+  </data>
+  <data name="ShowHighwayKeywords" xml:space="preserve">
+    <value>highway notes chart lanes falling preview guitar drums bass keys</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="HighwayFootnote" xml:space="preserve">
+    <value>Offsets are rounded to the nearest chart tick and written to the chart when you save.</value>
+  </data>
+  <data name="HighwayNoChart" xml:space="preserve">
+    <value>This song has no chart.</value>
+  </data>
+  <data name="HighwayUnreadableFormat" xml:space="preserve">
+    <value>The chart can't be read: {0}</value>
+  </data>
+  <data name="HighwayOffsetErrorFormat" xml:space="preserve">
+    <value>The offsets can't be applied, so the notes are shown where the chart has them: {0}</value>
+  </data>
+  <data name="HighwayMarkingsChangedFormat" xml:space="preserve">
+    <value>Moving {0} changes some notes' star power, taps or cymbals, because the markers every difficulty shares stay put. Move each difficulty by the same amount to move the markers with them.</value>
+    <comment>{0} lists instrument difficulties, e.g. 'Expert Guitar, Hard Drums'.</comment>
+  </data>
+  <data name="HighwayDifficultyOffsetFormat" xml:space="preserve">
+    <value>{0}  {1:+0;-0} ms</value>
+    <comment>A difficulty with a pending offset: {0} is the difficulty, {1} the milliseconds.</comment>
+  </data>
+  <data name="HighwayTrackFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{0} is a difficulty, {1} an instrument, e.g. 'Expert Guitar'.</comment>
+  </data>
+  <data name="InstrumentGuitar" xml:space="preserve">
+    <value>Guitar</value>
+  </data>
+  <data name="InstrumentBass" xml:space="preserve">
+    <value>Bass</value>
+  </data>
+  <data name="InstrumentDrums" xml:space="preserve">
+    <value>Drums</value>
+  </data>
+  <data name="InstrumentKeys" xml:space="preserve">
+    <value>Keys</value>
+  </data>
+  <data name="InstrumentRhythm" xml:space="preserve">
+    <value>Rhythm</value>
+  </data>
+  <data name="InstrumentGuitarCoop" xml:space="preserve">
+    <value>Guitar Co-op</value>
+  </data>
+  <data name="InstrumentGhlGuitar" xml:space="preserve">
+    <value>GHL Guitar</value>
+  </data>
+  <data name="InstrumentGhlBass" xml:space="preserve">
+    <value>GHL Bass</value>
+  </data>
+  <data name="DifficultyEasy" xml:space="preserve">
+    <value>Easy</value>
+  </data>
+  <data name="DifficultyMedium" xml:space="preserve">
+    <value>Medium</value>
+  </data>
+  <data name="DifficultyHard" xml:space="preserve">
+    <value>Hard</value>
+  </data>
+  <data name="DifficultyExpert" xml:space="preserve">
+    <value>Expert</value>
+  </data>
 </root>

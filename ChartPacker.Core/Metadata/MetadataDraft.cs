@@ -1,3 +1,4 @@
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Scanning;
 
 namespace ChartPacker.Core.Metadata;
@@ -54,14 +55,25 @@ public sealed class MetadataDraft
     // The removals an add made, by the added name, so that dropping the add drops them too.
     private readonly Dictionary<string, List<string>> _replacedBy = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>True when there are no pending changes, to the metadata, the album art, the backgrounds or the files.</summary>
-    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasBackgroundChanges && !HasFileChanges;
+    private readonly Dictionary<ChartTrackKey, int> _chartOffsets = [];
+
+    /// <summary>True when there are no pending changes, to the metadata, the album art, the backgrounds, the files or the chart's timing.</summary>
+    public bool IsEmpty => _changes.Count == 0 && AlbumArt is null && !HasBackgroundChanges && !HasFileChanges && !HasChartOffsets;
 
     /// <summary>True when a metadata key has a pending change. The album art, backgrounds and files don't count.</summary>
     public bool HasMetadataChanges => _changes.Count > 0;
 
     /// <summary>True when a file is to be removed or added. The album art and backgrounds don't count.</summary>
     public bool HasFileChanges => _removedFiles.Count > 0 || _addedFiles.Count > 0;
+
+    /// <summary>True when some of the chart's notes are to be moved.</summary>
+    public bool HasChartOffsets => _chartOffsets.Count > 0;
+
+    /// <summary>
+    /// How far to move each instrument difficulty's notes, in milliseconds, later when positive.
+    /// Saving rewrites the chart the song ends up with; see <see cref="ChartShifter"/>.
+    /// </summary>
+    public IReadOnlyDictionary<ChartTrackKey, int> ChartOffsets => _chartOffsets;
 
     /// <summary>True when the background image or video has a pending change.</summary>
     public bool HasBackgroundChanges => BackgroundImage is not null || BackgroundVideo is not null;
@@ -146,6 +158,18 @@ public sealed class MetadataDraft
         else
             BackgroundVideo = change;
     }
+
+    /// <summary>Moves the notes of <paramref name="track"/> by <paramref name="milliseconds"/>, replacing any earlier offset for it; zero forgets it.</summary>
+    public void SetChartOffset(ChartTrackKey track, int milliseconds)
+    {
+        if (milliseconds == 0)
+            _chartOffsets.Remove(track);
+        else
+            _chartOffsets[track] = milliseconds;
+    }
+
+    /// <summary>Forgets every chart offset, as when the chart they were set for is replaced or removed.</summary>
+    public void ClearChartOffsets() => _chartOffsets.Clear();
 
     /// <summary>Stages <paramref name="file"/> to be added, replacing any earlier add under the same name.</summary>
     public void AddFile(AddedFile file)
@@ -239,6 +263,7 @@ public sealed class MetadataDraft
         _removedFiles.Clear();
         _addedFiles.Clear();
         _replacedBy.Clear();
+        _chartOffsets.Clear();
     }
 
     /// <summary>Gets the pending change to <paramref name="key"/>, if there is one.</summary>

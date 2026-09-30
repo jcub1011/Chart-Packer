@@ -1,7 +1,9 @@
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
+using ChartPacker.Core.Tests.Charts;
 using ChartPacker.Core.Validation;
 
 namespace ChartPacker.Core.Tests.Metadata;
@@ -209,6 +211,76 @@ public sealed class DraftWriterTests
 
         CollectionAssert.AreEquivalent(new[] { "guitar.ogg", "notes.chart" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
     }
+
+    [TestMethod]
+    public async Task FolderChartOffsetsRewriteTheStoredChart()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        string chart = Path.Combine(folder, "notes.chart");
+        File.WriteAllText(chart, ChartReaderTests.Chart);
+        var draft = new MetadataDraft();
+        draft.SetChartOffset(ExpertGuitar, 500);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        CollectionAssert.AreEquivalent(new[] { "notes.chart" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreEqual(192, ChartReaderTests.Notes(ChartReader.Read(File.ReadAllBytes(chart), "notes.chart"), ChartInstrument.Guitar)[0].Tick);
+        Assert.IsEmpty(Directory.GetFiles(Path.GetTempPath(), "chartpacker-*.chart").Where(f => File.GetCreationTimeUtc(f) > DateTime.UtcNow.AddMinutes(-1)));
+    }
+
+    [TestMethod]
+    public async Task FolderChartOffsetsApplyToAnAddedChart()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        File.WriteAllBytes(Path.Combine(folder, "notes.chart"), [1]);
+        string source = WriteSource(ChartReaderTests.SampleMidi());
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("notes.mid", source, 1), ["notes.chart"]);
+        draft.SetChartOffset(ExpertGuitar, 250);
+
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+
+        CollectionAssert.AreEquivalent(new[] { "notes.mid" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreEqual(240, ChartReaderTests.Notes(ChartReader.Read(File.ReadAllBytes(Path.Combine(folder, "notes.mid")), "notes.mid"), ChartInstrument.Guitar)[0].Tick);
+        CollectionAssert.AreEqual(ChartReaderTests.SampleMidi(), File.ReadAllBytes(source));
+    }
+
+    [TestMethod]
+    public async Task FolderChartOffsetThatCantApplyWritesNothing()
+    {
+        string folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "Song")).FullName;
+        File.WriteAllText(Path.Combine(folder, "notes.chart"), ChartReaderTests.Chart);
+        string songIni = Path.Combine(folder, SongIni.FileName);
+        File.WriteAllText(songIni, "[song]\nname = A\n");
+        var draft = new MetadataDraft();
+        draft.Set("name", "B");
+        draft.SetChartOffset(ExpertGuitar, -500);
+
+        await Assert.ThrowsExactlyAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft));
+
+        Assert.AreEqual("[song]\nname = A\n", File.ReadAllText(songIni));
+        Assert.AreEqual(ChartReaderTests.Chart, File.ReadAllText(Path.Combine(folder, "notes.chart")));
+    }
+
+    [TestMethod]
+    public async Task SngChartOffsetsRewriteTheStoredChart()
+    {
+        byte[] midi = ChartReaderTests.SampleMidi();
+        string sng = await CreateSngAsync([P("name", "A")], ("notes.mid", midi), ("song.ogg", [4]));
+        var draft = new MetadataDraft();
+        draft.SetChartOffset(ExpertGuitar, 250);
+
+        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+
+        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
+        var after = SngReader.Read(sng);
+        CollectionAssert.AreEquivalent(new[] { "notes.mid", "song.ogg" }, after.Files.Select(f => f.Name).ToArray());
+        var chart = ChartReader.Read(Extract(sng, after, "notes.mid"), "notes.mid");
+        Assert.AreEqual(240, ChartReaderTests.Notes(chart, ChartInstrument.Guitar)[0].Tick);
+        CollectionAssert.AreEqual(new byte[] { 4 }, Extract(sng, after, "song.ogg"));
+    }
+
+    private static readonly ChartTrackKey ExpertGuitar = new(ChartInstrument.Guitar, ChartDifficulty.Expert);
 
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
 

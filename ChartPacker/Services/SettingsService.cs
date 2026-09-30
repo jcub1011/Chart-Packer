@@ -90,6 +90,10 @@ namespace ChartPacker.Services
             settings.MasterVolume = double.IsFinite(settings.MasterVolume)
                 ? Math.Clamp(settings.MasterVolume, 0, 1)
                 : AppSettings.DefaultMasterVolume;
+
+            settings.HighwayNoteSpeed = double.IsFinite(settings.HighwayNoteSpeed)
+                ? Math.Clamp(settings.HighwayNoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed)
+                : AppSettings.DefaultHighwayNoteSpeed;
         }
     }
 }

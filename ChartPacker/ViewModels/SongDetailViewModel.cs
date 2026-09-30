@@ -100,7 +100,7 @@ namespace ChartPacker.ViewModels
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
 
-        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker, PlayerViewModel player)
+        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker, PlayerViewModel player, HighwayViewModel highway)
         {
             _drafts = drafts;
             _job = job;
@@ -113,6 +113,8 @@ namespace ChartPacker.ViewModels
                 if (e.PropertyName == nameof(BackgroundViewModel.ShownKind))
                     RemoveBackgroundCommand.NotifyCanExecuteChanged();
             };
+            Highway = highway;
+            Highway.OffsetsChanged += (_, _) => OnDraftsChanged();
             foreach (string stem in AudioStems.Stems)
                 _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
             _job.PropertyChanged += (_, e) =>
@@ -140,6 +142,9 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The selected songs' background image or video, beside the album art.</summary>
         public BackgroundViewModel Background { get; }
+
+        /// <summary>The note highway over the background, for the one selected song's chart.</summary>
+        public HighwayViewModel Highway { get; }
 
         /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
         [ObservableProperty]
@@ -302,7 +307,7 @@ namespace ChartPacker.ViewModels
         public string ChartMissingNote => Charts.Count > 0 ? Strings.ChartWillBeRemoved : Strings.NoChart;
 
         /// <summary>The one selected song's chart has a staged change.</summary>
-        public bool IsChartChanged => Charts.Any(c => c.IsRemoved || c.Marker is not null);
+        public bool IsChartChanged => Charts.Any(c => c.IsRemoved || c.Marker is not null) || (_songs.Count == 1 && _songs[0].Item.Draft.HasChartOffsets);
 
         /// <summary>Every selected song was read and can be written back.</summary>
         public bool IsEditable => _songs.Count > 0 && _songs.Count == _entries.Count && ReadOnlyNote is null;
@@ -341,6 +346,7 @@ namespace ChartPacker.ViewModels
             // Playback is of what's shown, and holds its files open; so does the background video.
             Player.Unload();
             Background.Unload();
+            Highway.Unload();
 
             _entries = entries;
             _songs = [];
@@ -930,6 +936,9 @@ namespace ChartPacker.ViewModels
             var draft = songs[0].Item.Draft;
             RevertAddedCharts(draft);
 
+            // Offsets were set against the chart being replaced.
+            draft.ClearChartOffsets();
+
             // Recorded as replaced by the add, so removing it (or reverting the chart) brings them back.
             var replaced = ChartFiles.FilesOf(_diskFiles.Select(f => f.Path))
                 .Where(stored => !stored.Equals(storedName, StringComparison.Ordinal))
@@ -947,6 +956,7 @@ namespace ChartPacker.ViewModels
         {
             var draft = _songs[0].Item.Draft;
             RevertAddedCharts(draft);
+            draft.ClearChartOffsets();
             foreach (string stored in ChartFiles.FilesOf(_diskFiles.Select(f => f.Path)))
                 draft.RemoveFile(stored);
             ChartError = null;
@@ -955,12 +965,13 @@ namespace ChartPacker.ViewModels
 
         private bool CanRevertChart() => CanChangeFiles() && IsChartChanged;
 
-        /// <summary>Drops every staged change to the selected song's chart.</summary>
+        /// <summary>Drops every staged change to the selected song's chart, its offsets too.</summary>
         [RelayCommand(CanExecute = nameof(CanRevertChart))]
         private void RevertChart()
         {
             var draft = _songs[0].Item.Draft;
             RevertAddedCharts(draft);
+            draft.ClearChartOffsets();
             foreach (string stored in ChartFiles.FilesOf(_diskFiles.Select(f => f.Path)))
                 draft.RevertFile(stored);
             ChartError = null;
@@ -1320,6 +1331,7 @@ namespace ChartPacker.ViewModels
 
             (ArtFileName, ArtFileSize) = keys is [not null] ? SharedArtFile() : (null, null);
             Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
+            Highway.Refresh(HighwaySongOf());
             RebuildFiles();
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
@@ -1350,6 +1362,12 @@ namespace ChartPacker.ViewModels
         /// <summary><paramref name="song"/> as the background tile needs it, with its video timeline as drafted.</summary>
         private static BackgroundSong BackgroundSongOf(EditableSong song) =>
             new(song.Entry, song.Item.Draft, song.Backgrounds, VideoTimeline.From(song.Item.Draft.ApplyTo(song.Item.Original)));
+
+        /// <summary>The one selected song as the note highway needs it, or <see langword="null"/> when there isn't one.</summary>
+        private HighwaySong? HighwaySongOf() =>
+            _songs is [var song] && !IsBulk
+                ? new HighwaySong(song.Entry, song.Item.Draft, song.Item.Draft.ApplyTo(song.Item.Original), [.. _diskFiles.Select(f => f.Path)])
+                : null;
 
         /// <summary>
         /// The one selected song's chart files and other files, with the ones a staged change removes

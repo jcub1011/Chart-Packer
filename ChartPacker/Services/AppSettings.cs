@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Library;
@@ -13,6 +14,9 @@ namespace ChartPacker.Services
         public const int MaxScanMaxDepth = 10;
         public const double DefaultMasterVolume = 1;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
+        public const double DefaultHighwayNoteSpeed = 1;
+        public const double MinHighwayNoteSpeed = 0.5;
+        public const double MaxHighwayNoteSpeed = 3;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
@@ -48,5 +52,20 @@ namespace ChartPacker.Services
 
         /// <summary>Whether the spectrum is drawn behind the details panel. Off, it isn't worked out at all.</summary>
         public bool ShowSpectrum { get; set; } = true;
+
+        /// <summary>Whether the chart's notes are drawn over the background tile.</summary>
+        public bool ShowNoteHighway { get; set; } = true;
+
+        /// <summary>How fast the highway's notes fall, as a multiple of the normal speed.</summary>
+        public double HighwayNoteSpeed { get; set; } = DefaultHighwayNoteSpeed;
+
+        /// <summary>
+        /// The instruments last chosen for the highway, by <c>ChartInstrument</c> name, including ones
+        /// the song on show didn't have. <see langword="null"/> shows the first four a chart has.
+        /// </summary>
+        public List<string>? HighwayInstruments { get; set; }
+
+        /// <summary>The difficulty last chosen for each instrument, by name. An instrument not listed shows Expert.</summary>
+        public Dictionary<string, string>? HighwayDifficulties { get; set; }
     }
 }

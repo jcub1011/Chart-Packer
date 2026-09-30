@@ -1,3 +1,4 @@
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 
@@ -201,6 +202,27 @@ public sealed class MetadataDraftTests
         draft.RemoveBackground(BackgroundKind.Image);
 
         Assert.IsTrue(draft.BackgroundImage is { IsRemoval: true });
+    }
+
+    [TestMethod]
+    public void ChartOffsetsMakeTheDraftDirtyAndZeroForgetsOne()
+    {
+        var expert = new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Expert);
+        var hard = new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Hard);
+        var draft = new MetadataDraft();
+
+        draft.SetChartOffset(expert, 12);
+        draft.SetChartOffset(hard, -5);
+        draft.SetChartOffset(expert, 0);
+
+        Assert.IsFalse(draft.IsEmpty);
+        Assert.IsTrue(draft.HasChartOffsets);
+        Assert.IsFalse(draft.HasFileChanges);
+        CollectionAssert.AreEqual(new[] { KeyValuePair.Create(hard, -5) }, draft.ChartOffsets.ToArray());
+
+        draft.Clear();
+
+        Assert.IsTrue(draft.IsEmpty);
     }
 
     [TestMethod]

@@ -19,7 +19,7 @@ namespace ChartPacker.Services
     /// </remarks>
     public static class AppSettingsCatalog
     {
-        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player)
+        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway)
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
@@ -117,6 +117,32 @@ namespace ChartPacker.Services
                         DefaultValue = true,
                         Get = () => player.ShowSpectrum,
                         Set = show => player.ShowSpectrum = show,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "playback.showNoteHighway",
+                        Category = visualizers,
+                        Label = Strings.ShowHighwayLabel,
+                        Description = Strings.ShowHighwayDescription,
+                        Keywords = Words(Strings.ShowHighwayKeywords),
+                        DefaultValue = true,
+                        Get = () => highway.IsEnabled,
+                        Set = show => highway.IsEnabled = show,
+                    },
+                    new RangeSetting
+                    {
+                        Id = "playback.highwayNoteSpeed",
+                        Category = visualizers,
+                        Label = Strings.HighwayNoteSpeedLabel,
+                        Description = Strings.HighwayNoteSpeedDescription,
+                        Keywords = Words(Strings.HighwayNoteSpeedKeywords),
+                        DefaultValue = AppSettings.DefaultHighwayNoteSpeed,
+                        Minimum = AppSettings.MinHighwayNoteSpeed,
+                        Maximum = AppSettings.MaxHighwayNoteSpeed,
+                        SmallChange = 0.1,
+                        Format = speed => speed.ToString("0.0", CultureInfo.CurrentCulture) + "×",
+                        Get = () => highway.NoteSpeed,
+                        Set = speed => highway.NoteSpeed = speed,
                     },
                 ]);
         }
