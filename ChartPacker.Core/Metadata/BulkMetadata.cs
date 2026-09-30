@@ -52,7 +52,9 @@ public static class BulkMetadata
     /// <para>A row that is unchanged and holds an unset difficulty (<c>diff_* = -1</c>) in every item
     /// that has it is left out, as the viewer always has.</para>
     /// </remarks>
-    public static IReadOnlyList<BulkMetadataRow> BuildRows(IReadOnlyList<MetadataItem> items)
+    /// <param name="items">The items to merge.</param>
+    /// <param name="exclude">Keys to leave out, such as the ones edited elsewhere; none when <see langword="null"/>.</param>
+    public static IReadOnlyList<BulkMetadataRow> BuildRows(IReadOnlyList<MetadataItem> items, Func<string, bool>? exclude = null)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -81,11 +83,23 @@ public static class BulkMetadata
         var rows = new List<BulkMetadataRow>(keys.Count);
         foreach (string key in keys)
         {
-            if (BuildRow(items, key) is { } row)
+            if (exclude?.Invoke(key) != true && BuildRow(items, key, includeUnset: false) is { } row)
                 rows.Add(row);
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Merges <paramref name="key"/> across <paramref name="items"/> as <see cref="BuildRows"/> does,
+    /// but keeps an unset difficulty.
+    /// </summary>
+    /// <returns>The row, or <see langword="null"/> when no item had or will have the key.</returns>
+    public static BulkMetadataRow? RowOf(IReadOnlyList<MetadataItem> items, string key)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        return BuildRow(items, key, includeUnset: true);
     }
 
     /// <summary>Sets <paramref name="key"/> to <paramref name="value"/> in every item, adding it where it's missing.</summary>
@@ -130,7 +144,7 @@ public static class BulkMetadata
             item.Draft.Revert(key);
     }
 
-    private static BulkMetadataRow? BuildRow(IReadOnlyList<MetadataItem> items, string key)
+    private static BulkMetadataRow? BuildRow(IReadOnlyList<MetadataItem> items, string key, bool includeUnset)
     {
         bool anyOriginal = false, anyEffective = false, anyChange = false;
         bool allOriginal = true, allEffective = true;
@@ -179,7 +193,7 @@ public static class BulkMetadata
             : anyChange ? MetadataRowState.Edited
             : MetadataRowState.Unchanged;
 
-        if (state == MetadataRowState.Unchanged && allUnset)
+        if (state == MetadataRowState.Unchanged && allUnset && !includeUnset)
             return null;
 
         return new BulkMetadataRow(key, allEffective && effectivesAgree ? effectiveValue : null, state);

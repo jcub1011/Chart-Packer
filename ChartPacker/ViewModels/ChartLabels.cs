@@ -1,5 +1,7 @@
+using System.Linq;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Merging;
+using ChartPacker.Core.Metadata;
 using ChartPacker.Resources;
 
 namespace ChartPacker.ViewModels
@@ -25,6 +27,36 @@ namespace ChartPacker.ViewModels
             ChartDifficulty.Medium => Strings.DifficultyMedium,
             ChartDifficulty.Hard => Strings.DifficultyHard,
             _ => Strings.DifficultyExpert,
+        };
+
+        /// <summary>The one-letter name of <paramref name="difficulty"/>: E, M, H or X.</summary>
+        public static string DifficultyLetter(ChartDifficulty difficulty) => difficulty switch
+        {
+            ChartDifficulty.Easy => Strings.MergeDifficultyEasyLetter,
+            ChartDifficulty.Medium => Strings.MergeDifficultyMediumLetter,
+            ChartDifficulty.Hard => Strings.MergeDifficultyHardLetter,
+            _ => Strings.MergeDifficultyExpertLetter,
+        };
+
+        /// <summary>The name of the instrument <paramref name="slot"/> rates, e.g. <c>Pro Drums (PS)</c>.</summary>
+        public static string SlotName(DifficultySlot slot) => slot.Key switch
+        {
+            "diff_drums_real" => Strings.InstrumentProDrums,
+            "diff_drums_real_ps" => Strings.InstrumentProDrumsPs,
+            "diff_keys_real_ps" => Strings.InstrumentProKeysPs,
+            "diff_band" => Strings.InstrumentBand,
+            _ => MidiPartCatalog.Known.FirstOrDefault(p => p.Id == slot.PartId) is { } part ? PartName(part) : slot.Key,
+        };
+
+        /// <summary>The short tag that marks <paramref name="modifier"/>'s variant on an icon, or <see langword="null"/> for none.</summary>
+        public static string? ModifierTag(DifficultyModifier modifier) => modifier switch
+        {
+            DifficultyModifier.Coop => Strings.DifficultyTagCoop,
+            DifficultyModifier.Pro => Strings.DifficultyTagPro,
+            DifficultyModifier.Pro22 => Strings.DifficultyTagPro22,
+            DifficultyModifier.Ghl => Strings.DifficultyTagGhl,
+            DifficultyModifier.PhaseShift => Strings.DifficultyTagPhaseShift,
+            _ => null,
         };
 
         /// <summary>The name of <paramref name="part"/>, or its first track's name for a part that isn't known.</summary>

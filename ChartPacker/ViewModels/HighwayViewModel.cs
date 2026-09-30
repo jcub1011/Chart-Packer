@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using ChartPacker.Controls;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
@@ -40,6 +41,9 @@ namespace ChartPacker.ViewModels
         // How far ahead of the strike line the highway shows at the normal note speed, in seconds.
         private const double BaseLookAhead = 1.4;
         private HighwaySong? _song;
+
+        // The parts of a song without a chart; one instance, so setting it again doesn't notify.
+        private static readonly IReadOnlyDictionary<string, LibraryDifficulties> NoParts = new Dictionary<string, LibraryDifficulties>();
 
         // The chart being shown, by where it's read from, and its bytes once read.
         private string? _sourceKey;
@@ -107,6 +111,14 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasProblem))]
         public partial string? Problem { get; set; }
 
+        /// <summary>
+        /// The parts the song's chart has, by <see cref="Core.Merging.MidiPart.Id"/>, with the difficulties
+        /// each has notes for: empty when it has no chart, and <see langword="null"/> while that isn't known,
+        /// as with no song or several, while the chart is read, or when it can't be.
+        /// </summary>
+        [ObservableProperty]
+        public partial IReadOnlyDictionary<string, LibraryDifficulties>? ChartParts { get; private set; }
+
         /// <summary>How far ahead of the strike line the highway shows, in seconds.</summary>
         public double LookAhead => BaseLookAhead / Math.Clamp(NoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed);
 
@@ -149,6 +161,7 @@ namespace ChartPacker.ViewModels
             if (DraftChart.Of(song.Draft, song.StoredFiles) is not { } chart)
             {
                 Clear(Strings.HighwayNoChart);
+                ChartParts = NoParts;
                 return;
             }
 
@@ -204,6 +217,7 @@ namespace ChartPacker.ViewModels
             _originalOf = null;
             _shown = null;
             _builtOffsets = null;
+            ChartParts = null;
             Rows.Clear();
             Scene = null;
             Problem = null;
@@ -231,12 +245,18 @@ namespace ChartPacker.ViewModels
             if (bytes is null)
             {
                 Note = Strings.HighwayNoChart;
+                ChartParts = NoParts;
                 return;
             }
 
             _bytes = bytes;
             _chartName = chart.Name;
             RequestRebuild();
+
+            // Read alongside the rebuild; the parts don't depend on the offsets or pro_drums.
+            var parts = await Task.Run(() => ChartContents.ReadParts(bytes, chart.Name));
+            if (version == _version && key == _sourceKey)
+                ChartParts = parts;
         }
 
         /// <summary>Whether what's shown, or the rebuild under way, is of <paramref name="song"/>'s offsets and <c>pro_drums</c>.</summary>

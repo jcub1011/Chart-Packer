@@ -1,8 +1,8 @@
 # Third-party notices
 
 Chart-Packer includes no third-party source code. The first part of this file credits the work
-its implementation is based on. The second lists the libraries that are built into a release of
-the app, with their licenses.
+its implementation is based on. The second credits the icons it uses. The third lists the
+libraries that are built into a release of the app, with their licenses.
 
 ## Implementation references
 
@@ -64,6 +64,31 @@ specifications; no code from any implementation of them is used.
   [ID3v2](https://id3.org/id3v2.4.0-structure)'s tag header, to skip the tag
   (`Decoding/Mp3Source.cs`).
 - **WAV:** the RIFF WAVE format, including `WAVE_FORMAT_EXTENSIBLE` (`Decoding/WavSource.cs`).
+
+## Icons
+
+### game-icons.net
+
+- **Project:** [game-icons.net](https://game-icons.net) ([game-icons/icons](https://github.com/game-icons/icons))
+- **License:** [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)
+- **Used for:** the instrument icons of the difficulties in the details panel
+  (`ChartPacker/Styles/Icons.axaml`, the `Instrument*Geometry` resources). The SVG paths are
+  used unchanged, except that each command is written out in full so that Avalonia's path
+  parser reads it. They're drawn at a smaller size, and recoloured.
+
+| Icon | Author | Used as |
+|---|---|---|
+| [Guitar](https://game-icons.net/1x1/lorc/guitar.html) | [Lorc](https://lorcblog.blogspot.com) | Guitar, co-op, pro and GHL guitar |
+| [Guitar bass head](https://game-icons.net/1x1/delapouite/guitar-bass-head.html) | [Delapouite](https://delapouite.com) | Bass, pro and GHL bass |
+| [Guitar head](https://game-icons.net/1x1/delapouite/guitar-head.html) | [Delapouite](https://delapouite.com) | Rhythm, GHL rhythm |
+| [Drum](https://game-icons.net/1x1/delapouite/drum.html) | [Delapouite](https://delapouite.com) | Drums |
+| [Drum kit](https://game-icons.net/1x1/caro-asercion/drum-kit.html) | Caro Asercion | Pro drums |
+| [Musical keyboard](https://game-icons.net/1x1/delapouite/musical-keyboard.html) | [Delapouite](https://delapouite.com) | Keys |
+| [Piano keys](https://game-icons.net/1x1/delapouite/piano-keys.html) | [Delapouite](https://delapouite.com) | Pro keys |
+| [Microphone](https://game-icons.net/1x1/delapouite/microphone.html) | [Delapouite](https://delapouite.com) | Vocals |
+| [Musical notes](https://game-icons.net/1x1/delapouite/musical-notes.html) | [Delapouite](https://delapouite.com) | Harmonies |
+| [Footsteps](https://game-icons.net/1x1/skoll/footsteps.html) | Skoll | Dance |
+| [Three friends](https://game-icons.net/1x1/delapouite/three-friends.html) | [Delapouite](https://delapouite.com) | Band |
 
 ## Bundled libraries
 

@@ -714,13 +714,7 @@ namespace ChartPacker.ViewModels
         private static string DifficultiesOf(MergeSource source, string partId)
         {
             var part = source.Parts.First(p => p.Part.Id == partId);
-            string letters = string.Join(" ", part.Difficulties.Select(d => d switch
-            {
-                ChartDifficulty.Easy => Strings.MergeDifficultyEasyLetter,
-                ChartDifficulty.Medium => Strings.MergeDifficultyMediumLetter,
-                ChartDifficulty.Hard => Strings.MergeDifficultyHardLetter,
-                _ => Strings.MergeDifficultyExpertLetter,
-            }));
+            string letters = string.Join(" ", part.Difficulties.Select(ChartLabels.DifficultyLetter));
             return letters.Length > 0 ? letters : Strings.MergePartPresent;
         }
 

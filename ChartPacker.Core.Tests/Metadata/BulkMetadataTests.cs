@@ -181,6 +181,29 @@ public sealed class BulkMetadataTests
         Assert.AreEqual(new BulkMetadataRow("name", "B", MetadataRowState.Edited), rows[1]);
     }
 
+    [TestMethod]
+    public void ExcludedKeysHaveNoRow()
+    {
+        var items = Items([P("name", "A"), P("diff_guitar", "4"), P("diff_foo", "2")]);
+
+        var rows = BulkMetadata.BuildRows(items, DifficultySlots.Contains);
+
+        CollectionAssert.AreEqual(new[] { "diff_foo", "name" }, rows.Select(r => r.Key).ToArray());
+    }
+
+    [TestMethod]
+    public void RowOfKeepsAnUnsetDifficulty()
+    {
+        var items = Items([P("diff_guitar", "-1")]);
+
+        Assert.AreEqual(new BulkMetadataRow("diff_guitar", "-1", MetadataRowState.Unchanged), BulkMetadata.RowOf(items, "diff_guitar"));
+        Assert.IsFalse(BulkMetadata.BuildRows(items).Any(r => r.Key == "diff_guitar"));
+    }
+
+    [TestMethod]
+    public void RowOfAKeyNoItemHasIsNull() =>
+        Assert.IsNull(BulkMetadata.RowOf(Items([P("name", "A")]), "diff_guitar"));
+
     private static MetadataItem[] Items(params KeyValuePair<string, string>[][] originals) =>
         [.. originals.Select(o => new MetadataItem(o, new MetadataDraft()))];
 

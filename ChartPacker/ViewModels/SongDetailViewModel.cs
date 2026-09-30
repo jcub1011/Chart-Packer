@@ -123,6 +123,12 @@ namespace ChartPacker.ViewModels
             };
             Highway = highway;
             Highway.OffsetsChanged += (_, _) => OnOffsetsChanged();
+            Highway.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(HighwayViewModel.ChartParts))
+                    RefreshInstruments();
+            };
+            Instruments = [.. DifficultySlots.All.Select(s => new InstrumentDifficultyViewModel(this, s))];
             Lyrics = new LyricsViewModel(() => Player.CurrentPosition);
             Lyrics.OffsetChanged += (_, _) => OnOffsetsChanged();
 
@@ -142,6 +148,24 @@ namespace ChartPacker.ViewModels
         }
 
         public AvaloniaList<MetadataRowViewModel> Metadata { get; } = [];
+
+        /// <summary>An icon per song.ini difficulty, above the metadata rows, which leave the difficulties out.</summary>
+        public IReadOnlyList<InstrumentDifficultyViewModel> Instruments { get; }
+
+        /// <summary>Whether the icons of instruments that aren't charted and have no difficulty are shown too.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(InstrumentsToggleText))]
+        public partial bool ShowAllInstruments { get; set; }
+
+        /// <summary>The instruments' icons are shown: some selected song's metadata was read.</summary>
+        public bool ShowInstruments => _songs.Count > 0;
+
+        /// <summary>Some icons are hidden until Show all.</summary>
+        public bool HasHiddenInstruments => Instruments.Any(i => i.IsHidden);
+
+        public string InstrumentsToggleText => ShowAllInstruments
+            ? Strings.InstrumentsShowFewer
+            : string.Format(CultureInfo.CurrentCulture, Strings.InstrumentsShowAllFormat, Instruments.Count(i => i.IsHidden));
 
         /// <summary>The one selected song's files that aren't its album art, background, tracks, chart or song.ini.</summary>
         public AvaloniaList<FileRow> Files { get; } = [];
@@ -528,6 +552,22 @@ namespace ChartPacker.ViewModels
         {
             BulkMetadata.Revert(Items(), key);
             OnDraftsChanged();
+        }
+
+        /// <summary>Unsets the difficulty <paramref name="key"/>: <c>-1</c> where one is stored, and no change elsewhere.</summary>
+        internal void UnsetDifficulty(string key)
+        {
+            MetadataDifficulty.Unset(Items(), key);
+            OnDraftsChanged();
+        }
+
+        [RelayCommand]
+        private void ToggleShowAllInstruments() => ShowAllInstruments = !ShowAllInstruments;
+
+        partial void OnShowAllInstrumentsChanged(bool value)
+        {
+            foreach (var instrument in Instruments)
+                instrument.RefreshShown();
         }
 
         private bool CanAutoSetLength() => CanEdit && !IsAutoSettingLength;
@@ -1369,7 +1409,7 @@ namespace ChartPacker.ViewModels
         private void RebuildRows()
         {
             var byKey = Metadata.ToDictionary(r => r.Key, StringComparer.OrdinalIgnoreCase);
-            var next = BulkMetadata.BuildRows(Items())
+            var next = BulkMetadata.BuildRows(Items(), DifficultySlots.Contains)
                 .Select(r => byKey.TryGetValue(r.Key, out var existing) ? existing.Update(r) : new MetadataRowViewModel(this, r))
                 .ToList();
 
@@ -1388,11 +1428,26 @@ namespace ChartPacker.ViewModels
             while (Metadata.Count > next.Count)
                 Metadata.RemoveAt(Metadata.Count - 1);
 
-            MetadataNote = _loadNote ?? (Metadata.Count == 0 ? Strings.NoMetadata : null);
+            RefreshInstruments();
+            MetadataNote = _loadNote ?? (Metadata.Count == 0 && Instruments.All(i => i.IsAllUnset) ? Strings.NoMetadata : null);
             OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
             RefreshAvailableKeys();
             RefreshHeadline();
             RefreshState();
+        }
+
+        /// <summary>
+        /// Brings the instruments' icons up to date with the drafts and, for one song, with what its
+        /// chart has, as the highway read it.
+        /// </summary>
+        private void RefreshInstruments()
+        {
+            var items = Items();
+            var parts = IsBulk ? null : Highway.ChartParts;
+            foreach (var instrument in Instruments)
+                instrument.Update(BulkMetadata.RowOf(items, instrument.Key), MetadataDifficulty.IsUnsetIn(items, instrument.Key), parts);
+            OnPropertyChanged(nameof(HasHiddenInstruments));
+            OnPropertyChanged(nameof(InstrumentsToggleText));
         }
 
         /// <summary>
@@ -1421,13 +1476,13 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Offers the known keys that aren't a row yet. A removed row's key is offered again, since
-        /// adding it back is allowed; a hidden unset difficulty is offered too, and adding it edits it.
-        /// This is the same test <see cref="CommitAdd"/> uses to reject a key.
+        /// adding it back is allowed. The difficulties are left out, as their icons set them.
+        /// Apart from that, this is the same test <see cref="CommitAdd"/> uses to reject a key.
         /// </summary>
         private void RefreshAvailableKeys()
         {
             var used = Metadata.Where(r => !r.IsRemoved).Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var available = KnownKeys.All.Where(k => !used.Contains(k.Key)).ToList();
+            var available = KnownKeys.All.Where(k => !used.Contains(k.Key) && !DifficultySlots.Contains(k.Key)).ToList();
             if (!available.SequenceEqual(AvailableKeys))
                 AvailableKeys = available;
         }
@@ -1881,6 +1936,7 @@ namespace ChartPacker.ViewModels
         private void RefreshState()
         {
             OnPropertyChanged(nameof(ShowPlaceholder));
+            OnPropertyChanged(nameof(ShowInstruments));
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(ShowDetails));
             OnPropertyChanged(nameof(HasFindings));
@@ -1934,6 +1990,8 @@ namespace ChartPacker.ViewModels
                 command.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
                 row.RefreshCommands();
+            foreach (var instrument in Instruments)
+                instrument.RefreshCommands();
         }
 
         private void RefreshLyricsCommands()

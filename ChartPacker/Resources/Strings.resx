@@ -1203,6 +1203,90 @@
   <data name="InstrumentGhlBass" xml:space="preserve">
     <value>GHL Bass</value>
   </data>
+  <data name="InstrumentProDrums" xml:space="preserve">
+    <value>Pro Drums</value>
+  </data>
+  <data name="InstrumentProDrumsPs" xml:space="preserve">
+    <value>Pro Drums (PS)</value>
+    <comment>Phase Shift's pro drums difficulty.</comment>
+  </data>
+  <data name="InstrumentProKeysPs" xml:space="preserve">
+    <value>Pro Keys (PS)</value>
+    <comment>Phase Shift's pro keys difficulty.</comment>
+  </data>
+  <data name="InstrumentBand" xml:space="preserve">
+    <value>Band</value>
+    <comment>The whole band's difficulty.</comment>
+  </data>
+  <data name="InstrumentsListName" xml:space="preserve">
+    <value>Instrument difficulties</value>
+    <comment>Accessible name of the instrument icons above the metadata rows.</comment>
+  </data>
+  <data name="InstrumentsShowAllFormat" xml:space="preserve">
+    <value>Show all ({0} more)</value>
+    <comment>{0} is how many instruments are hidden: not charted, with no difficulty set.</comment>
+  </data>
+  <data name="InstrumentsShowFewer" xml:space="preserve">
+    <value>Show fewer</value>
+  </data>
+  <data name="InstrumentCaptionSeparator" xml:space="preserve">
+    <value> - </value>
+    <comment>Between an instrument's name and its charted difficulties' letters, e.g. 'Guitar - EMHX'.</comment>
+  </data>
+  <data name="InstrumentNotCharted" xml:space="preserve">
+    <value>The chart has no notes for this part.</value>
+  </data>
+  <data name="InstrumentAccessibleNameFormat" xml:space="preserve">
+    <value>{0}, difficulty {1}</value>
+    <comment>{0} is an instrument, {1} its song.ini difficulty, e.g. 'Guitar, difficulty 4'.</comment>
+  </data>
+  <data name="DifficultyTagCoop" xml:space="preserve">
+    <value>2P</value>
+    <comment>Tag on the co-op guitar's icon. Keep it to 3 characters.</comment>
+  </data>
+  <data name="DifficultyTagPro" xml:space="preserve">
+    <value>PRO</value>
+    <comment>Tag on a pro instrument's icon. Keep it to 3 characters.</comment>
+  </data>
+  <data name="DifficultyTagPro22" xml:space="preserve">
+    <value>22</value>
+    <comment>Tag on a 22-fret pro instrument's icon. Keep it to 3 characters.</comment>
+  </data>
+  <data name="DifficultyTagGhl" xml:space="preserve">
+    <value>GHL</value>
+    <comment>Tag on a six-fret (Guitar Hero Live) instrument's icon. Keep it to 3 characters.</comment>
+  </data>
+  <data name="DifficultyTagPhaseShift" xml:space="preserve">
+    <value>PS</value>
+    <comment>Tag on a Phase Shift instrument's icon. Keep it to 3 characters.</comment>
+  </data>
+  <data name="DifficultyUnsetBadge" xml:space="preserve">
+    <value>?</value>
+    <comment>The badge of an instrument with no difficulty set.</comment>
+  </data>
+  <data name="DifficultyDistinctBadge" xml:space="preserve">
+    <value>*</value>
+    <comment>The badge of an instrument whose difficulty differs between the selected songs.</comment>
+  </data>
+  <data name="DifficultyUnsetToolTip" xml:space="preserve">
+    <value>No difficulty (stored as -1)</value>
+  </data>
+  <data name="DifficultyDistinctToolTip" xml:space="preserve">
+    <value>The selected songs have different difficulties.</value>
+  </data>
+  <data name="DifficultyStoredValueFormat" xml:space="preserve">
+    <value>Stored as "{0}", which isn't a difficulty.</value>
+    <comment>{0} is the value in song.ini.</comment>
+  </data>
+  <data name="DifficultyOtherLabel" xml:space="preserve">
+    <value>Other</value>
+  </data>
+  <data name="DifficultySetButton" xml:space="preserve">
+    <value>Set</value>
+  </data>
+  <data name="DifficultyRevertButton" xml:space="preserve">
+    <value>Revert</value>
+  </data>
   <data name="DifficultyEasy" xml:space="preserve">
     <value>Easy</value>
   </data>

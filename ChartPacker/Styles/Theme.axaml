@@ -27,6 +27,22 @@
         <!-- Manila folder, for the FOLDER chip in the library list. -->
         <SolidColorBrush x:Key="FolderTintBrush" Color="#40E4C98F" />
         <SolidColorBrush x:Key="FolderTextBrush" Color="#F0DBAE" />
+        <!-- The chart's difficulties, as the games colour them: Easy green, Medium yellow, Hard red, Expert purple. -->
+        <SolidColorBrush x:Key="DifficultyEasyBrush" Color="#4ADE80" />
+        <SolidColorBrush x:Key="DifficultyMediumBrush" Color="#FACC15" />
+        <SolidColorBrush x:Key="DifficultyHardBrush" Color="#F87171" />
+        <SolidColorBrush x:Key="DifficultyExpertBrush" Color="#C084FC" />
+        <!-- A song.ini difficulty's tier, 0 to 6 (anything higher is 6), from cool to hot, on the badge of its
+             instrument; an unset one is a neutral grey. The badge's number is dark on every tier. -->
+        <SolidColorBrush x:Key="DifficultyTier0Brush" Color="#94A3B8" />
+        <SolidColorBrush x:Key="DifficultyTier1Brush" Color="#38BDF8" />
+        <SolidColorBrush x:Key="DifficultyTier2Brush" Color="#34D399" />
+        <SolidColorBrush x:Key="DifficultyTier3Brush" Color="#A3E635" />
+        <SolidColorBrush x:Key="DifficultyTier4Brush" Color="#FACC15" />
+        <SolidColorBrush x:Key="DifficultyTier5Brush" Color="#FB923C" />
+        <SolidColorBrush x:Key="DifficultyTier6Brush" Color="#F43F5E" />
+        <SolidColorBrush x:Key="DifficultyUnsetBrush" Color="#3A3C4E" />
+        <SolidColorBrush x:Key="DifficultyBadgeTextBrush" Color="#0E0F14" />
 
         <SolidColorBrush x:Key="AccentButtonBackground" Color="#8B5CF6" />
         <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#9D74F8" />

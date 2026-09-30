@@ -34,8 +34,8 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
     };
 
     // The parts the note reader reads, by the instruments it reads them as.
-    private static readonly Dictionary<ChartInstrument, LibraryInstruments> InstrumentFlags = MidiPartCatalog.Known
-        .SelectMany(p => MidiPartCatalog.InstrumentsOf(p).Select(i => KeyValuePair.Create(i, PartFlags[p.Id])))
+    private static readonly Dictionary<ChartInstrument, string> InstrumentParts = MidiPartCatalog.Known
+        .SelectMany(p => MidiPartCatalog.InstrumentsOf(p).Select(i => KeyValuePair.Create(i, p.Id)))
         .DistinctBy(p => p.Key)
         .ToDictionary();
 
@@ -47,6 +47,17 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
         ["PART REAL_KEYS_H"] = LibraryDifficulties.Hard,
         ["PART REAL_KEYS_X"] = LibraryDifficulties.Expert,
     };
+
+    // Pro guitar and bass keep every difficulty on one track: a string per pitch from 24, 48, 72 and 96.
+    private static readonly HashSet<string> ProStringParts = new(StringComparer.Ordinal) { "pro_guitar", "pro_guitar_22", "pro_bass", "pro_bass_22" };
+    private const int ProStringCount = 6;
+    private static readonly (int Base, LibraryDifficulties Difficulty)[] ProStringBases =
+    [
+        (24, LibraryDifficulties.Easy),
+        (48, LibraryDifficulties.Medium),
+        (72, LibraryDifficulties.Hard),
+        (96, LibraryDifficulties.Expert),
+    ];
 
     /// <summary>The flag of the known part <paramref name="partId"/>, e.g. <see cref="LibraryInstruments.Vocals"/> for <c>vocals</c>.</summary>
     public static LibraryInstruments FlagOf(string partId)
@@ -63,22 +74,47 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
     /// <exception cref="ArgumentException"><paramref name="storedName"/> isn't a chart's name.</exception>
     public static ChartContents? Read(byte[] bytes, string storedName, ChartReadOptions? options = null)
     {
+        if (ReadParts(bytes, storedName, options) is not { } parts)
+            return null;
+
+        var instruments = LibraryInstruments.None;
+        var difficulties = LibraryDifficulties.None;
+        foreach (var (part, partDifficulties) in parts)
+        {
+            instruments |= PartFlags[part];
+            difficulties |= partDifficulties;
+        }
+
+        return new ChartContents(instruments, difficulties);
+    }
+
+    /// <summary>
+    /// Reads which known parts <paramref name="bytes"/>, a chart stored as <paramref name="storedName"/>,
+    /// has, and the difficulties each has notes for. A part counts when it has a note, as for <see cref="Read"/>.
+    /// </summary>
+    /// <remarks>
+    /// Vocals, harmonies and dance have no difficulties this reads, so they're present with none.
+    /// Pro keys' difficulties come from its tracks, and pro guitar's and bass's from their notes' pitches.
+    /// </remarks>
+    /// <returns>The parts by id (<c>guitar</c>, <c>drums</c>, …), or <see langword="null"/> when the chart is malformed.</returns>
+    /// <exception cref="ArgumentException"><paramref name="storedName"/> isn't a chart's name.</exception>
+    public static IReadOnlyDictionary<string, LibraryDifficulties>? ReadParts(byte[] bytes, string storedName, ChartReadOptions? options = null)
+    {
         ArgumentNullException.ThrowIfNull(bytes);
         try
         {
             var document = ChartReader.Read(bytes, storedName, options);
-            var instruments = LibraryInstruments.None;
-            var difficulties = LibraryDifficulties.None;
+            var parts = new Dictionary<string, LibraryDifficulties>(StringComparer.Ordinal);
             foreach (var key in document.Tracks.Keys)
             {
-                instruments |= InstrumentFlags.GetValueOrDefault(key.Instrument);
-                difficulties |= (LibraryDifficulties)(1 << (int)key.Difficulty);
+                if (InstrumentParts.TryGetValue(key.Instrument, out string? part))
+                    parts[part] = parts.GetValueOrDefault(part) | (LibraryDifficulties)(1 << (int)key.Difficulty);
             }
 
             if (ChartReader.IsMidi(storedName))
-                AddUnreadParts(bytes, ref instruments, ref difficulties);
+                AddUnreadParts(bytes, parts);
 
-            return new ChartContents(instruments, difficulties);
+            return parts;
         }
         catch (ChartFormatException)
         {
@@ -87,7 +123,7 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
     }
 
     /// <summary>Adds the MIDI file's parts the note reader skips, such as vocals, that have a note.</summary>
-    private static void AddUnreadParts(byte[] bytes, ref LibraryInstruments instruments, ref LibraryDifficulties difficulties)
+    private static void AddUnreadParts(byte[] bytes, Dictionary<string, LibraryDifficulties> parts)
     {
         var (_, _, chunks) = MidiFile.ReadChunks(bytes);
         foreach (var chunk in chunks)
@@ -104,9 +140,29 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
                 continue;
             }
 
-            instruments |= PartFlags[part.Id];
-            difficulties |= ProKeysDifficulties.GetValueOrDefault(name);
+            var difficulties = ProStringParts.Contains(part.Id) ? ProStringDifficulties(bytes, events) : ProKeysDifficulties.GetValueOrDefault(name.Trim());
+            parts[part.Id] = parts.GetValueOrDefault(part.Id) | difficulties;
         }
+    }
+
+    /// <summary>The difficulties a pro guitar or bass track has a string note for.</summary>
+    private static LibraryDifficulties ProStringDifficulties(byte[] bytes, List<MidiEvent> events)
+    {
+        var difficulties = LibraryDifficulties.None;
+        foreach (var e in events)
+        {
+            if (e.Kind != 0x90 || e.DataLength < 2 || bytes[e.DataStart + 1] == 0)
+                continue;
+
+            int pitch = bytes[e.DataStart];
+            foreach (var (first, difficulty) in ProStringBases)
+            {
+                if (pitch >= first && pitch < first + ProStringCount)
+                    difficulties |= difficulty;
+            }
+        }
+
+        return difficulties;
     }
 
     private static bool HasNote(byte[] bytes, List<MidiEvent> events)

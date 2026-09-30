@@ -6,12 +6,44 @@
              xmlns:res="using:ChartPacker.Resources"
              xmlns:ctl="using:ChartPacker.Controls"
              xmlns:meta="using:ChartPacker.Core.Metadata"
+             xmlns:conv="using:ChartPacker.Converters"
              mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
              x:Class="ChartPacker.Views.SongDetailView"
              x:DataType="vm:SongDetailViewModel"
              Focusable="True"
              FocusAdorner="{x:Null}">
     <!-- Focusable so a click on empty space can take focus from an edit box, which commits it. -->
+
+    <UserControl.Resources>
+        <conv:DifficultyGlyphConverter x:Key="DifficultyGlyph"
+                                       Guitar="{StaticResource InstrumentGuitarGeometry}"
+                                       Bass="{StaticResource InstrumentBassGeometry}"
+                                       Rhythm="{StaticResource InstrumentRhythmGeometry}"
+                                       Drums="{StaticResource InstrumentDrumsGeometry}"
+                                       ProDrums="{StaticResource InstrumentProDrumsGeometry}"
+                                       Keys="{StaticResource InstrumentKeysGeometry}"
+                                       ProKeys="{StaticResource InstrumentProKeysGeometry}"
+                                       Vocals="{StaticResource InstrumentVocalsGeometry}"
+                                       Harmonies="{StaticResource InstrumentHarmoniesGeometry}"
+                                       Dance="{StaticResource InstrumentDanceGeometry}"
+                                       Band="{StaticResource InstrumentBandGeometry}" />
+        <!-- A chart difficulty's letter: E, M, H, X. -->
+        <conv:DifficultyBrushConverter x:Key="DifficultyLetterBrush"
+                                       Level0="{StaticResource DifficultyEasyBrush}"
+                                       Level1="{StaticResource DifficultyMediumBrush}"
+                                       Level2="{StaticResource DifficultyHardBrush}"
+                                       Level3="{StaticResource DifficultyExpertBrush}" />
+        <!-- A song.ini tier, 0 to 6 and up; unset is grey. -->
+        <conv:DifficultyBrushConverter x:Key="DifficultyTierBrush"
+                                       Level0="{StaticResource DifficultyTier0Brush}"
+                                       Level1="{StaticResource DifficultyTier1Brush}"
+                                       Level2="{StaticResource DifficultyTier2Brush}"
+                                       Level3="{StaticResource DifficultyTier3Brush}"
+                                       Level4="{StaticResource DifficultyTier4Brush}"
+                                       Level5="{StaticResource DifficultyTier5Brush}"
+                                       Level6="{StaticResource DifficultyTier6Brush}"
+                                       Fallback="{StaticResource DifficultyUnsetBrush}" />
+    </UserControl.Resources>
 
     <UserControl.Styles>
         <Style Selector="TextBlock.section">
@@ -249,6 +281,138 @@
             <Setter Property="Padding" Value="5,3" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- The instruments above the metadata: a round icon with the difficulty in a badge at its bottom right
+             and the variant's tag at its top left, and the name and charted difficulties under it. -->
+        <Style Selector="Button.instrument">
+            <Setter Property="Width" Value="100" />
+            <Setter Property="Padding" Value="2,4" />
+            <Setter Property="Margin" Value="0,0,2,4" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.instrument:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+        <Style Selector="Button.instrument:pressed">
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <!-- Read-only, the icons still read normally. -->
+        <Style Selector="Button.instrument:disabled">
+            <Setter Property="Cursor" Value="Arrow" />
+        </Style>
+        <Style Selector="Button.instrument:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <!-- The chart has no notes for the part. -->
+        <Style Selector="Button.instrument.absent StackPanel.instrumentFace">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="Border.instrumentCircle">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- A pending change rings the icon in the accent, as * marks an edited row. -->
+        <Style Selector="Border.instrumentCircle.edited">
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+        </Style>
+        <Style Selector="Border.instrumentCircle PathIcon">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+        </Style>
+        <Style Selector="Button.instrument.absent Border.instrumentCircle PathIcon">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
+        </Style>
+        <!-- Outlined in the panel's colour, so the badge and tag read as cut out of the circle. -->
+        <Style Selector="Border.instrumentBadge">
+            <Setter Property="MinWidth" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Padding" Value="3,0" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBackgroundBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+        </Style>
+        <Style Selector="Border.instrumentBadge TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyBadgeTextBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.instrumentBadge.unset TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="Border.instrumentTag">
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Padding" Value="3,0" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+        <Style Selector="Border.instrumentTag TextBlock">
+            <Setter Property="FontSize" Value="8" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.instrumentName">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="TextBlock.difficultyLetter">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <!-- The flyout's difficulties: a swatch of each tier's colour with its number, the current one outlined. -->
+        <Style Selector="Button.preset">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="5" />
+        </Style>
+        <Style Selector="Border.presetFace">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.preset:pointerover Border.presetFace">
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+        <Style Selector="Button.preset.current Border.presetFace">
+            <Setter Property="BorderBrush" Value="White" />
+        </Style>
+        <Style Selector="Border.presetFace TextBlock">
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyBadgeTextBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.presetFace.unset TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
         </Style>
 
         <Style Selector="Button.icon">
@@ -1190,6 +1354,145 @@
 
                     <TextBlock Classes="section" Text="{Binding MetadataHeader}" />
                     <TextBlock Classes="finding" TextWrapping="Wrap" Margin="0,0,0,6" Text="{Binding ReadOnlyNote}" IsVisible="{Binding HasReadOnlyNote}" />
+                    <!-- An icon per song.ini difficulty, which the rows below leave out. Clicking one sets it. -->
+                    <StackPanel Spacing="2" Margin="0,0,0,10" IsVisible="{Binding ShowInstruments}">
+                        <ItemsControl ItemsSource="{Binding Instruments}"
+                                      AutomationProperties.Name="{x:Static res:Strings.InstrumentsListName}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:InstrumentDifficultyViewModel">
+                                    <Button Classes="instrument"
+                                            Classes.absent="{Binding !IsCharted}"
+                                            IsVisible="{Binding IsShown}"
+                                            IsEnabled="{Binding CanEdit}"
+                                            ToolTip.ShowOnDisabled="True"
+                                            AutomationProperties.Name="{Binding AccessibleName}">
+                                        <ToolTip.Tip>
+                                            <StackPanel MaxWidth="320" Spacing="2">
+                                                <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Name}" />
+                                                <TextBlock Classes="muted" Text="{Binding Key}" />
+                                                <TextBlock TextWrapping="Wrap"
+                                                           Text="{Binding KeyDescription}"
+                                                           IsVisible="{Binding KeyDescription, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                <TextBlock TextWrapping="Wrap" Text="{Binding ValueNote}" IsVisible="{Binding HasValueNote}" />
+                                                <TextBlock TextWrapping="Wrap" Classes="muted" Text="{x:Static res:Strings.InstrumentNotCharted}" IsVisible="{Binding !IsCharted}" />
+                                            </StackPanel>
+                                        </ToolTip.Tip>
+                                        <Button.Flyout>
+                                            <Flyout Placement="BottomEdgeAlignedLeft">
+                                                <StackPanel Spacing="8">
+                                                    <StackPanel>
+                                                        <TextBlock Classes="highwayHeader" Text="{Binding Name}" />
+                                                        <TextBlock Classes="muted" FontSize="12" Text="{Binding Key}" />
+                                                    </StackPanel>
+                                                    <!-- ? unsets it; 0 to 6 set it, closing the flyout. -->
+                                                    <ItemsControl ItemsSource="{Binding Presets}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" Spacing="4" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:DifficultyPresetViewModel">
+                                                                <Button Classes="preset"
+                                                                        Classes.current="{Binding IsCurrent}"
+                                                                        Command="{Binding Command}"
+                                                                        CommandParameter="{Binding Tier}"
+                                                                        Click="OnDifficultyChosen"
+                                                                        AutomationProperties.Name="{Binding Text}">
+                                                                    <Border Classes="presetFace"
+                                                                            Classes.unset="{Binding Tier, Converter={x:Static ObjectConverters.IsNull}}"
+                                                                            Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}">
+                                                                        <TextBlock Text="{Binding Text}" />
+                                                                    </Border>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <!-- A tier past the buttons. Enter sets it and leaves the flyout open. -->
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DifficultyOtherLabel}" />
+                                                        <NumericUpDown Width="110"
+                                                                       VerticalAlignment="Center"
+                                                                       Value="{Binding OtherValue}"
+                                                                       Increment="1"
+                                                                       Minimum="0"
+                                                                       Maximum="2147483647"
+                                                                       FormatString="0"
+                                                                       AutomationProperties.Name="{x:Static res:Strings.DifficultyOtherLabel}">
+                                                            <NumericUpDown.KeyBindings>
+                                                                <KeyBinding Gesture="Enter" Command="{Binding ApplyOtherCommand}" />
+                                                            </NumericUpDown.KeyBindings>
+                                                        </NumericUpDown>
+                                                        <Button Classes="nudge"
+                                                                Content="{x:Static res:Strings.DifficultySetButton}"
+                                                                Command="{Binding ApplyOtherCommand}"
+                                                                Click="OnDifficultyChosen" />
+                                                        <Button Classes="nudge"
+                                                                Command="{Binding RevertCommand}"
+                                                                IsVisible="{Binding IsEdited}"
+                                                                Click="OnDifficultyChosen"
+                                                                ToolTip.Tip="{x:Static res:Strings.DifficultyRevertButton}"
+                                                                AutomationProperties.Name="{x:Static res:Strings.DifficultyRevertButton}">
+                                                            <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Flyout>
+                                        </Button.Flyout>
+                                        <StackPanel Classes="instrumentFace" Spacing="4">
+                                            <Panel Width="50" Height="44" HorizontalAlignment="Center">
+                                                <Border Classes="instrumentCircle" Classes.edited="{Binding IsEdited}">
+                                                    <PathIcon Data="{Binding Glyph, Converter={StaticResource DifficultyGlyph}}" />
+                                                </Border>
+                                                <Border Classes="instrumentTag" IsVisible="{Binding HasTag}">
+                                                    <TextBlock Text="{Binding Tag}" />
+                                                </Border>
+                                                <Border Classes="instrumentBadge"
+                                                        Classes.unset="{Binding Tier, Converter={x:Static ObjectConverters.IsNull}}"
+                                                        Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}">
+                                                    <TextBlock Text="{Binding BadgeText}" />
+                                                </Border>
+                                            </Panel>
+                                            <!-- "Guitar - EMHX": the letters are always shown whole; a long name gives way to them. -->
+                                            <DockPanel HorizontalAlignment="Center">
+                                                <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Letters}" IsVisible="{Binding HasLetters}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:DifficultyLetter">
+                                                            <TextBlock Classes="difficultyLetter"
+                                                                       Text="{Binding Text}"
+                                                                       Foreground="{Binding Difficulty, Converter={StaticResource DifficultyLetterBrush}}" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock DockPanel.Dock="Right"
+                                                           Classes="instrumentName"
+                                                           Text="{x:Static res:Strings.InstrumentCaptionSeparator}"
+                                                           IsVisible="{Binding HasLetters}" />
+                                                <TextBlock Classes="instrumentName" Text="{Binding Name}" />
+                                            </DockPanel>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="nudge"
+                                HorizontalAlignment="Left"
+                                Content="{Binding InstrumentsToggleText}"
+                                Command="{Binding ToggleShowAllInstrumentsCommand}"
+                                IsVisible="{Binding HasHiddenInstruments}" />
+                    </StackPanel>
+
+
                     <TextBlock Classes="muted" Text="{Binding MetadataNote}" IsVisible="{Binding HasMetadataNote}" />
                     <ItemsControl ItemsSource="{Binding Metadata}"
                                   Grid.IsSharedSizeScope="True"

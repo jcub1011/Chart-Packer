@@ -343,8 +343,22 @@ Behaviour:
      - Comments, other sections, unedited lines, the encoding and the line endings are kept.
      - New keys go at the end of `[song]`.
      - A folder without a `song.ini` gets one.
-   - Time values are edited in milliseconds. Unset difficulties (`diff_* = -1`) stay hidden, and
-     adding one edits its stored value.
+   - Time values are edited in milliseconds.
+   - **Instrument difficulties.** The known `diff_*` keys are shown as a row of round instrument
+     icons at the top of the metadata, not as rows, and aren't offered as new keys.
+     - Each icon has its difficulty in a badge at its bottom right, tinted by tier from 0 to 6.
+       The badge shows `?` when the key is missing, negative or not an integer, and `*` when the
+       selected songs differ. Pro, 22-fret, six-fret (GHL), Phase Shift and co-op variants get a
+       small tag.
+     - Under each icon are the instrument's name and the difficulties its chart has notes for, as
+       coloured letters, e.g. "Guitar - EMHX". An icon whose part the chart doesn't have is greyed
+       out. With several songs selected, the charts aren't read, so no icon is greyed out and
+       there are no letters.
+     - Icons that aren't charted, have no difficulty set and have no pending change are hidden
+       behind **Show all**.
+     - Clicking an icon opens a flyout with `?` and 0–6 buttons, a number box for higher tiers,
+       and a revert button while it's edited. `?` writes `-1` where a difficulty is stored and
+       leaves the others unchanged. An edited icon is ringed in the accent colour.
    - **Album art.** A tile at the top of the panel shows the album art. Hovering it shows icon
      buttons in its bottom-right corner: replace (a png, jpg or jpeg up to 16 MB) and remove. The
      background tile sits to its right, and with one song selected, its file list is below them.
