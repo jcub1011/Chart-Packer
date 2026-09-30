@@ -34,16 +34,13 @@ namespace ChartPacker.ViewModels
     /// <see cref="ChartShifter"/> makes from the draft, read back, so it's exactly what saving writes.
     /// Which instruments and difficulties are shown, and the note speed, are app settings.
     /// </remarks>
-    public sealed partial class HighwayViewModel : ViewModelBase
+    public sealed partial class HighwayViewModel(SettingsService settings, Func<TimeSpan> clock) : ViewModelBase
     {
         /// <summary>The most highways shown at once.</summary>
         public const int MaxLanes = 4;
 
         // How far ahead of the strike line the highway shows at the normal note speed, in seconds.
         private const double BaseLookAhead = 1.4;
-
-        private readonly SettingsService _settings;
-
         private HighwaySong? _song;
 
         // The chart being shown, by where it's read from, and its bytes once read.
@@ -63,19 +60,11 @@ namespace ChartPacker.ViewModels
         // Set while the rows are changed from here, so that doesn't read as the user changing them.
         private bool _isSyncing;
 
-        public HighwayViewModel(SettingsService settings, Func<TimeSpan> clock)
-        {
-            _settings = settings;
-            Clock = clock;
-            IsEnabled = settings.Settings.ShowNoteHighway;
-            NoteSpeed = settings.Settings.HighwayNoteSpeed;
-        }
-
         /// <summary>Raised when an offset is set in the draft of the song shown.</summary>
         public event EventHandler? OffsetsChanged;
 
         /// <summary>Where the audio is.</summary>
-        public Func<TimeSpan> Clock { get; }
+        public Func<TimeSpan> Clock { get; } = clock;
 
         /// <summary>One row per instrument the chart has, in display order.</summary>
         public AvaloniaList<HighwayRowViewModel> Rows { get; } = [];
@@ -83,12 +72,12 @@ namespace ChartPacker.ViewModels
         /// <summary>Whether the highway is drawn; the caption's toggle.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsShown))]
-        public partial bool IsEnabled { get; set; }
+        public partial bool IsEnabled { get; set; } = settings.Settings.ShowNoteHighway;
 
         /// <summary>How fast the notes fall, as a multiple of the normal speed.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(LookAhead))]
-        public partial double NoteSpeed { get; set; }
+        public partial double NoteSpeed { get; set; } = settings.Settings.HighwayNoteSpeed;
 
         /// <summary>What's drawn, or <see langword="null"/> for nothing.</summary>
         [ObservableProperty]
@@ -168,9 +157,9 @@ namespace ChartPacker.ViewModels
             RefreshState();
         }
 
-        partial void OnIsEnabledChanged(bool value) => _settings.Settings.ShowNoteHighway = value;
+        partial void OnIsEnabledChanged(bool value) => settings.Settings.ShowNoteHighway = value;
 
-        partial void OnNoteSpeedChanged(double value) => _settings.Settings.HighwayNoteSpeed = value;
+        partial void OnNoteSpeedChanged(double value) => settings.Settings.HighwayNoteSpeed = value;
 
         private void Clear(string? note)
         {
@@ -287,7 +276,7 @@ namespace ChartPacker.ViewModels
         private void BuildRows(ChartDocument chart)
         {
             var available = chart.Instruments;
-            var preferred = (_settings.Settings.HighwayInstruments ?? [])
+            var preferred = (settings.Settings.HighwayInstruments ?? [])
                 .Select(n => Enum.TryParse<ChartInstrument>(n, out var i) ? i : (ChartInstrument?)null)
                 .OfType<ChartInstrument>()
                 .ToHashSet();
@@ -300,7 +289,7 @@ namespace ChartPacker.ViewModels
             foreach (var instrument in available)
             {
                 var difficulties = chart.DifficultiesOf(instrument);
-                var wanted = _settings.Settings.HighwayDifficulties?.GetValueOrDefault(instrument.ToString()) is { } saved
+                var wanted = settings.Settings.HighwayDifficulties?.GetValueOrDefault(instrument.ToString()) is { } saved
                     && Enum.TryParse<ChartDifficulty>(saved, out var d) ? d : ChartDifficulty.Expert;
                 var difficulty = difficulties.Contains(wanted) ? wanted : difficulties.OrderBy(x => Math.Abs((int)x - (int)wanted)).ThenByDescending(x => x).First();
                 Rows.Add(new HighwayRowViewModel(this, instrument, difficulties, difficulty, chosen.Contains(instrument)));
@@ -356,9 +345,9 @@ namespace ChartPacker.ViewModels
 
             // Instruments this chart doesn't have stay chosen for the songs that do.
             var available = Rows.Select(r => r.Instrument).ToHashSet();
-            _settings.Settings.HighwayInstruments =
+            settings.Settings.HighwayInstruments =
             [
-                .. (_settings.Settings.HighwayInstruments ?? []).Where(n => !Enum.TryParse<ChartInstrument>(n, out var i) || !available.Contains(i)),
+                .. (settings.Settings.HighwayInstruments ?? []).Where(n => !Enum.TryParse<ChartInstrument>(n, out var i) || !available.Contains(i)),
                 .. Rows.Where(r => r.IsChecked).Select(r => r.Instrument.ToString()),
             ];
             RefreshCanCheck();
@@ -370,7 +359,7 @@ namespace ChartPacker.ViewModels
             if (_isSyncing)
                 return;
 
-            var difficulties = _settings.Settings.HighwayDifficulties ??= [];
+            var difficulties = settings.Settings.HighwayDifficulties ??= [];
             difficulties[row.Instrument.ToString()] = row.Difficulty.ToString();
             SyncRows();
             BuildScene();

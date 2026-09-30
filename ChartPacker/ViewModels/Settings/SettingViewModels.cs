@@ -76,50 +76,32 @@ namespace ChartPacker.ViewModels.Settings
     }
 
     /// <summary>An on/off setting, shown as a toggle switch.</summary>
-    public sealed class ToggleSettingViewModel : SettingViewModel
+    public sealed class ToggleSettingViewModel(SettingEdit<bool> edit) : SettingViewModel(edit)
     {
-        private readonly SettingEdit<bool> _edit;
-
-        public ToggleSettingViewModel(SettingEdit<bool> edit)
-            : base(edit)
-        {
-            _edit = edit;
-        }
-
         public bool Value
         {
-            get => _edit.Value;
-            set => _edit.Value = value;
+            get => edit.Value;
+            set => edit.Value = value;
         }
 
         protected override void OnValueChanged() => OnPropertyChanged(nameof(Value));
     }
 
     /// <summary>A whole number, shown as a spin box.</summary>
-    public sealed class IntegerSettingViewModel : SettingViewModel
+    public sealed class IntegerSettingViewModel(SettingEdit<int> edit, IntegerSetting definition) : SettingViewModel(edit)
     {
-        private readonly SettingEdit<int> _edit;
+        public decimal Minimum { get; } = definition.Minimum;
 
-        public IntegerSettingViewModel(SettingEdit<int> edit, IntegerSetting definition)
-            : base(edit)
-        {
-            _edit = edit;
-            Minimum = definition.Minimum;
-            Maximum = definition.Maximum;
-        }
-
-        public decimal Minimum { get; }
-
-        public decimal Maximum { get; }
+        public decimal Maximum { get; } = definition.Maximum;
 
         /// <summary>Nullable decimal to match <c>NumericUpDown.Value</c>.</summary>
         public decimal? Value
         {
-            get => _edit.Value;
+            get => edit.Value;
             set
             {
                 if (value is { } number)
-                    _edit.Value = (int)Math.Clamp(Math.Round(number), int.MinValue, int.MaxValue);
+                    edit.Value = (int)Math.Clamp(Math.Round(number), int.MinValue, int.MaxValue);
 
                 // The box was cleared, or the value was clamped: show the staged value.
                 OnPropertyChanged(nameof(Value));
@@ -130,31 +112,21 @@ namespace ChartPacker.ViewModels.Settings
     }
 
     /// <summary>A number in a range, shown as a slider and its formatted value.</summary>
-    public sealed class RangeSettingViewModel : SettingViewModel
+    public sealed class RangeSettingViewModel(SettingEdit<double> edit, RangeSetting definition) : SettingViewModel(edit)
     {
-        private readonly SettingEdit<double> _edit;
-        private readonly RangeSetting _definition;
+        public double Minimum => definition.Minimum;
 
-        public RangeSettingViewModel(SettingEdit<double> edit, RangeSetting definition)
-            : base(edit)
-        {
-            _edit = edit;
-            _definition = definition;
-        }
+        public double Maximum => definition.Maximum;
 
-        public double Minimum => _definition.Minimum;
-
-        public double Maximum => _definition.Maximum;
-
-        public double SmallChange => _definition.SmallChange;
+        public double SmallChange => definition.SmallChange;
 
         public double Value
         {
-            get => _edit.Value;
-            set => _edit.Value = value;
+            get => edit.Value;
+            set => edit.Value = value;
         }
 
-        public string ValueText => _definition.FormatValue(_edit.Value);
+        public string ValueText => definition.FormatValue(edit.Value);
 
         protected override void OnValueChanged()
         {
@@ -164,52 +136,32 @@ namespace ChartPacker.ViewModels.Settings
     }
 
     /// <summary>One of a fixed list, shown as a drop-down.</summary>
-    public sealed class ChoiceSettingViewModel : SettingViewModel
+    public sealed class ChoiceSettingViewModel(SettingEdit edit, IChoiceEdit choice) : SettingViewModel(edit)
     {
-        private readonly IChoiceEdit _choice;
-
-        public ChoiceSettingViewModel(SettingEdit edit, IChoiceEdit choice)
-            : base(edit)
-        {
-            _choice = choice;
-        }
-
-        public IReadOnlyList<string> Choices => _choice.ChoiceLabels;
+        public IReadOnlyList<string> Choices => choice.ChoiceLabels;
 
         public int SelectedIndex
         {
-            get => _choice.SelectedIndex;
-            set => _choice.SelectedIndex = value;
+            get => choice.SelectedIndex;
+            set => choice.SelectedIndex = value;
         }
 
         protected override void OnValueChanged() => OnPropertyChanged(nameof(SelectedIndex));
     }
 
     /// <summary>A folder path, shown as its path (or what happens without one) and a Browse button.</summary>
-    public sealed partial class FolderSettingViewModel : SettingViewModel
+    public sealed partial class FolderSettingViewModel(SettingEdit<string?> edit, FolderSetting definition, IFolderPickerService folderPicker) : SettingViewModel(edit)
     {
-        private readonly SettingEdit<string?> _edit;
-        private readonly FolderSetting _definition;
-        private readonly IFolderPickerService _folderPicker;
+        public bool IsEmpty => edit.Value is null;
 
-        public FolderSettingViewModel(SettingEdit<string?> edit, FolderSetting definition, IFolderPickerService folderPicker)
-            : base(edit)
-        {
-            _edit = edit;
-            _definition = definition;
-            _folderPicker = folderPicker;
-        }
-
-        public bool IsEmpty => _edit.Value is null;
-
-        public string DisplayText => _edit.Value ?? _definition.EmptyLabel ?? "";
+        public string DisplayText => edit.Value ?? definition.EmptyLabel ?? "";
 
         [RelayCommand]
         private async Task BrowseAsync()
         {
-            var path = await _folderPicker.PickFolderAsync(_definition.PickerTitle ?? _definition.Label);
+            var path = await folderPicker.PickFolderAsync(definition.PickerTitle ?? definition.Label);
             if (path is not null)
-                _edit.Value = path;
+                edit.Value = path;
         }
 
         protected override void OnValueChanged()

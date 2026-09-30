@@ -11,14 +11,11 @@ namespace ChartPacker.Audio.Mixing;
 /// read the same number of frames is at the same point in time. After the source ends, reads
 /// return silence rather than fewer frames, which keeps it aligned with the others.
 /// </remarks>
-internal sealed class StemReader
+internal sealed class StemReader(IPcmSource source, int outputRate)
 {
     private const int ChunkFrames = 1024;
-
-    private readonly IPcmSource _source;
-    private readonly int _outputRate;
-    private readonly double _step;
-    private readonly float[] _raw;
+    private readonly double _step = (double)source.SampleRate / outputRate;
+    private readonly float[] _raw = new float[ChunkFrames * source.Channels];
 
     // Source frames converted to stereo, not yet used; one frame of history is kept for interpolating.
     private float[] _stereo = new float[(ChunkFrames + 2) * 2];
@@ -28,18 +25,10 @@ internal sealed class StemReader
     private double _cursor;
     private bool _sourceEnded;
 
-    public StemReader(IPcmSource source, int outputRate)
-    {
-        _source = source;
-        _outputRate = outputRate;
-        _step = (double)source.SampleRate / outputRate;
-        _raw = new float[ChunkFrames * source.Channels];
-    }
-
-    public bool IsResampled => _source.SampleRate != _outputRate;
+    public bool IsResampled => source.SampleRate != outputRate;
 
     /// <summary>The source's length at the output rate, or -1 when it isn't known.</summary>
-    public long LengthFrames => _source.LengthFrames < 0 ? -1 : (long)Math.Ceiling(_source.LengthFrames / _step);
+    public long LengthFrames => source.LengthFrames < 0 ? -1 : (long)Math.Ceiling(source.LengthFrames / _step);
 
     /// <summary>The source has no more audio; reads return silence.</summary>
     public bool IsEnded => _sourceEnded && (IsResampled ? (int)_cursor >= _stereoFrames : _stereoFrames == 0);
@@ -102,7 +91,7 @@ internal sealed class StemReader
     {
         double position = frame * _step;
         long sourceFrame = (long)Math.Floor(position);
-        _source.SeekToFrame(sourceFrame);
+        source.SeekToFrame(sourceFrame);
         _stereoFrames = 0;
         _cursor = position - sourceFrame;
         _sourceEnded = false;
@@ -112,7 +101,7 @@ internal sealed class StemReader
     /// <returns><see langword="false"/> when the source has ended.</returns>
     private bool Fill()
     {
-        int frames = _source.ReadFrames(_raw);
+        int frames = source.ReadFrames(_raw);
         if (frames == 0)
         {
             _sourceEnded = true;
@@ -122,7 +111,7 @@ internal sealed class StemReader
         if (_stereo.Length < (_stereoFrames + frames) * 2)
             Array.Resize(ref _stereo, (_stereoFrames + frames) * 2);
 
-        int channels = _source.Channels;
+        int channels = source.Channels;
         var raw = _raw.AsSpan(0, frames * channels);
         var dest = _stereo.AsSpan(_stereoFrames * 2, frames * 2);
         switch (channels)

@@ -88,9 +88,8 @@ namespace ChartPacker.ViewModels
     /// opens. It waits for a job, shows progress while a pack or unpack job runs, then a summary and one
     /// row per item, grouped by outcome, until the next job.
     /// </summary>
-    public partial class JobViewModel : ViewModelBase
+    public partial class JobViewModel(IJobProgressWindowService details) : ViewModelBase
     {
-        private readonly IJobProgressWindowService _details;
         private CancellationTokenSource? _cts;
         private JobKind _kind;
         private int _total;
@@ -101,11 +100,6 @@ namespace ChartPacker.ViewModels
 
         // A job has run (or is running) this session, so there's a summary to show.
         private bool _hasRun;
-
-        public JobViewModel(IJobProgressWindowService details)
-        {
-            _details = details;
-        }
 
         /// <summary>Items that were packed or unpacked, including those with warnings or left-out files.</summary>
         public JobResultGroup Completed { get; } = new(Strings.JobGroupPackedFormat);
@@ -195,7 +189,7 @@ namespace ChartPacker.ViewModels
         private void Cancel() => _cts?.Cancel();
 
         [RelayCommand]
-        private void ShowDetails() => _details.Show(this);
+        private void ShowDetails() => details.Show(this);
 
         private void Add(JobKind kind, JobItemResult result)
         {

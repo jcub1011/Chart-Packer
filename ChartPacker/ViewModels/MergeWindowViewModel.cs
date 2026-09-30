@@ -20,41 +20,30 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartPacker.ViewModels
 {
     /// <summary>One cell of a merge choice: a source, or leaving the thing out.</summary>
-    public sealed partial class MergeOptionViewModel : ObservableObject
+    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true) : ObservableObject
     {
-        private readonly MergeChoiceViewModel _owner;
-
-        public MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true)
-        {
-            _owner = owner;
-            Source = source;
-            Text = text;
-            Detail = detail;
-            IsAvailable = isAvailable;
-            IsShown = isShown;
-        }
 
         /// <summary>The source it takes from; <see langword="null"/> to leave the thing out.</summary>
-        public int? Source { get; }
+        public int? Source { get; } = source;
 
         /// <summary>What the cell shows; a metadata value can carry rich-text tags, which are drawn.</summary>
-        public string Text { get; }
+        public string Text { get; } = text;
 
         /// <summary><see cref="Text"/> without its tags, for the tooltip and screen readers.</summary>
         public string PlainText => RichText.ToPlainText(Text);
 
-        public string? Detail { get; }
+        public string? Detail { get; } = detail;
 
         public bool HasDetail => !string.IsNullOrEmpty(Detail);
 
         /// <summary>The source has the thing, so it can be chosen.</summary>
-        public bool IsAvailable { get; }
+        public bool IsAvailable { get; } = isAvailable;
 
         /// <summary>False for a column the choice has no cell in, which keeps the columns lined up.</summary>
-        public bool IsShown { get; }
+        public bool IsShown { get; } = isShown;
 
         /// <summary>Radio buttons of one choice form one group.</summary>
-        public string GroupName => _owner.GroupName;
+        public string GroupName => owner.GroupName;
 
         [ObservableProperty]
         public partial bool IsSelected { get; set; }
@@ -62,29 +51,22 @@ namespace ChartPacker.ViewModels
         partial void OnIsSelectedChanged(bool value)
         {
             if (value)
-                _owner.OnOptionSelected(this);
+                owner.OnOptionSelected(this);
         }
     }
 
     /// <summary>A row of the merge window: one thing to take from one of the sources.</summary>
-    public sealed partial class MergeChoiceViewModel : ObservableObject
+    public sealed partial class MergeChoiceViewModel(string label, string? key = null) : ObservableObject
     {
         private static int _nextGroup;
         private bool _selecting;
 
-        public MergeChoiceViewModel(string label, string? key = null)
-        {
-            Label = label;
-            Key = key;
-            GroupName = "merge-choice-" + Interlocked.Increment(ref _nextGroup).ToString(CultureInfo.InvariantCulture);
-        }
-
-        public string Label { get; }
+        public string Label { get; } = label;
 
         /// <summary>The part id or metadata key the row is for.</summary>
-        public string? Key { get; }
+        public string? Key { get; } = key;
 
-        public string GroupName { get; }
+        public string GroupName { get; } = "merge-choice-" + Interlocked.Increment(ref _nextGroup).ToString(CultureInfo.InvariantCulture);
 
         public List<MergeOptionViewModel> Options { get; } = [];
 
@@ -173,14 +155,25 @@ namespace ChartPacker.ViewModels
     /// agree on isn't offered. The audio defaults to the song with the most tracks, and the base chart,
     /// album art and backgrounds follow it until they're chosen.
     /// </remarks>
-    public sealed partial class MergeWindowViewModel : ViewModelBase
+    /// <param name="entries">The songs, in the order their columns are shown.</param>
+    /// <param name="hasDrafts">Whether each song has unsaved changes, which the merge doesn't see.</param>
+    /// <param name="outputFolder">Where the merged <c>.sng</c> goes.</param>
+    /// <param name="policy">What to do when it already exists.</param>
+    /// <param name="video">Reads the background video's length, for <c>song_length</c>.</param>
+    /// <param name="preview">
+    /// The side panel's inspector, read-only but for its note highway's offsets, with a player of its
+    /// own; it shows the merged song as chosen.
+    /// </param>
+    /// <param name="previewDrafts">The preview's drafts: the offsets set on its highway, which the merge applies.</param>
+    public sealed partial class MergeWindowViewModel(
+        IReadOnlyList<SongEntry> entries,
+        IReadOnlyList<bool> hasDrafts,
+        string outputFolder,
+        OverwritePolicy policy,
+        IVideoDurationProbe video,
+        SongDetailViewModel preview,
+        MetadataDraftStore previewDrafts) : ViewModelBase
     {
-        private readonly IReadOnlyList<SongEntry> _entries;
-        private readonly IReadOnlyList<bool> _hasDrafts;
-        private readonly string _outputFolder;
-        private readonly OverwritePolicy _policy;
-        private readonly IVideoDurationProbe _video;
-        private readonly MetadataDraftStore _previewDrafts;
 
         // The source of each part the preview was staged with, so offsets set for one song's part go when another's is chosen.
         private Dictionary<string, int> _previewedParts = [];
@@ -196,36 +189,8 @@ namespace ChartPacker.ViewModels
         private bool _closed;
         private CancellationTokenSource? _previewCts;
 
-        /// <param name="entries">The songs, in the order their columns are shown.</param>
-        /// <param name="hasDrafts">Whether each song has unsaved changes, which the merge doesn't see.</param>
-        /// <param name="outputFolder">Where the merged <c>.sng</c> goes.</param>
-        /// <param name="policy">What to do when it already exists.</param>
-        /// <param name="video">Reads the background video's length, for <c>song_length</c>.</param>
-        /// <param name="preview">
-        /// The side panel's inspector, read-only but for its note highway's offsets, with a player of its
-        /// own; it shows the merged song as chosen.
-        /// </param>
-        /// <param name="previewDrafts">The preview's drafts: the offsets set on its highway, which the merge applies.</param>
-        public MergeWindowViewModel(
-            IReadOnlyList<SongEntry> entries,
-            IReadOnlyList<bool> hasDrafts,
-            string outputFolder,
-            OverwritePolicy policy,
-            IVideoDurationProbe video,
-            SongDetailViewModel preview,
-            MetadataDraftStore previewDrafts)
-        {
-            _previewDrafts = previewDrafts;
-            _entries = entries;
-            _hasDrafts = hasDrafts;
-            _outputFolder = outputFolder;
-            _policy = policy;
-            _video = video;
-            Preview = preview;
-        }
-
         /// <summary>The merged song as chosen so far, as the inspector shows a song.</summary>
-        public SongDetailViewModel Preview { get; }
+        public SongDetailViewModel Preview { get; } = preview;
 
         /// <summary>The preview is being put together.</summary>
         [ObservableProperty]
@@ -327,7 +292,7 @@ namespace ChartPacker.ViewModels
             _cts = new CancellationTokenSource();
             try
             {
-                _analysis = await SongMergeAnalysis.LoadAsync(_entries, _cts.Token);
+                _analysis = await SongMergeAnalysis.LoadAsync(entries, _cts.Token);
                 Build(_analysis);
             }
             catch (OperationCanceledException)
@@ -351,7 +316,7 @@ namespace ChartPacker.ViewModels
             {
                 var s = sources[i];
                 string? problem = s.ChartError is { } error ? string.Format(CultureInfo.CurrentCulture, Strings.MergeChartErrorFormat, error)
-                    : i < _hasDrafts.Count && _hasDrafts[i] ? Strings.MergeUnsavedEdits
+                    : i < hasDrafts.Count && hasDrafts[i] ? Strings.MergeUnsavedEdits
                     : null;
                 Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, s.Headline.Artist, SongHeadline.CharterMarkup(s.Pairs), FormatOf(s.Format), problem));
             }
@@ -450,7 +415,7 @@ namespace ChartPacker.ViewModels
                 Assets[0].Selected?.Source,
                 Assets[1].Selected?.Source,
                 Assets[2].Selected?.Source,
-                _previewFolder is { } folder && _previewDrafts.HasDrafts(folder) ? new Dictionary<ChartTrackKey, int>(_previewDrafts.Get(folder).ChartOffsets) : null);
+                _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? new Dictionary<ChartTrackKey, int>(previewDrafts.Get(folder).ChartOffsets) : null);
         }
 
         private void Refresh()
@@ -474,8 +439,8 @@ namespace ChartPacker.ViewModels
             TargetProblem = null;
             if (Plan() is { } plan)
             {
-                string preferred = Path.Combine(_outputFolder, SongMerger.FileNameFor(SongMerger.BuildMetadata(plan), plan.Analysis.Sources[plan.BaseSource].Entry.DisplayName) + ".sng");
-                string? target = SongMerger.TargetFor(plan, _outputFolder, _policy);
+                string preferred = Path.Combine(outputFolder, SongMerger.FileNameFor(SongMerger.BuildMetadata(plan), plan.Analysis.Sources[plan.BaseSource].Entry.DisplayName) + ".sng");
+                string? target = SongMerger.TargetFor(plan, outputFolder, policy);
                 TargetText = target ?? preferred;
                 if (target is null)
                     TargetProblem = string.Format(CultureInfo.CurrentCulture, Strings.MergeTargetExistsFormat, Path.GetFileName(preferred));
@@ -504,7 +469,7 @@ namespace ChartPacker.ViewModels
             IsMerging = true;
             try
             {
-                var result = await SongMerger.MergeAsync(plan, _outputFolder, _policy, _video, _cts.Token);
+                var result = await SongMerger.MergeAsync(plan, outputFolder, policy, video, _cts.Token);
                 ResultText = string.Format(CultureInfo.CurrentCulture, Strings.MergeDoneFormat, result.OutputPath);
                 Warnings = [.. result.Warnings.Select(Describe), .. result.PackFindings.Select(f => f.Message)];
                 IsDone = true;
@@ -636,7 +601,7 @@ namespace ChartPacker.ViewModels
                 await Preview.Player.WhenFilesClosedAsync();
 
                 _previewFolder ??= Directory.CreateTempSubdirectory("chartpacker-merge-preview-").FullName;
-                var warnings = await SongMerger.StageAsync(plan, _previewFolder, _video, _staged, cts.Token);
+                var warnings = await SongMerger.StageAsync(plan, _previewFolder, video, _staged, cts.Token);
                 if (cts.IsCancellationRequested || _closed)
                     return;
 
@@ -672,10 +637,10 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void ForgetOffsetsOfChangedParts(SongMergePlan plan)
         {
-            if (_previewFolder is not { } folder || !_previewDrafts.HasDrafts(folder))
+            if (_previewFolder is not { } folder || !previewDrafts.HasDrafts(folder))
                 return;
 
-            var draft = _previewDrafts.Get(folder);
+            var draft = previewDrafts.Get(folder);
             foreach (var part in plan.Analysis.Parts)
             {
                 bool was = _previewedParts.TryGetValue(part.Id, out int before);

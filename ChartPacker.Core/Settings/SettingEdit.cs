@@ -117,26 +117,17 @@ public interface IChoiceEdit
 }
 
 /// <summary>A staged change to a <see cref="ChoiceSetting{T}"/>.</summary>
-public sealed class ChoiceSettingEdit<T> : SettingEdit<T>, IChoiceEdit
+public sealed class ChoiceSettingEdit<T>(ChoiceSetting<T> definition) : SettingEdit<T>(definition), IChoiceEdit
 {
-    private readonly ChoiceSetting<T> _definition;
-
-    public ChoiceSettingEdit(ChoiceSetting<T> definition)
-        : base(definition)
-    {
-        _definition = definition;
-        ChoiceLabels = [.. definition.Choices.Select(c => c.Label)];
-    }
-
-    public IReadOnlyList<string> ChoiceLabels { get; }
+    public IReadOnlyList<string> ChoiceLabels { get; } = [.. definition.Choices.Select(c => c.Label)];
 
     public int SelectedIndex
     {
-        get => _definition.IndexOf(Value);
+        get => definition.IndexOf(Value);
         set
         {
-            if (value >= 0 && value < _definition.Choices.Count)
-                Value = _definition.Choices[value].Value;
+            if (value >= 0 && value < definition.Choices.Count)
+                Value = definition.Choices[value].Value;
         }
     }
 

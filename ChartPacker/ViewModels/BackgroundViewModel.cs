@@ -62,7 +62,8 @@ namespace ChartPacker.ViewModels
     /// through the first song's <see cref="VideoTimeline"/>; it's opened while shown, and holds its
     /// file open until <see cref="Unload"/>.
     /// </remarks>
-    public sealed partial class BackgroundViewModel : ViewModelBase
+    /// <param name="clock">Where the audio player is, read each frame the video is drawn.</param>
+    public sealed partial class BackgroundViewModel(Func<TimeSpan> clock) : ViewModelBase
     {
         /// <summary>Background images larger than this aren't read, as for album art.</summary>
         public const long MaxImageBytes = AlbumArt.DefaultMaxBytes;
@@ -75,8 +76,6 @@ namespace ChartPacker.ViewModels
 
         // Video is decoded a frame at a time, so it's decoded smaller than a still.
         private const int VideoDecodeWidth = 1280;
-
-        private readonly Func<TimeSpan> _clock;
 
         // The video whose frame size the tile has taken; read on the playback thread, so a frame
         // doesn't post an update once it has.
@@ -104,14 +103,8 @@ namespace ChartPacker.ViewModels
         // The kind asked for by Show, for the next Refresh.
         private BackgroundKind? _preferredKind;
 
-        /// <param name="clock">Where the audio player is, read each frame the video is drawn.</param>
-        public BackgroundViewModel(Func<TimeSpan> clock)
-        {
-            _clock = clock;
-        }
-
         /// <summary>Where the audio player is; the video frame drawn is the one due then.</summary>
-        public Func<TimeSpan> Clock => _clock;
+        public Func<TimeSpan> Clock => clock;
 
         /// <summary>The image to show, when the image is shown and every song has the same one.</summary>
         [ObservableProperty]
