@@ -171,14 +171,14 @@ namespace ChartPacker.ViewModels
         /// <summary>The selection has an image and a video, so either can be shown.</summary>
         public bool HasBoth => HasImageKind && HasVideoKind;
 
-        /// <summary>The Image toggle: on while the image is shown. Turning it off does nothing; turning Video on does.</summary>
+        /// <summary>The Image radio button: on while the image is shown. Turning it off does nothing; turning Video on does.</summary>
         public bool IsImageSelected
         {
             get => !ShowVideo && HasImageKind;
             set => Select(BackgroundKind.Image, value);
         }
 
-        /// <summary>The Video toggle: on while the video is shown. Turning it off does nothing; turning Image on does.</summary>
+        /// <summary>The Video radio button: on while the video is shown. Turning it off does nothing; turning Image on does.</summary>
         public bool IsVideoSelected
         {
             get => ShowVideo && HasVideoKind;
@@ -298,20 +298,13 @@ namespace ChartPacker.ViewModels
                 Render();
         }
 
-        // A toggle clicked while on stays on: its state is put back once the click is done.
+        // Only turning a kind on picks it; the other's radio button turning off follows from that.
         private void Select(BackgroundKind kind, bool selected)
         {
             if (selected)
             {
                 ShowVideo = kind == BackgroundKind.Video;
-                return;
             }
-
-            Dispatcher.UIThread.Post(() =>
-            {
-                OnPropertyChanged(nameof(IsImageSelected));
-                OnPropertyChanged(nameof(IsVideoSelected));
-            });
         }
 
         /// <summary>Shows the kind <see cref="ShowVideo"/> picks, as <see cref="Refresh"/> last worked it out.</summary>

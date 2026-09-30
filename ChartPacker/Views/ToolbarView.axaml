@@ -28,23 +28,6 @@
                                 AutomationProperties.Name="{x:Static res:Strings.RescanButton}">
                             <ctl:LineIcon Data="{StaticResource ScanStroke}" />
                         </Button>
-                        <StackPanel Orientation="Horizontal"
-                                    Spacing="6"
-                                    Margin="6,0,0,0"
-                                    Background="Transparent"
-                                    ToolTip.Tip="{x:Static res:Strings.ScanDepthToolTip}">
-                            <ctl:LineIcon Data="{StaticResource DepthStroke}" Opacity="0.7" />
-                            <NumericUpDown Value="{Binding Library.ScanDepth}"
-                                           Minimum="0"
-                                           Maximum="{Binding Library.MaxScanDepth}"
-                                           Increment="1"
-                                           FormatString="0"
-                                           ParsingNumberStyle="Integer"
-                                           ClipValueToMinMax="True"
-                                           Width="110"
-                                           VerticalAlignment="Center"
-                                           AutomationProperties.Name="{x:Static res:Strings.ScanDepthLabel}" />
-                        </StackPanel>
                     </StackPanel>
                 </Border>
 

@@ -201,6 +201,7 @@
                     <TextBox x:Name="SearchBox"
                              Grid.Column="0"
                              Classes="clearButton"
+                             VerticalContentAlignment="Center"
                              Text="{Binding Filter.SearchText}"
                              PlaceholderText="{x:Static res:Strings.SearchWatermark}"
                              AutomationProperties.Name="{x:Static res:Strings.SearchName}">

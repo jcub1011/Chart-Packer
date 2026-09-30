@@ -65,9 +65,6 @@
   <data name="ScanDepthLabel" xml:space="preserve">
     <value>Search depth</value>
   </data>
-  <data name="ScanDepthToolTip" xml:space="preserve">
-    <value>How many folder levels below the chosen folder to search</value>
-  </data>
   <data name="LibraryListName" xml:space="preserve">
     <value>Songs</value>
   </data>

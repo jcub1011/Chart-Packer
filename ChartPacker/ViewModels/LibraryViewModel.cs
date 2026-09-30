@@ -182,11 +182,9 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         public partial int SelectedCount { get; set; }
 
-        /// <summary>Max scan depth. Nullable decimal to match <c>NumericUpDown.Value</c>.</summary>
+        /// <summary>Max scan depth, set from the Settings window.</summary>
         [ObservableProperty]
         public partial decimal? ScanDepth { get; set; }
-
-        public int MaxScanDepth => AppSettings.MaxScanMaxDepth;
 
         private bool HasScanned => _scannedFolder is not null;
 

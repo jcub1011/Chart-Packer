@@ -209,15 +209,17 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
-        <!-- The background's Image | Video switch: compact icon toggles, the one shown in the accent. -->
-        <Style Selector="ToggleButton.backgroundKind">
+        <!-- The background's Image | Video switch: radio buttons, so one is always picked, drawn as
+             compact icon toggles with the one shown in the accent. -->
+        <Style Selector="RadioButton.backgroundKind">
+            <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="MinHeight" Value="0" />
             <Setter Property="Padding" Value="6,3" />
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="ToggleButton.backgroundKind PathIcon">
+        <Style Selector="RadioButton.backgroundKind PathIcon">
             <Setter Property="Width" Value="14" />
             <Setter Property="Height" Value="14" />
         </Style>
@@ -575,20 +577,20 @@
                                     </ToggleSplitButton>
                                     <!-- Always shown; a kind the selection doesn't have can't be picked. -->
                                     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2">
-                                        <ToggleButton Classes="backgroundKind"
-                                                      IsChecked="{Binding Background.IsImageSelected}"
-                                                      IsEnabled="{Binding Background.HasImageKind}"
-                                                      ToolTip.Tip="{x:Static res:Strings.ShowBackgroundImageToolTip}"
-                                                      AutomationProperties.Name="{x:Static res:Strings.ShowBackgroundImageToolTip}">
+                                        <RadioButton Classes="backgroundKind"
+                                                     IsChecked="{Binding Background.IsImageSelected}"
+                                                     IsEnabled="{Binding Background.HasImageKind}"
+                                                     ToolTip.Tip="{x:Static res:Strings.ShowBackgroundImageToolTip}"
+                                                     AutomationProperties.Name="{x:Static res:Strings.ShowBackgroundImageToolTip}">
                                             <PathIcon Data="{StaticResource ImageIconGeometry}" />
-                                        </ToggleButton>
-                                        <ToggleButton Classes="backgroundKind"
-                                                      IsChecked="{Binding Background.IsVideoSelected}"
-                                                      IsEnabled="{Binding Background.HasVideoKind}"
-                                                      ToolTip.Tip="{x:Static res:Strings.ShowBackgroundVideoToolTip}"
-                                                      AutomationProperties.Name="{x:Static res:Strings.ShowBackgroundVideoToolTip}">
+                                        </RadioButton>
+                                        <RadioButton Classes="backgroundKind"
+                                                     IsChecked="{Binding Background.IsVideoSelected}"
+                                                     IsEnabled="{Binding Background.HasVideoKind}"
+                                                     ToolTip.Tip="{x:Static res:Strings.ShowBackgroundVideoToolTip}"
+                                                     AutomationProperties.Name="{x:Static res:Strings.ShowBackgroundVideoToolTip}">
                                             <PathIcon Data="{StaticResource VideoIconGeometry}" />
-                                        </ToggleButton>
+                                        </RadioButton>
                                     </StackPanel>
                                 </Grid>
                             </Border>
