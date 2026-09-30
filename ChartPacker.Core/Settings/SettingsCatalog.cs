@@ -15,7 +15,10 @@ public sealed class SettingsCatalog
 
     /// <param name="categories">Every category, parents before their children, in display order.</param>
     /// <param name="definitions">Every setting, in display order within its category.</param>
-    /// <exception cref="ArgumentException">An id is used twice, or a category or parent isn't listed (or is listed after its children).</exception>
+    /// <exception cref="ArgumentException">
+    /// An id is used twice, a category or parent isn't listed (or is listed after its children), or a setting
+    /// requires one that isn't a listed toggle, or itself.
+    /// </exception>
     public SettingsCatalog(IEnumerable<SettingCategory> categories, IEnumerable<SettingDefinition> definitions)
     {
         ArgumentNullException.ThrowIfNull(categories);
@@ -55,6 +58,13 @@ public sealed class SettingsCatalog
 
             inCategory.Add(definition);
             all.Add(definition);
+        }
+
+        foreach (var definition in all.Where(d => d.RequiresId is not null))
+        {
+            var required = all.FirstOrDefault(d => d.Id == definition.RequiresId);
+            if (required is not ToggleSetting || ReferenceEquals(required, definition))
+                throw new ArgumentException($"Setting '{definition.Id}' requires '{definition.RequiresId}', which isn't another listed toggle.", nameof(definitions));
         }
 
         RootCategories = roots;

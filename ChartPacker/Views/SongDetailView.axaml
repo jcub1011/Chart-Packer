@@ -675,7 +675,7 @@
                                                         </ItemsControl.ItemsPanel>
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate x:DataType="vm:HighwayRowViewModel">
-                                                                <Grid ColumnDefinitions="110,140,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                                                                <Grid ColumnDefinitions="110,140,Auto,Auto,Auto,Auto,130" ColumnSpacing="6">
                                                                     <CheckBox Grid.Column="0"
                                                                               Content="{Binding Name}"
                                                                               IsChecked="{Binding IsChecked}" />
@@ -718,12 +718,33 @@
                                                                             AutomationProperties.Name="{x:Static res:Strings.HighwayRevertOffsetToolTip}">
                                                                         <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
                                                                     </Button>
+                                                                    <!-- The track drawn behind the instrument's notes: its own, or one picked for this song. -->
+                                                                    <ComboBox Grid.Column="6"
+                                                                              HorizontalAlignment="Stretch"
+                                                                              VerticalAlignment="Center"
+                                                                              ItemsSource="{Binding WaveformOptions}"
+                                                                              SelectedIndex="{Binding WaveformIndex}"
+                                                                              IsEnabled="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).Player.AreLaneWaveformsShown, FallbackValue=False}"
+                                                                              ToolTip.Tip="{x:Static res:Strings.LaneWaveformPickerToolTip}"
+                                                                              AutomationProperties.Name="{x:Static res:Strings.LaneWaveformName}">
+                                                                        <ComboBox.ItemTemplate>
+                                                                            <DataTemplate x:DataType="vm:WaveformOption">
+                                                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                                            </DataTemplate>
+                                                                        </ComboBox.ItemTemplate>
+                                                                    </ComboBox>
                                                                 </Grid>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
                                                     <TextBlock Classes="finding" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" Text="{Binding Highway.Problem}" IsVisible="{Binding Highway.HasProblem}" />
                                                     <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" Text="{Binding Highway.Note}" IsVisible="{Binding Highway.HasNote}" />
+                                                    <!-- Shared with the lyrics lane's waveform button, and a setting; only while track waveforms are read. -->
+                                                    <CheckBox Content="{x:Static res:Strings.ShowLaneWaveformsLabel}"
+                                                              IsChecked="{Binding Player.ShowLaneWaveforms}"
+                                                              IsEnabled="{Binding Player.ShowWaveforms}"
+                                                              ToolTip.Tip="{Binding Player.LaneWaveformsToolTip}"
+                                                              ToolTip.ShowOnDisabled="True" />
                                                     <Grid ColumnDefinitions="110,*" ColumnSpacing="6">
                                                         <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayNoteSpeedLabel}" />
                                                         <Slider Grid.Column="1"
@@ -772,6 +793,7 @@
                                     <ctl:NoteHighwayView Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
+                                                         Waveforms="{Binding Highway.LaneWaveforms}"
                                                          IsHitTestVisible="False"
                                                          IsVisible="{Binding Highway.IsShown}" />
                                     <StackPanel VerticalAlignment="Center"
@@ -826,7 +848,7 @@
                         <!-- The name, which gives way on a narrow panel, then the offset at the right, as the highway's
                              instruments have in their flyout. -->
                         <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
-                            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="6">
+                            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
                                 <TextBlock Grid.Column="0"
                                            Classes="marker"
                                            Text="{Binding Lyrics.Marker}"
@@ -844,7 +866,38 @@
                                            Text="{Binding Lyrics.Warning}"
                                            ToolTip.Tip="{Binding Lyrics.Warning}"
                                            IsVisible="{Binding Lyrics.HasWarning}" />
-                                <StackPanel Grid.Column="4"
+                                <!-- The audio behind the lane: the button shows or hides it, as the highway flyout's check box does,
+                                     and the arrow picks the track. -->
+                                <ToggleSplitButton Grid.Column="4"
+                                                   Classes="highway"
+                                                   IsChecked="{Binding Player.ShowLaneWaveforms}"
+                                                   IsEnabled="{Binding Player.ShowWaveforms}"
+                                                   IsVisible="{Binding Lyrics.HasLyrics}"
+                                                   ToolTip.Tip="{Binding Player.LaneWaveformsToolTip}"
+                                                   ToolTip.ShowOnDisabled="True"
+                                                   AutomationProperties.Name="{x:Static res:Strings.ShowLaneWaveformsLabel}">
+                                    <PathIcon Data="{StaticResource WaveformIconGeometry}" />
+                                    <ToggleSplitButton.Flyout>
+                                        <Flyout Placement="BottomEdgeAlignedRight">
+                                            <StackPanel Spacing="6" AutomationProperties.Name="{x:Static res:Strings.LaneWaveformOptionsName}">
+                                                <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.LaneWaveformName}" />
+                                                <ComboBox MinWidth="180"
+                                                          ItemsSource="{Binding Lyrics.WaveformOptions}"
+                                                          SelectedIndex="{Binding Lyrics.WaveformIndex}"
+                                                          IsEnabled="{Binding Player.AreLaneWaveformsShown}"
+                                                          ToolTip.Tip="{x:Static res:Strings.LaneWaveformPickerToolTip}"
+                                                          AutomationProperties.Name="{x:Static res:Strings.LaneWaveformName}">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:WaveformOption">
+                                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
+                                            </StackPanel>
+                                        </Flyout>
+                                    </ToggleSplitButton.Flyout>
+                                </ToggleSplitButton>
+                                <StackPanel Grid.Column="5"
                                             Orientation="Horizontal"
                                             Spacing="6"
                                             IsVisible="{Binding Lyrics.HasLyrics}">
@@ -881,6 +934,7 @@
                             <Panel>
                                 <ctl:LyricLaneView Scene="{Binding Lyrics.Scene}"
                                                    TimeShift="{Binding Lyrics.TimeShift}"
+                                                   Waveform="{Binding Lyrics.Waveform}"
                                                    Clock="{Binding Lyrics.Clock}"
                                                    IsHitTestVisible="False"
                                                    IsVisible="{Binding Lyrics.HasLyrics}" />

@@ -16,7 +16,7 @@ namespace ChartPacker.Services
     /// <param name="drafts">Says which songs have unsaved changes, which the merge reads past.</param>
     /// <param name="settings">The settings the preview's player and highway share with the main ones.</param>
     /// <param name="openOutput">Opens an audio device, for the preview's own player.</param>
-    /// <param name="mainPlayer">The main window's player, stopped while the preview can play.</param>
+    /// <param name="mainPlayer">The main window's player, stopped while the preview can play, which takes up the settings the preview's changed.</param>
     /// <param name="mainHighway">The main window's highway, which takes up the settings the preview's changed.</param>
     /// <param name="video">Reads background video lengths, for the merged song's <c>song_length</c>.</param>
     public sealed class AvaloniaMergeWindowService(
@@ -41,7 +41,7 @@ namespace ChartPacker.Services
             // The preview is the inspector, read-only but for its highway's offsets, with a player, highway,
             // drafts and job of its own. The offsets it keeps in its draft are what the merge applies.
             var player = new PlayerViewModel(settings, openOutput);
-            var highway = new HighwayViewModel(settings, () => player.CurrentPosition);
+            var highway = new HighwayViewModel(settings, player);
             var previewDrafts = new MetadataDraftStore();
             var preview = new SongDetailViewModel(previewDrafts, new JobViewModel(new NoProgressWindow()), imagePicker, filePicker, player, highway, video)
             {
@@ -53,6 +53,7 @@ namespace ChartPacker.Services
             _ = viewModel.LoadAsync();
             await dialog.ShowDialog(window);
             await viewModel.ShutdownAsync();
+            mainPlayer.ReloadSettings();
             mainHighway.ReloadSettings();
 
             // However the window was closed, a song may already have been merged.

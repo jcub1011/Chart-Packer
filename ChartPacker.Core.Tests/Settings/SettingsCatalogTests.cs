@@ -70,6 +70,33 @@ public sealed class SettingsCatalogTests
     }
 
     [TestMethod]
+    public void RequiringASettingThatIsNotListedThrows()
+    {
+        Assert.ThrowsExactly<ArgumentException>(() => new SettingsCatalog(
+            [Library],
+            [new ToggleSetting { Id = "lanes", Category = Library, Label = "Lanes", RequiresId = "missing", DefaultValue = false, Get = () => false, Set = _ => { } }]));
+    }
+
+    [TestMethod]
+    public void RequiringASettingThatIsNotAToggleThrows()
+    {
+        Assert.ThrowsExactly<ArgumentException>(() => new SettingsCatalog(
+            [Library],
+            [
+                new IntegerSetting { Id = "depth", Category = Library, Label = "Depth", Minimum = 0, Maximum = 5, DefaultValue = 1, Get = () => 1, Set = _ => { } },
+                new ToggleSetting { Id = "lanes", Category = Library, Label = "Lanes", RequiresId = "depth", DefaultValue = false, Get = () => false, Set = _ => { } },
+            ]));
+    }
+
+    [TestMethod]
+    public void RequiringItselfThrows()
+    {
+        Assert.ThrowsExactly<ArgumentException>(() => new SettingsCatalog(
+            [Library],
+            [new ToggleSetting { Id = "lanes", Category = Library, Label = "Lanes", RequiresId = "lanes", DefaultValue = false, Get = () => false, Set = _ => { } }]));
+    }
+
+    [TestMethod]
     public void DuplicateCategoryIdThrows()
     {
         Assert.ThrowsExactly<ArgumentException>(() => new SettingsCatalog(

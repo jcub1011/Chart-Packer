@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Collections;
+using ChartPacker.Audio.Waveforms;
 using ChartPacker.Controls;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Library;
@@ -34,12 +35,15 @@ namespace ChartPacker.ViewModels
     /// and <see cref="OffsetsChanged"/> tells the details panel so. What's drawn is the chart
     /// <see cref="ChartShifter"/> makes from the draft, read back, so it's exactly what saving writes.
     /// Every instrument is shown until it's unchecked, which lasts for that song until the app closes.
-    /// Which difficulties are shown, and the note speed, are app settings.
+    /// Which difficulties are shown, and the note speed, are app settings. Each highway draws the waveform
+    /// of the track its instrument is played against, or of one picked in its place, which likewise lasts
+    /// for that song until the app closes.
     /// </remarks>
-    public sealed partial class HighwayViewModel(SettingsService settings, Func<TimeSpan> clock) : ViewModelBase
+    public sealed partial class HighwayViewModel : ViewModelBase
     {
         // How far ahead of the strike line the highway shows at the normal note speed, in seconds.
         private const double BaseLookAhead = 1.4;
+        private readonly SettingsService _settings;
         private HighwaySong? _song;
 
         // The parts of a song without a chart; one instance, so setting it again doesn't notify.
@@ -73,11 +77,36 @@ namespace ChartPacker.ViewModels
         // The instruments unchecked for each song, by its path. Never saved.
         private readonly Dictionary<string, HashSet<ChartInstrument>> _hidden = new(StringComparer.Ordinal);
 
+        // The track picked for each instrument's waveform in place of its own, for each song, by its path. Never saved.
+        private readonly Dictionary<string, Dictionary<ChartInstrument, string>> _waveformStems = new(StringComparer.Ordinal);
+
+        // The instrument of each of the scene's highways, in order.
+        private List<ChartInstrument> _laneInstruments = [];
+
+        /// <param name="player">Plays the song, and has read its tracks' waveforms.</param>
+        public HighwayViewModel(SettingsService settings, PlayerViewModel player)
+        {
+            _settings = settings;
+            Player = player;
+            Clock = () => player.CurrentPosition;
+            IsEnabled = settings.Settings.ShowNoteHighway;
+            NoteSpeed = settings.Settings.HighwayNoteSpeed;
+            player.TrackWaveformsChanged += (_, _) => RefreshWaveforms();
+            player.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(PlayerViewModel.AreLaneWaveformsShown))
+                    RefreshWaveforms();
+            };
+        }
+
         /// <summary>Raised when an offset is set in the draft of the song shown.</summary>
         public event EventHandler? OffsetsChanged;
 
+        /// <summary>The player whose tracks' waveforms are drawn, and which says whether they are.</summary>
+        public PlayerViewModel Player { get; }
+
         /// <summary>Where the audio is.</summary>
-        public Func<TimeSpan> Clock { get; } = clock;
+        public Func<TimeSpan> Clock { get; }
 
         /// <summary>One row per instrument the chart has, in display order.</summary>
         public AvaloniaList<HighwayRowViewModel> Rows { get; } = [];
@@ -85,17 +114,24 @@ namespace ChartPacker.ViewModels
         /// <summary>Whether the highway is drawn; the caption's toggle.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsShown))]
-        public partial bool IsEnabled { get; set; } = settings.Settings.ShowNoteHighway;
+        public partial bool IsEnabled { get; set; }
 
         /// <summary>How fast the notes fall, as a multiple of the normal speed.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(LookAhead))]
-        public partial double NoteSpeed { get; set; } = settings.Settings.HighwayNoteSpeed;
+        public partial double NoteSpeed { get; set; }
 
         /// <summary>What's drawn, or <see langword="null"/> for nothing.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsShown))]
         public partial HighwayScene? Scene { get; set; }
+
+        /// <summary>
+        /// The waveform drawn behind each of the <see cref="Scene"/>'s highways, in order, or <see langword="null"/> for
+        /// one without; the whole list is <see langword="null"/> while lane waveforms aren't shown.
+        /// </summary>
+        [ObservableProperty]
+        public partial IReadOnlyList<Waveform?>? LaneWaveforms { get; private set; }
 
         /// <summary>Why there's no chart to show, if there isn't.</summary>
         [ObservableProperty]
@@ -187,8 +223,8 @@ namespace ChartPacker.ViewModels
         /// <summary>Takes up the settings again, as after another highway sharing them changed them: whether it's shown, the speed and the difficulties.</summary>
         public void ReloadSettings()
         {
-            IsEnabled = settings.Settings.ShowNoteHighway;
-            NoteSpeed = settings.Settings.HighwayNoteSpeed;
+            IsEnabled = _settings.Settings.ShowNoteHighway;
+            NoteSpeed = _settings.Settings.HighwayNoteSpeed;
             if (_original is { } chart)
             {
                 BuildRows(chart);
@@ -197,9 +233,9 @@ namespace ChartPacker.ViewModels
             }
         }
 
-        partial void OnIsEnabledChanged(bool value) => settings.Settings.ShowNoteHighway = value;
+        partial void OnIsEnabledChanged(bool value) => _settings.Settings.ShowNoteHighway = value;
 
-        partial void OnNoteSpeedChanged(double value) => settings.Settings.HighwayNoteSpeed = value;
+        partial void OnNoteSpeedChanged(double value) => _settings.Settings.HighwayNoteSpeed = value;
 
         partial void OnCanEditOffsetsChanged(bool value)
         {
@@ -220,6 +256,8 @@ namespace ChartPacker.ViewModels
             ChartParts = null;
             Rows.Clear();
             Scene = null;
+            _laneInstruments = [];
+            LaneWaveforms = null;
             Problem = null;
             Note = note;
             RefreshState();
@@ -385,7 +423,7 @@ namespace ChartPacker.ViewModels
             foreach (var instrument in chart.Instruments)
             {
                 var difficulties = chart.DifficultiesOf(instrument);
-                var wanted = settings.Settings.HighwayDifficulties?.GetValueOrDefault(instrument.ToString()) is { } saved
+                var wanted = _settings.Settings.HighwayDifficulties?.GetValueOrDefault(instrument.ToString()) is { } saved
                     && Enum.TryParse<ChartDifficulty>(saved, out var d) ? d : ChartDifficulty.Expert;
                 var difficulty = difficulties.Contains(wanted) ? wanted : difficulties.OrderBy(x => Math.Abs((int)x - (int)wanted)).ThenByDescending(x => x).First();
                 Rows.Add(new HighwayRowViewModel(this, instrument, difficulties, difficulty, hidden?.Contains(instrument) != true));
@@ -408,29 +446,66 @@ namespace ChartPacker.ViewModels
 
         private void BuildScene()
         {
-            if (_shown is not { } chart)
-            {
-                Scene = null;
-                return;
-            }
-
             var lanes = new List<HighwayLane>();
-            foreach (var row in Rows.Where(r => r.IsChecked))
+            var instruments = new List<ChartInstrument>();
+            if (_shown is { } chart)
             {
-                if (!chart.Tracks.TryGetValue(row.Key, out var track))
-                    continue;
-
-                var kind = ChartInstruments.KindOf(row.Instrument);
-                int laneCount = kind switch
+                foreach (var row in Rows.Where(r => r.IsChecked))
                 {
-                    ChartInstrumentKind.FiveFret => 5,
-                    ChartInstrumentKind.Drums => chart.IsFiveLaneDrums ? 5 : 4,
-                    _ => 3,
-                };
-                lanes.Add(new HighwayLane(kind, laneCount, TrackName(row.Key), track.Notes, chart.Tempo, _delay));
+                    if (!chart.Tracks.TryGetValue(row.Key, out var track))
+                        continue;
+
+                    var kind = ChartInstruments.KindOf(row.Instrument);
+                    int laneCount = kind switch
+                    {
+                        ChartInstrumentKind.FiveFret => 5,
+                        ChartInstrumentKind.Drums => chart.IsFiveLaneDrums ? 5 : 4,
+                        _ => 3,
+                    };
+                    lanes.Add(new HighwayLane(kind, laneCount, TrackName(row.Key), track.Notes, chart.Tempo, _delay));
+                    instruments.Add(row.Instrument);
+                }
             }
 
-            Scene = lanes.Count > 0 ? new HighwayScene(lanes, chart.Tempo, _delay) : null;
+            _laneInstruments = instruments;
+            Scene = lanes.Count > 0 && _shown is { } drawn ? new HighwayScene(lanes, drawn.Tempo, _delay) : null;
+            RefreshWaveforms();
+        }
+
+        /// <summary>
+        /// Brings each row's waveform picker up to date with the song's tracks, and picks the waveform drawn behind
+        /// each highway: none unless lane waveforms are shown and the player has this song's tracks.
+        /// </summary>
+        private void RefreshWaveforms()
+        {
+            // The player is given the song's tracks after the highway is given the song; until then they're another song's.
+            bool hasTracks = _song is { } song && song.Entry == Player.LoadedEntry;
+            var chosen = _song is { } shown ? _waveformStems.GetValueOrDefault(shown.Entry.FullPath) : null;
+            var tracks = hasTracks ? Player.Tracks.Select(t => t.Track).ToList() : [];
+
+            bool wasSyncing = _isSyncing;
+            _isSyncing = true;
+            foreach (var row in Rows)
+                row.SyncWaveforms(LaneWaveformChoice.OptionsFor(tracks, LaneStems.For(row.Instrument)), chosen?.GetValueOrDefault(row.Instrument));
+            _isSyncing = wasSyncing;
+
+            LaneWaveforms = hasTracks && Player.AreLaneWaveformsShown && Scene is not null
+                ? [.. _laneInstruments.Select(i => LaneWaveformChoice.Resolve(Player, LaneStems.For(i), chosen?.GetValueOrDefault(i)))]
+                : null;
+        }
+
+        internal void OnRowWaveformChanged(HighwayRowViewModel row)
+        {
+            if (_isSyncing || _song is not { } song)
+                return;
+
+            if (!_waveformStems.TryGetValue(song.Entry.FullPath, out var chosen))
+                _waveformStems[song.Entry.FullPath] = chosen = [];
+            if (row.WaveformStem is { } stem)
+                chosen[row.Instrument] = stem;
+            else
+                chosen.Remove(row.Instrument);
+            RefreshWaveforms();
         }
 
         internal void OnRowChecked(HighwayRowViewModel row)
@@ -452,7 +527,7 @@ namespace ChartPacker.ViewModels
             if (_isSyncing)
                 return;
 
-            var difficulties = settings.Settings.HighwayDifficulties ??= [];
+            var difficulties = _settings.Settings.HighwayDifficulties ??= [];
             difficulties[row.Instrument.ToString()] = row.Difficulty.ToString();
             SyncRows();
             BuildScene();
@@ -535,6 +610,16 @@ namespace ChartPacker.ViewModels
 
         public ChartTrackKey Key => new(Instrument, Difficulty);
 
+        /// <summary>The tracks the highway's waveform can be drawn from, the instrument's own first.</summary>
+        [ObservableProperty]
+        public partial IReadOnlyList<WaveformOption> WaveformOptions { get; set; } = [];
+
+        [ObservableProperty]
+        public partial int WaveformIndex { get; set; }
+
+        /// <summary>The stem picked for the waveform, or <see langword="null"/> for the instrument's own.</summary>
+        public string? WaveformStem => WaveformIndex >= 0 && WaveformIndex < WaveformOptions.Count ? WaveformOptions[WaveformIndex].Stem : null;
+
         /// <summary>Adds the milliseconds <paramref name="amount"/> gives, e.g. <c>-10</c>, to the offset.</summary>
         [RelayCommand(CanExecute = nameof(CanEdit))]
         private void Nudge(string? amount)
@@ -574,6 +659,14 @@ namespace ChartPacker.ViewModels
             Offset = offsets.GetValueOrDefault(Key);
         }
 
+        /// <summary>Shows <paramref name="options"/> in the waveform picker, with <paramref name="chosen"/> picked, or the instrument's own when the song hasn't that track.</summary>
+        internal void SyncWaveforms(IReadOnlyList<WaveformOption> options, string? chosen)
+        {
+            if (!options.SequenceEqual(WaveformOptions))
+                WaveformOptions = options;
+            WaveformIndex = LaneWaveformChoice.IndexOf(options, chosen);
+        }
+
         private int IndexOf(ChartDifficulty difficulty)
         {
             for (int i = 0; i < _difficulties.Count; i++)
@@ -591,6 +684,13 @@ namespace ChartPacker.ViewModels
         {
             if (value >= 0)
                 _owner.OnRowDifficultyChanged(this);
+        }
+
+        partial void OnWaveformIndexChanged(int value)
+        {
+            // A new list of options clears the picker's selection first.
+            if (value >= 0)
+                _owner.OnRowWaveformChanged(this);
         }
 
         // No limit of its own, as a chart can be off by any amount; only what the offset, in whole milliseconds, can hold.

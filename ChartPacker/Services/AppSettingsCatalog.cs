@@ -127,6 +127,18 @@ namespace ChartPacker.Services
                     },
                     new ToggleSetting
                     {
+                        Id = "playback.showLaneWaveforms",
+                        Category = visualizers,
+                        Label = Strings.ShowLaneWaveformsLabel,
+                        Description = Strings.ShowLaneWaveformsDescription,
+                        Keywords = Words(Strings.ShowLaneWaveformsKeywords),
+                        RequiresId = "playback.showWaveforms",
+                        DefaultValue = true,
+                        Get = () => player.ShowLaneWaveforms,
+                        Set = show => player.ShowLaneWaveforms = show,
+                    },
+                    new ToggleSetting
+                    {
                         Id = "playback.showSpectrum",
                         Category = visualizers,
                         Label = Strings.ShowSpectrumLabel,

@@ -22,7 +22,34 @@ public abstract class SettingEdit : INotifyPropertyChanged
     /// <summary>The staged value is the setting's default.</summary>
     public abstract bool IsDefault { get; }
 
+    /// <summary>The toggle this setting only applies while it's on, if it has one; see <see cref="SettingDefinition.RequiresId"/>.</summary>
+    public SettingDefinition? Requirement { get; private set; }
+
+    /// <summary>Whether the setting can be changed: it has no <see cref="Requirement"/>, or that's staged on.</summary>
+    public bool IsEnabled { get; private set; } = true;
+
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Makes this setting follow <paramref name="requirement"/>'s staged value: enabled only while it's on.</summary>
+    internal void Require(SettingEdit<bool> requirement)
+    {
+        Requirement = requirement.Definition;
+        requirement.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingEdit<bool>.Value))
+                SetEnabled(requirement.Value);
+        };
+        SetEnabled(requirement.Value);
+    }
+
+    private void SetEnabled(bool isEnabled)
+    {
+        if (isEnabled == IsEnabled)
+            return;
+
+        IsEnabled = isEnabled;
+        OnPropertyChanged(nameof(IsEnabled));
+    }
 
     /// <summary>Writes the staged value if it's modified, then takes the live value as the new starting point.</summary>
     /// <returns>Whether anything was written.</returns>

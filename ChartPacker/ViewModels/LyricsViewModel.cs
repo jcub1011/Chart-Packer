@@ -5,10 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using ChartPacker.Audio.Waveforms;
 using ChartPacker.Controls;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -26,9 +28,10 @@ namespace ChartPacker.ViewModels
     /// Vocals that would start before the song does are read back moved later just enough to fit,
     /// and the lane moved back by as much, so none are drawn stacked on the first tick.
     /// The row shows while the song has a vocals track to sing along to, vocals in its chart, or a
-    /// change to them to undo.
+    /// change to them to undo. The lane draws the vocals track's waveform behind the notes, or the
+    /// waveform of a track picked in its place, which lasts for that song until the app closes.
     /// </remarks>
-    public sealed partial class LyricsViewModel(Func<TimeSpan> clock) : ViewModelBase
+    public sealed partial class LyricsViewModel : ViewModelBase
     {
         private HighwaySong? _song;
         private bool _hasVocalStem;
@@ -57,11 +60,41 @@ namespace ChartPacker.ViewModels
         // Set while the offset is changed from here, so that doesn't read as the user changing it.
         private bool _isSyncing;
 
+        // The track picked for the lane's waveform in place of the vocals, for each song, by its path. Never saved.
+        private readonly Dictionary<string, string> _waveformStems = new(StringComparer.Ordinal);
+
+        /// <param name="player">Plays the song, and has read its tracks' waveforms.</param>
+        public LyricsViewModel(PlayerViewModel player)
+        {
+            Player = player;
+            Clock = () => player.CurrentPosition;
+            player.TrackWaveformsChanged += (_, _) => RefreshWaveform();
+            player.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(PlayerViewModel.AreLaneWaveformsShown))
+                    RefreshWaveform();
+            };
+        }
+
         /// <summary>Raised when the offset is set in the draft of the song shown.</summary>
         public event EventHandler? OffsetChanged;
 
+        /// <summary>The player whose tracks' waveforms are drawn, and which says whether they are.</summary>
+        public PlayerViewModel Player { get; }
+
         /// <summary>Where the audio is.</summary>
-        public Func<TimeSpan> Clock { get; } = clock;
+        public Func<TimeSpan> Clock { get; }
+
+        /// <summary>The waveform drawn behind the vocals, or <see langword="null"/> for none, as while lane waveforms aren't shown.</summary>
+        [ObservableProperty]
+        public partial Waveform? Waveform { get; private set; }
+
+        /// <summary>The tracks the lane's waveform can be drawn from, the vocals' own first.</summary>
+        [ObservableProperty]
+        public partial IReadOnlyList<WaveformOption> WaveformOptions { get; private set; } = [];
+
+        [ObservableProperty]
+        public partial int WaveformIndex { get; set; }
 
         /// <summary>What's drawn, or <see langword="null"/> when there are no vocals to show.</summary>
         [ObservableProperty]
@@ -146,6 +179,7 @@ namespace ChartPacker.ViewModels
             _song = null;
             _hasVocalStem = false;
             Clear(null);
+            RefreshWaveform();
         }
 
         /// <summary>
@@ -159,6 +193,7 @@ namespace ChartPacker.ViewModels
             _song = song;
             _hasVocalStem = hasVocalStem;
             SyncOffset();
+            RefreshWaveform();
             if (song is null || DraftChart.Of(song.Draft, song.StoredFiles) is not { } chart)
             {
                 Clear(song is null ? null : Strings.LyricsNoChart);
@@ -208,6 +243,45 @@ namespace ChartPacker.ViewModels
             ApplyOffset();
             RefreshState();
             OffsetChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        partial void OnWaveformIndexChanged(int value)
+        {
+            // A new list of options clears the picker's selection first.
+            if (_isSyncing || value < 0 || _song is not { } song)
+                return;
+
+            if (value < WaveformOptions.Count && WaveformOptions[value].Stem is { } stem)
+                _waveformStems[song.Entry.FullPath] = stem;
+            else
+                _waveformStems.Remove(song.Entry.FullPath);
+            RefreshWaveform();
+        }
+
+        /// <summary>
+        /// Brings the waveform picker up to date with the song's tracks, and picks the waveform drawn behind the vocals:
+        /// none unless lane waveforms are shown and the player has this song's tracks.
+        /// </summary>
+        private void RefreshWaveform()
+        {
+            // The player is given the song's tracks after the lane is given the song; until then they're another song's.
+            bool hasTracks = _song is { } song && song.Entry == Player.LoadedEntry;
+            string? chosen = _song is { } shown ? _waveformStems.GetValueOrDefault(shown.Entry.FullPath) : null;
+            var options = LaneWaveformChoice.OptionsFor(hasTracks ? [.. Player.Tracks.Select(t => t.Track)] : [], LaneStems.Vocals);
+
+            _isSyncing = true;
+            try
+            {
+                if (!options.SequenceEqual(WaveformOptions))
+                    WaveformOptions = options;
+                WaveformIndex = LaneWaveformChoice.IndexOf(options, chosen);
+            }
+            finally
+            {
+                _isSyncing = false;
+            }
+
+            Waveform = hasTracks && Player.AreLaneWaveformsShown ? LaneWaveformChoice.Resolve(Player, LaneStems.Vocals, chosen) : null;
         }
 
         /// <summary>Shows the draft's offset in the box, without that counting as the user setting it.</summary>

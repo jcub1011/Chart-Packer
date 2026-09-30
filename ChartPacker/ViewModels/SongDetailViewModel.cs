@@ -130,7 +130,7 @@ namespace ChartPacker.ViewModels
                     RefreshInstruments();
             };
             Instruments = [.. DifficultySlots.All.Select(s => new InstrumentDifficultyViewModel(this, s))];
-            Lyrics = new LyricsViewModel(() => Player.CurrentPosition);
+            Lyrics = new LyricsViewModel(Player);
             Lyrics.OffsetChanged += (_, _) => OnOffsetsChanged();
 
             // What the lyrics commands can do depends on what the lyrics row has read, which comes later.

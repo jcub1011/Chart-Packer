@@ -22,6 +22,13 @@ public sealed class SettingsSession : INotifyPropertyChanged
         }
 
         Edits = edits;
+
+        // A setting that requires a toggle follows that toggle as staged here, so switching it off locks the setting at once.
+        foreach (var edit in edits)
+        {
+            if (edit.Definition.RequiresId is { } id)
+                edit.Require((SettingEdit<bool>)edits.First(e => e.Definition.Id == id));
+        }
     }
 
     public SettingsCatalog Catalog { get; }

@@ -38,7 +38,7 @@ namespace ChartPacker
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
                 var audio = new SdlAudio();
                 var player = new PlayerViewModel(settings, audio.Open);
-                var highway = new HighwayViewModel(settings, () => player.CurrentPosition);
+                var highway = new HighwayViewModel(settings, player);
 
                 // FFmpeg is looked for now, off the UI thread, so the first video shown doesn't wait for it to load.
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);

@@ -164,6 +164,7 @@ namespace ChartPacker.ViewModels
             _settings = settings;
             Volume = settings.Settings.MasterVolume;
             ShowWaveforms = settings.Settings.ShowWaveforms;
+            ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
             _openOutput = openOutput;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
@@ -214,7 +215,23 @@ namespace ChartPacker.ViewModels
         /// length isn't known until it's played. Kept in the settings.
         /// </summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(AreLaneWaveformsShown))]
+        [NotifyPropertyChangedFor(nameof(LaneWaveformsToolTip))]
         public partial bool ShowWaveforms { get; set; }
+
+        /// <summary>
+        /// Whether the highways and the lyrics lane draw their tracks' waveforms behind their notes. Only while
+        /// <see cref="ShowWaveforms"/> is on, as nothing is read otherwise. Kept in the settings.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(AreLaneWaveformsShown))]
+        public partial bool ShowLaneWaveforms { get; set; }
+
+        /// <summary>The lanes draw their tracks' waveforms; see <see cref="ShowLaneWaveforms"/>.</summary>
+        public bool AreLaneWaveformsShown => ShowWaveforms && ShowLaneWaveforms;
+
+        /// <summary>What the lanes' waveform switch does, or, while waveforms are off, why it does nothing.</summary>
+        public string LaneWaveformsToolTip => ShowWaveforms ? Strings.LaneWaveformsToolTip : Strings.LaneWaveformsNeedWaveformsToolTip;
 
         /// <summary>Whether the spectrum of what's heard is worked out and shown. Kept in the settings.</summary>
         [ObservableProperty]
@@ -227,6 +244,19 @@ namespace ChartPacker.ViewModels
         public partial TimeSpan? PreviewStart { get; set; }
 
         public bool HasTracks => Tracks.Count > 0;
+
+        /// <summary>The song whose tracks are shown, playing or not.</summary>
+        public SongEntry? LoadedEntry => _entry;
+
+        /// <summary>Raised when the tracks shown change, or what's been read of one of their waveforms does.</summary>
+        public event EventHandler? TrackWaveformsChanged;
+
+        /// <summary>The waveform of the first track shown of <paramref name="stem"/>, or <see langword="null"/> when there's no such track.</summary>
+        public Waveform? WaveformOfStem(string stem) =>
+            Tracks.FirstOrDefault(t => t.Track.Stem.Equals(stem, StringComparison.OrdinalIgnoreCase))?.Waveform;
+
+        /// <summary>Takes up the settings again, as after another player sharing them changed them.</summary>
+        public void ReloadSettings() => ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
 
         /// <summary>The song that is playing, or <see langword="null"/> when nothing is.</summary>
         public SongEntry? ActiveEntry => IsPlaying ? _entry : null;
@@ -330,6 +360,7 @@ namespace ChartPacker.ViewModels
             }
 
             RebuildWaveform();
+            TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
             if (ShowWaveforms)
                 StartPeaks(entry, [.. tracks.Where(t => !_peaks.ContainsKey(t) || _partialPeaks.Contains(t))]);
             StartRequestedPreview(entry);
@@ -377,6 +408,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasTracks));
             OnPropertyChanged(nameof(TracksHeader));
             RefreshCommands();
+            TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>The seek slider is held: the position stops following playback until <see cref="EndScrub"/>.</summary>
@@ -615,6 +647,7 @@ namespace ChartPacker.ViewModels
                 foreach (var row in Tracks.Where(r => Equals(r.Track, track)))
                     row.Waveform = WaveformPeaks.Of(peaks);
                 ScheduleWaveformRebuild();
+                TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
             });
 
         /// <summary>Drops what was read of <paramref name="track"/>, whose read failed, unless the read has been stopped; from any thread.</summary>
@@ -628,6 +661,7 @@ namespace ChartPacker.ViewModels
                 foreach (var row in Tracks.Where(r => Equals(r.Track, track)))
                     row.Waveform = Waveform.Empty;
                 ScheduleWaveformRebuild();
+                TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
             });
 
         /// <summary>
@@ -760,6 +794,7 @@ namespace ChartPacker.ViewModels
                 ClearPeaks();
                 foreach (var row in Tracks)
                     row.Waveform = Waveform.Empty;
+                TrackWaveformsChanged?.Invoke(this, EventArgs.Empty);
             }
             else if (_entry is { } entry && HasTracks)
             {
@@ -767,6 +802,8 @@ namespace ChartPacker.ViewModels
                 StartPeaks(entry, [.. Tracks.Select(t => t.Track)]);
             }
         }
+
+        partial void OnShowLaneWaveformsChanged(bool value) => _settings.Settings.ShowLaneWaveforms = value;
 
         partial void OnShowSpectrumChanged(bool value)
         {

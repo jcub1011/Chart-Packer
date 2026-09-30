@@ -37,6 +37,15 @@
             <Setter Property="Opacity" Value="0.6" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
+        <!-- Locked while the toggle it depends on is off: dimmed, with a note saying which toggle that is. -->
+        <Style Selector="Border.setting-row.locked StackPanel.setting-text">
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+        <Style Selector="TextBlock.setting-locked">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
         <Style Selector="TreeViewItem" x:DataType="svm:SettingsCategoryViewModel">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
         </Style>
@@ -145,15 +154,20 @@
                                         <!-- The row. Its editor comes from Window.DataTemplates, by the setting's kind. -->
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate DataType="svm:SettingViewModel">
-                                                <Border Classes="setting-row" Classes.modified="{Binding IsModified}">
+                                                <Border Classes="setting-row" Classes.modified="{Binding IsModified}" Classes.locked="{Binding !IsEnabled}">
                                                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                                                         <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                                            <TextBlock Classes="setting-description"
-                                                                       Text="{Binding Description}"
-                                                                       IsVisible="{Binding HasDescription}" />
+                                                            <StackPanel Classes="setting-text" Spacing="2">
+                                                                <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                                                <TextBlock Classes="setting-description"
+                                                                           Text="{Binding Description}"
+                                                                           IsVisible="{Binding HasDescription}" />
+                                                            </StackPanel>
+                                                            <TextBlock Classes="setting-locked"
+                                                                       Text="{Binding LockedNote}"
+                                                                       IsVisible="{Binding !IsEnabled}" />
                                                         </StackPanel>
-                                                        <ContentControl Grid.Column="1" Content="{Binding}" VerticalAlignment="Center" />
+                                                        <ContentControl Grid.Column="1" Content="{Binding}" VerticalAlignment="Center" IsEnabled="{Binding IsEnabled}" />
                                                         <!-- Fixed width, so the editor doesn't shift when the button appears. -->
                                                         <Panel Grid.Column="2" Width="32" VerticalAlignment="Center">
                                                             <Button Classes="tool"

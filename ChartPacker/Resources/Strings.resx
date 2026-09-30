@@ -1155,6 +1155,43 @@
     <value>highway notes chart lanes falling preview guitar drums bass keys</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="ShowLaneWaveformsLabel" xml:space="preserve">
+    <value>Show waveforms in lanes</value>
+  </data>
+  <data name="ShowLaneWaveformsDescription" xml:space="preserve">
+    <value>Draw each instrument's track behind its notes on the note highway, and the vocals track behind the lyrics, to help line the chart up with the audio. A lane without a track of its own shows the song's. Needs Show waveforms.</value>
+  </data>
+  <data name="ShowLaneWaveformsKeywords" xml:space="preserve">
+    <value>waveform lanes highway lyrics align alignment offset sync timing audio track stem</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="SettingLockedFormat" xml:space="preserve">
+    <value>Turn on {0} to change this.</value>
+    <comment>Under a setting that only applies while another is on: {0} is that setting's label, e.g. Show waveforms.</comment>
+  </data>
+  <data name="LaneWaveformsToolTip" xml:space="preserve">
+    <value>Show the audio behind the notes, to line them up with it</value>
+  </data>
+  <data name="LaneWaveformsNeedWaveformsToolTip" xml:space="preserve">
+    <value>Turn on Show waveforms in Settings to show the audio behind the notes</value>
+  </data>
+  <data name="LaneWaveformName" xml:space="preserve">
+    <value>Waveform</value>
+  </data>
+  <data name="LaneWaveformPickerToolTip" xml:space="preserve">
+    <value>The track whose waveform is drawn behind the notes. Your choice lasts for this song until the app closes.</value>
+  </data>
+  <data name="LaneWaveformOptionsName" xml:space="preserve">
+    <value>Lyrics waveform options</value>
+  </data>
+  <data name="LaneWaveformAutoFormat" xml:space="preserve">
+    <value>Auto ({0})</value>
+    <comment>The waveform picker's first option: {0} is the name of the track it picks, e.g. guitar.ogg.</comment>
+  </data>
+  <data name="LaneWaveformAutoNone" xml:space="preserve">
+    <value>Auto (none)</value>
+    <comment>The waveform picker's first option when the song has no track for the lane.</comment>
+  </data>
   <data name="HighwayFootnote" xml:space="preserve">
     <value>Offsets are rounded to the nearest chart tick and written to the chart when you save.</value>
   </data>

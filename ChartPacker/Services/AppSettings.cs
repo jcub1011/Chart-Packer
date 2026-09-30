@@ -56,6 +56,9 @@ namespace ChartPacker.Services
         /// <summary>Whether the player reads and draws waveforms. Off, no track is read ahead of playback.</summary>
         public bool ShowWaveforms { get; set; } = true;
 
+        /// <summary>Whether each highway and the lyrics lane draw their track's waveform behind their notes, while waveforms are shown.</summary>
+        public bool ShowLaneWaveforms { get; set; } = true;
+
         /// <summary>Whether the spectrum is drawn behind the details panel. Off, it isn't worked out at all.</summary>
         public bool ShowSpectrum { get; set; } = true;
 

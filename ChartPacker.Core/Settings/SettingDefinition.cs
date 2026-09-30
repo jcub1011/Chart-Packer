@@ -21,6 +21,12 @@ public abstract class SettingDefinition
     /// <summary>Extra words search should find this setting by, beyond its label, description and category.</summary>
     public IReadOnlyList<string> Keywords { get; init; } = [];
 
+    /// <summary>
+    /// The id of a <see cref="ToggleSetting"/> this setting only applies while it's on, or <see langword="null"/>.
+    /// While it's staged off, this one can't be changed; see <see cref="SettingEdit.IsEnabled"/>.
+    /// </summary>
+    public string? RequiresId { get; init; }
+
     /// <summary>Starts staging a change to this setting, from its current value.</summary>
     public abstract SettingEdit BeginEdit();
 }

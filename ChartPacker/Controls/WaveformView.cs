@@ -35,9 +35,6 @@ namespace ChartPacker.Controls
         private const double BarGap = 1;
         private const double MinBarHeight = 1.5;
 
-        // How loud a column must be to fill the height: a full-scale sine, at -3 dBFS.
-        private const double RmsGain = 1.41;
-
         // The peaks behind the loudness are drawn this faintly.
         private const double PeakOpacity = 0.35;
 
@@ -201,7 +198,7 @@ namespace ChartPacker.Controls
                 var (low, high, rms) = levels[column];
 
                 // Never past the peaks: a square wave is as loud as its peaks, and no louder.
-                double loud = Math.Min(rms * RmsGain, Math.Max(-low, high)) * grown;
+                double loud = Math.Min(rms * LaneWaveformPainter.RmsGain, Math.Max(-low, high)) * grown;
                 DrawBar(context, column, columns, played, middle, loud, loud);
             }
         }
@@ -306,32 +303,16 @@ namespace ChartPacker.Controls
             if (waveform is not null && duration > 0)
             {
                 for (int column = 0; column < columns; column++)
-                    levels[column] = Levels(waveform, (double)column / columns * duration, (double)(column + 1) / columns * duration);
+                {
+                    var (low, high, rms) = LaneWaveformPainter.Levels(waveform, (double)column / columns * duration, (double)(column + 1) / columns * duration);
+                    levels[column] = new Column(low, high, rms);
+                }
             }
 
             _columns = levels;
             _columnsWaveform = waveform;
             _columnsDuration = duration;
             return levels;
-        }
-
-        /// <summary>The lowest and highest level between two times, and how loud it is across them.</summary>
-        private static Column Levels(Waveform waveform, double fromSeconds, double toSeconds)
-        {
-            int first = Math.Max(0, (int)Math.Floor(fromSeconds * WaveformPeaks.BucketsPerSecond));
-            int last = Math.Min(waveform.Count, (int)Math.Ceiling(toSeconds * WaveformPeaks.BucketsPerSecond));
-
-            double low = 0, high = 0, squares = 0;
-            for (int i = first; i < last; i++)
-            {
-                low = Math.Min(low, waveform.Min[i]);
-                high = Math.Max(high, waveform.Max[i]);
-                squares += (double)waveform.Rms[i] * waveform.Rms[i];
-            }
-
-            // The loudness of the buckets together, rather than of the loudest, so a column isn't only as quiet as its loudest moment.
-            double rms = last > first ? Math.Sqrt(squares / (last - first)) : 0;
-            return new Column(low, high, rms);
         }
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)

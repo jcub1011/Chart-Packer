@@ -98,6 +98,66 @@ public sealed class SettingsSessionTests
     }
 
     [TestMethod]
+    public void ASettingIsEnabledOnlyWhileTheToggleItRequiresIsStagedOn()
+    {
+        var (session, waveforms, lanes) = RequiringSession(waveformsOn: true);
+
+        Assert.IsTrue(lanes.IsEnabled);
+        Assert.AreSame(waveforms.Definition, lanes.Requirement);
+
+        var raised = new List<string?>();
+        lanes.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        waveforms.Value = false;
+
+        Assert.IsFalse(lanes.IsEnabled);
+        CollectionAssert.Contains(raised, nameof(SettingEdit.IsEnabled));
+
+        // Cancelling puts the toggle back, and the setting with it.
+        waveforms.Revert();
+        Assert.IsTrue(lanes.IsEnabled);
+        Assert.IsFalse(session.HasChanges);
+    }
+
+    [TestMethod]
+    public void ASettingStartsLockedWhenTheToggleItRequiresIsOff()
+    {
+        var (_, _, lanes) = RequiringSession(waveformsOn: false);
+
+        Assert.IsFalse(lanes.IsEnabled);
+    }
+
+    [TestMethod]
+    public void ASettingWithoutARequirementIsAlwaysEnabled()
+    {
+        var session = new SettingsSession(Catalog());
+
+        Assert.IsTrue(session.Edits.All(e => e.IsEnabled && e.Requirement is null));
+    }
+
+    [TestMethod]
+    public void LockingASettingKeepsItsValue()
+    {
+        var (session, waveforms, lanes) = RequiringSession(waveformsOn: true);
+
+        waveforms.Value = false;
+        session.Apply();
+
+        Assert.IsTrue(lanes.Value);
+    }
+
+    private static (SettingsSession Session, SettingEdit<bool> Waveforms, SettingEdit<bool> Lanes) RequiringSession(bool waveformsOn)
+    {
+        bool waveforms = waveformsOn, lanes = true;
+        var session = new SettingsSession(new SettingsCatalog(
+            [Category],
+            [
+                new ToggleSetting { Id = "waveforms", Category = Category, Label = "Show waveforms", DefaultValue = true, Get = () => waveforms, Set = v => waveforms = v },
+                new ToggleSetting { Id = "lanes", Category = Category, Label = "Lane waveforms", RequiresId = "waveforms", DefaultValue = true, Get = () => lanes, Set = v => lanes = v },
+            ]));
+        return (session, (SettingEdit<bool>)session.Edits[0], (SettingEdit<bool>)session.Edits[1]);
+    }
+
+    [TestMethod]
     public void ApplyWithNoChangesWritesNothing()
     {
         var session = new SettingsSession(Catalog());

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Threading.Tasks;
 using ChartPacker.Core.Settings;
+using ChartPacker.Resources;
 using ChartPacker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -34,7 +36,15 @@ namespace ChartPacker.ViewModels.Settings
 
         public bool IsDefault => _edit.IsDefault;
 
-        private bool CanReset() => !IsDefault;
+        /// <summary>The setting can be changed: the toggle it requires, if any, is on as staged.</summary>
+        public bool IsEnabled => _edit.IsEnabled;
+
+        /// <summary>Why the setting can't be changed, while it can't.</summary>
+        public string? LockedNote => !IsEnabled && _edit.Requirement is { } requirement
+            ? string.Format(CultureInfo.CurrentCulture, Strings.SettingLockedFormat, requirement.Label)
+            : null;
+
+        private bool CanReset() => !IsDefault && IsEnabled;
 
         /// <summary>Stages the default; OK or Apply writes it.</summary>
         [RelayCommand(CanExecute = nameof(CanReset))]
@@ -55,6 +65,11 @@ namespace ChartPacker.ViewModels.Settings
                     break;
                 case nameof(SettingEdit.IsDefault):
                     OnPropertyChanged(nameof(IsDefault));
+                    ResetCommand.NotifyCanExecuteChanged();
+                    break;
+                case nameof(SettingEdit.IsEnabled):
+                    OnPropertyChanged(nameof(IsEnabled));
+                    OnPropertyChanged(nameof(LockedNote));
                     ResetCommand.NotifyCanExecuteChanged();
                     break;
             }

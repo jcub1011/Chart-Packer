@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
 
 namespace ChartPacker.Controls
@@ -81,9 +82,10 @@ namespace ChartPacker.Controls
     /// <summary>
     /// Draws up to four flat note highways side by side, notes falling toward a strike line just
     /// above the bottom. Each frame the screen is drawn it reads <see cref="Clock"/>, so the notes
-    /// follow the audio whether it's playing, paused or being dragged.
+    /// follow the audio whether it's playing, paused or being dragged. Behind each highway's notes it
+    /// can draw a track's <see cref="Waveforms"/>, falling with them.
     /// </summary>
-    /// <example><c>&lt;ctl:NoteHighwayView Scene="{Binding Highway.Scene}" Clock="{Binding Highway.Clock}" LookAhead="{Binding Highway.LookAhead}" /&gt;</c></example>
+    /// <example><c>&lt;ctl:NoteHighwayView Scene="{Binding Highway.Scene}" Clock="{Binding Highway.Clock}" LookAhead="{Binding Highway.LookAhead}" Waveforms="{Binding Highway.LaneWaveforms}" /&gt;</c></example>
     public sealed class NoteHighwayView : Control
     {
         public static readonly StyledProperty<HighwayScene?> SceneProperty =
@@ -94,6 +96,9 @@ namespace ChartPacker.Controls
 
         public static readonly StyledProperty<double> LookAheadProperty =
             AvaloniaProperty.Register<NoteHighwayView, double>(nameof(LookAhead), 1.4);
+
+        public static readonly StyledProperty<IReadOnlyList<Waveform?>?> WaveformsProperty =
+            AvaloniaProperty.Register<NoteHighwayView, IReadOnlyList<Waveform?>?>(nameof(Waveforms));
 
         // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it.
         private const double StrikeFraction = 0.87;
@@ -127,6 +132,10 @@ namespace ChartPacker.Controls
         private static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
         private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
 
+        // The track's waveform behind the notes: faint, so the gems stand out in front of it.
+        private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
+        private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
+
         private static readonly Color StarPowerColor = Color.FromRgb(0x7F, 0xE9, 0xFF);
         private static readonly Color OpenColor = Color.FromRgb(0xB0, 0x4C, 0xE0);
         private static readonly Color KickColor = Color.FromRgb(0xFB, 0x8C, 0x00);
@@ -152,7 +161,7 @@ namespace ChartPacker.Controls
 
         static NoteHighwayView()
         {
-            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty);
+            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty);
         }
 
         /// <summary>The highways to draw, or <see langword="null"/> for none.</summary>
@@ -174,6 +183,16 @@ namespace ChartPacker.Controls
         {
             get => GetValue(LookAheadProperty);
             set => SetValue(LookAheadProperty, value);
+        }
+
+        /// <summary>
+        /// The audio drawn behind each of the <see cref="Scene"/>'s highways, in order, at the time it's heard; a
+        /// <see langword="null"/> one, or the whole list, draws none.
+        /// </summary>
+        public IReadOnlyList<Waveform?>? Waveforms
+        {
+            get => GetValue(WaveformsProperty);
+            set => SetValue(WaveformsProperty, value);
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -215,11 +234,15 @@ namespace ChartPacker.Controls
             double narrowest = width / scene.Lanes.Max(l => l.LaneCount);
             double gem = Math.Clamp(narrowest * 0.42, 5, Math.Max(5, Math.Min(18, (height - strike - 13) / 0.9)));
 
+            var waveforms = Waveforms;
             for (int i = 0; i < count; i++)
-                DrawHighway(context, scene, scene.Lanes[i], new Rect(left + (i * (width + gap)), 0, width, height), strike, gem, now, from, to, Y);
+            {
+                var waveform = waveforms is not null && i < waveforms.Count ? waveforms[i] : null;
+                DrawHighway(context, scene, scene.Lanes[i], waveform, new Rect(left + (i * (width + gap)), 0, width, height), strike, gem, now, from, to, Y);
+            }
         }
 
-        private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Rect bounds, double strike, double gem, double now, double from, double to, Func<double, double> y)
+        private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, double from, double to, Func<double, double> y)
         {
             double laneWidth = bounds.Width / lane.LaneCount;
             var hits = HitsAt(lane, now);
@@ -228,6 +251,14 @@ namespace ChartPacker.Controls
             using (context.PushOpacityMask(FadeMask, bounds))
             {
                 context.FillRectangle(HighwayBrush, bounds);
+
+                // The track as it's heard, inside the rails, so a note can be lined up with the sound it's played to. Scaled
+                // so its loudest peak fills the highway, so a quiet track's beats show as clearly as a loud one's.
+                if (waveform is not null)
+                {
+                    LaneWaveformPainter.Draw(context, waveform, bounds.Deflate(new Thickness(4, 0)), isVertical: true, from, to, y,
+                        WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform));
+                }
 
                 // A beam of light rises from a lane as it's struck.
                 for (int column = 0; column < lane.LaneCount; column++)

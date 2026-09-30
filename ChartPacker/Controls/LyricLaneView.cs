@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
 
 namespace ChartPacker.Controls
@@ -95,9 +96,9 @@ namespace ChartPacker.Controls
     /// the notes are bars at their pitch, and the words run along the bottom, lit as they're sung.
     /// Each frame the screen is drawn it reads <see cref="Clock"/>, so the lane follows the audio
     /// whether it's playing, paused or being dragged. <see cref="TimeShift"/> moves the whole part in
-    /// time without the scene being built again.
+    /// time without the scene being built again. Behind the notes it can draw a track's <see cref="Waveform"/>.
     /// </summary>
-    /// <example><c>&lt;ctl:LyricLaneView Scene="{Binding Lyrics.Scene}" Clock="{Binding Lyrics.Clock}" TimeShift="{Binding Lyrics.TimeShift}" /&gt;</c></example>
+    /// <example><c>&lt;ctl:LyricLaneView Scene="{Binding Lyrics.Scene}" Clock="{Binding Lyrics.Clock}" TimeShift="{Binding Lyrics.TimeShift}" Waveform="{Binding Lyrics.Waveform}" /&gt;</c></example>
     public sealed class LyricLaneView : Control
     {
         public static readonly StyledProperty<LyricScene?> SceneProperty =
@@ -108,6 +109,9 @@ namespace ChartPacker.Controls
 
         public static readonly StyledProperty<TimeSpan> TimeShiftProperty =
             AvaloniaProperty.Register<LyricLaneView, TimeSpan>(nameof(TimeShift));
+
+        public static readonly StyledProperty<Waveform?> WaveformProperty =
+            AvaloniaProperty.Register<LyricLaneView, Waveform?>(nameof(Waveform));
 
         public static readonly StyledProperty<double> WindowSecondsProperty =
             AvaloniaProperty.Register<LyricLaneView, double>(nameof(WindowSeconds), 4);
@@ -138,6 +142,10 @@ namespace ChartPacker.Controls
         private static readonly IBrush PhraseWordBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xF2, 0xF2, 0xF6));
         private static readonly IBrush OtherWordBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x7C, 0x7F, 0x96));
 
+        // The track's waveform behind the notes, in a faint tint of what's been sung, so the notes stand out in front of it.
+        private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x1C, SungColor.R, SungColor.G, SungColor.B));
+        private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x3C, SungColor.R, SungColor.G, SungColor.B));
+
         private static readonly Typeface WordTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
         private readonly Dictionary<(int Index, int State), FormattedText> _words = [];
@@ -147,7 +155,7 @@ namespace ChartPacker.Controls
 
         static LyricLaneView()
         {
-            AffectsRender<LyricLaneView>(SceneProperty, TimeShiftProperty, WindowSecondsProperty);
+            AffectsRender<LyricLaneView>(SceneProperty, TimeShiftProperty, WaveformProperty, WindowSecondsProperty);
         }
 
         /// <summary>The part to draw, or <see langword="null"/> for none.</summary>
@@ -169,6 +177,13 @@ namespace ChartPacker.Controls
         {
             get => GetValue(TimeShiftProperty);
             set => SetValue(TimeShiftProperty, value);
+        }
+
+        /// <summary>The audio drawn behind the notes, at the time it's heard, which <see cref="TimeShift"/> doesn't move; <see langword="null"/> for none.</summary>
+        public Waveform? Waveform
+        {
+            get => GetValue(WaveformProperty);
+            set => SetValue(WaveformProperty, value);
         }
 
         /// <summary>How much of the song shows ahead of the now line, in seconds.</summary>
@@ -214,6 +229,16 @@ namespace ChartPacker.Controls
             using (context.PushClip(bounds))
             {
                 context.FillRectangle(LaneBrush, bounds);
+
+                // The track as it's heard, where the notes are, so they can be lined up with it: at the audio's own
+                // time, which the shift doesn't move. Scaled so its loudest peak fills the lane, so quiet vocals still show.
+                if (Waveform is { } waveform && noteBottom - noteTop > 6)
+                {
+                    double shift = TimeShift.TotalSeconds;
+                    LaneWaveformPainter.Draw(context, waveform, new Rect(0, noteTop, bounds.Width, noteBottom - noteTop), isVertical: false,
+                        from + shift, to + shift, time => X(time - shift), WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform));
+                }
+
                 int phrase = DrawPhrases(context, scene, bounds, now, from, to, X);
                 if (scene.NoteStarts.Length > 0 && noteBottom - noteTop > 6)
                     DrawNotes(context, scene, bounds, noteTop, noteBottom, now, from, to, X);
