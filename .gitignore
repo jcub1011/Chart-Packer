@@ -403,4 +403,6 @@ FodyWeavers.xsd
 # FFmpeg shared libraries, built or fetched by build/ffmpeg
 ChartPacker.Ffmpeg/runtimes/
 build/ffmpeg/.work/
+
+# Playwright output
 /.playwright-mcp
