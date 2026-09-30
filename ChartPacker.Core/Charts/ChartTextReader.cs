@@ -245,7 +245,7 @@ internal static class ChartTextReader
         return sections;
     }
 
-    private static string Decode(byte[] bytes)
+    internal static string Decode(byte[] bytes)
     {
         using var reader = new StreamReader(new MemoryStream(bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         return reader.ReadToEnd();

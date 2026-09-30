@@ -40,14 +40,16 @@ namespace ChartPacker
                 // FFmpeg is looked for now, off the UI thread, so the first video shown doesn't wait for it to load.
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);
 
-                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player);
+                var videoProbe = new FfmpegVideoDurationProbe();
+                var mergeWindow = new AvaloniaMergeWindowService(() => window, drafts, settings, audio.Open, player, imagePicker, filePicker, videoProbe);
+                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player, mergeWindow);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
                     settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway), settingsPicker, settings.Save));
 
                 window.DataContext = new MainWindowViewModel(
                     library,
-                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, new FfmpegVideoDurationProbe()),
+                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe),
                     settings,
                     drafts,
                     confirmation,

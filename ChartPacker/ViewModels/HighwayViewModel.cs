@@ -521,7 +521,8 @@ namespace ChartPacker.ViewModels
                 _owner.OnRowDifficultyChanged(this);
         }
 
+        // No limit of its own, as a chart can be off by any amount; only what the offset, in whole milliseconds, can hold.
         partial void OnOffsetChanged(decimal? value) =>
-            _owner.SetOffset(this, (int)Math.Round(Math.Clamp(value ?? 0, -60_000, 60_000)));
+            _owner.SetOffset(this, (int)Math.Round(Math.Clamp(value ?? 0, int.MinValue, int.MaxValue)));
     }
 }

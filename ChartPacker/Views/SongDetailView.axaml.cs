@@ -48,6 +48,17 @@ namespace ChartPacker.Views
             Focus();
         }
 
+        /// <summary>
+        /// A click on the highway options' empty space or a label takes focus from an offset box, keeping
+        /// what was typed, and leaves the flyout open. The flyout is a popup of its own, so
+        /// <see cref="OnPointerPressedAnywhere"/> doesn't see its clicks. Clicks the controls handle don't reach this.
+        /// </summary>
+        private void OnHighwayOptionsPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is StackPanel panel && e.Source is Visual source && source.FindAncestorOfType<TextBox>(includeSelf: true) is null)
+                panel.Focus(NavigationMethod.Pointer);
+        }
+
         private PlayerViewModel? Player => (DataContext as SongDetailViewModel)?.Player;
 
         private void EndScrub()

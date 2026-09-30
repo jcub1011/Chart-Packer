@@ -40,6 +40,8 @@
     <StreamGeometry x:Key="ClearStroke">M4.5,4.5 L11.5,11.5 M11.5,4.5 L4.5,11.5</StreamGeometry>
     <StreamGeometry x:Key="PackStroke">M1.5,9.5 V13.5 H14.5 V9.5 M8,1.5 V9 M5,6 L8,9 L11,6</StreamGeometry>
     <StreamGeometry x:Key="UnpackStroke">M1.5,9.5 V13.5 H14.5 V9.5 M8,9.5 V2 M5,5 L8,2 L11,5</StreamGeometry>
+    <!-- Two lines joining into one: songs merged. -->
+    <StreamGeometry x:Key="MergeStroke">M3,2 V5 C3,8 8,8 8,11 V14 M13,2 V5 C13,8 8,8 8,11 M5.5,11.5 L8,14 L10.5,11.5</StreamGeometry>
     <StreamGeometry x:Key="FlatStroke">M8,1.5 V5.5 M5.5,3 L8,5.5 L10.5,3 M1.5,8 H14.5 M8,14.5 V10.5 M5.5,13 L8,10.5 L10.5,13</StreamGeometry>
     <StreamGeometry x:Key="UndoStroke">M3,6.5 H10 A3.5,3.5 0 0 1 10,13.5 H6 M6,3.5 L3,6.5 L6,9.5</StreamGeometry>
     <!-- A cog: eight teeth around a hub. -->

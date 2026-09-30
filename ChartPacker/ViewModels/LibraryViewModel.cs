@@ -23,7 +23,7 @@ namespace ChartPacker.ViewModels
     /// <summary>An overwrite policy as offered in the policy picker.</summary>
     public sealed record OverwriteOption(OverwritePolicy Value, string Label);
 
-    /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack.</summary>
+    /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge.</summary>
     /// <remarks>
     /// Scanning only happens on an explicit <see cref="RescanCommand"/>. Picking a folder, changing
     /// the depth or launching the app never scans; the list is flagged as out of date instead.
@@ -43,6 +43,7 @@ namespace ChartPacker.ViewModels
         private readonly IFolderPickerService _folderPicker;
         private readonly SettingsService _settings;
         private readonly MetadataDraftStore _drafts;
+        private readonly IMergeWindowService _mergeWindow;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
         // Every scanned song, in scan order, whether or not it passes the filters.
@@ -75,11 +76,13 @@ namespace ChartPacker.ViewModels
         private LibraryItemViewModel? _previewingItem;
 
         /// <param name="player">Plays a song from the list's art buttons; the detail panel shows the same one.</param>
-        public LibraryViewModel(IFolderPickerService folderPicker, SettingsService settings, MetadataDraftStore drafts, JobViewModel job, PlayerViewModel player)
+        /// <param name="mergeWindow">Shows the Merge window for the selected songs.</param>
+        public LibraryViewModel(IFolderPickerService folderPicker, SettingsService settings, MetadataDraftStore drafts, JobViewModel job, PlayerViewModel player, IMergeWindowService mergeWindow)
         {
             _folderPicker = folderPicker;
             _settings = settings;
             _drafts = drafts;
+            _mergeWindow = mergeWindow;
             Player = player;
             Player.PropertyChanged += (_, e) =>
             {
@@ -163,6 +166,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
+        [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         public partial bool IsScanning { get; set; }
 
         [ObservableProperty]
@@ -175,6 +179,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
+        [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         public partial int SelectedCount { get; set; }
 
         /// <summary>Max scan depth. Nullable decimal to match <c>NumericUpDown.Value</c>.</summary>
@@ -223,7 +228,7 @@ namespace ChartPacker.ViewModels
                 : string.Format(CultureInfo.CurrentCulture, Strings.SongCountFormat, _allItems.Count),
         };
 
-        /// <summary>Where Pack and Unpack write: the chosen output folder, or else the scanned folder.</summary>
+        /// <summary>Where Pack, Unpack and Merge write: the chosen output folder, or else the scanned folder.</summary>
         public string? EffectiveOutputFolder => OutputFolder ?? _scannedFolder ?? FolderPath;
 
         /// <summary>The chosen output folder, or <see langword="null"/> to write next to the scanned songs.</summary>
@@ -329,6 +334,22 @@ namespace ChartPacker.ViewModels
 
             _outputsChanged = true;
             RefreshState();
+        }
+
+        private bool CanMerge() => SelectedCount > 1 && HasScanned && !IsScanning && !Job.IsRunning;
+
+        /// <summary>Opens the Merge window, which combines the selected songs into one new .sng in the output folder.</summary>
+        [RelayCommand(CanExecute = nameof(CanMerge))]
+        private async Task MergeAsync()
+        {
+            if (EffectiveOutputFolder is not { } destination)
+                return;
+
+            if (await _mergeWindow.ShowAsync(SelectedEntries, destination, SelectedOverwriteOption.Value))
+            {
+                _outputsChanged = true;
+                RefreshState();
+            }
         }
 
         partial void OnSelectedOverwriteOptionChanged(OverwriteOption value) => _settings.Settings.OverwritePolicy = value.Value;
@@ -610,6 +631,7 @@ namespace ChartPacker.ViewModels
             RescanCommand.NotifyCanExecuteChanged();
             PackCommand.NotifyCanExecuteChanged();
             UnpackCommand.NotifyCanExecuteChanged();
+            MergeCommand.NotifyCanExecuteChanged();
         }
     }
 }

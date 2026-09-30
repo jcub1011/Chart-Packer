@@ -186,6 +186,12 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial string? ReadOnlyNote { get; set; }
 
+        /// <summary>
+        /// Set for a panel that only shows songs, such as the Merge window's preview: every song is
+        /// read-only, with this as the reason.
+        /// </summary>
+        public string? PreviewNote { get; init; }
+
         /// <summary>More than one item is selected: only the merged metadata is shown.</summary>
         [ObservableProperty]
         public partial bool IsBulk { get; set; }
@@ -1204,7 +1210,7 @@ namespace ChartPacker.ViewModels
                 .OfType<string>()
                 .Select(p => Background.StagedAt(p)?.Error)
                 .FirstOrDefault(e => e is not null);
-            ReadOnlyNote = loaded.Songs.Select(s => s.ReadOnlyReason).FirstOrDefault(r => r is not null);
+            ReadOnlyNote = PreviewNote ?? loaded.Songs.Select(s => s.ReadOnlyReason).FirstOrDefault(r => r is not null);
             _loadNote = loaded.MetadataNote;
 
             if (IsBulk)

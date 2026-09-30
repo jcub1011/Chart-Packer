@@ -487,8 +487,19 @@
                                             <TextBlock Classes="marker" Text="{Binding Highway.Marker}" IsVisible="{Binding Highway.IsChanged}" />
                                         </StackPanel>
                                         <ToggleSplitButton.Flyout>
-                                            <Flyout Placement="TopEdgeAlignedRight" FlyoutPresenterClasses="highwayFlyout">
-                                                <StackPanel Classes="highwayOptions" Spacing="8" AutomationProperties.Name="{x:Static res:Strings.HighwayOptionsName}">
+                                            <!-- Always below the button, never flipped over the highway, so the lanes stay in sight while the
+                                                 offsets are set; short of room it shrinks and scrolls instead. -->
+                                            <Flyout Placement="BottomEdgeAlignedRight"
+                                                    PlacementConstraintAdjustment="SlideX, FlipX, ResizeY"
+                                                    FlyoutPresenterClasses="highwayFlyout">
+                                                <!-- Focusable, so a click on its empty space or a label (or Enter in an offset box) can take
+                                                     focus from the offset box without closing the flyout. -->
+                                                <StackPanel Classes="highwayOptions"
+                                                            Spacing="8"
+                                                            Background="Transparent"
+                                                            Focusable="True"
+                                                            PointerPressed="OnHighwayOptionsPressed"
+                                                            AutomationProperties.Name="{x:Static res:Strings.HighwayOptionsName}">
                                                     <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.HighwayInstrumentsHeader}" />
                                                     <ItemsControl ItemsSource="{Binding Highway.Rows}">
                                                         <ItemsControl.ItemsPanel>
@@ -516,13 +527,14 @@
                                                                         </ComboBox.ItemTemplate>
                                                                     </ComboBox>
                                                                     <NumericUpDown Grid.Column="2"
+                                                                                   ctl:DragScrub.IsEnabled="True"
                                                                                    Width="72"
                                                                                    ShowButtonSpinner="False"
                                                                                    VerticalAlignment="Center"
                                                                                    Value="{Binding Offset}"
                                                                                    Increment="1"
-                                                                                   Minimum="-60000"
-                                                                                   Maximum="60000"
+                                                                                   Minimum="-2147483648"
+                                                                                   Maximum="2147483647"
                                                                                    FormatString="+0;-0;0"
                                                                                    ToolTip.Tip="{x:Static res:Strings.HighwayOffsetToolTip}"
                                                                                    AutomationProperties.Name="{x:Static res:Strings.HighwayOffsetName}" />

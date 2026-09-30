@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
 
@@ -265,20 +264,6 @@ public static class ChartShifter
         if (endOfTrack is { } eot)
             placed.Add(eot with { Tick = Math.Max(eot.Tick, placed.Count > 0 ? placed[^1].Tick : 0) });
 
-        using var track = new MemoryStream();
-        long tick = 0;
-        foreach (var e in placed)
-        {
-            MidiFile.WriteVlq(track, e.Tick - tick);
-            tick = e.Tick;
-            track.WriteByte(e.Status);
-            track.Write(bytes, e.DataStart, e.DataLength);
-        }
-
-        Span<byte> header = stackalloc byte[8];
-        "MTrk"u8.CopyTo(header);
-        BinaryPrimitives.WriteUInt32BigEndian(header[4..], (uint)track.Length);
-        output.Write(header);
-        track.WriteTo(output);
+        MidiWriter.WriteTrack(output, bytes, placed);
     }
 }

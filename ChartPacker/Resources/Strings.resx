@@ -984,7 +984,7 @@
     <comment>Milliseconds, after the offset box.</comment>
   </data>
   <data name="HighwayOffsetToolTip" xml:space="preserve">
-    <value>Moves this difficulty's notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
+    <value>Moves this difficulty's notes later (positive) or earlier (negative). Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, a tenth with Ctrl. Saving rewrites the chart.</value>
   </data>
   <data name="HighwayNudgeFormat" xml:space="preserve">
     <value>{0:+0;-0} ms</value>
@@ -1072,5 +1072,206 @@
   </data>
   <data name="DifficultyExpert" xml:space="preserve">
     <value>Expert</value>
+  </data>
+  <data name="MergeButton" xml:space="preserve">
+    <value>Merge</value>
+  </data>
+  <data name="MergeToolTip" xml:space="preserve">
+    <value>Combine the selected songs into one new .sng, choosing which song each part, the audio and the metadata come from</value>
+  </data>
+  <data name="MergeWindowTitle" xml:space="preserve">
+    <value>Merge songs</value>
+  </data>
+  <data name="MergeLoading" xml:space="preserve">
+    <value>Reading the songs…</value>
+  </data>
+  <data name="MergeReadFailedFormat" xml:space="preserve">
+    <value>The songs can't be read: {0}</value>
+  </data>
+  <data name="MergeChartErrorFormat" xml:space="preserve">
+    <value>Its chart can't be read: {0}</value>
+  </data>
+  <data name="MergeUnsavedEdits" xml:space="preserve">
+    <value>Unsaved edits aren't included</value>
+  </data>
+  <data name="MergeSectionChart" xml:space="preserve">
+    <value>Base chart</value>
+  </data>
+  <data name="MergeBaseDescription" xml:space="preserve">
+    <value>Its tempo map, sections, events and delay are kept. Parts from the other songs are placed by song time; fine-tune them afterwards with the note highway's offsets.</value>
+  </data>
+  <data name="MergeBaseLabel" xml:space="preserve">
+    <value>Tempo map and events</value>
+  </data>
+  <data name="MergeSectionParts" xml:space="preserve">
+    <value>Parts</value>
+  </data>
+  <data name="MergePartsDescription" xml:space="preserve">
+    <value>Choose the song each part comes from; its difficulties come with it. Parts more than one song has must be chosen.</value>
+  </data>
+  <data name="MergeSectionAudio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="MergeAudioLabel" xml:space="preserve">
+    <value>Audio tracks</value>
+  </data>
+  <data name="MergeSectionAssets" xml:space="preserve">
+    <value>Album art and backgrounds</value>
+  </data>
+  <data name="MergeAlbumArtLabel" xml:space="preserve">
+    <value>Album art</value>
+  </data>
+  <data name="MergeBackgroundLabel" xml:space="preserve">
+    <value>Background image</value>
+  </data>
+  <data name="MergeVideoLabel" xml:space="preserve">
+    <value>Background video</value>
+  </data>
+  <data name="MergeSectionMetadata" xml:space="preserve">
+    <value>Metadata</value>
+  </data>
+  <data name="MergeMetadataDescription" xml:space="preserve">
+    <value>Only the values the songs disagree on are listed. Charters, difficulties, preview and song length are worked out.</value>
+  </data>
+  <data name="MergeNoConflicts" xml:space="preserve">
+    <value>The songs agree on every other value.</value>
+  </data>
+  <data name="MergeCharterLabel" xml:space="preserve">
+    <value>Charters</value>
+  </data>
+  <data name="MergeOutputLabel" xml:space="preserve">
+    <value>Output</value>
+  </data>
+  <data name="MergeLeaveOut" xml:space="preserve">
+    <value>Leave out</value>
+  </data>
+  <data name="MergeNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="MergeNotSet" xml:space="preserve">
+    <value>(not set)</value>
+  </data>
+  <data name="MergeUnavailable" xml:space="preserve">
+    <value>—</value>
+  </data>
+  <data name="MergeNeedsChoice" xml:space="preserve">
+    <value>Choose which song to take this from.</value>
+  </data>
+  <data name="MergeFormatMidi" xml:space="preserve">
+    <value>MIDI</value>
+  </data>
+  <data name="MergeFormatChart" xml:space="preserve">
+    <value>.chart (converted)</value>
+  </data>
+  <data name="MergeFormatNone" xml:space="preserve">
+    <value>No chart</value>
+  </data>
+  <data name="MergeStemsNone" xml:space="preserve">
+    <value>No audio</value>
+  </data>
+  <data name="MergeDifficultyFormat" xml:space="preserve">
+    <value>diff {0}</value>
+  </data>
+  <data name="MergePartPresent" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="MergeDifficultyEasyLetter" xml:space="preserve">
+    <value>E</value>
+  </data>
+  <data name="MergeDifficultyMediumLetter" xml:space="preserve">
+    <value>M</value>
+  </data>
+  <data name="MergeDifficultyHardLetter" xml:space="preserve">
+    <value>H</value>
+  </data>
+  <data name="MergeDifficultyExpertLetter" xml:space="preserve">
+    <value>X</value>
+  </data>
+  <data name="MergeNoParts" xml:space="preserve">
+    <value>None of the songs has a chart that can be read.</value>
+  </data>
+  <data name="MergeChooseParts" xml:space="preserve">
+    <value>Choose the song for each highlighted part.</value>
+  </data>
+  <data name="MergeChooseSomething" xml:space="preserve">
+    <value>Keep at least one part.</value>
+  </data>
+  <data name="MergeTargetExistsFormat" xml:space="preserve">
+    <value>{0} already exists. Choose Overwrite or Rename in the toolbar to merge anyway.</value>
+  </data>
+  <data name="MergeTargetIsSourceFormat" xml:space="preserve">
+    <value>{0} is one of the songs being merged, so it can't be written over.</value>
+  </data>
+  <data name="MergeMerging" xml:space="preserve">
+    <value>Merging…</value>
+  </data>
+  <data name="MergeDoneFormat" xml:space="preserve">
+    <value>Merged into {0}</value>
+  </data>
+  <data name="MergeWarningsHeading" xml:space="preserve">
+    <value>Check these on the note highway:</value>
+  </data>
+  <data name="MergeFailedFormat" xml:space="preserve">
+    <value>The merge failed: {0}</value>
+  </data>
+  <data name="MergeCanceled" xml:space="preserve">
+    <value>The merge was canceled.</value>
+  </data>
+  <data name="MergeIssueSustainsFormat" xml:space="preserve">
+    <value>{0} {1}: some sustains became plain notes, or the other way round</value>
+  </data>
+  <data name="MergeIssueMarkingsFormat" xml:space="preserve">
+    <value>{0} {1}: some notes changed what they are (HOPO, tap, cymbal or star power)</value>
+  </data>
+  <data name="MergeIssueNotesChangedFormat" xml:space="preserve">
+    <value>{0} {1}: some notes moved or changed lane</value>
+  </data>
+  <data name="MergeIssueNotesLostFormat" xml:space="preserve">
+    <value>{0} {1}: some notes landed on the same tick and were combined</value>
+  </data>
+  <data name="MergePartProKeys" xml:space="preserve">
+    <value>Pro Keys</value>
+  </data>
+  <data name="MergePartVocals" xml:space="preserve">
+    <value>Vocals</value>
+  </data>
+  <data name="MergePartHarmonies" xml:space="preserve">
+    <value>Harmonies</value>
+  </data>
+  <data name="MergePartProGuitar" xml:space="preserve">
+    <value>Pro Guitar</value>
+  </data>
+  <data name="MergePartProGuitar22" xml:space="preserve">
+    <value>Pro Guitar (22)</value>
+  </data>
+  <data name="MergePartProBass" xml:space="preserve">
+    <value>Pro Bass</value>
+  </data>
+  <data name="MergePartProBass22" xml:space="preserve">
+    <value>Pro Bass (22)</value>
+  </data>
+  <data name="MergePartGhlRhythm" xml:space="preserve">
+    <value>GHL Rhythm</value>
+  </data>
+  <data name="MergePartGhlCoop" xml:space="preserve">
+    <value>GHL Co-op</value>
+  </data>
+  <data name="MergePartDance" xml:space="preserve">
+    <value>Dance</value>
+  </data>
+  <data name="MergePreviewHeading" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="MergePreviewUpdating" xml:space="preserve">
+    <value>Updating the preview…</value>
+  </data>
+  <data name="MergePreviewNeedsChoices" xml:space="preserve">
+    <value>Choose a song for each highlighted part to see the merged song.</value>
+  </data>
+  <data name="MergePreviewFailedFormat" xml:space="preserve">
+    <value>The preview can't be put together: {0}</value>
+  </data>
+  <data name="MergePreviewNote" xml:space="preserve">
+    <value>This is a preview of the merged song. Offsets set on its note highway are applied when it's merged; everything else can be edited once it's merged.</value>
   </data>
 </root>
