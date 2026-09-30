@@ -47,8 +47,8 @@ public static class BulkMetadata
 {
     /// <summary>Builds the rows to show for <paramref name="items"/>.</summary>
     /// <remarks>
-    /// <para>The rows are the union of every item's keys, compared ignoring case. Saved keys come
-    /// first, in the order they're first seen across the items; keys only in drafts follow.</para>
+    /// <para>The rows are the union of every item's saved and drafted keys, compared ignoring case,
+    /// sorted by key ignoring case. Each key is spelled as it's first seen, saved keys before drafted ones.</para>
     /// <para>A row that is unchanged and holds an unset difficulty (<c>diff_* = -1</c>) in every item
     /// that has it is left out, as the viewer always has.</para>
     /// </remarks>
@@ -75,6 +75,8 @@ public static class BulkMetadata
                     keys.Add(change.Key);
             }
         }
+
+        keys.Sort(StringComparer.OrdinalIgnoreCase);
 
         var rows = new List<BulkMetadataRow>(keys.Count);
         foreach (string key in keys)

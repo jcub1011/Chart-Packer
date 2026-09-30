@@ -63,6 +63,10 @@
             <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
         </Style>
+        <!-- Fluent shrinks a pressed button a little; across a full-width value that reads as the row sliding. -->
+        <Style Selector="Button.value:pressed">
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
         <Style Selector="Button.value:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListMediumBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
@@ -349,8 +353,9 @@
                     </Grid>
 
                     <!-- Album art on the left and the background beside it, each in its own shape, as tall as
-                         lets both fit the panel's width, up to 312px, with a caption below each. -->
-                    <ctl:MediaRow Margin="0,16,0,0" MaxRowHeight="312" FooterHeight="32" ClipToBounds="True">
+                         lets both fit the panel's width, with a caption below each. The row, captions included,
+                         is at most 512px or 40% of the window's height, whichever is smaller. -->
+                    <ctl:MediaRow Margin="0,16,0,0" MaxRowHeight="512" MaxViewportFraction="0.4" FooterHeight="32" ClipToBounds="True">
                         <!-- The file's name, and its size in a chip, under the tile; a - for each when there's none.
                              The actions show over the image while the pointer is over it, or focus is on one of them. -->
                         <DockPanel ctl:MediaRow.AspectRatio="{Binding ArtAspect}">
