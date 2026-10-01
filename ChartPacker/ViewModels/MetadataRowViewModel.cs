@@ -56,6 +56,20 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasError))]
         public partial string? Error { get; set; }
 
+        /// <summary>Why the value as drafted fails validation, e.g. a type mismatch; the row is marked while it's set.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasIssue))]
+        public partial string? Issue { get; set; }
+
+        /// <summary>A suggestion that doesn't count as a failure, e.g. the key that replaced a legacy one.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasHint))]
+        public partial string? Hint { get; set; }
+
+        public bool HasIssue => Issue is not null;
+
+        public bool HasHint => Hint is not null;
+
         public bool IsDistinct => Value is null;
 
         /// <summary>The value to show. Times are formatted as HH:MM:SS:mmm; rich-text tags are left for the view to render.</summary>
@@ -113,6 +127,13 @@ namespace ChartPacker.ViewModels
             return this;
         }
 
+        /// <summary>Takes the row's validation, from the drafted metadata of every selected song.</summary>
+        public void SetValidation(string? issue, string? hint)
+        {
+            Issue = issue;
+            Hint = hint;
+        }
+
         /// <summary>Re-evaluates the commands after the panel's editability changed.</summary>
         public void RefreshCommands()
         {
@@ -132,7 +153,10 @@ namespace ChartPacker.ViewModels
             IsEditing = true;
         }
 
-        /// <summary>Puts the edit box's text into the drafts. Invalid text stays in the box with an error.</summary>
+        /// <summary>
+        /// Puts the edit box's text into the drafts. Text song.ini can't hold stays in the box with an error; text
+        /// that only fails validation, such as a word for a number, goes in, and the row is marked instead.
+        /// </summary>
         [RelayCommand]
         private void Commit()
         {

@@ -19,7 +19,11 @@ public enum SongIniStatus
 /// <summary>The result of reading a <c>song.ini</c> file.</summary>
 /// <param name="Status">Whether a <c>[song]</c> section was found.</param>
 /// <param name="Pairs">The <c>[song]</c> pairs in file order; empty unless <paramref name="Status"/> is <see cref="SongIniStatus.Ok"/>.</param>
-public sealed record SongIniReadResult(SongIniStatus Status, IReadOnlyList<KeyValuePair<string, string>> Pairs);
+public sealed record SongIniReadResult(SongIniStatus Status, IReadOnlyList<KeyValuePair<string, string>> Pairs)
+{
+    /// <summary>The <c>[song]</c> keys that appear more than once (SNG022), as first spelled; the last value of each is in <see cref="Pairs"/>.</summary>
+    public IReadOnlyList<string> DuplicateKeys { get; init; } = [];
+}
 
 /// <summary>Reads and writes the <c>[song]</c> section of a <c>song.ini</c>.</summary>
 /// <remarks>
@@ -54,7 +58,13 @@ public static class SongIni
     /// Parses INI text and returns the <c>[song]</c> section's pairs, or <see langword="null"/>
     /// when there is no <c>[song]</c> section.
     /// </summary>
-    public static IReadOnlyList<KeyValuePair<string, string>>? Parse(TextReader reader)
+    public static IReadOnlyList<KeyValuePair<string, string>>? Parse(TextReader reader) => Parse(reader, duplicateKeys: null);
+
+    /// <summary>
+    /// Like <see cref="Parse(TextReader)"/>, and adds each <c>[song]</c> key that appears more than
+    /// once to <paramref name="duplicateKeys"/>, once, as first spelled.
+    /// </summary>
+    public static IReadOnlyList<KeyValuePair<string, string>>? Parse(TextReader reader, ICollection<string>? duplicateKeys)
     {
         ArgumentNullException.ThrowIfNull(reader);
 
@@ -88,7 +98,10 @@ public static class SongIni
 
             if (indexByKey.TryGetValue(key, out int existing))
             {
-                pairs[existing] = new KeyValuePair<string, string>(pairs[existing].Key, value);
+                string firstKey = pairs[existing].Key;
+                if (duplicateKeys is not null && !duplicateKeys.Contains(firstKey))
+                    duplicateKeys.Add(firstKey);
+                pairs[existing] = new KeyValuePair<string, string>(firstKey, value);
             }
             else
             {
@@ -118,10 +131,11 @@ public static class SongIni
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         string text = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
 
-        var pairs = Parse(new StringReader(text));
+        var duplicateKeys = new List<string>();
+        var pairs = Parse(new StringReader(text), duplicateKeys);
         return pairs is null
             ? new SongIniReadResult(SongIniStatus.NoSongSection, [])
-            : new SongIniReadResult(SongIniStatus.Ok, pairs);
+            : new SongIniReadResult(SongIniStatus.Ok, pairs) { DuplicateKeys = duplicateKeys };
     }
 
     /// <summary>

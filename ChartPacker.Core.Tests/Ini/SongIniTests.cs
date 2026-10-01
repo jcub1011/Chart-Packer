@@ -157,6 +157,27 @@ public sealed class SongIniTests
     }
 
     [TestMethod]
+    public async Task ReadAsyncReportsRepeatedKeysOnceAsFirstSpelled()
+    {
+        string path = Path.Combine(_root.FullName, "song.ini");
+        await File.WriteAllTextAsync(path, "[song]\nName = A\nname = B\nNAME = C\ndelay = 0\n");
+
+        var result = await SongIni.ReadAsync(path);
+
+        CollectionAssert.AreEqual(new[] { P("Name", "C"), P("delay", "0") }, result.Pairs.ToArray());
+        CollectionAssert.AreEqual(new[] { "Name" }, result.DuplicateKeys.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncReportsNoDuplicatesForDistinctKeys()
+    {
+        string path = Path.Combine(_root.FullName, "song.ini");
+        await File.WriteAllTextAsync(path, "[song]\nname = A\nartist = B\n");
+
+        Assert.IsEmpty((await SongIni.ReadAsync(path)).DuplicateKeys);
+    }
+
+    [TestMethod]
     public async Task ReadAsyncRefusesOversizedFile()
     {
         string path = Path.Combine(_root.FullName, "song.ini");

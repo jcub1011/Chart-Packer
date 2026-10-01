@@ -1,0 +1,152 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:ChartPacker.ViewModels"
+        xmlns:res="using:ChartPacker.Resources"
+        xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:views="using:ChartPacker.Views"
+        mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="880"
+        x:Class="ChartPacker.Views.ValidatorWindow"
+        x:DataType="vm:ValidatorWindowViewModel"
+        Title="{x:Static res:Strings.ValidatorWindowTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="1400" Height="880"
+        MinWidth="900" MinHeight="520"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.validator-heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.issue">
+            <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.path">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Opacity" Value="0.55" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- A song that fails: an orange bar at its left. Once it passes, the bar goes and the song dims. -->
+        <Style Selector="Border.validator-song">
+            <Setter Property="BorderBrush" Value="{DynamicResource InvalidBrush}" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="Padding" Value="10,6" />
+        </Style>
+        <Style Selector="Border.validator-song.fixed">
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="2*,Auto,3*">
+        <!-- The songs that fail, as they're found. -->
+        <DockPanel Grid.Column="0" MinWidth="320">
+            <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="validator-heading" Text="{x:Static res:Strings.ValidatorWindowTitle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Arc Classes="spinner"
+                             Classes.active="{Binding IsChecking}"
+                             IsVisible="{Binding IsChecking}"
+                             Width="14" Height="14" StrokeThickness="2" />
+                        <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding StatusText}" />
+                    </StackPanel>
+                    <ProgressBar IsVisible="{Binding IsChecking}" Minimum="0" Maximum="{Binding Total}" Value="{Binding Checked}" />
+                </StackPanel>
+            </Border>
+
+            <Panel>
+                <ListBox ItemsSource="{Binding Songs}"
+                         SelectedItem="{Binding SelectedSong}"
+                         SelectionMode="Single"
+                         Background="Transparent"
+                         AutomationProperties.Name="{x:Static res:Strings.ValidatorSongsListName}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ValidatorSongViewModel">
+                            <Border Classes="validator-song" Classes.fixed="{Binding IsFixed}">
+                                <StackPanel Spacing="2">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBlock Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                        <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="{Binding IssueCountText}" />
+                                    </Grid>
+                                    <TextBlock Classes="path" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" />
+                                    <ItemsControl ItemsSource="{Binding IssueLines}" IsVisible="{Binding !IsFixed}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <TextBlock Classes="issue" Text="{Binding}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Classes="muted centered"
+                           Margin="24"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding ShowAllPass}"
+                           Text="{Binding StatusText}" />
+            </Panel>
+        </DockPanel>
+
+        <GridSplitter Grid.Column="1"
+                      Width="4"
+                      ResizeDirection="Columns"
+                      Background="{DynamicResource SubtleBorderBrush}" />
+
+        <!-- The picked song in the full inspector, with its own Save and Discard, as the main toolbar has. -->
+        <Border Grid.Column="2" Background="{DynamicResource SurfaceBrush}" MinWidth="420">
+            <DockPanel>
+                <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1" IsVisible="{Binding ShowInspector}">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Panel Width="14" VerticalAlignment="Center">
+                            <Arc Classes="spinner"
+                                 Classes.active="{Binding Inspector.IsSaving}"
+                                 IsVisible="{Binding Inspector.IsSaving}"
+                                 Width="14" Height="14" StrokeThickness="2" />
+                        </Panel>
+                        <Border Classes="toolbar-group">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <Button Classes="tool"
+                                        Command="{Binding Inspector.DiscardCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.DiscardToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.DiscardButton}">
+                                    <ctl:LineIcon Data="{StaticResource UndoStroke}" />
+                                </Button>
+                                <Button Classes="labelled accent"
+                                        Command="{Binding Inspector.SaveCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.SaveToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.SaveButton}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ctl:LineIcon Data="{StaticResource SaveStroke}" />
+                                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SaveButton}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Panel>
+                    <Panel IsVisible="{Binding ShowInspector}">
+                        <views:SongDetailView DataContext="{Binding Inspector}" />
+                    </Panel>
+                    <TextBlock Classes="muted centered"
+                               Margin="24"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding ShowPickPrompt}"
+                               Text="{x:Static res:Strings.ValidatorPickSong}" />
+                </Panel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

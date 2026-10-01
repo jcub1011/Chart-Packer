@@ -30,8 +30,17 @@ public static class SngRules
     /// <summary>A value contains <c>;</c>, <c>\r</c> or <c>\n</c>.</summary>
     public const string Sng021 = "SNG021";
 
+    /// <summary>A duplicate key, compared ignoring case.</summary>
+    public const string Sng022 = "SNG022";
+
     /// <summary>An empty key.</summary>
     public const string Sng023 = "SNG023";
+
+    /// <summary>A known key's value doesn't parse as its expected type (e.g. <c>diff_guitar = hard</c>).</summary>
+    public const string Sng024 = "SNG024";
+
+    /// <summary>A legacy key (<c>frets</c>, <c>track</c>, <c>star_power_note</c>, <c>pro_drum</c>), with its replacement suggested.</summary>
+    public const string Sng025 = "SNG025";
 
     /// <summary>A path segment breaks the filename rules (forbidden or control character, <c>..</c>, trailing <c>.</c> or space, reserved name, empty segment).</summary>
     public const string Sng030 = "SNG030";
@@ -59,6 +68,9 @@ public static class SngRules
 
     /// <summary><c>song.ini</c> is stored as a file.</summary>
     public const string Sng053 = "SNG053";
+
+    /// <summary>A known boolean key isn't exactly <c>True</c> or <c>False</c> (e.g. <c>true</c>, <c>1</c>).</summary>
+    public const string Sng060 = "SNG060";
 
     /// <summary>An empty value. It is dropped when packing.</summary>
     public const string Sng061 = "SNG061";

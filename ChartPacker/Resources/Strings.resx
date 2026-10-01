@@ -2129,4 +2129,67 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>{0:0.0} ms/px</value>
     <comment>The Ctrl+drag speed setting's value: {0} is milliseconds of the song for each pixel dragged.</comment>
   </data>
+  <data name="IssueSongCountFormat" xml:space="preserve">
+    <value>{0} ({1} of {2} songs)</value>
+    <comment>A metadata row's validation message with several songs selected: {0} is the message, {1} how many of the songs fail, {2} how many are selected.</comment>
+  </data>
+  <data name="HiddenIssuesListName" xml:space="preserve">
+    <value>Difficulties that fail validation</value>
+  </data>
+  <data name="SaveInvalidTitle" xml:space="preserve">
+    <value>Save metadata that fails validation?</value>
+  </data>
+  <data name="SaveInvalidMessageFormat" xml:space="preserve">
+    <value>Some of the metadata fails validation: {0} marked in orange. Games may misread or ignore these values. Save it anyway?</value>
+    <comment>{0} is how many keys fail.</comment>
+  </data>
+  <data name="SaveAnywayButton" xml:space="preserve">
+    <value>Save anyway</value>
+  </data>
+  <data name="ValidateButton" xml:space="preserve">
+    <value>Validate</value>
+  </data>
+  <data name="ValidateToolTip" xml:space="preserve">
+    <value>Check the selected songs' metadata for values games may misread, such as a word where a number belongs, and fix them in place. Unsaved changes are checked as drafted.</value>
+  </data>
+  <data name="ValidatorWindowTitle" xml:space="preserve">
+    <value>Validate metadata</value>
+  </data>
+  <data name="ValidatorCheckingFormat" xml:space="preserve">
+    <value>Checking {0} of {1} songs…</value>
+    <comment>{0} is how many songs have been read, {1} how many are selected.</comment>
+  </data>
+  <data name="ValidatorSummaryFormat" xml:space="preserve">
+    <value>{0} of {1} songs fail validation.</value>
+    <comment>{0} is how many songs fail, {1} how many were checked.</comment>
+  </data>
+  <data name="ValidatorAllPassFormat" xml:space="preserve">
+    <value>Every song passes validation ({0} checked).</value>
+    <comment>{0} is how many songs were checked.</comment>
+  </data>
+  <data name="ValidatorIssueCountFormat" xml:space="preserve">
+    <value>Issues: {0}</value>
+    <comment>{0} is how many keys of the song fail.</comment>
+  </data>
+  <data name="ValidatorIssueLineFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>A song's failing key in the Validator's list: {0} is the key, {1} the message.</comment>
+  </data>
+  <data name="ValidatorMoreIssuesFormat" xml:space="preserve">
+    <value>…and {0} more</value>
+    <comment>{0} is how many more failing keys the song has than are listed.</comment>
+  </data>
+  <data name="ValidatorFixed" xml:space="preserve">
+    <value>Passes now</value>
+  </data>
+  <data name="ValidatorUnreadableFormat" xml:space="preserve">
+    <value>Couldn't be read: {0}</value>
+    <comment>{0} is why.</comment>
+  </data>
+  <data name="ValidatorPickSong" xml:space="preserve">
+    <value>Pick a song to see and fix its metadata. Changes you don't save here stay as drafts in the main window.</value>
+  </data>
+  <data name="ValidatorSongsListName" xml:space="preserve">
+    <value>Songs that fail validation</value>
+  </data>
 </root>

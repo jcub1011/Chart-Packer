@@ -55,6 +55,9 @@ namespace ChartPacker.ViewModels
     /// <summary>A structural problem found in a <c>.sng</c>.</summary>
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
 
+    /// <summary>Why a key that has no metadata row, such as a difficulty, fails validation.</summary>
+    public sealed record MetadataIssueRow(string Key, string Message);
+
     /// <summary>An entry of the Add track menu: a stem, labelled to say whether choosing it replaces the song's track for it.</summary>
     public sealed record StemOption(string Stem, string Label, IAsyncRelayCommand Command);
 
@@ -90,7 +93,16 @@ namespace ChartPacker.ViewModels
         private readonly IDownloadService? _downloads;
         private readonly IFileRevealService? _reveal;
         private readonly SongFileGate _songFiles;
+        private readonly IConfirmationService? _confirmation;
         private CancellationTokenSource? _loadCts;
+
+        // This panel is telling the draft store about its own change, which it needn't hear back.
+        private bool _notifyingDrafts;
+
+        // Another panel sharing the drafts, such as the Validator window's, changed a song shown here: what's shown is
+        // read again once it's been still a moment, so a drag of an offset there reloads once.
+        private readonly DispatcherTimer _externalChangeTimer;
+        private static readonly TimeSpan ExternalChangeDelay = TimeSpan.FromMilliseconds(250);
 
         // The download command of each of the one selected song's files, by file, so a row rebuilt for the same file is equal to it.
         private readonly Dictionary<SongFileSource, IAsyncRelayCommand> _downloadCommands = [];
@@ -139,6 +151,7 @@ namespace ChartPacker.ViewModels
         /// Keeps saving a song apart from copies of it being downloaded; the one <paramref name="downloads"/> uses.
         /// None for a panel nothing else downloads from.
         /// </param>
+        /// <param name="confirmation">Asks before saving metadata that fails validation; none for a panel that never saves.</param>
         public SongDetailViewModel(
             MetadataDraftStore drafts,
             JobViewModel job,
@@ -149,12 +162,17 @@ namespace ChartPacker.ViewModels
             IVideoDurationProbe videoProbe,
             IDownloadService? downloads = null,
             IFileRevealService? reveal = null,
-            SongFileGate? songFiles = null)
+            SongFileGate? songFiles = null,
+            IConfirmationService? confirmation = null)
         {
             _drafts = drafts;
             _downloads = downloads;
             _reveal = reveal;
             _songFiles = songFiles ?? new SongFileGate();
+            _confirmation = confirmation;
+            _externalChangeTimer = new DispatcherTimer(ExternalChangeDelay, DispatcherPriority.Background, (_, _) => OnExternalChangeSettled());
+            _externalChangeTimer.Stop();
+            _drafts.DraftsChanged += OnDraftsChangedElsewhere;
             _job = job;
             _imagePicker = imagePicker;
             _filePicker = filePicker;
@@ -200,11 +218,13 @@ namespace ChartPacker.ViewModels
             };
             foreach (string stem in AudioStems.Stems)
                 _addTrackCommands[stem] = new AsyncRelayCommand(() => AddTrackAsync(stem), CanChangeFiles);
-            _job.PropertyChanged += (_, e) =>
-            {
-                if (e.PropertyName == nameof(JobViewModel.IsRunning))
-                    RefreshCommands();
-            };
+            _job.PropertyChanged += OnJobPropertyChanged;
+        }
+
+        private void OnJobPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(JobViewModel.IsRunning))
+                RefreshCommands();
         }
 
         public AvaloniaList<MetadataRowViewModel> Metadata { get; } = [];
@@ -237,6 +257,17 @@ namespace ChartPacker.ViewModels
         public AvaloniaList<RemovedTrackRow> RemovedTracks { get; } = [];
 
         public AvaloniaList<FindingRow> Findings { get; } = [];
+
+        /// <summary>Validation failures of keys that have no row, such as a difficulty, shown under their icons.</summary>
+        public AvaloniaList<MetadataIssueRow> HiddenIssues { get; } = [];
+
+        public bool HasHiddenIssues => HiddenIssues.Count > 0;
+
+        /// <summary>How many keys, shown as rows or not, fail validation as drafted.</summary>
+        public int FailingFieldCount => Metadata.Count(r => r.HasIssue) + HiddenIssues.Count;
+
+        /// <summary>Some selected song's metadata, as drafted, fails validation; saving asks first.</summary>
+        public bool HasValidationIssues => FailingFieldCount > 0;
 
         /// <summary>Plays the one selected song's audio tracks.</summary>
         public PlayerViewModel Player { get; }
@@ -513,6 +544,9 @@ namespace ChartPacker.ViewModels
             Charts.Clear();
             RemovedTracks.Clear();
             Findings.Clear();
+            HiddenIssues.Clear();
+            OnPropertyChanged(nameof(HasHiddenIssues));
+            OnPropertyChanged(nameof(HasValidationIssues));
             Title = entries.Count switch
             {
                 0 => Strings.DetailPlaceholderTitle,
@@ -1311,13 +1345,28 @@ namespace ChartPacker.ViewModels
         // Only committed changes count: text still in an edit box isn't a change yet.
         private bool CanSave() => CanEdit && HasDrafts && !_job.IsRunning;
 
-        /// <summary>Writes the selected songs' drafts. Songs that fail keep their drafts.</summary>
+        /// <summary>
+        /// Writes the selected songs' drafts. Songs that fail keep their drafts. Metadata that fails
+        /// validation is only saved once the user confirms it.
+        /// </summary>
         [RelayCommand(CanExecute = nameof(CanSave))]
         private async Task SaveAsync()
         {
             var entries = _entries;
             var dirty = _songs.Where(s => !s.Item.Draft.IsEmpty).ToList();
             var failures = new List<string>();
+
+            if (HasValidationIssues && _confirmation is not null)
+            {
+                string message = string.Format(CultureInfo.CurrentCulture, Strings.SaveInvalidMessageFormat, FailingFieldCount);
+                if (!await _confirmation.ConfirmAsync(Strings.SaveInvalidTitle, message, Strings.SaveAnywayButton))
+                    return;
+
+                // The selection, or the drafts, may have moved on while the dialog was open.
+                if (!ReferenceEquals(entries, _entries) || !CanSave())
+                    return;
+                dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
+            }
 
             CancelAdd();
             IsSaving = true;
@@ -1354,7 +1403,7 @@ namespace ChartPacker.ViewModels
                         if (error is null)
                         {
                             song.Item.Draft.Clear();
-                            _drafts.NotifyChanged(song.Entry.FullPath);
+                            NotifyDrafts([song]);
                         }
                         else
                         {
@@ -1428,10 +1477,60 @@ namespace ChartPacker.ViewModels
 
         private void OnDraftsChanged()
         {
-            foreach (var song in _songs)
-                _drafts.NotifyChanged(song.Entry.FullPath);
+            NotifyDrafts(_songs);
             RebuildRows();
             RefreshArt();
+        }
+
+        /// <summary>Tells the draft store that <paramref name="songs"/>' drafts changed, without this panel hearing it back.</summary>
+        private void NotifyDrafts(IEnumerable<EditableSong> songs)
+        {
+            _notifyingDrafts = true;
+            try
+            {
+                foreach (var song in songs)
+                    _drafts.NotifyChanged(song.Entry.FullPath);
+            }
+            finally
+            {
+                _notifyingDrafts = false;
+            }
+        }
+
+        /// <summary>
+        /// Another panel sharing the drafts changed one: if it's a song shown here, what's shown is read again
+        /// shortly, as it may have been saved, or have staged files this panel hasn't read.
+        /// </summary>
+        private void OnDraftsChangedElsewhere(string path)
+        {
+            if (_notifyingDrafts || !_entries.Any(e => e.FullPath.Equals(path, StringComparison.Ordinal)))
+                return;
+
+            _externalChangeTimer.Stop();
+            _externalChangeTimer.Start();
+        }
+
+        private void OnExternalChangeSettled()
+        {
+            _externalChangeTimer.Stop();
+
+            // Never under an edit in progress here: try again once it's done.
+            if (IsSaving || IsAdding || Metadata.Any(r => r.IsEditing))
+            {
+                _externalChangeTimer.Start();
+                return;
+            }
+
+            _ = ShowAsync(_entries);
+        }
+
+        /// <summary>Stops following the shared drafts and job, for a panel whose window has closed.</summary>
+        public void Detach()
+        {
+            _drafts.DraftsChanged -= OnDraftsChangedElsewhere;
+            _job.PropertyChanged -= OnJobPropertyChanged;
+            _externalChangeTimer.Stop();
+            _loadCts?.Cancel();
         }
 
         /// <summary>
@@ -1440,8 +1539,7 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void OnOffsetsChanged()
         {
-            foreach (var song in _songs)
-                _drafts.NotifyChanged(song.Entry.FullPath);
+            NotifyDrafts(_songs);
             OnPropertyChanged(nameof(IsChartChanged));
             RefreshState();
 
@@ -1455,8 +1553,7 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void OnTimingChanged()
         {
-            foreach (var song in _songs)
-                _drafts.NotifyChanged(song.Entry.FullPath);
+            NotifyDrafts(_songs);
             RebuildRows();
             RefreshPlayback();
 
@@ -1511,7 +1608,8 @@ namespace ChartPacker.ViewModels
             _songs = loaded.Songs
                 .Select((s, i) => (Song: s, ArtHash: loaded.Art.DiskHashes[i], Backgrounds: loaded.Backgrounds.Stored.ElementAtOrDefault(i) ?? StoredBackgrounds.None))
                 .Where(x => x.Song.Pairs is not null)
-                .Select(x => new EditableSong(x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath)), x.Song.SongIniPath, x.ArtHash, x.Backgrounds))
+                .Select(x => new EditableSong(
+                    x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath)), x.Song.SongIniPath, x.ArtHash, x.Backgrounds, x.Song.DuplicateKeys ?? []))
                 .ToList();
             _artImages = loaded.Art.Images;
             _stagedArt = loaded.Art.Staged;
@@ -1580,7 +1678,66 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
             RefreshAvailableKeys();
             RefreshHeadline();
+            RefreshValidation();
             RefreshState();
+        }
+
+        /// <summary>
+        /// Checks each selected song's metadata as drafted, so what's marked is what saving would write: each row
+        /// gets its key's failures and hints, and the failures of keys without a row are listed apart.
+        /// </summary>
+        private void RefreshValidation()
+        {
+            // Per key, every failing finding with the song it's in, and the first hint.
+            var failing = new Dictionary<string, List<(int Song, Finding Finding)>>(StringComparer.OrdinalIgnoreCase);
+            var hints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < _songs.Count; i++)
+            {
+                var song = _songs[i];
+                foreach (var finding in MetadataValidator.Validate(song.Item.Draft.ApplyTo(song.Item.Original), song.DuplicateKeys))
+                {
+                    string key = finding.Key ?? "";
+                    if (MetadataValidator.IsFailing(finding))
+                    {
+                        if (!failing.TryGetValue(key, out var list))
+                            failing[key] = list = [];
+                        list.Add((i, finding));
+                    }
+                    else
+                    {
+                        hints.TryAdd(key, finding.Message);
+                    }
+                }
+            }
+
+            foreach (var row in Metadata)
+                row.SetValidation(DescribeIssue(failing.GetValueOrDefault(row.Key)), hints.GetValueOrDefault(row.Key));
+
+            var rowKeys = Metadata.Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var hidden = failing
+                .Where(f => !rowKeys.Contains(f.Key))
+                .Select(f => new MetadataIssueRow(f.Key, DescribeIssue(f.Value)!))
+                .ToList();
+            if (!hidden.SequenceEqual(HiddenIssues))
+            {
+                HiddenIssues.Clear();
+                HiddenIssues.AddRange(hidden);
+            }
+
+            OnPropertyChanged(nameof(HasHiddenIssues));
+            OnPropertyChanged(nameof(FailingFieldCount));
+            OnPropertyChanged(nameof(HasValidationIssues));
+        }
+
+        /// <summary>A key's failures as one message: each distinct one on its own line, and for several songs, how many fail.</summary>
+        private string? DescribeIssue(List<(int Song, Finding Finding)>? failures)
+        {
+            if (failures is null or [])
+                return null;
+
+            string message = string.Join(Environment.NewLine, failures.Select(f => f.Finding.Message).Distinct(StringComparer.Ordinal));
+            int songs = failures.Select(f => f.Song).Distinct().Count();
+            return IsBulk ? string.Format(CultureInfo.CurrentCulture, Strings.IssueSongCountFormat, message, songs, _songs.Count) : message;
         }
 
         /// <summary>
@@ -1708,7 +1865,7 @@ namespace ChartPacker.ViewModels
                     new LoadedSong(entry, [], songIniPath, string.Format(CultureInfo.CurrentCulture, Strings.SongIniTooLargeFormat, entry.DisplayName)),
                     Strings.SongIniTooLarge),
                 SongIniStatus.NoSongSection => (new LoadedSong(entry, [], songIniPath, null), Strings.SongIniNoSongSection),
-                _ => (new LoadedSong(entry, result.Pairs, songIniPath, null), null),
+                _ => (new LoadedSong(entry, result.Pairs, songIniPath, null, result.DuplicateKeys), null),
             };
         }
 
@@ -2351,7 +2508,8 @@ namespace ChartPacker.ViewModels
         /// <param name="SongIniPath">For a folder, the song.ini to edit (which may not exist yet).</param>
         /// <param name="DiskArtHash">The hash of its album art as stored, or <see langword="null"/> when it has none that could be read.</param>
         /// <param name="Backgrounds">Its background image and video as stored.</param>
-        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath, string? DiskArtHash, StoredBackgrounds Backgrounds);
+        /// <param name="DuplicateKeys">The keys its song.ini repeats, which reading it merged.</param>
+        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath, string? DiskArtHash, StoredBackgrounds Backgrounds, IReadOnlyList<string> DuplicateKeys);
 
         /// <summary>A file of the one selected song, as stored.</summary>
         private sealed record DiskFile(string Path, ulong Length);
@@ -2370,7 +2528,13 @@ namespace ChartPacker.ViewModels
         /// <summary>One song's metadata as loaded off the UI thread.</summary>
         /// <param name="Pairs">The stored pairs, or <see langword="null"/> when the song couldn't be read.</param>
         /// <param name="ReadOnlyReason">Why the song's metadata can't be edited, if it can't.</param>
-        private sealed record LoadedSong(SongEntry Entry, IReadOnlyList<KeyValuePair<string, string>>? Pairs, string? SongIniPath, string? ReadOnlyReason);
+        /// <param name="DuplicateKeys">The keys a song.ini repeats, which reading it merged.</param>
+        private sealed record LoadedSong(
+            SongEntry Entry,
+            IReadOnlyList<KeyValuePair<string, string>>? Pairs,
+            string? SongIniPath,
+            string? ReadOnlyReason,
+            IReadOnlyList<string>? DuplicateKeys = null);
 
         /// <summary>Everything loaded off the UI thread, applied in one go. Files and findings are only loaded for one song.</summary>
         private sealed record LoadedSelection(
