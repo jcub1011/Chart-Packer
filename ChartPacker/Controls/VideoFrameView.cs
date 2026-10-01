@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -29,14 +28,16 @@ namespace ChartPacker.Controls
             AvaloniaProperty.Register<VideoFrameView, Func<TimeSpan>?>(nameof(Clock));
 
         private WriteableBitmap? _bitmap;
-        private byte[] _frame = [];
         private int _version;
         private bool _isFrameRequested;
+        private bool _isInViewport = true;
 
         static VideoFrameView()
         {
             AffectsRender<VideoFrameView>(PlaybackProperty);
         }
+
+        public VideoFrameView() => EffectiveViewportChanged += (_, e) => _isInViewport = e.EffectiveViewport.Intersects(new Rect(Bounds.Size));
 
         /// <summary>The video to draw, or <see langword="null"/> for nothing.</summary>
         public VideoPlayback? Playback
@@ -114,6 +115,13 @@ namespace ChartPacker.Controls
             if (Playback is not { } playback || TopLevel.GetTopLevel(this) is null)
                 return;
 
+            // Out of sight, the video isn't asked to keep up, so it isn't decoded; it seeks when it's seen again.
+            if (!IsEffectivelyVisible || !_isInViewport)
+            {
+                RequestFrame();
+                return;
+            }
+
             var clock = Clock?.Invoke() ?? TimeSpan.Zero;
             playback.RequestTime((Timeline ?? VideoTimeline.Default).Map(clock, playback.Duration));
 
@@ -129,11 +137,7 @@ namespace ChartPacker.Controls
         {
             int width = playback.Width;
             int height = playback.Height;
-            int rowBytes = width * 4;
-            if (_frame.Length != rowBytes * height)
-                _frame = new byte[rowBytes * height];
-
-            if (!playback.TryCopyFrame(_frame, ref _version))
+            if (!playback.HasFrameNewerThan(_version))
                 return false;
 
             if (_bitmap is null || _bitmap.PixelSize.Width != width || _bitmap.PixelSize.Height != height)
@@ -142,11 +146,9 @@ namespace ChartPacker.Controls
                 _bitmap = new WriteableBitmap(new PixelSize(width, height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
             }
 
+            // Straight into the bitmap.
             using var buffer = _bitmap.Lock();
-            for (int y = 0; y < height; y++)
-                Marshal.Copy(_frame, y * rowBytes, buffer.Address + (y * buffer.RowBytes), rowBytes);
-
-            return true;
+            return playback.TryCopyFrame(buffer.Address, buffer.RowBytes, width, height, ref _version);
         }
     }
 }

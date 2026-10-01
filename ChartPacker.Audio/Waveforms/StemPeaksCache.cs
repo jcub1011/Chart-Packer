@@ -16,8 +16,8 @@ public readonly record struct StemPeaksKey(string FilePath, string StoredName, l
 /// </remarks>
 public sealed class StemPeaksCache
 {
-    /// <summary>The cache the app shares: about the last eight songs of several stems.</summary>
-    public static StemPeaksCache Shared { get; } = new(64L * 1024 * 1024);
+    /// <summary>The cache the app shares: about the last ten songs of several stems, read at <see cref="WaveformResolution.High"/>.</summary>
+    public static StemPeaksCache Shared { get; } = new(128L * 1024 * 1024);
 
     private readonly Lock _lock = new();
     private readonly Dictionary<StemPeaksKey, LinkedListNode<(StemPeaksKey Key, StemPeaks Peaks)>> _entries = [];
@@ -80,6 +80,19 @@ public sealed class StemPeaksCache
                 return true;
             }
         }
+
+        peaks = null;
+        return false;
+    }
+
+    /// <summary>
+    /// The peaks kept for <paramref name="key"/>, if they were read at <paramref name="resolution"/>: those read at another
+    /// aren't used, and are replaced once the track is read again.
+    /// </summary>
+    public bool TryGet(StemPeaksKey key, WaveformResolution resolution, [MaybeNullWhen(false)] out StemPeaks peaks)
+    {
+        if (TryGet(key, out peaks) && peaks.Resolution == resolution)
+            return true;
 
         peaks = null;
         return false;

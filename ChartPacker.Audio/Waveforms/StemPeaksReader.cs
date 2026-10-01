@@ -8,7 +8,7 @@ namespace ChartPacker.Audio.Waveforms;
 /// that a long stem isn't decoded on one thread. Read each chunk once, then <see cref="Finish"/>.
 /// </summary>
 /// <remarks>
-/// <para>Every chunk starts on a bucket boundary and takes the ticks of the <see cref="WaveformPeaks.SignalRate"/> grid
+/// <para>Every chunk starts on a bucket boundary and takes the ticks of the <see cref="WaveformResolution.SignalRate"/> grid
 /// that fall on its frames, so each has buckets and ticks of its own: the chunks fill the same arrays side by side, with nothing to
 /// join where they meet. A chunk's source seeks to its start, and every decoder lands a seek on the sample a
 /// straight read gives there.</para>
@@ -17,10 +17,11 @@ namespace ChartPacker.Audio.Waveforms;
 /// </remarks>
 public sealed class StemPeaksReader
 {
-    /// <summary>How long a chunk is unless another length is given, in buckets: 15 seconds.</summary>
-    public const int DefaultChunkBuckets = WaveformPeaks.BucketsPerSecond * 15;
+    /// <summary>How long a chunk is unless another length is given.</summary>
+    public const int DefaultChunkSeconds = 15;
 
     private readonly string _name;
+    private readonly WaveformResolution _resolution;
     private readonly int _rate;
     private readonly int _channels;
     private readonly int _count;
@@ -54,30 +55,33 @@ public sealed class StemPeaksReader
     /// as far as the chunks have been read without a gap from the start. It's called on a reading thread, never
     /// on two at once. Not at all when the length isn't known.
     /// </param>
-    /// <param name="chunkBuckets">How long each chunk is, in buckets.</param>
-    public StemPeaksReader(string name, IPcmSource source, Action<StemPeaks>? progress = null, TimeSpan progressInterval = default, int chunkBuckets = DefaultChunkBuckets)
+    /// <param name="chunkBuckets">How long each chunk is, in buckets; <see cref="DefaultChunkSeconds"/> unless given.</param>
+    /// <param name="resolution">How finely to read it; <see cref="WaveformResolution.Low"/> unless given.</param>
+    public StemPeaksReader(string name, IPcmSource source, Action<StemPeaks>? progress = null, TimeSpan progressInterval = default, int? chunkBuckets = null, WaveformResolution? resolution = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkBuckets);
 
         _name = name;
+        _resolution = resolution ?? WaveformResolution.Low;
         _rate = source.SampleRate;
         _channels = source.Channels;
         long length = source.LengthFrames;
+        int bucketsPerChunk = chunkBuckets ?? (_resolution.BucketsPerSecond * DefaultChunkSeconds);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bucketsPerChunk, nameof(chunkBuckets));
 
-        _count = WaveformPeaks.Count(length, WaveformPeaks.BucketsPerSecond, _rate);
+        _count = WaveformPeaks.Count(length, _resolution.BucketsPerSecond, _rate);
         _min = new float[_count];
         _max = new float[_count];
         _rms = new float[_count];
-        _signal = new Half[WaveformPeaks.Count(length, WaveformPeaks.SignalRate, _rate)];
+        _signal = new Half[WaveformPeaks.Count(length, _resolution.SignalRate, _rate)];
 
-        int chunks = length < 0 || _count == 0 ? 1 : (int)(((long)_count + chunkBuckets - 1) / chunkBuckets);
+        int chunks = length < 0 || _count == 0 ? 1 : (int)(((long)_count + bucketsPerChunk - 1) / bucketsPerChunk);
         _chunks = new Chunk[chunks];
         for (int i = 0; i < chunks; i++)
         {
-            int first = (int)((long)i * chunkBuckets);
-            int end = (int)Math.Min((long)(i + 1) * chunkBuckets, _count);
+            int first = (int)((long)i * bucketsPerChunk);
+            int end = (int)Math.Min((long)(i + 1) * bucketsPerChunk, _count);
             _chunks[i] = new Chunk(first, FirstTickOf(first), end, FirstTickOf(end), i == chunks - 1);
         }
 
@@ -112,10 +116,10 @@ public sealed class StemPeaksReader
 
         int bucket = chunk.FirstBucket;
         int tick = chunk.FirstTick;
-        long frame = WaveformPeaks.Boundary(bucket, _rate);
-        long end = chunk.IsLast ? long.MaxValue : WaveformPeaks.Boundary(chunk.EndBucket, _rate);
-        long nextBoundary = WaveformPeaks.Boundary(bucket + 1, _rate);
-        long nextTick = WaveformPeaks.TickFrame(tick, _rate);
+        long frame = WaveformPeaks.Boundary(bucket, _resolution.BucketsPerSecond, _rate);
+        long end = chunk.IsLast ? long.MaxValue : WaveformPeaks.Boundary(chunk.EndBucket, _resolution.BucketsPerSecond, _rate);
+        long nextBoundary = WaveformPeaks.Boundary(bucket + 1, _resolution.BucketsPerSecond, _rate);
+        long nextTick = WaveformPeaks.TickFrame(tick, _resolution.SignalRate, _rate);
         float low = 0, high = 0;
         double squares = 0;
         int bucketFrames = 0;
@@ -144,7 +148,7 @@ public sealed class StemPeaksReader
                         squares = 0;
                         bucketFrames = 0;
                         bucket++;
-                        nextBoundary = WaveformPeaks.Boundary(bucket + 1, _rate);
+                        nextBoundary = WaveformPeaks.Boundary(bucket + 1, _resolution.BucketsPerSecond, _rate);
                     }
 
                     float sum = 0;
@@ -157,7 +161,7 @@ public sealed class StemPeaksReader
                     {
                         PutTick(tick, (Half)sample);
                         tick++;
-                        nextTick = WaveformPeaks.TickFrame(tick, _rate);
+                        nextTick = WaveformPeaks.TickFrame(tick, _resolution.SignalRate, _rate);
                     }
 
                     if (sample < low)
@@ -211,6 +215,7 @@ public sealed class StemPeaksReader
 
         return new StemPeaks(
             _name,
+            _resolution,
             Trim(_min, _minOverflow, buckets),
             Trim(_max, _maxOverflow, buckets),
             Trim(_rms, _rmsOverflow, buckets),
@@ -240,7 +245,7 @@ public sealed class StemPeaksReader
             break;
         }
 
-        return new StemPeaks(_name, _min, _max, _rms, _signal, _count, Math.Min(buckets, _count), Math.Min(ticks, _signal.Length));
+        return new StemPeaks(_name, _resolution, _min, _max, _rms, _signal, _count, Math.Min(buckets, _count), Math.Min(ticks, _signal.Length));
     }
 
     private void ReportProgress()
@@ -294,10 +299,10 @@ public sealed class StemPeaksReader
 
     /// <summary>
     /// The first tick on or after bucket <paramref name="bucket"/>'s first frame. It's the bucket's first tick at
-    /// <see cref="WaveformPeaks.SignalRate"/> and above; below it, one frame can be the first at or after the last
+    /// <see cref="WaveformResolution.SignalRate"/> and above; below it, one frame can be the first at or after the last
     /// tick of one bucket and the first of the next.
     /// </summary>
-    private int FirstTickOf(int bucket) => WaveformPeaks.Count(WaveformPeaks.Boundary(bucket, _rate), WaveformPeaks.SignalRate, _rate);
+    private int FirstTickOf(int bucket) => WaveformPeaks.Count(WaveformPeaks.Boundary(bucket, _resolution.BucketsPerSecond, _rate), _resolution.SignalRate, _rate);
 
     /// <summary>The first <paramref name="count"/> of <paramref name="array"/> then <paramref name="overflow"/>: the array itself when that's all of it.</summary>
     private static T[] Trim<T>(T[] array, List<T> overflow, int count)

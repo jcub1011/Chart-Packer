@@ -1165,6 +1165,32 @@
     <value>waveform lanes highway lyrics align alignment offset sync timing audio track stem</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="WaveformFidelityLabel" xml:space="preserve">
+    <value>Waveform detail</value>
+  </data>
+  <data name="WaveformFidelityDescription" xml:space="preserve">
+    <value>How finely each track's waveform is read: finer detail shows the start of each note more sharply in the lanes, but takes longer to read and more memory. Changing it reads the tracks again. Needs Show waveforms.</value>
+  </data>
+  <data name="WaveformFidelityKeywords" xml:space="preserve">
+    <value>waveform resolution fidelity detail quality precision sharp fine lanes highway</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="WaveformFidelityLow" xml:space="preserve">
+    <value>Low (20 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+  </data>
+  <data name="WaveformFidelityMedium" xml:space="preserve">
+    <value>Medium (10 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+  </data>
+  <data name="WaveformFidelityHigh" xml:space="preserve">
+    <value>High (5 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+  </data>
+  <data name="WaveformFidelityUltra" xml:space="preserve">
+    <value>Ultra (2.5 ms)</value>
+    <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
+  </data>
   <data name="SettingLockedFormat" xml:space="preserve">
     <value>Turn on {0} to change this.</value>
     <comment>Under a setting that only applies while another is on: {0} is that setting's label, e.g. Show waveforms.</comment>

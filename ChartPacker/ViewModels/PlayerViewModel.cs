@@ -170,6 +170,9 @@ namespace ChartPacker.ViewModels
         // The waveforms of several stems drawn together behind one lane, by the stems, with the peaks each was mixed from.
         private readonly Dictionary<string, (StemPeaks[] From, Waveform Mix)> _laneMixes = new(StringComparer.OrdinalIgnoreCase);
 
+        // The lanes' mixes being made in the background, by the stems, so that each is only mixed once at a time.
+        private readonly HashSet<string> _laneMixesMixing = new(StringComparer.OrdinalIgnoreCase);
+
         // A song the library asked to play, to be started when the detail view gives it its tracks.
         private SongEntry? _previewRequest;
 
@@ -191,6 +194,7 @@ namespace ChartPacker.ViewModels
             ShowWaveforms = settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
+            WaveformFidelity = settings.Settings.WaveformFidelity;
             _openOutput = openOutput;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
             _timer.Tick += (_, _) => RefreshPosition();
@@ -262,6 +266,12 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool ShowSpectrum { get; set; }
 
+        /// <summary>How finely the tracks' waveforms are read; changed, they're read again. Kept in the settings.</summary>
+        [ObservableProperty]
+        public partial WaveformFidelity WaveformFidelity { get; set; }
+
+        private WaveformResolution Resolution => WaveformResolution.Of(WaveformFidelity);
+
         /// <summary>Where the song's <c>preview_start_time</c> puts the preview, if it sets one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasPreviewStart))]
@@ -303,14 +313,41 @@ namespace ChartPacker.ViewModels
             if (peaks.Count == 0)
                 return RowOfStem(stems[0])?.Waveform;
 
-            // Mixed again only once one of them has been read further, as a mix of several long stems takes a while.
+            // Mixed again only once one of them has been read further, and in the background, as a mix of several long
+            // stems takes a while: meanwhile the lane keeps the mix it had, or the first stem's own waveform.
             string key = string.Join('|', stems);
-            if (_laneMixes.TryGetValue(key, out var known) && known.From.SequenceEqual(peaks))
+            bool isKnown = _laneMixes.TryGetValue(key, out var known);
+            if (isKnown && known.From.SequenceEqual(peaks))
                 return known.Mix;
 
-            var mix = WaveformPeaks.Mix([.. peaks.Select(p => new AudibleStem(p, IsMuted: false, IsSolo: false))]);
-            _laneMixes[key] = ([.. peaks], mix);
-            return mix;
+            _ = MixLaneAsync(key, stems, [.. peaks]);
+            return isKnown ? known.Mix : RowOfStem(stems[0])?.Waveform;
+        }
+
+        /// <summary>
+        /// Mixes <paramref name="peaks"/> for the lane of <paramref name="stems"/> on a background thread, unless it's being
+        /// mixed already, then tells the lanes to ask for it again: the mix, if nothing was cleared meanwhile, or a newer
+        /// one if they've been read further since. On the UI thread.
+        /// </summary>
+        private async Task MixLaneAsync(string key, IReadOnlyList<string> stems, StemPeaks[] peaks)
+        {
+            if (!_laneMixesMixing.Add(key))
+                return;
+
+            int generation = _waveformGeneration;
+            try
+            {
+                var mix = await Task.Run(() => WaveformPeaks.Mix([.. peaks.Select(p => new AudibleStem(p, IsMuted: false, IsSolo: false))]));
+                if (generation == _waveformGeneration)
+                    _laneMixes[key] = (peaks, mix);
+            }
+            finally
+            {
+                _laneMixesMixing.Remove(key);
+            }
+
+            foreach (var stem in stems)
+                ScheduleWaveformChanged(stem);
         }
 
         private TrackRowViewModel? RowOfStem(string stem) =>
@@ -326,6 +363,7 @@ namespace ChartPacker.ViewModels
             ShowWaveforms = _settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
+            WaveformFidelity = _settings.Settings.WaveformFidelity;
         }
 
         /// <summary>The song that is playing, or <see langword="null"/> when nothing is.</summary>
@@ -618,10 +656,11 @@ namespace ChartPacker.ViewModels
 
             // Taken now, so the task never reads the token source itself, which CancelPeaks disposes.
             var token = cts.Token;
-            _peaksTask = Task.Run(() => ReadPeaks(entry, tracks, token));
+            var resolution = Resolution;
+            _peaksTask = Task.Run(() => ReadPeaks(entry, tracks, resolution, token));
         }
 
-        private void ReadPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken)
+        private void ReadPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks, WaveformResolution resolution, CancellationToken cancellationToken)
         {
             try
             {
@@ -631,7 +670,7 @@ namespace ChartPacker.ViewModels
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var key = StemPeaksCache.KeyOf(entry, track);
-                    if (key is { } found && StemPeaksCache.Shared.TryGet(found, out var cached))
+                    if (key is { } found && StemPeaksCache.Shared.TryGet(found, resolution, out var cached))
                         ShowPeaks(track, cached, isComplete: true, cancellationToken);
                     else
                         keys[track] = key;
@@ -649,7 +688,7 @@ namespace ChartPacker.ViewModels
                 var reads = audio.Tracks
                     .Where(t => t.Source is not null)
                     .OrderByDescending(t => t.Source!.LengthFrames)
-                    .Select(opened => new TrackRead(opened, partial => ShowPeaks(opened.Track, partial, isComplete: false, cancellationToken), PeaksProgressInterval))
+                    .Select(opened => new TrackRead(opened, partial => ShowPeaks(opened.Track, partial, isComplete: false, cancellationToken), PeaksProgressInterval, resolution))
                     .ToList();
                 var chunks = reads
                     .SelectMany(read => Enumerable.Range(0, read.Reader.ChunkCount).Select(index => (Read: read, Index: index)))
@@ -904,6 +943,25 @@ namespace ChartPacker.ViewModels
 
         partial void OnShowLaneWaveformsChanged(bool value) => _settings.Settings.ShowLaneWaveforms = value;
 
+        partial void OnWaveformFidelityChanged(WaveformFidelity value)
+        {
+            _settings.Settings.WaveformFidelity = value;
+            if (!ShowWaveforms || _entry is not { } entry || !HasTracks)
+            {
+                // Read again at the new fidelity when they're next shown.
+                ClearPeaks();
+                return;
+            }
+
+            // Every track is read again, or found in StemPeaksCache.Shared if it was read at this fidelity before.
+            CancelPeaks();
+            ClearPeaks();
+            foreach (var row in Tracks)
+                row.Waveform = Waveform.Empty;
+            RaiseTracksChanged();
+            StartPeaks(entry, [.. Tracks.Select(t => t.Track)]);
+        }
+
         partial void OnShowSpectrumChanged(bool value)
         {
             _settings.Settings.ShowSpectrum = value;
@@ -1087,11 +1145,18 @@ namespace ChartPacker.ViewModels
 
             SetPosition(_player.Position.TotalSeconds);
 
-            // A stem found to be damaged while playing goes quiet; its row says why.
-            foreach (var row in Tracks)
+            // A stem found to be damaged while playing goes quiet; its row says why. Only those stems are looked for among the rows.
+            var stems = _player.Mixer.Stems;
+            for (int i = 0; i < stems.Count; i++)
             {
-                if (row.Error is null && _player.Mixer.Stems.FirstOrDefault(s => s.Name == row.Name)?.Error is { } error)
-                    row.Error = string.Format(CultureInfo.CurrentCulture, Strings.TrackUnplayableFormat, error);
+                if (stems[i].Error is not { } error)
+                    continue;
+
+                foreach (var row in Tracks)
+                {
+                    if (row.Error is null && row.Name == stems[i].Name)
+                        row.Error = string.Format(CultureInfo.CurrentCulture, Strings.TrackUnplayableFormat, error);
+                }
             }
         }
 
@@ -1120,10 +1185,10 @@ namespace ChartPacker.ViewModels
             private int _remaining;
 
             /// <param name="show">Shows the peaks read so far, unless the read has failed.</param>
-            public TrackRead(OpenedTrack opened, Action<StemPeaks> show, TimeSpan progressInterval)
+            public TrackRead(OpenedTrack opened, Action<StemPeaks> show, TimeSpan progressInterval, WaveformResolution resolution)
             {
                 Opened = opened;
-                Reader = new StemPeaksReader(opened.Track.StoredName, opened.Source!, Show, progressInterval);
+                Reader = new StemPeaksReader(opened.Track.StoredName, opened.Source!, Show, progressInterval, resolution: resolution);
                 _remaining = Reader.ChunkCount;
 
                 void Show(StemPeaks partial)

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Settings;
@@ -136,6 +137,25 @@ namespace ChartPacker.Services
                         DefaultValue = true,
                         Get = () => player.ShowLaneWaveforms,
                         Set = show => player.ShowLaneWaveforms = show,
+                    },
+                    new ChoiceSetting<WaveformFidelity>
+                    {
+                        Id = "playback.waveformFidelity",
+                        Category = visualizers,
+                        Label = Strings.WaveformFidelityLabel,
+                        Description = Strings.WaveformFidelityDescription,
+                        Keywords = Words(Strings.WaveformFidelityKeywords),
+                        RequiresId = "playback.showWaveforms",
+                        DefaultValue = AppSettings.DefaultWaveformFidelity,
+                        Choices =
+                        [
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.Low, Strings.WaveformFidelityLow),
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.Medium, Strings.WaveformFidelityMedium),
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.High, Strings.WaveformFidelityHigh),
+                            new SettingChoice<WaveformFidelity>(WaveformFidelity.Ultra, Strings.WaveformFidelityUltra),
+                        ],
+                        Get = () => player.WaveformFidelity,
+                        Set = fidelity => player.WaveformFidelity = fidelity,
                     },
                     new ToggleSetting
                     {

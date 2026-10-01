@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartPacker.Audio.Waveforms;
@@ -151,7 +152,11 @@ namespace ChartPacker.Controls
         private readonly Dictionary<(int Index, int State), FormattedText> _words = [];
         private double _spaceWidth = -1;
         private bool _isFrameRequested;
+        private bool _isInViewport = true;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
+
+        // A spoken note's diamond, a unit across from its middle, scaled and moved to each drawn.
+        private static StreamGeometry? s_diamond;
 
         static LyricLaneView()
         {
@@ -193,6 +198,17 @@ namespace ChartPacker.Controls
             set => SetValue(WindowSecondsProperty, value);
         }
 
+        public LyricLaneView() => EffectiveViewportChanged += OnEffectiveViewportChanged;
+
+        // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves.
+        private void OnEffectiveViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
+        {
+            bool wasInViewport = _isInViewport;
+            _isInViewport = e.EffectiveViewport.Intersects(new Rect(Bounds.Size));
+            if (_isInViewport && !wasInViewport)
+                InvalidateVisual();
+        }
+
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
@@ -215,7 +231,8 @@ namespace ChartPacker.Controls
                 return;
 
             // Drawing the part later is drawing it at an earlier moment of the scene's own time.
-            double now = ((Clock?.Invoke() ?? TimeSpan.Zero) - TimeShift).TotalSeconds;
+            // The time read for this frame, rather than reading the clock again.
+            double now = ((_drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero) - TimeShift).TotalSeconds;
             double nowX = bounds.Width * NowFraction;
             double perSecond = (bounds.Width - nowX) / Math.Max(0.5, WindowSeconds);
             double X(double time) => nowX + ((time - now) * perSecond);
@@ -236,7 +253,7 @@ namespace ChartPacker.Controls
                 {
                     double shift = TimeShift.TotalSeconds;
                     LaneWaveformPainter.Draw(context, waveform, new Rect(0, noteTop, bounds.Width, noteBottom - noteTop), isVertical: false,
-                        from + shift, to + shift, time => X(time - shift), WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform));
+                        from + shift, to + shift, time => X(time - shift), WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
                 }
 
                 int phrase = DrawPhrases(context, scene, bounds, now, from, to, X);
@@ -304,17 +321,8 @@ namespace ChartPacker.Controls
                     // A spoken note is a diamond at its start, with a thin tail for its length.
                     double half = thickness * 0.9;
                     context.FillRectangle(brush, new Rect(left, y - 1, right - left, 2));
-                    var diamond = new StreamGeometry();
-                    using (var g = diamond.Open())
-                    {
-                        g.BeginFigure(new Point(left, y - half), true);
-                        g.LineTo(new Point(left + half, y));
-                        g.LineTo(new Point(left, y + half));
-                        g.LineTo(new Point(left - half, y));
-                        g.EndFigure(true);
-                    }
-
-                    context.DrawGeometry(brush, null, diamond);
+                    using (context.PushTransform(new Matrix(half, 0, 0, half, left, y)))
+                        context.DrawGeometry(brush, null, Diamond());
                 }
                 else
                 {
@@ -383,6 +391,25 @@ namespace ChartPacker.Controls
             return lo;
         }
 
+        /// <summary>A diamond reaching a unit from the origin each way, made once.</summary>
+        private static StreamGeometry Diamond()
+        {
+            if (s_diamond is { } diamond)
+                return diamond;
+
+            diamond = new StreamGeometry();
+            using (var g = diamond.Open())
+            {
+                g.BeginFigure(new Point(0, -1), true);
+                g.LineTo(new Point(1, 0));
+                g.LineTo(new Point(0, 1));
+                g.LineTo(new Point(-1, 0));
+                g.EndFigure(true);
+            }
+
+            return s_diamond = diamond;
+        }
+
         /// <summary>Asks to be called back when the screen is next drawn, while there's a part to draw.</summary>
         private void RequestFrame()
         {
@@ -399,9 +426,15 @@ namespace ChartPacker.Controls
             if (TopLevel.GetTopLevel(this) is null)
                 return;
 
-            // Paused, nothing moves, so nothing is redrawn.
+            // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view.
+            if (!IsEffectivelyVisible || !_isInViewport)
+            {
+                RequestFrame();
+                return;
+            }
+
             var clock = Clock?.Invoke() ?? TimeSpan.Zero;
-            if (clock != _drawnAt && IsEffectivelyVisible)
+            if (clock != _drawnAt)
             {
                 _drawnAt = clock;
                 InvalidateVisual();

@@ -144,6 +144,34 @@ already measured FFmpeg's decoders at about 2× (Opus), 3× (Vorbis) and 8× (MP
 per core, and `ChartPacker.Audio` now feeds them the same packets. To measure it, run the commands
 under [Setup](#setup): each benchmark then has an `FFmpeg speed-up` column.
 
+## Waveform fidelity
+
+What reading and drawing the waveform costs at each `WaveformFidelity` (`WaveformBenchmarks`):
+
+```
+dotnet run -c Release --project tools/DecodeBench -- "<song folder>" --per-format 1 --waveforms
+```
+
+- **Machine:** AMD Ryzen 9 7900X (12 cores, 24 threads), Windows 11 25H2, .NET SDK 10.0.401, runtime 10.0.12, JIT.
+- **Stem:** a 4:04 stereo Opus at 48 kHz, decoded on `Auto` (FFmpeg), as the app decodes it.
+
+| Benchmark | What it times | Low (20 ms) | Medium (10 ms) | High (5 ms) | Ultra (2.5 ms) |
+|---|---|--:|--:|--:|--:|
+| `PeaksChunked` | Reading the stem's peaks as the player does | 54.1 ms | 53.9 ms | 54.5 ms | 53.6 ms |
+| `Mix` | Four stems summed, as for the player's waveform or a split kit's lane | 5.2 ms | 5.5 ms | 5.7 ms | 10.8 ms |
+| `Columns` | The seek bar's 333 columns, worked out once per waveform | 16 µs | 29 µs | 57 µs | 113 µs |
+
+All values are medians.
+
+1. **Reading is decode-bound at every fidelity.** Finer buckets add nothing measurable. They only add
+   memory: about 5.4 MB allocated per read at Low and 7.4 MB at Ultra.
+2. **Mixing barely changes up to High.** It costs the same samples for mixing (2000 a second) at
+   every fidelity up to High. Ultra doubles them to 4000 a second, so its mix takes about twice as long.
+   Lanes now mix on a background thread, so this doesn't reach the UI thread either way.
+3. **The seek bar's columns grow linearly with fidelity but stay negligible.** Even at Ultra they take
+   0.1 ms, once per waveform change rather than once per frame.
+
+
 ## Full results
 
 ### Fixtures (`ChartPacker.Core.Tests/Audio/Fixtures`, 1 s each)

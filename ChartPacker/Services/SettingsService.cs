@@ -87,6 +87,9 @@ namespace ChartPacker.Services
             if (!Enum.IsDefined(settings.DedupKeepPreference))
                 settings.DedupKeepPreference = AppSettings.DefaultDedupKeepPreference;
 
+            if (!Enum.IsDefined(settings.WaveformFidelity))
+                settings.WaveformFidelity = AppSettings.DefaultWaveformFidelity;
+
             if (!Enum.IsDefined(settings.LibrarySortField))
                 settings.LibrarySortField = LibrarySortField.ScanOrder;
 

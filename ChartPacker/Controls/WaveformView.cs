@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using ChartPacker.Audio.Waveforms;
 
 namespace ChartPacker.Controls
@@ -34,6 +35,7 @@ namespace ChartPacker.Controls
         private const double BarWidth = 2;
         private const double BarGap = 1;
         private const double MinBarHeight = 1.5;
+        private const double BarRadius = 1;
 
         // The peaks behind the loudness are drawn this faintly.
         private const double PeakOpacity = 0.35;
@@ -71,6 +73,15 @@ namespace ChartPacker.Controls
         private Waveform? _columnsWaveform;
         private double _columnsDuration;
 
+        // The columns drawn into two pictures, played and not, at the screen's pixels, so redrawing the control (as the
+        // playhead moves, or as what's behind it moves) draws two pictures rather than every column. Drawn again only
+        // when the columns, the size, the brushes or how far they've grown in change. And how many columns were drawn
+        // played, so the playhead only redraws as it passes one.
+        private RenderTargetBitmap? _playedBars;
+        private RenderTargetBitmap? _unplayedBars;
+        private (Column[] Columns, Size Size, double Scaling, double Shown, IBrush? Played, IBrush? Unplayed) _barsKey;
+        private int _drawnPlayed = -1;
+
         // How far in, in seconds, the waveform is drawn, moving towards TargetSeconds at _revealSpeed seconds a second.
         private double _shownSeconds;
         private double _revealSpeed;
@@ -79,7 +90,7 @@ namespace ChartPacker.Controls
 
         static WaveformView()
         {
-            AffectsRender<WaveformView>(WaveformProperty, PositionSecondsProperty, LengthSecondsProperty, PlayedBrushProperty, UnplayedBrushProperty);
+            AffectsRender<WaveformView>(WaveformProperty, LengthSecondsProperty, PlayedBrushProperty, UnplayedBrushProperty);
             FocusableProperty.OverrideDefaultValue<WaveformView>(false);
             CursorProperty.OverrideDefaultValue<WaveformView>(new Cursor(StandardCursorType.Hand));
         }
@@ -147,6 +158,8 @@ namespace ChartPacker.Controls
                 OnWaveformChanged(change.GetOldValue<Waveform?>(), change.GetNewValue<Waveform?>());
             else if (change.Property == LengthSecondsProperty)
                 Retarget();
+            else if (change.Property == PositionSecondsProperty && PlayedColumns(ColumnCount(Bounds.Width)) != _drawnPlayed)
+                InvalidateVisual();
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -158,6 +171,12 @@ namespace ChartPacker.Controls
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
+
+            // Drawn again when it's shown.
+            _playedBars?.Dispose();
+            _unplayedBars?.Dispose();
+            _playedBars = _unplayedBars = null;
+            _barsKey = default;
 
             // A frame asked for now may never come; one is asked for again when it's shown.
             _isFrameRequested = false;
@@ -175,35 +194,131 @@ namespace ChartPacker.Controls
             context.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, width, height));
 
             double duration = DurationSeconds;
-            double played = duration > 0 ? Math.Clamp(PositionSeconds / duration, 0, 1) : 0;
-            double middle = height / 2;
-            int columns = Math.Max(1, (int)((width + BarGap) / (BarWidth + BarGap)));
+            int columns = ColumnCount(width);
             var levels = Columns(Waveform, columns, duration);
-            double edge = EdgeSeconds;
+            int played = PlayedColumns(columns);
+            _drawnPlayed = played;
 
-            // The peaks first, faintly, all in one layer; then the loudness over them.
+            // While the columns grow in they change every frame, so they're drawn as they are rather than into pictures.
+            if (_shownSeconds < TargetSeconds)
+            {
+                DrawGrowing(context, levels, columns, duration, height, played);
+                return;
+            }
+
+            Bars(levels, columns, duration, new Size(width, height));
+
+            // The columns played, up to the gap after the last of them, in the played brush; the rest in the other.
+            double split = Math.Clamp((played * (BarWidth + BarGap)) - (BarGap / 2), 0, width);
+            var playedArea = new Rect(0, 0, split, height);
+            var unplayedArea = new Rect(split, 0, width - split, height);
+
+            DrawPart(context, _playedBars, playedArea, width, height);
+            DrawPart(context, _unplayedBars, unplayedArea, width, height);
+        }
+
+        private void DrawGrowing(DrawingContext context, Column[] levels, int columns, double duration, double height, int played)
+        {
+            double middle = height / 2;
+            double edge = EdgeSeconds;
             using (context.PushOpacity(PeakOpacity))
             {
                 for (int column = 0; column < columns; column++)
                 {
-                    double grown = Grown(column, columns, duration, edge);
+                    if ((column < played ? PlayedBrush : UnplayedBrush) is not { } brush)
+                        continue;
+
                     var (low, high, _) = levels[column];
-                    DrawBar(context, column, columns, played, middle, -low * grown, high * grown);
+                    double grown = Grown(column, columns, duration, edge);
+                    Bar(context, brush, column, middle, -low * grown, high * grown);
                 }
             }
 
             for (int column = 0; column < columns; column++)
             {
-                double grown = Grown(column, columns, duration, edge);
-                var (low, high, rms) = levels[column];
+                if ((column < played ? PlayedBrush : UnplayedBrush) is not { } brush)
+                    continue;
 
-                double loud = WaveformLevels.Loudness(low, high, rms) * grown;
-                DrawBar(context, column, columns, played, middle, loud, loud);
+                var (low, high, rms) = levels[column];
+                double loud = WaveformLevels.Loudness(low, high, rms) * Grown(column, columns, duration, edge);
+                Bar(context, brush, column, middle, loud, loud);
+            }
+        }
+
+        private static void DrawPart(DrawingContext context, RenderTargetBitmap? bars, Rect area, double width, double height)
+        {
+            if (area.Width <= 0 || bars is null)
+                return;
+
+            // Pixel for pixel, as it was drawn at the screen's pixels: smoothing would only blur it.
+            using (context.PushClip(area))
+            using (context.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = BitmapInterpolationMode.None }))
+                context.DrawImage(bars, new Rect(0, 0, bars.PixelSize.Width, bars.PixelSize.Height), new Rect(0, 0, width, height));
+        }
+
+        private static int ColumnCount(double width) => Math.Max(1, (int)((width + BarGap) / (BarWidth + BarGap)));
+
+        /// <summary>How many of <paramref name="columns"/> columns have been played: each once the playhead has passed its middle.</summary>
+        private int PlayedColumns(int columns)
+        {
+            double duration = DurationSeconds;
+            double played = duration > 0 ? Math.Clamp(PositionSeconds / duration, 0, 1) : 0;
+            return Math.Clamp((int)Math.Floor((played * columns) - 0.5) + 1, 0, columns);
+        }
+
+        /// <summary>Draws the columns into the pictures again, in each brush, if what they show has changed.</summary>
+        private void Bars(Column[] levels, int columns, double duration, Size size)
+        {
+            // Only drawn once every column has grown in, so how far the edge has gone past them doesn't change them.
+            double shown = double.PositiveInfinity;
+            double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
+            var key = (levels, size, scaling, shown, PlayedBrush, UnplayedBrush);
+            if (_barsKey == key)
+                return;
+
+            _barsKey = key;
+            _playedBars?.Dispose();
+            _unplayedBars?.Dispose();
+            _playedBars = Draw(PlayedBrush);
+            _unplayedBars = Draw(UnplayedBrush);
+
+            RenderTargetBitmap? Draw(IBrush? brush)
+            {
+                if (brush is null)
+                    return null;
+
+                var pixels = new PixelSize(Math.Max(1, (int)Math.Ceiling(size.Width * scaling)), Math.Max(1, (int)Math.Ceiling(size.Height * scaling)));
+                var bitmap = new RenderTargetBitmap(pixels, new Vector(96, 96));
+                double middle = size.Height / 2;
+                double edge = EdgeSeconds;
+                using (var context = bitmap.CreateDrawingContext())
+                using (context.PushTransform(Matrix.CreateScale(scaling, scaling)))
+                {
+                    // The peaks first, faintly; then the loudness over them.
+                    using (context.PushOpacity(PeakOpacity))
+                    {
+                        for (int column = 0; column < columns; column++)
+                        {
+                            var (low, high, _) = levels[column];
+                            double grown = Grown(column, columns, duration, edge);
+                            Bar(context, brush, column, middle, -low * grown, high * grown);
+                        }
+                    }
+
+                    for (int column = 0; column < columns; column++)
+                    {
+                        var (low, high, rms) = levels[column];
+                        double loud = WaveformLevels.Loudness(low, high, rms) * Grown(column, columns, duration, edge);
+                        Bar(context, brush, column, middle, loud, loud);
+                    }
+                }
+
+                return bitmap;
             }
         }
 
         /// <summary>Draws a column reaching <paramref name="below"/> and <paramref name="above"/> of the way from the middle, each from 0 to 1.</summary>
-        private void DrawBar(DrawingContext context, int column, int columns, double played, double middle, double below, double above)
+        private static void Bar(DrawingContext context, IBrush brush, int column, double middle, double below, double above)
         {
             double x = column * (BarWidth + BarGap);
             double top = middle - (Math.Clamp(above, 0, 1) * middle);
@@ -214,10 +329,7 @@ namespace ChartPacker.Controls
                 bottom = middle + (MinBarHeight / 2);
             }
 
-            // A column is played once the playhead has passed its middle.
-            double centre = (column + 0.5) / columns;
-            var brush = centre <= played ? PlayedBrush : UnplayedBrush;
-            context.DrawRectangle(brush, null, new RoundedRect(new Rect(x, top, BarWidth, bottom - top), 1));
+            context.DrawRectangle(brush, null, new RoundedRect(new Rect(x, top, BarWidth, bottom - top), BarRadius));
         }
 
         /// <summary>

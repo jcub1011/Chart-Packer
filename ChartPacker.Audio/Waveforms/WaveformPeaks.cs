@@ -3,18 +3,87 @@ using ChartPacker.Audio.Decoding;
 
 namespace ChartPacker.Audio.Waveforms;
 
+/// <summary>How finely a waveform is read: each a <see cref="WaveformResolution"/>, from coarsest to finest.</summary>
+public enum WaveformFidelity
+{
+    /// <summary>20 ms a bucket.</summary>
+    Low,
+
+    /// <summary>10 ms a bucket.</summary>
+    Medium,
+
+    /// <summary>5 ms a bucket.</summary>
+    High,
+
+    /// <summary>2.5 ms a bucket.</summary>
+    Ultra,
+}
+
 /// <summary>
-/// One stem's loudness over time: the lowest and highest sample in each <see cref="WaveformPeaks.BucketsPerSecond"/>th
-/// of a second and how loud it is on average, and the stem itself sampled <see cref="WaveformPeaks.SignalRate"/>
+/// How many buckets a second a waveform holds, and how often each stem is sampled for mixing: a whole number
+/// of times a bucket, and never less often than 2000 times a second.
+/// </summary>
+public readonly record struct WaveformResolution
+{
+    /// <summary>20 ms a bucket, sampled 40 times a bucket.</summary>
+    public static readonly WaveformResolution Low = new(50);
+
+    /// <summary>10 ms a bucket, sampled 20 times a bucket.</summary>
+    public static readonly WaveformResolution Medium = new(100);
+
+    /// <summary>5 ms a bucket, sampled 10 times a bucket.</summary>
+    public static readonly WaveformResolution High = new(200);
+
+    /// <summary>2.5 ms a bucket, sampled 10 times a bucket.</summary>
+    public static readonly WaveformResolution Ultra = new(400);
+
+    // Sampled fewer times a bucket than this, a mix's peaks would be guesswork.
+    private const int MinTicksPerBucket = 10;
+
+    private const int MinSignalRate = 2000;
+
+    /// <exception cref="ArgumentOutOfRangeException">The samples for mixing wouldn't fall a whole number of times a bucket.</exception>
+    public WaveformResolution(int bucketsPerSecond)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bucketsPerSecond);
+        BucketsPerSecond = bucketsPerSecond;
+        SignalRate = Math.Max(MinSignalRate, bucketsPerSecond * MinTicksPerBucket);
+        if (SignalRate % bucketsPerSecond != 0)
+            throw new ArgumentOutOfRangeException(nameof(bucketsPerSecond), bucketsPerSecond, $"Must divide {MinSignalRate} evenly, or be over {MinSignalRate / MinTicksPerBucket}.");
+    }
+
+    /// <summary>How many buckets a second holds.</summary>
+    public int BucketsPerSecond { get; }
+
+    /// <summary>How often each stem is sampled for mixing.</summary>
+    public int SignalRate { get; }
+
+    /// <summary>How many of the samples for mixing fall in a bucket.</summary>
+    public int TicksPerBucket => SignalRate / BucketsPerSecond;
+
+    /// <summary>The resolution <paramref name="fidelity"/> reads at; <see cref="High"/> for one not known.</summary>
+    public static WaveformResolution Of(WaveformFidelity fidelity) => fidelity switch
+    {
+        WaveformFidelity.Low => Low,
+        WaveformFidelity.Medium => Medium,
+        WaveformFidelity.Ultra => Ultra,
+        _ => High,
+    };
+}
+
+/// <summary>
+/// One stem's loudness over time: the lowest and highest sample in each of <see cref="WaveformResolution.BucketsPerSecond"/>
+/// buckets a second and how loud it is on average, and the stem itself sampled <see cref="WaveformResolution.SignalRate"/>
 /// times a second for mixing.
 /// </summary>
 public sealed class StemPeaks
 {
     // The arrays may be longer than what has been read, and a progress snapshot's are still being filled past
     // it: only the first readBuckets and readTicks are ever looked at, and the reader never writes those again.
-    internal StemPeaks(string name, float[] min, float[] max, float[] rms, Half[] signal, int count, int readBuckets, int readTicks)
+    internal StemPeaks(string name, WaveformResolution resolution, float[] min, float[] max, float[] rms, Half[] signal, int count, int readBuckets, int readTicks)
     {
         Name = name;
+        Resolution = resolution;
         MinBuckets = min;
         MaxBuckets = max;
         RmsBuckets = rms;
@@ -29,6 +98,9 @@ public sealed class StemPeaks
     }
 
     public string Name { get; }
+
+    /// <summary>How long a bucket is, and how often the stem is sampled for mixing.</summary>
+    public WaveformResolution Resolution { get; }
 
     /// <summary>The lowest sample of each bucket, at most 0. Channels are averaged.</summary>
     public IReadOnlyList<float> Min { get; }
@@ -65,7 +137,7 @@ public sealed class StemPeaks
 
     internal int ReadBuckets { get; }
 
-    // The stem's samples, channels averaged, at each tick of the SignalRate grid: tick k is the first frame
+    // The stem's samples, channels averaged, at each tick of the Resolution.SignalRate grid: tick k is the first frame
     // at or after k / SignalRate seconds, so every stem is sampled at the same instants whatever its rate.
     // Those from ReadTicks on are silent.
     internal Half[] Signal { get; }
@@ -117,16 +189,31 @@ public readonly record struct AudibleStem(StemPeaks Peaks, bool IsMuted, bool Is
 /// <summary>The peaks of everything that is heard, as drawn; see <see cref="WaveformPeaks.Mix"/>.</summary>
 public sealed class Waveform
 {
-    public static readonly Waveform Empty = new([], [], [], 0, 0);
+    public static readonly Waveform Empty = new(WaveformResolution.Low, [], [], [], [], [], [], 0, 0);
 
-    internal Waveform(IReadOnlyList<float> min, IReadOnlyList<float> max, IReadOnlyList<float> rms, int readCount, float peak)
+    // The buckets as arrays too, at least readCount long, so that drawing reads them directly.
+    private readonly float[] _min;
+    private readonly float[] _max;
+    private readonly float[] _rms;
+
+    internal Waveform(WaveformResolution resolution, IReadOnlyList<float> min, IReadOnlyList<float> max, IReadOnlyList<float> rms, float[] minBuckets, float[] maxBuckets, float[] rmsBuckets, int readCount, float peak)
     {
+        Resolution = resolution;
         Min = min;
         Max = max;
         Rms = rms;
+        _min = minBuckets;
+        _max = maxBuckets;
+        _rms = rmsBuckets;
         ReadCount = readCount;
         Peak = peak;
     }
+
+    /// <summary>How long a bucket is.</summary>
+    public WaveformResolution Resolution { get; }
+
+    /// <summary>How many buckets a second holds; see <see cref="Resolution"/>.</summary>
+    public int BucketsPerSecond => Resolution.BucketsPerSecond;
 
     /// <summary>The lowest level of each bucket, from -1 to 0.</summary>
     public IReadOnlyList<float> Min { get; }
@@ -149,23 +236,37 @@ public sealed class Waveform
     public float Peak { get; }
 
     /// <summary>How much time the buckets cover.</summary>
-    public double Seconds => (double)Count / WaveformPeaks.BucketsPerSecond;
+    public double Seconds => (double)Count / BucketsPerSecond;
 
     /// <summary>How much time the known buckets cover; see <see cref="ReadCount"/>.</summary>
-    public double ReadSeconds => (double)ReadCount / WaveformPeaks.BucketsPerSecond;
+    public double ReadSeconds => (double)ReadCount / BucketsPerSecond;
+
+    /// <summary>
+    /// The lowest and highest level of the known buckets from <paramref name="first"/> up to <paramref name="last"/>,
+    /// and how loud they are together: the root mean square of them all, so a stretch isn't only as quiet as its loudest moment.
+    /// </summary>
+    /// <remarks>Only what's been read counts: the buckets past <see cref="ReadCount"/> are silent for now, not quiet.</remarks>
+    public (double Low, double High, double Rms) LevelsOf(int first, int last)
+    {
+        first = Math.Max(0, first);
+        last = Math.Min(ReadCount, last);
+
+        float low = 0, high = 0;
+        double squares = 0;
+        for (int i = first; i < last; i++)
+        {
+            low = Math.Min(low, _min[i]);
+            high = Math.Max(high, _max[i]);
+            squares += (double)_rms[i] * _rms[i];
+        }
+
+        return (low, high, last > first ? Math.Sqrt(squares / (last - first)) : 0);
+    }
 }
 
 /// <summary>Summarises stems into peaks for drawing a waveform, and combines them the way the mixer does.</summary>
 public static class WaveformPeaks
 {
-    /// <summary>The waveform's resolution: 20 ms per bucket, however the stems are sampled.</summary>
-    public const int BucketsPerSecond = 50;
-
-    /// <summary>How often each stem is sampled for mixing: 40 times a bucket.</summary>
-    public const int SignalRate = 2000;
-
-    private const int TicksPerBucket = SignalRate / BucketsPerSecond;
-
     // How many frames are decoded at a time.
     internal const int ChunkFrames = 4096;
 
@@ -179,6 +280,11 @@ public static class WaveformPeaks
     public static StemPeaks Compute(string name, IPcmSource source, CancellationToken cancellationToken = default) =>
         Compute(name, source, null, TimeSpan.Zero, cancellationToken);
 
+    /// <summary>Reads <paramref name="source"/> from where it is to its end, at <paramref name="resolution"/>.</summary>
+    /// <inheritdoc cref="Compute(string, IPcmSource, CancellationToken)"/>
+    public static StemPeaks Compute(string name, IPcmSource source, WaveformResolution resolution, CancellationToken cancellationToken = default) =>
+        Compute(name, source, null, TimeSpan.Zero, cancellationToken, resolution);
+
     /// <summary>
     /// Reads <paramref name="source"/> from where it is to its end, as <see cref="Compute(string, IPcmSource, CancellationToken)"/>,
     /// handing <paramref name="progress"/> the peaks read so far at most once every <paramref name="progressInterval"/>.
@@ -190,10 +296,11 @@ public static class WaveformPeaks
     /// what had been read when it was taken. The result is the same as without progress.
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
-    public static StemPeaks Compute(string name, IPcmSource source, Action<StemPeaks>? progress, TimeSpan progressInterval, CancellationToken cancellationToken = default)
+    /// <param name="resolution">How finely to read it; <see cref="WaveformResolution.Low"/> unless given.</param>
+    public static StemPeaks Compute(string name, IPcmSource source, Action<StemPeaks>? progress, TimeSpan progressInterval, CancellationToken cancellationToken = default, WaveformResolution? resolution = null)
     {
         // One chunk, as long as the stem.
-        var reader = new StemPeaksReader(name, source, progress, progressInterval, int.MaxValue);
+        var reader = new StemPeaksReader(name, source, progress, progressInterval, int.MaxValue, resolution);
         reader.ReadChunk(0, source, cancellationToken);
         return reader.Finish();
     }
@@ -205,15 +312,21 @@ public static class WaveformPeaks
     /// </summary>
     /// <remarks>
     /// It covers the longest stem, muted or not, so muting doesn't change how much time is shown. One stem
-    /// heard alone gives its own peaks. Several are summed from their <see cref="SignalRate"/> samples, which
+    /// heard alone gives its own peaks. Several are summed from their <see cref="WaveformResolution.SignalRate"/> samples, which
     /// fall at the same instants in every stem, so the sum is the mix's at those instants: it can miss the
     /// sharpest peaks between them, which is the safe way round for a picture, where adding the stems' peaks
     /// would overstate every bucket. It is known as far as the heard stem read least far, or with nothing
-    /// heard, as far as any stem has been read; see <see cref="Waveform.ReadCount"/>.
+    /// heard, as far as any stem has been read; see <see cref="Waveform.ReadCount"/>. The stems must all have
+    /// been read at the same <see cref="WaveformResolution"/>.
     /// </remarks>
+    /// <exception cref="ArgumentException">The stems weren't all read at the same resolution.</exception>
     public static Waveform Mix(IReadOnlyList<AudibleStem> stems)
     {
         ArgumentNullException.ThrowIfNull(stems);
+
+        var resolution = stems.Count > 0 ? stems[0].Peaks.Resolution : WaveformResolution.Low;
+        if (stems.Any(s => s.Peaks.Resolution != resolution))
+            throw new ArgumentException("The stems were read at different resolutions.", nameof(stems));
 
         int count = stems.Select(s => s.Peaks.Count).DefaultIfEmpty(0).Max();
         var min = new float[count];
@@ -244,18 +357,19 @@ public static class WaveformPeaks
         }
         else if (heard.Count > 1)
         {
-            Span<float> sum = stackalloc float[TicksPerBucket];
+            int ticksPerBucket = resolution.TicksPerBucket;
+            Span<float> sum = stackalloc float[ticksPerBucket];
             for (int b = 0; b < count; b++)
             {
                 sum.Clear();
-                int first = b * TicksPerBucket;
+                int first = b * ticksPerBucket;
 
                 // The loudness is of the ticks some stem reaches: a bucket the stems end part way through isn't quieter for it.
                 int covered = 0;
                 foreach (var stem in heard)
                 {
                     Half[] stemSignal = stem.Peaks.Signal;
-                    int end = Math.Min(stem.Peaks.ReadTicks, first + TicksPerBucket);
+                    int end = Math.Min(stem.Peaks.ReadTicks, first + ticksPerBucket);
                     for (int k = first; k < end; k++)
                         sum[k - first] += (float)stemSignal[k] * stem.Volume;
                     covered = Math.Max(covered, end - first);
@@ -280,7 +394,7 @@ public static class WaveformPeaks
         }
 
         readCount = Math.Min(readCount, count);
-        return new Waveform(min, max, rms, readCount, StemPeaks.PeakOf(min, max, readCount));
+        return new Waveform(resolution, min, max, rms, min, max, rms, readCount, StemPeaks.PeakOf(min, max, readCount));
     }
 
     /// <summary>
@@ -290,7 +404,7 @@ public static class WaveformPeaks
     public static Waveform Of(StemPeaks peaks)
     {
         ArgumentNullException.ThrowIfNull(peaks);
-        return new Waveform(peaks.Min, peaks.Max, peaks.Rms, peaks.ReadBuckets, peaks.Peak);
+        return new Waveform(peaks.Resolution, peaks.Min, peaks.Max, peaks.Rms, peaks.MinBuckets, peaks.MaxBuckets, peaks.RmsBuckets, peaks.ReadBuckets, peaks.Peak);
     }
 
     internal static float RootMeanSquare(double squares, int count) => count <= 0 ? 0f : (float)Math.Sqrt(squares / count);
@@ -299,9 +413,9 @@ public static class WaveformPeaks
     internal static int Count(long frames, int perSecond, int rate) =>
         frames <= 0 ? 0 : (int)(((frames - 1) * perSecond / rate) + 1);
 
-    /// <summary>The first frame of bucket <paramref name="bucket"/> at <paramref name="rate"/>.</summary>
-    internal static long Boundary(int bucket, int rate) => (((long)bucket * rate) + BucketsPerSecond - 1) / BucketsPerSecond;
+    /// <summary>The first frame at <paramref name="rate"/> of bucket <paramref name="bucket"/>, of <paramref name="perSecond"/> a second.</summary>
+    internal static long Boundary(int bucket, int perSecond, int rate) => (((long)bucket * rate) + perSecond - 1) / perSecond;
 
-    /// <summary>The frame sampled for tick <paramref name="tick"/> at <paramref name="rate"/>: the first at or after it.</summary>
-    internal static long TickFrame(long tick, int rate) => ((tick * rate) + SignalRate - 1) / SignalRate;
+    /// <summary>The frame at <paramref name="rate"/> sampled for tick <paramref name="tick"/>, of <paramref name="signalRate"/> a second: the first at or after it.</summary>
+    internal static long TickFrame(long tick, int signalRate, int rate) => ((tick * rate) + signalRate - 1) / signalRate;
 }

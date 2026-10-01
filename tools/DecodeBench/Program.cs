@@ -12,17 +12,19 @@ using DecodeBench;
 
 // Times the app's audio decoders with BenchmarkDotNet, on the managed and FFmpeg backends (see RESULTS.md):
 //
-//   dotnet run -c Release --project tools/DecodeBench -- [paths…] [--per-format K] [--iterations N] [--aot] [--list]
+//   dotnet run -c Release --project tools/DecodeBench -- [paths…] [--per-format K] [--iterations N] [--aot] [--list] [--waveforms]
 //
 // A path is an audio file, a .sng (its audio is read in place) or a directory searched for both, which
 // keeps its K longest stems of each format. With no paths it reads the test fixtures. --aot adds a
-// Native AOT job beside the JIT one, as the app ships; --list only shows the stems found. Files are only read.
+// Native AOT job beside the JIT one, as the app ships; --list only shows the stems found; --waveforms times what the
+// waveform costs at each fidelity (WaveformBenchmarks) instead of the decoders. Files are only read.
 
 var paths = new List<string>();
 int perFormat = 2;
 int iterations = 10;
 bool aot = false;
 bool list = false;
+bool waveforms = false;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -39,6 +41,9 @@ for (int i = 0; i < args.Length; i++)
             break;
         case "--list":
             list = true;
+            break;
+        case "--waveforms":
+            waveforms = true;
             break;
         default:
             paths.Add(args[i]);
@@ -69,6 +74,23 @@ Environment.SetEnvironmentVariable(StemLocation.Variable, serialized);
 var variable = new EnvironmentVariable(StemLocation.Variable, serialized);
 
 var job = Job.Default.WithWarmupCount(2).WithIterationCount(iterations).WithLaunchCount(1).WithEnvironmentVariable(variable);
+if (waveforms)
+{
+    var waveformConfig = ManualConfig.Create(DefaultConfig.Instance)
+        .AddJob(job.WithId("JIT"))
+        .AddColumn(StatisticColumn.Median)
+        .AddDiagnoser(BenchmarkDotNet.Diagnosers.MemoryDiagnoser.Default)
+        .WithSummaryStyle(SummaryStyle.Default.WithMaxParameterColumnWidth(80))
+        .WithOrderer(new DefaultOrderer(SummaryOrderPolicy.Declared, MethodOrderPolicy.Declared))
+        .AddLogicalGroupRules(BenchmarkLogicalGroupRule.ByMethod)
+        .WithArtifactsPath(Path.Combine(AppContext.BaseDirectory, "BenchmarkDotNet.Artifacts"));
+    if (aot)
+        waveformConfig = waveformConfig.AddJob(job.WithRuntime(NativeAotRuntime.Net10_0).WithId("NativeAOT"));
+
+    BenchmarkRunner.Run<WaveformBenchmarks>(waveformConfig);
+    return 0;
+}
+
 var config = ManualConfig.Create(DefaultConfig.Instance)
     .AddJob(job.WithId("JIT"))
     .AddColumn(StatisticColumn.Median)

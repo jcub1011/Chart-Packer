@@ -90,6 +90,37 @@ public sealed class VideoPlayback : IDisposable
         }
     }
 
+    /// <summary>Whether there's a frame newer than <paramref name="version"/>, for <see cref="TryCopyFrame(nint, int, int, int, ref int)"/>.</summary>
+    public bool HasFrameNewerThan(int version)
+    {
+        lock (_frameLock)
+            return _front is not null && _version != version;
+    }
+
+    /// <summary>
+    /// Copies the latest frame, row by row, into the <paramref name="width"/> × <paramref name="height"/> BGRA pixels at
+    /// <paramref name="destination"/>, <paramref name="rowBytes"/> apart, such as a locked bitmap's, if it's newer than
+    /// <paramref name="version"/>, which is then updated; as <see cref="TryCopyFrame(Span{byte}, ref int)"/>, without a buffer between.
+    /// </summary>
+    /// <returns>Whether a newer frame was copied: not when it isn't that size, as when the video changed meanwhile.</returns>
+    public unsafe bool TryCopyFrame(nint destination, int rowBytes, int width, int height, ref int version)
+    {
+        int frameRowBytes = width * 4;
+        if (destination == 0 || rowBytes < frameRowBytes)
+            return false;
+
+        lock (_frameLock)
+        {
+            if (_front is null || _version == version || _front.Length != frameRowBytes * height)
+                return false;
+
+            for (int y = 0; y < height; y++)
+                _front.AsSpan(y * frameRowBytes, frameRowBytes).CopyTo(new Span<byte>((byte*)destination + ((long)y * rowBytes), frameRowBytes));
+            version = _version;
+            return true;
+        }
+    }
+
     /// <summary>Completes once the playback thread has stopped and closed the video, after <see cref="Dispose"/>.</summary>
     public Task WhenClosedAsync() => _closed.Task;
 

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartPacker.Audio.Waveforms;
@@ -70,9 +71,13 @@ namespace ChartPacker.Controls
             var beats = tempo.BeatLines(0, last).ToList();
             BeatTimes = [.. beats.Select(b => tempo.SecondsAt(b.Tick) + delay.TotalSeconds)];
             IsMeasure = [.. beats.Select(b => b.IsMeasure)];
+            MaxLaneCount = lanes.Select(l => l.LaneCount).DefaultIfEmpty(1).Max();
         }
 
         public IReadOnlyList<HighwayLane> Lanes { get; }
+
+        /// <summary>The most lanes any of the highways has.</summary>
+        public int MaxLaneCount { get; }
 
         public double[] BeatTimes { get; }
 
@@ -163,7 +168,14 @@ namespace ChartPacker.Controls
         private readonly Dictionary<(Color, double), IPen> _pens = [];
         private readonly Dictionary<string, FormattedText> _labels = [];
         private bool _isFrameRequested;
+        private bool _isInViewport = true;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
+
+        // How brightly each column of the highway being drawn is lit; one for them all, as they're drawn one at a time.
+        private double[] _hits = [];
+
+        // A cymbal's shape for each size of gem, at the origin, moved to each gem drawn.
+        private readonly Dictionary<Size, StreamGeometry> _cymbals = [];
 
         static NoteHighwayView()
         {
@@ -211,12 +223,24 @@ namespace ChartPacker.Controls
             set => SetValue(AreNotesOutlinedProperty, value);
         }
 
+        public NoteHighwayView() => EffectiveViewportChanged += OnEffectiveViewportChanged;
+
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
         }
+
+        // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves.
+        private void OnEffectiveViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
+        {
+            bool wasInViewport = _isInViewport;
+            _isInViewport = e.EffectiveViewport.Intersects(new Rect(Bounds.Size));
+            if (_isInViewport && !wasInViewport)
+                InvalidateVisual();
+        }
+
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
@@ -229,7 +253,8 @@ namespace ChartPacker.Controls
             if (Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
                 return;
 
-            double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
+            // The time read for this frame, rather than reading the clock again.
+            double now = (_drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
             double lookAhead = Math.Max(0.1, LookAhead);
             double height = Bounds.Height;
             double strike = height * StrikeFraction;
@@ -247,7 +272,7 @@ namespace ChartPacker.Controls
             double to = now + lookAhead;
 
             // One gem size for every highway, from the narrowest lanes, leaving room for the names below the strike bar.
-            double narrowest = width / scene.Lanes.Max(l => l.LaneCount);
+            double narrowest = width / scene.MaxLaneCount;
             double gem = Math.Clamp(narrowest * 0.42, 5, Math.Max(5, Math.Min(18, (height - strike - 13) / 0.9)));
 
             var waveforms = Waveforms;
@@ -273,7 +298,7 @@ namespace ChartPacker.Controls
                 if (waveform is not null)
                 {
                     LaneWaveformPainter.Draw(context, waveform, bounds.Deflate(new Thickness(4, 0)), isVertical: true, from, to, y,
-                        WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform));
+                        WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
                 }
 
                 // A beam of light rises from a lane as it's struck.
@@ -312,9 +337,12 @@ namespace ChartPacker.Controls
         }
 
         /// <summary>How brightly each column is lit, from 0 to 1: just struck, or held.</summary>
-        private static double[] HitsAt(HighwayLane lane, double now)
+        private double[] HitsAt(HighwayLane lane, double now)
         {
-            var hits = new double[lane.LaneCount];
+            if (_hits.Length < lane.LaneCount)
+                _hits = new double[lane.LaneCount];
+            var hits = _hits;
+            Array.Clear(hits, 0, lane.LaneCount);
             for (int i = LowerBound(lane.Starts, now - Math.Max(HitGlow, lane.MaxLength)); i < lane.Starts.Length && lane.Starts[i] <= now; i++)
             {
                 var note = lane.Notes[i];
@@ -328,7 +356,7 @@ namespace ChartPacker.Controls
                 // An open note or kick lights every lane.
                 if (note.Lane == ChartNote.OpenLane)
                 {
-                    for (int c = 0; c < hits.Length; c++)
+                    for (int c = 0; c < lane.LaneCount; c++)
                         hits[c] = Math.Max(hits[c], glow * 0.6);
                 }
                 else
@@ -480,32 +508,51 @@ namespace ChartPacker.Controls
         /// <summary>A cymbal: a flat hexagon, pointed at the sides, in two tones like a gem; outlined, only its edge in the colour.</summary>
         private void DrawCymbal(DrawingContext context, Rect rect, Color color, bool outlined)
         {
-            double point = Math.Min(rect.Height * 0.6, rect.Width * 0.25);
-            var hexagon = new StreamGeometry();
+            var hexagon = Cymbal(rect.Size);
+            using (context.PushTransform(Matrix.CreateTranslation(rect.X, rect.Y)))
+            {
+                if (outlined)
+                {
+                    context.DrawGeometry(null, Pen(color, 1.5), hexagon);
+                    return;
+                }
+
+                var face = new Rect(rect.Size);
+                using (context.PushGeometryClip(hexagon))
+                {
+                    context.FillRectangle(Brush(Darken(color, 0.38)), face);
+                    context.FillRectangle(Brush(color), face.WithHeight(face.Height * 0.62));
+                }
+
+                context.DrawGeometry(null, OutlinePen, hexagon);
+            }
+        }
+
+        /// <summary>A cymbal's hexagon filling <paramref name="size"/> from the origin, made once for each size.</summary>
+        private StreamGeometry Cymbal(Size size)
+        {
+            if (_cymbals.TryGetValue(size, out var hexagon))
+                return hexagon;
+
+            // Resized often (a window being dragged larger), the sizes no longer drawn go.
+            if (_cymbals.Count > 16)
+                _cymbals.Clear();
+
+            double point = Math.Min(size.Height * 0.6, size.Width * 0.25);
+            hexagon = new StreamGeometry();
             using (var g = hexagon.Open())
             {
-                g.BeginFigure(new Point(rect.X, rect.Center.Y), true);
-                g.LineTo(new Point(rect.X + point, rect.Y));
-                g.LineTo(new Point(rect.Right - point, rect.Y));
-                g.LineTo(new Point(rect.Right, rect.Center.Y));
-                g.LineTo(new Point(rect.Right - point, rect.Bottom));
-                g.LineTo(new Point(rect.X + point, rect.Bottom));
+                g.BeginFigure(new Point(0, size.Height / 2), true);
+                g.LineTo(new Point(point, 0));
+                g.LineTo(new Point(size.Width - point, 0));
+                g.LineTo(new Point(size.Width, size.Height / 2));
+                g.LineTo(new Point(size.Width - point, size.Height));
+                g.LineTo(new Point(point, size.Height));
                 g.EndFigure(true);
             }
 
-            if (outlined)
-            {
-                context.DrawGeometry(null, Pen(color, 1.5), hexagon);
-                return;
-            }
-
-            using (context.PushGeometryClip(hexagon))
-            {
-                context.FillRectangle(Brush(Darken(color, 0.38)), rect);
-                context.FillRectangle(Brush(color), rect.WithHeight(rect.Height * 0.62));
-            }
-
-            context.DrawGeometry(null, OutlinePen, hexagon);
+            _cymbals[size] = hexagon;
+            return hexagon;
         }
 
         /// <summary>The mark across the face of a HOPO or tap gem.</summary>
@@ -641,9 +688,15 @@ namespace ChartPacker.Controls
             if (TopLevel.GetTopLevel(this) is null)
                 return;
 
-            // Paused, nothing moves, so nothing is redrawn.
+            // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view.
+            if (!IsEffectivelyVisible || !_isInViewport)
+            {
+                RequestFrame();
+                return;
+            }
+
             var clock = Clock?.Invoke() ?? TimeSpan.Zero;
-            if (clock != _drawnAt && IsEffectivelyVisible)
+            if (clock != _drawnAt)
             {
                 _drawnAt = clock;
                 InvalidateVisual();
