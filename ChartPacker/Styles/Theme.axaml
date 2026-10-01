@@ -93,8 +93,8 @@
 
     <!-- Icon-only toolbar buttons. Tooltips show even when disabled, so a greyed-out icon can still be identified. -->
     <Style Selector=":is(Button).tool">
-        <Setter Property="Width" Value="32" />
-        <Setter Property="Height" Value="32" />
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="BorderThickness" Value="0" />
@@ -119,8 +119,8 @@
 
     <!-- Toolbar buttons with an icon and a label: Pack, Unpack, Save. -->
     <Style Selector="Button.labelled">
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="8,0" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
