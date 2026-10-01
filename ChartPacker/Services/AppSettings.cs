@@ -22,6 +22,10 @@ namespace ChartPacker.Services
         public const double MaxHighwayNoteSpeed = 3;
         public const HighwayPlacement DefaultHighwayPlacement = HighwayPlacement.Background;
         public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
+        public const ScrubStep DefaultScrubStep = ScrubStep.Quarter;
+        public const double DefaultFineScrubMilliseconds = 5;
+        public const double MinFineScrubMilliseconds = 0.5;
+        public const double MaxFineScrubMilliseconds = 20;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
@@ -84,6 +88,13 @@ namespace ChartPacker.Services
 
         /// <summary>How fast the highway's notes fall, as a multiple of the normal speed.</summary>
         public double HighwayNoteSpeed { get; set; } = DefaultHighwayNoteSpeed;
+
+        /// <summary>How far Ctrl and the wheel move the audio over the seek bar or a lane: a note of this length on the chart's grid.</summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<ScrubStep>))]
+        public ScrubStep ScrubStep { get; set; } = DefaultScrubStep;
+
+        /// <summary>How far each pixel dragged with Ctrl held moves the audio, in milliseconds, whatever the song's length.</summary>
+        public double FineScrubMilliseconds { get; set; } = DefaultFineScrubMilliseconds;
 
         /// <summary>The difficulty last chosen for each instrument, by name. An instrument not listed shows Expert.</summary>
         public Dictionary<string, string>? HighwayDifficulties { get; set; }

@@ -20,6 +20,20 @@ namespace ChartPacker.Controls
     /// </summary>
     internal static class LaneScrub
     {
+        /// <summary>
+        /// How far a pixel dragged with Ctrl held moves the audio, in seconds, unless the settings say otherwise: the same
+        /// however long the song is, so a fine drag moves as far for the same distance on any song.
+        /// </summary>
+        public const double DefaultFineSecondsPerPixel = 0.005;
+
+        /// <summary>Whether Ctrl is held, which makes a drag fine, and shows a lane as it plays rather than its whole chart.</summary>
+        public static bool IsFine(KeyModifiers modifiers) => modifiers.HasFlag(KeyModifiers.Control);
+
+        /// <summary>Whether Ctrl is held once <paramref name="e"/> has been taken, whatever the modifiers say of a Ctrl key itself going down or up.</summary>
+        public static bool IsFine(KeyEventArgs e) => e.Key is Key.LeftCtrl or Key.RightCtrl
+            ? e.RoutedEvent == InputElement.KeyDownEvent
+            : IsFine(e.KeyModifiers);
+
         /// <summary>The pointer over a lane that can be scrubbed.</summary>
         public static readonly Cursor HandCursor = new(StandardCursorType.Hand);
 

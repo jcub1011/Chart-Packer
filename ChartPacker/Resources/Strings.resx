@@ -2012,4 +2012,92 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>ask prompt dialog choose location download</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="SettingsCategoryScrubbing" xml:space="preserve">
+    <value>Scrubbing</value>
+    <comment>A settings category: moving through the song by dragging the seek bar or a lane, or with the wheel.</comment>
+  </data>
+  <data name="ScrubStepLabel" xml:space="preserve">
+    <value>Ctrl+scroll step</value>
+  </data>
+  <data name="ScrubStepDescription" xml:space="preserve">
+    <value>How far each notch of the wheel moves the song with Ctrl held over the seek bar, a highway or the lyrics, to the next note of this length on the chart's beat grid.</value>
+  </data>
+  <data name="ScrubStepKeywords" xml:space="preserve">
+    <value>scroll wheel ctrl control step snap grid beat quarter eighth sixteenth note seek scrub</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="ScrubStepWhole" xml:space="preserve">
+    <value>Whole note</value>
+    <comment>A choice of Ctrl+scroll step.</comment>
+  </data>
+  <data name="ScrubStepHalf" xml:space="preserve">
+    <value>Half note</value>
+    <comment>A choice of Ctrl+scroll step.</comment>
+  </data>
+  <data name="ScrubStepQuarter" xml:space="preserve">
+    <value>Quarter note</value>
+    <comment>A choice of Ctrl+scroll step.</comment>
+  </data>
+  <data name="ScrubStepEighth" xml:space="preserve">
+    <value>Eighth note</value>
+    <comment>A choice of Ctrl+scroll step.</comment>
+  </data>
+  <data name="ScrubStepEighthTriplet" xml:space="preserve">
+    <value>Eighth-note triplet</value>
+    <comment>A choice of Ctrl+scroll step: a third of a quarter note.</comment>
+  </data>
+  <data name="ScrubStepSixteenth" xml:space="preserve">
+    <value>Sixteenth note</value>
+    <comment>A choice of Ctrl+scroll step.</comment>
+  </data>
+  <data name="ScrubStepSixteenthTriplet" xml:space="preserve">
+    <value>Sixteenth-note triplet</value>
+    <comment>A choice of Ctrl+scroll step: a sixth of a quarter note.</comment>
+  </data>
+  <data name="ScrubStepThirtySecond" xml:space="preserve">
+    <value>Thirty-second note</value>
+    <comment>A choice of Ctrl+scroll step.</comment>
+  </data>
+  <data name="FineScrubSpeedLabel" xml:space="preserve">
+    <value>Ctrl+drag speed</value>
+  </data>
+  <data name="FineScrubSpeedDescription" xml:space="preserve">
+    <value>How far the song moves for each pixel dragged with Ctrl held on the seek bar, a highway or the lyrics, the same however long the song is.</value>
+  </data>
+  <data name="FineScrubSpeedKeywords" xml:space="preserve">
+    <value>ctrl control drag fine scrub seek slow precise speed pixel</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="SeekBarScrubToolTip" xml:space="preserve">
+    <value>Click or drag to seek</value>
+    <comment>First line of the seek bar's tooltip; the Ctrl hints follow on lines of their own.</comment>
+  </data>
+  <data name="SeekBarFineScrubToolTip" xml:space="preserve">
+    <value>Ctrl+drag to scrub finely</value>
+    <comment>A line of the seek bar's tooltip.</comment>
+  </data>
+  <data name="HighwayScrubToolTip" xml:space="preserve">
+    <value>Drag to scrub through the chart</value>
+    <comment>First line of a highway's tooltip; the Ctrl hints follow on lines of their own.</comment>
+  </data>
+  <data name="HighwayFineScrubToolTip" xml:space="preserve">
+    <value>Hold Ctrl to see the notes as they play, and drag to scrub finely</value>
+    <comment>A line of a highway's tooltip.</comment>
+  </data>
+  <data name="LyricsScrubToolTip" xml:space="preserve">
+    <value>Drag to scrub through the vocals</value>
+    <comment>First line of the lyrics lane's tooltip; the Ctrl hints follow on lines of their own.</comment>
+  </data>
+  <data name="LyricsFineScrubToolTip" xml:space="preserve">
+    <value>Hold Ctrl to see the lyrics as they're sung, and drag to scrub finely</value>
+    <comment>A line of the lyrics lane's tooltip.</comment>
+  </data>
+  <data name="ScrubStepToolTipFormat" xml:space="preserve">
+    <value>Ctrl+scroll to step through the beat grid ({0})</value>
+    <comment>The last line of the seek bar's, a highway's and the lyrics lane's tooltips: {0} is the Ctrl+scroll step chosen in Settings, e.g. Quarter note.</comment>
+  </data>
+  <data name="FineScrubSpeedFormat" xml:space="preserve">
+    <value>{0:0.0} ms/px</value>
+    <comment>The Ctrl+drag speed setting's value: {0} is milliseconds of the song for each pixel dragged.</comment>
+  </data>
 </root>

@@ -858,16 +858,7 @@
                                                         Timeline="{Binding Background.Timeline}"
                                                         Clock="{Binding Background.Clock}"
                                                         IsVisible="{Binding Background.HasVideo}" />
-                                    <!-- The chart's notes over whatever the background is, as a game draws them, unless the
-                                         settings put them in their own row below the lyrics. A highway under the pointer shows
-                                         its whole chart, to scrub through. -->
-                                    <ctl:NoteHighwayView x:Name="HighwayOverlayView"
-                                                         Scene="{Binding Highway.Scene}"
-                                                         Clock="{Binding Highway.Clock}"
-                                                         LookAhead="{Binding Highway.LookAhead}"
-                                                         Waveforms="{Binding Highway.LaneWaveforms}"
-                                                         LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                         IsVisible="{Binding Highway.IsShownOverBackground}" />
+                                    <!-- Why there's no background, behind the highway as the background would be. -->
                                     <StackPanel VerticalAlignment="Center"
                                                 Margin="12"
                                                 Spacing="6"
@@ -880,6 +871,21 @@
                                                    TextWrapping="Wrap"
                                                    Text="{Binding Background.Note}" />
                                     </StackPanel>
+                                    <!-- The chart's notes over whatever the background is, as a game draws them, unless the
+                                         settings put them in their own row below the lyrics. A highway under the pointer shows
+                                         its whole chart, to scrub through. -->
+                                    <ctl:NoteHighwayView x:Name="HighwayOverlayView"
+                                                         Scene="{Binding Highway.Scene}"
+                                                         Clock="{Binding Highway.Clock}"
+                                                         LookAhead="{Binding Highway.LookAhead}"
+                                                         Waveforms="{Binding Highway.LaneWaveforms}"
+                                                         LengthSeconds="{Binding Player.TimelineSeconds}"
+                                                         FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                         IsVisible="{Binding Highway.IsShownOverBackground}">
+                                        <ToolTip.Tip>
+                                            <ToolTip Classes="lane" Content="{Binding Player.HighwayScrubToolTip}" />
+                                        </ToolTip.Tip>
+                                    </ctl:NoteHighwayView>
                                 </Panel>
                             </Border>
                         </DockPanel>
@@ -1010,7 +1016,12 @@
                                                    Waveform="{Binding Lyrics.Waveform}"
                                                    Clock="{Binding Lyrics.Clock}"
                                                    LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                   IsVisible="{Binding Lyrics.HasLyrics}" />
+                                                   FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                   IsVisible="{Binding Lyrics.HasLyrics}">
+                                    <ToolTip.Tip>
+                                        <ToolTip Classes="lane" Content="{Binding Player.LyricsScrubToolTip}" />
+                                    </ToolTip.Tip>
+                                </ctl:LyricLaneView>
                                 <TextBlock Classes="muted centered"
                                            VerticalAlignment="Center"
                                            Margin="12"
@@ -1064,7 +1075,12 @@
                                                      LookAhead="{Binding Highway.LookAhead}"
                                                      Waveforms="{Binding Highway.LaneWaveforms}"
                                                      LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                     IsVisible="{Binding Highway.IsShown}" />
+                                                     FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                     IsVisible="{Binding Highway.IsShown}">
+                                    <ToolTip.Tip>
+                                        <ToolTip Classes="lane" Content="{Binding Player.HighwayScrubToolTip}" />
+                                    </ToolTip.Tip>
+                                </ctl:NoteHighwayView>
                             </Border>
                         </DockPanel>
                     </Panel>
@@ -1180,6 +1196,8 @@
                                               Waveform="{Binding Player.Waveform}"
                                               PositionSeconds="{Binding Player.PositionSeconds}"
                                               LengthSeconds="{Binding Player.TimelineSeconds}"
+                                              FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                              ToolTip.Tip="{Binding Player.SeekBarToolTip}"
                                               PlayedBrush="{DynamicResource AccentTextBrush}"
                                               UnplayedBrush="{DynamicResource WaveformBrush}"
                                               VerticalAlignment="Center"

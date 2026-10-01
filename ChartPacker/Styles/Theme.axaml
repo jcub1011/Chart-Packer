@@ -19,6 +19,8 @@
         <SolidColorBrush x:Key="ExcludeTextBrush" Color="#FDA4AF" />
         <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
         <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
+        <!-- Behind a tooltip over a highway or the lyrics lane: see-through enough that the lane shows past it. -->
+        <SolidColorBrush x:Key="LaneToolTipBrush" Color="#B81D1E29" />
         <!-- The spectrum behind the details panel while a song plays: a shade for each bar, stepped from rose at
              the bass through a periwinkle near the accent to orchid at the treble. SpectrumView sets how faint. -->
         <Color x:Key="SpectrumLowColor">#F2587A</Color>
@@ -84,6 +86,12 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="Padding" Value="3" />
+    </Style>
+
+    <!-- A tooltip over a highway or the lyrics lane, which it would otherwise hide: its background is see-through, its
+         words aren't. -->
+    <Style Selector="ToolTip.lane">
+        <Setter Property="Background" Value="{DynamicResource LaneToolTipBrush}" />
     </Style>
 
     <!-- Icon-only toolbar buttons. Tooltips show even when disabled, so a greyed-out icon can still be identified. -->

@@ -7,12 +7,16 @@ using Avalonia.LogicalTree;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ChartPacker.Services;
 using ChartPacker.ViewModels;
 
 namespace ChartPacker.Views
 {
     public partial class SongDetailView : UserControl
     {
+        // How far the wheel has turned with Ctrl held towards the next step, in notches.
+        private double _wheelNotches;
+
         public SongDetailView()
         {
             InitializeComponent();
@@ -41,6 +45,10 @@ namespace ChartPacker.Views
             LyricLane.ScrubStarted += (_, _) => Player?.BeginScrub();
             LyricLane.Scrubbed += (_, e) => ScrubTo(e.Seconds);
             LyricLane.ScrubEnded += (_, _) => EndScrub();
+
+            // Ctrl and the wheel over any of them steps by notes. Tunnelled, so the panel doesn't scroll with it.
+            foreach (var scrubbed in (Control[])[SeekBar, HighwayOverlayView, HighwayRowView, LyricLane])
+                scrubbed.AddHandler(PointerWheelChangedEvent, OnScrubWheel, RoutingStrategies.Tunnel);
 
             AddHandler(PointerPressedEvent, OnPointerPressedAnywhere, RoutingStrategies.Bubble, handledEventsToo: true);
         }
@@ -112,6 +120,30 @@ namespace ChartPacker.Views
         {
             if (Player is { IsScrubbing: true } player)
                 player.PositionSeconds = seconds;
+        }
+
+        /// <summary>
+        /// Ctrl and the wheel over the seek bar or a lane moves the audio a note a notch, of the length the settings choose,
+        /// to the next on the chart's grid: up later, down earlier. A wheel that turns in parts of a notch, as a touchpad's
+        /// does, steps once they add up to one. Not while a lane or the seek bar is being dragged, which seeks when it's let go.
+        /// </summary>
+        private void OnScrubWheel(object? sender, PointerWheelEventArgs e)
+        {
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || DataContext is not SongDetailViewModel { Player: { IsScrubbing: false } player } vm)
+                return;
+
+            e.Handled = true;
+            if (Math.Sign(e.Delta.Y) != Math.Sign(_wheelNotches))
+                _wheelNotches = 0;
+            _wheelNotches += e.Delta.Y;
+
+            int steps = (int)Math.Truncate(_wheelNotches);
+            if (steps == 0)
+                return;
+
+            _wheelNotches -= steps;
+            double to = vm.Highway.StepNotes(player.CurrentPosition.TotalSeconds, steps, ScrubSteps.QuartersOf(player.ScrubStep));
+            player.PositionSeconds = Math.Clamp(to, 0, player.TimelineSeconds);
         }
 
         /// <summary>Clicking away from a value's edit box keeps what was typed, like pressing Enter.</summary>

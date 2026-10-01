@@ -204,6 +204,8 @@ namespace ChartPacker.ViewModels
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
             WaveformFidelity = settings.Settings.WaveformFidelity;
+            ScrubStep = settings.Settings.ScrubStep;
+            FineScrubMilliseconds = settings.Settings.FineScrubMilliseconds;
             _openOutput = openOutput;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
             _timer.Tick += (_, _) => RefreshPosition();
@@ -292,6 +294,30 @@ namespace ChartPacker.ViewModels
         public partial WaveformFidelity WaveformFidelity { get; set; }
 
         private WaveformResolution Resolution => WaveformResolution.Of(WaveformFidelity);
+
+        /// <summary>How far Ctrl and a notch of the wheel move the audio over the seek bar or a lane. Kept in the settings.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(SeekBarToolTip))]
+        [NotifyPropertyChangedFor(nameof(HighwayScrubToolTip))]
+        [NotifyPropertyChangedFor(nameof(LyricsScrubToolTip))]
+        public partial ScrubStep ScrubStep { get; set; }
+
+        /// <summary>What the seek bar does with the pointer, and with Ctrl held, a line each.</summary>
+        public string SeekBarToolTip => ScrubToolTip(Strings.SeekBarScrubToolTip, Strings.SeekBarFineScrubToolTip);
+
+        /// <summary>What a highway does with the pointer, and with Ctrl held, a line each.</summary>
+        public string HighwayScrubToolTip => ScrubToolTip(Strings.HighwayScrubToolTip, Strings.HighwayFineScrubToolTip);
+
+        /// <summary>What the lyrics lane does with the pointer, and with Ctrl held, a line each.</summary>
+        public string LyricsScrubToolTip => ScrubToolTip(Strings.LyricsScrubToolTip, Strings.LyricsFineScrubToolTip);
+
+        /// <summary>How far each pixel dragged with Ctrl held moves the audio, in milliseconds. Kept in the settings.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FineScrubSecondsPerPixel))]
+        public partial double FineScrubMilliseconds { get; set; }
+
+        /// <summary><see cref="FineScrubMilliseconds"/> in seconds, as the seek bar and the lanes take it.</summary>
+        public double FineScrubSecondsPerPixel => FineScrubMilliseconds / 1000;
 
         /// <summary>Where the song's <c>preview_start_time</c> puts the preview, if it sets one.</summary>
         [ObservableProperty]
@@ -385,6 +411,8 @@ namespace ChartPacker.ViewModels
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
             WaveformFidelity = _settings.Settings.WaveformFidelity;
+            ScrubStep = _settings.Settings.ScrubStep;
+            FineScrubMilliseconds = _settings.Settings.FineScrubMilliseconds;
         }
 
         /// <summary>The song that is playing, or <see langword="null"/> when nothing is.</summary>
@@ -964,6 +992,14 @@ namespace ChartPacker.ViewModels
         }
 
         partial void OnShowLaneWaveformsChanged(bool value) => _settings.Settings.ShowLaneWaveforms = value;
+
+        partial void OnScrubStepChanged(ScrubStep value) => _settings.Settings.ScrubStep = value;
+
+        /// <summary>A scrubbed surface's tooltip: what dragging does, what Ctrl does, and the step Ctrl and the wheel take.</summary>
+        private string ScrubToolTip(string drag, string fine) =>
+            string.Join('\n', drag, fine, string.Format(CultureInfo.CurrentCulture, Strings.ScrubStepToolTipFormat, ScrubSteps.NameOf(ScrubStep)));
+
+        partial void OnFineScrubMillisecondsChanged(double value) => _settings.Settings.FineScrubMilliseconds = value;
 
         partial void OnWaveformFidelityChanged(WaveformFidelity value)
         {

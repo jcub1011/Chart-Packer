@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -44,7 +43,6 @@ namespace ChartPacker.Controls
         // How many increments Shift makes a key press or a wheel notch, and a dragged pixel how many steps.
         private const int ShiftFactor = 10;
 
-        private static readonly Cursor Hidden = new(StandardCursorType.None);
         private static readonly Cursor Sideways = new(StandardCursorType.SizeWestEast);
         private static readonly ConditionalWeakTable<NumericUpDown, Drag> Drags = [];
 
@@ -255,14 +253,14 @@ namespace ChartPacker.Controls
 
                 drag.IsDragging = true;
                 drag.Last = drag.Start;
-                SetCursor(box, CanHoldPointer ? Hidden : Sideways);
+                SetCursor(box, HeldPointer.CanHold ? HeldPointer.Hidden : Sideways);
             }
 
             double dx = at.X - drag.Last.X;
-            if (CanHoldPointer)
+            if (HeldPointer.CanHold)
             {
                 // Put the pointer back where the drag began; the move that makes comes back with no distance.
-                _ = SetCursorPos(drag.ScreenStart.X, drag.ScreenStart.Y);
+                HeldPointer.Return(drag.ScreenStart);
                 drag.Last = drag.Start;
             }
             else
@@ -321,11 +319,6 @@ namespace ChartPacker.Controls
 
         private static TextBox? TextBoxOf(NumericUpDown box) =>
             TextBoxes.TryGetValue(box, out var text) ? text : box.FindDescendantOfType<TextBox>();
-
-        private static bool CanHoldPointer => OperatingSystem.IsWindows();
-
-        [DllImport("user32.dll")]
-        private static extern int SetCursorPos(int x, int y);
 
         /// <summary>A press on the box, and the drag it becomes.</summary>
         /// <param name="Start">Where it was pressed, in the box.</param>

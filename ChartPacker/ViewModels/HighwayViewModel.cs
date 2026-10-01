@@ -43,6 +43,10 @@ namespace ChartPacker.ViewModels
     {
         // How far ahead of the strike line the highway shows at the normal note speed, in seconds.
         private const double BaseLookAhead = 1.4;
+
+        // The notes stepped through without a chart: 120 BPM from the start, as a chart is before its first tempo.
+        private static readonly TempoMap NoChartTempo = new(192, [], []);
+
         private readonly SettingsService _settings;
         private HighwaySong? _song;
 
@@ -210,6 +214,20 @@ namespace ChartPacker.ViewModels
         public string? Marker => IsChanged ? "*" : null;
 
         public string ToggleToolTip => HasChart ? Strings.HighwayToggleToolTip : Strings.HighwayNoChartToolTip;
+
+        /// <summary>
+        /// The song time of the note <paramref name="steps"/> on from <paramref name="seconds"/>, or back when negative, on a
+        /// grid of notes <paramref name="noteQuarters"/> quarter notes long by the chart shown as it plays against the audio;
+        /// without one, at 120 BPM.
+        /// </summary>
+        public double StepNotes(double seconds, int steps, double noteQuarters)
+        {
+            if (_shown is not { } chart)
+                return NoChartTempo.StepNotes(seconds, steps, noteQuarters);
+
+            double delay = _delay.TotalSeconds;
+            return chart.Tempo.StepNotes(seconds - delay, steps, noteQuarters) + delay;
+        }
 
         /// <summary>Forgets the song and its chart, so the next <see cref="Refresh"/> reads it afresh, as after saving.</summary>
         public void Unload()

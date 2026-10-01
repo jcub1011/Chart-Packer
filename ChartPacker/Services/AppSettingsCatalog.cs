@@ -32,9 +32,10 @@ namespace ChartPacker.Services
             var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
+            var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers],
+                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing],
                 [
                     new IntegerSetting
                     {
@@ -235,6 +236,33 @@ namespace ChartPacker.Services
                         Format = speed => speed.ToString("0.0", CultureInfo.CurrentCulture) + "×",
                         Get = () => highway.NoteSpeed,
                         Set = speed => highway.NoteSpeed = speed,
+                    },
+                    new ChoiceSetting<ScrubStep>
+                    {
+                        Id = "playback.scrubStep",
+                        Category = scrubbing,
+                        Label = Strings.ScrubStepLabel,
+                        Description = Strings.ScrubStepDescription,
+                        Keywords = Words(Strings.ScrubStepKeywords),
+                        DefaultValue = AppSettings.DefaultScrubStep,
+                        Choices = [.. Enum.GetValues<ScrubStep>().Select(step => new SettingChoice<ScrubStep>(step, ScrubSteps.NameOf(step)))],
+                        Get = () => player.ScrubStep,
+                        Set = step => player.ScrubStep = step,
+                    },
+                    new RangeSetting
+                    {
+                        Id = "playback.fineScrubSpeed",
+                        Category = scrubbing,
+                        Label = Strings.FineScrubSpeedLabel,
+                        Description = Strings.FineScrubSpeedDescription,
+                        Keywords = Words(Strings.FineScrubSpeedKeywords),
+                        DefaultValue = AppSettings.DefaultFineScrubMilliseconds,
+                        Minimum = AppSettings.MinFineScrubMilliseconds,
+                        Maximum = AppSettings.MaxFineScrubMilliseconds,
+                        SmallChange = 0.5,
+                        Format = ms => string.Format(CultureInfo.CurrentCulture, Strings.FineScrubSpeedFormat, ms),
+                        Get = () => player.FineScrubMilliseconds,
+                        Set = ms => player.FineScrubMilliseconds = ms,
                     },
                 ]);
         }

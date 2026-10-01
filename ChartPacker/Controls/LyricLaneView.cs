@@ -5,6 +5,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
@@ -107,6 +108,9 @@ namespace ChartPacker.Controls
     /// left to <see cref="LengthSeconds"/> at the right, with the phrase under the pointer written out. Pressing on it and
     /// dragging scrubs: from <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>, <see cref="Scrubbed"/> says where to,
     /// and the owner seeks when it ends, as it does for <see cref="WaveformView"/>.</para>
+    /// <para>While Ctrl is held the lane goes on scrolling with the audio, and a drag is fine: left moves the audio later,
+    /// as if pulling the words along, by <see cref="FineSecondsPerPixel"/> for each pixel, rather than following the pointer
+    /// across the whole part, with the pointer held still. A press with Ctrl held leaves the audio where it is.</para>
     /// </summary>
     /// <example><c>&lt;ctl:LyricLaneView Scene="{Binding Lyrics.Scene}" Clock="{Binding Lyrics.Clock}" TimeShift="{Binding Lyrics.TimeShift}" Waveform="{Binding Lyrics.Waveform}" /&gt;</c></example>
     public sealed class LyricLaneView : Control
@@ -128,6 +132,9 @@ namespace ChartPacker.Controls
 
         public static readonly StyledProperty<double> LengthSecondsProperty =
             AvaloniaProperty.Register<LyricLaneView, double>(nameof(LengthSeconds));
+
+        public static readonly StyledProperty<double> FineSecondsPerPixelProperty =
+            AvaloniaProperty.Register<LyricLaneView, double>(nameof(FineSecondsPerPixel), LaneScrub.DefaultFineSecondsPerPixel);
 
         // Where the now line sits, as a fraction of the width from the left.
         private const double NowFraction = 0.2;
@@ -173,6 +180,14 @@ namespace ChartPacker.Controls
         // Whether the whole part is shown, for the pointer over the lane, and how far across it the pointer is; NaN for not.
         private double _hoverX = double.NaN;
         private bool _isScrubbing;
+
+        // Ctrl is held over the lane, or while scrubbing: it scrolls with the audio, and a drag is fine, moving the audio by
+        // how far the pointer goes, holding it still.
+        private bool _isFine;
+        private readonly FineDrag _fine;
+
+        // The window whose keys say when Ctrl is pressed or let go with the pointer still.
+        private TopLevel? _keysFrom;
 
         // The whole part's notes as last laid out, and the words of the phrase last written out under the pointer.
         private OverviewMarks? _overview;
@@ -240,7 +255,18 @@ namespace ChartPacker.Controls
             set => SetValue(LengthSecondsProperty, value);
         }
 
-        public LyricLaneView() => EffectiveViewportChanged += OnEffectiveViewportChanged;
+        /// <summary>How far a pixel dragged with Ctrl held moves the audio, in seconds, whatever the song's length.</summary>
+        public double FineSecondsPerPixel
+        {
+            get => GetValue(FineSecondsPerPixelProperty);
+            set => SetValue(FineSecondsPerPixelProperty, value);
+        }
+
+        public LyricLaneView()
+        {
+            _fine = new FineDrag(this);
+            EffectiveViewportChanged += OnEffectiveViewportChanged;
+        }
 
         // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
         // out (hidden, say), it has no size to check, so it's taken to be, lest it's left undrawn once shown in place.
@@ -276,6 +302,37 @@ namespace ChartPacker.Controls
         {
             base.OnAttachedToVisualTree(e);
             RequestFrame();
+
+            // Tunnelled, and handled ones too, so Ctrl is seen whatever has focus.
+            _keysFrom = TopLevel.GetTopLevel(this);
+            _keysFrom?.AddHandler(KeyDownEvent, OnModifierKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+            _keysFrom?.AddHandler(KeyUpEvent, OnModifierKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
+            _keysFrom?.RemoveHandler(KeyDownEvent, OnModifierKey);
+            _keysFrom?.RemoveHandler(KeyUpEvent, OnModifierKey);
+            _keysFrom = null;
+        }
+
+        /// <summary>Ctrl pressed or let go with the pointer over the lane, or while scrubbing, shows it scrolling or the whole part at once.</summary>
+        private void OnModifierKey(object? sender, KeyEventArgs e)
+        {
+            if (!double.IsNaN(_hoverX) || _isScrubbing)
+                SetFine(LaneScrub.IsFine(e));
+        }
+
+        private void SetFine(bool isFine)
+        {
+            if (isFine == _isFine)
+                return;
+
+            _isFine = isFine;
+            if (!isFine)
+                _fine.Stop();
+            InvalidateVisual();
         }
 
         public override void Render(DrawingContext context)
@@ -287,7 +344,7 @@ namespace ChartPacker.Controls
             // The time read for this frame, rather than reading the clock again.
             var clock = _drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero;
             double wordBand = scene.WordTimes.Length > 0 ? WordFontSize * 1.9 : 0;
-            if (!double.IsNaN(_hoverX))
+            if (!double.IsNaN(_hoverX) && !_isFine)
             {
                 DrawOverview(context, scene, bounds, clock.TotalSeconds, wordBand);
                 return;
@@ -534,10 +591,28 @@ namespace ChartPacker.Controls
         protected override void OnPointerMoved(PointerEventArgs e)
         {
             base.OnPointerMoved(e);
-            double x = e.GetPosition(this).X;
-            SetHover(x);
+            var point = e.GetPosition(this);
+            SetFine(LaneScrub.IsFine(e.KeyModifiers));
+            SetHover(point.X);
             if (_isScrubbing)
-                Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(x)));
+                Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
+        }
+
+        /// <summary>
+        /// Where a drag to <paramref name="point"/> moves the audio: the time there across the whole part, or while it's fine,
+        /// on from where the audio is by how far left the pointer has gone since it last moved, holding the pointer still.
+        /// </summary>
+        private double ScrubTimeAt(Point point)
+        {
+            if (!_isFine || Scene is not { } scene)
+            {
+                _fine.Stop();
+                return TimeAt(point.X);
+            }
+
+            _fine.Start(point);
+            double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
+            return Math.Clamp(now - (_fine.Move(point).X * FineSecondsPerPixel), 0, TimelineOf(scene));
         }
 
         protected override void OnPointerExited(PointerEventArgs e)
@@ -553,12 +628,18 @@ namespace ChartPacker.Controls
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || Scene is not { IsEmpty: false })
                 return;
 
-            double x = e.GetPosition(this).X;
-            SetHover(x);
+            var point = e.GetPosition(this);
+            SetFine(LaneScrub.IsFine(e.KeyModifiers));
+            SetHover(point.X);
             _isScrubbing = true;
             e.Pointer.Capture(this);
             ScrubStarted?.Invoke(this, EventArgs.Empty);
-            Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(x)));
+
+            // A press with Ctrl held starts a fine drag from where the audio is.
+            if (_isFine)
+                _fine.Start(point);
+            else
+                Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.X)));
             e.Handled = true;
         }
 
@@ -569,7 +650,8 @@ namespace ChartPacker.Controls
                 return;
 
             var point = e.GetPosition(this);
-            Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.X)));
+            SetFine(LaneScrub.IsFine(e.KeyModifiers));
+            Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
             e.Pointer.Capture(null);
             EndScrub();
 
@@ -590,6 +672,7 @@ namespace ChartPacker.Controls
                 return;
 
             _isScrubbing = false;
+            _fine.Stop();
             ScrubEnded?.Invoke(this, EventArgs.Empty);
         }
 

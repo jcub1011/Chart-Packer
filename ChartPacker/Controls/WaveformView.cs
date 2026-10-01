@@ -25,6 +25,11 @@ namespace ChartPacker.Controls
     /// song is opened. For a waveform that only shows, set <c>IsHitTestVisible</c> to false.
     /// </para>
     /// <para>
+    /// With Ctrl held a drag is fine: the position moves on from where it is by <see cref="FineSecondsPerPixel"/> for each
+    /// pixel, rather than following the pointer, which is held still, and a press with Ctrl held leaves it where it is.
+    /// Let go of Ctrl while dragging, it follows the pointer again.
+    /// </para>
+    /// <para>
     /// A waveform still being read grows in from the left, following <see cref="Waveform.ReadSeconds"/>
     /// smoothly rather than jumping with each part read; one that's already read sweeps in quickly.
     /// </para>
@@ -65,7 +70,13 @@ namespace ChartPacker.Controls
         public static readonly StyledProperty<IBrush?> UnplayedBrushProperty =
             AvaloniaProperty.Register<WaveformView, IBrush?>(nameof(UnplayedBrush), Brushes.Gray);
 
+        public static readonly StyledProperty<double> FineSecondsPerPixelProperty =
+            AvaloniaProperty.Register<WaveformView, double>(nameof(FineSecondsPerPixel), LaneScrub.DefaultFineSecondsPerPixel);
+
         private bool _isScrubbing;
+
+        // A drag with Ctrl held, which moves the position by how far the pointer goes, holding it still.
+        private readonly FineDrag _fine;
 
         // Each column's levels, worked out again only when the waveform, the width or the duration
         // changes, and not as the playhead moves.
@@ -94,6 +105,8 @@ namespace ChartPacker.Controls
             FocusableProperty.OverrideDefaultValue<WaveformView>(false);
             CursorProperty.OverrideDefaultValue<WaveformView>(new Cursor(StandardCursorType.Hand));
         }
+
+        public WaveformView() => _fine = new FineDrag(this);
 
         /// <summary>Raised when the pointer goes down on the waveform, before <see cref="PositionSeconds"/> moves.</summary>
         public event EventHandler? ScrubStarted;
@@ -131,6 +144,13 @@ namespace ChartPacker.Controls
         {
             get => GetValue(UnplayedBrushProperty);
             set => SetValue(UnplayedBrushProperty, value);
+        }
+
+        /// <summary>How far a pixel dragged with Ctrl held moves the position, in seconds, whatever the song's length.</summary>
+        public double FineSecondsPerPixel
+        {
+            get => GetValue(FineSecondsPerPixelProperty);
+            set => SetValue(FineSecondsPerPixelProperty, value);
         }
 
         private double DurationSeconds => LengthSeconds > 0 ? LengthSeconds : Waveform?.Seconds ?? 0;
@@ -435,7 +455,12 @@ namespace ChartPacker.Controls
             _isScrubbing = true;
             e.Pointer.Capture(this);
             ScrubStarted?.Invoke(this, EventArgs.Empty);
-            Scrub(e);
+
+            // A press with Ctrl held starts a fine drag from where the position is.
+            if (LaneScrub.IsFine(e.KeyModifiers))
+                _fine.Start(e.GetPosition(this));
+            else
+                Scrub(e);
             e.Handled = true;
         }
 
@@ -464,10 +489,22 @@ namespace ChartPacker.Controls
             EndScrub();
         }
 
+        /// <summary>
+        /// Moves the position with the pointer: to where it is across the waveform, or with Ctrl held, on by how far it's
+        /// moved, with the pointer held where the fine drag began.
+        /// </summary>
         private void Scrub(PointerEventArgs e)
         {
-            double x = e.GetPosition(this).X;
-            PositionSeconds = Math.Clamp(x / Math.Max(1, Bounds.Width), 0, 1) * DurationSeconds;
+            var at = e.GetPosition(this);
+            if (!LaneScrub.IsFine(e.KeyModifiers))
+            {
+                _fine.Stop();
+                PositionSeconds = Math.Clamp(at.X / Math.Max(1, Bounds.Width), 0, 1) * DurationSeconds;
+                return;
+            }
+
+            _fine.Start(at);
+            PositionSeconds = Math.Clamp(PositionSeconds + (_fine.Move(at).X * FineSecondsPerPixel), 0, DurationSeconds);
         }
 
         private void EndScrub()
@@ -476,6 +513,7 @@ namespace ChartPacker.Controls
                 return;
 
             _isScrubbing = false;
+            _fine.Stop();
             ScrubEnded?.Invoke(this, EventArgs.Empty);
         }
 

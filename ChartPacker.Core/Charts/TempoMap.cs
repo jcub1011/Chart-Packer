@@ -93,6 +93,50 @@ public sealed class TempoMap
         return shifted <= 0 ? 0 : (long)shifted;
     }
 
+    /// <summary>
+    /// The song time of the note <paramref name="steps"/> on from <paramref name="seconds"/>, or back from it when negative,
+    /// on a grid of notes <paramref name="noteQuarters"/> quarter notes long from the start (a half for an eighth note, a
+    /// third for an eighth-note triplet). The first step is to the next note on the grid, or the one before, so a time
+    /// between two is put on one, and a time already on one, or within <see cref="OnNoteSeconds"/> of it, moves a whole
+    /// note. It can be before the start, as the map runs on back.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="noteQuarters"/> isn't positive.</exception>
+    public double StepNotes(double seconds, int steps, double noteQuarters)
+    {
+        if (!(noteQuarters > 0) || double.IsInfinity(noteQuarters))
+            throw new ArgumentOutOfRangeException(nameof(noteQuarters), noteQuarters, "A note has to be some length.");
+        if (steps == 0)
+            return seconds;
+
+        double noteTicks = Resolution * noteQuarters;
+        double note = TickAt(seconds) / noteTicks;
+        double At(double n) => SecondsAt(n * noteTicks);
+
+        // The first note on, or back; one just ahead of the time, or just behind it, is the note the time is on.
+        double first;
+        if (steps > 0)
+        {
+            first = Math.Floor(note) + 1;
+            if (At(first) - seconds <= OnNoteSeconds)
+                first++;
+        }
+        else
+        {
+            first = Math.Ceiling(note) - 1;
+            if (seconds - At(first) <= OnNoteSeconds)
+                first--;
+        }
+
+        return At(first + steps - Math.Sign(steps));
+    }
+
+    /// <summary>
+    /// How near a note a time is on it, in seconds, for <see cref="StepNotes"/>. Audio seeks to a whole frame, which can be
+    /// a little before the note it was sent to; that's still on the note, so the next step moves on from it rather than
+    /// back to it. Far less than the shortest note stepped by, so no note is skipped.
+    /// </summary>
+    public const double OnNoteSeconds = 0.001;
+
     /// <summary>The beat lines from <paramref name="fromTick"/> up to and including <paramref name="toTick"/>, in order.</summary>
     public IEnumerable<BeatLine> BeatLines(long fromTick, long toTick)
     {

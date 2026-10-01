@@ -93,6 +93,9 @@ namespace ChartPacker.Services
             if (!Enum.IsDefined(settings.WaveformFidelity))
                 settings.WaveformFidelity = AppSettings.DefaultWaveformFidelity;
 
+            if (!Enum.IsDefined(settings.ScrubStep))
+                settings.ScrubStep = AppSettings.DefaultScrubStep;
+
             if (!Enum.IsDefined(settings.LibrarySortField))
                 settings.LibrarySortField = LibrarySortField.ScanOrder;
 
@@ -103,6 +106,10 @@ namespace ChartPacker.Services
             settings.HighwayNoteSpeed = double.IsFinite(settings.HighwayNoteSpeed)
                 ? Math.Clamp(settings.HighwayNoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed)
                 : AppSettings.DefaultHighwayNoteSpeed;
+
+            settings.FineScrubMilliseconds = double.IsFinite(settings.FineScrubMilliseconds)
+                ? Math.Clamp(settings.FineScrubMilliseconds, AppSettings.MinFineScrubMilliseconds, AppSettings.MaxFineScrubMilliseconds)
+                : AppSettings.DefaultFineScrubMilliseconds;
         }
     }
 }
