@@ -89,6 +89,7 @@ namespace ChartPacker.ViewModels
         private readonly IVideoDurationProbe _videoProbe;
         private readonly IDownloadService? _downloads;
         private readonly IFileRevealService? _reveal;
+        private readonly SongFileGate _songFiles;
         private CancellationTokenSource? _loadCts;
 
         // The download command of each of the one selected song's files, by file, so a row rebuilt for the same file is equal to it.
@@ -134,6 +135,10 @@ namespace ChartPacker.ViewModels
 
         /// <param name="downloads">Saves copies of the song's files from their right-click menus; none for a panel that only previews.</param>
         /// <param name="reveal">Shows the selected songs in the file manager; none for a panel that only previews.</param>
+        /// <param name="songFiles">
+        /// Keeps saving a song apart from copies of it being downloaded; the one <paramref name="downloads"/> uses.
+        /// None for a panel nothing else downloads from.
+        /// </param>
         public SongDetailViewModel(
             MetadataDraftStore drafts,
             JobViewModel job,
@@ -143,11 +148,13 @@ namespace ChartPacker.ViewModels
             HighwayViewModel highway,
             IVideoDurationProbe videoProbe,
             IDownloadService? downloads = null,
-            IFileRevealService? reveal = null)
+            IFileRevealService? reveal = null,
+            SongFileGate? songFiles = null)
         {
             _drafts = drafts;
             _downloads = downloads;
             _reveal = reveal;
+            _songFiles = songFiles ?? new SongFileGate();
             _job = job;
             _imagePicker = imagePicker;
             _filePicker = filePicker;
@@ -1299,28 +1306,34 @@ namespace ChartPacker.ViewModels
             {
                 await Player.WhenFilesClosedAsync();
                 await Background.WhenClosedAsync();
-                await _songLengthTask;
 
-                foreach (var song in dirty)
+                // A failed estimate only costs the timeline its length; it mustn't stop the save.
+                await _songLengthTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+
+                // Downloads of these songs finish first, and new ones wait until they're saved.
+                using (await _songFiles.WriteAsync(dirty.Select(s => s.Entry.FullPath)))
                 {
-                    string? error;
-                    try
+                    foreach (var song in dirty)
                     {
-                        error = await Task.Run(() => SaveSongAsync(song));
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-                    {
-                        error = ex.Message;
-                    }
+                        string? error;
+                        try
+                        {
+                            error = await Task.Run(() => SaveSongAsync(song));
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                        {
+                            error = ex.Message;
+                        }
 
-                    if (error is null)
-                    {
-                        song.Item.Draft.Clear();
-                        _drafts.NotifyChanged(song.Entry.FullPath);
-                    }
-                    else
-                    {
-                        failures.Add(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedItemFormat, song.Entry.DisplayName, error));
+                        if (error is null)
+                        {
+                            song.Item.Draft.Clear();
+                            _drafts.NotifyChanged(song.Entry.FullPath);
+                        }
+                        else
+                        {
+                            failures.Add(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedItemFormat, song.Entry.DisplayName, error));
+                        }
                     }
                 }
             }
@@ -2198,7 +2211,8 @@ namespace ChartPacker.ViewModels
             if (_downloads is null || Lyrics.ExportSource() is not { } export)
                 return Task.CompletedTask;
 
-            return _downloads.SaveFileAsync(DownloadPrefix(), ChartFiles.MidiName, _ => Task.Run(() => (Stream)new MemoryStream(export())));
+            // The lyrics were read when shown: this reads no file of the song.
+            return _downloads.SaveFileAsync(null, DownloadPrefix(), ChartFiles.MidiName, _ => Task.Run(() => (Stream)new MemoryStream(export())));
         }
 
         /// <summary>
@@ -2236,7 +2250,7 @@ namespace ChartPacker.ViewModels
         }
 
         private Task DownloadAsync(SongFileSource source) =>
-            _downloads?.SaveFileAsync(DownloadPrefix(), source.StoredName, _ => Task.Run(source.Open)) ?? Task.CompletedTask;
+            _downloads?.SaveFileAsync(source.Entry, DownloadPrefix(), source.StoredName, _ => Task.Run(source.Open)) ?? Task.CompletedTask;
 
         /// <summary>What names the one selected song's saved files: <c>Artist - Title</c> as drafted, or its file or folder name.</summary>
         private string DownloadPrefix()

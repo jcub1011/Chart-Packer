@@ -8,12 +8,19 @@ namespace ChartPacker.Core.Packing;
 /// <remarks>
 /// A <c>.sng</c> is extracted as <see cref="Unpacker"/> extracts it; a folder is copied, subfolders
 /// and all. The draft is then saved to the copy, so the folder has what the app shows. It's built
-/// in a hidden folder beside the target and moved into place at the end, so a failure or cancel
+/// in a temp folder beside the target and moved into place at the end, so a failure or cancel
 /// leaves nothing behind.
 /// </remarks>
 public static class SongExport
 {
-    private const string TempSuffix = ".chartpacker-tmp";
+    // Unlike SongFolderListing, a subfolder that can't be read fails the copy rather than being
+    // left out of it. Hidden files are copied; links aren't followed, so they can't make cycles.
+    private static readonly EnumerationOptions CopyOptions = new()
+    {
+        IgnoreInaccessible = false,
+        RecurseSubdirectories = true,
+        AttributesToSkip = FileAttributes.ReparsePoint,
+    };
 
     /// <summary>Saves <paramref name="entry"/>, with <paramref name="draft"/> applied, as the new folder <paramref name="targetFolder"/>.</summary>
     /// <param name="draft">The song's unsaved changes, or <see langword="null"/> for none.</param>
@@ -25,7 +32,7 @@ public static class SongExport
     /// <paramref name="targetFolder"/> exists, or a file can't be read or written; or, as a
     /// <see cref="Charts.ChartFormatException"/>, the draft's chart changes can't be applied.
     /// </exception>
-    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied, to a subfolder of the song among others.</exception>
     /// <exception cref="OperationCanceledException">The export was cancelled.</exception>
     public static async Task<UnpackResult> ExportFolderAsync(SongEntry entry, MetadataDraft? draft, string targetFolder, CancellationToken cancellationToken = default)
     {
@@ -38,7 +45,7 @@ public static class SongExport
 
         string parent = Path.GetDirectoryName(target) ?? throw new IOException($"'{target}' has no parent folder.");
         Directory.CreateDirectory(parent);
-        string staging = Path.Combine(parent, "." + Path.GetFileName(target) + "." + Guid.NewGuid().ToString("N")[..8] + TempSuffix);
+        string staging = StagingPath.For(target);
 
         try
         {
@@ -64,20 +71,20 @@ public static class SongExport
         }
         finally
         {
-            TryDeleteDirectory(staging);
+            StagingPath.TryDeleteDirectory(staging);
         }
     }
 
     private static void CopyFolder(string source, string destination, CancellationToken cancellationToken)
     {
+        string root = Path.GetFullPath(source);
         Directory.CreateDirectory(destination);
-        foreach (var file in SongFolderListing.List(source, cancellationToken))
+        foreach (string file in Directory.EnumerateFiles(root, "*", CopyOptions))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string[] segments = file.RelativePath.Split('/');
-            string to = Path.Combine([destination, .. segments]);
+            string to = Path.Combine(destination, Path.GetRelativePath(root, file));
             Directory.CreateDirectory(Path.GetDirectoryName(to)!);
-            File.Copy(Path.Combine([source, .. segments]), to);
+            File.Copy(file, to);
         }
     }
 
@@ -85,16 +92,4 @@ public static class SongExport
     private static string SongIniIn(string folder) =>
         Directory.EnumerateFiles(folder).FirstOrDefault(p => Path.GetFileName(p).Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase))
         ?? Path.Combine(folder, SongIni.FileName);
-
-    private static void TryDeleteDirectory(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path))
-                Directory.Delete(path, recursive: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
-    }
 }

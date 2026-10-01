@@ -197,9 +197,7 @@ public sealed class StemMixer
 
             try
             {
-                // A stem isn't asked to seek past its own end, which not every decoder allows.
-                long length = stem.Reader.LengthFrames;
-                stem.Reader.Seek(length >= 0 ? Math.Min(frame, length) : frame);
+                stem.Reader.Seek(frame);
             }
             catch (InvalidDataException ex)
             {

@@ -7,6 +7,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Ffmpeg;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
@@ -35,7 +36,8 @@ namespace ChartPacker
                 var confirmation = new AvaloniaConfirmationService(() => window);
                 var reveal = new FileRevealService(() => window);
                 var notice = new NoticeViewModel(reveal);
-                var downloads = new DownloadService(settings, () => window, notice);
+                var songFiles = new SongFileGate();
+                var downloads = new DownloadService(settings, () => window, notice, songFiles);
                 var drafts = new MetadataDraftStore();
                 var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window));
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
@@ -64,7 +66,7 @@ namespace ChartPacker
 
                 window.DataContext = new MainWindowViewModel(
                     library,
-                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal),
+                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles),
                     settings,
                     drafts,
                     confirmation,

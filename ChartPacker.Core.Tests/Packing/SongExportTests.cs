@@ -1,3 +1,6 @@
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Packing;
 using ChartPacker.Core.Scanning;
@@ -93,6 +96,34 @@ public sealed class SongExportTests
         string target = Path.Combine(_root.FullName, "out", "Song");
 
         await Assert.ThrowsAsync<IOException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), draft, target));
+
+        Assert.IsFalse(Directory.Exists(target));
+        Assert.IsEmpty(Directory.GetFileSystemEntries(Path.Combine(_root.FullName, "out")));
+    }
+
+    [TestMethod]
+    [SupportedOSPlatform("windows")]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task AnUnreadableSubfolderFailsTheCopyRatherThanBeingLeftOut()
+    {
+        string folder = CreateFolder("Song", ("notes.mid", [1]), ("stems/drums.ogg", [2]));
+        var stems = new DirectoryInfo(Path.Combine(folder, "stems"));
+        var user = WindowsIdentity.GetCurrent().User!;
+        var deny = new FileSystemAccessRule(user, FileSystemRights.ListDirectory, AccessControlType.Deny);
+        var security = stems.GetAccessControl();
+        security.AddAccessRule(deny);
+        stems.SetAccessControl(security);
+        string target = Path.Combine(_root.FullName, "out", "Song");
+
+        try
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), null, target));
+        }
+        finally
+        {
+            security.RemoveAccessRule(deny);
+            stems.SetAccessControl(security);
+        }
 
         Assert.IsFalse(Directory.Exists(target));
         Assert.IsEmpty(Directory.GetFileSystemEntries(Path.Combine(_root.FullName, "out")));

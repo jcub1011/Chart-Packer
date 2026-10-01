@@ -10,7 +10,7 @@ namespace ChartPacker.ViewModels
     /// <summary>
     /// The short note along the bottom of the main window that says what a download did: where it
     /// saved, with a button to show it, or why it couldn't. It goes away on its own after a few
-    /// seconds, except while the download is still running.
+    /// seconds, except while a download is still running: then it goes back to saying so.
     /// </summary>
     public sealed partial class NoticeViewModel : ViewModelBase
     {
@@ -18,7 +18,11 @@ namespace ChartPacker.ViewModels
 
         private readonly IFileRevealService _reveal;
         private readonly DispatcherTimer _hideTimer;
+        private readonly List<BusyNotice> _running = [];
         private IReadOnlyList<string> _paths = [];
+
+        // The running download whose message is shown; null while a result is shown, or nothing is.
+        private BusyNotice? _shown;
 
         public NoticeViewModel(IFileRevealService reveal)
         {
@@ -39,7 +43,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool IsError { get; private set; }
 
-        /// <summary>The download is still running, so there's nothing to show yet.</summary>
+        /// <summary>A download is still running, so there's nothing to show yet.</summary>
         [ObservableProperty]
         public partial bool IsBusy { get; private set; }
 
@@ -48,14 +52,39 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(RevealCommand))]
         public partial bool CanReveal { get; private set; }
 
-        /// <summary>Says a download is under way, until <see cref="ShowSaved"/> or <see cref="ShowError"/>.</summary>
-        public void ShowBusy(string message) => Show(message, [], isError: false, isBusy: true);
+        /// <summary>
+        /// Says a download is under way, until the result is disposed. A result already shown stays
+        /// for its time first, so it can still be acted on.
+        /// </summary>
+        public BusyNotice BeginBusy(string message)
+        {
+            var busy = new BusyNotice(this, message);
+            _running.Add(busy);
+            if (!_hideTimer.IsEnabled)
+                ShowBusy(busy);
+            return busy;
+        }
 
         /// <summary>Says <paramref name="paths"/> were saved, with a button to show them.</summary>
-        public void ShowSaved(string message, IReadOnlyList<string> paths) => Show(message, paths, isError: false, isBusy: false);
+        public void ShowSaved(string message, IReadOnlyList<string> paths) => ShowResult(message, paths, isError: false);
 
         /// <summary>Says a download failed; <paramref name="paths"/> are anything it saved before it did.</summary>
-        public void ShowError(string message, IReadOnlyList<string>? paths = null) => Show(message, paths ?? [], isError: true, isBusy: false);
+        public void ShowError(string message, IReadOnlyList<string>? paths = null) => ShowResult(message, paths ?? [], isError: true);
+
+        private void ShowResult(string message, IReadOnlyList<string> paths, bool isError)
+        {
+            _shown = null;
+            Show(message, paths, isError, isBusy: false);
+            _hideTimer.Stop();
+            _hideTimer.Start();
+        }
+
+        private void ShowBusy(BusyNotice busy)
+        {
+            _shown = busy;
+            _hideTimer.Stop();
+            Show(busy.Message, [], isError: false, isBusy: true);
+        }
 
         private void Show(string message, IReadOnlyList<string> paths, bool isError, bool isBusy)
         {
@@ -65,10 +94,36 @@ namespace ChartPacker.ViewModels
             IsBusy = isBusy;
             CanReveal = paths.Count > 0;
             IsVisible = true;
+        }
 
-            _hideTimer.Stop();
-            if (!isBusy)
-                _hideTimer.Start();
+        /// <summary>Goes back to the latest download still running, or hides when there's none.</summary>
+        private void ShowRunningOrHide()
+        {
+            if (_running.Count > 0)
+            {
+                ShowBusy(_running[^1]);
+                return;
+            }
+
+            _shown = null;
+            IsBusy = false;
+            IsVisible = false;
+        }
+
+        private void Update(BusyNotice busy)
+        {
+            if (ReferenceEquals(_shown, busy))
+                Message = busy.Message;
+        }
+
+        private void End(BusyNotice busy)
+        {
+            if (!_running.Remove(busy))
+                return;
+
+            // It ended without saying how; whatever result was shown stays.
+            if (ReferenceEquals(_shown, busy))
+                ShowRunningOrHide();
         }
 
         [RelayCommand(CanExecute = nameof(CanReveal))]
@@ -85,7 +140,30 @@ namespace ChartPacker.ViewModels
             if (IsBusy)
                 return;
 
-            IsVisible = false;
+            ShowRunningOrHide();
+        }
+
+        /// <summary>A download the notice says is running, from <see cref="BeginBusy"/>. Disposing it says it's over.</summary>
+        public sealed class BusyNotice : IDisposable
+        {
+            private readonly NoticeViewModel _notice;
+
+            internal BusyNotice(NoticeViewModel notice, string message)
+            {
+                _notice = notice;
+                Message = message;
+            }
+
+            public string Message { get; private set; }
+
+            /// <summary>Changes what the notice says about the download, as it moves on.</summary>
+            public void Update(string message)
+            {
+                Message = message;
+                _notice.Update(this);
+            }
+
+            public void Dispose() => _notice.End(this);
         }
     }
 }

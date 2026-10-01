@@ -668,7 +668,8 @@ namespace ChartPacker.ViewModels
                 {
                     var item = _itemsByPath.GetValueOrDefault(entry.FullPath);
                     string name = DownloadNames.SongPrefix(item?.Artist, item?.Title, entry.DisplayName);
-                    return new SongDownload(entry, DraftFor(entry.FullPath), name);
+                    // A copy: the export reads it off the UI thread, while the song can still be edited.
+                    return new SongDownload(entry, DraftFor(entry.FullPath)?.Clone(), name);
                 })
                 .ToList();
             return _downloads.SaveSongFoldersAsync(songs);

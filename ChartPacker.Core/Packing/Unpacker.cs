@@ -33,8 +33,6 @@ public sealed record UnpackResult(bool Extracted, IReadOnlyList<Finding> Finding
 /// </remarks>
 public static class Unpacker
 {
-    private const string TempSuffix = ".chartpacker-tmp";
-
     /// <summary>Extracts <paramref name="sngPath"/> into <paramref name="targetFolder"/> on the thread pool.</summary>
     /// <param name="sngPath">The <c>.sng</c> to read.</param>
     /// <param name="targetFolder">The song folder to create.</param>
@@ -69,7 +67,7 @@ public static class Unpacker
 
         string parent = Path.GetDirectoryName(target) ?? throw new IOException($"'{target}' has no parent folder.");
         Directory.CreateDirectory(parent);
-        string temp = Path.Combine(parent, "." + Path.GetFileName(target) + "." + Guid.NewGuid().ToString("N")[..8] + TempSuffix);
+        string temp = StagingPath.For(target);
 
         try
         {
@@ -82,7 +80,7 @@ public static class Unpacker
         }
         finally
         {
-            TryDeleteDirectory(temp);
+            StagingPath.TryDeleteDirectory(temp);
         }
 
         return new UnpackResult(true, findings);
@@ -162,18 +160,6 @@ public static class Unpacker
             string destination = Path.Combine(target, Path.GetRelativePath(temp, file));
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             File.Move(file, destination, overwrite: true);
-        }
-    }
-
-    private static void TryDeleteDirectory(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path))
-                Directory.Delete(path, recursive: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
         }
     }
 
