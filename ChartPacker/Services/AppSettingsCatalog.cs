@@ -21,19 +21,20 @@ namespace ChartPacker.Services
     /// </remarks>
     public static class AppSettingsCatalog
     {
-        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway)
+        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads)
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
             var duplicates = new SettingCategory("library.dedup", Strings.SettingsCategoryDuplicates, libraryCategory);
             var output = new SettingCategory("output", Strings.SettingsCategoryOutput);
             var packing = new SettingCategory("output.packing", Strings.SettingsCategoryPacking, output);
+            var downloadsCategory = new SettingCategory("output.downloads", Strings.SettingsCategoryDownloads, output);
             var playback = new SettingCategory("playback", Strings.SettingsCategoryPlayback);
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, playback, audio, visualizers],
+                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers],
                 [
                     new IntegerSetting
                     {
@@ -99,6 +100,30 @@ namespace ChartPacker.Services
                         DefaultValue = false,
                         Get = () => library.FlatPackOutput,
                         Set = flat => library.FlatPackOutput = flat,
+                    },
+                    new FolderSetting
+                    {
+                        Id = "downloads.folder",
+                        Category = downloadsCategory,
+                        Label = Strings.DownloadFolderLabel,
+                        Description = Strings.DownloadFolderDescription,
+                        Keywords = Words(Strings.DownloadFolderKeywords),
+                        DefaultValue = null,
+                        EmptyLabel = Strings.DownloadFolderEmpty,
+                        PickerTitle = Strings.BrowseDownloadDialogTitle,
+                        Get = () => downloads.Folder,
+                        Set = folder => downloads.Folder = folder,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "downloads.askEveryTime",
+                        Category = downloadsCategory,
+                        Label = Strings.AskDownloadLocationLabel,
+                        Description = Strings.AskDownloadLocationDescription,
+                        Keywords = Words(Strings.AskDownloadLocationKeywords),
+                        DefaultValue = false,
+                        Get = () => downloads.AskEveryTime,
+                        Set = ask => downloads.AskEveryTime = ask,
                     },
                     new RangeSetting
                     {

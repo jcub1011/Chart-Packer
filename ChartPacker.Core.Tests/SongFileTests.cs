@@ -44,6 +44,33 @@ public sealed class SongFileTests
     }
 
     [TestMethod]
+    public async Task FolderFileInASubfolderIsReadByItsStoredName()
+    {
+        var entry = Folder(CreateFolder(("Extras/Readme.TXT", Data), ("notes.chart", [1])));
+
+        CollectionAssert.AreEqual(Data, await SongFile.ReadAsync(entry, "extras/readme.txt", long.MaxValue));
+        await using (var stream = SongFile.OpenRead(entry, "EXTRAS/readme.txt"))
+            Assert.AreEqual(Data.Length, stream!.Length);
+        Assert.IsNull(SongFile.OpenRead(entry, "extras/missing.txt"));
+        Assert.IsNull(SongFile.OpenRead(entry, "missing/readme.txt"));
+    }
+
+    [TestMethod]
+    [DataRow("../outside.txt")]
+    [DataRow("Song/../../outside.txt")]
+    [DataRow("./notes.chart")]
+    [DataRow("extras//readme.txt")]
+    [DataRow("..\\outside.txt")]
+    public async Task FolderNameLeadingOutsideTheSongFindsNothing(string name)
+    {
+        File.WriteAllBytes(Path.Combine(_root.FullName, "outside.txt"), Data);
+        var entry = Folder(CreateFolder(("extras/readme.txt", Data), ("notes.chart", [1])));
+
+        Assert.IsNull(SongFile.OpenRead(entry, name));
+        Assert.IsNull(await SongFile.ReadAsync(entry, name, long.MaxValue));
+    }
+
+    [TestMethod]
     public void ListTopLevelLeavesOutSubfolders()
     {
         var folder = Folder(CreateFolder(("background.png", Data), ("extras/video.mp4", [1])));

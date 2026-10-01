@@ -66,7 +66,7 @@ public static class SongFile
     /// <summary>
     /// Opens the file <paramref name="storedName"/> of <paramref name="entry"/>, matched ignoring
     /// case, for reading and seeking: a folder's file as it is, or a <c>.sng</c>'s unmasked as
-    /// it's read. Disposing the stream closes the file.
+    /// it's read. A <c>/</c>-separated name opens a file in a subfolder. Disposing the stream closes the file.
     /// </summary>
     /// <returns>The stream, or <see langword="null"/> when there's no such file.</returns>
     /// <exception cref="IOException">The file can't be read.</exception>
@@ -156,9 +156,27 @@ public static class SongFile
         return data.ToArray();
     }
 
-    /// <summary>The path of the file directly in <paramref name="folder"/> named <paramref name="name"/>, ignoring case.</summary>
-    private static string? FindInFolder(string folder, string name) =>
-        Directory.EnumerateFiles(folder).FirstOrDefault(p => Path.GetFileName(p).Equals(name, StringComparison.OrdinalIgnoreCase));
+    /// <summary>
+    /// The path of the file in <paramref name="folder"/> named <paramref name="name"/>, ignoring case:
+    /// directly in it, or, for a <c>/</c>-separated name as a <c>.sng</c> stores one, in its subfolders.
+    /// A name that leads outside the folder finds nothing.
+    /// </summary>
+    private static string? FindInFolder(string folder, string name)
+    {
+        string[] segments = name.Split('/');
+        if (segments.Any(s => s is "" or "." or ".." || s.Contains('\\')))
+            return null;
+
+        string? current = folder;
+        foreach (string segment in segments[..^1])
+        {
+            current = Directory.EnumerateDirectories(current).FirstOrDefault(p => Path.GetFileName(p).Equals(segment, StringComparison.OrdinalIgnoreCase));
+            if (current is null)
+                return null;
+        }
+
+        return Directory.EnumerateFiles(current).FirstOrDefault(p => Path.GetFileName(p).Equals(segments[^1], StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>A read-only stream that closes a file handle along with itself.</summary>
     private sealed class HandleOwningStream(Stream inner, SafeFileHandle handle) : Stream

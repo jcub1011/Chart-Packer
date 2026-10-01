@@ -51,6 +51,10 @@ namespace ChartPacker.ViewModels
         private VocalChart? _shown;
         private TimeSpan _delay;
 
+        // The chart _shown was read from, with the metadata that places it, for exporting what's drawn.
+        private byte[]? _shownBytes;
+        private IReadOnlyList<KeyValuePair<string, string>> _shownMetadata = [];
+
         // How much later than the change places them _shown was built, so they fit in the song; the lane takes it back off.
         private TimeSpan _lead;
 
@@ -107,6 +111,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasLyrics))]
         [NotifyPropertyChangedFor(nameof(ReplaceToolTip))]
+        [NotifyPropertyChangedFor(nameof(CanExport))]
         [NotifyPropertyChangedFor(nameof(CanNudge))]
         [NotifyCanExecuteChangedFor(nameof(NudgeCommand))]
         [NotifyCanExecuteChangedFor(nameof(RevertOffsetCommand))]
@@ -177,6 +182,25 @@ namespace ChartPacker.ViewModels
         public bool IsChanged => _song?.Draft is { } draft && (draft.Vocals is not null || draft.HasVocalsOffset);
 
         public string? Marker => IsChanged ? "*" : null;
+
+        /// <summary>The vocals drawn can be exported: there are some, as the draft's change leaves them.</summary>
+        public bool CanExport => Scene is not null && _shownBytes is not null;
+
+        /// <summary>
+        /// Works out what's drawn as a <c>notes.mid</c> of its own: the vocals as the draft's change
+        /// leaves them, moved by the offset, with the song's delay worked into their ticks. Safe to
+        /// run off the UI thread; <see langword="null"/> when there's nothing to export.
+        /// </summary>
+        /// <remarks>The function throws a <see cref="ChartFormatException"/> when the vocals can't be written, e.g. moved before the song starts.</remarks>
+        public Func<byte[]>? ExportSource()
+        {
+            if (!CanExport || _shownBytes is not { } bytes || _chartName is not { } name)
+                return null;
+
+            var metadata = _shownMetadata;
+            var shift = TimeShift;
+            return () => LyricsExport.ToMidi(bytes, name, metadata, shift);
+        }
 
         public string ReplaceToolTip => HasLyrics ? Strings.LyricsReplaceToolTip : Strings.LyricsAddToolTip;
 
@@ -305,6 +329,7 @@ namespace ChartPacker.ViewModels
             _bytes = null;
             _builtKey = null;
             _shown = null;
+            _shownBytes = null;
             _lead = TimeSpan.Zero;
             _start = null;
             Scene = null;
@@ -386,7 +411,7 @@ namespace ChartPacker.ViewModels
                     var delay = SongChartSettings.DelayOf(metadata, chart);
                     var original = VocalReader.Read(bytes, name, chart.Tempo);
                     if (change is null)
-                        return new Built(original, original, delay, TimeSpan.Zero, VocalsEditor.StartOf(original, delay, delay), false, null);
+                        return new Built(original, original, bytes, delay, TimeSpan.Zero, VocalsEditor.StartOf(original, delay, delay), false, null);
 
                     try
                     {
@@ -395,12 +420,12 @@ namespace ChartPacker.ViewModels
                         var start = source is null ? null : VocalsEditor.StartOf(source.Vocals, source.Chart.Delay, delay);
                         var lead = start is { } early && early < TimeSpan.Zero ? TimeSpan.FromMilliseconds(Math.Ceiling(-early.TotalMilliseconds)) : TimeSpan.Zero;
                         var edited = VocalsEditor.Apply(bytes, name, metadata, source, lead);
-                        return new Built(original, VocalReader.Read(edited.Bytes, name, chart.Tempo), delay, lead, start, edited.LyricsOnly, null);
+                        return new Built(original, VocalReader.Read(edited.Bytes, name, chart.Tempo), edited.Bytes, delay, lead, start, edited.LyricsOnly, null);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         // ChartFormatException is an IOException: the vocals chosen can't go in this chart.
-                        return new Built(original, null, delay, TimeSpan.Zero, null, false, ex.Message);
+                        return new Built(original, null, null, delay, TimeSpan.Zero, null, false, ex.Message);
                     }
                 });
             }
@@ -409,6 +434,7 @@ namespace ChartPacker.ViewModels
                 if (version == _version)
                 {
                     _shown = null;
+                    _shownBytes = null;
                     _start = null;
                     Scene = null;
                     Problem = null;
@@ -427,6 +453,8 @@ namespace ChartPacker.ViewModels
             Warning = result.LyricsOnly ? Strings.LyricsChartKeepsWordsOnly : null;
             SourceName = change?.SourcePath is { } picked ? Path.GetFileName(picked) : result.Original.HasVocals ? name : null;
             _shown = result.Shown is { HasVocals: true } shownVocals ? shownVocals : null;
+            _shownBytes = _shown is null ? null : result.ShownBytes;
+            _shownMetadata = metadata;
             _delay = result.Delay;
             _lead = result.Lead;
             _start = result.Start;
@@ -463,7 +491,8 @@ namespace ChartPacker.ViewModels
         /// <param name="Shown">The vocals it will have once the change is saved, or <see langword="null"/> when it can't be made.</param>
         /// <param name="Lead">How much later than the change places them <paramref name="Shown"/> was built.</param>
         /// <param name="Start">When their first event is sung, from the chart's first tick, before the offset.</param>
+        /// <param name="ShownBytes">The chart <paramref name="Shown"/> was read from.</param>
         /// <param name="Error">Why the change can't be made.</param>
-        private sealed record Built(VocalChart Original, VocalChart? Shown, TimeSpan Delay, TimeSpan Lead, TimeSpan? Start, bool LyricsOnly, string? Error);
+        private sealed record Built(VocalChart Original, VocalChart? Shown, byte[]? ShownBytes, TimeSpan Delay, TimeSpan Lead, TimeSpan? Start, bool LyricsOnly, string? Error);
     }
 }

@@ -47,6 +47,15 @@ namespace ChartPacker.ViewModels
 
         public bool HasSize => Size is not null;
 
+        /// <summary>Saves a copy of the track's file, from its right-click menu; set by whoever knows where to save it. None, no menu.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanDownload))]
+        public partial IAsyncRelayCommand? DownloadCommand { get; set; }
+
+        public bool CanDownload => DownloadCommand is not null;
+
+        public string DownloadHeader => SongFileSource.DownloadHeaderFor(Name);
+
         [ObservableProperty]
         public partial bool IsMuted { get; set; }
 

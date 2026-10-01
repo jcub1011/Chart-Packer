@@ -162,6 +162,20 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial string? ShownFileSize { get; set; }
 
+        /// <summary>The shown background's file, to save a copy of, when every song has the same one.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(DownloadHeader))]
+        public partial SongFileSource? ShownFile { get; set; }
+
+        /// <summary>
+        /// The right-click menu's item that saves <see cref="ShownFile"/>, naming the file:
+        /// <c>Download "video.mp4"</c>. While there's none to save, it names the kind shown.
+        /// </summary>
+        public string DownloadHeader =>
+            ShownFile is { } file ? SongFileSource.DownloadHeaderFor(file.StoredName)
+            : ShowVideo ? Strings.MenuDownloadBackgroundVideo
+            : Strings.MenuDownloadBackgroundImage;
+
         public bool HasImage => Image is not null;
 
         public bool HasVideo => Video is not null;
@@ -370,6 +384,7 @@ namespace ChartPacker.ViewModels
         {
             string? name = null;
             string? size = null;
+            SongFileSource? file = null;
             if (slot.State == SlotState.Same && _songs.Count > 0)
             {
                 var first = _songs[0];
@@ -378,16 +393,21 @@ namespace ChartPacker.ViewModels
                     name = SongBackgrounds.StoredNameFor(kind, source);
                     if (_staged.GetValueOrDefault(source) is { Error: null } staged)
                         size = ByteSizeFormatter.Format((ulong)staged.Length);
+                    if (name is not null)
+                        file = new SongFileSource(first.Entry, name, source);
                 }
                 else if (first.Stored.Of(kind) is { } stored)
                 {
                     name = stored.StoredName;
                     size = ByteSizeFormatter.Format((ulong)stored.Length);
+                    file = new SongFileSource(first.Entry, stored.StoredName);
                 }
             }
 
             ShownFileName = name;
             ShownFileSize = size;
+            ShownFile = file;
+            OnPropertyChanged(nameof(DownloadHeader));
         }
 
         private void StartVideo(VideoSource source)

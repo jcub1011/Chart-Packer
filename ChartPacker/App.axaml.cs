@@ -33,6 +33,9 @@ namespace ChartPacker
                 var imagePicker = new AvaloniaImagePickerService(() => window);
                 var filePicker = new AvaloniaFilePickerService(() => window);
                 var confirmation = new AvaloniaConfirmationService(() => window);
+                var reveal = new FileRevealService(() => window);
+                var notice = new NoticeViewModel(reveal);
+                var downloads = new DownloadService(settings, () => window, notice);
                 var drafts = new MetadataDraftStore();
                 var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window));
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
@@ -54,18 +57,19 @@ namespace ChartPacker
                     player,
                     mergeWindowFor,
                     Path.Combine(UserConfigPaths.ConfigFolder, "dedup-log.jsonl"));
-                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow);
+                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, reveal, downloads);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
-                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway), settingsPicker, settings.Save));
+                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway, downloads), settingsPicker, settings.Save));
 
                 window.DataContext = new MainWindowViewModel(
                     library,
-                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe),
+                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal),
                     settings,
                     drafts,
                     confirmation,
-                    settingsWindow);
+                    settingsWindow,
+                    notice);
 
                 // Subscribed after MainWindow's own Closing handler, which captures the splitter positions first.
                 // It also runs when that handler cancels the close to ask about unsaved changes, which is harmless.

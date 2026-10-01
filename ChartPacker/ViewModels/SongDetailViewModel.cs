@@ -30,17 +30,23 @@ namespace ChartPacker.ViewModels
     /// <param name="IsRemoved">A staged change removes or replaces the file.</param>
     /// <param name="CanRemove">The file can be removed, or, when it's added, the add dropped.</param>
     /// <param name="CanRevert">The staged change that removes or replaces the file can be dropped.</param>
-    public sealed record FileRow(string Path, string Size, string? Marker = null, bool IsRemoved = false, bool CanRemove = false, bool CanRevert = false)
+    /// <param name="DownloadCommand">Saves a copy of the file, from its right-click menu; none where nothing is saved.</param>
+    public sealed record FileRow(string Path, string Size, string? Marker = null, bool IsRemoved = false, bool CanRemove = false, bool CanRevert = false, IAsyncRelayCommand? DownloadCommand = null)
     {
         public bool IsAdded => Marker is not null;
+
+        public string DownloadHeader => SongFileSource.DownloadHeaderFor(Path);
     }
 
     /// <summary>A chart file of the song, with its size already formatted.</summary>
     /// <param name="Marker"><c>+</c> for a chart a staged change adds.</param>
     /// <param name="IsRemoved">A staged change removes or replaces the file.</param>
-    public sealed record ChartRow(string Name, string Size, string? Marker = null, bool IsRemoved = false)
+    /// <param name="DownloadCommand">Saves a copy of the chart, from its right-click menu; none where nothing is saved.</param>
+    public sealed record ChartRow(string Name, string Size, string? Marker = null, bool IsRemoved = false, IAsyncRelayCommand? DownloadCommand = null)
     {
         public bool IsKept => !IsRemoved;
+
+        public string DownloadHeader => SongFileSource.DownloadHeaderFor(Name);
     }
 
     /// <summary>A track a staged change removes, shown struck through so that its removal can be undone.</summary>
@@ -81,7 +87,12 @@ namespace ChartPacker.ViewModels
         private readonly IImagePickerService _imagePicker;
         private readonly IFilePickerService _filePicker;
         private readonly IVideoDurationProbe _videoProbe;
+        private readonly IDownloadService? _downloads;
+        private readonly IFileRevealService? _reveal;
         private CancellationTokenSource? _loadCts;
+
+        // The download command of each of the one selected song's files, by file, so a row rebuilt for the same file is equal to it.
+        private readonly Dictionary<SongFileSource, IAsyncRelayCommand> _downloadCommands = [];
 
         // Cancels Auto Set song_length when the selection changes under it.
         private CancellationTokenSource? _autoLengthCts;
@@ -121,9 +132,22 @@ namespace ChartPacker.ViewModels
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
 
-        public SongDetailViewModel(MetadataDraftStore drafts, JobViewModel job, IImagePickerService imagePicker, IFilePickerService filePicker, PlayerViewModel player, HighwayViewModel highway, IVideoDurationProbe videoProbe)
+        /// <param name="downloads">Saves copies of the song's files from their right-click menus; none for a panel that only previews.</param>
+        /// <param name="reveal">Shows the selected songs in the file manager; none for a panel that only previews.</param>
+        public SongDetailViewModel(
+            MetadataDraftStore drafts,
+            JobViewModel job,
+            IImagePickerService imagePicker,
+            IFilePickerService filePicker,
+            PlayerViewModel player,
+            HighwayViewModel highway,
+            IVideoDurationProbe videoProbe,
+            IDownloadService? downloads = null,
+            IFileRevealService? reveal = null)
         {
             _drafts = drafts;
+            _downloads = downloads;
+            _reveal = reveal;
             _job = job;
             _imagePicker = imagePicker;
             _filePicker = filePicker;
@@ -134,6 +158,8 @@ namespace ChartPacker.ViewModels
             {
                 if (e.PropertyName == nameof(BackgroundViewModel.ShownKind))
                     RemoveBackgroundCommand.NotifyCanExecuteChanged();
+                else if (e.PropertyName == nameof(BackgroundViewModel.ShownFile))
+                    DownloadBackgroundCommand.NotifyCanExecuteChanged();
             };
             Highway = highway;
             Highway.OffsetsChanged += (_, _) => OnOffsetsChanged();
@@ -149,7 +175,7 @@ namespace ChartPacker.ViewModels
             // What the lyrics commands can do depends on what the lyrics row has read, which comes later.
             Lyrics.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(LyricsViewModel.HasLyrics) or nameof(LyricsViewModel.HasChart) or nameof(LyricsViewModel.IsChanged))
+                if (e.PropertyName is nameof(LyricsViewModel.HasLyrics) or nameof(LyricsViewModel.HasChart) or nameof(LyricsViewModel.IsChanged) or nameof(LyricsViewModel.CanExport))
                     RefreshLyricsCommands();
             };
             foreach (string stem in AudioStems.Stems)
@@ -285,6 +311,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The shown album art's stored name, e.g. <c>album.png</c>, when it's known.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ArtDownloadHeader))]
         public partial string? ArtFileName { get; set; }
 
         /// <summary>The shown album art's size, formatted, when it's known.</summary>
@@ -322,6 +349,9 @@ namespace ChartPacker.ViewModels
         public partial string? TracksError { get; set; }
 
         public bool HasArtImage => ArtImage is not null;
+
+        /// <summary>The art's right-click menu item, naming the file it saves: <c>Download "album.png"</c>.</summary>
+        public string ArtDownloadHeader => ArtFileName is { } name ? SongFileSource.DownloadHeaderFor(name) : Strings.MenuDownloadArt;
 
         /// <summary>The art tile's width over its height: the shown image's, or square when there's none.</summary>
         public double ArtAspect => ArtImage is { Size: { Width: > 0, Height: > 0 } size } ? size.Width / size.Height : 1;
@@ -439,6 +469,8 @@ namespace ChartPacker.ViewModels
 
             _entries = entries;
             _songs = [];
+            _downloadCommands.Clear();
+            RevealCommand.NotifyCanExecuteChanged();
             _loadNote = null;
             _diskFiles = [];
             _totalSize = 0;
@@ -1679,6 +1711,7 @@ namespace ChartPacker.ViewModels
             var draft = song?.Item.Draft;
             var change = draft?.AlbumArt;
             bool isFolder = song is not null && song.Entry.Kind != SongEntryKind.SngFile;
+            var entry = !IsBulk && _entries.Count == 1 ? _entries[0] : null;
 
             bool IsRemoved(string path) =>
                 (change is not null && AlbumArt.IsAlbumArtName(path))
@@ -1700,13 +1733,13 @@ namespace ChartPacker.ViewModels
 
             var charts = _diskFiles
                 .Where(f => ChartFiles.IsChartName(f.Path))
-                .Select(f => new ChartRow(f.Path, ByteSizeFormatter.Format(f.Length), IsRemoved: IsRemoved(f.Path)))
+                .Select(f => new ChartRow(f.Path, ByteSizeFormatter.Format(f.Length), IsRemoved: IsRemoved(f.Path), DownloadCommand: DownloadCommandFor(entry, f.Path)))
                 .ToList();
             if (draft is not null)
             {
                 charts.InsertRange(0, draft.AddedFiles
                     .Where(f => ChartFiles.IsChartName(f.StoredName))
-                    .Select(f => new ChartRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+")));
+                    .Select(f => new ChartRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+", DownloadCommand: DownloadCommandFor(entry, f.StoredName, f.SourcePath))));
             }
 
             // What's kept first, then what's going.
@@ -1723,7 +1756,8 @@ namespace ChartPacker.ViewModels
                 {
                     bool removed = IsRemoved(f.Path);
                     return new FileRow(f.Path, ByteSizeFormatter.Format(f.Length),
-                        IsRemoved: removed, CanRemove: draft is not null && !removed, CanRevert: draft is not null && removed);
+                        IsRemoved: removed, CanRemove: draft is not null && !removed, CanRevert: draft is not null && removed,
+                        DownloadCommand: DownloadCommandFor(entry, f.Path));
                 })
                 .ToList();
 
@@ -1732,7 +1766,8 @@ namespace ChartPacker.ViewModels
             {
                 rows.AddRange(draft.AddedFiles
                     .Where(f => AudioStems.StemOf(f.StoredName) is null && !ChartFiles.IsChartName(f.StoredName))
-                    .Select(f => new FileRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+", CanRemove: true)));
+                    .Select(f => new FileRow(f.StoredName, ByteSizeFormatter.Format((ulong)f.Length), Marker: "+", CanRemove: true,
+                        DownloadCommand: DownloadCommandFor(entry, f.StoredName, f.SourcePath))));
             }
 
             if (!rows.SequenceEqual(Files))
@@ -1771,7 +1806,10 @@ namespace ChartPacker.ViewModels
             Player.Load(_entries[0], tracks, song is null ? null : PreviewStartOf(song));
             RefreshSongLength();
             foreach (var row in Player.Tracks)
+            {
                 row.Size = TrackSize(row.Track, draft);
+                row.DownloadCommand = DownloadCommandFor(_entries[0], row.Track.StoredName, row.Track.StagedSourcePath);
+            }
 
             // A stem with a track staged to replace it isn't missing a track, so what it replaces isn't listed.
             var stagedStems = draft?.AddedFiles.Select(f => AudioStems.StemOf(f.StoredName)).OfType<string>().ToHashSet(StringComparer.Ordinal) ?? [];
@@ -2111,6 +2149,8 @@ namespace ChartPacker.ViewModels
             ChooseChartCommand.NotifyCanExecuteChanged();
             RemoveChartCommand.NotifyCanExecuteChanged();
             RevertChartCommand.NotifyCanExecuteChanged();
+            DownloadArtCommand.NotifyCanExecuteChanged();
+            DownloadBackgroundCommand.NotifyCanExecuteChanged();
             RefreshLyricsCommands();
             foreach (var command in _addTrackCommands.Values)
                 command.NotifyCanExecuteChanged();
@@ -2125,6 +2165,89 @@ namespace ChartPacker.ViewModels
             ReplaceLyricsCommand.NotifyCanExecuteChanged();
             RemoveLyricsCommand.NotifyCanExecuteChanged();
             RevertLyricsCommand.NotifyCanExecuteChanged();
+            ExportLyricsCommand.NotifyCanExecuteChanged();
+        }
+
+        /// <summary>The right-click menu's name for <see cref="RevealCommand"/>, after the platform's file manager.</summary>
+        public static string RevealLabel => FileRevealService.RevealLabel;
+
+        private bool CanReveal() => _reveal is not null && _entries.Count > 0;
+
+        /// <summary>Shows the selected songs' files and folders in the file manager.</summary>
+        [RelayCommand(CanExecute = nameof(CanReveal))]
+        private void Reveal() => _reveal?.Reveal([.. _entries.Select(e => e.FullPath)]);
+
+        private bool CanDownloadArt() => _downloads is not null && ArtSource() is not null;
+
+        /// <summary>Saves a copy of the album art shown: the staged image, or the song's own.</summary>
+        [RelayCommand(CanExecute = nameof(CanDownloadArt))]
+        private Task DownloadArtAsync() => ArtSource() is { } source ? DownloadAsync(source) : Task.CompletedTask;
+
+        private bool CanDownloadBackground() => _downloads is not null && !IsBulk && Background.ShownFile is not null;
+
+        /// <summary>Saves a copy of the background shown, the image or the video, staged or the song's own.</summary>
+        [RelayCommand(CanExecute = nameof(CanDownloadBackground))]
+        private Task DownloadBackgroundAsync() => Background.ShownFile is { } source ? DownloadAsync(source) : Task.CompletedTask;
+
+        private bool CanExportLyrics() => _downloads is not null && !IsBulk && Lyrics.CanExport;
+
+        /// <summary>Saves the lyrics drawn, with the draft's change and offset, as a <c>notes.mid</c> of their own.</summary>
+        [RelayCommand(CanExecute = nameof(CanExportLyrics))]
+        private Task ExportLyricsAsync()
+        {
+            if (_downloads is null || Lyrics.ExportSource() is not { } export)
+                return Task.CompletedTask;
+
+            return _downloads.SaveFileAsync(DownloadPrefix(), ChartFiles.MidiName, _ => Task.Run(() => (Stream)new MemoryStream(export())));
+        }
+
+        /// <summary>
+        /// The album art shown, as a file to save: a staged image, or the one selected song's own.
+        /// <see langword="null"/> for none, or for several songs.
+        /// </summary>
+        private SongFileSource? ArtSource()
+        {
+            if (IsBulk || _songs is not [var song] || ArtImage is null)
+                return null;
+
+            if (song.Item.Draft.AlbumArt is { } change)
+            {
+                return change.SourcePath is { } source && AlbumArt.StoredNameFor(source) is { } name
+                    ? new SongFileSource(song.Entry, name, source)
+                    : null;
+            }
+
+            return AlbumArt.Pick(_diskFiles, f => f.Path) is { } file ? new SongFileSource(song.Entry, file.Path) : null;
+        }
+
+        /// <summary>
+        /// The command that saves the file <paramref name="storedName"/> of <paramref name="entry"/>, the
+        /// same one each time; none without a song, or for a panel that only previews.
+        /// </summary>
+        private IAsyncRelayCommand? DownloadCommandFor(SongEntry? entry, string storedName, string? stagedPath = null)
+        {
+            if (_downloads is null || entry is null)
+                return null;
+
+            var source = new SongFileSource(entry, storedName, stagedPath);
+            if (!_downloadCommands.TryGetValue(source, out var command))
+                _downloadCommands[source] = command = new AsyncRelayCommand(() => DownloadAsync(source));
+            return command;
+        }
+
+        private Task DownloadAsync(SongFileSource source) =>
+            _downloads?.SaveFileAsync(DownloadPrefix(), source.StoredName, _ => Task.Run(source.Open)) ?? Task.CompletedTask;
+
+        /// <summary>What names the one selected song's saved files: <c>Artist - Title</c> as drafted, or its file or folder name.</summary>
+        private string DownloadPrefix()
+        {
+            if (_songs is [var song])
+            {
+                var headline = SongHeadline.From(song.Item.Draft.ApplyTo(song.Item.Original));
+                return DownloadNames.SongPrefix(headline.Artist, headline.Name, song.Entry.DisplayName);
+            }
+
+            return _entries is [var entry] ? DownloadNames.SafeName(entry.DisplayName) : string.Empty;
         }
 
         /// <summary>A selected song whose metadata was read, with its draft.</summary>

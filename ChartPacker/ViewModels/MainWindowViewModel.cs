@@ -19,7 +19,8 @@ namespace ChartPacker.ViewModels
             SettingsService settings,
             MetadataDraftStore drafts,
             IConfirmationService confirmation,
-            ISettingsWindowService settingsWindow)
+            ISettingsWindowService settingsWindow,
+            NoticeViewModel notice)
         {
             Library = library;
             Detail = detail;
@@ -27,6 +28,7 @@ namespace ChartPacker.ViewModels
             _drafts = drafts;
             _confirmation = confirmation;
             _settingsWindow = settingsWindow;
+            Notice = notice;
 
             Library.PropertyChanged += (_, e) =>
             {
@@ -38,6 +40,9 @@ namespace ChartPacker.ViewModels
         public LibraryViewModel Library { get; }
 
         public SongDetailViewModel Detail { get; }
+
+        /// <summary>What the latest download did, shown along the bottom for a few seconds.</summary>
+        public NoticeViewModel Notice { get; }
 
         /// <summary>The pack/unpack results panel, always shown under both panels.</summary>
         public JobViewModel Job => Library.Job;

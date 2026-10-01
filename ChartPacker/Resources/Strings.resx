@@ -1846,4 +1846,104 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>{0:N0} moved to the {1}, {2:N0} deleted permanently, {3:N0} skipped or failed</value>
     <comment>{0}, {2} and {3} are counts, {1} is "Recycle Bin" or "Trash".</comment>
   </data>
+  <data name="RevealInExplorer" xml:space="preserve">
+    <value>Show in Explorer</value>
+    <comment>Right-click menu item on Windows.</comment>
+  </data>
+  <data name="RevealInFinder" xml:space="preserve">
+    <value>Show in Finder</value>
+    <comment>Right-click menu item on macOS.</comment>
+  </data>
+  <data name="RevealInFolder" xml:space="preserve">
+    <value>Show in folder</value>
+    <comment>Right-click menu item on Linux, and the download notice's button.</comment>
+  </data>
+  <data name="MenuDownloadAllFiles" xml:space="preserve">
+    <value>Download all files</value>
+    <comment>Library right-click menu: saves each selected song as a song folder.</comment>
+  </data>
+  <data name="MenuDownloadFileFormat" xml:space="preserve">
+    <value>Download "{0}"</value>
+    <comment>Right-click menu item on a track or file. {0} is the file's name, e.g. guitar.ogg.</comment>
+  </data>
+  <data name="MenuDownloadArt" xml:space="preserve">
+    <value>Download album art</value>
+    <comment>Right-click menu item on the album art while there's none to download.</comment>
+  </data>
+  <data name="MenuDownloadBackgroundImage" xml:space="preserve">
+    <value>Download background image</value>
+    <comment>Right-click menu item on the background while there's none to download.</comment>
+  </data>
+  <data name="MenuDownloadBackgroundVideo" xml:space="preserve">
+    <value>Download background video</value>
+    <comment>Right-click menu item on the background while there's none to download.</comment>
+  </data>
+  <data name="MenuExportLyrics" xml:space="preserve">
+    <value>Export lyrics as "notes.mid"</value>
+  </data>
+  <data name="DownloadSavingFormat" xml:space="preserve">
+    <value>Saving {0}…</value>
+    <comment>{0} is the file or folder name.</comment>
+  </data>
+  <data name="DownloadSavingSongsFormat" xml:space="preserve">
+    <value>Saving song {0:N0} of {1:N0}…</value>
+  </data>
+  <data name="DownloadSavedFormat" xml:space="preserve">
+    <value>Saved {0} to {1}</value>
+    <comment>{0} is the file or folder name, {1} the name of the folder it's in.</comment>
+  </data>
+  <data name="DownloadSavedSongsFormat" xml:space="preserve">
+    <value>Saved {0:N0} songs to {1}</value>
+    <comment>{1} is the name of the folder they're in.</comment>
+  </data>
+  <data name="DownloadFailedFormat" xml:space="preserve">
+    <value>Couldn't save {0}: {1}</value>
+    <comment>{0} is the file or song name, {1} why.</comment>
+  </data>
+  <data name="DownloadPartlyFailedFormat" xml:space="preserve">
+    <value>Saved {0:N0} of {1:N0} songs. Couldn't save {2}: {3}</value>
+    <comment>{2} is the song that failed, {3} why.</comment>
+  </data>
+  <data name="DownloadUnreadable" xml:space="preserve">
+    <value>the .sng can't be read</value>
+  </data>
+  <data name="DownloadPickerTitle" xml:space="preserve">
+    <value>Save file</value>
+  </data>
+  <data name="DownloadFolderPickerTitle" xml:space="preserve">
+    <value>Choose where to save the songs</value>
+  </data>
+  <data name="NoticeDismissToolTip" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="SettingsCategoryDownloads" xml:space="preserve">
+    <value>Downloads</value>
+  </data>
+  <data name="DownloadFolderLabel" xml:space="preserve">
+    <value>Download folder</value>
+  </data>
+  <data name="DownloadFolderDescription" xml:space="preserve">
+    <value>Where files and songs saved from a right-click menu go.</value>
+  </data>
+  <data name="DownloadFolderEmpty" xml:space="preserve">
+    <value>The system's Downloads folder</value>
+    <comment>Shown in place of a folder when none is chosen.</comment>
+  </data>
+  <data name="DownloadFolderKeywords" xml:space="preserve">
+    <value>download save export location directory destination</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="BrowseDownloadDialogTitle" xml:space="preserve">
+    <value>Choose the download folder</value>
+  </data>
+  <data name="AskDownloadLocationLabel" xml:space="preserve">
+    <value>Ask where to save each download</value>
+  </data>
+  <data name="AskDownloadLocationDescription" xml:space="preserve">
+    <value>Shows a save dialog for every download, starting in the download folder.</value>
+  </data>
+  <data name="AskDownloadLocationKeywords" xml:space="preserve">
+    <value>ask prompt dialog choose location download</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
 </root>

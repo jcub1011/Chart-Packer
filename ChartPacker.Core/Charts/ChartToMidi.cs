@@ -126,7 +126,8 @@ public static class ChartToMidi
     private static byte[] Build(int resolution, List<(string Name, List<MidiMessage> Messages)> tracks) =>
         MidiWriter.WriteFile(resolution, tracks.Select(t => MidiWriter.Track(t.Messages)).ToList());
 
-    private static List<MidiMessage> Conductor(TempoMap tempo)
+    /// <summary>The tempo track: <paramref name="tempo"/>'s time signatures and tempo changes.</summary>
+    internal static List<MidiMessage> Conductor(TempoMap tempo)
     {
         var messages = new List<MidiMessage>();
         foreach (var signature in tempo.TimeSignatures)

@@ -81,6 +81,9 @@ namespace ChartPacker.Services
             if (string.IsNullOrWhiteSpace(settings.OutputFolder))
                 settings.OutputFolder = null;
 
+            if (string.IsNullOrWhiteSpace(settings.DownloadFolder))
+                settings.DownloadFolder = null;
+
             if (!Enum.IsDefined(settings.OverwritePolicy))
                 settings.OverwritePolicy = AppSettings.DefaultOverwritePolicy;
 

@@ -578,36 +578,44 @@
 
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="20,16">
-                    <!-- "Name - Artist", with the charter at the right; the path below, with the song's size at the right. -->
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                        <SelectableTextBlock Grid.Column="0"
-                                             FontSize="18"
-                                             FontWeight="SemiBold"
-                                             VerticalAlignment="Center"
-                                             TextWrapping="Wrap"
-                                             Text="{Binding Title}" />
-                        <!-- The charter can carry rich-text tags (colours, bold…), which are drawn rather than shown. -->
-                        <Border Grid.Column="1"
-                                Classes="chip large"
-                                MaxWidth="240"
-                                IsVisible="{Binding HasCharter}"
-                                ToolTip.Tip="{x:Static res:Strings.CharterToolTip}">
-                            <TextBlock Opacity="1"
-                                       TextTrimming="CharacterEllipsis"
-                                       ctl:RichTextMarkup.Text="{Binding Charter}" />
-                        </Border>
-                    </Grid>
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,2,0,0">
-                        <SelectableTextBlock Grid.Column="0"
-                                             Opacity="0.7"
-                                             FontSize="12"
-                                             VerticalAlignment="Center"
-                                             TextWrapping="Wrap"
-                                             Text="{Binding Subtitle}" />
-                        <Border Grid.Column="1" Classes="chip large" IsVisible="{Binding HasSizeText}">
-                            <TextBlock Text="{Binding SizeText}" />
-                        </Border>
-                    </Grid>
+                    <!-- "Name - Artist", with the charter at the right; the path below, with the song's size at the right.
+                         Right-clicking either line shows the songs in the file manager. -->
+                    <StackPanel Background="Transparent">
+                        <StackPanel.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{x:Static vm:SongDetailViewModel.RevealLabel}" Command="{Binding RevealCommand}" />
+                            </ContextMenu>
+                        </StackPanel.ContextMenu>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <SelectableTextBlock Grid.Column="0"
+                                                 FontSize="18"
+                                                 FontWeight="SemiBold"
+                                                 VerticalAlignment="Center"
+                                                 TextWrapping="Wrap"
+                                                 Text="{Binding Title}" />
+                            <!-- The charter can carry rich-text tags (colours, bold…), which are drawn rather than shown. -->
+                            <Border Grid.Column="1"
+                                    Classes="chip large"
+                                    MaxWidth="240"
+                                    IsVisible="{Binding HasCharter}"
+                                    ToolTip.Tip="{x:Static res:Strings.CharterToolTip}">
+                                <TextBlock Opacity="1"
+                                           TextTrimming="CharacterEllipsis"
+                                           ctl:RichTextMarkup.Text="{Binding Charter}" />
+                            </Border>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,2,0,0">
+                            <SelectableTextBlock Grid.Column="0"
+                                                 Opacity="0.7"
+                                                 FontSize="12"
+                                                 VerticalAlignment="Center"
+                                                 TextWrapping="Wrap"
+                                                 Text="{Binding Subtitle}" />
+                            <Border Grid.Column="1" Classes="chip large" IsVisible="{Binding HasSizeText}">
+                                <TextBlock Text="{Binding SizeText}" />
+                            </Border>
+                        </Grid>
+                    </StackPanel>
 
                     <!-- Album art on the left and the background beside it, each in its own shape, as tall as
                          lets both fit the panel's width, with a caption below each. The row, captions included,
@@ -660,6 +668,11 @@
                             </Border>
 
                             <Border Classes="artTile" AutomationProperties.Name="{x:Static res:Strings.AlbumArtName}">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{Binding ArtDownloadHeader}" Command="{Binding DownloadArtCommand}" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                                 <Panel>
                                     <Image Source="{Binding ArtImage}"
                                            Stretch="Uniform"
@@ -756,6 +769,12 @@
                             </Border>
 
                             <Border Classes="artTile" AutomationProperties.Name="{x:Static res:Strings.BackgroundName}">
+                                <!-- Saves the kind shown, image or video, as the toggle above picks it. -->
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{Binding Background.DownloadHeader}" Command="{Binding DownloadBackgroundCommand}" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                                 <Panel>
                                     <Image Source="{Binding Background.Image}"
                                            Stretch="Uniform"
@@ -904,6 +923,11 @@
                         </Border>
 
                         <Border Classes="artTile" Height="120" AutomationProperties.Name="{x:Static res:Strings.LyricsHeader}">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{x:Static res:Strings.MenuExportLyrics}" Command="{Binding ExportLyricsCommand}" />
+                                </ContextMenu>
+                            </Border.ContextMenu>
                             <Panel>
                                 <ctl:LyricLaneView x:Name="LyricLane"
                                                    Scene="{Binding Lyrics.Scene}"
@@ -1073,7 +1097,15 @@
                                       AutomationProperties.Name="{x:Static res:Strings.TracksListName}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:TrackRowViewModel">
-                                    <Grid ColumnSpacing="6" RowDefinitions="Auto,Auto">
+                                    <!-- Transparent so the whole row, gaps and waveform included, takes a right-click. -->
+                                    <Grid ColumnSpacing="6" RowDefinitions="Auto,Auto" Background="Transparent">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding DownloadHeader}"
+                                                          Command="{Binding DownloadCommand}"
+                                                          IsEnabled="{Binding CanDownload}" />
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="14" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSwitches" />
@@ -1255,7 +1287,14 @@
                                       AutomationProperties.Name="{x:Static res:Strings.ChartsListName}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ChartRow">
-                                    <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="4" Margin="0,1">
+                                    <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="4" Margin="0,1" Background="Transparent">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding DownloadHeader}"
+                                                          Command="{Binding DownloadCommand}"
+                                                          IsEnabled="{Binding DownloadCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
                                         <TextBlock Grid.Column="0"
                                                    Classes="marker"
                                                    VerticalAlignment="Center"
@@ -1322,7 +1361,14 @@
                                       AutomationProperties.Name="{x:Static res:Strings.OtherFilesListName}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:FileRow">
-                                    <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="4" Margin="0,1">
+                                    <Grid ColumnDefinitions="14,*,Auto,Auto" ColumnSpacing="4" Margin="0,1" Background="Transparent">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding DownloadHeader}"
+                                                          Command="{Binding DownloadCommand}"
+                                                          IsEnabled="{Binding DownloadCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
                                         <TextBlock Grid.Column="0"
                                                    Classes="marker"
                                                    VerticalAlignment="Center"

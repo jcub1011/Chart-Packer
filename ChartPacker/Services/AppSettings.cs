@@ -42,6 +42,12 @@ namespace ChartPacker.Services
         /// <summary>Whether Pack writes every .sng directly in the output folder instead of mirroring the scanned folder's layout.</summary>
         public bool FlatPackOutput { get; set; }
 
+        /// <summary>Where files saved out of a song go. <see langword="null"/> means the system's Downloads folder.</summary>
+        public string? DownloadFolder { get; set; }
+
+        /// <summary>Whether each download asks where to save, starting in <see cref="DownloadFolder"/>.</summary>
+        public bool AskDownloadLocation { get; set; }
+
         /// <summary>Which copy the Deduplicate window keeps by default when a song is both a folder and a .sng.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter<DedupKindPreference>))]
         public DedupKindPreference DedupKeepPreference { get; set; } = DefaultDedupKeepPreference;

@@ -46,6 +46,8 @@ namespace ChartPacker.ViewModels
         private readonly MetadataDraftStore _drafts;
         private readonly IMergeWindowService _mergeWindow;
         private readonly IDedupWindowService _dedupWindow;
+        private readonly IFileRevealService _reveal;
+        private readonly IDownloadService _downloads;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
         // Every scanned song, in scan order, whether or not it passes the filters.
@@ -80,6 +82,8 @@ namespace ChartPacker.ViewModels
         /// <param name="player">Plays a song from the list's art buttons; the detail panel shows the same one.</param>
         /// <param name="mergeWindow">Shows the Merge window for the selected songs.</param>
         /// <param name="dedupWindow">Shows the Deduplicate window for the whole library.</param>
+        /// <param name="reveal">Shows the selected songs in the file manager.</param>
+        /// <param name="downloads">Saves copies of the selected songs as song folders.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -87,13 +91,17 @@ namespace ChartPacker.ViewModels
             JobViewModel job,
             PlayerViewModel player,
             IMergeWindowService mergeWindow,
-            IDedupWindowService dedupWindow)
+            IDedupWindowService dedupWindow,
+            IFileRevealService reveal,
+            IDownloadService downloads)
         {
             _folderPicker = folderPicker;
             _settings = settings;
             _drafts = drafts;
             _mergeWindow = mergeWindow;
             _dedupWindow = dedupWindow;
+            _reveal = reveal;
+            _downloads = downloads;
             Player = player;
             Player.PropertyChanged += (_, e) =>
             {
@@ -186,7 +194,12 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The selected items, in list order rather than the order they were clicked.</summary>
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(RevealCommand))]
+        [NotifyCanExecuteChangedFor(nameof(DownloadAllCommand))]
         public partial IReadOnlyList<SongEntry> SelectedEntries { get; set; } = [];
+
+        /// <summary>The right-click menu's name for <see cref="RevealCommand"/>, after the platform's file manager.</summary>
+        public static string RevealLabel => FileRevealService.RevealLabel;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
@@ -635,6 +648,30 @@ namespace ChartPacker.ViewModels
             }
 
             RefreshState();
+        }
+
+        private bool HasSelection() => SelectedEntries.Count > 0;
+
+        /// <summary>Shows the selected songs' files and folders in the file manager. Right-clicking a song selects it first.</summary>
+        [RelayCommand(CanExecute = nameof(HasSelection))]
+        private void Reveal() => _reveal.Reveal([.. SelectedEntries.Select(e => e.FullPath)]);
+
+        /// <summary>
+        /// Saves a copy of each selected song, unsaved changes and all, as a song folder named
+        /// <c>Artist - Title</c> in the download folder.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(HasSelection))]
+        private Task DownloadAllAsync()
+        {
+            var songs = SelectedEntries
+                .Select(entry =>
+                {
+                    var item = _itemsByPath.GetValueOrDefault(entry.FullPath);
+                    string name = DownloadNames.SongPrefix(item?.Artist, item?.Title, entry.DisplayName);
+                    return new SongDownload(entry, DraftFor(entry.FullPath), name);
+                })
+                .ToList();
+            return _downloads.SaveSongFoldersAsync(songs);
         }
 
         private void OnSelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)

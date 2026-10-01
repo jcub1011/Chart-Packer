@@ -460,6 +460,13 @@
                      Selection="{Binding Selection}"
                      SelectionMode="Multiple"
                      AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
+                <!-- Right-clicking a row selects it, or keeps the selection it's part of, so the menu acts on the selection. -->
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="{x:Static vm:LibraryViewModel.RevealLabel}" Command="{Binding RevealCommand}" />
+                        <MenuItem Header="{x:Static res:Strings.MenuDownloadAllFiles}" Command="{Binding DownloadAllCommand}" />
+                    </ContextMenu>
+                </ListBox.ContextMenu>
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:LibraryItemViewModel">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10"
