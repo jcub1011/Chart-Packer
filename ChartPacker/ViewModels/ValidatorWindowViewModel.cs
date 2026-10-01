@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -9,9 +10,11 @@ using Avalonia.Threading;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Validation;
+using ChartPacker.Core.Validation.QuickFixes;
 using ChartPacker.Resources;
 using ChartPacker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
@@ -20,33 +23,60 @@ namespace ChartPacker.ViewModels
     /// one picked in a full inspector beside the list, where it can be fixed and saved.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The inspector shares the main window's drafts, so an edit made here is the same draft the main window shows,
     /// saved or not. Each listed song is checked again whenever its draft changes, and read again from disk once its
     /// draft is saved or discarded. A song that comes to pass stays listed, marked as passing, so the list doesn't
     /// move under the pointer.
+    /// </para>
+    /// <para>
+    /// Issues with a quick fix can be ticked and fixed together. Fixes only go into the drafts; Save all changes
+    /// writes every listed song's draft.
+    /// </para>
     /// </remarks>
     public sealed partial class ValidatorWindowViewModel : ViewModelBase
     {
         private readonly IReadOnlyList<SongEntry> _entries;
         private readonly MetadataDraftStore _drafts;
+        private readonly JobViewModel _job;
+        private readonly DraftSaver _saver;
+        private readonly IConfirmationService? _confirmation;
         private readonly int _parallelism;
         private readonly CancellationTokenSource _closing = new();
 
         // The listed songs, by full path.
         private readonly Dictionary<string, ValidatorSongViewModel> _byPath = new(StringComparer.Ordinal);
 
+        // Set while many issues are ticked at once, so the counts are worked out once at the end.
+        private bool _selectingAll;
+
         /// <param name="entries">The songs to check, in the order they're listed.</param>
         /// <param name="drafts">The main window's drafts, which the songs are checked as.</param>
         /// <param name="inspector">The inspector the picked song is shown in, sharing <paramref name="drafts"/>.</param>
         /// <param name="parallelism">How many songs are read at once.</param>
-        public ValidatorWindowViewModel(IReadOnlyList<SongEntry> entries, MetadataDraftStore drafts, SongDetailViewModel inspector, int parallelism)
+        /// <param name="job">The main window's job: nothing is saved while one runs.</param>
+        /// <param name="saver">Writes the listed songs' drafts.</param>
+        /// <param name="confirmation">Asks before saving metadata that still fails; none to save without asking.</param>
+        public ValidatorWindowViewModel(
+            IReadOnlyList<SongEntry> entries,
+            MetadataDraftStore drafts,
+            SongDetailViewModel inspector,
+            int parallelism,
+            JobViewModel job,
+            DraftSaver saver,
+            IConfirmationService? confirmation = null)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(parallelism, 1);
             _entries = entries;
             _drafts = drafts;
+            _job = job;
+            _saver = saver;
+            _confirmation = confirmation;
             _parallelism = parallelism;
             Inspector = inspector;
             _drafts.DraftsChanged += OnDraftsChanged;
+            _job.PropertyChanged += OnJobPropertyChanged;
+            Inspector.PropertyChanged += OnInspectorPropertyChanged;
         }
 
         /// <summary>The picked song, editable and playable as in the main window.</summary>
@@ -68,6 +98,18 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(StatusText))]
         public partial int Checked { get; set; }
 
+        /// <summary>Save all changes is writing the listed songs; nothing can be edited meanwhile.</summary>
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(FixSelectedCommand), nameof(SaveAllCommand))]
+        public partial bool IsSaving { get; set; }
+
+        /// <summary>Which songs Save all changes couldn't save, and why.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSaveError))]
+        public partial string? SaveError { get; set; }
+
+        public bool HasSaveError => SaveError is not null;
+
         public int Total => _entries.Count;
 
         /// <summary>How many listed songs still fail.</summary>
@@ -84,6 +126,56 @@ namespace ChartPacker.ViewModels
         public bool ShowInspector => SelectedSong is not null;
 
         public bool ShowPickPrompt => SelectedSong is null;
+
+        /// <summary>Some listed issue has a quick fix.</summary>
+        public bool HasFixes => FixableIssues.Any();
+
+        /// <summary>How many ticked issues Fix selected would fix.</summary>
+        public int SelectedFixCount => FixableIssues.Count(i => i.IsSelected);
+
+        public string FixSelectedText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorFixSelectedFormat, SelectedFixCount);
+
+        /// <summary>
+        /// Whether every issue with a quick fix is ticked: <see langword="null"/> when only some are. Setting it ticks
+        /// or clears them all; clearing it while only some are ticked ticks them all, so a click on the partly ticked
+        /// box selects everything first.
+        /// </summary>
+        public bool? AllFixesSelected
+        {
+            get
+            {
+                int fixable = 0, selected = 0;
+                foreach (var issue in FixableIssues)
+                {
+                    fixable++;
+                    if (issue.IsSelected)
+                        selected++;
+                }
+
+                return selected == 0 ? false : selected == fixable ? true : null;
+            }
+            set
+            {
+                bool select = value ?? true;
+                if (value == false && AllFixesSelected is null)
+                    select = true;
+
+                _selectingAll = true;
+                try
+                {
+                    foreach (var issue in FixableIssues)
+                        issue.IsSelected = select;
+                }
+                finally
+                {
+                    _selectingAll = false;
+                }
+
+                RefreshSelection();
+            }
+        }
+
+        private IEnumerable<ValidatorIssueViewModel> FixableIssues => Songs.SelectMany(s => s.Issues).Where(i => i.IsFixable);
 
         /// <summary>Reads and checks every song, listing the ones that fail as they're found.</summary>
         public async Task LoadAsync()
@@ -113,6 +205,8 @@ namespace ChartPacker.ViewModels
         {
             _closing.Cancel();
             _drafts.DraftsChanged -= OnDraftsChanged;
+            _job.PropertyChanged -= OnJobPropertyChanged;
+            Inspector.PropertyChanged -= OnInspectorPropertyChanged;
             await Inspector.ShowAsync([]);
             Inspector.Detach();
             await Inspector.Player.WhenFilesClosedAsync();
@@ -122,13 +216,88 @@ namespace ChartPacker.ViewModels
         partial void OnSelectedSongChanged(ValidatorSongViewModel? value) =>
             _ = Inspector.ShowAsync(value is null ? [] : [value.Entry]);
 
+        // Drafts mustn't change while either this window or the inspector is writing them.
+        private bool CanFixSelected() => !IsSaving && !Inspector.IsSaving && SelectedFixCount > 0;
+
+        /// <summary>
+        /// Applies the ticked issues' quick fixes to their songs' drafts, each worked out from the song as drafted
+        /// now. Nothing is saved.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanFixSelected))]
+        private void FixSelected()
+        {
+            // Fixing a song checks it again, which replaces its issues, so the ticked ones are gathered first.
+            var work = Songs
+                .Select(s => (Song: s, Keys: s.Issues.Where(i => i.IsFixable && i.IsSelected).Select(i => i.Key).ToList()))
+                .Where(w => w.Keys.Count > 0)
+                .ToList();
+
+            foreach (var (song, keys) in work)
+            {
+                var item = new MetadataItem(song.Report.Pairs, _drafts.Get(song.Path));
+                foreach (string key in keys)
+                    QuickFixRegistry.FixKey(item, key, song.Report.DuplicateKeys, includeHints: false);
+
+                // Checks the song again, here and in any inspector showing it.
+                _drafts.NotifyChanged(song.Path);
+            }
+        }
+
+        /// <summary>The listed songs that can be saved and have something to save.</summary>
+        private IEnumerable<ValidatorSongViewModel> SongsToSave => Songs.Where(s => s.Report.ReadError is null && _drafts.HasDrafts(s.Path));
+
+        private bool CanSaveAll() => !IsSaving && !Inspector.IsSaving && !_job.IsRunning && SongsToSave.Any();
+
+        /// <summary>
+        /// Writes the drafts of every listed song. Songs that fail keep their drafts. Songs whose metadata still fails
+        /// validation are only saved once the user confirms it.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanSaveAll))]
+        private async Task SaveAllAsync()
+        {
+            int stillFailing = SongsToSave.Count(s => !s.IsFixed);
+            if (stillFailing > 0 && _confirmation is not null)
+            {
+                string message = string.Format(CultureInfo.CurrentCulture, Strings.ValidatorSaveInvalidMessageFormat, stillFailing);
+                if (!await _confirmation.ConfirmAsync(Strings.SaveInvalidTitle, message, Strings.SaveAnywayButton))
+                    return;
+
+                // The drafts, or the job, may have moved on while the dialog was open.
+                if (!CanSaveAll())
+                    return;
+            }
+
+            var targets = SongsToSave
+                .Select(s => new SaveTarget(s.Entry, s.Report.SongIniPath, _drafts.Get(s.Path)))
+                .ToList();
+
+            IsSaving = true;
+            SaveError = null;
+            IReadOnlyList<string> failures;
+            try
+            {
+                // The inspector's player and background video hold the picked song's files open.
+                await Inspector.ReleaseFilesAsync();
+                failures = await _saver.SaveAsync(targets, entry => _drafts.NotifyChanged(entry.FullPath));
+            }
+            finally
+            {
+                IsSaving = false;
+            }
+
+            // The inspector let go of its song's files whether or not it was saved, so it's shown again.
+            await Inspector.ShowAsync(SelectedSong is null ? [] : [SelectedSong.Entry]);
+            if (failures.Count > 0)
+                SaveError = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, string.Join(Environment.NewLine, failures));
+        }
+
         private void Add(int index, SongMetadataReport report)
         {
             if (_closing.IsCancellationRequested)
                 return;
 
             Checked++;
-            var song = new ValidatorSongViewModel(index, report);
+            var song = new ValidatorSongViewModel(index, report, OnIssueSelectionChanged);
             song.Check(DraftOf(report.Entry));
             if (song.IsFixed)
                 return;
@@ -172,6 +341,27 @@ namespace ChartPacker.ViewModels
             }
         }
 
+        private void OnJobPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(JobViewModel.IsRunning))
+                SaveAllCommand.NotifyCanExecuteChanged();
+        }
+
+        private void OnInspectorPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(SongDetailViewModel.IsSaving))
+            {
+                FixSelectedCommand.NotifyCanExecuteChanged();
+                SaveAllCommand.NotifyCanExecuteChanged();
+            }
+        }
+
+        private void OnIssueSelectionChanged()
+        {
+            if (!_selectingAll)
+                RefreshSelection();
+        }
+
         private MetadataDraft? DraftOf(SongEntry entry) => _drafts.HasDrafts(entry.FullPath) ? _drafts.Get(entry.FullPath) : null;
 
         private void RefreshCounts()
@@ -179,21 +369,35 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(FailingCount));
             OnPropertyChanged(nameof(StatusText));
             OnPropertyChanged(nameof(ShowAllPass));
+            SaveAllCommand.NotifyCanExecuteChanged();
+            RefreshSelection();
+        }
+
+        private void RefreshSelection()
+        {
+            OnPropertyChanged(nameof(HasFixes));
+            OnPropertyChanged(nameof(SelectedFixCount));
+            OnPropertyChanged(nameof(FixSelectedText));
+            OnPropertyChanged(nameof(AllFixesSelected));
+            FixSelectedCommand.NotifyCanExecuteChanged();
         }
     }
 
     /// <summary>A song in the Validator's list: what it's called, and which of its keys fail and why.</summary>
     public sealed partial class ValidatorSongViewModel : ObservableObject
     {
-        // How many failing keys are spelled out; the rest are counted.
+        // How many failing keys without a quick fix are spelled out; the rest are counted. Every fixable one is listed.
         private const int ListedIssues = 3;
 
+        private readonly Action _selectionChanged;
         private SongMetadataReport _report;
 
-        public ValidatorSongViewModel(int index, SongMetadataReport report)
+        /// <param name="selectionChanged">Called when one of the song's issues is ticked or cleared.</param>
+        public ValidatorSongViewModel(int index, SongMetadataReport report, Action selectionChanged)
         {
             Index = index;
             _report = report;
+            _selectionChanged = selectionChanged;
             Title = report.Entry.DisplayName;
         }
 
@@ -204,13 +408,23 @@ namespace ChartPacker.ViewModels
 
         public string Path => _report.Entry.FullPath;
 
+        /// <summary>The metadata as last read from disk.</summary>
+        internal SongMetadataReport Report => _report;
+
         /// <summary>"Name - Artist" as drafted, or the file or folder name.</summary>
         [ObservableProperty]
         public partial string Title { get; set; }
 
-        /// <summary>The first few failing keys, each with why.</summary>
+        /// <summary>The failing keys, each with why: every one with a quick fix, and the first few of the rest.</summary>
         [ObservableProperty]
-        public partial IReadOnlyList<string> IssueLines { get; set; } = [];
+        public partial IReadOnlyList<ValidatorIssueViewModel> Issues { get; set; } = [];
+
+        /// <summary>How many failing keys aren't listed, as a line under the listed ones.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasMoreIssues))]
+        public partial string? MoreIssuesText { get; set; }
+
+        public bool HasMoreIssues => MoreIssuesText is not null;
 
         [ObservableProperty]
         public partial string? IssueCountText { get; set; }
@@ -226,7 +440,7 @@ namespace ChartPacker.ViewModels
             Check(draft);
         }
 
-        /// <summary>Checks the metadata as <paramref name="draft"/> would save it.</summary>
+        /// <summary>Checks the metadata as <paramref name="draft"/> would save it. Issues ticked before stay ticked while they're still fixable.</summary>
         public void Check(MetadataDraft? draft)
         {
             var pairs = draft?.ApplyTo(_report.Pairs) ?? _report.Pairs;
@@ -238,26 +452,91 @@ namespace ChartPacker.ViewModels
                 _ => _report.Entry.DisplayName,
             };
 
+            var selected = Issues.Where(i => i.IsSelected).Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             if (_report.ReadError is { } error)
             {
-                IssueLines = [string.Format(CultureInfo.CurrentCulture, Strings.ValidatorUnreadableFormat, error)];
+                Issues = [new ValidatorIssueViewModel("", string.Format(CultureInfo.CurrentCulture, Strings.ValidatorUnreadableFormat, error), null, false, _selectionChanged)];
+                MoreIssuesText = null;
                 IssueCountText = null;
                 IsFixed = false;
                 return;
             }
 
-            // One line per failing key, its messages joined.
+            // One line per failing key, its messages joined, with what its quick fixes do.
             var byKey = MetadataValidator.Validate(pairs, _report.DuplicateKeys)
                 .Where(MetadataValidator.IsFailing)
                 .GroupBy(f => f.Key ?? "", StringComparer.OrdinalIgnoreCase)
-                .Select(g => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorIssueLineFormat, g.Key, string.Join(" ", g.Select(f => f.Message).Distinct(StringComparer.Ordinal))))
                 .ToList();
+
+            var issues = new List<ValidatorIssueViewModel>();
+            int unfixableListed = 0, unlisted = 0;
+            foreach (var group in byKey)
+            {
+                var fixes = group
+                    .Select(f => QuickFixRegistry.Propose(f, pairs)?.Description)
+                    .OfType<string>()
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+                string? fix = fixes.Count == 0 ? null : string.Join(", ", fixes);
+
+                if (fix is null && unfixableListed == ListedIssues)
+                {
+                    unlisted++;
+                    continue;
+                }
+
+                if (fix is null)
+                    unfixableListed++;
+
+                string text = string.Format(CultureInfo.CurrentCulture, Strings.ValidatorIssueLineFormat, group.Key,
+                    string.Join(" ", group.Select(f => f.Message).Distinct(StringComparer.Ordinal)));
+                issues.Add(new ValidatorIssueViewModel(group.Key, text, fix, fix is not null && selected.Contains(group.Key), _selectionChanged));
+            }
 
             IsFixed = byKey.Count == 0;
             IssueCountText = IsFixed ? Strings.ValidatorFixed : string.Format(CultureInfo.CurrentCulture, Strings.ValidatorIssueCountFormat, byKey.Count);
-            IssueLines = byKey.Count > ListedIssues
-                ? [.. byKey.Take(ListedIssues), string.Format(CultureInfo.CurrentCulture, Strings.ValidatorMoreIssuesFormat, byKey.Count - ListedIssues)]
-                : byKey;
+            Issues = issues;
+            MoreIssuesText = unlisted > 0 ? string.Format(CultureInfo.CurrentCulture, Strings.ValidatorMoreIssuesFormat, unlisted) : null;
         }
+    }
+
+    /// <summary>A failing key of a song in the Validator's list, which can be ticked for Fix selected when it has a quick fix.</summary>
+    public sealed partial class ValidatorIssueViewModel : ObservableObject
+    {
+        private readonly Action _selectionChanged;
+
+        /// <param name="key">The failing key.</param>
+        /// <param name="text">The key and why it fails.</param>
+        /// <param name="fixDescription">What the key's quick fix does, or <see langword="null"/> without one.</param>
+        /// <param name="isSelected">Whether it starts ticked.</param>
+        /// <param name="selectionChanged">Called when it's ticked or cleared.</param>
+        public ValidatorIssueViewModel(string key, string text, string? fixDescription, bool isSelected, Action selectionChanged)
+        {
+            Key = key;
+            Text = text;
+            FixDescription = fixDescription;
+            IsSelected = isSelected;
+            _selectionChanged = selectionChanged;
+        }
+
+        public string Key { get; }
+
+        public string Text { get; }
+
+        /// <summary>What the quick fix does, e.g. "Change to True"; <see langword="null"/> without one.</summary>
+        public string? FixDescription { get; }
+
+        public bool IsFixable => FixDescription is not null;
+
+        /// <summary>The line under a fixable issue saying what fixing it does.</summary>
+        public string? FixText => FixDescription is null ? null : string.Format(CultureInfo.CurrentCulture, Strings.ValidatorFixDescriptionFormat, FixDescription);
+
+        /// <summary>Ticked for Fix selected.</summary>
+        [ObservableProperty]
+        public partial bool IsSelected { get; set; }
+
+        // Null while the constructor sets the starting tick, which isn't a change to report.
+        partial void OnIsSelectedChanged(bool value) => _selectionChanged?.Invoke();
     }
 }

@@ -10,11 +10,13 @@ namespace ChartPacker.Core.Validation;
 /// <param name="Pairs">Its pairs in stored order; a <c>.sng</c>'s keep any duplicates. Empty without a <c>song.ini</c> or <c>[song]</c> section.</param>
 /// <param name="DuplicateKeys">The keys a <c>song.ini</c> repeats, which its reader merged out of <paramref name="Pairs"/>.</param>
 /// <param name="ReadError">Why the metadata couldn't be read, or <see langword="null"/> when it was.</param>
+/// <param name="SongIniPath">For a folder, the <c>song.ini</c> its metadata is saved to (which may not exist yet); <see langword="null"/> for a <c>.sng</c>.</param>
 public sealed record SongMetadataReport(
     SongEntry Entry,
     IReadOnlyList<KeyValuePair<string, string>> Pairs,
     IReadOnlyList<string> DuplicateKeys,
-    string? ReadError);
+    string? ReadError,
+    string? SongIniPath = null);
 
 /// <summary>Reads a song's stored metadata the way the detail panel does, so the two agree on what's checked.</summary>
 public static class SongMetadataCheck
@@ -37,12 +39,12 @@ public static class SongMetadataCheck
             string? songIni = Directory.EnumerateFiles(entry.FullPath)
                 .FirstOrDefault(f => Path.GetFileName(f).Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase));
             if (songIni is null)
-                return new SongMetadataReport(entry, [], [], null);
+                return new SongMetadataReport(entry, [], [], null, Path.Combine(entry.FullPath, SongIni.FileName));
 
             var ini = await SongIni.ReadAsync(songIni, cancellationToken).ConfigureAwait(false);
             return ini.Status == SongIniStatus.TooLarge
-                ? new SongMetadataReport(entry, [], [], FindingMessages.SongIniTooLarge)
-                : new SongMetadataReport(entry, ini.Pairs, ini.DuplicateKeys, null);
+                ? new SongMetadataReport(entry, [], [], FindingMessages.SongIniTooLarge, songIni)
+                : new SongMetadataReport(entry, ini.Pairs, ini.DuplicateKeys, null, songIni);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

@@ -27,6 +27,11 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
+        <Style Selector="TextBlock.fix">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
         <Style Selector="TextBlock.path">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Opacity" Value="0.55" />
@@ -58,6 +63,38 @@
                         <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding StatusText}" />
                     </StackPanel>
                     <ProgressBar IsVisible="{Binding IsChecking}" Minimum="0" Maximum="{Binding Total}" Value="{Binding Checked}" />
+                    <!-- Quick fixes go into the drafts; Save all changes writes every listed song's. -->
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <CheckBox Grid.Column="0"
+                                  VerticalAlignment="Center"
+                                  IsThreeState="False"
+                                  IsEnabled="{Binding HasFixes}"
+                                  IsChecked="{Binding AllFixesSelected}"
+                                  Content="{x:Static res:Strings.ValidatorSelectAllFixes}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                            <Panel Width="14" VerticalAlignment="Center">
+                                <Arc Classes="spinner"
+                                     Classes.active="{Binding IsSaving}"
+                                     IsVisible="{Binding IsSaving}"
+                                     Width="14" Height="14" StrokeThickness="2" />
+                            </Panel>
+                            <Button Classes="labelled"
+                                    Command="{Binding FixSelectedCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ValidatorFixSelectedToolTip}">
+                                <TextBlock VerticalAlignment="Center" Text="{Binding FixSelectedText}" />
+                            </Button>
+                            <Button Classes="labelled accent"
+                                    Command="{Binding SaveAllCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ValidatorSaveAllToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.ValidatorSaveAll}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ctl:LineIcon Data="{StaticResource SaveStroke}" />
+                                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ValidatorSaveAll}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Classes="issue" IsVisible="{Binding HasSaveError}" Text="{Binding SaveError}" />
                 </StackPanel>
             </Border>
 
@@ -76,13 +113,25 @@
                                         <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="{Binding IssueCountText}" />
                                     </Grid>
                                     <TextBlock Classes="path" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" />
-                                    <ItemsControl ItemsSource="{Binding IssueLines}" IsVisible="{Binding !IsFixed}">
+                                    <!-- An issue with a quick fix can be ticked for Fix selected, with what the fix does under it. -->
+                                    <ItemsControl ItemsSource="{Binding Issues}" IsVisible="{Binding !IsFixed}">
                                         <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="x:String">
-                                                <TextBlock Classes="issue" Text="{Binding}" />
+                                            <DataTemplate x:DataType="vm:ValidatorIssueViewModel">
+                                                <Panel>
+                                                    <CheckBox IsVisible="{Binding IsFixable}"
+                                                              IsChecked="{Binding IsSelected}"
+                                                              AutomationProperties.Name="{Binding Text}">
+                                                        <StackPanel>
+                                                            <TextBlock Classes="issue" Text="{Binding Text}" />
+                                                            <TextBlock Classes="fix" Text="{Binding FixText}" />
+                                                        </StackPanel>
+                                                    </CheckBox>
+                                                    <TextBlock Classes="issue" IsVisible="{Binding !IsFixable}" Text="{Binding Text}" />
+                                                </Panel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+                                    <TextBlock Classes="issue" IsVisible="{Binding HasMoreIssues}" Text="{Binding MoreIssuesText}" />
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
@@ -105,7 +154,7 @@
         <!-- The picked song in the full inspector, with its own Save and Discard, as the main toolbar has. -->
         <Border Grid.Column="2" Background="{DynamicResource SurfaceBrush}" MinWidth="420">
             <DockPanel>
-                <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1" IsVisible="{Binding ShowInspector}">
+                <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1" IsVisible="{Binding ShowInspector}" IsEnabled="{Binding !IsSaving}">
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                         <Panel Width="14" VerticalAlignment="Center">
                             <Arc Classes="spinner"
@@ -136,7 +185,8 @@
                 </Border>
 
                 <Panel>
-                    <Panel IsVisible="{Binding ShowInspector}">
+                    <!-- Nothing is edited while Save all changes writes the drafts. -->
+                    <Panel IsVisible="{Binding ShowInspector}" IsEnabled="{Binding !IsSaving}">
                         <views:SongDetailView DataContext="{Binding Inspector}" />
                     </Panel>
                     <TextBlock Classes="muted centered"

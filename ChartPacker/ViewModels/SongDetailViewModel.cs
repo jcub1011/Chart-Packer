@@ -17,6 +17,7 @@ using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
 using ChartPacker.Core.Validation;
+using ChartPacker.Core.Validation.QuickFixes;
 using ChartPacker.Formatting;
 using ChartPacker.Resources;
 using ChartPacker.Services;
@@ -56,7 +57,15 @@ namespace ChartPacker.ViewModels
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
 
     /// <summary>Why a key that has no metadata row, such as a difficulty, fails validation.</summary>
-    public sealed record MetadataIssueRow(string Key, string Message);
+    /// <param name="QuickFixDescription">What the quick fix does, when that's one thing.</param>
+    /// <param name="QuickFixCommand">Applies the key's quick fixes from its right-click menu; disabled when it has none.</param>
+    public sealed record MetadataIssueRow(string Key, string Message, string? QuickFixDescription, IRelayCommand QuickFixCommand)
+    {
+        /// <summary>The right-click menu's Quick Fix item, saying what it does when that's one thing.</summary>
+        public string QuickFixHeader => QuickFixDescription is { } description
+            ? string.Format(CultureInfo.CurrentCulture, Strings.QuickFixMenuFormat, description)
+            : Strings.QuickFixMenu;
+    }
 
     /// <summary>An entry of the Add track menu: a stem, labelled to say whether choosing it replaces the song's track for it.</summary>
     public sealed record StemOption(string Stem, string Label, IAsyncRelayCommand Command);
@@ -94,6 +103,7 @@ namespace ChartPacker.ViewModels
         private readonly IFileRevealService? _reveal;
         private readonly SongFileGate _songFiles;
         private readonly IConfirmationService? _confirmation;
+        private readonly DraftSaver _saver;
         private CancellationTokenSource? _loadCts;
 
         // This panel is telling the draft store about its own change, which it needn't hear back.
@@ -145,6 +155,10 @@ namespace ChartPacker.ViewModels
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
 
+        // The Quick Fix commands of keys without a row, and the keys some selected song has a quick fix for.
+        private readonly Dictionary<string, IRelayCommand> _quickFixKeyCommands = new(StringComparer.OrdinalIgnoreCase);
+        private HashSet<string> _keysWithQuickFix = new(StringComparer.OrdinalIgnoreCase);
+
         /// <param name="downloads">Saves copies of the song's files from their right-click menus; none for a panel that only previews.</param>
         /// <param name="reveal">Shows the selected songs in the file manager; none for a panel that only previews.</param>
         /// <param name="songFiles">
@@ -152,6 +166,7 @@ namespace ChartPacker.ViewModels
         /// None for a panel nothing else downloads from.
         /// </param>
         /// <param name="confirmation">Asks before saving metadata that fails validation; none for a panel that never saves.</param>
+        /// <param name="saver">Writes the drafts; one of its own over <paramref name="songFiles"/> when none is given.</param>
         public SongDetailViewModel(
             MetadataDraftStore drafts,
             JobViewModel job,
@@ -163,13 +178,15 @@ namespace ChartPacker.ViewModels
             IDownloadService? downloads = null,
             IFileRevealService? reveal = null,
             SongFileGate? songFiles = null,
-            IConfirmationService? confirmation = null)
+            IConfirmationService? confirmation = null,
+            DraftSaver? saver = null)
         {
             _drafts = drafts;
             _downloads = downloads;
             _reveal = reveal;
             _songFiles = songFiles ?? new SongFileGate();
             _confirmation = confirmation;
+            _saver = saver ?? new DraftSaver(_songFiles);
             _externalChangeTimer = new DispatcherTimer(ExternalChangeDelay, DispatcherPriority.Background, (_, _) => OnExternalChangeSettled());
             _externalChangeTimer.Stop();
             _drafts.DraftsChanged += OnDraftsChangedElsewhere;
@@ -666,6 +683,40 @@ namespace ChartPacker.ViewModels
         {
             BulkMetadata.Revert(Items(), key);
             OnDraftsChanged();
+        }
+
+        /// <summary>
+        /// Applies every quick fix for <paramref name="key"/> to each selected song's draft, each worked out from that
+        /// song's own value. Nothing is saved.
+        /// </summary>
+        internal void ApplyQuickFixes(string key)
+        {
+            bool applied = false;
+            foreach (var song in _songs)
+                applied |= QuickFixRegistry.FixKey(song.Item, key, song.DuplicateKeys) > 0;
+            if (applied)
+                OnDraftsChanged();
+        }
+
+        /// <summary>
+        /// The Quick Fix command of a key without a row, kept per key so a listed failure keeps its command, and the
+        /// list its rows, while the key's validation stays the same.
+        /// </summary>
+        private IRelayCommand QuickFixCommandFor(string key)
+        {
+            if (!_quickFixKeyCommands.TryGetValue(key, out var command))
+            {
+                command = new RelayCommand(() => ApplyQuickFixes(key), () => CanEdit && _keysWithQuickFix.Contains(key));
+                _quickFixKeyCommands[key] = command;
+            }
+
+            return command;
+        }
+
+        private void RefreshQuickFixKeyCommands()
+        {
+            foreach (var command in _quickFixKeyCommands.Values)
+                command.NotifyCanExecuteChanged();
         }
 
         /// <summary>Unsets the difficulty <paramref name="key"/>: <c>-1</c> where one is stored, and no change elsewhere.</summary>
@@ -1354,7 +1405,7 @@ namespace ChartPacker.ViewModels
         {
             var entries = _entries;
             var dirty = _songs.Where(s => !s.Item.Draft.IsEmpty).ToList();
-            var failures = new List<string>();
+            IReadOnlyList<string> failures = [];
 
             if (HasValidationIssues && _confirmation is not null)
             {
@@ -1371,46 +1422,13 @@ namespace ChartPacker.ViewModels
             CancelAdd();
             IsSaving = true;
             SaveError = null;
-
-            // Playback holds the song's files open, which would stop them being replaced or deleted;
-            // so does the background video.
-            Player.Unload();
-            Background.Unload();
-            ForgetSongLength();
             try
             {
-                await Player.WhenFilesClosedAsync();
-                await Background.WhenClosedAsync();
-
-                // A failed estimate only costs the timeline its length; it mustn't stop the save.
-                await _songLengthTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
-
-                // Downloads of these songs finish first, and new ones wait until they're saved.
-                using (await _songFiles.WriteAsync(dirty.Select(s => s.Entry.FullPath)))
-                {
-                    foreach (var song in dirty)
-                    {
-                        string? error;
-                        try
-                        {
-                            error = await Task.Run(() => SaveSongAsync(song));
-                        }
-                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-                        {
-                            error = ex.Message;
-                        }
-
-                        if (error is null)
-                        {
-                            song.Item.Draft.Clear();
-                            NotifyDrafts([song]);
-                        }
-                        else
-                        {
-                            failures.Add(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedItemFormat, song.Entry.DisplayName, error));
-                        }
-                    }
-                }
+                await ReleaseFilesAsync();
+                var bySong = dirty.ToDictionary(s => s.Entry.FullPath, StringComparer.Ordinal);
+                failures = await _saver.SaveAsync(
+                    [.. dirty.Select(s => new SaveTarget(s.Entry, s.SongIniPath, s.Item.Draft))],
+                    entry => NotifyDrafts([bySong[entry.FullPath]]));
             }
             finally
             {
@@ -1442,20 +1460,21 @@ namespace ChartPacker.ViewModels
             OnDraftsChanged();
         }
 
-        /// <summary>Re-reads the song and writes it back with only the draft's keys, album art and files changed.</summary>
-        /// <returns>Why it couldn't be saved, or <see langword="null"/> on success.</returns>
-        private static async Task<string?> SaveSongAsync(EditableSong song)
+        /// <summary>
+        /// Lets go of every file of the shown songs this panel holds open, which would stop them being replaced or
+        /// deleted: playback's, and the background video's. They're opened again when the songs are next shown.
+        /// </summary>
+        internal async Task ReleaseFilesAsync()
         {
-            var draft = song.Item.Draft;
-            if (song.Entry.Kind == SongEntryKind.SngFile)
-                return FirstError(await DraftWriter.SaveSngAsync(song.Entry.FullPath, draft).ConfigureAwait(false));
+            Player.Unload();
+            Background.Unload();
+            ForgetSongLength();
+            await Player.WhenFilesClosedAsync();
+            await Background.WhenClosedAsync();
 
-            await DraftWriter.SaveFolderAsync(song.Entry.FullPath, song.SongIniPath!, draft).ConfigureAwait(false);
-            return null;
+            // A failed estimate only costs the timeline its length; it mustn't stop the save.
+            await _songLengthTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
-
-        private static string? FirstError(IEnumerable<Finding> findings) =>
-            findings.FirstOrDefault(f => f.Severity == Severity.Error)?.Message;
 
         partial void OnIsLoadingChanged(bool value) => RefreshState();
 
@@ -1688,15 +1707,24 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void RefreshValidation()
         {
-            // Per key, every failing finding with the song it's in, and the first hint.
+            // Per key, every failing finding with the song it's in, the first hint, and what its quick fixes do.
             var failing = new Dictionary<string, List<(int Song, Finding Finding)>>(StringComparer.OrdinalIgnoreCase);
             var hints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var fixes = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < _songs.Count; i++)
             {
                 var song = _songs[i];
-                foreach (var finding in MetadataValidator.Validate(song.Item.Draft.ApplyTo(song.Item.Original), song.DuplicateKeys))
+                var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
+                foreach (var finding in MetadataValidator.Validate(pairs, song.DuplicateKeys))
                 {
                     string key = finding.Key ?? "";
+                    if (QuickFixRegistry.Propose(finding, pairs) is { } fix)
+                    {
+                        if (!fixes.TryGetValue(key, out var descriptions))
+                            fixes[key] = descriptions = new HashSet<string>(StringComparer.Ordinal);
+                        descriptions.Add(fix.Description);
+                    }
+
                     if (MetadataValidator.IsFailing(finding))
                     {
                         if (!failing.TryGetValue(key, out var list))
@@ -1710,13 +1738,20 @@ namespace ChartPacker.ViewModels
                 }
             }
 
+            _keysWithQuickFix = new HashSet<string>(fixes.Keys, StringComparer.OrdinalIgnoreCase);
+
+            // A key's fixes are named when they're one; several, e.g. different values across songs, are just "Quick Fix".
+            (bool Available, string? Description) QuickFixOf(string key) => fixes.TryGetValue(key, out var descriptions)
+                ? (true, descriptions.Count == 1 ? descriptions.First() : null)
+                : (false, null);
+
             foreach (var row in Metadata)
-                row.SetValidation(DescribeIssue(failing.GetValueOrDefault(row.Key)), hints.GetValueOrDefault(row.Key));
+                row.SetValidation(DescribeIssue(failing.GetValueOrDefault(row.Key)), hints.GetValueOrDefault(row.Key), QuickFixOf(row.Key));
 
             var rowKeys = Metadata.Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var hidden = failing
                 .Where(f => !rowKeys.Contains(f.Key))
-                .Select(f => new MetadataIssueRow(f.Key, DescribeIssue(f.Value)!))
+                .Select(f => new MetadataIssueRow(f.Key, DescribeIssue(f.Value)!, QuickFixOf(f.Key).Description, QuickFixCommandFor(f.Key)))
                 .ToList();
             if (!hidden.SequenceEqual(HiddenIssues))
             {
@@ -1727,6 +1762,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasHiddenIssues));
             OnPropertyChanged(nameof(FailingFieldCount));
             OnPropertyChanged(nameof(HasValidationIssues));
+            RefreshQuickFixKeyCommands();
         }
 
         /// <summary>A key's failures as one message: each distinct one on its own line, and for several songs, how many fail.</summary>
@@ -2404,6 +2440,7 @@ namespace ChartPacker.ViewModels
             RevertChartCommand.NotifyCanExecuteChanged();
             DownloadArtCommand.NotifyCanExecuteChanged();
             DownloadBackgroundCommand.NotifyCanExecuteChanged();
+            RefreshQuickFixKeyCommands();
             RefreshLyricsCommands();
             foreach (var command in _addTrackCommands.Values)
                 command.NotifyCanExecuteChanged();

@@ -41,6 +41,8 @@ namespace ChartPacker.Services
             // The inspector is the main one in full, with a player and highway of its own. Its pickers and prompts
             // belong to this window, so they come up over it; its drafts and file gate are the main window's.
             var dialog = new ValidatorWindow();
+            var confirmation = new AvaloniaConfirmationService(() => dialog);
+            var saver = new DraftSaver(songFiles);
             var player = new PlayerViewModel(settings, openOutput);
             var highway = new HighwayViewModel(settings, player);
             var inspector = new SongDetailViewModel(
@@ -54,11 +56,12 @@ namespace ChartPacker.Services
                 new DownloadService(settings, () => dialog, notice, songFiles),
                 new FileRevealService(() => dialog),
                 songFiles,
-                new AvaloniaConfirmationService(() => dialog));
+                confirmation,
+                saver);
 
             // Songs are read as many at once as a library scan reads.
             int parallelism = Math.Max(settings.Settings.ScanParallelism, AppSettings.MinScanParallelism);
-            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism);
+            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, confirmation);
             dialog.DataContext = viewModel;
             _ = viewModel.LoadAsync();
             WindowChrome.UseOwnerIcon(dialog, window);

@@ -26,6 +26,7 @@ public sealed class SongMetadataCheckTests
         Assert.IsNull(report.ReadError);
         CollectionAssert.AreEqual(new[] { P("name", "B"), P("diff_guitar", "hard") }, report.Pairs.ToArray());
         CollectionAssert.AreEqual(new[] { "name" }, report.DuplicateKeys.ToArray());
+        Assert.AreEqual(Path.Combine(folder, "Song.INI"), report.SongIniPath);
     }
 
     [TestMethod]
@@ -37,6 +38,7 @@ public sealed class SongMetadataCheckTests
 
         Assert.IsNull(report.ReadError);
         Assert.IsEmpty(report.Pairs);
+        Assert.AreEqual(Path.Combine(folder, "song.ini"), report.SongIniPath);
     }
 
     [TestMethod]
@@ -50,6 +52,7 @@ public sealed class SongMetadataCheckTests
 
         Assert.IsNull(report.ReadError);
         CollectionAssert.AreEqual(new[] { P("name", "A"), P("Name", "B"), P("pro_drums", "true") }, report.Pairs.ToArray());
+        Assert.IsNull(report.SongIniPath);
     }
 
     [TestMethod]

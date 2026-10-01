@@ -105,15 +105,18 @@ public static class MetadataValidator
         if (value is "True" or "False")
             return null;
 
-        string? canonical =
-            value.Equals("true", StringComparison.OrdinalIgnoreCase) || value == "1" ? "True"
-            : value.Equals("false", StringComparison.OrdinalIgnoreCase) || value == "0" ? "False"
-            : null;
+        string? canonical = CanonicalBoolean(value);
         return canonical is null
             ? Mismatch(FindingMessages.PairExpectedBoolean)
             : new Finding(SngRules.Sng060, Severity.Warning,
                 string.Format(CultureInfo.CurrentCulture, FindingMessages.PairLenientBooleanFormat, canonical));
     }
+
+    /// <summary><c>True</c> or <c>False</c> for any case of them, <c>1</c> or <c>0</c>; otherwise <see langword="null"/>.</summary>
+    internal static string? CanonicalBoolean(string value) =>
+        value.Equals("true", StringComparison.OrdinalIgnoreCase) || value == "1" ? "True"
+        : value.Equals("false", StringComparison.OrdinalIgnoreCase) || value == "0" ? "False"
+        : null;
 
     /// <summary>An optional <c>+</c> or <c>-</c>, then one or more of the digits <c>0–9</c> (sng-spec §6.2).</summary>
     internal static bool IsInteger(ReadOnlySpan<char> value)

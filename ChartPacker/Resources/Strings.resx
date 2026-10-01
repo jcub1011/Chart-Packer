@@ -2198,4 +2198,37 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorSongsListName" xml:space="preserve">
     <value>Songs that fail validation</value>
   </data>
+  <data name="ValidatorSelectAllFixes" xml:space="preserve">
+    <value>Select all quick fixes</value>
+    <comment>A three-state check box over the Validator's list that ticks or clears every issue that has a quick fix.</comment>
+  </data>
+  <data name="ValidatorFixSelectedFormat" xml:space="preserve">
+    <value>Fix selected ({0})</value>
+    <comment>{0} is how many ticked issues the button fixes.</comment>
+  </data>
+  <data name="ValidatorFixSelectedToolTip" xml:space="preserve">
+    <value>Apply the quick fixes of the ticked issues to the songs' drafts. Nothing is saved until you save.</value>
+  </data>
+  <data name="ValidatorSaveAll" xml:space="preserve">
+    <value>Save all changes</value>
+  </data>
+  <data name="ValidatorSaveAllToolTip" xml:space="preserve">
+    <value>Save the unsaved changes of every listed song</value>
+  </data>
+  <data name="ValidatorSaveInvalidMessageFormat" xml:space="preserve">
+    <value>{0} of the songs being saved still fail validation. Games may misread or ignore those values. Save them anyway?</value>
+    <comment>{0} is how many of the songs being saved still fail.</comment>
+  </data>
+  <data name="ValidatorFixDescriptionFormat" xml:space="preserve">
+    <value>Quick fix: {0}</value>
+    <comment>Under a fixable issue in the Validator's list. {0} is what the fix does, e.g. "Change to True".</comment>
+  </data>
+  <data name="QuickFixMenu" xml:space="preserve">
+    <value>Quick Fix</value>
+    <comment>Right-click menu item on a metadata row that applies the row's quick fix to the draft; disabled when it has none.</comment>
+  </data>
+  <data name="QuickFixMenuFormat" xml:space="preserve">
+    <value>Quick Fix: {0}</value>
+    <comment>Right-click menu item on a metadata row. {0} is what the fix does, e.g. "Change to True".</comment>
+  </data>
 </root>

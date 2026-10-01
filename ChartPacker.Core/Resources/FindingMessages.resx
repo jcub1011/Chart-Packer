@@ -238,6 +238,22 @@
     <value>A legacy key; newer games read {0} instead.</value>
     <comment>{0} is the key that replaced it.</comment>
   </data>
+  <data name="QuickFixSetValueFormat" xml:space="preserve">
+    <value>Change to {0}</value>
+    <comment>A quick fix that replaces a pair's value. {0} is the new value, e.g. True.</comment>
+  </data>
+  <data name="QuickFixRemoveKey" xml:space="preserve">
+    <value>Remove the key</value>
+    <comment>A quick fix that removes a pair, e.g. one with an empty value.</comment>
+  </data>
+  <data name="QuickFixStripForbidden" xml:space="preserve">
+    <value>Remove the ; and line breaks</value>
+    <comment>A quick fix that removes the characters song.ini can't hold from a value; line breaks become spaces.</comment>
+  </data>
+  <data name="QuickFixRenameKeyFormat" xml:space="preserve">
+    <value>Rename to {0}</value>
+    <comment>A quick fix that renames a legacy key. {0} is the key that replaced it.</comment>
+  </data>
   <data name="NoSongIni" xml:space="preserve">
     <value>There's no song.ini, so the .sng will have no metadata.</value>
   </data>

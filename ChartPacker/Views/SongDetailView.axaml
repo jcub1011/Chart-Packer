@@ -1763,6 +1763,11 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:MetadataIssueRow">
                                     <Border Classes="metadataRow invalid" Margin="0,1">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                             <TextBlock Grid.Column="0" Classes="issue" FontWeight="SemiBold" Text="{Binding Key}" />
                                             <TextBlock Grid.Column="1" Classes="issue" Text="{Binding Message}" />
@@ -1782,6 +1787,12 @@
                             <DataTemplate x:DataType="vm:MetadataRowViewModel">
                                 <!-- A value that fails validation is marked orange, with why under it. -->
                                 <Border Classes="metadataRow" Classes.invalid="{Binding HasIssue}" Margin="0,1">
+                                    <!-- Quick Fix puts the key's fix in the drafts; it's there on every row, disabled where there's none. -->
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
                                     <Grid RowDefinitions="Auto,Auto">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="14" />
