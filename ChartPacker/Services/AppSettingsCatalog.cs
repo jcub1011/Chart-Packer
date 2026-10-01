@@ -179,6 +179,23 @@ namespace ChartPacker.Services
                         Get = () => highway.IsEnabled,
                         Set = show => highway.IsEnabled = show,
                     },
+                    new ChoiceSetting<HighwayPlacement>
+                    {
+                        Id = "playback.highwayPlacement",
+                        Category = visualizers,
+                        Label = Strings.HighwayPlacementLabel,
+                        Description = Strings.HighwayPlacementDescription,
+                        Keywords = Words(Strings.HighwayPlacementKeywords),
+                        RequiresId = "playback.showNoteHighway",
+                        DefaultValue = AppSettings.DefaultHighwayPlacement,
+                        Choices =
+                        [
+                            new SettingChoice<HighwayPlacement>(HighwayPlacement.Background, Strings.HighwayPlacementBackground),
+                            new SettingChoice<HighwayPlacement>(HighwayPlacement.Row, Strings.HighwayPlacementRow),
+                        ],
+                        Get = () => highway.Placement,
+                        Set = placement => highway.Placement = placement,
+                    },
                     new RangeSetting
                     {
                         Id = "playback.highwayNoteSpeed",

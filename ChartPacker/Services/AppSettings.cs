@@ -20,6 +20,7 @@ namespace ChartPacker.Services
         public const double DefaultHighwayNoteSpeed = 1;
         public const double MinHighwayNoteSpeed = 0.5;
         public const double MaxHighwayNoteSpeed = 3;
+        public const HighwayPlacement DefaultHighwayPlacement = HighwayPlacement.Background;
         public const WaveformFidelity DefaultWaveformFidelity = WaveformFidelity.High;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
@@ -68,8 +69,12 @@ namespace ChartPacker.Services
         /// <summary>Whether the spectrum is drawn behind the details panel. Off, it isn't worked out at all.</summary>
         public bool ShowSpectrum { get; set; } = true;
 
-        /// <summary>Whether the chart's notes are drawn over the background tile.</summary>
+        /// <summary>Whether the chart's notes are drawn.</summary>
         public bool ShowNoteHighway { get; set; } = true;
+
+        /// <summary>Where the chart's notes are drawn: over the background, or in a row of their own.</summary>
+        [JsonConverter(typeof(JsonStringEnumConverter<HighwayPlacement>))]
+        public HighwayPlacement HighwayPlacement { get; set; } = DefaultHighwayPlacement;
 
         /// <summary>How fast the highway's notes fall, as a multiple of the normal speed.</summary>
         public double HighwayNoteSpeed { get; set; } = DefaultHighwayNoteSpeed;

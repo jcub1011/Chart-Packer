@@ -27,7 +27,7 @@ namespace ChartPacker.ViewModels
     public sealed record DifficultyOption(ChartDifficulty Difficulty, string Label);
 
     /// <summary>
-    /// The note highway drawn over the background tile: the one selected song's chart, as its draft
+    /// The note highway, drawn over the background tile or in its own row below the lyrics: the one selected song's chart, as its draft
     /// would save it, with a highway for each of its instruments, each at its own difficulty.
     /// </summary>
     /// <remarks>
@@ -96,6 +96,7 @@ namespace ChartPacker.ViewModels
             _player = player;
             Clock = () => player.CurrentPosition;
             IsEnabled = settings.Settings.ShowNoteHighway;
+            Placement = settings.Settings.HighwayPlacement;
             NoteSpeed = settings.Settings.HighwayNoteSpeed;
             player.TrackWaveformsChanged += (_, e) =>
             {
@@ -124,7 +125,16 @@ namespace ChartPacker.ViewModels
         /// <summary>Whether the highway is drawn; the caption's toggle.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsShown))]
+        [NotifyPropertyChangedFor(nameof(IsShownOverBackground))]
+        [NotifyPropertyChangedFor(nameof(IsTileShown))]
         public partial bool IsEnabled { get; set; }
+
+        /// <summary>Where the highway is drawn: over the background, or in its own row below the lyrics.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsOverBackground))]
+        [NotifyPropertyChangedFor(nameof(IsInRow))]
+        [NotifyPropertyChangedFor(nameof(IsShownOverBackground))]
+        public partial HighwayPlacement Placement { get; set; }
 
         /// <summary>How fast the notes fall, as a multiple of the normal speed.</summary>
         [ObservableProperty]
@@ -134,6 +144,7 @@ namespace ChartPacker.ViewModels
         /// <summary>What's drawn, or <see langword="null"/> for nothing.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsShown))]
+        [NotifyPropertyChangedFor(nameof(IsShownOverBackground))]
         public partial HighwayScene? Scene { get; set; }
 
         /// <summary>
@@ -175,6 +186,16 @@ namespace ChartPacker.ViewModels
         public bool HasProblem => Problem is not null;
 
         public bool IsShown => IsEnabled && Scene is { Lanes.Count: > 0 };
+
+        public bool IsOverBackground => Placement == HighwayPlacement.Background;
+
+        public bool IsInRow => Placement == HighwayPlacement.Row;
+
+        /// <summary>Whether the highway is drawn over the background tile now.</summary>
+        public bool IsShownOverBackground => IsShown && IsOverBackground;
+
+        /// <summary>Whether the highway's own row has its tile: while there's a chart and it's switched on.</summary>
+        public bool IsTileShown => IsEnabled && HasChart;
 
         /// <summary>Whether the song shown has an offset to save.</summary>
         public bool IsChanged => _song?.Draft.HasChartOffsets == true;
@@ -230,10 +251,11 @@ namespace ChartPacker.ViewModels
             RefreshState();
         }
 
-        /// <summary>Takes up the settings again, as after another highway sharing them changed them: whether it's shown, the speed and the difficulties.</summary>
+        /// <summary>Takes up the settings again, as after another highway sharing them changed them: whether it's shown, where, the speed and the difficulties.</summary>
         public void ReloadSettings()
         {
             IsEnabled = _settings.Settings.ShowNoteHighway;
+            Placement = _settings.Settings.HighwayPlacement;
             NoteSpeed = _settings.Settings.HighwayNoteSpeed;
             if (_original is { } chart)
             {
@@ -244,6 +266,8 @@ namespace ChartPacker.ViewModels
         }
 
         partial void OnIsEnabledChanged(bool value) => _settings.Settings.ShowNoteHighway = value;
+
+        partial void OnPlacementChanged(HighwayPlacement value) => _settings.Settings.HighwayPlacement = value;
 
         partial void OnNoteSpeedChanged(double value) => _settings.Settings.HighwayNoteSpeed = value;
 
@@ -572,6 +596,7 @@ namespace ChartPacker.ViewModels
         private void RefreshState()
         {
             OnPropertyChanged(nameof(HasChart));
+            OnPropertyChanged(nameof(IsTileShown));
             OnPropertyChanged(nameof(IsChanged));
             OnPropertyChanged(nameof(Marker));
             OnPropertyChanged(nameof(ToggleToolTip));

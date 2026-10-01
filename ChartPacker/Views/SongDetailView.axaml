@@ -43,6 +43,117 @@
                                        Level5="{StaticResource DifficultyTier5Brush}"
                                        Level6="{StaticResource DifficultyTier6Brush}"
                                        Fallback="{StaticResource DifficultyUnsetBrush}" />
+
+        <!-- The note highway's options, shared by its button in the background's caption and in its own row's. Always
+             below the button, never flipped over the highway, so the lanes stay in sight while the offsets are set;
+             short of room it shrinks and scrolls instead. -->
+        <Flyout x:Key="HighwayOptionsFlyout"
+                x:DataType="vm:SongDetailViewModel"
+                Placement="BottomEdgeAlignedRight"
+                PlacementConstraintAdjustment="SlideX, FlipX, ResizeY"
+                FlyoutPresenterClasses="highwayFlyout"
+                Opened="OnHighwayOptionsOpened"
+                Closed="OnHighwayOptionsClosed">
+            <!-- Focusable, so a click on its empty space or a label (or Enter in an offset box) can take
+                 focus from the offset box without closing the flyout. -->
+            <StackPanel Classes="highwayOptions"
+                        Spacing="8"
+                        Background="Transparent"
+                        Focusable="True"
+                        PointerPressed="OnHighwayOptionsPressed"
+                        AutomationProperties.Name="{x:Static res:Strings.HighwayOptionsName}">
+                <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.HighwayInstrumentsHeader}" />
+                <ItemsControl ItemsSource="{Binding Highway.Rows}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="4" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HighwayRowViewModel">
+                            <Grid ColumnDefinitions="110,140,Auto,Auto,Auto,Auto,130" ColumnSpacing="6">
+                                <CheckBox Grid.Column="0"
+                                          Content="{Binding Name}"
+                                          IsChecked="{Binding IsChecked}" />
+                                <ComboBox Grid.Column="1"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding Difficulties}"
+                                          SelectedIndex="{Binding DifficultyIndex}"
+                                          AutomationProperties.Name="{Binding Name}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DifficultyOption">
+                                            <TextBlock Text="{Binding Label}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <NumericUpDown Grid.Column="2"
+                                               ctl:DragScrub.IsEnabled="True"
+                                               Width="72"
+                                               ShowButtonSpinner="False"
+                                               VerticalAlignment="Center"
+                                               Value="{Binding Offset}"
+                                               IsEnabled="{Binding CanEdit}"
+                                               Increment="1"
+                                               Minimum="-2147483648"
+                                               Maximum="2147483647"
+                                               FormatString="+0;-0;0"
+                                               ToolTip.Tip="{x:Static res:Strings.HighwayOffsetToolTip}"
+                                               AutomationProperties.Name="{x:Static res:Strings.HighwayOffsetName}" />
+                                <TextBlock Grid.Column="3" Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2">
+                                    <Button Classes="nudge" Content="-10" Command="{Binding NudgeCommand}" CommandParameter="-10" />
+                                    <Button Classes="nudge" Content="-1" Command="{Binding NudgeCommand}" CommandParameter="-1" />
+                                    <Button Classes="nudge" Content="+1" Command="{Binding NudgeCommand}" CommandParameter="1" />
+                                    <Button Classes="nudge" Content="+10" Command="{Binding NudgeCommand}" CommandParameter="10" />
+                                </StackPanel>
+                                <Button Grid.Column="5"
+                                        Classes="nudge"
+                                        Command="{Binding RevertOffsetCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.HighwayRevertOffsetToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.HighwayRevertOffsetToolTip}">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                </Button>
+                                <!-- The track drawn behind the instrument's notes: its own, or one picked for this song. -->
+                                <ComboBox Grid.Column="6"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding WaveformPicker.Options}"
+                                          SelectedIndex="{Binding WaveformPicker.Index}"
+                                          IsEnabled="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).Player.AreLaneWaveformsShown, FallbackValue=False}"
+                                          ToolTip.Tip="{x:Static res:Strings.LaneWaveformPickerToolTip}"
+                                          AutomationProperties.Name="{x:Static res:Strings.LaneWaveformName}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:WaveformOption">
+                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="finding" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" Text="{Binding Highway.Problem}" IsVisible="{Binding Highway.HasProblem}" />
+                <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" Text="{Binding Highway.Note}" IsVisible="{Binding Highway.HasNote}" />
+                <!-- Shared with the lyrics lane's waveform button, and a setting; only while track waveforms are read. -->
+                <CheckBox Content="{x:Static res:Strings.ShowLaneWaveformsLabel}"
+                          IsChecked="{Binding Player.ShowLaneWaveforms}"
+                          IsEnabled="{Binding Player.ShowWaveforms}"
+                          ToolTip.Tip="{Binding Player.LaneWaveformsToolTip}"
+                          ToolTip.ShowOnDisabled="True" />
+                <Grid ColumnDefinitions="110,*" ColumnSpacing="6">
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayNoteSpeedLabel}" />
+                    <Slider Grid.Column="1"
+                            Minimum="0.5"
+                            Maximum="3"
+                            SmallChange="0.1"
+                            LargeChange="0.5"
+                            Value="{Binding Highway.NoteSpeed}"
+                            AutomationProperties.Name="{x:Static res:Strings.HighwayNoteSpeedLabel}" />
+                </Grid>
+                <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" FontSize="12" Text="{x:Static res:Strings.HighwayFootnote}" />
+            </StackPanel>
+        </Flyout>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -644,129 +755,22 @@
                                     <Border Grid.Column="2" Classes="chip large">
                                         <TextBlock Text="{Binding Background.ShownFileSize, TargetNullValue='-'}" />
                                     </Border>
-                                    <!-- The note highway: the button shows or hides it, the arrow opens its options.
-                                         Only one song's chart can play along, so it's hidden for several. -->
-                                    <ToggleSplitButton Grid.Column="3"
-                                                       Classes="highway"
-                                                       IsChecked="{Binding Highway.IsEnabled}"
-                                                       IsEnabled="{Binding Highway.HasChart}"
-                                                       IsVisible="{Binding ShowSongFiles}"
-                                                       ToolTip.Tip="{Binding Highway.ToggleToolTip}"
-                                                       AutomationProperties.Name="{x:Static res:Strings.HighwayToggleToolTip}">
-                                        <StackPanel Orientation="Horizontal" Spacing="3">
-                                            <PathIcon Data="{StaticResource HighwayIconGeometry}" />
-                                            <TextBlock Classes="marker" Text="{Binding Highway.Marker}" IsVisible="{Binding Highway.IsChanged}" />
-                                        </StackPanel>
-                                        <ToggleSplitButton.Flyout>
-                                            <!-- Always below the button, never flipped over the highway, so the lanes stay in sight while the
-                                                 offsets are set; short of room it shrinks and scrolls instead. -->
-                                            <Flyout Placement="BottomEdgeAlignedRight"
-                                                    PlacementConstraintAdjustment="SlideX, FlipX, ResizeY"
-                                                    FlyoutPresenterClasses="highwayFlyout"
-                                                    Opened="OnHighwayOptionsOpened"
-                                                    Closed="OnHighwayOptionsClosed">
-                                                <!-- Focusable, so a click on its empty space or a label (or Enter in an offset box) can take
-                                                     focus from the offset box without closing the flyout. -->
-                                                <StackPanel Classes="highwayOptions"
-                                                            Spacing="8"
-                                                            Background="Transparent"
-                                                            Focusable="True"
-                                                            PointerPressed="OnHighwayOptionsPressed"
-                                                            AutomationProperties.Name="{x:Static res:Strings.HighwayOptionsName}">
-                                                    <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.HighwayInstrumentsHeader}" />
-                                                    <ItemsControl ItemsSource="{Binding Highway.Rows}">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <StackPanel Spacing="4" />
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate x:DataType="vm:HighwayRowViewModel">
-                                                                <Grid ColumnDefinitions="110,140,Auto,Auto,Auto,Auto,130" ColumnSpacing="6">
-                                                                    <CheckBox Grid.Column="0"
-                                                                              Content="{Binding Name}"
-                                                                              IsChecked="{Binding IsChecked}" />
-                                                                    <ComboBox Grid.Column="1"
-                                                                              HorizontalAlignment="Stretch"
-                                                                              VerticalAlignment="Center"
-                                                                              ItemsSource="{Binding Difficulties}"
-                                                                              SelectedIndex="{Binding DifficultyIndex}"
-                                                                              AutomationProperties.Name="{Binding Name}">
-                                                                        <ComboBox.ItemTemplate>
-                                                                            <DataTemplate x:DataType="vm:DifficultyOption">
-                                                                                <TextBlock Text="{Binding Label}" />
-                                                                            </DataTemplate>
-                                                                        </ComboBox.ItemTemplate>
-                                                                    </ComboBox>
-                                                                    <NumericUpDown Grid.Column="2"
-                                                                                   ctl:DragScrub.IsEnabled="True"
-                                                                                   Width="72"
-                                                                                   ShowButtonSpinner="False"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Value="{Binding Offset}"
-                                                                                   IsEnabled="{Binding CanEdit}"
-                                                                                   Increment="1"
-                                                                                   Minimum="-2147483648"
-                                                                                   Maximum="2147483647"
-                                                                                   FormatString="+0;-0;0"
-                                                                                   ToolTip.Tip="{x:Static res:Strings.HighwayOffsetToolTip}"
-                                                                                   AutomationProperties.Name="{x:Static res:Strings.HighwayOffsetName}" />
-                                                                    <TextBlock Grid.Column="3" Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
-                                                                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2">
-                                                                        <Button Classes="nudge" Content="-10" Command="{Binding NudgeCommand}" CommandParameter="-10" />
-                                                                        <Button Classes="nudge" Content="-1" Command="{Binding NudgeCommand}" CommandParameter="-1" />
-                                                                        <Button Classes="nudge" Content="+1" Command="{Binding NudgeCommand}" CommandParameter="1" />
-                                                                        <Button Classes="nudge" Content="+10" Command="{Binding NudgeCommand}" CommandParameter="10" />
-                                                                    </StackPanel>
-                                                                    <Button Grid.Column="5"
-                                                                            Classes="nudge"
-                                                                            Command="{Binding RevertOffsetCommand}"
-                                                                            ToolTip.Tip="{x:Static res:Strings.HighwayRevertOffsetToolTip}"
-                                                                            AutomationProperties.Name="{x:Static res:Strings.HighwayRevertOffsetToolTip}">
-                                                                        <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
-                                                                    </Button>
-                                                                    <!-- The track drawn behind the instrument's notes: its own, or one picked for this song. -->
-                                                                    <ComboBox Grid.Column="6"
-                                                                              HorizontalAlignment="Stretch"
-                                                                              VerticalAlignment="Center"
-                                                                              ItemsSource="{Binding WaveformPicker.Options}"
-                                                                              SelectedIndex="{Binding WaveformPicker.Index}"
-                                                                              IsEnabled="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).Player.AreLaneWaveformsShown, FallbackValue=False}"
-                                                                              ToolTip.Tip="{x:Static res:Strings.LaneWaveformPickerToolTip}"
-                                                                              AutomationProperties.Name="{x:Static res:Strings.LaneWaveformName}">
-                                                                        <ComboBox.ItemTemplate>
-                                                                            <DataTemplate x:DataType="vm:WaveformOption">
-                                                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-                                                                            </DataTemplate>
-                                                                        </ComboBox.ItemTemplate>
-                                                                    </ComboBox>
-                                                                </Grid>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                    <TextBlock Classes="finding" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" Text="{Binding Highway.Problem}" IsVisible="{Binding Highway.HasProblem}" />
-                                                    <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" Text="{Binding Highway.Note}" IsVisible="{Binding Highway.HasNote}" />
-                                                    <!-- Shared with the lyrics lane's waveform button, and a setting; only while track waveforms are read. -->
-                                                    <CheckBox Content="{x:Static res:Strings.ShowLaneWaveformsLabel}"
-                                                              IsChecked="{Binding Player.ShowLaneWaveforms}"
-                                                              IsEnabled="{Binding Player.ShowWaveforms}"
-                                                              ToolTip.Tip="{Binding Player.LaneWaveformsToolTip}"
-                                                              ToolTip.ShowOnDisabled="True" />
-                                                    <Grid ColumnDefinitions="110,*" ColumnSpacing="6">
-                                                        <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayNoteSpeedLabel}" />
-                                                        <Slider Grid.Column="1"
-                                                                Minimum="0.5"
-                                                                Maximum="3"
-                                                                SmallChange="0.1"
-                                                                LargeChange="0.5"
-                                                                Value="{Binding Highway.NoteSpeed}"
-                                                                AutomationProperties.Name="{x:Static res:Strings.HighwayNoteSpeedLabel}" />
-                                                    </Grid>
-                                                    <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" FontSize="12" Text="{x:Static res:Strings.HighwayFootnote}" />
-                                                </StackPanel>
-                                            </Flyout>
-                                        </ToggleSplitButton.Flyout>
-                                    </ToggleSplitButton>
+                                    <!-- The note highway's button, while the highway is drawn over the background; only one song's chart can
+                                         play along, so it's hidden for several. -->
+                                    <Panel Grid.Column="3" IsVisible="{Binding ShowSongFiles}">
+                                        <ToggleSplitButton Classes="highway"
+                                                           IsChecked="{Binding Highway.IsEnabled}"
+                                                           IsEnabled="{Binding Highway.HasChart}"
+                                                           IsVisible="{Binding Highway.IsOverBackground}"
+                                                           ToolTip.Tip="{Binding Highway.ToggleToolTip}"
+                                                           Flyout="{StaticResource HighwayOptionsFlyout}"
+                                                           AutomationProperties.Name="{x:Static res:Strings.HighwayToggleToolTip}">
+                                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                                <PathIcon Data="{StaticResource HighwayIconGeometry}" />
+                                                <TextBlock Classes="marker" Text="{Binding Highway.Marker}" IsVisible="{Binding Highway.IsChanged}" />
+                                            </StackPanel>
+                                        </ToggleSplitButton>
+                                    </Panel>
                                     <!-- Always shown; a kind the selection doesn't have can't be picked. -->
                                     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2">
                                         <RadioButton Classes="backgroundKind"
@@ -796,14 +800,15 @@
                                                         Timeline="{Binding Background.Timeline}"
                                                         Clock="{Binding Background.Clock}"
                                                         IsVisible="{Binding Background.HasVideo}" />
-                                    <!-- The chart's notes over whatever the background is, as a game draws them. -->
-                                    <ctl:NoteHighwayView x:Name="HighwayView"
+                                    <!-- The chart's notes over whatever the background is, as a game draws them, unless the
+                                         settings put them in their own row below the lyrics. -->
+                                    <ctl:NoteHighwayView x:Name="HighwayOverlayView"
                                                          Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
                                                          Waveforms="{Binding Highway.LaneWaveforms}"
                                                          IsHitTestVisible="False"
-                                                         IsVisible="{Binding Highway.IsShown}" />
+                                                         IsVisible="{Binding Highway.IsShownOverBackground}" />
                                     <StackPanel VerticalAlignment="Center"
                                                 Margin="12"
                                                 Spacing="6"
@@ -984,6 +989,52 @@
                     </DockPanel>
                     <TextBlock Classes="error" Text="{Binding LyricsError}" IsVisible="{Binding HasLyricsError}" />
                     <TextBlock Classes="error" Text="{Binding Lyrics.Problem}" IsVisible="{Binding Lyrics.HasProblem}" />
+
+                    <!-- The one selected song's chart as note highways, one per instrument, in step with the audio, while the
+                         settings put them here rather than over the background. Captioned like the lyrics: the button at the
+                         right shows or hides the highways, and its arrow opens their options. -->
+                    <Panel IsVisible="{Binding ShowSongFiles}">
+                        <DockPanel Margin="0,16,0,0" IsVisible="{Binding Highway.IsInRow}">
+                            <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6">
+                                    <TextBlock Grid.Column="0"
+                                               Classes="marker"
+                                               Text="{Binding Highway.Marker}"
+                                               IsVisible="{Binding Highway.IsChanged}" />
+                                    <TextBlock Grid.Column="1" Classes="artName" Text="{x:Static res:Strings.HighwayInstrumentsHeader}" />
+                                    <TextBlock Grid.Column="2"
+                                               Classes="artName muted"
+                                               Text="{Binding Highway.Note}"
+                                               ToolTip.Tip="{Binding Highway.Note}"
+                                               IsVisible="{Binding Highway.HasNote}" />
+                                    <ToggleSplitButton Grid.Column="3"
+                                                       Classes="highway"
+                                                       IsChecked="{Binding Highway.IsEnabled}"
+                                                       IsEnabled="{Binding Highway.HasChart}"
+                                                       ToolTip.Tip="{Binding Highway.ToggleToolTip}"
+                                                       Flyout="{StaticResource HighwayOptionsFlyout}"
+                                                       AutomationProperties.Name="{x:Static res:Strings.HighwayToggleToolTip}">
+                                        <PathIcon Data="{StaticResource HighwayIconGeometry}" />
+                                    </ToggleSplitButton>
+                                </Grid>
+                            </Border>
+
+                            <!-- Only while there's a chart and the highways are switched on, leaving the caption, with why there's
+                                 no chart, to switch them back on. Highways are as wide as the height allows, centred. -->
+                            <Border Classes="artTile"
+                                    Height="240"
+                                    IsVisible="{Binding Highway.IsTileShown}"
+                                    AutomationProperties.Name="{x:Static res:Strings.HighwayInstrumentsHeader}">
+                                <ctl:NoteHighwayView x:Name="HighwayRowView"
+                                                     Scene="{Binding Highway.Scene}"
+                                                     Clock="{Binding Highway.Clock}"
+                                                     LookAhead="{Binding Highway.LookAhead}"
+                                                     Waveforms="{Binding Highway.LaneWaveforms}"
+                                                     IsHitTestVisible="False"
+                                                     IsVisible="{Binding Highway.IsShown}" />
+                            </Border>
+                        </DockPanel>
+                    </Panel>
 
                     <!-- The one selected song's audio tracks, played together and in step. A track
                          can be muted, or soloed to hear it alone; added and removed tracks play as

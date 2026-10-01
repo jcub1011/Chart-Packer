@@ -185,7 +185,7 @@ namespace ChartPacker.ViewModels
         /// <summary>The selected songs' background image or video, beside the album art.</summary>
         public BackgroundViewModel Background { get; }
 
-        /// <summary>The note highway over the background, for the one selected song's chart.</summary>
+        /// <summary>The note highway, over the background or in its own row, for the one selected song's chart.</summary>
         public HighwayViewModel Highway { get; }
 
         /// <summary>The lyrics row under the album art, for the one selected song's vocals.</summary>

@@ -63,9 +63,16 @@ namespace ChartPacker.Views
         }
 
         /// <summary>While the highway options are open, the notes are drawn as outlines so the waveform behind them shows as offsets are set.</summary>
-        private void OnHighwayOptionsOpened(object? sender, EventArgs e) => HighwayView.Classes.Set("tuning", true);
+        private void OnHighwayOptionsOpened(object? sender, EventArgs e) => SetTuning(true);
 
-        private void OnHighwayOptionsClosed(object? sender, EventArgs e) => HighwayView.Classes.Set("tuning", false);
+        private void OnHighwayOptionsClosed(object? sender, EventArgs e) => SetTuning(false);
+
+        // Both placements' views, as the options are shared and only the one in use is shown.
+        private void SetTuning(bool isTuning)
+        {
+            HighwayOverlayView.Classes.Set("tuning", isTuning);
+            HighwayRowView.Classes.Set("tuning", isTuning);
+        }
 
         /// <summary>
         /// Choosing a difficulty in an instrument's flyout closes it. The flyout is a popup of its own,

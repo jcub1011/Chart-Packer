@@ -1107,7 +1107,7 @@
     <value>Song folders</value>
   </data>
   <data name="HighwayToggleToolTip" xml:space="preserve">
-    <value>Show the chart's notes over the background, in time with the audio</value>
+    <value>Show the chart's notes in time with the audio</value>
   </data>
   <data name="HighwayOptionsName" xml:space="preserve">
     <value>Note highway options</value>
@@ -1139,7 +1139,7 @@
     <value>Note speed</value>
   </data>
   <data name="HighwayNoteSpeedDescription" xml:space="preserve">
-    <value>How fast notes fall down the note highway over the background.</value>
+    <value>How fast notes fall down the note highway.</value>
   </data>
   <data name="HighwayNoteSpeedKeywords" xml:space="preserve">
     <value>highway scroll speed hyperspeed notes chart falling</value>
@@ -1149,11 +1149,29 @@
     <value>Show note highway</value>
   </data>
   <data name="ShowHighwayDescription" xml:space="preserve">
-    <value>Draw the chart's notes falling over the background tile, in time with the audio. Choose the instruments from the button next to the Image and Video switch.</value>
+    <value>Draw the chart's notes falling in time with the audio. Choose the instruments from the note highway's button: next to the Image and Video switch, or in its row's caption.</value>
   </data>
   <data name="ShowHighwayKeywords" xml:space="preserve">
     <value>highway notes chart lanes falling preview guitar drums bass keys</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="HighwayPlacementLabel" xml:space="preserve">
+    <value>Note highway position</value>
+  </data>
+  <data name="HighwayPlacementDescription" xml:space="preserve">
+    <value>Where the note highway is drawn: over the background video or image, as a game draws it, or in its own row below the lyrics, leaving the background clear. Needs Show note highway.</value>
+  </data>
+  <data name="HighwayPlacementKeywords" xml:space="preserve">
+    <value>highway position placement location row lane overlay background video lyrics</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="HighwayPlacementBackground" xml:space="preserve">
+    <value>Over the background</value>
+    <comment>A choice of Note highway position.</comment>
+  </data>
+  <data name="HighwayPlacementRow" xml:space="preserve">
+    <value>In its own row</value>
+    <comment>A choice of Note highway position.</comment>
   </data>
   <data name="ShowLaneWaveformsLabel" xml:space="preserve">
     <value>Show waveforms in lanes</value>
