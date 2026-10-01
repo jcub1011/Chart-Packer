@@ -86,6 +86,19 @@ namespace ChartPacker.ViewModels
         // Cancels Auto Set song_length when the selection changes under it.
         private CancellationTokenSource? _autoLengthCts;
 
+        // The one selected song's length worked out for the player's timeline when it has no song_length: what the latest
+        // estimate was of, what it found, and the one running, if one is.
+        private string? _songLengthKey;
+        private double _estimatedSongLength;
+        private CancellationTokenSource? _songLengthCts;
+        private Task _songLengthTask = Task.CompletedTask;
+
+        // How long the drafts must be still before the length is worked out again, so a burst of edits reads the files once.
+        private static readonly TimeSpan SongLengthDelay = TimeSpan.FromMilliseconds(300);
+
+        // The metadata the length estimate reads: the chart's delay and drums, and the video's timeline.
+        private static readonly string[] SongLengthKeys = ["delay", "pro_drums", "pro_drum", "video_start_time", "video_end_time", "video_loop"];
+
         // What's shown: the selection, and the songs among it whose metadata could be read.
         private IReadOnlyList<SongEntry> _entries = [];
         private IReadOnlyList<EditableSong> _songs = [];
@@ -419,6 +432,7 @@ namespace ChartPacker.ViewModels
 
             // Playback is of what's shown, and holds its files open; so does the background video.
             Player.Unload();
+            ForgetSongLength();
             Background.Unload();
             Highway.Unload();
             Lyrics.Unload();
@@ -1248,10 +1262,12 @@ namespace ChartPacker.ViewModels
             // so does the background video.
             Player.Unload();
             Background.Unload();
+            ForgetSongLength();
             try
             {
                 await Player.WhenFilesClosedAsync();
                 await Background.WhenClosedAsync();
+                await _songLengthTask;
 
                 foreach (var song in dirty)
                 {
@@ -1357,6 +1373,9 @@ namespace ChartPacker.ViewModels
                 _drafts.NotifyChanged(song.Entry.FullPath);
             OnPropertyChanged(nameof(IsChartChanged));
             RefreshState();
+
+            // Moving the chart can move its last note.
+            RefreshSongLength();
         }
 
         private void Apply(LoadedSelection loaded)
@@ -1739,6 +1758,7 @@ namespace ChartPacker.ViewModels
             if (IsBulk || _entries.Count != 1)
             {
                 Player.Unload();
+                ForgetSongLength();
                 RemovedTracks.Clear();
                 OnPropertyChanged(nameof(HasRemovedTracks));
                 AddTrackOptions = [];
@@ -1749,6 +1769,7 @@ namespace ChartPacker.ViewModels
             var draft = song?.Item.Draft;
             var tracks = SongTracks.Resolve(_diskFiles.Select(f => f.Path), draft);
             Player.Load(_entries[0], tracks, song is null ? null : PreviewStartOf(song));
+            RefreshSongLength();
             foreach (var row in Player.Tracks)
                 row.Size = TrackSize(row.Track, draft);
 
@@ -1800,6 +1821,111 @@ namespace ChartPacker.ViewModels
         /// <summary>Where the song's <c>preview_start_time</c>, drafted or stored, starts the preview.</summary>
         private static TimeSpan? PreviewStartOf(EditableSong song) =>
             PreviewStart.From(song.Item.Draft.ApplyTo(song.Item.Original));
+
+        /// <summary>
+        /// Gives the player how long the one selected song plays for in a game, which can run on past its audio: its
+        /// <c>song_length</c> as drafted, or else what <see cref="SongLengthEstimator"/> works out, as Auto Set does. The
+        /// estimate reads the song's files, so it's made in the background once the drafts are still, and only again when
+        /// something it reads has changed.
+        /// </summary>
+        private void RefreshSongLength()
+        {
+            if (IsBulk || IsSaving || _entries.Count != 1 || _songs is not [var song])
+            {
+                ForgetSongLength();
+                return;
+            }
+
+            var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
+            if (SongHeadline.From(pairs).LengthMs is { } ms)
+            {
+                // An estimate still running would be of no use; one already made is kept, should the row go again.
+                if (_songLengthCts is not null)
+                {
+                    CancelSongLength();
+                    _songLengthKey = null;
+                }
+
+                Player.SongLengthSeconds = ms / 1000.0;
+                return;
+            }
+
+            string key = SongLengthKeyOf(song, pairs);
+            if (key == _songLengthKey)
+            {
+                // The estimate of this is made, or on its way.
+                if (_songLengthCts is null)
+                    Player.SongLengthSeconds = _estimatedSongLength;
+                return;
+            }
+
+            // Until the new estimate is in, the timeline keeps the length it has.
+            CancelSongLength();
+            _songLengthKey = key;
+            _songLengthTask = EstimateSongLengthAsync(song.Entry, song.Item.Draft.Clone(), pairs, key);
+        }
+
+        /// <summary>Works out the song's length off the UI thread, and gives it to the player unless something newer is wanted by then.</summary>
+        private async Task EstimateSongLengthAsync(SongEntry entry, MetadataDraft draft, IReadOnlyList<KeyValuePair<string, string>> pairs, string key)
+        {
+            using var cts = new CancellationTokenSource();
+            _songLengthCts = cts;
+            long? ms = null;
+            try
+            {
+                await Task.Delay(SongLengthDelay, cts.Token);
+                ms = await Task.Run(() => SongLengthEstimator.Estimate(entry, draft, pairs, _videoProbe, cts.Token).SongLengthMs, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // The song can't be listed: the timeline is the audio's length.
+            }
+            finally
+            {
+                if (ReferenceEquals(_songLengthCts, cts))
+                    _songLengthCts = null;
+            }
+
+            if (cts.IsCancellationRequested || key != _songLengthKey)
+                return;
+
+            _estimatedSongLength = ms is { } length ? length / 1000.0 : 0;
+            Player.SongLengthSeconds = _estimatedSongLength;
+        }
+
+        /// <summary>What the song's length estimate reads, as one string: when it's unchanged, so is the estimate.</summary>
+        private string SongLengthKeyOf(EditableSong song, IReadOnlyList<KeyValuePair<string, string>> pairs)
+        {
+            var draft = song.Item.Draft;
+            var stored = _diskFiles.Select(f => f.Path).ToList();
+            var parts = new List<string?> { song.Entry.FullPath };
+            parts.AddRange(SongTracks.Resolve(stored, draft).Select(t => $"{t.StoredName}<{t.StagedSourcePath}"));
+            parts.Add(DraftChart.Of(draft, stored)?.ToString());
+            parts.Add(draft.BackgroundVideo is { } video ? $"video<{video.SourcePath}" : null);
+            parts.AddRange(draft.RemovedFiles.Order(StringComparer.Ordinal).Select(f => $"-{f}"));
+            parts.AddRange(draft.ChartOffsets.Select(o => $"{o.Key}={o.Value}").Order(StringComparer.Ordinal));
+            parts.AddRange(SongLengthKeys.Select(k => $"{k}={pairs.FirstOrDefault(p => p.Key.Equals(k, StringComparison.OrdinalIgnoreCase)).Value}"));
+            return string.Join('\n', parts);
+        }
+
+        private void CancelSongLength()
+        {
+            _songLengthCts?.Cancel();
+            _songLengthCts = null;
+        }
+
+        /// <summary>Stops any length estimate and takes the length from the player, as when the song shown changes.</summary>
+        private void ForgetSongLength()
+        {
+            CancelSongLength();
+            _songLengthKey = null;
+            _estimatedSongLength = 0;
+            Player.SongLengthSeconds = 0;
+        }
 
         private void AddImage(string hash, Bitmap bitmap)
         {

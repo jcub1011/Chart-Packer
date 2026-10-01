@@ -95,8 +95,18 @@ public sealed class StemPlayer : IDisposable
         }
     }
 
-    /// <summary>The song's length, or as much of it as is known.</summary>
+    /// <summary>The audio's own length, or as much of it as is known; <see cref="MinimumLength"/> left out.</summary>
     public TimeSpan Length => FramesToTime(_mixer.LengthFrames >= 0 ? _mixer.LengthFrames : _mixer.KnownLengthFrames);
+
+    /// <summary>
+    /// How long playback runs for at least: past the end of the audio it plays on in silence until here, so what
+    /// follows the clock (a chart, a video) can run on past the audio. Shorter than the audio, it changes nothing.
+    /// </summary>
+    public TimeSpan MinimumLength
+    {
+        get => FramesToTime(_mixer.MinimumLengthFrames);
+        set => _mixer.MinimumLengthFrames = Math.Max(0, (long)(value.TotalSeconds * _mixer.OutputRate));
+    }
 
     /// <summary>What's being heard now.</summary>
     public TimeSpan Position

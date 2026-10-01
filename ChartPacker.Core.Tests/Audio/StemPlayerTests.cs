@@ -122,6 +122,26 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void AMinimumLengthPlaysOnPastTheAudioInSilence()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 0.1);
+        player.MinimumLength = TimeSpan.FromSeconds(0.3);
+
+        player.Play();
+        PlayFor(output, Rate / 5);
+        Assert.IsTrue(player.IsPlaying);
+        Assert.AreEqual(0.2, player.Position.TotalSeconds, 0.001);
+
+        WaitUntil(() => player.Mixer.IsEnded);
+        output.Drain(output.QueuedFrames);
+        WaitUntil(() => player.IsEnded);
+        Assert.AreEqual(0.3, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual(0.1, player.Length.TotalSeconds, 0.001);
+        Assert.AreEqual(0.3, player.MinimumLength.TotalSeconds, 0.001);
+    }
+
+    [TestMethod]
     public void AFailingDeviceStopsPlaybackWithTheReason()
     {
         using var output = new FakeOutput { FailWrites = true };

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
@@ -53,7 +54,11 @@ namespace ChartPacker.Controls
 
             PhraseStarts = [.. part.Phrases.Select(p => Seconds(p.Tick))];
             PhraseEnds = [.. part.Phrases.Select(p => Seconds(p.Tick + p.Length))];
+            EndSeconds = Math.Max(0, NoteEnds.Concat(PhraseEnds).Concat(WordTimes).DefaultIfEmpty().Max());
         }
+
+        /// <summary>When the last note, phrase or word ends, in seconds.</summary>
+        public double EndSeconds { get; }
 
         /// <summary>Each note's song time, in seconds.</summary>
         public double[] NoteStarts { get; }
@@ -98,6 +103,10 @@ namespace ChartPacker.Controls
     /// Each frame the screen is drawn it reads <see cref="Clock"/>, so the lane follows the audio
     /// whether it's playing, paused or being dragged. <see cref="TimeShift"/> moves the whole part in
     /// time without the scene being built again. Behind the notes it can draw a track's <see cref="Waveform"/>.
+    /// <para>While the pointer is over it, it shows the whole part instead, squeezed into its width from the start at the
+    /// left to <see cref="LengthSeconds"/> at the right, with the phrase under the pointer written out. Pressing on it and
+    /// dragging scrubs: from <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>, <see cref="Scrubbed"/> says where to,
+    /// and the owner seeks when it ends, as it does for <see cref="WaveformView"/>.</para>
     /// </summary>
     /// <example><c>&lt;ctl:LyricLaneView Scene="{Binding Lyrics.Scene}" Clock="{Binding Lyrics.Clock}" TimeShift="{Binding Lyrics.TimeShift}" Waveform="{Binding Lyrics.Waveform}" /&gt;</c></example>
     public sealed class LyricLaneView : Control
@@ -116,6 +125,9 @@ namespace ChartPacker.Controls
 
         public static readonly StyledProperty<double> WindowSecondsProperty =
             AvaloniaProperty.Register<LyricLaneView, double>(nameof(WindowSeconds), 4);
+
+        public static readonly StyledProperty<double> LengthSecondsProperty =
+            AvaloniaProperty.Register<LyricLaneView, double>(nameof(LengthSeconds));
 
         // Where the now line sits, as a fraction of the width from the left.
         private const double NowFraction = 0.2;
@@ -149,19 +161,39 @@ namespace ChartPacker.Controls
 
         private static readonly Typeface WordTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
+        // The phrase under the pointer when the whole part is shown, lit above the others.
+        private static readonly IBrush HoveredPhraseBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x2C, 0xFF, 0xFF, 0xFF));
+
         private readonly Dictionary<(int Index, int State), FormattedText> _words = [];
         private double _spaceWidth = -1;
         private bool _isFrameRequested;
         private Rect? _viewport;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
 
+        // Whether the whole part is shown, for the pointer over the lane, and how far across it the pointer is; NaN for not.
+        private double _hoverX = double.NaN;
+        private bool _isScrubbing;
+
+        // The whole part's notes as last laid out, and the words of the phrase last written out under the pointer.
+        private OverviewMarks? _overview;
+        private (int Index, double Width, FormattedText Text)? _phraseText;
+
         // A spoken note's diamond, a unit across from its middle, scaled and moved to each drawn.
         private static StreamGeometry? s_diamond;
 
         static LyricLaneView()
         {
-            AffectsRender<LyricLaneView>(SceneProperty, TimeShiftProperty, WaveformProperty, WindowSecondsProperty);
+            AffectsRender<LyricLaneView>(SceneProperty, TimeShiftProperty, WaveformProperty, WindowSecondsProperty, LengthSecondsProperty);
         }
+
+        /// <summary>Raised when the lane is pressed, before the first <see cref="Scrubbed"/>.</summary>
+        public event EventHandler? ScrubStarted;
+
+        /// <summary>Raised as the pointer moves while the lane is pressed, with the time it's at.</summary>
+        public event EventHandler<ScrubEventArgs>? Scrubbed;
+
+        /// <summary>Raised when the lane is let go, or the press is lost.</summary>
+        public event EventHandler? ScrubEnded;
 
         /// <summary>The part to draw, or <see langword="null"/> for none.</summary>
         public LyricScene? Scene
@@ -198,6 +230,16 @@ namespace ChartPacker.Controls
             set => SetValue(WindowSecondsProperty, value);
         }
 
+        /// <summary>
+        /// How long the song is, in seconds: what the lane shows of it while the pointer is over it, and scrubs through. At
+        /// zero, the part's own end is taken instead.
+        /// </summary>
+        public double LengthSeconds
+        {
+            get => GetValue(LengthSecondsProperty);
+            set => SetValue(LengthSecondsProperty, value);
+        }
+
         public LyricLaneView() => EffectiveViewportChanged += OnEffectiveViewportChanged;
 
         // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
@@ -217,9 +259,17 @@ namespace ChartPacker.Controls
         {
             base.OnPropertyChanged(change);
             if (change.Property == SceneProperty)
+            {
                 _words.Clear();
+                _overview = null;
+                _phraseText = null;
+            }
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
+
+            // Shown again, it scrolls with the audio until the pointer is over it again.
+            if (change.Property == IsVisibleProperty && !IsVisible && !_isScrubbing)
+                SetHover(double.NaN);
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -234,16 +284,23 @@ namespace ChartPacker.Controls
             if (Scene is not { IsEmpty: false } scene || bounds.Width <= 0 || bounds.Height <= 0)
                 return;
 
-            // Drawing the part later is drawing it at an earlier moment of the scene's own time.
             // The time read for this frame, rather than reading the clock again.
-            double now = ((_drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero) - TimeShift).TotalSeconds;
+            var clock = _drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero;
+            double wordBand = scene.WordTimes.Length > 0 ? WordFontSize * 1.9 : 0;
+            if (!double.IsNaN(_hoverX))
+            {
+                DrawOverview(context, scene, bounds, clock.TotalSeconds, wordBand);
+                return;
+            }
+
+            // Drawing the part later is drawing it at an earlier moment of the scene's own time.
+            double now = (clock - TimeShift).TotalSeconds;
             double nowX = bounds.Width * NowFraction;
             double perSecond = (bounds.Width - nowX) / Math.Max(0.5, WindowSeconds);
             double X(double time) => nowX + ((time - now) * perSecond);
             double from = now - (nowX / perSecond);
             double to = now + ((bounds.Width - nowX) / perSecond);
 
-            double wordBand = scene.WordTimes.Length > 0 ? WordFontSize * 1.9 : 0;
             double noteTop = Padding;
             double noteBottom = bounds.Height - wordBand - Padding;
 
@@ -294,16 +351,13 @@ namespace ChartPacker.Controls
 
         private static void DrawNotes(DrawingContext context, LyricScene scene, Rect bounds, double top, double bottom, double now, double from, double to, Func<double, double> x)
         {
-            int range = Math.Max(1, scene.HighestPitch - scene.LowestPitch);
-            double thickness = Math.Clamp((bottom - top) / (range + 2), 3, 8);
-            double Y(int i) => scene.IsUnpitched[i]
-                ? (top + bottom) / 2
-                : bottom - ((scene.Pitches[i] - scene.LowestPitch) / (double)range * (bottom - top - thickness)) - (thickness / 2);
+            double thickness = Math.Clamp((bottom - top) / (Math.Max(1, scene.HighestPitch - scene.LowestPitch) + 2), 3, 8);
+            double Y(int i) => NoteY(scene, i, top, bottom, thickness);
 
             // A faint line an octave apart, so the pitches have something to be read against.
             for (int pitch = scene.LowestPitch - (scene.LowestPitch % 12) + 12; pitch <= scene.HighestPitch; pitch += 12)
             {
-                double at = bottom - ((pitch - scene.LowestPitch) / (double)range * (bottom - top - thickness)) - (thickness / 2);
+                double at = PitchY(scene, pitch, top, bottom, thickness);
                 context.DrawLine(PitchLinePen, new Point(bounds.Left, at), new Point(bounds.Right, at));
             }
 
@@ -333,6 +387,222 @@ namespace ChartPacker.Controls
                     context.DrawRectangle(brush, null, new RoundedRect(new Rect(left, y - (thickness / 2), right - left, thickness), thickness / 2));
                 }
             }
+        }
+
+        /// <summary>Where a note at <paramref name="pitch"/> is drawn between <paramref name="top"/> and <paramref name="bottom"/>, through its middle.</summary>
+        private static double PitchY(LyricScene scene, int pitch, double top, double bottom, double thickness) =>
+            bottom - ((pitch - scene.LowestPitch) / (double)Math.Max(1, scene.HighestPitch - scene.LowestPitch) * (bottom - top - thickness)) - (thickness / 2);
+
+        /// <summary>Where the scene's <paramref name="index"/>th note is drawn, through its middle: at its pitch, or halfway up when it's spoken.</summary>
+        private static double NoteY(LyricScene scene, int index, double top, double bottom, double thickness) =>
+            scene.IsUnpitched[index] ? (top + bottom) / 2 : PitchY(scene, scene.Pitches[index], top, bottom, thickness);
+
+        /// <summary>How much of the song the whole part covers, in seconds: the song's length, or else the part's, as heard.</summary>
+        private double TimelineOf(LyricScene scene) => LengthSeconds > 0 ? LengthSeconds : scene.EndSeconds + Math.Max(0, TimeShift.TotalSeconds) + 1;
+
+        /// <summary>
+        /// The whole part, from the start at the left to the end of the song at the right, as it's heard: its phrases, its
+        /// notes as thin bars at their pitch, and the words of the phrase under the pointer; what's been played shaded, a line
+        /// where the audio is, and one where the pointer is.
+        /// </summary>
+        /// <param name="now">Where the audio is, in seconds: <see cref="TimeShift"/> not taken off.</param>
+        private void DrawOverview(DrawingContext context, LyricScene scene, Rect bounds, double now, double wordBand)
+        {
+            double timeline = Math.Max(0.1, TimelineOf(scene));
+            double shift = TimeShift.TotalSeconds;
+            double X(double sceneTime) => (sceneTime + shift) / timeline * bounds.Width;
+            double noteTop = Padding;
+            double noteBottom = bounds.Height - wordBand - Padding;
+            double hover = Math.Clamp(_hoverX, 0, bounds.Width);
+            int phrase = PhraseAt(scene, TimeAt(hover) - shift);
+
+            using (context.PushClip(bounds))
+            {
+                context.FillRectangle(LaneBrush, bounds);
+                for (int i = 0; i < scene.PhraseStarts.Length; i++)
+                {
+                    var block = new Rect(new Point(X(scene.PhraseStarts[i]), 0), new Point(Math.Max(X(scene.PhraseEnds[i]), X(scene.PhraseStarts[i]) + 1), bounds.Height));
+                    context.FillRectangle(i == phrase ? HoveredPhraseBrush : PhraseBrush, block);
+                }
+
+                if (scene.NoteStarts.Length > 0 && noteBottom - noteTop > 6)
+                {
+                    foreach (var bar in OverviewBarsOf(scene, bounds.Size, noteTop, noteBottom, timeline, shift))
+                        context.FillRectangle(NoteBrush, bar);
+                }
+
+                if (wordBand > 0 && phrase >= 0)
+                {
+                    var text = PhraseText(scene, phrase, bounds.Width - (Padding * 2));
+                    context.DrawText(text, new Point(Padding, bounds.Height - wordBand + ((wordBand - text.Height) / 2)));
+                }
+
+                double playhead = Math.Clamp(now / timeline * bounds.Width, 0, bounds.Width);
+                context.FillRectangle(LaneScrub.PlayedBrush, new Rect(0, 0, playhead, bounds.Height));
+                context.DrawLine(LaneScrub.PlayheadPen, new Point(playhead, 0), new Point(playhead, bounds.Height));
+                context.DrawLine(LaneScrub.HoverPen, new Point(hover, 0), new Point(hover, bounds.Height));
+                LaneScrub.DrawTimeTag(context, TimeAt(hover), bounds, hover, isAcross: false);
+            }
+        }
+
+        /// <summary>
+        /// The whole part's notes as thin bars in a lane of <paramref name="size"/> covering <paramref name="timeline"/> seconds,
+        /// each run of notes at one height that touch on screen as one bar, so a long part is a few hundred rectangles. Laid out
+        /// again only when one of those, or the shift, changes.
+        /// </summary>
+        private List<Rect> OverviewBarsOf(LyricScene scene, Size size, double top, double bottom, double timeline, double shift)
+        {
+            if (_overview is { } known && ReferenceEquals(known.Scene, scene) && known.Size == size && known.Timeline == timeline && known.Shift == shift)
+                return known.Bars;
+
+            double thickness = Math.Clamp((bottom - top) / (Math.Max(1, scene.HighestPitch - scene.LowestPitch) + 2), 2, 4);
+            double X(double sceneTime) => (sceneTime + shift) / timeline * size.Width;
+            var bars = new List<Rect>();
+
+            // The bar being built at each height; notes are in time order, so each starts at or after the one before.
+            var runs = new Dictionary<double, (double Left, double Right)>();
+            for (int i = 0; i < scene.NoteStarts.Length; i++)
+            {
+                double y = NoteY(scene, i, top, bottom, thickness);
+                double left = X(scene.NoteStarts[i]);
+                double right = Math.Max(X(scene.NoteEnds[i]), left + 1.5);
+                if (runs.TryGetValue(y, out var run))
+                {
+                    if (left <= run.Right + 1)
+                    {
+                        runs[y] = (run.Left, Math.Max(run.Right, right));
+                        continue;
+                    }
+
+                    bars.Add(new Rect(run.Left, y - (thickness / 2), run.Right - run.Left, thickness));
+                }
+
+                runs[y] = (left, right);
+            }
+
+            foreach (var (y, run) in runs)
+                bars.Add(new Rect(run.Left, y - (thickness / 2), run.Right - run.Left, thickness));
+
+            _overview = new OverviewMarks(scene, size, timeline, shift, bars);
+            return bars;
+        }
+
+        /// <summary>The index of the phrase being sung at <paramref name="time"/> of the scene's own time, or -1.</summary>
+        private static int PhraseAt(LyricScene scene, double time)
+        {
+            int i = LowerBound(scene.PhraseStarts, time + 1e-9) - 1;
+            return i >= 0 && time < scene.PhraseEnds[i] ? i : -1;
+        }
+
+        /// <summary>The words of the scene's <paramref name="phrase"/>th phrase as one line, cut short to <paramref name="width"/>.</summary>
+        private FormattedText PhraseText(LyricScene scene, int phrase, double width)
+        {
+            width = Math.Max(1, width);
+            if (_phraseText is { } known && known.Index == phrase)
+            {
+                if (known.Width != width)
+                {
+                    known.Text.MaxTextWidth = width;
+                    _phraseText = (phrase, width, known.Text);
+                }
+
+                return known.Text;
+            }
+
+            var line = new System.Text.StringBuilder();
+            for (int i = LowerBound(scene.WordTimes, scene.PhraseStarts[phrase]); i < scene.WordTimes.Length && scene.WordTimes[i] < scene.PhraseEnds[phrase]; i++)
+            {
+                line.Append(scene.Words[i]);
+                if (!scene.JoinsNext[i])
+                    line.Append(' ');
+            }
+
+            var text = new FormattedText(line.ToString().TrimEnd(), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, WordTypeface, WordFontSize, PhraseWordBrush)
+            {
+                MaxTextWidth = width,
+                MaxLineCount = 1,
+                Trimming = TextTrimming.CharacterEllipsis,
+            };
+            _phraseText = (phrase, width, text);
+            return text;
+        }
+
+        /// <summary>The song time at <paramref name="x"/> across the whole part.</summary>
+        private double TimeAt(double x) =>
+            Scene is { } scene && Bounds.Width > 0 ? Math.Clamp(x / Bounds.Width, 0, 1) * TimelineOf(scene) : 0;
+
+        protected override void OnPointerMoved(PointerEventArgs e)
+        {
+            base.OnPointerMoved(e);
+            double x = e.GetPosition(this).X;
+            SetHover(x);
+            if (_isScrubbing)
+                Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(x)));
+        }
+
+        protected override void OnPointerExited(PointerEventArgs e)
+        {
+            base.OnPointerExited(e);
+            if (!_isScrubbing)
+                SetHover(double.NaN);
+        }
+
+        protected override void OnPointerPressed(PointerPressedEventArgs e)
+        {
+            base.OnPointerPressed(e);
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || Scene is not { IsEmpty: false })
+                return;
+
+            double x = e.GetPosition(this).X;
+            SetHover(x);
+            _isScrubbing = true;
+            e.Pointer.Capture(this);
+            ScrubStarted?.Invoke(this, EventArgs.Empty);
+            Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(x)));
+            e.Handled = true;
+        }
+
+        protected override void OnPointerReleased(PointerReleasedEventArgs e)
+        {
+            base.OnPointerReleased(e);
+            if (!_isScrubbing)
+                return;
+
+            var point = e.GetPosition(this);
+            Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.X)));
+            e.Pointer.Capture(null);
+            EndScrub();
+
+            // Let go off the lane, it goes back to the words scrolling by.
+            SetHover(new Rect(Bounds.Size).Contains(point) ? point.X : double.NaN);
+            e.Handled = true;
+        }
+
+        protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+        {
+            base.OnPointerCaptureLost(e);
+            EndScrub();
+        }
+
+        private void EndScrub()
+        {
+            if (!_isScrubbing)
+                return;
+
+            _isScrubbing = false;
+            ScrubEnded?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>Shows the whole part with the pointer <paramref name="x"/> across it; NaN shows the lane as it scrolls.</summary>
+        private void SetHover(double x)
+        {
+            if (x == _hoverX || (double.IsNaN(x) && double.IsNaN(_hoverX)))
+                return;
+
+            if (double.IsNaN(x) != double.IsNaN(_hoverX))
+                Cursor = double.IsNaN(x) ? null : LaneScrub.HandCursor;
+            _hoverX = x;
+            InvalidateVisual();
         }
 
         /// <summary>
@@ -446,5 +716,8 @@ namespace ChartPacker.Controls
 
             RequestFrame();
         }
+
+        /// <summary>The whole part's note bars, and the scene, size, length of song and shift they were laid out for.</summary>
+        private sealed record OverviewMarks(LyricScene Scene, Size Size, double Timeline, double Shift, List<Rect> Bars);
     }
 }

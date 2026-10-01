@@ -235,6 +235,18 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(TimelineSeconds))]
         public partial double LengthSeconds { get; set; }
 
+        /// <summary>
+        /// How long the song plays for in a game, in seconds, which can run on past its audio: its <c>song_length</c>, or else
+        /// worked out from its chart, audio and video; 0 while that isn't known. Set by the details panel. Playback plays on
+        /// in silence past the audio to here, so what follows the clock does too.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LengthText))]
+        [NotifyPropertyChangedFor(nameof(IsLengthKnown))]
+        [NotifyPropertyChangedFor(nameof(LengthToolTip))]
+        [NotifyPropertyChangedFor(nameof(TimelineSeconds))]
+        public partial double SongLengthSeconds { get; set; }
+
         /// <summary>The master volume, from 0 to 1. Kept in the settings, so it carries over to the next run.</summary>
         [ObservableProperty]
         public partial double Volume { get; set; }
@@ -387,16 +399,17 @@ namespace ChartPacker.ViewModels
         public string PositionText => MetadataTimes.FormatDuration((long)(Math.Max(0, PositionSeconds) * 1000));
 
         /// <summary>
-        /// The song's length is known: from the player once the audio is open, and until then from how far the
-        /// waveform reaches, the way the waveform itself is laid out before the first play.
+        /// The song's length is known: from <see cref="SongLengthSeconds"/>, from the player once the audio is open, and
+        /// until then from how far the waveform reaches, the way the waveform itself is laid out before the first play.
         /// </summary>
-        public bool IsLengthKnown => LengthSeconds > 0 || Waveform.Count > 0;
+        public bool IsLengthKnown => SongLengthSeconds > 0 || LengthSeconds > 0 || Waveform.Count > 0;
 
         /// <summary>
-        /// How long the song is, in the same way as <see cref="LengthText"/>, or 0 while that isn't known. Every
-        /// track's waveform is laid out across it, so they share one time axis.
+        /// How long the song is, in the same way as <see cref="LengthText"/>, or 0 while that isn't known: the longer of
+        /// <see cref="SongLengthSeconds"/> and the audio, so neither is cut off. Every track's waveform is laid out across
+        /// it, so they share one time axis.
         /// </summary>
-        public double TimelineSeconds => Math.Max(0, LengthSeconds > 0 ? LengthSeconds : Waveform.Seconds);
+        public double TimelineSeconds => Math.Max(Math.Max(0, SongLengthSeconds), LengthSeconds > 0 ? LengthSeconds : Waveform.Seconds);
 
         /// <summary>How long the song is, or a placeholder while that isn't known yet; see <see cref="IsLengthKnown"/>.</summary>
         public string LengthText => IsLengthKnown
@@ -624,7 +637,7 @@ namespace ChartPacker.ViewModels
             if (!CanPlay() || await EnsureOpenAsync() is not { } player)
                 return;
 
-            var start = PreviewStartTime.Resolve(PreviewStart, player.Length);
+            var start = PreviewStartTime.Resolve(PreviewStart, TimeSpan.FromSeconds(Math.Max(TimelineSeconds, player.Length.TotalSeconds)));
             player.Seek(start);
             SetPosition(start.TotalSeconds);
             player.Play();
@@ -969,6 +982,12 @@ namespace ChartPacker.ViewModels
                 _player.CapturesHeard = value;
         }
 
+        partial void OnSongLengthSecondsChanged(double value)
+        {
+            if (_player is not null)
+                _player.MinimumLength = TimeSpan.FromSeconds(Math.Max(0, value));
+        }
+
         // A change from the slider (a click on its track, or the keyboard) seeks; a drag seeks when it ends.
         partial void OnPositionSecondsChanged(double value)
         {
@@ -1018,6 +1037,7 @@ namespace ChartPacker.ViewModels
                 foreach (var row in Tracks)
                     ApplySwitches(row);
                 player.Stopped += OnPlayerStopped;
+                player.MinimumLength = TimeSpan.FromSeconds(Math.Max(0, SongLengthSeconds));
                 LengthSeconds = player.Length.TotalSeconds;
 
                 // A spot picked on the waveform before the first play.

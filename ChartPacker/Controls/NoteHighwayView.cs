@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
@@ -72,7 +73,11 @@ namespace ChartPacker.Controls
             BeatTimes = [.. beats.Select(b => tempo.SecondsAt(b.Tick) + delay.TotalSeconds)];
             IsMeasure = [.. beats.Select(b => b.IsMeasure)];
             MaxLaneCount = lanes.Select(l => l.LaneCount).DefaultIfEmpty(1).Max();
+            EndSeconds = Math.Max(0, lanes.SelectMany(l => l.Ends).DefaultIfEmpty().Max());
         }
+
+        /// <summary>When the last note of any highway ends, sustain included, in seconds.</summary>
+        public double EndSeconds { get; }
 
         public IReadOnlyList<HighwayLane> Lanes { get; }
 
@@ -89,6 +94,10 @@ namespace ChartPacker.Controls
     /// above the bottom. Each frame the screen is drawn it reads <see cref="Clock"/>, so the notes
     /// follow the audio whether it's playing, paused or being dragged. Behind each highway's notes it
     /// can draw a track's <see cref="Waveforms"/>, falling with them.
+    /// <para>While the pointer is over a highway, that one shows its whole chart instead, squeezed into its height from the
+    /// start at the bottom to <see cref="LengthSeconds"/> at the top. Pressing on it and dragging scrubs: from
+    /// <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>, <see cref="Scrubbed"/> says where to, and the owner seeks
+    /// when it ends, as it does for <see cref="WaveformView"/>.</para>
     /// </summary>
     /// <example><c>&lt;ctl:NoteHighwayView Scene="{Binding Highway.Scene}" Clock="{Binding Highway.Clock}" LookAhead="{Binding Highway.LookAhead}" Waveforms="{Binding Highway.LaneWaveforms}" /&gt;</c></example>
     public sealed class NoteHighwayView : Control
@@ -107,6 +116,9 @@ namespace ChartPacker.Controls
 
         public static readonly StyledProperty<bool> AreNotesOutlinedProperty =
             AvaloniaProperty.Register<NoteHighwayView, bool>(nameof(AreNotesOutlined));
+
+        public static readonly StyledProperty<double> LengthSecondsProperty =
+            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(LengthSeconds));
 
         // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it.
         private const double StrikeFraction = 0.87;
@@ -130,7 +142,11 @@ namespace ChartPacker.Controls
             (0.7, Color.FromArgb(0x70, 0xC8, 0xD2, 0xFF)),
             (1, Color.FromArgb(0xA0, 0xE0, 0xE6, 0xFF)));
 
-        private static readonly IPen LaneDividerPen = new ImmutablePen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
+        // A highway shown as its whole chart: evenly dark, with no fade, so the marks read the same all the way up.
+        private static readonly IBrush OverviewBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0x06, 0x06, 0x0C));
+        private static readonly IPen OverviewEdgePen = new ImmutablePen(Color.FromArgb(0x50, 0xC8, 0xD2, 0xFF).ToUInt32(), 1);
+
+        private static readonly IPen LaneDividerPen =new ImmutablePen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IPen BeatPen = new ImmutablePen(Color.FromArgb(0x2A, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IPen MeasurePen = new ImmutablePen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF).ToUInt32(), 2);
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x00, 0x00, 0x00));
@@ -177,10 +193,28 @@ namespace ChartPacker.Controls
         // A cymbal's shape for each size of gem, at the origin, moved to each gem drawn.
         private readonly Dictionary<Size, StreamGeometry> _cymbals = [];
 
+        // The highway the pointer is over, drawn as its whole chart, and how far down it the pointer is; -1 and NaN for
+        // none. While scrubbing it stays the highway the press was on.
+        private int _hoveredLane = -1;
+        private double _hoverY = double.NaN;
+        private bool _isScrubbing;
+
+        // The whole-chart marks of the highway last drawn that way, and what they were laid out for.
+        private OverviewMarks? _overview;
+
         static NoteHighwayView()
         {
-            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty, AreNotesOutlinedProperty);
+            AffectsRender<NoteHighwayView>(SceneProperty, LookAheadProperty, WaveformsProperty, AreNotesOutlinedProperty, LengthSecondsProperty);
         }
+
+        /// <summary>Raised when a highway is pressed, before the first <see cref="Scrubbed"/>.</summary>
+        public event EventHandler? ScrubStarted;
+
+        /// <summary>Raised as the pointer moves while a highway is pressed, with the time it's at.</summary>
+        public event EventHandler<ScrubEventArgs>? Scrubbed;
+
+        /// <summary>Raised when the highway is let go, or the press is lost.</summary>
+        public event EventHandler? ScrubEnded;
 
         /// <summary>The highways to draw, or <see langword="null"/> for none.</summary>
         public HighwayScene? Scene
@@ -223,13 +257,29 @@ namespace ChartPacker.Controls
             set => SetValue(AreNotesOutlinedProperty, value);
         }
 
+        /// <summary>
+        /// How long the song is, in seconds: what a highway shows of it while the pointer is over it, and scrubs through. At
+        /// zero, the chart's own end is taken instead.
+        /// </summary>
+        public double LengthSeconds
+        {
+            get => GetValue(LengthSecondsProperty);
+            set => SetValue(LengthSecondsProperty, value);
+        }
+
         public NoteHighwayView() => EffectiveViewportChanged += OnEffectiveViewportChanged;
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
+            if (change.Property == SceneProperty)
+                _overview = null;
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
+
+            // Shown again, it shows the notes falling until the pointer is over a highway again.
+            if (change.Property == IsVisibleProperty && !IsVisible && !_isScrubbing)
+                SetHover(-1, double.NaN);
         }
 
         // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
@@ -264,27 +314,266 @@ namespace ChartPacker.Controls
             double strike = height * StrikeFraction;
             double Y(double time) => strike - ((time - now) / lookAhead * strike);
 
-            // Highways as wide as the height allows, narrower when four don't fit, with small gaps.
             int count = scene.Lanes.Count;
-            const double GapFraction = 0.1;
-            double width = Math.Min(height * 0.45, Bounds.Width * 0.96 / (count + ((count - 1) * GapFraction)));
-            double gap = width * GapFraction;
-            double left = (Bounds.Width - ((count * width) + ((count - 1) * gap))) / 2;
 
             // What's past the strike line shows for as long as it takes to fall off the bottom.
             double from = now - ((height - strike) / strike * lookAhead);
             double to = now + lookAhead;
 
             // One gem size for every highway, from the narrowest lanes, leaving room for the names below the strike bar.
-            double narrowest = width / scene.MaxLaneCount;
+            double narrowest = HighwayRect(scene, 0).Width / scene.MaxLaneCount;
             double gem = Math.Clamp(narrowest * 0.42, 5, Math.Max(5, Math.Min(18, (height - strike - 13) / 0.9)));
 
             var waveforms = Waveforms;
             for (int i = 0; i < count; i++)
             {
+                var bounds = HighwayRect(scene, i);
+
+                // Transparent, so the whole highway takes the pointer, and the gaps between them don't.
+                context.DrawRectangle(Brushes.Transparent, null, bounds);
+                if (i == _hoveredLane)
+                {
+                    DrawOverview(context, scene.Lanes[i], bounds, now);
+                    continue;
+                }
+
                 var waveform = waveforms is not null && i < waveforms.Count ? waveforms[i] : null;
-                DrawHighway(context, scene, scene.Lanes[i], waveform, new Rect(left + (i * (width + gap)), 0, width, height), strike, gem, now, from, to, Y);
+                DrawHighway(context, scene, scene.Lanes[i], waveform, bounds, strike, gem, now, from, to, Y);
             }
+        }
+
+        /// <summary>
+        /// Where the <paramref name="index"/>th of <paramref name="scene"/>'s highways is drawn: as wide as the height allows,
+        /// narrower when they don't all fit, with small gaps, centred.
+        /// </summary>
+        private Rect HighwayRect(HighwayScene scene, int index)
+        {
+            const double GapFraction = 0.1;
+            int count = scene.Lanes.Count;
+            double width = Math.Min(Bounds.Height * 0.45, Bounds.Width * 0.96 / (count + ((count - 1) * GapFraction)));
+            double gap = width * GapFraction;
+            double left = (Bounds.Width - ((count * width) + ((count - 1) * gap))) / 2;
+            return new Rect(left + (index * (width + gap)), 0, width, Bounds.Height);
+        }
+
+        /// <summary>The highway at <paramref name="point"/>, or -1 when it's over none.</summary>
+        private int HighwayAt(Point point)
+        {
+            if (Scene is not { Lanes.Count: > 0 } scene || Bounds.Width <= 0 || Bounds.Height <= 0)
+                return -1;
+
+            for (int i = 0; i < scene.Lanes.Count; i++)
+            {
+                if (HighwayRect(scene, i).Contains(point))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>How much of the song a highway's whole chart covers, in seconds: the song's length, or else the chart's.</summary>
+        private double TimelineOf(HighwayScene scene) => LengthSeconds > 0 ? LengthSeconds : scene.EndSeconds + 1;
+
+        /// <summary>
+        /// A highway as its whole chart, from the start at the bottom to the end of the song at the top: the notes as small
+        /// marks in their lanes, what's been played shaded, a line where the audio is, and one where the pointer is.
+        /// </summary>
+        private void DrawOverview(DrawingContext context, HighwayLane lane, Rect bounds, double now)
+        {
+            double timeline = Math.Max(0.1, Scene is { } scene ? TimelineOf(scene) : 0);
+            double Y(double time) => bounds.Bottom - (time / timeline * bounds.Height);
+
+            using (context.PushClip(bounds))
+            {
+                context.FillRectangle(OverviewBrush, bounds);
+                double laneWidth = bounds.Width / lane.LaneCount;
+                for (int i = 1; i < lane.LaneCount; i++)
+                {
+                    double x = bounds.X + (i * laneWidth);
+                    context.DrawLine(LaneDividerPen, new Point(x, bounds.Top), new Point(x, bounds.Bottom));
+                }
+
+                using (context.PushTransform(Matrix.CreateTranslation(bounds.X, bounds.Y)))
+                {
+                    foreach (var (rect, color) in OverviewMarksOf(lane, bounds.Size, timeline))
+                        context.FillRectangle(Brush(color), rect);
+                }
+
+                double playhead = Math.Clamp(Y(now), bounds.Top, bounds.Bottom);
+                context.FillRectangle(LaneScrub.PlayedBrush, new Rect(bounds.X, playhead, bounds.Width, bounds.Bottom - playhead));
+                context.DrawLine(LaneScrub.PlayheadPen, new Point(bounds.X, playhead), new Point(bounds.Right, playhead));
+                context.DrawRectangle(null, OverviewEdgePen, bounds.Deflate(0.5));
+
+                if (!double.IsNaN(_hoverY))
+                {
+                    double at = Math.Clamp(_hoverY, bounds.Top, bounds.Bottom);
+                    context.DrawLine(LaneScrub.HoverPen, new Point(bounds.X, at), new Point(bounds.Right, at));
+                    LaneScrub.DrawTimeTag(context, TimeAt(at), bounds, at, isAcross: true);
+                }
+            }
+
+            // At the top, out of the way of the time.
+            DrawLabel(context, lane.Label, bounds, bounds.Bottom);
+        }
+
+        /// <summary>
+        /// <paramref name="lane"/>'s notes as marks in a highway of <paramref name="size"/> covering <paramref name="timeline"/>
+        /// seconds, from its top left: kick and open bars, then tails, then gems, each a run of the notes in a lane that fall
+        /// on the same pixel row or the next one in the same colour, so a dense chart is a few hundred rectangles. Laid out
+        /// again only when one of those changes.
+        /// </summary>
+        private List<(Rect Rect, Color Color)> OverviewMarksOf(HighwayLane lane, Size size, double timeline)
+        {
+            if (_overview is { } known && ReferenceEquals(known.Lane, lane) && known.Size == size && known.Timeline == timeline)
+                return known.Marks;
+
+            const double GemHeight = 2;
+            double laneWidth = size.Width / lane.LaneCount;
+            double Y(double time) => size.Height - (time / timeline * size.Height);
+
+            var bars = new List<(Rect, Color)>();
+            var tails = new List<(Rect, Color)>();
+            var gems = new List<(Rect, Color)>();
+
+            // The run being built in each lane, by its column (-1 for the bars across), for gems and for tails apart.
+            var gemRuns = new Dictionary<int, (double Top, double Bottom, Color Color)>();
+            var tailRuns = new Dictionary<int, (double Top, double Bottom, Color Color)>();
+
+            Rect GemMark(int column, double top, double bottom) => column < 0
+                ? new Rect(2, top, size.Width - 4, bottom - top)
+                : new Rect((column * laneWidth) + (laneWidth * 0.14), top, laneWidth * 0.72, bottom - top);
+
+            Rect TailMark(int column, double top, double bottom)
+            {
+                double width = Math.Max(1.5, laneWidth * 0.2);
+                return new Rect(((column + 0.5) * laneWidth) - (width / 2), top, width, bottom - top);
+            }
+
+            // Notes are in time order, so each is at or above the one before in its lane.
+            static void Add(Dictionary<int, (double Top, double Bottom, Color Color)> runs, List<(Rect, Color)> marks, Func<int, double, double, Rect> rectOf, int column, double top, double bottom, Color color)
+            {
+                if (runs.TryGetValue(column, out var run))
+                {
+                    if (run.Color == color && bottom >= run.Top - 1)
+                    {
+                        runs[column] = (Math.Min(run.Top, top), run.Bottom, color);
+                        return;
+                    }
+
+                    marks.Add((rectOf(column, run.Top, run.Bottom), run.Color));
+                }
+
+                runs[column] = (top, bottom, color);
+            }
+
+            for (int i = 0; i < lane.Notes.Length; i++)
+            {
+                var note = lane.Notes[i];
+                int column = note.Lane == ChartNote.OpenLane ? -1 : Column(lane, note.Lane);
+
+                // A black fret's own colour would be lost on the dark highway.
+                var color = IsBlackFret(lane, note) ? BlackFretEdgeColor : NoteColor(lane, note);
+                double bottom = Y(lane.Starts[i]);
+                Add(gemRuns, column < 0 ? bars : gems, GemMark, column, bottom - GemHeight, bottom, color);
+                if (column >= 0 && lane.Ends[i] > lane.Starts[i])
+                    Add(tailRuns, tails, TailMark, column, Y(lane.Ends[i]), bottom, WithAlpha(color, 0xA0));
+            }
+
+            foreach (var (column, run) in tailRuns)
+                tails.Add((TailMark(column, run.Top, run.Bottom), run.Color));
+            foreach (var (column, run) in gemRuns)
+                (column < 0 ? bars : gems).Add((GemMark(column, run.Top, run.Bottom), run.Color));
+
+            List<(Rect, Color)> marks = [.. bars, .. tails, .. gems];
+            _overview = new OverviewMarks(lane, size, timeline, marks);
+            return marks;
+        }
+
+        /// <summary>The song time at <paramref name="y"/> down a highway's whole chart.</summary>
+        private double TimeAt(double y) =>
+            Scene is { } scene && Bounds.Height > 0 ? Math.Clamp((Bounds.Height - y) / Bounds.Height, 0, 1) * TimelineOf(scene) : 0;
+
+        protected override void OnPointerMoved(PointerEventArgs e)
+        {
+            base.OnPointerMoved(e);
+            var point = e.GetPosition(this);
+            if (_isScrubbing)
+            {
+                SetHover(_hoveredLane, point.Y);
+                Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.Y)));
+                return;
+            }
+
+            SetHover(HighwayAt(point), point.Y);
+        }
+
+        protected override void OnPointerExited(PointerEventArgs e)
+        {
+            base.OnPointerExited(e);
+            if (!_isScrubbing)
+                SetHover(-1, double.NaN);
+        }
+
+        protected override void OnPointerPressed(PointerPressedEventArgs e)
+        {
+            base.OnPointerPressed(e);
+            var point = e.GetPosition(this);
+            int lane = HighwayAt(point);
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || lane < 0)
+                return;
+
+            SetHover(lane, point.Y);
+            _isScrubbing = true;
+            e.Pointer.Capture(this);
+            ScrubStarted?.Invoke(this, EventArgs.Empty);
+            Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.Y)));
+            e.Handled = true;
+        }
+
+        protected override void OnPointerReleased(PointerReleasedEventArgs e)
+        {
+            base.OnPointerReleased(e);
+            if (!_isScrubbing)
+                return;
+
+            var point = e.GetPosition(this);
+            Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.Y)));
+            e.Pointer.Capture(null);
+            EndScrub();
+
+            // Let go off the highway, it goes back to the notes falling.
+            SetHover(HighwayAt(point), point.Y);
+            e.Handled = true;
+        }
+
+        protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+        {
+            base.OnPointerCaptureLost(e);
+            EndScrub();
+        }
+
+        private void EndScrub()
+        {
+            if (!_isScrubbing)
+                return;
+
+            _isScrubbing = false;
+            ScrubEnded?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>Shows <paramref name="lane"/>'s whole chart, with the pointer <paramref name="y"/> down it; -1 shows none.</summary>
+        private void SetHover(int lane, double y)
+        {
+            if (lane < 0)
+                y = double.NaN;
+            if (lane == _hoveredLane && (y == _hoverY || (double.IsNaN(y) && double.IsNaN(_hoverY))))
+                return;
+
+            if (lane != _hoveredLane)
+                Cursor = lane >= 0 ? LaneScrub.HandCursor : null;
+            _hoveredLane = lane;
+            _hoverY = y;
+            InvalidateVisual();
         }
 
         private void DrawHighway(DrawingContext context, HighwayScene scene, HighwayLane lane, Waveform? waveform, Rect bounds, double strike, double gem, double now, double from, double to, Func<double, double> y)
@@ -708,5 +997,8 @@ namespace ChartPacker.Controls
 
             RequestFrame();
         }
+
+        /// <summary>A highway's whole-chart marks, and the highway, size and length of song they were laid out for.</summary>
+        private sealed record OverviewMarks(HighwayLane Lane, Size Size, double Timeline, List<(Rect Rect, Color Color)> Marks);
     }
 }

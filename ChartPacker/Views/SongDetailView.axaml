@@ -243,101 +243,49 @@
             <Setter Property="ClipToBounds" Value="True" />
         </Style>
 
-        <!-- The tile's actions: the image dims and large round buttons fade in over its middle while
-             the tile is hovered or one of them has focus. -->
-        <Style Selector="Panel.artOverlay">
-            <Setter Property="Opacity" Value="0" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="CubicEaseOut" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.artTile:pointerover Panel.artOverlay, Panel.artOverlay:focus-within">
-            <Setter Property="Opacity" Value="1" />
-        </Style>
-        <Style Selector="Border.artDim">
-            <Setter Property="Background" Value="#99000000" />
-        </Style>
-        <!-- The buttons settle into place as they fade in. -->
-        <Style Selector="Panel.artOverlay Viewbox">
-            <Setter Property="RenderTransform" Value="scale(0.92)" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.artTile:pointerover Panel.artOverlay Viewbox, Panel.artOverlay:focus-within Viewbox">
-            <Setter Property="RenderTransform" Value="scale(1)" />
-        </Style>
-
-        <!-- Round, dark buttons that stay legible over any image; the Viewbox around them shrinks them
-             on a tile too small to fit them whole. -->
-        <Style Selector="Button.artAction">
-            <Setter Property="Width" Value="32" />
-            <Setter Property="Height" Value="32" />
+        <!-- A tile's actions, small and flat beside its file's name in its caption: Replace, Remove, then Undo. -->
+        <Style Selector="Button.captionAction">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="#66FFFFFF" />
-            <Setter Property="Background" Value="#B3000000" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="0.75" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
-        <Style Selector="Button.artAction /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.12" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
-                </Transitions>
-            </Setter>
+        <Style Selector="Button.captionAction:pointerover, Button.captionAction:focus-visible">
+            <Setter Property="Opacity" Value="1" />
         </Style>
-        <Style Selector="Button.artAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#E6000000" />
-            <Setter Property="BorderBrush" Value="White" />
-            <Setter Property="Foreground" Value="White" />
+        <Style Selector="Button.captionAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
         </Style>
-        <Style Selector="Button.artAction:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
-            <Setter Property="BorderBrush" Value="White" />
-            <Setter Property="Foreground" Value="White" />
+        <Style Selector="Button.captionAction:pressed">
+            <Setter Property="RenderTransform" Value="none" />
         </Style>
-        <!-- Remove stays in place, dimmed, when there's nothing to remove, so the buttons keep their size;
+        <Style Selector="Button.captionAction:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListMediumBrush}" />
+        </Style>
+        <!-- Remove stays in place, dimmed, when there's nothing to remove, so the buttons don't move;
              Undo is only there while there's a change to undo. -->
-        <Style Selector="Button.artAction:disabled">
-            <Setter Property="Opacity" Value="0.35" />
+        <Style Selector="Button.captionAction:disabled">
+            <Setter Property="Opacity" Value="0.3" />
+            <Setter Property="Cursor" Value="Arrow" />
         </Style>
-        <Style Selector="Button.artAction:disabled /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#B3000000" />
-            <Setter Property="BorderBrush" Value="#66FFFFFF" />
-            <Setter Property="Foreground" Value="White" />
+        <Style Selector="Button.captionAction:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
         </Style>
-        <Style Selector="Button.artAction.revert:disabled">
+        <Style Selector="Button.captionAction.revert:disabled">
             <Setter Property="IsVisible" Value="False" />
         </Style>
-        <Style Selector="Button.artAction PathIcon">
-            <Setter Property="Width" Value="14" />
-            <Setter Property="Height" Value="14" />
-            <Setter Property="RenderTransform" Value="scale(1)" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Button.artAction:pointerover PathIcon">
-            <Setter Property="RenderTransform" Value="scale(1.15)" />
-        </Style>
-        <Style Selector="Button.artAction:pressed PathIcon">
-            <Setter Property="RenderTransform" Value="scale(0.95)" />
-        </Style>
-        <Style Selector="Button.artAction:disabled PathIcon">
-            <Setter Property="RenderTransform" Value="scale(1)" />
+        <Style Selector="Button.captionAction PathIcon">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="13" />
         </Style>
 
         <!-- The caption under a tile: its file's name, which gives way on a narrow tile, then its size
@@ -665,8 +613,8 @@
                          lets both fit the panel's width, with a caption below each. The row, captions included,
                          is at most 512px or 40% of the window's height, whichever is smaller. -->
                     <ctl:MediaRow Margin="0,16,0,0" MaxRowHeight="512" MaxViewportFraction="0.4" FooterHeight="32" ClipToBounds="True">
-                        <!-- The file's name, and its size in a chip, under the tile; a - for each when there's none.
-                             The actions show over the image while the pointer is over it, or focus is on one of them. -->
+                        <!-- The file's name, with its actions beside it, and its size in a chip, under the tile; a - for
+                             each when there's none. -->
                         <DockPanel ctl:MediaRow.AspectRatio="{Binding ArtAspect}">
                             <Border DockPanel.Dock="Bottom"
                                     Classes="mediaCaption"
@@ -677,10 +625,34 @@
                                                Classes="marker"
                                                Text="{Binding ArtMarker}"
                                                IsVisible="{Binding IsArtChanged}" />
-                                    <TextBlock Grid.Column="1"
-                                               Classes="artName"
-                                               Text="{Binding ArtFileName, TargetNullValue='-'}"
-                                               ToolTip.Tip="{Binding ArtFileName}" />
+                                    <!-- Left-aligned, the name's column is only as wide as the name, so the actions sit just
+                                         after it; short of room, the name gives way rather than the actions. -->
+                                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="4" HorizontalAlignment="Left">
+                                        <TextBlock Classes="artName"
+                                                   Text="{Binding ArtFileName, TargetNullValue='-'}"
+                                                   ToolTip.Tip="{Binding ArtFileName}" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" IsVisible="{Binding CanEdit}">
+                                            <Button Classes="captionAction"
+                                                    Command="{Binding ReplaceArtCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.ReplaceArtToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.ReplaceArtToolTip}">
+                                                <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="captionAction"
+                                                    Command="{Binding RemoveArtCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RemoveArtToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RemoveArtToolTip}">
+                                                <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                            </Button>
+                                            <!-- Hidden by Button.captionAction.revert:disabled unless there's a change to undo. -->
+                                            <Button Classes="captionAction revert"
+                                                    Command="{Binding RevertArtCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RevertArtToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RevertArtToolTip}">
+                                                <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
                                     <Border Grid.Column="2" Classes="chip large">
                                         <TextBlock Text="{Binding ArtFileSize, TargetNullValue='-'}" />
                                     </Border>
@@ -704,41 +676,12 @@
                                                    TextWrapping="Wrap"
                                                    Text="{Binding ArtNote}" />
                                     </StackPanel>
-
-                                    <!-- The buttons are shown at full size, centred, and shrink only when the tile can't fit them. -->
-                                    <Panel Classes="artOverlay" IsVisible="{Binding CanEdit}">
-                                        <Border Classes="artDim" />
-                                        <Viewbox Margin="12" Stretch="Uniform" StretchDirection="DownOnly">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <!-- Hidden by Button.artAction.revert:disabled unless there's a change to undo. -->
-                                                <Button Classes="artAction revert"
-                                                        Command="{Binding RevertArtCommand}"
-                                                        ToolTip.Tip="{x:Static res:Strings.RevertArtToolTip}"
-                                                        AutomationProperties.Name="{x:Static res:Strings.RevertArtToolTip}">
-                                                    <PathIcon Data="{StaticResource RevertIconGeometry}" />
-                                                </Button>
-                                                <Button Classes="artAction"
-                                                        Command="{Binding ReplaceArtCommand}"
-                                                        ToolTip.Tip="{x:Static res:Strings.ReplaceArtToolTip}"
-                                                        AutomationProperties.Name="{x:Static res:Strings.ReplaceArtToolTip}">
-                                                    <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
-                                                </Button>
-                                                <Button Classes="artAction"
-                                                        Command="{Binding RemoveArtCommand}"
-                                                        ToolTip.Tip="{x:Static res:Strings.RemoveArtToolTip}"
-                                                        AutomationProperties.Name="{x:Static res:Strings.RemoveArtToolTip}">
-                                                    <PathIcon Data="{StaticResource TrashIconGeometry}" />
-                                                </Button>
-                                            </StackPanel>
-                                        </Viewbox>
-                                    </Panel>
                                 </Panel>
                             </Border>
                         </DockPanel>
 
-                        <!-- The background video or image, or why there's none to show, captioned like the art
-                             with the Image | Video switch at the right. Its actions show like the art's;
-                             Remove removes the kind shown. -->
+                        <!-- The background video or image, or why there's none to show, captioned like the art, with its
+                             actions beside its name and the Image | Video switch at the right. Remove removes the kind shown. -->
                         <DockPanel ctl:MediaRow.AspectRatio="{Binding Background.AspectRatio}">
                             <Border DockPanel.Dock="Bottom"
                                     Classes="mediaCaption"
@@ -748,10 +691,31 @@
                                                Classes="marker"
                                                Text="{Binding Background.Marker}"
                                                IsVisible="{Binding Background.IsChanged}" />
-                                    <TextBlock Grid.Column="1"
-                                               Classes="artName"
-                                               Text="{Binding Background.ShownFileName, TargetNullValue='-'}"
-                                               ToolTip.Tip="{Binding Background.ShownFileName}" />
+                                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="4" HorizontalAlignment="Left">
+                                        <TextBlock Classes="artName"
+                                                   Text="{Binding Background.ShownFileName, TargetNullValue='-'}"
+                                                   ToolTip.Tip="{Binding Background.ShownFileName}" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" IsVisible="{Binding CanEdit}">
+                                            <Button Classes="captionAction"
+                                                    Command="{Binding ReplaceBackgroundCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.ReplaceBackgroundToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.ReplaceBackgroundToolTip}">
+                                                <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="captionAction"
+                                                    Command="{Binding RemoveBackgroundCommand}"
+                                                    ToolTip.Tip="{Binding Background.RemoveToolTip}"
+                                                    AutomationProperties.Name="{Binding Background.RemoveToolTip}">
+                                                <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="captionAction revert"
+                                                    Command="{Binding RevertBackgroundCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RevertBackgroundToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RevertBackgroundToolTip}">
+                                                <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
                                     <Border Grid.Column="2" Classes="chip large">
                                         <TextBlock Text="{Binding Background.ShownFileSize, TargetNullValue='-'}" />
                                     </Border>
@@ -801,13 +765,14 @@
                                                         Clock="{Binding Background.Clock}"
                                                         IsVisible="{Binding Background.HasVideo}" />
                                     <!-- The chart's notes over whatever the background is, as a game draws them, unless the
-                                         settings put them in their own row below the lyrics. -->
+                                         settings put them in their own row below the lyrics. A highway under the pointer shows
+                                         its whole chart, to scrub through. -->
                                     <ctl:NoteHighwayView x:Name="HighwayOverlayView"
                                                          Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
                                                          Waveforms="{Binding Highway.LaneWaveforms}"
-                                                         IsHitTestVisible="False"
+                                                         LengthSeconds="{Binding Player.TimelineSeconds}"
                                                          IsVisible="{Binding Highway.IsShownOverBackground}" />
                                     <StackPanel VerticalAlignment="Center"
                                                 Margin="12"
@@ -821,32 +786,6 @@
                                                    TextWrapping="Wrap"
                                                    Text="{Binding Background.Note}" />
                                     </StackPanel>
-
-                                    <Panel Classes="artOverlay" IsVisible="{Binding CanEdit}">
-                                        <Border Classes="artDim" />
-                                        <Viewbox Margin="12" Stretch="Uniform" StretchDirection="DownOnly">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Button Classes="artAction revert"
-                                                        Command="{Binding RevertBackgroundCommand}"
-                                                        ToolTip.Tip="{x:Static res:Strings.RevertBackgroundToolTip}"
-                                                        AutomationProperties.Name="{x:Static res:Strings.RevertBackgroundToolTip}">
-                                                    <PathIcon Data="{StaticResource RevertIconGeometry}" />
-                                                </Button>
-                                                <Button Classes="artAction"
-                                                        Command="{Binding ReplaceBackgroundCommand}"
-                                                        ToolTip.Tip="{x:Static res:Strings.ReplaceBackgroundToolTip}"
-                                                        AutomationProperties.Name="{x:Static res:Strings.ReplaceBackgroundToolTip}">
-                                                    <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
-                                                </Button>
-                                                <Button Classes="artAction"
-                                                        Command="{Binding RemoveBackgroundCommand}"
-                                                        ToolTip.Tip="{Binding Background.RemoveToolTip}"
-                                                        AutomationProperties.Name="{Binding Background.RemoveToolTip}">
-                                                    <PathIcon Data="{StaticResource TrashIconGeometry}" />
-                                                </Button>
-                                            </StackPanel>
-                                        </Viewbox>
-                                    </Panel>
                                 </Panel>
                             </Border>
                         </DockPanel>
@@ -855,11 +794,11 @@
                     <TextBlock Classes="error" Text="{Binding BackgroundError}" IsVisible="{Binding HasBackgroundError}" />
 
                     <!-- The one selected song's vocals as a karaoke lane, in step with the audio, shown while it has
-                         a vocals track or vocals in its chart. Captioned and edited like the art: the actions show
-                         over the lane while the pointer is over it, or focus is on one of them. -->
+                         a vocals track or vocals in its chart. Captioned and edited like the art. While the pointer is
+                         over the lane it shows the whole part, to scrub through. -->
                     <DockPanel Margin="0,16,0,0" IsVisible="{Binding Lyrics.IsVisible}">
-                        <!-- The name, which gives way on a narrow panel, then the offset at the right, as the highway's
-                             instruments have in their flyout. -->
+                        <!-- The name, which gives way on a narrow panel, with its actions beside it, then the offset at the
+                             right, as the highway's instruments have in their flyout. -->
                         <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
                             <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
                                 <TextBlock Grid.Column="0"
@@ -867,10 +806,31 @@
                                            Text="{Binding Lyrics.Marker}"
                                            IsVisible="{Binding Lyrics.IsChanged}" />
                                 <TextBlock Grid.Column="1" Classes="artName" Text="{x:Static res:Strings.LyricsHeader}" />
-                                <TextBlock Grid.Column="2"
-                                           Classes="artName muted"
-                                           Text="{Binding Lyrics.SourceName, TargetNullValue='-'}"
-                                           ToolTip.Tip="{Binding Lyrics.SourceName}" />
+                                <Grid Grid.Column="2" ColumnDefinitions="*,Auto" ColumnSpacing="4" HorizontalAlignment="Left">
+                                    <TextBlock Classes="artName muted"
+                                               Text="{Binding Lyrics.SourceName, TargetNullValue='-'}"
+                                               ToolTip.Tip="{Binding Lyrics.SourceName}" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" IsVisible="{Binding CanEdit}">
+                                        <Button Classes="captionAction"
+                                                Command="{Binding ReplaceLyricsCommand}"
+                                                ToolTip.Tip="{Binding Lyrics.ReplaceToolTip}"
+                                                AutomationProperties.Name="{Binding Lyrics.ReplaceToolTip}">
+                                            <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
+                                        </Button>
+                                        <Button Classes="captionAction"
+                                                Command="{Binding RemoveLyricsCommand}"
+                                                ToolTip.Tip="{x:Static res:Strings.LyricsRemoveToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.LyricsRemoveToolTip}">
+                                            <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                        </Button>
+                                        <Button Classes="captionAction revert"
+                                                Command="{Binding RevertLyricsCommand}"
+                                                ToolTip.Tip="{x:Static res:Strings.LyricsRevertToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.LyricsRevertToolTip}">
+                                            <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
                                 <TextBlock Grid.Column="3"
                                            Classes="finding"
                                            MaxWidth="260"
@@ -945,11 +905,12 @@
 
                         <Border Classes="artTile" Height="120" AutomationProperties.Name="{x:Static res:Strings.LyricsHeader}">
                             <Panel>
-                                <ctl:LyricLaneView Scene="{Binding Lyrics.Scene}"
+                                <ctl:LyricLaneView x:Name="LyricLane"
+                                                   Scene="{Binding Lyrics.Scene}"
                                                    TimeShift="{Binding Lyrics.TimeShift}"
                                                    Waveform="{Binding Lyrics.Waveform}"
                                                    Clock="{Binding Lyrics.Clock}"
-                                                   IsHitTestVisible="False"
+                                                   LengthSeconds="{Binding Player.TimelineSeconds}"
                                                    IsVisible="{Binding Lyrics.HasLyrics}" />
                                 <TextBlock Classes="muted centered"
                                            VerticalAlignment="Center"
@@ -957,33 +918,6 @@
                                            TextWrapping="Wrap"
                                            Text="{Binding Lyrics.Note}"
                                            IsVisible="{Binding Lyrics.HasNote}" />
-
-                                <Panel Classes="artOverlay" IsVisible="{Binding CanEdit}">
-                                    <Border Classes="artDim" />
-                                    <Viewbox Margin="12" Stretch="Uniform" StretchDirection="DownOnly">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <!-- Hidden by Button.artAction.revert:disabled unless there's a change to undo. -->
-                                            <Button Classes="artAction revert"
-                                                    Command="{Binding RevertLyricsCommand}"
-                                                    ToolTip.Tip="{x:Static res:Strings.LyricsRevertToolTip}"
-                                                    AutomationProperties.Name="{x:Static res:Strings.LyricsRevertToolTip}">
-                                                <PathIcon Data="{StaticResource RevertIconGeometry}" />
-                                            </Button>
-                                            <Button Classes="artAction"
-                                                    Command="{Binding ReplaceLyricsCommand}"
-                                                    ToolTip.Tip="{Binding Lyrics.ReplaceToolTip}"
-                                                    AutomationProperties.Name="{Binding Lyrics.ReplaceToolTip}">
-                                                <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
-                                            </Button>
-                                            <Button Classes="artAction"
-                                                    Command="{Binding RemoveLyricsCommand}"
-                                                    ToolTip.Tip="{x:Static res:Strings.LyricsRemoveToolTip}"
-                                                    AutomationProperties.Name="{x:Static res:Strings.LyricsRemoveToolTip}">
-                                                <PathIcon Data="{StaticResource TrashIconGeometry}" />
-                                            </Button>
-                                        </StackPanel>
-                                    </Viewbox>
-                                </Panel>
                             </Panel>
                         </Border>
                     </DockPanel>
@@ -1030,7 +964,7 @@
                                                      Clock="{Binding Highway.Clock}"
                                                      LookAhead="{Binding Highway.LookAhead}"
                                                      Waveforms="{Binding Highway.LaneWaveforms}"
-                                                     IsHitTestVisible="False"
+                                                     LengthSeconds="{Binding Player.TimelineSeconds}"
                                                      IsVisible="{Binding Highway.IsShown}" />
                             </Border>
                         </DockPanel>
@@ -1102,13 +1036,14 @@
                                            Text="{Binding Player.PositionText}" />
                             </Panel>
                             <!-- What is heard, as a waveform that changes with the mute and solo switches. Dragging seeks
-                                 when it's let go; a click seeks at once. -->
+                                 when it's let go; a click seeks at once. It spans the song as a game plays it, which can
+                                 run on past the audio, so the waveform can stop short of the end. -->
                             <ctl:WaveformView x:Name="SeekBar"
                                               Grid.Column="3"
                                               Height="40"
                                               Waveform="{Binding Player.Waveform}"
                                               PositionSeconds="{Binding Player.PositionSeconds}"
-                                              LengthSeconds="{Binding Player.LengthSeconds}"
+                                              LengthSeconds="{Binding Player.TimelineSeconds}"
                                               PlayedBrush="{DynamicResource AccentTextBrush}"
                                               UnplayedBrush="{DynamicResource WaveformBrush}"
                                               VerticalAlignment="Center"

@@ -118,6 +118,79 @@ public sealed class StemMixerTests
     }
 
     [TestMethod]
+    public void AMinimumLengthPlaysOnInSilencePastTheStemsThenEnds()
+    {
+        var mixer = Mixer(("song", Constant(0.5f, frames: 100)));
+        mixer.MinimumLengthFrames = 250;
+
+        float[] output = Mix(mixer, 200);
+        Assert.AreEqual(0.5f, output[2 * 99], 1e-6f);
+        Assert.AreEqual(0f, output[2 * 100]);
+
+        var buffer = new float[2 * 200];
+        Assert.AreEqual(50, mixer.Mix(buffer));
+        Assert.AreEqual(0, mixer.Mix(buffer));
+        Assert.IsTrue(mixer.IsEnded);
+        Assert.AreEqual(100, mixer.LengthFrames);
+    }
+
+    [TestMethod]
+    public void SeekingPastTheStemsButInsideTheMinimumLengthPlaysSilenceFromThere()
+    {
+        var mixer = Mixer(("song", Constant(0.5f, frames: 100)));
+        mixer.MinimumLengthFrames = 1000;
+
+        mixer.Seek(600);
+
+        Assert.AreEqual(600, mixer.PositionFrames);
+        Assert.AreEqual(0f, Mix(mixer, 10)[0]);
+        var buffer = new float[2 * 1000];
+        Assert.AreEqual(390, mixer.Mix(buffer));
+
+        // Seeking back into the audio plays it again.
+        mixer.Seek(50);
+        Assert.AreEqual(0.5f, Mix(mixer, 1)[0], 1e-6f);
+    }
+
+    [TestMethod]
+    public void SeekingPastTheMinimumLengthStopsAtItsEnd()
+    {
+        var mixer = Mixer(("song", Constant(0.5f, frames: 100)));
+        mixer.MinimumLengthFrames = 300;
+
+        mixer.Seek(5000);
+
+        Assert.AreEqual(300, mixer.PositionFrames);
+    }
+
+    [TestMethod]
+    public void AMinimumLengthShorterThanTheStemsChangesNothing()
+    {
+        var mixer = Mixer(("song", Constant(0.5f, frames: 250)));
+        mixer.MinimumLengthFrames = 100;
+
+        var buffer = new float[2 * 1000];
+        Assert.AreEqual(250, mixer.Mix(buffer));
+        Assert.AreEqual(0, mixer.Mix(buffer));
+        Assert.IsTrue(mixer.IsEnded);
+    }
+
+    [TestMethod]
+    public void WhenALengthIsntKnownTheMinimumLengthStillPlaysOut()
+    {
+        var mixer = Mixer(("guitar", new FakeSource(Rate, 2, 300, (_, _) => 0.1f) { LengthFrames = -1 }));
+        mixer.MinimumLengthFrames = 1000;
+
+        int total = 0, frames;
+        var buffer = new float[2 * 128];
+        while ((frames = mixer.Mix(buffer)) > 0)
+            total += frames;
+
+        Assert.AreEqual(1000, total);
+        Assert.IsTrue(mixer.IsEnded);
+    }
+
+    [TestMethod]
     public void MonoIsSentToBothSides()
     {
         var mixer = Mixer(("vocals", new FakeSource(Rate, 1, 100, (_, _) => 0.25f)));

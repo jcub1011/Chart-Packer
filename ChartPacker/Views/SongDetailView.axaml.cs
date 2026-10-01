@@ -31,6 +31,17 @@ namespace ChartPacker.Views
             SeekBar.ScrubStarted += (_, _) => Player?.BeginScrub();
             SeekBar.ScrubEnded += (_, _) => EndScrub();
 
+            // The lanes scrub the same way, showing their whole chart while the pointer is over them.
+            HighwayOverlayView.ScrubStarted += (_, _) => Player?.BeginScrub();
+            HighwayOverlayView.Scrubbed += (_, e) => ScrubTo(e.Seconds);
+            HighwayOverlayView.ScrubEnded += (_, _) => EndScrub();
+            HighwayRowView.ScrubStarted += (_, _) => Player?.BeginScrub();
+            HighwayRowView.Scrubbed += (_, e) => ScrubTo(e.Seconds);
+            HighwayRowView.ScrubEnded += (_, _) => EndScrub();
+            LyricLane.ScrubStarted += (_, _) => Player?.BeginScrub();
+            LyricLane.Scrubbed += (_, e) => ScrubTo(e.Seconds);
+            LyricLane.ScrubEnded += (_, _) => EndScrub();
+
             AddHandler(PointerPressedEvent, OnPointerPressedAnywhere, RoutingStrategies.Bubble, handledEventsToo: true);
         }
 
@@ -94,6 +105,13 @@ namespace ChartPacker.Views
         {
             if (Player is { IsScrubbing: true } player)
                 player.EndScrub();
+        }
+
+        /// <summary>A lane is being dragged: the position follows it, and playback moves there when it's let go.</summary>
+        private void ScrubTo(double seconds)
+        {
+            if (Player is { IsScrubbing: true } player)
+                player.PositionSeconds = seconds;
         }
 
         /// <summary>Clicking away from a value's edit box keeps what was typed, like pressing Enter.</summary>

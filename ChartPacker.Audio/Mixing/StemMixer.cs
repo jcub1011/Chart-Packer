@@ -61,6 +61,10 @@ public sealed class StemMixer
 {
     private readonly List<MixerStem> _stems = [];
     private float[] _scratch = [];
+    private long _minimumLengthFrames;
+
+    // Every stem was found to have ended by the last mix, while the stems' length isn't known: only silence is left.
+    private bool _stemsEnded;
 
     /// <param name="sources">The stems, by name. The mixer reads them but doesn't own them.</param>
     /// <param name="outputRate">The rate to mix at; by default, the rate most of the stems have, so that as few as possible are resampled.</param>
@@ -86,10 +90,21 @@ public sealed class StemMixer
     /// <summary>The longest of the lengths that are known, for display when <see cref="LengthFrames"/> isn't.</summary>
     public long KnownLengthFrames { get; }
 
+    /// <summary>
+    /// How long the song plays for at least, in frames: past the end of its stems it plays on in silence until here,
+    /// as a game plays a chart whose notes or video run on past its audio. Shorter than the stems, it changes nothing.
+    /// Can be set from any thread; it takes effect at the next <see cref="Mix"/> or <see cref="Seek"/>.
+    /// </summary>
+    public long MinimumLengthFrames
+    {
+        get => Volatile.Read(ref _minimumLengthFrames);
+        set => Volatile.Write(ref _minimumLengthFrames, Math.Max(0, value));
+    }
+
     /// <summary>The frame the next <see cref="Mix"/> starts at.</summary>
     public long PositionFrames { get; private set; }
 
-    /// <summary>Every stem has ended.</summary>
+    /// <summary>Every stem has ended, and so has <see cref="MinimumLengthFrames"/>.</summary>
     public bool IsEnded { get; private set; }
 
     /// <summary>The rate most of <paramref name="rates"/> share, the higher on a tie; 48 kHz when there are none.</summary>
@@ -108,8 +123,13 @@ public sealed class StemMixer
         int frames = stereo.Length / 2;
         if (IsEnded)
             return 0;
+
+        // Past the stems' end, silence plays on to the minimum length.
+        long minimum = MinimumLengthFrames;
         if (LengthFrames >= 0)
-            frames = (int)Math.Min(frames, LengthFrames - PositionFrames);
+            frames = (int)Math.Min(frames, Math.Max(LengthFrames, minimum) - PositionFrames);
+        else if (_stemsEnded)
+            frames = (int)Math.Min(frames, minimum - PositionFrames);
         if (frames <= 0)
         {
             IsEnded = true;
@@ -154,16 +174,21 @@ public sealed class StemMixer
 
         PositionFrames += frames;
         if (LengthFrames < 0 && allEnded)
-            IsEnded = true;
+        {
+            _stemsEnded = true;
+            if (PositionFrames >= minimum)
+                IsEnded = true;
+        }
+
         return frames;
     }
 
-    /// <summary>Moves every stem to <paramref name="frame"/>.</summary>
+    /// <summary>Moves every stem to <paramref name="frame"/>; past a stem's end, it plays silence from there.</summary>
     public void Seek(long frame)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(frame);
         if (LengthFrames >= 0)
-            frame = Math.Min(frame, LengthFrames);
+            frame = Math.Min(frame, Math.Max(LengthFrames, MinimumLengthFrames));
 
         foreach (var stem in _stems)
         {
@@ -172,7 +197,9 @@ public sealed class StemMixer
 
             try
             {
-                stem.Reader.Seek(frame);
+                // A stem isn't asked to seek past its own end, which not every decoder allows.
+                long length = stem.Reader.LengthFrames;
+                stem.Reader.Seek(length >= 0 ? Math.Min(frame, length) : frame);
             }
             catch (InvalidDataException ex)
             {
@@ -182,5 +209,6 @@ public sealed class StemMixer
 
         PositionFrames = frame;
         IsEnded = false;
+        _stemsEnded = false;
     }
 }
