@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartPacker.Core.Dedup;
@@ -36,10 +35,9 @@ namespace ChartPacker.Services
             dialog.Opened += (_, _) => handle = dialog.TryGetPlatformHandle()?.Handle ?? 0;
 
             // The prompts and the Merge window it opens belong to this window, so they come up over it.
-            var drafted = request.Entries.Where(e => drafts.HasDrafts(e.FullPath)).Select(e => e.FullPath).ToHashSet(StringComparer.Ordinal);
             var viewModel = new DedupWindowViewModel(
                 request,
-                drafted,
+                drafts.HasDrafts,
                 settings,
                 new AvaloniaConfirmationService(() => dialog),
                 mergeWindowFor(() => dialog),

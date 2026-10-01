@@ -289,6 +289,51 @@ public sealed class DedupAnalyzerTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => DedupAnalyzer.AnalyzeAsync([a], cancellationToken: cts.Token));
     }
 
+    [TestMethod]
+    public async Task ParallelismBelowOneThrows()
+    {
+        var a = Song(_root, "A");
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DedupAnalyzer.AnalyzeAsync([a], parallelism: 0));
+    }
+
+    [TestMethod]
+    public async Task ParallelismDoesntChangeTheResult()
+    {
+        // Three sets of exact copies, two variants of one chart, two charts of one song, and a loner.
+        List<SongEntry> entries = [];
+        for (int set = 0; set < 3; set++)
+        {
+            for (int copy = 0; copy < 3; copy++)
+                entries.Add(Song(_root, $"Exact{set}-{copy}", title: "Exact" + set, chart: Chart.Replace("0 = N 0 0", $"0 = N {6 + set} 0"), audio: Bytes(8192, set)));
+        }
+
+        entries.Add(Song(_root, "SameA", title: "Same One", chart: Chart.Replace("0 = N 0 0", "0 = N 3 0")));
+        entries.Add(Song(_root, "SameB", title: "Same Two", chart: Chart.Replace("0 = N 0 0", "0 = N 3 0")));
+        entries.Add(Song(_root, "MergeA", "Band", "Merge"));
+        entries.Add(Song(_root, "MergeB", "Band", "Merge", chart: Chart.Replace("0 = N 0 0", "0 = N 4 0")));
+        entries.Add(Song(_root, "Alone", title: "Alone", chart: Chart.Replace("0 = N 0 0", "0 = N 5 0")));
+
+        var one = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 1));
+        var many = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 8));
+
+        Assert.HasCount(3, one.Exact);
+        Assert.HasCount(1, one.SameChart);
+        Assert.HasCount(1, one.Merge);
+        CollectionAssert.AreEqual(one.Exact, many.Exact);
+        CollectionAssert.AreEqual(one.SameChart, many.SameChart);
+        CollectionAssert.AreEqual(one.Merge, many.Merge);
+
+        static (string[] Exact, string[] SameChart, string[] Merge) Describe(DedupAnalysis analysis) =>
+        (
+            [.. analysis.Exact.Select(v => Paths(v.Entries))],
+            [.. analysis.SameChart.Select(c => string.Join(" | ", c.Variants.Select(v => Paths(v.Entries))))],
+            [.. analysis.MergeCandidates.Select(s => string.Join(" | ", s.Charts.Select(c => Paths(c.Entries))))]
+        );
+
+        static string Paths(IEnumerable<SongFingerprint> songs) => string.Join(", ", songs.Select(s => s.Entry.FullPath));
+    }
+
     /// <summary>A fingerprinted song folder, from two exact copies so both are fingerprinted.</summary>
     private async Task<SongFingerprint> FingerprintAsync()
     {

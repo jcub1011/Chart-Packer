@@ -886,7 +886,7 @@
     <value>Parallel reads</value>
   </data>
   <data name="ScanParallelismDescription" xml:space="preserve">
-    <value>How many folders a scan searches, and how many songs it reads, at once. Higher can be faster on SSDs and network drives; 1 reads one at a time.</value>
+    <value>How many folders a scan searches, and how many songs it reads, at once. Deduplicate reads and compares this many files at once too. Higher can be faster on SSDs and network drives; 1 reads one at a time.</value>
   </data>
   <data name="ScanParallelismKeywords" xml:space="preserve">
     <value>threads parallel parallelism concurrency workers speed performance</value>
@@ -1658,7 +1658,7 @@
     <value>Deduplicate</value>
   </data>
   <data name="DedupToolTip" xml:space="preserve">
-    <value>Find duplicate copies of songs across the whole library, and different charts of the same song, and move the copies you don't need to the trash. Needs an up-to-date scan.</value>
+    <value>Find duplicate copies of songs across the whole library, and different charts of the same song, and move the copies you don't need to the trash. Rescans the library first, so it compares what's on disk now.</value>
   </data>
   <data name="DedupWindowTitle" xml:space="preserve">
     <value>Deduplicate library</value>
@@ -1681,6 +1681,17 @@
   <data name="DedupKeepKeywords" xml:space="preserve">
     <value>duplicate dedupe deduplicate keep prefer sng folder copy</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="DedupPhaseSearchingFormat" xml:space="preserve">
+    <value>Scanning library… read {0:N0} of {1:N0} found, still searching</value>
+    <comment>{0} is the number of songs the library scan has read, {1} the number found so far. Shown while folders are still being searched.</comment>
+  </data>
+  <data name="DedupPhaseScanningFormat" xml:space="preserve">
+    <value>Scanning library… read {0:N0} of {1:N0}</value>
+    <comment>{0} is the number of songs the library scan has read, {1} the number found. Shown once every folder has been searched.</comment>
+  </data>
+  <data name="DedupScanIncomplete" xml:space="preserve">
+    <value>The library scan didn't finish, so nothing was compared. Close this window and try again once the folder can be read.</value>
   </data>
   <data name="DedupPhaseReadingFormat" xml:space="preserve">
     <value>Reading songs… {0:N0} of {1:N0}</value>

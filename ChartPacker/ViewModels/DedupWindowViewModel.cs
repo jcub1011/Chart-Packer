@@ -35,7 +35,7 @@ namespace ChartPacker.ViewModels
     public sealed partial class DedupWindowViewModel : ViewModelBase
     {
         private readonly DedupRequest _request;
-        private readonly IReadOnlySet<string> _drafted;
+        private readonly Func<string, bool> _hasDrafts;
         private readonly SettingsService _settings;
         private readonly IConfirmationService _confirmation;
         private readonly IMergeWindowService _merge;
@@ -45,6 +45,9 @@ namespace ChartPacker.ViewModels
         private readonly List<string> _removed = [];
         private CancellationTokenSource? _deleteCts;
         private Task _running = Task.CompletedTask;
+
+        // The songs with unsaved metadata edits, taken once the scan has found the songs.
+        private IReadOnlySet<string> _drafted = new HashSet<string>(StringComparer.Ordinal);
         private DedupAnalysis? _analysis;
         private int _trashedCount;
         private int _permanentCount;
@@ -53,8 +56,8 @@ namespace ChartPacker.ViewModels
         // Set while a whole tab is marked, so the tab's count is taken once rather than for every copy.
         private bool _isMarking;
 
-        /// <param name="request">The songs to compare, and where a merge writes.</param>
-        /// <param name="drafted">The songs with unsaved metadata edits, which are never deleted.</param>
+        /// <param name="request">How to get the songs to compare, and where a merge writes.</param>
+        /// <param name="hasDrafts">Whether the song at a path has unsaved metadata edits; those are never deleted. UI thread only.</param>
         /// <param name="settings">Holds the keep preference.</param>
         /// <param name="confirmation">Asks before anything is deleted.</param>
         /// <param name="merge">Shows the Merge window over this one.</param>
@@ -62,7 +65,7 @@ namespace ChartPacker.ViewModels
         /// <param name="log">Records every deletion.</param>
         public DedupWindowViewModel(
             DedupRequest request,
-            IReadOnlySet<string> drafted,
+            Func<string, bool> hasDrafts,
             SettingsService settings,
             IConfirmationService confirmation,
             IMergeWindowService merge,
@@ -70,12 +73,13 @@ namespace ChartPacker.ViewModels
             DeletionLog log)
         {
             _request = request;
-            _drafted = drafted;
+            _hasDrafts = hasDrafts;
             _settings = settings;
             _confirmation = confirmation;
             _merge = merge;
             _trash = trash;
             _log = log;
+            DescribeGate = new SemaphoreSlim(request.Parallelism);
 
             KeepOptions =
             [
@@ -202,9 +206,9 @@ namespace ChartPacker.ViewModels
         private bool OutputsChanged { get; set; }
 
         /// <summary>How many Same chart comparisons read files at once.</summary>
-        internal SemaphoreSlim DescribeGate { get; } = new(2);
+        internal SemaphoreSlim DescribeGate { get; }
 
-        /// <summary>Compares the songs and builds the groups.</summary>
+        /// <summary>Waits for the library scan, then compares the songs and builds the groups.</summary>
         public Task AnalyzeAsync()
         {
             _running = RunAnalysisAsync();
@@ -216,7 +220,16 @@ namespace ChartPacker.ViewModels
             var progress = new Progress<DedupProgress>(ShowProgress);
             try
             {
-                _analysis = await DedupAnalyzer.AnalyzeAsync(_request.Entries, _drafted.Contains, progress, _closing.Token);
+                var entries = await _request.LoadEntries(new Progress<DedupScanProgress>(ShowScanProgress), _closing.Token);
+                if (entries is null)
+                {
+                    ErrorMessage = Strings.DedupScanIncomplete;
+                    return;
+                }
+
+                // Taken here, on the UI thread: the comparison asks from other threads.
+                _drafted = entries.Select(e => e.FullPath).Where(_hasDrafts).ToHashSet(StringComparer.Ordinal);
+                _analysis = await DedupAnalyzer.AnalyzeAsync(entries, _drafted.Contains, progress, _request.Parallelism, _closing.Token);
             }
             catch (OperationCanceledException)
             {
@@ -252,6 +265,15 @@ namespace ChartPacker.ViewModels
 
             foreach (var group in SameChartGroups)
                 _ = group.DescribeAsync(_analysis.Hasher, _closing.Token);
+        }
+
+        private void ShowScanProgress(DedupScanProgress progress)
+        {
+            // Nothing can say how far a scan has got while it's still finding songs.
+            IsProgressIndeterminate = progress.IsSearching || progress.Found == 0;
+            ProgressValue = progress.Found == 0 ? 0 : 100.0 * progress.Read / progress.Found;
+            string format = progress.IsSearching ? Strings.DedupPhaseSearchingFormat : Strings.DedupPhaseScanningFormat;
+            ProgressText = string.Format(CultureInfo.CurrentCulture, format, progress.Read, progress.Found);
         }
 
         private void ShowProgress(DedupProgress progress)

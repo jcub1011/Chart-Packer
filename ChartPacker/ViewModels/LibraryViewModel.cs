@@ -27,7 +27,8 @@ namespace ChartPacker.ViewModels
 
     /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Deduplicate.</summary>
     /// <remarks>
-    /// Scanning only happens on an explicit <see cref="RescanCommand"/>. Picking a folder, changing
+    /// Scanning only happens on an explicit <see cref="RescanCommand"/>, or as the first step of
+    /// <see cref="DeduplicateCommand"/>. Picking a folder, changing
     /// the depth or launching the app never scans; the list is flagged as out of date instead.
     /// The same goes for a pack or unpack job, which changes what's on disk.
     /// <para>
@@ -195,7 +196,6 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
-        [NotifyCanExecuteChangedFor(nameof(DeduplicateCommand))]
         public partial bool IsScanning { get; set; }
 
         /// <summary>How many songs the scan has found so far.</summary>
@@ -307,7 +307,10 @@ namespace ChartPacker.ViewModels
 
         public bool HasCustomOutputFolder => OutputFolder is not null;
 
-        /// <summary>How many folders a scan searches, and how many songs it reads, at once. Taken when a scan starts.</summary>
+        /// <summary>
+        /// How many folders a scan searches, and how many songs it reads, at once; also how many files
+        /// Deduplicate reads at once. Taken when a scan or a Deduplicate starts.
+        /// </summary>
         public int ScanParallelism
         {
             get => _settings.Settings.ScanParallelism;
@@ -338,7 +341,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>Scans the chosen folder. Re-running it mid-scan cancels and restarts.</summary>
         [RelayCommand(CanExecute = nameof(CanRescan))]
-        private void Rescan() => _ = ScanAsync(FolderPath!, _settings.Settings.ScanMaxDepth);
+        private void Rescan() => _ = StartScan(FolderPath!, _settings.Settings.ScanMaxDepth);
 
         [RelayCommand(CanExecute = nameof(CanBrowse))]
         private async Task BrowseOutputAsync()
@@ -429,27 +432,62 @@ namespace ChartPacker.ViewModels
             }
         }
 
+        private bool CanDeduplicate() => FolderPath is not null && !Job.IsRunning;
+
+        /// <summary>
+        /// Rescans the library and opens the Deduplicate window, which compares the songs once the scan
+        /// is done, finds duplicates across the whole library and deletes the copies marked.
+        /// </summary>
         /// <remarks>
-        /// Needs an up-to-date list: after a pack, the new .sng files aren't listed until a rescan, and
+        /// Always on a fresh scan: after a pack, the new .sng files aren't listed until a rescan, and
         /// deciding what to delete from an old list is riskier.
         /// </remarks>
-        private bool CanDeduplicate() => HasScanned && !IsScanning && !Job.IsRunning && !IsStale && _allItems.Count > 1;
-
-        /// <summary>Opens the Deduplicate window, which finds duplicate songs across the whole library and deletes the copies marked.</summary>
         [RelayCommand(CanExecute = nameof(CanDeduplicate))]
         private async Task DeduplicateAsync()
         {
+            // Also clears the selection, so the detail panel lets go of the song it shows and its files can be deleted.
+            var scan = StartScan(FolderPath!, _settings.Settings.ScanMaxDepth);
             if (EffectiveOutputFolder is not { } destination)
                 return;
 
-            // The detail panel lets go of the song it shows, so its files can be deleted.
-            Selection.Clear();
-
-            var result = await _dedupWindow.ShowAsync(new DedupRequest([.. _allItems.Select(i => i.Entry)], destination, SelectedOverwriteOption.Value));
+            var request = new DedupRequest(
+                (progress, ct) => WaitForScanAsync(scan, progress, ct),
+                destination,
+                SelectedOverwriteOption.Value,
+                ScanParallelism);
+            var result = await _dedupWindow.ShowAsync(request);
             RemoveEntries(result.RemovedPaths);
             if (result.OutputsChanged)
                 _outputsChanged = true;
             RefreshState();
+        }
+
+        /// <summary>Reports how far <paramref name="scan"/> has got until it ends; then, if it finished, every song it found.</summary>
+        /// <returns>The songs, or <see langword="null"/> when the scan stopped short.</returns>
+        /// <remarks>Cancelling stops only the wait; the scan carries on.</remarks>
+        private async Task<IReadOnlyList<SongEntry>?> WaitForScanAsync(Task<bool> scan, IProgress<DedupScanProgress> progress, CancellationToken cancellationToken)
+        {
+            void Report() => progress.Report(new DedupScanProgress(ScanRead, ScanFound, IsSearching));
+
+            void OnChanged(object? sender, PropertyChangedEventArgs e)
+            {
+                if (e.PropertyName is nameof(ScanRead) or nameof(ScanFound) or nameof(IsSearching))
+                    Report();
+            }
+
+            PropertyChanged += OnChanged;
+            try
+            {
+                Report();
+                if (!await scan.WaitAsync(cancellationToken))
+                    return null;
+            }
+            finally
+            {
+                PropertyChanged -= OnChanged;
+            }
+
+            return [.. _allItems.Select(i => i.Entry)];
         }
 
         /// <summary>Takes songs that no longer exist out of the list, without a rescan.</summary>
@@ -497,12 +535,19 @@ namespace ChartPacker.ViewModels
             RefreshState();
         }
 
-        private async Task ScanAsync(string folder, int depth)
+        /// <summary>Scans <paramref name="folder"/>, replacing any scan that's running.</summary>
+        /// <returns>
+        /// Completes with <see langword="true"/> once every song found is listed, or with
+        /// <see langword="false"/> if the scan stops short: it failed, or another scan replaced it.
+        /// </returns>
+        private Task<bool> StartScan(string folder, int depth)
         {
             _scanCts?.Cancel();
-            using var cts = new CancellationTokenSource();
+            var cts = new CancellationTokenSource();
             _scanCts = cts;
 
+            // A replaced scan never ends on its own, since only the current one is listed.
+            _scanSink?.Ended.TrySetResult(false);
             var sink = new ScanSink(this);
             _scanSink = sink;
 
@@ -526,6 +571,13 @@ namespace ChartPacker.ViewModels
             IsScanning = true;
             RefreshState();
 
+            _ = LoadAsync(folder, depth, sink, cts);
+            return sink.Ended.Task;
+        }
+
+        private async Task LoadAsync(string folder, int depth, ScanSink sink, CancellationTokenSource cts)
+        {
+            using var _ = cts;
             try
             {
                 await SongLibraryLoader.LoadAsync(folder, depth, ScanParallelism, sink, cts.Token);
@@ -550,7 +602,7 @@ namespace ChartPacker.ViewModels
                 if (_scanCts == cts)
                     _scanCts = null;
                 if (_scanSink == sink && !sink.IsLoaded)
-                    EndScan(completed: false);
+                    EndScan(sink, completed: false);
             }
         }
 
@@ -582,12 +634,12 @@ namespace ChartPacker.ViewModels
             if (!sink.Songs.IsEmpty)
                 sink.RequestList();
             else if (sink.IsLoaded)
-                EndScan(completed: true);
+                EndScan(sink, completed: true);
 
             RefreshState();
         }
 
-        private void EndScan(bool completed)
+        private void EndScan(ScanSink sink, bool completed)
         {
             _scanSink = null;
 
@@ -597,6 +649,7 @@ namespace ChartPacker.ViewModels
 
             IsSearching = false;
             IsScanning = false;
+            sink.Ended.TrySetResult(completed);
         }
 
         /// <summary>A list item for a song the scan read, showing what was read.</summary>
@@ -860,6 +913,9 @@ namespace ChartPacker.ViewModels
 
             /// <summary>The load has finished, so every song it read is listed or in <see cref="Songs"/>. UI thread only.</summary>
             public bool IsLoaded { get; set; }
+
+            /// <summary>Set once the scan has listed every song (<see langword="true"/>) or stopped short.</summary>
+            public TaskCompletionSource<bool> Ended { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             public void Report(LibraryLoadProgress value)
             {

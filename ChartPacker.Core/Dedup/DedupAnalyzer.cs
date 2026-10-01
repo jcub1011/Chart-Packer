@@ -20,32 +20,33 @@ namespace ChartPacker.Core.Dedup;
 /// </remarks>
 public static class DedupAnalyzer
 {
-    /// <summary>How many songs are read at once.</summary>
-    public const int ReadParallelism = 4;
-
-    /// <summary>How many candidate groups are hashed at once.</summary>
-    public const int HashParallelism = 2;
+    /// <summary>How many songs are read, and files hashed, at once when no other number is given.</summary>
+    public const int DefaultParallelism = 4;
 
     /// <summary>Compares <paramref name="entries"/>.</summary>
     /// <param name="entries">The songs to compare.</param>
     /// <param name="hasDrafts">Whether the song at a path has unsaved metadata edits.</param>
     /// <param name="progress">Told how far the comparison has got.</param>
+    /// <param name="parallelism">How many songs are read, and how many files hashed, at once.</param>
     /// <param name="cancellationToken">Cancels the comparison.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="parallelism"/> is less than 1.</exception>
     /// <exception cref="OperationCanceledException">The comparison was cancelled.</exception>
     public static async Task<DedupAnalysis> AnalyzeAsync(
         IReadOnlyList<SongEntry> entries,
         Func<string, bool>? hasDrafts = null,
         IProgress<DedupProgress>? progress = null,
+        int parallelism = DefaultParallelism,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
+        ArgumentOutOfRangeException.ThrowIfLessThan(parallelism, 1);
         hasDrafts ??= _ => false;
 
         var hasher = new ContentHasher();
         var skipped = new Dictionary<string, DedupSkipped>(StringComparer.Ordinal);
-        var songs = await ReadAllAsync(entries, hasDrafts, skipped, progress, cancellationToken).ConfigureAwait(false);
+        var songs = await ReadAllAsync(entries, hasDrafts, skipped, parallelism, progress, cancellationToken).ConfigureAwait(false);
 
-        var run = new Run(hasher, skipped, progress);
+        var run = new Run(hasher, skipped, parallelism, progress);
         var variants = await run.FindVariantsAsync(songs, cancellationToken).ConfigureAwait(false);
         var charts = await run.FindChartsAsync(variants, cancellationToken).ConfigureAwait(false);
 
@@ -65,6 +66,7 @@ public static class DedupAnalyzer
         IReadOnlyList<SongEntry> entries,
         Func<string, bool> hasDrafts,
         Dictionary<string, DedupSkipped> skipped,
+        int parallelism,
         IProgress<DedupProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -73,7 +75,7 @@ public static class DedupAnalyzer
         int done = 0;
         progress?.Report(new DedupProgress(DedupPhase.Reading, 0, entries.Count, 0));
 
-        var options = new ParallelOptions { MaxDegreeOfParallelism = ReadParallelism, CancellationToken = cancellationToken };
+        var options = new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken };
         await Parallel.ForEachAsync(Enumerable.Range(0, entries.Count), options, async (i, ct) =>
         {
             var entry = entries[i];
@@ -138,12 +140,15 @@ public static class DedupAnalyzer
     private static string SortKey(SongFingerprint song) => song.Entry.RelativePath;
 
     /// <summary>The state one comparison shares across its stages.</summary>
-    private sealed class Run(ContentHasher hasher, Dictionary<string, DedupSkipped> skipped, IProgress<DedupProgress>? progress)
+    private sealed class Run(ContentHasher hasher, Dictionary<string, DedupSkipped> skipped, int parallelism, IProgress<DedupProgress>? progress)
     {
         /// <summary>The shortest time between two progress reports, in milliseconds.</summary>
         private const long ReportInterval = 100;
 
         private readonly Lock _gate = new();
+
+        // However the work is split up, no more than this many files are read at once.
+        private readonly SemaphoreSlim _hashGate = new(parallelism);
         private volatile DedupPhase _phase = DedupPhase.Comparing;
         private int _stepsDone;
         private int _stepsTotal;
@@ -162,7 +167,7 @@ public static class DedupAnalyzer
             BeginStage(DedupPhase.Comparing, candidates.Count);
 
             var found = new List<DedupVariant>[candidates.Count];
-            var options = new ParallelOptions { MaxDegreeOfParallelism = HashParallelism, CancellationToken = cancellationToken };
+            var options = new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken };
             await Parallel.ForEachAsync(Enumerable.Range(0, candidates.Count), options, async (i, ct) =>
             {
                 found[i] = await RefineAsync(candidates[i], ct).ConfigureAwait(false);
@@ -183,27 +188,33 @@ public static class DedupAnalyzer
                 .ToList();
 
             var charts = bySize.Where(g => g.Count() == 1).Select(g => new DedupChart(g.First().Entries[0].ChartName!, null, [g.First()])).ToList();
-            var candidates = bySize.Where(g => g.Count() > 1).ToList();
+            var candidates = bySize.Select(g => g.ToList()).Where(g => g.Count > 1).ToList();
             BeginStage(DedupPhase.MatchingCharts, candidates.Count);
 
-            foreach (var group in candidates)
+            // Kept in candidate order, so the result doesn't depend on which group finished first.
+            var found = new List<DedupChart>[candidates.Count];
+            var options = new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken };
+            await Parallel.ForEachAsync(Enumerable.Range(0, candidates.Count), options, async (i, ct) =>
             {
-                var hashed = new List<(DedupVariant Variant, string? Hash)>();
-                foreach (var variant in group)
-                    hashed.Add((variant, await ChartHashAsync(variant, cancellationToken).ConfigureAwait(false)));
+                var group = candidates[i];
+                var hashes = await Task.WhenAll(group.Select(v => ChartHashAsync(v, ct))).ConfigureAwait(false);
 
-                foreach (var same in hashed.GroupBy(h => h.Hash, StringComparer.Ordinal))
+                var list = new List<DedupChart>();
+                foreach (var same in group.Zip(hashes, (Variant, Hash) => (Variant, Hash)).GroupBy(h => h.Hash, StringComparer.Ordinal))
                 {
                     var members = same.Select(h => h.Variant).ToList();
                     if (same.Key is null)
-                        charts.AddRange(members.Select(v => new DedupChart(v.Entries[0].ChartName!, null, [v])));
+                        list.AddRange(members.Select(v => new DedupChart(v.Entries[0].ChartName!, null, [v])));
                     else
-                        charts.Add(new DedupChart(members[0].Entries[0].ChartName!, same.Key, members));
+                        list.Add(new DedupChart(members[0].Entries[0].ChartName!, same.Key, members));
                 }
 
+                found[i] = list;
                 StepDone();
-            }
+            }).ConfigureAwait(false);
 
+            foreach (var list in found)
+                charts.AddRange(list);
             return charts;
         }
 
@@ -227,6 +238,10 @@ public static class DedupAnalyzer
         }
 
         /// <summary>Splits a bucket of same-shaped songs by one file's hash at a time, smallest first.</summary>
+        /// <remarks>
+        /// Every song still matching is hashed at once, but a file is only hashed once the smaller
+        /// ones all matched, so a larger file is never read for songs already told apart.
+        /// </remarks>
         private async Task<List<DedupVariant>> RefineAsync(List<SongFingerprint> bucket, CancellationToken cancellationToken)
         {
             var files = bucket[0].Files.OrderBy(f => f.Length).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -235,17 +250,13 @@ public static class DedupAnalyzer
 
             foreach (var file in files)
             {
-                var next = new List<List<SongFingerprint>>();
-                foreach (var group in groups)
-                {
-                    var hashed = new List<(SongFingerprint Song, string Hash)>();
-                    foreach (var song in group)
-                    {
-                        if (await TryHashAsync(song, file.Name, cancellationToken).ConfigureAwait(false) is { } hash)
-                            hashed.Add((song, hash));
-                    }
+                var hashes = await Task.WhenAll(groups.Select(g => Task.WhenAll(g.Select(s => TryHashAsync(s, file.Name, cancellationToken))))).ConfigureAwait(false);
 
-                    foreach (var same in hashed.GroupBy(h => h.Hash, StringComparer.Ordinal))
+                var next = new List<List<SongFingerprint>>();
+                for (int g = 0; g < groups.Count; g++)
+                {
+                    var hashed = groups[g].Zip(hashes[g], (Song, Hash) => (Song, Hash)).Where(h => h.Hash is not null);
+                    foreach (var same in hashed.GroupBy(h => h.Hash!, StringComparer.Ordinal))
                     {
                         var members = same.Select(h => h.Song).ToList();
                         if (members.Count > 1)
@@ -280,7 +291,17 @@ public static class DedupAnalyzer
         {
             try
             {
-                string hash = await hasher.HashAsync(song, storedName, cancellationToken).ConfigureAwait(false);
+                string hash;
+                await _hashGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    hash = await hasher.HashAsync(song, storedName, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _hashGate.Release();
+                }
+
                 ReportThrottled(Volatile.Read(ref _stepsDone));
                 return hash;
             }
