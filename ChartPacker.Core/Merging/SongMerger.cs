@@ -28,6 +28,15 @@ namespace ChartPacker.Core.Merging;
 /// <see cref="SongMerger.MergeAsync"/>, not by <see cref="SongMerger.StageAsync"/>, whose preview
 /// shows them as a draft's offsets instead.
 /// </param>
+/// <param name="AudioOffset">
+/// How far to move the audio against the merged chart, in milliseconds, later when positive, as the
+/// preview's audio offset sets it: worked into the <c>delay</c>; see <see cref="TimingOffsets"/>.
+/// Applied, like <paramref name="ChartOffsets"/>, by <see cref="SongMerger.MergeAsync"/> and not by <see cref="SongMerger.StageAsync"/>.
+/// </param>
+/// <param name="VideoOffset">
+/// How far to move the background video against the audio, in milliseconds, later when positive: worked
+/// into the <c>video_start_time</c>. Applied as <paramref name="AudioOffset"/> is, and only with a video.
+/// </param>
 public sealed record SongMergePlan(
     SongMergeAnalysis Analysis,
     int BaseSource,
@@ -37,7 +46,9 @@ public sealed record SongMergePlan(
     int? AlbumArtSource,
     int? BackgroundSource,
     int? VideoSource,
-    IReadOnlyDictionary<ChartTrackKey, int>? ChartOffsets = null);
+    IReadOnlyDictionary<ChartTrackKey, int>? ChartOffsets = null,
+    int AudioOffset = 0,
+    int VideoOffset = 0);
 
 /// <summary>A merged song.</summary>
 /// <param name="OutputPath">The <c>.sng</c> written.</param>
@@ -285,6 +296,8 @@ public static class SongMerger
             .Concat(merged.Warnings)
             .ToList();
         var pairs = BuildMetadata(plan).ToList();
+        if (applyOffsets)
+            pairs = WithTimingOffsets(pairs, plan);
 
         byte[] midi = merged.Midi;
         if (applyOffsets && plan.ChartOffsets is { Count: > 0 } offsets)
@@ -336,6 +349,19 @@ public static class SongMerger
             SetLength(pairs, length);
         await SongIni.WriteAsync(Path.Combine(folder, SongIni.FileName), pairs, cancellationToken).ConfigureAwait(false);
         return warnings;
+    }
+
+    /// <summary>
+    /// <paramref name="pairs"/> with the plan's audio and video offsets worked into their keys. The merged chart is a
+    /// <c>notes.mid</c>, which has no offset of its own, so an unset <c>delay</c> is zero.
+    /// </summary>
+    private static List<KeyValuePair<string, string>> WithTimingOffsets(List<KeyValuePair<string, string>> pairs, SongMergePlan plan)
+    {
+        var draft = new MetadataDraft();
+        TimingOffsets.Set(draft, TimingOffsets.AudioKey, pairs, TimeSpan.Zero, plan.AudioOffset);
+        if (plan.VideoSource is not null)
+            TimingOffsets.Set(draft, TimingOffsets.VideoKey, pairs, TimeSpan.Zero, plan.VideoOffset);
+        return draft.ApplyTo(pairs);
     }
 
     private static string KeyOf(MergeSource source, string storedName) => source.Entry.FullPath + "|" + storedName;

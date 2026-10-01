@@ -782,7 +782,7 @@
     <value>Lyrics offset</value>
   </data>
   <data name="LyricsOffsetToolTip" xml:space="preserve">
-    <value>Moves the lyrics and vocal notes later (positive) or earlier (negative). Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, a tenth with Ctrl. Saving rewrites the chart.</value>
+    <value>Moves the lyrics and vocal notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
   </data>
   <data name="LyricsRevertOffsetToolTip" xml:space="preserve">
     <value>Reset the lyrics offset</value>
@@ -1130,14 +1130,35 @@
     <comment>Milliseconds, after the offset box.</comment>
   </data>
   <data name="HighwayOffsetToolTip" xml:space="preserve">
-    <value>Moves this difficulty's notes later (positive) or earlier (negative). Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, a tenth with Ctrl. Saving rewrites the chart.</value>
-  </data>
-  <data name="HighwayNudgeFormat" xml:space="preserve">
-    <value>{0:+0;-0} ms</value>
-    <comment>A nudge button: {0} is the milliseconds added, with its sign.</comment>
+    <value>Moves this difficulty's notes later (positive) or earlier (negative). Saving rewrites the chart.</value>
   </data>
   <data name="HighwayRevertOffsetToolTip" xml:space="preserve">
     <value>Reset this offset</value>
+  </data>
+  <data name="OffsetControlsHelp" xml:space="preserve">
+    <value>Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, finer with Ctrl. Click it to type a value; Enter keeps it. While typing, Up and Down or the mouse wheel step a millisecond, ten with Shift.</value>
+    <comment>Under each offset box's own tooltip: the ways to change it.</comment>
+  </data>
+  <data name="AudioOffsetName" xml:space="preserve">
+    <value>Audio offset</value>
+  </data>
+  <data name="AudioOffsetToolTip" xml:space="preserve">
+    <value>Moves all the audio later (positive) or earlier (negative) against the chart and lyrics. The background video stays with the audio; it has its own offset. Saved as song.ini's delay.</value>
+  </data>
+  <data name="AudioRevertOffsetToolTip" xml:space="preserve">
+    <value>Reset the audio offset</value>
+  </data>
+  <data name="VideoOffsetName" xml:space="preserve">
+    <value>Video offset</value>
+  </data>
+  <data name="VideoOffsetToolTip" xml:space="preserve">
+    <value>Moves the background video later (positive) or earlier (negative) against the audio. Saved as song.ini's video_start_time.</value>
+  </data>
+  <data name="VideoOffsetButtonToolTip" xml:space="preserve">
+    <value>Line the video up with the audio</value>
+  </data>
+  <data name="VideoRevertOffsetToolTip" xml:space="preserve">
+    <value>Reset the video offset</value>
   </data>
   <data name="HighwayNoteSpeedLabel" xml:space="preserve">
     <value>Note speed</value>

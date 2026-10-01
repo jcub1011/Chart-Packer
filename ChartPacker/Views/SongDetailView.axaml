@@ -60,7 +60,7 @@
                         Spacing="8"
                         Background="Transparent"
                         Focusable="True"
-                        PointerPressed="OnHighwayOptionsPressed"
+                        PointerPressed="OnOffsetFlyoutPressed"
                         AutomationProperties.Name="{x:Static res:Strings.HighwayOptionsName}">
                 <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.HighwayInstrumentsHeader}" />
                 <ItemsControl ItemsSource="{Binding Highway.Rows}">
@@ -71,7 +71,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:HighwayRowViewModel">
-                            <Grid ColumnDefinitions="110,140,Auto,Auto,Auto,Auto,130" ColumnSpacing="6">
+                            <Grid ColumnDefinitions="110,140,Auto,Auto,Auto,130" ColumnSpacing="6">
                                 <CheckBox Grid.Column="0"
                                           Content="{Binding Name}"
                                           IsChecked="{Binding IsChecked}" />
@@ -98,16 +98,17 @@
                                                Minimum="-2147483648"
                                                Maximum="2147483647"
                                                FormatString="+0;-0;0"
-                                               ToolTip.Tip="{x:Static res:Strings.HighwayOffsetToolTip}"
-                                               AutomationProperties.Name="{x:Static res:Strings.HighwayOffsetName}" />
+                                               AutomationProperties.Name="{x:Static res:Strings.HighwayOffsetName}">
+                                    <!-- What it moves, then, muted, the ways to change it, which every offset box shares. -->
+                                    <ToolTip.Tip>
+                                        <StackPanel MaxWidth="320" Spacing="6">
+                                            <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.HighwayOffsetToolTip}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                        </StackPanel>
+                                    </ToolTip.Tip>
+                                </NumericUpDown>
                                 <TextBlock Grid.Column="3" Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
-                                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2">
-                                    <Button Classes="nudge" Content="-10" Command="{Binding NudgeCommand}" CommandParameter="-10" />
-                                    <Button Classes="nudge" Content="-1" Command="{Binding NudgeCommand}" CommandParameter="-1" />
-                                    <Button Classes="nudge" Content="+1" Command="{Binding NudgeCommand}" CommandParameter="1" />
-                                    <Button Classes="nudge" Content="+10" Command="{Binding NudgeCommand}" CommandParameter="10" />
-                                </StackPanel>
-                                <Button Grid.Column="5"
+                                <Button Grid.Column="4"
                                         Classes="nudge"
                                         Command="{Binding RevertOffsetCommand}"
                                         ToolTip.Tip="{x:Static res:Strings.HighwayRevertOffsetToolTip}"
@@ -115,7 +116,7 @@
                                     <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
                                 </Button>
                                 <!-- The track drawn behind the instrument's notes: its own, or one picked for this song. -->
-                                <ComboBox Grid.Column="6"
+                                <ComboBox Grid.Column="5"
                                           HorizontalAlignment="Stretch"
                                           VerticalAlignment="Center"
                                           ItemsSource="{Binding WaveformPicker.Options}"
@@ -327,11 +328,22 @@
             <Setter Property="Width" Value="14" />
             <Setter Property="Height" Value="14" />
         </Style>
-        <!-- Wider than Fluent lets a flyout be, so a row's offset and nudges fit on one line. -->
+        <!-- Wider than Fluent lets a flyout be, so a row's difficulty, offset and waveform fit on one line. -->
         <Style Selector="FlyoutPresenter.highwayFlyout">
             <Setter Property="MaxWidth" Value="720" />
         </Style>
-        <Style Selector="TextBlock.highwayHeader">
+        <!-- The background's offset button, sized to sit with the Image | Video switch beside it. -->
+        <Style Selector="Button.offset">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.offset PathIcon, StackPanel.timing PathIcon">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+        </Style>        <Style Selector="TextBlock.highwayHeader">
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Opacity" Value="0.7" />
         </Style>
@@ -699,7 +711,7 @@
                             <Border DockPanel.Dock="Bottom"
                                     Classes="mediaCaption"
                                     Height="{Binding $parent[ctl:MediaRow].FooterHeight}">
-                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                                     <TextBlock Grid.Column="0"
                                                Classes="marker"
                                                Text="{Binding Background.Marker}"
@@ -748,8 +760,59 @@
                                             </StackPanel>
                                         </ToggleSplitButton>
                                     </Panel>
+                                    <!-- The video's offset, in a flyout of its own so the caption stays short; only while the one
+                                         selected song's video is shown. Focusable, so a click on its empty space or a label (or Enter
+                                         in the box) can take focus from the box without closing the flyout. -->
+                                    <Button Grid.Column="4"
+                                            Classes="offset"
+                                            IsVisible="{Binding ShowVideoOffset}"
+                                            ToolTip.Tip="{x:Static res:Strings.VideoOffsetButtonToolTip}"
+                                            AutomationProperties.Name="{x:Static res:Strings.VideoOffsetName}">
+                                        <StackPanel Orientation="Horizontal" Spacing="3">
+                                            <PathIcon Data="{StaticResource OffsetIconGeometry}" />
+                                            <TextBlock Classes="marker" Text="{Binding VideoOffset.Marker}" IsVisible="{Binding VideoOffset.HasOffset}" />
+                                        </StackPanel>
+                                        <Button.Flyout>
+                                            <Flyout Placement="BottomEdgeAlignedRight">
+                                                <StackPanel Spacing="6"
+                                                            Background="Transparent"
+                                                            Focusable="True"
+                                                            PointerPressed="OnOffsetFlyoutPressed"
+                                                            AutomationProperties.Name="{x:Static res:Strings.VideoOffsetName}">
+                                                    <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.VideoOffsetName}" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                                                       Width="72"
+                                                                       ShowButtonSpinner="False"
+                                                                       VerticalAlignment="Center"
+                                                                       Value="{Binding VideoOffset.Offset}"
+                                                                       IsEnabled="{Binding VideoOffset.CanEdit}"
+                                                                       Increment="1"
+                                                                       Minimum="-2147483648"
+                                                                       Maximum="2147483647"
+                                                                       FormatString="+0;-0;0"
+                                                                       AutomationProperties.Name="{x:Static res:Strings.VideoOffsetName}">
+                                                            <ToolTip.Tip>
+                                                                <StackPanel MaxWidth="320" Spacing="6">
+                                                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.VideoOffsetToolTip}" />
+                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                                                </StackPanel>
+                                                            </ToolTip.Tip>
+                                                        </NumericUpDown>
+                                                        <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                                                        <Button Classes="nudge"
+                                                                Command="{Binding VideoOffset.RevertOffsetCommand}"
+                                                                ToolTip.Tip="{x:Static res:Strings.VideoRevertOffsetToolTip}"
+                                                                AutomationProperties.Name="{x:Static res:Strings.VideoRevertOffsetToolTip}">
+                                                            <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Flyout>
+                                        </Button.Flyout>
+                                    </Button>
                                     <!-- Always shown; a kind the selection doesn't have can't be picked. -->
-                                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2">
+                                    <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="2">
                                         <RadioButton Classes="backgroundKind"
                                                      IsChecked="{Binding Background.IsImageSelected}"
                                                      IsEnabled="{Binding Background.HasImageKind}"
@@ -898,20 +961,20 @@
                                                    ShowButtonSpinner="False"
                                                    VerticalAlignment="Center"
                                                    Value="{Binding Lyrics.Offset}"
-                                                   IsEnabled="{Binding Lyrics.CanNudge}"
+                                                   IsEnabled="{Binding Lyrics.CanSetOffset}"
                                                    Increment="1"
                                                    Minimum="-2147483648"
                                                    Maximum="2147483647"
                                                    FormatString="+0;-0;0"
-                                                   ToolTip.Tip="{x:Static res:Strings.LyricsOffsetToolTip}"
-                                                   AutomationProperties.Name="{x:Static res:Strings.LyricsOffsetName}" />
+                                                   AutomationProperties.Name="{x:Static res:Strings.LyricsOffsetName}">
+                                        <ToolTip.Tip>
+                                            <StackPanel MaxWidth="320" Spacing="6">
+                                                <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.LyricsOffsetToolTip}" />
+                                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                            </StackPanel>
+                                        </ToolTip.Tip>
+                                    </NumericUpDown>
                                     <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
-                                    <StackPanel Orientation="Horizontal" Spacing="2">
-                                        <Button Classes="nudge" Content="-10" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="-10" />
-                                        <Button Classes="nudge" Content="-1" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="-1" />
-                                        <Button Classes="nudge" Content="+1" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="1" />
-                                        <Button Classes="nudge" Content="+10" Command="{Binding Lyrics.NudgeCommand}" CommandParameter="10" />
-                                    </StackPanel>
                                     <Button Classes="nudge"
                                             Command="{Binding Lyrics.RevertOffsetCommand}"
                                             ToolTip.Tip="{x:Static res:Strings.LyricsRevertOffsetToolTip}"
@@ -1003,16 +1066,53 @@
                         <StackPanel.Resources>
                             <x:Double x:Key="SliderHorizontalHeight">20</x:Double>
                         </StackPanel.Resources>
-                        <!-- The master volume sits at the right of the header; each track has its own level in the mix below. -->
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                        <!-- The audio offset and the master volume sit at the right of the header; each track has its own level
+                             in the mix below. The offset moves every track alike, as song.ini's delay does. -->
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
                             <TextBlock Grid.Column="0" Classes="section" Text="{Binding Player.TracksHeader}" />
-                            <PathIcon Grid.Column="1"
+                            <StackPanel Grid.Column="1"
+                                        Classes="timing"
+                                        Orientation="Horizontal"
+                                        Spacing="6"
+                                        Margin="0,0,12,0"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding Player.HasTracks}">
+                                <TextBlock Classes="marker" VerticalAlignment="Center" Text="{Binding AudioOffset.Marker}" IsVisible="{Binding AudioOffset.HasOffset}" />
+                                <PathIcon Opacity="0.7" VerticalAlignment="Center" Data="{StaticResource OffsetIconGeometry}" />
+                                <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                               Width="72"
+                                               ShowButtonSpinner="False"
+                                               VerticalAlignment="Center"
+                                               Value="{Binding AudioOffset.Offset}"
+                                               IsEnabled="{Binding AudioOffset.CanEdit}"
+                                               Increment="1"
+                                               Minimum="-2147483648"
+                                               Maximum="2147483647"
+                                               FormatString="+0;-0;0"
+                                               ToolTip.ShowOnDisabled="True"
+                                               AutomationProperties.Name="{x:Static res:Strings.AudioOffsetName}">
+                                    <ToolTip.Tip>
+                                        <StackPanel MaxWidth="320" Spacing="6">
+                                            <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.AudioOffsetToolTip}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                        </StackPanel>
+                                    </ToolTip.Tip>
+                                </NumericUpDown>
+                                <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                                <Button Classes="nudge"
+                                        Command="{Binding AudioOffset.RevertOffsetCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.AudioRevertOffsetToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.AudioRevertOffsetToolTip}">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                </Button>
+                            </StackPanel>
+                            <PathIcon Grid.Column="2"
                                       Width="14" Height="14"
                                       Opacity="0.7"
                                       VerticalAlignment="Center"
                                       IsVisible="{Binding Player.HasTracks}"
                                       Data="{StaticResource VolumeIconGeometry}" />
-                            <Slider Grid.Column="2"
+                            <Slider Grid.Column="3"
                                     Width="90"
                                     Minimum="0"
                                     Maximum="1"

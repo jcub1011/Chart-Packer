@@ -167,6 +167,11 @@ namespace ChartPacker.ViewModels
                     RemoveBackgroundCommand.NotifyCanExecuteChanged();
                 else if (e.PropertyName == nameof(BackgroundViewModel.ShownFile))
                     DownloadBackgroundCommand.NotifyCanExecuteChanged();
+                else if (e.PropertyName == nameof(BackgroundViewModel.HasVideo))
+                {
+                    OnPropertyChanged(nameof(ShowVideoOffset));
+                    RefreshTimingOffsetsEditable();
+                }
             };
             Highway = highway;
             Highway.OffsetsChanged += (_, _) => OnOffsetsChanged();
@@ -174,7 +179,15 @@ namespace ChartPacker.ViewModels
             {
                 if (e.PropertyName == nameof(HighwayViewModel.ChartParts))
                     RefreshInstruments();
+                else if (e.PropertyName == nameof(HighwayViewModel.ChartOffset))
+                {
+                    // The audio offset is worked out against the chart's own, which is only known once the chart is read.
+                    SyncTimingOffsets();
+                    RefreshTimingOffsetsEditable();
+                }
             };
+            AudioOffset.OffsetChanged += (_, _) => OnTimingChanged();
+            VideoOffset.OffsetChanged += (_, _) => OnTimingChanged();
             Instruments = [.. DifficultySlots.All.Select(s => new InstrumentDifficultyViewModel(this, s))];
             Lyrics = new LyricsViewModel(Player);
             Lyrics.OffsetChanged += (_, _) => OnOffsetsChanged();
@@ -236,6 +249,12 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The lyrics row under the album art, for the one selected song's vocals.</summary>
         public LyricsViewModel Lyrics { get; }
+
+        /// <summary>How far the one selected song's draft moves its audio against the chart, as its <c>delay</c>; beside the master volume.</summary>
+        public TimingOffsetViewModel AudioOffset { get; } = new(TimingOffsets.AudioKey);
+
+        /// <summary>How far the one selected song's draft moves its background video, as its <c>video_start_time</c>; in the background's caption.</summary>
+        public TimingOffsetViewModel VideoOffset { get; } = new(TimingOffsets.VideoKey);
 
         /// <summary>The Add track menu: every stem, labelled to replace the ones the song already has.</summary>
         [ObservableProperty]
@@ -404,6 +423,9 @@ namespace ChartPacker.ViewModels
         /// <summary>One song is selected, so its tracks, chart and other files are shown.</summary>
         public bool ShowSongFiles => !IsBulk;
 
+        /// <summary>The background's offset button is shown: one song is selected, and its video is.</summary>
+        public bool ShowVideoOffset => ShowSongFiles && Background.HasVideo;
+
         public bool ShowNoOtherFiles => !IsBulk && Files.Count == 0;
 
         public bool HasRemovedTracks => RemovedTracks.Count > 0;
@@ -476,6 +498,7 @@ namespace ChartPacker.ViewModels
 
             _entries = entries;
             _songs = [];
+            SyncTimingOffsets();
             _downloadCommands.Clear();
             RevealCommand.NotifyCanExecuteChanged();
             _loadNote = null;
@@ -1423,6 +1446,57 @@ namespace ChartPacker.ViewModels
             RefreshSongLength();
         }
 
+        /// <summary>
+        /// The audio or video offset set its key. The key's row, the highway, the lyrics and the video follow it, but
+        /// no file does, so this is lighter than <see cref="OnDraftsChanged"/>, as it runs for every step of a drag.
+        /// </summary>
+        private void OnTimingChanged()
+        {
+            foreach (var song in _songs)
+                _drafts.NotifyChanged(song.Entry.FullPath);
+            RebuildRows();
+            Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
+            Highway.Refresh(HighwaySongOf());
+            Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
+
+            // The delay moves the chart's last note, and the video's start moves its end.
+            RefreshSongLength();
+        }
+
+        /// <summary>Shows the one selected song's audio and video offsets, as its draft has its timing keys.</summary>
+        private void SyncTimingOffsets()
+        {
+            if (_songs is [var song] && !IsBulk)
+            {
+                var drafted = song.Item.Draft.ApplyTo(song.Item.Original);
+
+                // Until the chart is read, its own offset, which an unset delay stands for, isn't known.
+                AudioOffset.Sync(Highway.ChartOffset is null ? null : song.Item.Draft, song.Item.Original, drafted, Highway.ChartOffset ?? TimeSpan.Zero);
+                VideoOffset.Sync(song.Item.Draft, song.Item.Original, drafted, TimeSpan.Zero);
+            }
+            else
+            {
+                AudioOffset.Sync(null, [], [], TimeSpan.Zero);
+                VideoOffset.Sync(null, [], [], TimeSpan.Zero);
+            }
+        }
+
+        /// <summary>
+        /// The one selected song's highway, audio and video offsets can be changed: it can be edited, or it's a preview,
+        /// whose offsets stay editable, as lining a merge's parts up is what it's for. The merge takes them.
+        /// </summary>
+        private bool CanEditOffsets() => _songs.Count == 1 && !IsBulk && !IsSaving && (ReadOnlyNote is null || ReadOnlyNote == PreviewNote);
+
+        /// <summary>
+        /// The audio and video offsets can be changed, as the highway's can. The delay only moves a chart, so the
+        /// audio's needs one read; the video's needs a video shown.
+        /// </summary>
+        private void RefreshTimingOffsetsEditable()
+        {
+            AudioOffset.CanEdit = CanEditOffsets() && Highway.ChartOffset is not null;
+            VideoOffset.CanEdit = CanEditOffsets() && Background.HasVideo;
+        }
+
         private void Apply(LoadedSelection loaded)
         {
             _songs = loaded.Songs
@@ -1670,6 +1744,7 @@ namespace ChartPacker.ViewModels
             Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
             Highway.Refresh(HighwaySongOf());
             Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
+            SyncTimingOffsets();
             RebuildFiles();
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
@@ -2120,6 +2195,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasMetadataNote));
             OnPropertyChanged(nameof(HasReadOnlyNote));
             OnPropertyChanged(nameof(ShowSongFiles));
+            OnPropertyChanged(nameof(ShowVideoOffset));
             OnPropertyChanged(nameof(ShowNoOtherFiles));
             OnPropertyChanged(nameof(ShowChartMissing));
             OnPropertyChanged(nameof(IsEditable));
@@ -2133,11 +2209,11 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ArtMarker));
             OnPropertyChanged(nameof(IsBackgroundChanged));
 
-            // A preview's offsets stay editable, as they're what it's for.
-            Highway.CanEditOffsets = _songs.Count == 1 && !IsBulk && !IsSaving && (ReadOnlyNote is null || ReadOnlyNote == PreviewNote);
+            Highway.CanEditOffsets = CanEditOffsets();
 
             // Not in a preview: the merge doesn't take the lyrics' offset.
             Lyrics.CanEditOffset = CanChangeFiles();
+            RefreshTimingOffsetsEditable();
             RefreshCommands();
         }
 

@@ -63,11 +63,11 @@ namespace ChartPacker.Views
         }
 
         /// <summary>
-        /// A click on the highway options' empty space or a label takes focus from an offset box, keeping
-        /// what was typed, and leaves the flyout open. The flyout is a popup of its own, so
-        /// <see cref="OnPointerPressedAnywhere"/> doesn't see its clicks. Clicks the controls handle don't reach this.
+        /// A click on the empty space or a label of a flyout with an offset box in it, the highway options or the video
+        /// offset, takes focus from the box, keeping what was typed, and leaves the flyout open. The flyout is a popup
+        /// of its own, so <see cref="OnPointerPressedAnywhere"/> doesn't see its clicks. Clicks the controls handle don't reach this.
         /// </summary>
-        private void OnHighwayOptionsPressed(object? sender, PointerPressedEventArgs e)
+        private void OnOffsetFlyoutPressed(object? sender, PointerPressedEventArgs e)
         {
             if (sender is StackPanel panel && e.Source is Visual source && source.FindAncestorOfType<TextBox>(includeSelf: true) is null)
                 panel.Focus(NavigationMethod.Pointer);

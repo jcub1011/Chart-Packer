@@ -176,6 +176,13 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial IReadOnlyDictionary<string, LibraryDifficulties>? ChartParts { get; private set; }
 
+        /// <summary>
+        /// The offset the chart carries itself, which plays as the <c>delay</c> while song.ini sets none: zero for a
+        /// chart without one, and <see langword="null"/> while there's no chart read, as with no song or several.
+        /// </summary>
+        [ObservableProperty]
+        public partial TimeSpan? ChartOffset { get; private set; }
+
         /// <summary>How far ahead of the strike line the highway shows, in seconds.</summary>
         public double LookAhead => BaseLookAhead / Math.Clamp(NoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed);
 
@@ -288,6 +295,7 @@ namespace ChartPacker.ViewModels
             _shown = null;
             _builtOffsets = null;
             ChartParts = null;
+            ChartOffset = null;
             Rows.Clear();
             Scene = null;
             _laneInstruments = [];
@@ -439,6 +447,8 @@ namespace ChartPacker.ViewModels
                 _originalOf = (bytes, options.ProDrums);
                 BuildRows(result.Original);
             }
+
+            ChartOffset = result.Original.Offset ?? TimeSpan.Zero;
 
             SyncRows();
             BuildScene();
@@ -656,14 +666,6 @@ namespace ChartPacker.ViewModels
         /// <summary>Which track the highway's waveform is drawn from: the instrument's own, or another picked for this song.</summary>
         public LaneWaveformPickerViewModel WaveformPicker { get; }
 
-        /// <summary>Adds the milliseconds <paramref name="amount"/> gives, e.g. <c>-10</c>, to the offset.</summary>
-        [RelayCommand(CanExecute = nameof(CanEdit))]
-        private void Nudge(string? amount)
-        {
-            if (int.TryParse(amount, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int ms))
-                Offset = (Offset ?? 0) + ms;
-        }
-
         private bool CanRevertOffset() => HasOffset && CanEdit;
 
         [RelayCommand(CanExecute = nameof(CanRevertOffset))]
@@ -672,7 +674,6 @@ namespace ChartPacker.ViewModels
         internal void OnCanEditChanged()
         {
             OnPropertyChanged(nameof(CanEdit));
-            NudgeCommand.NotifyCanExecuteChanged();
             RevertOffsetCommand.NotifyCanExecuteChanged();
         }
 

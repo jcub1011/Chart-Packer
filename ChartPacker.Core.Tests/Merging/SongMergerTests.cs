@@ -196,6 +196,41 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task AudioAndVideoOffsetsGoIntoTheMergedSongIniButNotIntoAPreview()
+    {
+        var withVideo = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(withVideo.FullPath, "video.mp4"), [0, 0, 0, 0]);
+        var analysis = await SongMergeAnalysis.LoadAsync([withVideo, await DrumsAndGuitarSngAsync()]);
+
+        // Audio later is a smaller delay, a video later a smaller start; neither song sets either.
+        var plan = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0 }) with { VideoSource = 0, AudioOffset = 120, VideoOffset = -250 };
+        string output = _root.CreateSubdirectory("out").FullName;
+
+        var result = await SongMerger.MergeAsync(plan, output, OverwritePolicy.Skip, new NoVideo());
+        var metadata = SngReader.Read(result.OutputPath).Metadata.ToDictionary(p => p.Key, p => p.Value);
+        Assert.AreEqual("-120", metadata["delay"]);
+        Assert.AreEqual("250", metadata["video_start_time"]);
+
+        string folder = _root.CreateSubdirectory("preview").FullName;
+        await SongMerger.StageAsync(plan, folder, new NoVideo(), new Dictionary<string, string>());
+        string ini = File.ReadAllText(Path.Combine(folder, "song.ini"));
+        Assert.IsFalse(ini.Contains("delay", StringComparison.Ordinal));
+        Assert.IsFalse(ini.Contains("video_start_time", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task AVideoOffsetWithoutAVideoIsLeftOut()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0 }) with { VideoOffset = 300 };
+        string output = _root.CreateSubdirectory("out").FullName;
+
+        var result = await SongMerger.MergeAsync(plan, output, OverwritePolicy.Skip, new NoVideo());
+
+        Assert.IsFalse(SngReader.Read(result.OutputPath).Metadata.Any(p => p.Key == "video_start_time"));
+    }
+
+    [TestMethod]
     public async Task StagingAgainReplacesOnlyWhatChanged()
     {
         var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);

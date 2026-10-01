@@ -175,7 +175,7 @@ namespace ChartPacker.ViewModels
         MetadataDraftStore previewDrafts) : ViewModelBase
     {
 
-        // The plan the preview was staged with, which its highway's offsets were set against.
+        // The plan the preview was staged with, which its highway's, audio's and video's offsets were set against.
         private SongMergePlan? _previewed;
         private SongMergeAnalysis? _analysis;
         private CancellationTokenSource? _cts;
@@ -421,12 +421,57 @@ namespace ChartPacker.ViewModels
 
             // Checked here, not only when the preview is next staged, so a merge straight after a change can't take them.
             var offsets = PreviewOffsets().Where(p => OffsetApplies(p.Key, plan)).ToDictionary(p => p.Key, p => p.Value);
-            return offsets.Count > 0 ? plan with { ChartOffsets = offsets } : plan;
+            var (audioOffset, videoOffset) = PreviewTimingOffsets();
+            return plan with
+            {
+                ChartOffsets = offsets.Count > 0 ? offsets : null,
+                AudioOffset = AudioOffsetApplies(plan) ? audioOffset : 0,
+                VideoOffset = VideoOffsetApplies(plan) ? videoOffset : 0,
+            };
         }
 
         /// <summary>The offsets set on the preview's highway, against <see cref="_previewed"/>.</summary>
         private IReadOnlyDictionary<ChartTrackKey, int> PreviewOffsets() =>
             _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? previewDrafts.Get(folder).ChartOffsets : new Dictionary<ChartTrackKey, int>();
+
+        /// <summary>
+        /// The audio and video offsets set on the preview, against <see cref="_previewed"/>: how far its draft moves the
+        /// <c>delay</c> and <c>video_start_time</c> the merge staged it with.
+        /// </summary>
+        private (int Audio, int Video) PreviewTimingOffsets()
+        {
+            if (_previewed is not { } previewed || _previewFolder is not { } folder || !previewDrafts.HasDrafts(folder))
+                return (0, 0);
+
+            var staged = SongMerger.BuildMetadata(previewed);
+            var drafted = previewDrafts.Get(folder).ApplyTo(staged);
+            return (TimingOffsets.OffsetOf(TimingOffsets.AudioKey, staged, drafted, TimeSpan.Zero),
+                TimingOffsets.OffsetOf(TimingOffsets.VideoKey, staged, drafted, TimeSpan.Zero));
+        }
+
+        /// <summary>Whether the audio offset set on the preview still lines the audio up in <paramref name="plan"/>: it's the same audio against the same base chart.</summary>
+        private bool AudioOffsetApplies(SongMergePlan plan) =>
+            _previewed is { } previewed && previewed.BaseSource == plan.BaseSource && previewed.AudioSource == plan.AudioSource;
+
+        /// <summary>Whether the video offset set on the preview still lines the video up in <paramref name="plan"/>: it's the same video against the same audio.</summary>
+        private bool VideoOffsetApplies(SongMergePlan plan) =>
+            _previewed is { } previewed && plan.VideoSource is not null && previewed.VideoSource == plan.VideoSource && previewed.AudioSource == plan.AudioSource;
+
+        /// <summary>
+        /// The preview's draft holds its audio and video offsets as changes to the keys of the song it was staged as;
+        /// staged again as <paramref name="plan"/>, they're made changes to its keys instead, or dropped where they no
+        /// longer apply, as <see cref="Plan"/> has worked out.
+        /// </summary>
+        private void RebaseTimingOffsets(SongMergePlan plan)
+        {
+            if (_previewFolder is not { } folder || !previewDrafts.HasDrafts(folder))
+                return;
+
+            var draft = previewDrafts.Get(folder);
+            var staged = SongMerger.BuildMetadata(plan);
+            TimingOffsets.Set(draft, TimingOffsets.AudioKey, staged, TimeSpan.Zero, plan.AudioOffset);
+            TimingOffsets.Set(draft, TimingOffsets.VideoKey, staged, TimeSpan.Zero, plan.VideoOffset);
+        }
 
         /// <summary>
         /// Whether an offset set on the preview still lines <paramref name="key"/> up in <paramref name="plan"/>:
@@ -641,6 +686,7 @@ namespace ChartPacker.ViewModels
                 PreviewWarnings = [.. warnings.Select(Describe)];
                 PreviewMessage = null;
                 _previewedPlan = signature;
+                RebaseTimingOffsets(plan);
                 _previewed = plan;
                 await Preview.ShowAsync([new SongEntry(SongEntryKind.SongFolder, _previewFolder, ".", name)]);
             }

@@ -14,7 +14,7 @@ namespace ChartPacker.Core.Metadata;
 /// <param name="Loop">Whether the video starts over from <paramref name="Start"/> when it reaches its end.</param>
 public sealed record VideoTimeline(TimeSpan Start, TimeSpan? End, bool Loop)
 {
-    private const string StartKey = "video_start_time";
+    internal const string StartKey = "video_start_time";
     private const string EndKey = "video_end_time";
     private const string LoopKey = "video_loop";
 
@@ -84,7 +84,8 @@ public sealed record VideoTimeline(TimeSpan Start, TimeSpan? End, bool Loop)
         return null;
     }
 
-    private static long? ParseMilliseconds(string? value) =>
+    /// <summary>A time in milliseconds as the timeline reads one, or <see langword="null"/> when it isn't one.</summary>
+    internal static long? ParseMilliseconds(string? value) =>
         long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long ms) && ms >= -MaxMilliseconds && ms <= MaxMilliseconds
             ? ms
             : null;

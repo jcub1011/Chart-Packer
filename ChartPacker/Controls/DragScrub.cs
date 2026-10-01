@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -21,6 +22,9 @@ namespace ChartPacker.Controls
     /// <para>A click without a drag edits the text as usual, and while the box is being typed in it doesn't drag
     /// at all. Enter keeps what was typed and stops editing: focus moves to the nearest focusable
     /// ancestor, so a box in a flyout can be left without closing the flyout.</para>
+    /// <para>While it's typed in, Up and Down and the mouse wheel step the value by its increment, as the box does by
+    /// itself; with Shift they step ten times as far. Ctrl does nothing to them: they step in whole increments. Over a
+    /// box that isn't being typed in, the wheel scrolls what the box is in, so scrolling past it changes nothing.</para>
     /// <para>On Windows the pointer is hidden while dragging and held where the drag began, so a drag can go on
     /// as far as it needs without the pointer reaching the edge of the screen; it's left where it started.
     /// Elsewhere the pointer moves as usual and shows as a sideways arrow.</para>
@@ -36,6 +40,9 @@ namespace ChartPacker.Controls
 
         // How far the pointer moves, in pixels, before a press becomes a drag rather than a click.
         private const double DragThreshold = 4;
+
+        // How many increments Shift makes a key press or a wheel notch, and a dragged pixel how many steps.
+        private const int ShiftFactor = 10;
 
         private static readonly Cursor Hidden = new(StandardCursorType.None);
         private static readonly Cursor Sideways = new(StandardCursorType.SizeWestEast);
@@ -75,6 +82,10 @@ namespace ChartPacker.Controls
             box.AddHandler(InputElement.PointerReleasedEvent, OnReleased, RoutingStrategies.Tunnel);
             box.AddHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost);
             box.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
+
+            // Tunnelled, so a Shift step is taken before the box takes the key or the notch as a single one.
+            box.AddHandler(InputElement.KeyDownEvent, OnStepKeyDown, RoutingStrategies.Tunnel);
+            box.AddHandler(InputElement.PointerWheelChangedEvent, OnWheel, RoutingStrategies.Tunnel);
             box.PropertyChanged += OnBoxPropertyChanged;
             box.TemplateApplied += OnTemplateApplied;
             box.PointerEntered += OnPointerEntered;
@@ -88,6 +99,8 @@ namespace ChartPacker.Controls
             box.RemoveHandler(InputElement.PointerReleasedEvent, OnReleased);
             box.RemoveHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost);
             box.RemoveHandler(InputElement.KeyDownEvent, OnKeyDown);
+            box.RemoveHandler(InputElement.KeyDownEvent, OnStepKeyDown);
+            box.RemoveHandler(InputElement.PointerWheelChangedEvent, OnWheel);
             box.PropertyChanged -= OnBoxPropertyChanged;
             box.TemplateApplied -= OnTemplateApplied;
             box.PointerEntered -= OnPointerEntered;
@@ -125,6 +138,48 @@ namespace ChartPacker.Controls
                     return;
                 }
             }
+        }
+
+        /// <summary>Shift+Up and Shift+Down step ten increments; without Shift the box steps one by itself.</summary>
+        private static void OnStepKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (sender is not NumericUpDown box || e.Key is not (Key.Up or Key.Down) || !e.KeyModifiers.HasFlag(KeyModifiers.Shift) || !CanStep(box))
+                return;
+
+            StepBy(box, (e.Key == Key.Up ? 1 : -1) * ShiftFactor * box.Increment);
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// With Shift a wheel notch steps ten increments; without, the box steps one by itself. Some platforms turn a
+        /// wheel turned with Shift held into a sideways scroll, so that counts too.
+        /// </summary>
+        private static void OnWheel(object? sender, PointerWheelEventArgs e)
+        {
+            if (sender is not NumericUpDown box || !e.KeyModifiers.HasFlag(KeyModifiers.Shift) || !CanStep(box))
+                return;
+
+            double delta = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
+            if (delta == 0)
+                return;
+
+            StepBy(box, Math.Sign(delta) * ShiftFactor * box.Increment);
+            e.Handled = true;
+        }
+
+        // Keys and the wheel step only a box being typed in, as the box steps by itself.
+        private static bool CanStep(NumericUpDown box) => box.IsEffectivelyEnabled && box.IsKeyboardFocusWithin && !box.IsReadOnly;
+
+        /// <summary>Adds <paramref name="amount"/> to the value, from what's typed if that's a number, within the box's limits.</summary>
+        private static void StepBy(NumericUpDown box, decimal amount)
+        {
+            decimal from = TextBoxOf(box)?.Text is { } text
+                && decimal.TryParse(text, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal typed)
+                ? typed
+                : box.Value ?? 0;
+            decimal value = Math.Clamp(from + amount, box.Minimum, box.Maximum);
+            if (box.Value != value)
+                box.Value = value;
         }
 
         private static void OnBoxPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -207,7 +262,7 @@ namespace ChartPacker.Controls
             if (dx == 0)
                 return;
 
-            double perPixel = GetStep(box) * (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 10 : e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 0.1 : 1);
+            double perPixel = GetStep(box) * (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? ShiftFactor : e.KeyModifiers.HasFlag(KeyModifiers.Control) ? 0.1 : 1);
             drag.Moved += dx * perPixel;
 
             decimal wanted = Math.Round(drag.StartValue + (decimal)drag.Moved, MidpointRounding.AwayFromZero);

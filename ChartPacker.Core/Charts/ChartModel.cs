@@ -131,13 +131,23 @@ public static class SongChartSettings
     /// </summary>
     public static TimeSpan DelayOf(IReadOnlyList<KeyValuePair<string, string>> pairs, ChartDocument chart)
     {
-        ArgumentNullException.ThrowIfNull(pairs);
         ArgumentNullException.ThrowIfNull(chart);
-        return long.TryParse(First(pairs, "delay"), System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out long ms)
-            && Math.Abs(ms) < 86_400_000
-            ? TimeSpan.FromMilliseconds(ms)
-            : chart.Offset ?? TimeSpan.Zero;
+        return DelayOf(pairs, chart.Offset);
     }
+
+    /// <summary>As <see cref="DelayOf(IReadOnlyList{KeyValuePair{string, string}}, ChartDocument)"/>, given the chart's own offset rather than the chart.</summary>
+    public static TimeSpan DelayOf(IReadOnlyList<KeyValuePair<string, string>> pairs, TimeSpan? chartOffset)
+    {
+        ArgumentNullException.ThrowIfNull(pairs);
+        return ParseDelay(First(pairs, "delay")) is { } ms ? TimeSpan.FromMilliseconds(ms) : chartOffset ?? TimeSpan.Zero;
+    }
+
+    /// <summary>A <c>delay</c> value in milliseconds, or <see langword="null"/> when it isn't one.</summary>
+    internal static long? ParseDelay(string? value) =>
+        long.TryParse(value, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out long ms)
+        && Math.Abs(ms) < 86_400_000
+            ? ms
+            : null;
 
     internal static string? First(IReadOnlyList<KeyValuePair<string, string>> pairs, string key) =>
         pairs.FirstOrDefault(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;

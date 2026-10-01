@@ -71,9 +71,9 @@ specifications; no code from any implementation of them is used.
 
 - **Project:** [game-icons.net](https://game-icons.net) ([game-icons/icons](https://github.com/game-icons/icons))
 - **License:** [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)
-- **Used for:** the instrument icons of the difficulties in the details panel, and the lyrics
-  lane's waveform button (`ChartPacker/Styles/Icons.axaml`, the `Instrument*Geometry` and
-  `WaveformIconGeometry` resources). The SVG paths are
+- **Used for:** the instrument icons of the difficulties in the details panel, the lyrics
+  lane's waveform button, and the audio and video offsets (`ChartPacker/Styles/Icons.axaml`, the
+  `Instrument*Geometry`, `WaveformIconGeometry` and `OffsetIconGeometry` resources). The SVG paths are
   used unchanged, except that each command is written out in full so that Avalonia's path
   parser reads it. They're drawn at a smaller size, and recoloured.
 
@@ -91,6 +91,7 @@ specifications; no code from any implementation of them is used.
 | [Footsteps](https://game-icons.net/1x1/skoll/footsteps.html) | Skoll | Dance |
 | [Three friends](https://game-icons.net/1x1/delapouite/three-friends.html) | [Delapouite](https://delapouite.com) | Band |
 | [Sound waves](https://game-icons.net/1x1/skoll/sound-waves.html) | Skoll | Lane waveforms |
+| [Stopwatch](https://game-icons.net/1x1/lorc/stopwatch.html) | [Lorc](https://lorcblog.blogspot.com) | Audio and video offsets |
 
 ## Bundled libraries
 
