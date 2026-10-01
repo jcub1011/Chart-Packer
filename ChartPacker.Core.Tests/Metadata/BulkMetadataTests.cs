@@ -201,6 +201,27 @@ public sealed class BulkMetadataTests
     }
 
     [TestMethod]
+    public void SettingTheSavedValueOfARepeatedSongIniKeyKeepsTheChange()
+    {
+        var item = new MetadataItem([P("name", "A")], new MetadataDraft(), ["Name"]);
+
+        BulkMetadata.Set([item], "name", "A");
+
+        Assert.IsTrue(item.Draft.TryGetChange("name", out var change));
+        Assert.AreEqual("A", change.Value);
+    }
+
+    [TestMethod]
+    public void RemainingDuplicateKeysLeaveOutTheKeysTheDraftChanges()
+    {
+        var item = new MetadataItem([P("name", "A"), P("artist", "B"), P("genre", "C")], new MetadataDraft(), ["name", "artist", "genre"]);
+        item.Draft.Set("NAME", "A");
+        item.Draft.Remove("artist");
+
+        CollectionAssert.AreEqual(new[] { "genre" }, item.RemainingDuplicateKeys().ToArray());
+    }
+
+    [TestMethod]
     public void RowOfAKeyNoItemHasIsNull() =>
         Assert.IsNull(BulkMetadata.RowOf(Items([P("name", "A")]), "diff_guitar"));
 

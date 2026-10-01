@@ -14,6 +14,12 @@ public interface IAudioOutput : IDisposable
     /// <summary>The playback volume, from 0 (silent) to 1 (as mixed).</summary>
     float Volume { get; set; }
 
+    /// <summary>
+    /// How fast the queue plays, from 0.01 to 100; 1 plays it as written. The pitch moves with it.
+    /// <see cref="QueuedFrames"/> still counts frames as they were written.
+    /// </summary>
+    float Speed { get; set; }
+
     /// <summary>Queues <paramref name="stereo"/> (interleaved left, right) to play after what's already queued.</summary>
     void Write(ReadOnlySpan<float> stereo);
 

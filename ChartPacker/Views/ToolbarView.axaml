@@ -9,7 +9,7 @@
              x:Class="ChartPacker.Views.ToolbarView"
              x:DataType="vm:MainWindowViewModel">
 
-    <!-- Input: where songs are found. Output: where Pack/Unpack write and how. Tools: Merge/Deduplicate, which open
+    <!-- Input: where songs are found. Output: where Pack/Unpack write and how. Tools: Merge/Validate/Deduplicate, which open
          their own windows. Metadata: the selection's unsaved edits.
          Input, Output and Tools wrap onto a second row when the window is narrow; Metadata stays at the top right. -->
     <Border Classes="toolbar">
@@ -67,6 +67,8 @@
                             </StackPanel>
                         </Button>
                         <ComboBox Width="132"
+                                  Height="28"
+                                  MinHeight="28"
                                   Margin="6,0,0,0"
                                   VerticalAlignment="Center"
                                   ItemsSource="{Binding Library.OverwriteOptions}"
@@ -104,6 +106,17 @@
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ctl:LineIcon Data="{StaticResource MergeStroke}" />
                                 <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.MergeButton}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="labelled"
+                                Margin="2,0,0,0"
+                                Command="{Binding Library.ValidateCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.ValidateToolTip}"
+                                ToolTip.ShowOnDisabled="True"
+                                AutomationProperties.Name="{x:Static res:Strings.ValidateButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ctl:LineIcon Data="{StaticResource CheckStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ValidateButton}" />
                             </StackPanel>
                         </Button>
                         <Button Classes="labelled"

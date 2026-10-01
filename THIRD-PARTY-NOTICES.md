@@ -379,7 +379,7 @@ libraries beside the executable (`avcodec-63.dll`, `libavcodec.so.63` or `libavc
 so on). They decode background video, and audio packets.
 Chart-Packer uses them under the
 [GNU Lesser General Public License, version 2.1 or later](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html);
-no GPL or non-free parts of FFmpeg are enabled. They're built, unmodified, from the `n9.0` tag of
+no GPL or non-free parts of FFmpeg are enabled. They're built, unmodified, from the `n9.0.2` tag of
 the [FFmpeg source](https://git.ffmpeg.org/ffmpeg.git) by
 [build/ffmpeg/build.sh](build/ffmpeg/build.sh), which gives the full configure line. They can be
 replaced with any other build of the same major versions. Chart-Packer's bindings to them

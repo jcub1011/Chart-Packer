@@ -204,6 +204,30 @@
             <Setter Property="Margin" Value="0,2,0,0" />
         </Style>
 
+        <!-- A metadata row whose value fails validation: an orange bar at its left, a faint tint, and why under it. -->
+        <Style Selector="Border.metadataRow">
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Padding" Value="2,0,0,0" />
+        </Style>
+        <Style Selector="Border.metadataRow.invalid">
+            <Setter Property="BorderBrush" Value="{DynamicResource InvalidBrush}" />
+            <Setter Property="Background" Value="{DynamicResource InvalidTintBrush}" />
+        </Style>
+        <Style Selector="TextBlock.issue">
+            <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+
         <!-- Row markers: * edited, + added; removed rows are struck through. -->
         <Style Selector="TextBlock.marker">
             <Setter Property="FontWeight" Value="Bold" />
@@ -889,14 +913,14 @@
                                     </StackPanel>
                                     <!-- The chart's notes over whatever the background is, as a game draws them, unless the
                                          settings put them in their own row below the lyrics. A highway under the pointer shows
-                                         its whole chart, to scrub through. -->
+                                         its whole chart while Shift is held, to scrub through. -->
                                     <ctl:NoteHighwayView x:Name="HighwayOverlayView"
                                                          Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
                                                          Waveforms="{Binding Highway.LaneWaveforms}"
                                                          LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                         FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                         FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
                                                          ToolTip.Tip="{Binding Player.HighwayScrubToolTip}"
                                                          IsVisible="{Binding Highway.IsShownOverBackground}" />
                                 </Panel>
@@ -907,7 +931,7 @@
                     <TextBlock Classes="error" Text="{Binding BackgroundError}" IsVisible="{Binding HasBackgroundError}" />
 
                     <!-- The one selected song's vocals as a karaoke lane, in step with the audio, shown while it has
-                         a vocals track or vocals in its chart. Captioned and edited like the art. While the pointer is
+                         a vocals track or vocals in its chart. Captioned and edited like the art. While Shift is held
                          over the lane it shows the whole part, to scrub through. -->
                     <DockPanel Margin="0,16,0,0" IsVisible="{Binding Lyrics.IsVisible}">
                         <!-- The name, which gives way on a narrow panel, with its actions beside it, then the offset at the
@@ -1029,7 +1053,7 @@
                                                    Waveform="{Binding Lyrics.Waveform}"
                                                    Clock="{Binding Lyrics.Clock}"
                                                    LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                   FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                   FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
                                                    ToolTip.Tip="{Binding Player.LyricsScrubToolTip}"
                                                    IsVisible="{Binding Lyrics.HasLyrics}" />
                                 <TextBlock Classes="muted centered"
@@ -1085,7 +1109,7 @@
                                                      LookAhead="{Binding Highway.LookAhead}"
                                                      Waveforms="{Binding Highway.LaneWaveforms}"
                                                      LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                     FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                     FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
                                                      ToolTip.Tip="{Binding Player.HighwayScrubToolTip}"
                                                      IsVisible="{Binding Highway.IsShown}" />
                             </Border>
@@ -1101,9 +1125,9 @@
                         <StackPanel.Resources>
                             <x:Double x:Key="SliderHorizontalHeight">20</x:Double>
                         </StackPanel.Resources>
-                        <!-- The audio offset and the master volume sit at the right of the header; each track has its own level
-                             in the mix below. The offset moves every track alike, as song.ini's delay does. -->
-                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                        <!-- The audio offset, the master volume and the playback speed sit at the right of the header; each track
+                             has its own level in the mix below. The offset moves every track alike, as song.ini's delay does. -->
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                             <TextBlock Grid.Column="0" Classes="section" Text="{Binding Player.TracksHeader}" />
                             <StackPanel Grid.Column="1"
                                         Classes="timing"
@@ -1156,6 +1180,37 @@
                                     IsVisible="{Binding Player.HasTracks}"
                                     ToolTip.Tip="{x:Static res:Strings.VolumeName}"
                                     AutomationProperties.Name="{x:Static res:Strings.VolumeName}" />
+                            <!-- Presets, or any whole percent typed in; what's typed takes effect on Enter or leaving the box, so
+                                 typing 150 doesn't play at 1% and 15% on the way. See SongDetailView.CommitPlaybackSpeed. -->
+                            <TextBlock Grid.Column="4"
+                                       Classes="muted"
+                                       Margin="6,0,0,0"
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding Player.HasTracks}"
+                                       Text="{x:Static res:Strings.PlaybackSpeedLabel}" />
+                            <ComboBox Grid.Column="5"
+                                      x:Name="PlaybackSpeedBox"
+                                      IsEditable="True"
+                                      Width="90"
+                                      Padding="8,0,0,0"
+                                      VerticalAlignment="Center"
+                                      VerticalContentAlignment="Center"
+                                      ItemsSource="{x:Static vm:PlayerViewModel.PlaybackSpeedPresets}"
+                                      Text="{Binding Player.PlaybackSpeedText, Mode=OneWay}"
+                                      IsVisible="{Binding Player.HasTracks}"
+                                      ToolTip.Tip="{x:Static res:Strings.PlaybackSpeedToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.PlaybackSpeedName}">
+                                <!-- Fluent pads a ComboBox unevenly for its selection text and gives a text box a minimum height of
+                                     its own, which together leave the typed text off centre; the box's text is centred instead. -->
+                                <ComboBox.Styles>
+                                    <Style Selector="ComboBox /template/ TextBox#PART_EditableTextBox">
+                                        <Setter Property="MinHeight" Value="0" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="VerticalAlignment" Value="Stretch" />
+                                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                                    </Style>
+                                </ComboBox.Styles>
+                            </ComboBox>
                         </Grid>
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.NoTracks}" IsVisible="{Binding !Player.HasTracks}" />
 
@@ -1731,6 +1786,27 @@
                                 Content="{Binding InstrumentsToggleText}"
                                 Command="{Binding ToggleShowAllInstrumentsCommand}"
                                 IsVisible="{Binding HasHiddenInstruments}" />
+                        <!-- The difficulties have icons rather than rows, so their validation failures are listed here. -->
+                        <ItemsControl ItemsSource="{Binding HiddenIssues}"
+                                      IsVisible="{Binding HasHiddenIssues}"
+                                      Margin="0,4,0,0"
+                                      AutomationProperties.Name="{x:Static res:Strings.HiddenIssuesListName}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MetadataIssueRow">
+                                    <Border Classes="metadataRow invalid" Margin="0,1">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                            <TextBlock Grid.Column="0" Classes="issue" FontWeight="SemiBold" Text="{Binding Key}" />
+                                            <TextBlock Grid.Column="1" Classes="issue" Text="{Binding Message}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
 
 
@@ -1740,96 +1816,110 @@
                                   AutomationProperties.Name="{x:Static res:Strings.MetadataListName}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:MetadataRowViewModel">
-                                <Grid Margin="0,1">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="14" />
-                                        <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataActions" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Classes="marker"
-                                               Margin="0,2,0,0"
-                                               Text="{Binding Marker}" />
-                                    <TextBlock Grid.Column="1"
-                                               Classes="muted"
-                                               Classes.removed="{Binding IsRemoved}"
-                                               MaxWidth="220"
-                                               Margin="0,2,16,0"
-                                               TextTrimming="CharacterEllipsis"
-                                               Text="{Binding Key}">
-                                        <!-- The key in full (it may be trimmed), and what it does when it's a known key. -->
-                                        <ToolTip.Tip>
-                                            <StackPanel Spacing="2">
-                                                <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Key}" />
-                                                <TextBlock TextWrapping="Wrap" Text="{Binding KeyDescription}" IsVisible="{Binding HasKeyDescription}" />
-                                            </StackPanel>
-                                        </ToolTip.Tip>
-                                    </TextBlock>
+                                <!-- A value that fails validation is marked orange, with why under it. -->
+                                <Border Classes="metadataRow" Classes.invalid="{Binding HasIssue}" Margin="0,1">
+                                    <!-- Quick Fix puts the key's fix in the drafts; it's there on every row, disabled where there's none. -->
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <Grid RowDefinitions="Auto,Auto">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataActions" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Classes="marker"
+                                                   Margin="0,2,0,0"
+                                                   Text="{Binding Marker}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="muted"
+                                                   Classes.removed="{Binding IsRemoved}"
+                                                   MaxWidth="220"
+                                                   Margin="0,2,16,0"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Text="{Binding Key}">
+                                            <!-- The key in full (it may be trimmed), and what it does when it's a known key. -->
+                                            <ToolTip.Tip>
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Key}" />
+                                                    <TextBlock TextWrapping="Wrap" Text="{Binding KeyDescription}" IsVisible="{Binding HasKeyDescription}" />
+                                                </StackPanel>
+                                            </ToolTip.Tip>
+                                        </TextBlock>
 
-                                    <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
-                                    <Button Grid.Column="2"
-                                            Classes="value"
-                                            Command="{Binding BeginEditCommand}"
-                                            IsVisible="{Binding !IsEditing}"
-                                            ToolTip.Tip="{Binding ToolTip}"
-                                            AutomationProperties.Name="{Binding Key}">
-                                        <Panel>
-                                            <TextBlock TextWrapping="Wrap"
-                                                       Classes.removed="{Binding IsRemoved}"
-                                                       ctl:RichTextMarkup.Text="{Binding DisplayValue}"
-                                                       IsVisible="{Binding ShowRichValue}" />
-                                            <TextBlock TextWrapping="Wrap"
-                                                       Classes="distinct"
-                                                       Classes.removed="{Binding IsRemoved}"
-                                                       Text="{Binding DisplayValue}"
-                                                       IsVisible="{Binding ShowDistinct}" />
-                                        </Panel>
-                                    </Button>
-                                    <StackPanel Grid.Column="2" IsVisible="{Binding IsEditing}">
-                                        <!-- Enter or leaving the box keeps the text; Escape drops it. -->
-                                        <TextBox Classes="inline"
-                                                 Text="{Binding EditText}"
-                                                 PlaceholderText="{Binding EditPlaceholder}"
-                                                 IsVisible="{Binding IsEditing}"
-                                                 ctl:FocusWhenShown.IsEnabled="True"
-                                                 LostFocus="OnEditLostFocus"
-                                                 AutomationProperties.Name="{Binding Key}">
-                                            <TextBox.KeyBindings>
-                                                <KeyBinding Gesture="Enter" Command="{Binding CommitCommand}" />
-                                                <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
-                                            </TextBox.KeyBindings>
-                                        </TextBox>
-                                        <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
-                                    </StackPanel>
+                                        <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
+                                        <Button Grid.Column="2"
+                                                Classes="value"
+                                                Command="{Binding BeginEditCommand}"
+                                                IsVisible="{Binding !IsEditing}"
+                                                ToolTip.Tip="{Binding ToolTip}"
+                                                AutomationProperties.Name="{Binding Key}">
+                                            <Panel>
+                                                <TextBlock TextWrapping="Wrap"
+                                                           Classes.removed="{Binding IsRemoved}"
+                                                           ctl:RichTextMarkup.Text="{Binding DisplayValue}"
+                                                           IsVisible="{Binding ShowRichValue}" />
+                                                <TextBlock TextWrapping="Wrap"
+                                                           Classes="distinct"
+                                                           Classes.removed="{Binding IsRemoved}"
+                                                           Text="{Binding DisplayValue}"
+                                                           IsVisible="{Binding ShowDistinct}" />
+                                            </Panel>
+                                        </Button>
+                                        <StackPanel Grid.Column="2" IsVisible="{Binding IsEditing}">
+                                            <!-- Enter or leaving the box keeps the text; Escape drops it. -->
+                                            <TextBox Classes="inline"
+                                                     Text="{Binding EditText}"
+                                                     PlaceholderText="{Binding EditPlaceholder}"
+                                                     IsVisible="{Binding IsEditing}"
+                                                     ctl:FocusWhenShown.IsEnabled="True"
+                                                     LostFocus="OnEditLostFocus"
+                                                     AutomationProperties.Name="{Binding Key}">
+                                                <TextBox.KeyBindings>
+                                                    <KeyBinding Gesture="Enter" Command="{Binding CommitCommand}" />
+                                                    <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
+                                                </TextBox.KeyBindings>
+                                            </TextBox>
+                                            <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="3"
-                                                Orientation="Horizontal"
-                                                Margin="4,0,0,0"
-                                                IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
-                                        <Button Classes="icon"
-                                                Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).AutoSetSongLengthCommand}"
-                                                IsVisible="{Binding IsSongLength}"
-                                                ToolTip.Tip="{x:Static res:Strings.AutoSetLengthToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.AutoSetLengthButton}">
-                                            <PathIcon Width="12" Height="12" Data="{StaticResource AutoLengthIconGeometry}" />
-                                        </Button>
-                                        <Button Classes="icon"
-                                                Command="{Binding RevertCommand}"
-                                                IsVisible="{Binding IsChanged}"
-                                                ToolTip.Tip="{x:Static res:Strings.RevertRowToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.RevertRowToolTip}">
-                                            <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
-                                        </Button>
-                                        <Button Classes="icon"
-                                                Command="{Binding RemoveCommand}"
-                                                IsVisible="{Binding CanRemove}"
-                                                ToolTip.Tip="{x:Static res:Strings.RemoveRowToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.RemoveRowToolTip}">
-                                            <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
-                                        </Button>
-                                    </StackPanel>
-                                </Grid>
+                                        <StackPanel Grid.Column="3"
+                                                    Orientation="Horizontal"
+                                                    Margin="4,0,0,0"
+                                                    IsVisible="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).CanEdit, FallbackValue=False}">
+                                            <Button Classes="icon"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SongDetailViewModel)DataContext).AutoSetSongLengthCommand}"
+                                                    IsVisible="{Binding IsSongLength}"
+                                                    ToolTip.Tip="{x:Static res:Strings.AutoSetLengthToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.AutoSetLengthButton}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource AutoLengthIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="icon"
+                                                    Command="{Binding RevertCommand}"
+                                                    IsVisible="{Binding IsChanged}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RevertRowToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RevertRowToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                            </Button>
+                                            <Button Classes="icon"
+                                                    Command="{Binding RemoveCommand}"
+                                                    IsVisible="{Binding CanRemove}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RemoveRowToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.RemoveRowToolTip}">
+                                                <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                            </Button>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" IsVisible="{Binding !IsEditing}">
+                                            <TextBlock Classes="issue" Text="{Binding Issue}" IsVisible="{Binding HasIssue}" />
+                                            <TextBlock Classes="hint" Text="{Binding Hint}" IsVisible="{Binding HasHint}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

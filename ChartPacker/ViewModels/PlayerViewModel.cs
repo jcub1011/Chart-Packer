@@ -194,18 +194,22 @@ namespace ChartPacker.ViewModels
         private SpectrumAnalyzer? _analyzer;
         private readonly float[] _heard = new float[SpectrumAnalyzer.FftSize];
 
-        /// <param name="settings">Where the master volume and which visualisers are shown are kept between runs.</param>
+        /// <param name="settings">
+        /// Where the master volume and which visualisers are shown are kept between runs, and the playback speed for this run.
+        /// </param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
         public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput)
         {
             _settings = settings;
             Volume = settings.Settings.MasterVolume;
+            PlaybackSpeed = settings.PlaybackSpeed;
             ShowWaveforms = settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
             WaveformFidelity = settings.Settings.WaveformFidelity;
             ScrubStep = settings.Settings.ScrubStep;
             FineScrubMilliseconds = settings.Settings.FineScrubMilliseconds;
+            LaneFineScrubFactor = settings.Settings.LaneFineScrubFactor;
             _openOutput = openOutput;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
             _timer.Tick += (_, _) => RefreshPosition();
@@ -263,6 +267,46 @@ namespace ChartPacker.ViewModels
         public partial double Volume { get; set; }
 
         /// <summary>
+        /// How fast the song plays, as a fraction from 0.01 to 10: 1 is its own speed. The pitch moves with it. Shared by
+        /// every song and player for this run, but not saved.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(PlaybackSpeedText))]
+        public partial double PlaybackSpeed { get; set; } = 1;
+
+        /// <summary>The speeds the playback speed box offers, as it shows them; any whole percent in range can be typed too.</summary>
+        public static IReadOnlyList<string> PlaybackSpeedPresets { get; } =
+            [.. new[] { 1, 10, 25, 50, 75, 90, 100, 110, 125, 150, 200, 300, 500, 1000 }.Select(FormatPercent)];
+
+        /// <summary><see cref="PlaybackSpeed"/> as the playback speed box shows it: a whole percent.</summary>
+        public string PlaybackSpeedText => FormatPercent((int)Math.Round(PlaybackSpeed * 100));
+
+        /// <summary>
+        /// Sets <see cref="PlaybackSpeed"/> from what was typed or picked in its box: a number of percent, with or without the
+        /// <c>%</c>, rounded to a whole one and kept from 1% to 1000%. Either way the box is told to show the speed again,
+        /// so what can't be read goes back to what it was.
+        /// </summary>
+        /// <returns>Whether <paramref name="text"/> could be read as a speed.</returns>
+        public bool TrySetPlaybackSpeed(string? text)
+        {
+            string trimmed = (text ?? "").Trim();
+            if (trimmed.EndsWith('%'))
+                trimmed = trimmed[..^1].TrimEnd();
+
+            bool isRead = double.TryParse(trimmed, NumberStyles.Float, CultureInfo.CurrentCulture, out double percent) && double.IsFinite(percent);
+            if (isRead)
+            {
+                percent = Math.Clamp(Math.Round(percent), SettingsService.MinPlaybackSpeed * 100, SettingsService.MaxPlaybackSpeed * 100);
+                PlaybackSpeed = percent / 100;
+            }
+
+            OnPropertyChanged(nameof(PlaybackSpeedText));
+            return isRead;
+        }
+
+        private static string FormatPercent(int percent) => string.Format(CultureInfo.CurrentCulture, "{0}%", percent);
+
+        /// <summary>
         /// Whether the tracks' waveforms are read and shown. Off, no track is read ahead of playback, so the song's
         /// length isn't known until it's played. Kept in the settings.
         /// </summary>
@@ -305,19 +349,23 @@ namespace ChartPacker.ViewModels
         /// <summary>What the seek bar does with the pointer, and with Ctrl held, a line each.</summary>
         public string SeekBarToolTip => ScrubToolTip(Strings.SeekBarScrubToolTip, Strings.SeekBarFineScrubToolTip);
 
-        /// <summary>What a highway does with the pointer, and with Ctrl held, a line each.</summary>
-        public string HighwayScrubToolTip => ScrubToolTip(Strings.HighwayScrubToolTip, Strings.HighwayFineScrubToolTip);
+        /// <summary>What a highway does with the pointer, and with Shift and with Ctrl held, a line each.</summary>
+        public string HighwayScrubToolTip => ScrubToolTip(Strings.HighwayScrubToolTip, Strings.HighwayFineScrubToolTip, Strings.HighwayOverviewToolTip);
 
-        /// <summary>What the lyrics lane does with the pointer, and with Ctrl held, a line each.</summary>
-        public string LyricsScrubToolTip => ScrubToolTip(Strings.LyricsScrubToolTip, Strings.LyricsFineScrubToolTip);
+        /// <summary>What the lyrics lane does with the pointer, and with Shift and with Ctrl held, a line each.</summary>
+        public string LyricsScrubToolTip => ScrubToolTip(Strings.LyricsScrubToolTip, Strings.LyricsFineScrubToolTip, Strings.LyricsOverviewToolTip);
 
-        /// <summary>How far each pixel dragged with Ctrl held moves the audio, in milliseconds. Kept in the settings.</summary>
+        /// <summary>How far each pixel dragged with Ctrl held on the seek bar moves the audio, in milliseconds. Kept in the settings.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(FineScrubSecondsPerPixel))]
         public partial double FineScrubMilliseconds { get; set; }
 
-        /// <summary><see cref="FineScrubMilliseconds"/> in seconds, as the seek bar and the lanes take it.</summary>
+        /// <summary><see cref="FineScrubMilliseconds"/> in seconds, as the seek bar takes it.</summary>
         public double FineScrubSecondsPerPixel => FineScrubMilliseconds / 1000;
+
+        /// <summary>How many times less far a drag with Ctrl held moves a highway's or the lyrics' notes than a plain drag. Kept in the settings.</summary>
+        [ObservableProperty]
+        public partial double LaneFineScrubFactor { get; set; }
 
         /// <summary>Where the song's <c>preview_start_time</c> puts the preview, if it sets one.</summary>
         [ObservableProperty]
@@ -401,18 +449,20 @@ namespace ChartPacker.ViewModels
             Tracks.FirstOrDefault(t => t.Track.Stem.Equals(stem, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
-        /// Takes up the settings again, as after another player sharing them changed them: the master volume, and
-        /// which visualisers are shown.
+        /// Takes up the settings again, as after another player sharing them changed them: the master volume, the
+        /// playback speed, and which visualisers are shown.
         /// </summary>
         public void ReloadSettings()
         {
             Volume = _settings.Settings.MasterVolume;
+            PlaybackSpeed = _settings.PlaybackSpeed;
             ShowWaveforms = _settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
             WaveformFidelity = _settings.Settings.WaveformFidelity;
             ScrubStep = _settings.Settings.ScrubStep;
             FineScrubMilliseconds = _settings.Settings.FineScrubMilliseconds;
+            LaneFineScrubFactor = _settings.Settings.LaneFineScrubFactor;
         }
 
         /// <summary>The song that is playing, or <see langword="null"/> when nothing is.</summary>
@@ -456,7 +506,8 @@ namespace ChartPacker.ViewModels
         /// <summary>Why there's no length yet, while there isn't; otherwise no tool tip.</summary>
         public string? LengthToolTip => IsLengthKnown ? null : Strings.LengthPendingToolTip;
 
-        public string PlayPauseToolTip => IsPlaying ? Strings.PauseToolTip : Strings.PlayToolTip;
+        /// <summary>What the play button does now, with Space, which does the same from anywhere in the window.</summary>
+        public string PlayPauseToolTip => IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip;
 
         /// <summary>
         /// Shows <paramref name="tracks"/> of <paramref name="entry"/>. When they're the tracks
@@ -594,7 +645,9 @@ namespace ChartPacker.ViewModels
                 return false;
 
             _analyzer ??= new SpectrumAnalyzer();
-            _analyzer.Analyze(_heard, player.Mixer.OutputRate, levels);
+            // What's heard is played faster or slower than it was mixed, and higher or lower with it.
+            int heardRate = Math.Max(1, (int)Math.Round(player.Mixer.OutputRate * PlaybackSpeed));
+            _analyzer.Analyze(_heard, heardRate, levels);
             return true;
         }
 
@@ -980,6 +1033,20 @@ namespace ChartPacker.ViewModels
                 _player.Volume = (float)value;
         }
 
+        partial void OnPlaybackSpeedChanged(double value)
+        {
+            double speed = double.IsFinite(value) ? Math.Clamp(value, SettingsService.MinPlaybackSpeed, SettingsService.MaxPlaybackSpeed) : 1;
+            if (speed != value)
+            {
+                PlaybackSpeed = speed;
+                return;
+            }
+
+            _settings.PlaybackSpeed = speed;
+            if (_player is not null)
+                _player.Speed = (float)speed;
+        }
+
         partial void OnShowWaveformsChanged(bool value)
         {
             _settings.Settings.ShowWaveforms = value;
@@ -1003,11 +1070,19 @@ namespace ChartPacker.ViewModels
 
         partial void OnScrubStepChanged(ScrubStep value) => _settings.Settings.ScrubStep = value;
 
-        /// <summary>A scrubbed surface's tooltip: what dragging does, what Ctrl does, and the step Ctrl and the wheel take.</summary>
-        private string ScrubToolTip(string drag, string fine) =>
-            string.Join('\n', drag, fine, string.Format(CultureInfo.CurrentCulture, Strings.ScrubStepToolTipFormat, ScrubSteps.NameOf(ScrubStep)));
+        /// <summary>
+        /// A scrubbed surface's tooltip: what dragging does, what Shift does if <paramref name="overview"/> is given, what Ctrl
+        /// does, and the step Ctrl and the wheel take.
+        /// </summary>
+        private string ScrubToolTip(string drag, string fine, string? overview = null)
+        {
+            string step = string.Format(CultureInfo.CurrentCulture, Strings.ScrubStepToolTipFormat, ScrubSteps.NameOf(ScrubStep));
+            return overview is null ? string.Join('\n', drag, fine, step) : string.Join('\n', drag, overview, fine, step);
+        }
 
         partial void OnFineScrubMillisecondsChanged(double value) => _settings.Settings.FineScrubMilliseconds = value;
+
+        partial void OnLaneFineScrubFactorChanged(double value) => _settings.Settings.LaneFineScrubFactor = value;
 
         partial void OnWaveformFidelityChanged(WaveformFidelity value)
         {
@@ -1086,6 +1161,7 @@ namespace ChartPacker.ViewModels
                 _audio = audio;
                 _player = player;
                 player.Volume = (float)Volume;
+                player.Speed = (float)PlaybackSpeed;
                 player.CapturesHeard = ShowSpectrum;
                 foreach (var row in Tracks)
                     ApplySwitches(row);

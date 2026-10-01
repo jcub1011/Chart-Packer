@@ -40,7 +40,7 @@ namespace ChartPacker.ViewModels
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove))]
-        [NotifyCanExecuteChangedFor(nameof(BeginEditCommand), nameof(RemoveCommand), nameof(RevertCommand))]
+        [NotifyCanExecuteChangedFor(nameof(BeginEditCommand), nameof(RemoveCommand), nameof(RevertCommand), nameof(QuickFixCommand))]
         public partial MetadataRowState State { get; set; }
 
         [ObservableProperty]
@@ -55,6 +55,35 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasError))]
         public partial string? Error { get; set; }
+
+        /// <summary>Why the value as drafted fails validation, e.g. a type mismatch; the row is marked while it's set.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasIssue))]
+        public partial string? Issue { get; set; }
+
+        /// <summary>A suggestion that doesn't count as a failure, e.g. the key that replaced a legacy one.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasHint))]
+        public partial string? Hint { get; set; }
+
+        /// <summary>Some selected song has a quick fix for the key, a failure's or a hint's.</summary>
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(QuickFixCommand))]
+        public partial bool HasQuickFix { get; set; }
+
+        /// <summary>What the quick fix does, when every song it applies to would have the same one; otherwise <see langword="null"/>.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(QuickFixHeader))]
+        public partial string? QuickFixDescription { get; set; }
+
+        /// <summary>The right-click menu's Quick Fix item, saying what it does when that's one thing.</summary>
+        public string QuickFixHeader => QuickFixDescription is { } description
+            ? string.Format(CultureInfo.CurrentCulture, Strings.QuickFixMenuFormat, description)
+            : Strings.QuickFixMenu;
+
+        public bool HasIssue => Issue is not null;
+
+        public bool HasHint => Hint is not null;
 
         public bool IsDistinct => Value is null;
 
@@ -113,12 +142,23 @@ namespace ChartPacker.ViewModels
             return this;
         }
 
+        /// <summary>Takes the row's validation, from the drafted metadata of every selected song.</summary>
+        /// <param name="quickFix">Whether there's a quick fix, and what it does when that's one thing.</param>
+        public void SetValidation(string? issue, string? hint, (bool Available, string? Description) quickFix)
+        {
+            Issue = issue;
+            Hint = hint;
+            HasQuickFix = quickFix.Available;
+            QuickFixDescription = quickFix.Available ? quickFix.Description : null;
+        }
+
         /// <summary>Re-evaluates the commands after the panel's editability changed.</summary>
         public void RefreshCommands()
         {
             BeginEditCommand.NotifyCanExecuteChanged();
             RemoveCommand.NotifyCanExecuteChanged();
             RevertCommand.NotifyCanExecuteChanged();
+            QuickFixCommand.NotifyCanExecuteChanged();
         }
 
         private bool CanBeginEdit() => _owner.CanEdit && !IsRemoved;
@@ -132,7 +172,10 @@ namespace ChartPacker.ViewModels
             IsEditing = true;
         }
 
-        /// <summary>Puts the edit box's text into the drafts. Invalid text stays in the box with an error.</summary>
+        /// <summary>
+        /// Puts the edit box's text into the drafts. Text song.ini can't hold stays in the box with an error; text
+        /// that only fails validation, such as a word for a number, goes in, and the row is marked instead.
+        /// </summary>
         [RelayCommand]
         private void Commit()
         {
@@ -181,6 +224,16 @@ namespace ChartPacker.ViewModels
         {
             Cancel();
             _owner.RevertKey(Key);
+        }
+
+        private bool CanQuickFix() => _owner.CanEdit && HasQuickFix && !IsRemoved;
+
+        /// <summary>Applies the key's quick fixes to the selected songs' drafts. Nothing is saved.</summary>
+        [RelayCommand(CanExecute = nameof(CanQuickFix))]
+        private void QuickFix()
+        {
+            Cancel();
+            _owner.ApplyQuickFixes(Key);
         }
     }
 }

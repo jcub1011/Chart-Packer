@@ -14,6 +14,9 @@
         <SolidColorBrush x:Key="AccentTintBrush" Color="#408B5CF6" />
         <SolidColorBrush x:Key="AccentTextBrush" Color="#C4B5FD" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
+        <!-- Metadata that fails validation: an orange bar and tint on its row, and the message under it. -->
+        <SolidColorBrush x:Key="InvalidBrush" Color="#FB923C" />
+        <SolidColorBrush x:Key="InvalidTintBrush" Color="#1FFB923C" />
         <!-- Something left out, e.g. a filter chip set to Excludes: the rose of the spectrum's bass. -->
         <SolidColorBrush x:Key="ExcludeTintBrush" Color="#40F2587A" />
         <SolidColorBrush x:Key="ExcludeTextBrush" Color="#FDA4AF" />
@@ -90,8 +93,8 @@
 
     <!-- Icon-only toolbar buttons. Tooltips show even when disabled, so a greyed-out icon can still be identified. -->
     <Style Selector=":is(Button).tool">
-        <Setter Property="Width" Value="32" />
-        <Setter Property="Height" Value="32" />
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="BorderThickness" Value="0" />
@@ -116,8 +119,8 @@
 
     <!-- Toolbar buttons with an icon and a label: Pack, Unpack, Save. -->
     <Style Selector="Button.labelled">
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="8,0" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>

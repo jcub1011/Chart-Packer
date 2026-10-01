@@ -21,7 +21,7 @@ set -euo pipefail
 yes=
 [[ "${1:-}" == --yes || "${1:-}" == -y ]] && { yes=1; shift; }
 rid="${1:?usage: build.sh [--yes] <rid>}"
-tag="n9.0"
+tag="n9.0.2"
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 out="$root/ChartPacker.Ffmpeg/runtimes/$rid/native"

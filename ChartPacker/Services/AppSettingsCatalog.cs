@@ -277,6 +277,21 @@ namespace ChartPacker.Services
                         Get = () => player.FineScrubMilliseconds,
                         Set = ms => player.FineScrubMilliseconds = ms,
                     },
+                    new RangeSetting
+                    {
+                        Id = "playback.laneFineScrubFactor",
+                        Category = scrubbing,
+                        Label = Strings.LaneFineScrubLabel,
+                        Description = Strings.LaneFineScrubDescription,
+                        Keywords = Words(Strings.LaneFineScrubKeywords),
+                        DefaultValue = AppSettings.DefaultLaneFineScrubFactor,
+                        Minimum = AppSettings.MinLaneFineScrubFactor,
+                        Maximum = AppSettings.MaxLaneFineScrubFactor,
+                        SmallChange = 1,
+                        Format = factor => string.Format(CultureInfo.CurrentCulture, Strings.LaneFineScrubFormat, factor),
+                        Get = () => player.LaneFineScrubFactor,
+                        Set = factor => player.LaneFineScrubFactor = factor,
+                    },
                 ]);
         }
 

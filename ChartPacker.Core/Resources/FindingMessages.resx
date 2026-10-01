@@ -200,6 +200,64 @@
     <value>"{0}" was left out of song.ini because its key or value contains a character song.ini can't hold.</value>
     <comment>{0} is the key.</comment>
   </data>
+  <data name="PairKeyForbidden" xml:space="preserve">
+    <value>The key contains ;, =, a line break or a NUL, which song.ini can't hold.</value>
+  </data>
+  <data name="PairValueForbidden" xml:space="preserve">
+    <value>The value contains ;, a line break or a NUL, which song.ini can't hold.</value>
+  </data>
+  <data name="PairKeyEmpty" xml:space="preserve">
+    <value>The key is empty.</value>
+  </data>
+  <data name="PairValueEmpty" xml:space="preserve">
+    <value>The value is empty, so packing leaves it out.</value>
+  </data>
+  <data name="PairDuplicateKey" xml:space="preserve">
+    <value>The key appears more than once; only the last value is kept.</value>
+  </data>
+  <data name="PairExpectedInteger" xml:space="preserve">
+    <value>Expected a whole number, e.g. 150 or -1.</value>
+  </data>
+  <data name="PairExpectedBoolean" xml:space="preserve">
+    <value>Expected True or False.</value>
+  </data>
+  <data name="PairLenientBooleanFormat" xml:space="preserve">
+    <value>Write this as {0}: some games only read True or False exactly.</value>
+    <comment>{0} is True or False.</comment>
+  </data>
+  <data name="PairExpectedColor" xml:space="preserve">
+    <value>Expected a hex colour, e.g. #FF8800.</value>
+  </data>
+  <data name="PairExpectedIntegerPair" xml:space="preserve">
+    <value>Expected two whole numbers separated by a space, e.g. 55000 85000.</value>
+  </data>
+  <data name="PairExpectedTuning" xml:space="preserve">
+    <value>Expected 4 to 6 whole numbers, optionally followed by a quoted name, e.g. 0 0 0 0 0 0 "Standard".</value>
+  </data>
+  <data name="PairLegacyKeyFormat" xml:space="preserve">
+    <value>A legacy key; newer games read {0} instead.</value>
+    <comment>{0} is the key that replaced it.</comment>
+  </data>
+  <data name="QuickFixSetValueFormat" xml:space="preserve">
+    <value>Change to {0}</value>
+    <comment>A quick fix that replaces a pair's value. {0} is the new value, e.g. True.</comment>
+  </data>
+  <data name="QuickFixRemoveKey" xml:space="preserve">
+    <value>Remove the key</value>
+    <comment>A quick fix that removes a pair, e.g. one with an empty value.</comment>
+  </data>
+  <data name="QuickFixStripForbidden" xml:space="preserve">
+    <value>Remove the ; and line breaks</value>
+    <comment>A quick fix that removes the characters song.ini can't hold from a value; line breaks become spaces.</comment>
+  </data>
+  <data name="QuickFixRenameKeyFormat" xml:space="preserve">
+    <value>Rename to {0}</value>
+    <comment>A quick fix that renames a legacy key. {0} is the key that replaced it.</comment>
+  </data>
+  <data name="QuickFixMergeDuplicates" xml:space="preserve">
+    <value>Remove the repeats</value>
+    <comment>A quick fix that keeps one line of a key stored more than once, with the value it has.</comment>
+  </data>
   <data name="NoSongIni" xml:space="preserve">
     <value>There's no song.ini, so the .sng will have no metadata.</value>
   </data>

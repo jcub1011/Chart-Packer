@@ -183,6 +183,47 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void TheSpeedIsTheOutputs()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 1);
+
+        player.Speed = 2.5f;
+
+        Assert.AreEqual(2.5f, output.Speed);
+    }
+
+    [TestMethod]
+    public void AFasterSpeedQueuesAsMuchMoreAsPlaysMeanwhile()
+    {
+        using var output = new FakeOutput { Speed = 4 };
+        using var player = Player(output, seconds: 10);
+
+        player.Play();
+
+        // The device plays the queue four times as fast, so four times the frames last QueueMilliseconds.
+        WaitUntil(() => output.QueuedFrames >= QueueTarget * 4);
+        Thread.Sleep(50);
+        Assert.IsTrue(output.QueuedFrames < (QueueTarget * 4) + (Rate / 20), $"{output.QueuedFrames} frames were queued.");
+    }
+
+    [TestMethod]
+    public void ASlowSpeedQueuesNoMoreThanPlaysInTheQueueTime()
+    {
+        using var output = new FakeOutput { Speed = 0.01f };
+        using var player = Player(output, seconds: 10);
+        int target = QueueTarget / 100;
+
+        player.Play();
+
+        // Less than one ordinary 20 ms chunk, which would take two seconds to play at this speed.
+        WaitUntil(() => output.QueuedFrames > 0);
+        Thread.Sleep(50);
+        Assert.IsTrue(output.QueuedFrames <= target, $"{output.QueuedFrames} frames were queued.");
+        Assert.IsTrue(output.LargestWrite <= target, $"{output.LargestWrite} frames were written at once.");
+    }
+
+    [TestMethod]
     public void WhatIsHeardLagsWhatIsQueued()
     {
         using var output = new FakeOutput();
@@ -296,6 +337,7 @@ public sealed class StemPlayerTests
     {
         private readonly Lock _lock = new();
         private int _queued;
+        private int _largestWrite;
         private float? _firstAfterClear;
 
         public int SampleRate => Rate;
@@ -309,6 +351,18 @@ public sealed class StemPlayerTests
         public int Clears { get; private set; }
 
         public float Volume { get; set; } = 1;
+
+        public float Speed { get; set; } = 1;
+
+        /// <summary>The most frames written at once.</summary>
+        public int LargestWrite
+        {
+            get
+            {
+                lock (_lock)
+                    return _largestWrite;
+            }
+        }
 
         /// <summary>The first left sample written since the last <see cref="Clear"/>, or since the start.</summary>
         public float? FirstSampleAfterLastClear
@@ -339,6 +393,7 @@ public sealed class StemPlayerTests
                 if (_queued == 0 && _firstAfterClear is null)
                     _firstAfterClear = stereo[0];
                 _queued += stereo.Length / 2;
+                _largestWrite = Math.Max(_largestWrite, stereo.Length / 2);
             }
         }
 

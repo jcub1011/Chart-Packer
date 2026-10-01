@@ -59,14 +59,18 @@ namespace ChartPacker
                     player,
                     mergeWindowFor,
                     Path.Combine(UserConfigPaths.ConfigFolder, "dedup-log.jsonl"));
-                var library = new LibraryViewModel(folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, reveal, downloads);
+                var detail = new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation);
+                var validatorWindow = new AvaloniaValidatorWindowService(
+                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles);
+                var library = new LibraryViewModel(
+                    folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
                     settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway, downloads), settingsPicker, settings.Save));
 
                 window.DataContext = new MainWindowViewModel(
                     library,
-                    new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles),
+                    detail,
                     settings,
                     drafts,
                     confirmation,

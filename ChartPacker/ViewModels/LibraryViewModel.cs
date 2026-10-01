@@ -25,7 +25,7 @@ namespace ChartPacker.ViewModels
     /// <summary>An overwrite policy as offered in the policy picker.</summary>
     public sealed record OverwriteOption(OverwritePolicy Value, string Label);
 
-    /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Deduplicate.</summary>
+    /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Validate/Deduplicate.</summary>
     /// <remarks>
     /// Scanning only happens on an explicit <see cref="RescanCommand"/>, or as the first step of
     /// <see cref="DeduplicateCommand"/>. Picking a folder, changing
@@ -54,6 +54,7 @@ namespace ChartPacker.ViewModels
         private readonly MetadataDraftStore _drafts;
         private readonly IMergeWindowService _mergeWindow;
         private readonly IDedupWindowService _dedupWindow;
+        private readonly IValidatorWindowService _validatorWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
@@ -92,6 +93,7 @@ namespace ChartPacker.ViewModels
         /// <param name="player">Plays a song from the list's art buttons; the detail panel shows the same one.</param>
         /// <param name="mergeWindow">Shows the Merge window for the selected songs.</param>
         /// <param name="dedupWindow">Shows the Deduplicate window for the whole library.</param>
+        /// <param name="validatorWindow">Shows the Validator window for the selected songs.</param>
         /// <param name="reveal">Shows the selected songs in the file manager.</param>
         /// <param name="downloads">Saves copies of the selected songs as song folders.</param>
         public LibraryViewModel(
@@ -102,6 +104,7 @@ namespace ChartPacker.ViewModels
             PlayerViewModel player,
             IMergeWindowService mergeWindow,
             IDedupWindowService dedupWindow,
+            IValidatorWindowService validatorWindow,
             IFileRevealService reveal,
             IDownloadService downloads)
         {
@@ -110,6 +113,7 @@ namespace ChartPacker.ViewModels
             _drafts = drafts;
             _mergeWindow = mergeWindow;
             _dedupWindow = dedupWindow;
+            _validatorWindow = validatorWindow;
             _reveal = reveal;
             _downloads = downloads;
             Player = player;
@@ -140,7 +144,7 @@ namespace ChartPacker.ViewModels
             Selection = new SelectionModel<LibraryItemViewModel> { SingleSelect = false, Source = Entries };
             Selection.PropertyChanged += OnSelectionPropertyChanged;
 
-            _drafts.DraftsChanged += path =>
+            _drafts.DraftsChanged += (path, change) =>
             {
                 if (!_itemsByPath.TryGetValue(path, out var item))
                     return;
@@ -196,6 +200,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         public partial bool IsScanning { get; set; }
 
         /// <summary>How many songs the scan has found so far.</summary>
@@ -230,6 +235,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(PackCommand))]
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         public partial int SelectedCount { get; set; }
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
@@ -437,6 +443,12 @@ namespace ChartPacker.ViewModels
                 RefreshState();
             }
         }
+
+        private bool CanValidate() => SelectedCount > 0 && HasScanned && !IsScanning && !Job.IsRunning;
+
+        /// <summary>Opens the Validator window, which lists the selected songs whose metadata fails validation, to fix them.</summary>
+        [RelayCommand(CanExecute = nameof(CanValidate))]
+        private Task ValidateAsync() => _validatorWindow.ShowAsync(SelectedEntries);
 
         private bool CanDeduplicate() => FolderPath is not null && !Job.IsRunning;
 
@@ -916,6 +928,7 @@ namespace ChartPacker.ViewModels
             PackCommand.NotifyCanExecuteChanged();
             UnpackCommand.NotifyCanExecuteChanged();
             MergeCommand.NotifyCanExecuteChanged();
+            ValidateCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
         }
 

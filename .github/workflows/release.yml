@@ -1,0 +1,251 @@
+# Builds the Windows installer and portable zip, and publishes them as a GitHub release tagged
+# v<Version>, with <Version> read from ChartPacker/ChartPacker.csproj. Bump it there before running this.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: Mark the release as a pre-release.
+        type: boolean
+        default: false
+      overwrite:
+        description: Replace the release and tag for this version if they already exist.
+        type: boolean
+        default: false
+      draft:
+        description: Don't create a release; upload the installer and zip as a workflow artifact instead.
+        type: boolean
+        default: false
+
+# One release at a time, so two runs can't race on the same tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RID: win-x64
+
+jobs:
+  # Reads the version and checks its tag before the long build, so a version that wasn't bumped fails in seconds.
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      numeric: ${{ steps.version.outputs.numeric }}
+      tag: ${{ steps.version.outputs.tag }}
+      exists: ${{ steps.exists.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the version
+        id: version
+        shell: bash
+        run: |
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' ChartPacker/ChartPacker.csproj | head -n 1 | tr -d '[:space:]')"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error file=ChartPacker/ChartPacker.csproj::<Version> is '$version', which isn't a semantic version such as 1.2.3 or 1.2.3-beta.1."
+            exit 1
+          fi
+          {
+            echo "version=$version"
+            # The Windows file version takes numbers only, so a pre-release suffix is dropped from it.
+            echo "numeric=${version%%-*}"
+            echo "tag=v$version"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version $version, tag v$version"
+
+      - name: Check whether the release already exists
+        id: exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          DRAFT: ${{ inputs.draft }}
+        run: |
+          exists=false
+          if out="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" 2>&1)"; then
+            exists=true
+            echo "Release $TAG exists."
+          elif [[ "$out" != *"release not found"* ]]; then
+            echo "::error::Couldn't check for release $TAG: $out"
+            exit 1
+          fi
+          # A tag can exist without a release; creating the release would then reuse that tag's old commit.
+          set +e
+          git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null
+          code=$?
+          set -e
+          if (( code == 0 )); then
+            exists=true
+            echo "Tag $TAG exists."
+          elif (( code != 2 )); then
+            echo "::error::Couldn't check for tag $TAG (git ls-remote exited with $code)."
+            exit 1
+          fi
+          echo "exists=$exists" >> "$GITHUB_OUTPUT"
+
+          if [[ "$exists" == true ]]; then
+            if [[ "$DRAFT" == true ]]; then
+              echo "::warning::$TAG already exists. This is a draft run, so it's left alone."
+            elif [[ "$OVERWRITE" == true ]]; then
+              echo "::warning::$TAG already exists and will be replaced."
+            else
+              echo "::error::$TAG already exists. Bump <Version> in ChartPacker/ChartPacker.csproj, or run again with overwrite."
+              exit 1
+            fi
+          fi
+
+  build:
+    needs: prepare
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      NUMERIC_VERSION: ${{ needs.prepare.outputs.numeric }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # FFmpeg takes several minutes to build under MSYS2, so it's rebuilt only when build.sh (which pins the tag) changes.
+      - name: Restore FFmpeg
+        id: ffmpeg-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ChartPacker.Ffmpeg/runtimes/${{ env.RID }}/native
+          key: ffmpeg-${{ env.RID }}-${{ hashFiles('build/ffmpeg/build.sh') }}
+
+      - name: Set up MSYS2
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            git
+            make
+            diffutils
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-nasm
+
+      - name: Build FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: build/ffmpeg/build.sh --yes "$RID"
+
+      # Saved straight away rather than at the end of the job, so a failing test doesn't throw the build away.
+      - name: Save FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ChartPacker.Ffmpeg/runtimes/${{ env.RID }}/native
+          key: ${{ steps.ffmpeg-cache.outputs.cache-primary-key }}
+
+      # After FFmpeg is in place, so the FFmpeg decoder tests run rather than being skipped as inconclusive.
+      - name: Test
+        shell: pwsh
+        run: dotnet test --project ChartPacker.Core.Tests/ChartPacker.Core.Tests.csproj --configuration Release
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          ./build/publish.ps1 -Runtime $env:RID -Yes
+          # Ship the licenses with the app: FFmpeg's LGPL, among others, requires its notice to go with it.
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md "publish/$env:RID/"
+
+      # The runner image's Inno Setup lags behind, so the latest release is installed from its GitHub
+      # repository instead, after checking it's signed by Inno Setup's publisher.
+      - name: Install Inno Setup
+        id: inno
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = gh release view --repo jrsoftware/issrc --json tagName --jq .tagName
+          if ($LASTEXITCODE -ne 0) { throw "Couldn't find the latest Inno Setup release." }
+          $download = Join-Path $env:RUNNER_TEMP 'innosetup'
+          gh release download $tag --repo jrsoftware/issrc --pattern 'innosetup-*-x64.exe' --dir $download --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Couldn't download Inno Setup $tag." }
+          $setup = (Get-ChildItem $download -Filter 'innosetup-*-x64.exe' | Select-Object -First 1).FullName
+          $signature = Get-AuthenticodeSignature $setup
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch '\bO=Pyrsys B\.V\.') {
+            throw "$setup isn't validly signed by Inno Setup's publisher: $($signature.Status), $($signature.SignerCertificate.Subject)."
+          }
+          # Portable mode installs into the given folder without registering an uninstaller.
+          $dir = Join-Path $env:RUNNER_TEMP 'inno'
+          $process = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/CURRENTUSER', '/PORTABLE=1', '/NOICONS', "/DIR=$dir" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installing Inno Setup $tag failed with exit code $($process.ExitCode)." }
+          Write-Host "Inno Setup $tag"
+          "iscc=$(Join-Path $dir 'ISCC.exe')" >> $env:GITHUB_OUTPUT
+
+      - name: Build the installer
+        shell: pwsh
+        env:
+          ISCC: ${{ steps.inno.outputs.iscc }}
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & $env:ISCC `
+            "/DAppVersion=$env:VERSION" `
+            "/DAppNumericVersion=$env:NUMERIC_VERSION" `
+            "/DSourceDir=$((Resolve-Path "publish/$env:RID").Path)" `
+            "/O$((Resolve-Path dist).Path)" `
+            installer/ChartPacker.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
+
+      - name: Zip the portable build
+        shell: pwsh
+        run: Compress-Archive -Path "publish/$env:RID/*" -DestinationPath "dist/ChartPacker-$env:VERSION-$env:RID.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ChartPacker-${{ env.VERSION }}-${{ env.RID }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, build]
+    if: ${{ !inputs.draft }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ChartPacker-${{ env.VERSION }}-${{ env.RID }}
+          path: dist
+
+      # The tag goes too, so the new release's tag points at this run's commit, not the old one.
+      - name: Remove the existing release
+        if: ${{ inputs.overwrite && needs.prepare.outputs.exists == 'true' }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" > /dev/null 2>&1; then
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG"
+          fi
+
+      - name: Create the release
+        shell: bash
+        env:
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          args=()
+          [[ "$PRERELEASE" == true ]] && args+=(--prerelease)
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Chart Packer $VERSION" \
+            --generate-notes \
+            "${args[@]}"

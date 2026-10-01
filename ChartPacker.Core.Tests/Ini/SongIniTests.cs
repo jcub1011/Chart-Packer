@@ -15,6 +15,24 @@ public sealed class SongIniTests
     public void DeleteRoot() => _root.Delete(recursive: true);
 
     [TestMethod]
+    public void FindInMatchesTheFolderOwnSongIniIgnoringCase()
+    {
+        string path = Path.Combine(_root.FullName, "Song.INI");
+        File.WriteAllText(path, "[song]\n");
+
+        Assert.AreEqual(path, SongIni.FindIn(_root.FullName));
+    }
+
+    [TestMethod]
+    public void FindInIgnoresASongIniInASubfolder()
+    {
+        var sub = _root.CreateSubdirectory("Other");
+        File.WriteAllText(Path.Combine(sub.FullName, "song.ini"), "[song]\n");
+
+        Assert.IsNull(SongIni.FindIn(_root.FullName));
+    }
+
+    [TestMethod]
     public void WriteProducesOneSongSectionThatParsesBack()
     {
         var pairs = new[] { P("name", "Title"), P("loading_phrase", "a = b"), P("delay", "0") };
@@ -154,6 +172,27 @@ public sealed class SongIniTests
 
         Assert.AreEqual(SongIniStatus.NoSongSection, result.Status);
         Assert.IsEmpty(result.Pairs);
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncReportsRepeatedKeysOnceAsFirstSpelled()
+    {
+        string path = Path.Combine(_root.FullName, "song.ini");
+        await File.WriteAllTextAsync(path, "[song]\nName = A\nname = B\nNAME = C\ndelay = 0\n");
+
+        var result = await SongIni.ReadAsync(path);
+
+        CollectionAssert.AreEqual(new[] { P("Name", "C"), P("delay", "0") }, result.Pairs.ToArray());
+        CollectionAssert.AreEqual(new[] { "Name" }, result.DuplicateKeys.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncReportsNoDuplicatesForDistinctKeys()
+    {
+        string path = Path.Combine(_root.FullName, "song.ini");
+        await File.WriteAllTextAsync(path, "[song]\nname = A\nartist = B\n");
+
+        Assert.IsEmpty((await SongIni.ReadAsync(path)).DuplicateKeys);
     }
 
     [TestMethod]
