@@ -1649,7 +1649,7 @@
     <value>Every file and all the metadata match, so deleting a copy loses nothing. One copy in each group is kept.</value>
   </data>
   <data name="DedupSameChartDescription" xml:space="preserve">
-    <value>The chart is the same, but the metadata or other files differ. Check what's different, then delete group by group, or open a group in Merge to compare and combine its metadata and files.</value>
+    <value>The chart is the same, but the metadata or other files differ. Check what's different, then delete group by group or all at once, or open a group in Merge to compare and combine its metadata and files.</value>
   </data>
   <data name="DedupMergeDescription" xml:space="preserve">
     <value>The same artist and title, with different charts. Merge them into one new .sng; once it's made, you can delete the charts it came from.</value>
@@ -1699,6 +1699,13 @@
   </data>
   <data name="DedupDeleteSourcesFormat" xml:space="preserve">
     <value>Delete merged sources ({0:N0})…</value>
+    <comment>{0} is the number of marked rows.</comment>
+  </data>
+  <data name="DedupMarkMerged" xml:space="preserve">
+    <value>Mark merged for deletion</value>
+  </data>
+  <data name="DedupDeleteMarkedFilesFormat" xml:space="preserve">
+    <value>Delete files marked for deletion ({0:N0})…</value>
     <comment>{0} is the number of marked rows.</comment>
   </data>
   <data name="DedupOpenInMerge" xml:space="preserve">

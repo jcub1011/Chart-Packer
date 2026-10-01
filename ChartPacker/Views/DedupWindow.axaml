@@ -209,6 +209,15 @@
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="8,8,8,16" Spacing="10">
                                 <TextBlock Classes="description" Text="{x:Static res:Strings.DedupSameChartDescription}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoSameChart}">
+                                    <Button Content="{x:Static res:Strings.DedupMarkMerged}"
+                                            Command="{Binding MarkMergedSameChartCommand}"
+                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkMerged}" />
+                                    <Button Classes="accent"
+                                            Content="{Binding SameChartDeleteMarkedLabel}"
+                                            Command="{Binding DeleteSameChartCommand}"
+                                            AutomationProperties.Name="{Binding SameChartDeleteMarkedLabel}" />
+                                </StackPanel>
                                 <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoSameChart}" IsVisible="{Binding HasNoSameChart}" />
                                 <ItemsControl ItemsSource="{Binding SameChartGroups}">
                                     <ItemsControl.ItemsPanel>
@@ -225,6 +234,15 @@
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="8,8,8,16" Spacing="10">
                                 <TextBlock Classes="description" Text="{x:Static res:Strings.DedupMergeDescription}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoMerge}">
+                                    <Button Content="{x:Static res:Strings.DedupMarkMerged}"
+                                            Command="{Binding MarkMergedMergeCommand}"
+                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkMerged}" />
+                                    <Button Classes="accent"
+                                            Content="{Binding MergeDeleteMarkedLabel}"
+                                            Command="{Binding DeleteMergeCommand}"
+                                            AutomationProperties.Name="{Binding MergeDeleteMarkedLabel}" />
+                                </StackPanel>
                                 <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoMerge}" IsVisible="{Binding HasNoMerge}" />
                                 <ItemsControl ItemsSource="{Binding MergeGroups}">
                                     <ItemsControl.ItemsPanel>

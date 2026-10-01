@@ -170,6 +170,20 @@ namespace ChartPacker.ViewModels
 
         public string DeleteMarkedLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteMarkedFormat, ExactMarkedCount);
 
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(SameChartDeleteMarkedLabel))]
+        [NotifyCanExecuteChangedFor(nameof(DeleteSameChartCommand))]
+        public partial int SameChartMarkedCount { get; set; }
+
+        public string SameChartDeleteMarkedLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteMarkedFilesFormat, SameChartMarkedCount);
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(MergeDeleteMarkedLabel))]
+        [NotifyCanExecuteChangedFor(nameof(DeleteMergeCommand))]
+        public partial int MergeMarkedCount { get; set; }
+
+        public string MergeDeleteMarkedLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteMarkedFilesFormat, MergeMarkedCount);
+
         public AvaloniaList<DedupResultRow> Results { get; } = [];
 
         public bool HasResults => Results.Count > 0;
@@ -275,6 +289,40 @@ namespace ChartPacker.ViewModels
 
         private bool CanDeleteExact() => IsReady && CanDelete && ExactMarkedCount > 0;
 
+        /// <summary>Marks every copy of a merged group on the Same chart tab.</summary>
+        [RelayCommand(CanExecute = nameof(CanMarkMergedSameChart))]
+        private void MarkMergedSameChart() => MarkMerged(SameChartGroups);
+
+        private bool CanMarkMergedSameChart() => CanMarkMerged(SameChartGroups);
+
+        /// <summary>Deletes every marked copy on the Same chart tab.</summary>
+        [RelayCommand(CanExecute = nameof(CanDeleteSameChart))]
+        private Task DeleteSameChartAsync() => DeleteMarkedAsync(SameChartGroups);
+
+        private bool CanDeleteSameChart() => IsReady && CanDelete && SameChartMarkedCount > 0;
+
+        /// <summary>Marks every source of a merged group on the Merge tab.</summary>
+        [RelayCommand(CanExecute = nameof(CanMarkMergedMerge))]
+        private void MarkMergedMerge() => MarkMerged(MergeGroups);
+
+        private bool CanMarkMergedMerge() => CanMarkMerged(MergeGroups);
+
+        /// <summary>Deletes every marked source on the Merge tab.</summary>
+        [RelayCommand(CanExecute = nameof(CanDeleteMerge))]
+        private Task DeleteMergeAsync() => DeleteMarkedAsync(MergeGroups);
+
+        private bool CanDeleteMerge() => IsReady && CanDelete && MergeMarkedCount > 0;
+
+        private static void MarkMerged(IEnumerable<DedupGroupViewModel> groups)
+        {
+            foreach (var member in groups.Where(g => g.HasMerged).SelectMany(g => g.Members).Where(m => m.CanMark))
+                member.IsMarked = true;
+        }
+
+        private bool CanMarkMerged(IEnumerable<DedupGroupViewModel> groups) => IsReady && CanDelete && groups.Any(g => g.HasMerged);
+
+        private Task DeleteMarkedAsync(IEnumerable<DedupGroupViewModel> groups) => DeleteAsync([.. groups.Where(g => g.MarkedCount > 0).SelectMany(g => g.PlanDeletion())]);
+
         /// <summary>Deletes the marked copies of one group.</summary>
         internal Task DeleteGroupAsync(DedupGroupViewModel group) => DeleteAsync(group.PlanDeletion());
 
@@ -309,6 +357,8 @@ namespace ChartPacker.ViewModels
                     foreach (var groups in new[] { ExactGroups, SameChartGroups, MergeGroups })
                         groups.Remove(group);
                 }
+
+                RefreshCommands();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -421,8 +471,13 @@ namespace ChartPacker.ViewModels
             OnMarksChanged();
         }
 
-        /// <summary>A mark changed somewhere; the Exact tab's count follows.</summary>
-        internal void OnMarksChanged() => ExactMarkedCount = ExactGroups.Sum(g => g.MarkedCount);
+        /// <summary>A mark changed somewhere; each tab's count follows.</summary>
+        internal void OnMarksChanged()
+        {
+            ExactMarkedCount = ExactGroups.Sum(g => g.MarkedCount);
+            SameChartMarkedCount = SameChartGroups.Sum(g => g.MarkedCount);
+            MergeMarkedCount = MergeGroups.Sum(g => g.MarkedCount);
+        }
 
         /// <summary>Stops a deletion after the copy it's on; otherwise closes the window.</summary>
         [RelayCommand]
@@ -463,12 +518,18 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasNoSameChart));
             OnPropertyChanged(nameof(HasNoMerge));
             MarkAllCommand.NotifyCanExecuteChanged();
+            MarkMergedSameChartCommand.NotifyCanExecuteChanged();
+            MarkMergedMergeCommand.NotifyCanExecuteChanged();
         }
 
         private void RefreshCommands()
         {
             MarkAllCommand.NotifyCanExecuteChanged();
             DeleteExactCommand.NotifyCanExecuteChanged();
+            MarkMergedSameChartCommand.NotifyCanExecuteChanged();
+            DeleteSameChartCommand.NotifyCanExecuteChanged();
+            MarkMergedMergeCommand.NotifyCanExecuteChanged();
+            DeleteMergeCommand.NotifyCanExecuteChanged();
             foreach (var group in ExactGroups.Concat(SameChartGroups).Concat(MergeGroups))
                 group.RefreshCommands();
         }
