@@ -14,6 +14,7 @@ namespace ChartPacker.Services
                 return false;
 
             var dialog = new ConfirmDialog(title, message, confirmLabel);
+            WindowChrome.UseOwnerIcon(dialog, window);
             return await dialog.ShowDialog<bool>(window);
         }
     }

@@ -48,6 +48,7 @@ namespace ChartPacker.Services
             dialog.DataContext = viewModel;
 
             _ = viewModel.AnalyzeAsync();
+            WindowChrome.UseOwnerIcon(dialog, window);
             await dialog.ShowDialog(window);
             await viewModel.ShutdownAsync();
             return viewModel.Result;

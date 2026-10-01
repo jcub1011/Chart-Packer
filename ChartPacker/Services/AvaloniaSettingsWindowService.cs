@@ -20,6 +20,7 @@ namespace ChartPacker.Services
 
             var dialog = new SettingsWindow();
             dialog.DataContext = createViewModel(new AvaloniaFolderPickerService(() => dialog));
+            WindowChrome.UseOwnerIcon(dialog, window);
             await dialog.ShowDialog(window);
         }
     }

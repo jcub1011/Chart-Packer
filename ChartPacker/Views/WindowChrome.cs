@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Avalonia;
 using Avalonia.Controls;
 
 namespace ChartPacker.Views
@@ -21,6 +22,14 @@ namespace ChartPacker.Views
 
             int enabled = 1;
             _ = DwmSetWindowAttribute(handle.Handle, DwmUseImmersiveDarkMode, ref enabled, sizeof(int));
+        }
+
+        /// <summary>Gives the window its owner's icon and keeps it in step when the owner's changes. Call before showing it.</summary>
+        public static void UseOwnerIcon(Window window, Window owner)
+        {
+            var link = window.Bind(Window.IconProperty, owner.GetObservable(Window.IconProperty));
+            // The owner outlives the window; drop the subscription so a closed window isn't kept alive by it.
+            window.Closed += (_, _) => link.Dispose();
         }
     }
 }

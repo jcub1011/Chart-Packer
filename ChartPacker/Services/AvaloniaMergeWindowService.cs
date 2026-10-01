@@ -51,6 +51,7 @@ namespace ChartPacker.Services
             var viewModel = new MergeWindowViewModel(entries, [.. entries.Select(e => drafts.HasDrafts(e.FullPath))], outputFolder, policy, video, preview, previewDrafts);
             var dialog = new MergeWindow { DataContext = viewModel };
             _ = viewModel.LoadAsync();
+            WindowChrome.UseOwnerIcon(dialog, window);
             await dialog.ShowDialog(window);
             await viewModel.ShutdownAsync();
             mainPlayer.ReloadSettings();

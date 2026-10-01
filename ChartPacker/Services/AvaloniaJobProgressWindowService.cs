@@ -27,6 +27,7 @@ namespace ChartPacker.Services
             var dialog = new JobProgressWindow { DataContext = job };
             dialog.Closed += (_, _) => _open = null;
             _open = dialog;
+            WindowChrome.UseOwnerIcon(dialog, window);
             dialog.Show(window);
         }
     }
