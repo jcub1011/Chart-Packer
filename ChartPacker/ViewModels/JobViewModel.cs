@@ -17,7 +17,8 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartPacker.ViewModels
 {
     /// <summary>A warning or error under a job item.</summary>
-    public sealed record JobMessageRow(string Text, bool IsError);
+    /// <param name="RuleId">The validation rule that raised it.</param>
+    public sealed record JobMessageRow(string RuleId, string Message, bool IsError);
 
     /// <summary>One item's outcome in the results panel.</summary>
     /// <param name="Name">The item's name.</param>
@@ -41,18 +42,43 @@ namespace ChartPacker.ViewModels
             JobItemStatus.Skipped => "–",
             _ => "✕",
         };
+
+        /// <summary>Whether the name, detail or any message contains <paramref name="query"/>, ignoring case.</summary>
+        public bool Matches(string query) =>
+            Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || Detail.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || Messages.Any(m => m.RuleId.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || m.Message.Contains(query, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>One group of rows in the progress window, e.g. everything that was skipped.</summary>
+    /// <summary>One tab of rows in the progress window, e.g. everything that was skipped, with its own search.</summary>
     /// <param name="titleFormat">The heading's format; <c>{0}</c> is the number of rows.</param>
-    public sealed class JobResultGroup(string titleFormat) : ViewModelBase
+    public sealed partial class JobResultGroup(string titleFormat) : ViewModelBase
     {
+        private readonly List<JobItemRow> _all = [];
+
+        /// <summary>The rows that match the search; every row while there's no search.</summary>
         public AvaloniaList<JobItemRow> Rows { get; } = [];
 
-        /// <summary>The heading, with the number of rows.</summary>
-        public string Title => string.Format(CultureInfo.CurrentCulture, TitleFormat, Rows.Count);
+        [ObservableProperty]
+        public partial string SearchText { get; set; } = "";
 
-        public bool HasRows => Rows.Count > 0;
+        /// <summary>The heading, with the number of rows, whatever the search.</summary>
+        public string Title => Format(TitleFormat, _all.Count);
+
+        public bool HasRows => _all.Count > 0;
+
+        public bool IsSearching => Query.Length > 0;
+
+        /// <summary>There are rows, but none match the search.</summary>
+        public bool HasNoMatches => HasRows && Rows.Count == 0;
+
+        public string NoMatchesText => Format(Strings.JobSearchNoMatchesFormat, Query);
+
+        /// <summary>How many rows match, out of how many, e.g. "3 of 120".</summary>
+        public string MatchCountText => Format(Strings.JobSearchCountFormat, Rows.Count, _all.Count);
+
+        private string Query => SearchText?.Trim() ?? "";
 
         internal string TitleFormat
         {
@@ -66,13 +92,32 @@ namespace ChartPacker.ViewModels
 
         internal void Add(JobItemRow row)
         {
-            Rows.Add(row);
+            _all.Add(row);
+            if (row.Matches(Query))
+                Rows.Add(row);
             Refresh();
         }
 
         internal void Clear()
         {
+            _all.Clear();
             Rows.Clear();
+            SearchText = "";
+            Refresh();
+        }
+
+        // Only while searching, so Escape in an empty search box still reaches the window's Close button.
+        [RelayCommand(CanExecute = nameof(IsSearching))]
+        private void ClearSearch() => SearchText = "";
+
+        partial void OnSearchTextChanged(string value)
+        {
+            string query = Query;
+            Rows.Clear();
+            Rows.AddRange(_all.Where(r => r.Matches(query)));
+            OnPropertyChanged(nameof(IsSearching));
+            ClearSearchCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(NoMatchesText));
             Refresh();
         }
 
@@ -80,7 +125,11 @@ namespace ChartPacker.ViewModels
         {
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(HasRows));
+            OnPropertyChanged(nameof(HasNoMatches));
+            OnPropertyChanged(nameof(MatchCountText));
         }
+
+        private static string Format(string format, params object[] args) => string.Format(CultureInfo.CurrentCulture, format, args);
     }
 
     /// <summary>
@@ -208,7 +257,7 @@ namespace ChartPacker.ViewModels
 
             var messages = result.Findings
                 .Where(f => f.Severity != Severity.Info)
-                .Select(f => new JobMessageRow($"{f.RuleId}: {f.Message}", f.Severity == Severity.Error))
+                .Select(f => new JobMessageRow(f.RuleId, f.Message, f.Severity == Severity.Error))
                 .ToList();
 
             var row = new JobItemRow(result.Entry.DisplayName, Describe(kind, result), result.Status, messages);

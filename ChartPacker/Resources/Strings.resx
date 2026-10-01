@@ -315,8 +315,19 @@
     <comment>{0} is the number of items.</comment>
   </data>
   <data name="JobGroupEmpty" xml:space="preserve">
-    <value>None</value>
-    <comment>Shown in a progress window group with no items.</comment>
+    <value>Nothing here.</value>
+    <comment>Shown in a progress window tab with no items.</comment>
+  </data>
+  <data name="JobSearchWatermark" xml:space="preserve">
+    <value>Search name, path or message</value>
+  </data>
+  <data name="JobSearchNoMatchesFormat" xml:space="preserve">
+    <value>No results match "{0}".</value>
+    <comment>{0} is the search text.</comment>
+  </data>
+  <data name="JobSearchCountFormat" xml:space="preserve">
+    <value>{0:N0} of {1:N0}</value>
+    <comment>{0} is the number of items matching the search; {1} the number in the tab.</comment>
   </data>
   <data name="JobCanceledPack" xml:space="preserve">
     <value>Canceled before it was packed.</value>

@@ -4,73 +4,206 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
-        mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="520"
+        xmlns:ctl="using:ChartPacker.Controls"
+        mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="560"
         x:Class="ChartPacker.Views.JobProgressWindow"
         x:DataType="vm:JobViewModel"
         Title="{x:Static res:Strings.JobProgressWindowTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
-        Width="640" Height="520"
-        MinWidth="420" MinHeight="280"
+        Width="760" Height="560"
+        MinWidth="460" MinHeight="320"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
 
     <Window.Styles>
-        <Style Selector="TextBlock.status.attention, TextBlock.group-heading.attention">
+        <!-- Tabs: smaller than Fluent's default headers. Skipped and Failed are only coloured once they
+             have something in them. -->
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="MinHeight" Value="40" />
+        </Style>
+        <Style Selector="TextBlock.tab-header.attention">
             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
         </Style>
-        <Style Selector="TextBlock.status.failed, TextBlock.group-heading.failed">
+        <Style Selector="TextBlock.tab-header.failed">
             <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
         </Style>
+
+        <!-- The list sits in a framed panel, like the settings and library lists. -->
+        <Style Selector="Border.results-frame">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <Style Selector="ListBox.results">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <!-- Rows: hover and selection as in the library list (tint and a violet bar on the left). The
+             separator is on the row inside the padding, so it's inset from the bar. -->
+        <Style Selector="ListBox.results ListBoxItem">
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#558B5CF6" />
+        </Style>
+        <Style Selector="Border.result-row">
+            <Setter Property="Padding" Value="0,9" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+
+        <!-- The round status mark at the start of a row: green, amber, red, or grey when canceled. -->
+        <Style Selector="Border.status-badge">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="#2E4ADE80" />
+        </Style>
+        <Style Selector="Border.status-badge > TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="#4ADE80" />
+        </Style>
+        <Style Selector="Border.status-badge.attention">
+            <Setter Property="Background" Value="#2EFBBF24" />
+        </Style>
+        <Style Selector="Border.status-badge.attention > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="Border.status-badge.failed">
+            <Setter Property="Background" Value="#2EF87171" />
+        </Style>
+        <Style Selector="Border.status-badge.failed > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+        <Style Selector="Border.status-badge.canceled">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Border.status-badge.canceled > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+
         <Style Selector="TextBlock.message">
             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
         </Style>
         <Style Selector="TextBlock.message.error">
             <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
         </Style>
-        <Style Selector="TextBlock.group-heading">
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="Expander">
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="IsExpanded" Value="True" />
-        </Style>
     </Window.Styles>
 
     <Window.DataTemplates>
-        <!-- A group's body: its rows, or "None" while it has none. -->
+        <!-- A tab: its search, then its rows, or why there are none. -->
         <DataTemplate DataType="vm:JobResultGroup">
-            <Panel>
-                <TextBlock Classes="muted" Text="{x:Static res:Strings.JobGroupEmpty}" IsVisible="{Binding !HasRows}" />
-                <ItemsControl ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}" />
-            </Panel>
+            <DockPanel Margin="8,10,8,8">
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,8">
+                    <TextBox Grid.Column="0"
+                             Classes="clearButton"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding SearchText}"
+                             PlaceholderText="{x:Static res:Strings.JobSearchWatermark}"
+                             AutomationProperties.Name="{x:Static res:Strings.JobSearchWatermark}">
+                        <TextBox.InnerLeftContent>
+                            <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                        </TextBox.InnerLeftContent>
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <TextBlock Grid.Column="1"
+                               Classes="muted"
+                               VerticalAlignment="Center"
+                               Text="{Binding MatchCountText}"
+                               IsVisible="{Binding IsSearching}" />
+                </Grid>
+
+                <Border Classes="results-frame">
+                    <Panel>
+                        <ListBox Classes="results"
+                                 ItemsSource="{Binding Rows}"
+                                 AutomationProperties.Name="{Binding Title}" />
+                        <TextBlock Classes="muted centered"
+                                   VerticalAlignment="Center"
+                                   Margin="16"
+                                   IsHitTestVisible="False"
+                                   Text="{x:Static res:Strings.JobGroupEmpty}"
+                                   IsVisible="{Binding !HasRows}" />
+                        <TextBlock Classes="muted centered"
+                                   VerticalAlignment="Center"
+                                   Margin="16"
+                                   IsHitTestVisible="False"
+                                   Text="{Binding NoMatchesText}"
+                                   IsVisible="{Binding HasNoMatches}" />
+                    </Panel>
+                </Border>
+            </DockPanel>
         </DataTemplate>
+
+        <!-- One item: its status mark, its name, what happened, and any warnings or errors. -->
         <DataTemplate DataType="vm:JobItemRow">
-            <Grid ColumnDefinitions="20,Auto,*" ColumnSpacing="8" Margin="0,3">
-                <TextBlock Grid.Column="0"
-                           Classes="status"
-                           Classes.attention="{Binding IsAttention}"
-                           Classes.failed="{Binding IsFailed}"
-                           Classes.muted="{Binding IsCanceled}"
-                           FontWeight="Bold"
-                           Text="{Binding Glyph}" />
-                <TextBlock Grid.Column="1"
-                           FontWeight="SemiBold"
-                           MaxWidth="220"
-                           TextTrimming="CharacterEllipsis"
-                           ToolTip.Tip="{Binding Name}"
-                           Text="{Binding Name}" />
-                <StackPanel Grid.Column="2">
-                    <SelectableTextBlock Opacity="0.8" TextWrapping="Wrap" Text="{Binding Detail}" />
-                    <ItemsControl ItemsSource="{Binding Messages}" IsVisible="{Binding HasMessages}" />
-                </StackPanel>
-            </Grid>
+            <Border Classes="result-row">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Border Grid.Column="0"
+                            Classes="status-badge"
+                            Classes.attention="{Binding IsAttention}"
+                            Classes.failed="{Binding IsFailed}"
+                            Classes.canceled="{Binding IsCanceled}">
+                        <TextBlock Text="{Binding Glyph}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Name}"
+                                   Text="{Binding Name}" />
+                        <SelectableTextBlock FontSize="12"
+                                             Opacity="0.7"
+                                             TextWrapping="Wrap"
+                                             Text="{Binding Detail}" />
+                        <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding Messages}" IsVisible="{Binding HasMessages}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="3" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </DataTemplate>
+
+        <!-- A warning or error: the rule as a chip, then the message. -->
         <DataTemplate DataType="vm:JobMessageRow">
-            <TextBlock Classes="message"
-                       Classes.error="{Binding IsError}"
-                       FontSize="12"
-                       TextWrapping="Wrap"
-                       Text="{Binding Text}" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <Border Grid.Column="0"
+                        Classes="chip large"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top">
+                    <TextBlock Text="{Binding RuleId}" />
+                </Border>
+                <TextBlock Grid.Column="1"
+                           Classes="message"
+                           Classes.error="{Binding IsError}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Text="{Binding Message}" />
+            </Grid>
         </DataTemplate>
     </Window.DataTemplates>
 
@@ -95,28 +228,26 @@
             </Grid>
         </Border>
 
-        <!-- One section per outcome, so each kind is easy to find. -->
-        <ScrollViewer Grid.Row="1"
-                      HorizontalScrollBarVisibility="Disabled"
-                      AutomationProperties.Name="{x:Static res:Strings.JobResultsListName}">
-            <StackPanel Margin="16,12" Spacing="10">
-                <Expander Content="{Binding Completed}">
-                    <Expander.Header>
-                        <TextBlock Classes="group-heading" Text="{Binding Completed.Title}" />
-                    </Expander.Header>
-                </Expander>
-                <Expander Content="{Binding Skipped}">
-                    <Expander.Header>
-                        <TextBlock Classes="group-heading attention" Text="{Binding Skipped.Title}" />
-                    </Expander.Header>
-                </Expander>
-                <Expander Content="{Binding Failed}">
-                    <Expander.Header>
-                        <TextBlock Classes="group-heading failed" Text="{Binding Failed.Title}" />
-                    </Expander.Header>
-                </Expander>
-            </StackPanel>
-        </ScrollViewer>
+        <!-- One tab per outcome, so each kind is easy to find. -->
+        <TabControl Grid.Row="1"
+                    Margin="8,4,8,0"
+                    AutomationProperties.Name="{x:Static res:Strings.JobResultsListName}">
+            <TabItem Content="{Binding Completed}">
+                <TabItem.Header>
+                    <TextBlock Classes="tab-header" Text="{Binding Completed.Title}" />
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding Skipped}">
+                <TabItem.Header>
+                    <TextBlock Classes="tab-header" Classes.attention="{Binding Skipped.HasRows}" Text="{Binding Skipped.Title}" />
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding Failed}">
+                <TabItem.Header>
+                    <TextBlock Classes="tab-header" Classes.failed="{Binding Failed.HasRows}" Text="{Binding Failed.Title}" />
+                </TabItem.Header>
+            </TabItem>
+        </TabControl>
 
         <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
             <Button HorizontalAlignment="Right"
