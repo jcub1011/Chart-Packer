@@ -182,7 +182,7 @@ namespace ChartPacker.Services
             {
                 Title = Strings.DownloadPickerTitle,
                 SuggestedFileName = name,
-                SuggestedStartLocation = await StartFolderAsync(owner, folder),
+                SuggestedStartLocation = await StorageStartFolder.TryGetAsync(owner.StorageProvider, folder),
                 DefaultExtension = extension.Length > 0 ? extension[1..] : null,
                 FileTypeChoices = extension.Length > 0
                     ? [new FilePickerFileType(extension[1..].ToUpperInvariant()) { Patterns = ["*" + extension] }, FilePickerFileTypes.All]
@@ -202,21 +202,9 @@ namespace ChartPacker.Services
             {
                 Title = Strings.DownloadFolderPickerTitle,
                 AllowMultiple = false,
-                SuggestedStartLocation = await StartFolderAsync(owner, folder),
+                SuggestedStartLocation = await StorageStartFolder.TryGetAsync(owner.StorageProvider, folder),
             });
             return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
-        }
-
-        private static async Task<IStorageFolder?> StartFolderAsync(TopLevel owner, string folder)
-        {
-            try
-            {
-                return Directory.Exists(folder) ? await owner.StorageProvider.TryGetFolderFromPathAsync(folder) : null;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-            {
-                return null;
-            }
         }
 
         /// <summary>The name of the folder <paramref name="path"/> is in, for the notice.</summary>

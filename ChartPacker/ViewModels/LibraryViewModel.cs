@@ -279,7 +279,7 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanBrowse))]
         private async Task BrowseAsync()
         {
-            var path = await _folderPicker.PickFolderAsync(Strings.BrowseDialogTitle);
+            var path = await _folderPicker.PickFolderAsync(Strings.BrowseDialogTitle, FolderPath);
             if (path is null)
                 return;
 
@@ -296,7 +296,7 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanBrowse))]
         private async Task BrowseOutputAsync()
         {
-            var path = await _folderPicker.PickFolderAsync(Strings.BrowseOutputDialogTitle);
+            var path = await _folderPicker.PickFolderAsync(Strings.BrowseOutputDialogTitle, EffectiveOutputFolder);
             if (path is null)
                 return;
 

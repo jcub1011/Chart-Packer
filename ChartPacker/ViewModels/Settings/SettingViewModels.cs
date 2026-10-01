@@ -174,7 +174,7 @@ namespace ChartPacker.ViewModels.Settings
         [RelayCommand]
         private async Task BrowseAsync()
         {
-            var path = await folderPicker.PickFolderAsync(definition.PickerTitle ?? definition.Label);
+            var path = await folderPicker.PickFolderAsync(definition.PickerTitle ?? definition.Label, edit.Value);
             if (path is not null)
                 edit.Value = path;
         }

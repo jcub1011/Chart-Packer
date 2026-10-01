@@ -7,7 +7,7 @@ namespace ChartPacker.Services
 {
     public sealed class AvaloniaFolderPickerService(Func<TopLevel?> topLevel) : IFolderPickerService
     {
-        public async Task<string?> PickFolderAsync(string title)
+        public async Task<string?> PickFolderAsync(string title, string? startFolder = null)
         {
             if (topLevel() is not { } owner)
                 return null;
@@ -16,6 +16,7 @@ namespace ChartPacker.Services
             {
                 Title = title,
                 AllowMultiple = false,
+                SuggestedStartLocation = await StorageStartFolder.TryGetAsync(owner.StorageProvider, startFolder),
             });
 
             return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
