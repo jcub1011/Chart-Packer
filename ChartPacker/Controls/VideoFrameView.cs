@@ -30,14 +30,19 @@ namespace ChartPacker.Controls
         private WriteableBitmap? _bitmap;
         private int _version;
         private bool _isFrameRequested;
-        private bool _isInViewport = true;
+        private Rect? _viewport;
 
         static VideoFrameView()
         {
             AffectsRender<VideoFrameView>(PlaybackProperty);
         }
 
-        public VideoFrameView() => EffectiveViewportChanged += (_, e) => _isInViewport = e.EffectiveViewport.Intersects(new Rect(Bounds.Size));
+        public VideoFrameView() => EffectiveViewportChanged += (_, e) => _viewport = e.EffectiveViewport;
+
+        // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
+        // out (hidden, say), it has no size to check, so it's taken to be, lest it's left undrawn once shown in place.
+        private bool IsInViewport =>
+            _viewport is not { } viewport || Bounds.Width <= 0 || Bounds.Height <= 0 || viewport.Intersects(new Rect(Bounds.Size));
 
         /// <summary>The video to draw, or <see langword="null"/> for nothing.</summary>
         public VideoPlayback? Playback
@@ -116,7 +121,7 @@ namespace ChartPacker.Controls
                 return;
 
             // Out of sight, the video isn't asked to keep up, so it isn't decoded; it seeks when it's seen again.
-            if (!IsEffectivelyVisible || !_isInViewport)
+            if (!IsEffectivelyVisible || !IsInViewport)
             {
                 RequestFrame();
                 return;

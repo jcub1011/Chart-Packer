@@ -152,7 +152,7 @@ namespace ChartPacker.Controls
         private readonly Dictionary<(int Index, int State), FormattedText> _words = [];
         private double _spaceWidth = -1;
         private bool _isFrameRequested;
-        private bool _isInViewport = true;
+        private Rect? _viewport;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
 
         // A spoken note's diamond, a unit across from its middle, scaled and moved to each drawn.
@@ -200,12 +200,16 @@ namespace ChartPacker.Controls
 
         public LyricLaneView() => EffectiveViewportChanged += OnEffectiveViewportChanged;
 
-        // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves.
+        // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
+        // out (hidden, say), it has no size to check, so it's taken to be, lest it's left undrawn once shown in place.
+        private bool IsInViewport =>
+            _viewport is not { } viewport || Bounds.Width <= 0 || Bounds.Height <= 0 || viewport.Intersects(new Rect(Bounds.Size));
+
         private void OnEffectiveViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
         {
-            bool wasInViewport = _isInViewport;
-            _isInViewport = e.EffectiveViewport.Intersects(new Rect(Bounds.Size));
-            if (_isInViewport && !wasInViewport)
+            bool wasInViewport = IsInViewport;
+            _viewport = e.EffectiveViewport;
+            if (IsInViewport && !wasInViewport)
                 InvalidateVisual();
         }
 
@@ -427,7 +431,7 @@ namespace ChartPacker.Controls
                 return;
 
             // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view.
-            if (!IsEffectivelyVisible || !_isInViewport)
+            if (!IsEffectivelyVisible || !IsInViewport)
             {
                 RequestFrame();
                 return;

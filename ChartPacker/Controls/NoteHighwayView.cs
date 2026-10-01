@@ -168,7 +168,7 @@ namespace ChartPacker.Controls
         private readonly Dictionary<(Color, double), IPen> _pens = [];
         private readonly Dictionary<string, FormattedText> _labels = [];
         private bool _isFrameRequested;
-        private bool _isInViewport = true;
+        private Rect? _viewport;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
 
         // How brightly each column of the highway being drawn is lit; one for them all, as they're drawn one at a time.
@@ -232,12 +232,16 @@ namespace ChartPacker.Controls
                 RequestFrame();
         }
 
-        // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves.
+        // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
+        // out (hidden, say), it has no size to check, so it's taken to be, lest it's left undrawn once shown in place.
+        private bool IsInViewport =>
+            _viewport is not { } viewport || Bounds.Width <= 0 || Bounds.Height <= 0 || viewport.Intersects(new Rect(Bounds.Size));
+
         private void OnEffectiveViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
         {
-            bool wasInViewport = _isInViewport;
-            _isInViewport = e.EffectiveViewport.Intersects(new Rect(Bounds.Size));
-            if (_isInViewport && !wasInViewport)
+            bool wasInViewport = IsInViewport;
+            _viewport = e.EffectiveViewport;
+            if (IsInViewport && !wasInViewport)
                 InvalidateVisual();
         }
 
@@ -689,7 +693,7 @@ namespace ChartPacker.Controls
                 return;
 
             // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view.
-            if (!IsEffectivelyVisible || !_isInViewport)
+            if (!IsEffectivelyVisible || !IsInViewport)
             {
                 RequestFrame();
                 return;
