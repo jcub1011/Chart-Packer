@@ -1,5 +1,6 @@
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
@@ -55,9 +56,10 @@ public enum MergeKeyRule
 
 /// <summary>A part one source has.</summary>
 /// <param name="Part">The part.</param>
-/// <param name="Difficulties">The difficulties it has notes for, for a part the chart reader models; otherwise empty.</param>
+/// <param name="Difficulties">The difficulties it has notes for, as <see cref="ChartContents.ReadParts"/> reads them; empty for a part without difficulties, such as vocals.</param>
 /// <param name="Difficulty">The source's song.ini difficulty for it (its first key), if it has one.</param>
-public sealed record MergeSourcePart(MidiPart Part, IReadOnlyList<ChartDifficulty> Difficulties, string? Difficulty);
+/// <param name="NoteCounts">Its notes on each difficulty or harmony line, as <see cref="ChartPart.NoteCounts"/>.</param>
+public sealed record MergeSourcePart(MidiPart Part, IReadOnlyList<ChartDifficulty> Difficulties, string? Difficulty, IReadOnlyList<NoteCount> NoteCounts);
 
 /// <summary>A key whose value differs between the sources.</summary>
 /// <param name="Key">The key.</param>
@@ -243,7 +245,7 @@ public sealed class SongMergeAnalysis
     {
         var (_, _, chunks) = MidiFile.ReadChunks(chart.Midi);
         var names = chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.NameOf(chart.Midi, MidiFile.ReadEvents(chart.Midi, c))).OfType<string>().ToList();
-        var document = ChartReader.Read(chart.Midi, ChartFiles.MidiName, chart.Options);
+        var contents = ChartContents.PartsOf(ChartReader.Read(chart.Midi, ChartFiles.MidiName, chart.Options), chart.Midi);
 
         return names
             .Select(MidiPartCatalog.PartOf)
@@ -251,10 +253,16 @@ public sealed class SongMergeAnalysis
             .DistinctBy(p => p.Id)
             .OrderBy(MidiPartCatalog.OrderOf)
             .ThenBy(p => p.Id, StringComparer.Ordinal)
-            .Select(p => new MergeSourcePart(
-                p,
-                p.TrackNames.Where(MidiLayout.TrackNames.ContainsKey).Select(t => MidiLayout.TrackNames[t]).Distinct().SelectMany(document.DifficultiesOf).Distinct().Order().ToList(),
-                p.Keys.Count > 0 ? source.Value(p.Keys[0]) : null))
+            .Select(p =>
+            {
+                var read = contents.GetValueOrDefault(p.Id);
+                var difficulties = read?.Difficulties ?? LibraryDifficulties.None;
+                return new MergeSourcePart(
+                    p,
+                    Enum.GetValues<ChartDifficulty>().Where(d => difficulties.HasFlag((LibraryDifficulties)(1 << (int)d))).ToList(),
+                    p.Keys.Count > 0 ? source.Value(p.Keys[0]) : null,
+                    read?.NoteCounts ?? []);
+            })
             .ToList();
     }
 

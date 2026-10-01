@@ -14,6 +14,9 @@ namespace ChartPacker.ViewModels
     /// <summary>A charted difficulty's letter under an instrument's icon, coloured by <see cref="Difficulty"/>.</summary>
     public sealed record DifficultyLetter(ChartDifficulty Difficulty, string Text);
 
+    /// <summary>A line of an instrument's note counts: a difficulty or harmony line, and how many notes it has.</summary>
+    public sealed record NoteCountRow(string Label, string Count);
+
     /// <summary>One of the difficulties an instrument's flyout offers, coloured by <see cref="Tier"/>.</summary>
     /// <param name="Tier">The tier it sets, or <see langword="null"/> for unset.</param>
     public sealed partial class DifficultyPresetViewModel(int? tier, string text, IRelayCommand command) : ObservableObject
@@ -104,7 +107,14 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial decimal? OtherValue { get; set; }
 
+        /// <summary>The part's notes on each difficulty, hardest first, or harmony line; none when they aren't known.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasNoteCounts))]
+        public partial IReadOnlyList<NoteCountRow> NoteCounts { get; private set; } = [];
+
         public bool HasLetters => Letters.Count > 0;
+
+        public bool HasNoteCounts => NoteCounts.Count > 0;
 
         /// <summary>The selected songs don't all share one value, and not all of them leave it unset.</summary>
         public bool IsDistinct => Row is { IsDistinct: true } && !IsAllUnset;
@@ -136,7 +146,7 @@ namespace ChartPacker.ViewModels
         /// Takes the merged state after the drafts or the chart changed. <paramref name="parts"/> is
         /// <see langword="null"/> when what the chart has isn't known, as for several songs.
         /// </summary>
-        internal void Update(BulkMetadataRow? row, bool isAllUnset, IReadOnlyDictionary<string, LibraryDifficulties>? parts)
+        internal void Update(BulkMetadataRow? row, bool isAllUnset, IReadOnlyDictionary<string, ChartPart>? parts)
         {
             Row = row;
             IsAllUnset = isAllUnset;
@@ -144,18 +154,29 @@ namespace ChartPacker.ViewModels
             {
                 IsCharted = true;
                 Letters = [];
+                NoteCounts = [];
             }
             else
             {
-                var difficulties = LibraryDifficulties.None;
-                bool charted = Slot.PartId is { } part ? parts.TryGetValue(part, out difficulties) : parts.Count > 0;
+                ChartPart? read = null;
+                bool charted = Slot.PartId is { } part ? parts.TryGetValue(part, out read) : parts.Count > 0;
                 IsCharted = charted;
-                var letters = Slot.PartId is null ? [] : Enum.GetValues<ChartDifficulty>()
+                var difficulties = read?.Difficulties ?? LibraryDifficulties.None;
+                var letters = Enum.GetValues<ChartDifficulty>()
                     .Where(d => difficulties.HasFlag((LibraryDifficulties)(1 << (int)d)))
                     .Select(d => new DifficultyLetter(d, ChartLabels.DifficultyLetter(d)))
                     .ToList();
                 if (!letters.SequenceEqual(Letters))
                     Letters = letters;
+
+                // Hardest first; harmony lines in order.
+                var counts = (read?.NoteCounts ?? [])
+                    .OrderByDescending(c => c.Difficulty)
+                    .ThenBy(c => c.Line)
+                    .Select(c => new NoteCountRow(ChartLabels.NoteCountLabel(c), ChartLabels.NoteCountText(c.Count)))
+                    .ToList();
+                if (!counts.SequenceEqual(NoteCounts))
+                    NoteCounts = counts;
             }
 
             // Without the chart's parts, as for several songs, only the value counts.

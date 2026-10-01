@@ -1361,6 +1361,29 @@
     <value>{0}, difficulty {1}</value>
     <comment>{0} is an instrument, {1} its song.ini difficulty, e.g. 'Guitar, difficulty 4'.</comment>
   </data>
+  <data name="NoteCountFormat" xml:space="preserve">
+    <value>{0:N0} notes</value>
+    <comment>{0} is how many notes a difficulty has, more than one, e.g. '1,234 notes'. A chord counts as one note.</comment>
+  </data>
+  <data name="NoteCountOne" xml:space="preserve">
+    <value>1 note</value>
+  </data>
+  <data name="NoteCountVocals" xml:space="preserve">
+    <value>Notes</value>
+    <comment>Labels the note count of a vocal part, which has no difficulties.</comment>
+  </data>
+  <data name="NoteCountHarmonyFormat" xml:space="preserve">
+    <value>Harmony {0}</value>
+    <comment>Labels one harmony line's note count; {0} is the line, 1 to 3.</comment>
+  </data>
+  <data name="NoteCountLineFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>One line of a note count tooltip: {0} is a difficulty or harmony line, {1} its count, e.g. 'Expert: 1,234 notes'.</comment>
+  </data>
+  <data name="MergeNoteCountSeparator" xml:space="preserve">
+    <value> · </value>
+    <comment>Goes between a merge cell's note counts, e.g. '312 · 640 · 980 · 1,234'.</comment>
+  </data>
   <data name="DifficultyTagCoop" xml:space="preserve">
     <value>2P</value>
     <comment>Tag on the co-op guitar's icon. Keep it to 3 characters.</comment>

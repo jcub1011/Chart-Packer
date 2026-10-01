@@ -155,6 +155,17 @@
                 <TextBlock Classes="muted" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left" FontSize="12" Text="{x:Static res:Strings.HighwayFootnote}" />
             </StackPanel>
         </Flyout>
+        <!-- "Expert   1,234 notes": a list's labels line up in a column, for an ItemsControl that's a shared size scope. -->
+        <DataTemplate x:Key="NoteCountRowTemplate" x:DataType="vm:NoteCountRow">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="NoteCountLabel" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Classes="muted" Text="{Binding Label}" />
+                <TextBlock Grid.Column="1" Text="{Binding Count}" />
+            </Grid>
+        </DataTemplate>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -1575,6 +1586,11 @@
                                                            Text="{Binding KeyDescription}"
                                                            IsVisible="{Binding KeyDescription, Converter={x:Static ObjectConverters.IsNotNull}}" />
                                                 <TextBlock TextWrapping="Wrap" Text="{Binding ValueNote}" IsVisible="{Binding HasValueNote}" />
+                                                <ItemsControl Margin="0,4,0,0"
+                                                              Grid.IsSharedSizeScope="True"
+                                                              ItemsSource="{Binding NoteCounts}"
+                                                              ItemTemplate="{StaticResource NoteCountRowTemplate}"
+                                                              IsVisible="{Binding HasNoteCounts}" />
                                                 <TextBlock TextWrapping="Wrap" Classes="muted" Text="{x:Static res:Strings.InstrumentNotCharted}" IsVisible="{Binding !IsCharted}" />
                                             </StackPanel>
                                         </ToolTip.Tip>
@@ -1585,6 +1601,10 @@
                                                         <TextBlock Classes="highwayHeader" Text="{Binding Name}" />
                                                         <TextBlock Classes="muted" FontSize="12" Text="{Binding Key}" />
                                                     </StackPanel>
+                                                    <ItemsControl Grid.IsSharedSizeScope="True"
+                                                                  ItemsSource="{Binding NoteCounts}"
+                                                                  ItemTemplate="{StaticResource NoteCountRowTemplate}"
+                                                                  IsVisible="{Binding HasNoteCounts}" />
                                                     <!-- ? unsets it; 0 to 6 set it, closing the flyout. -->
                                                     <ItemsControl ItemsSource="{Binding Presets}">
                                                         <ItemsControl.ItemsPanel>

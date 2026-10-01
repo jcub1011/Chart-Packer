@@ -75,11 +75,17 @@
                                                  IsEnabled="{Binding IsAvailable}"
                                                  IsVisible="{Binding IsShown}"
                                                  HorizontalAlignment="Stretch"
-                                                 ToolTip.Tip="{Binding PlainText}"
-                                                 AutomationProperties.Name="{Binding PlainText}">
+                                                 ToolTip.Tip="{Binding ToolTip}"
+                                                 AutomationProperties.Name="{Binding ToolTip}">
                                         <StackPanel Spacing="1">
                                             <!-- A value can carry rich-text tags (colours, bold…), which are drawn as the inspector draws them. -->
                                             <TextBlock ctl:RichTextMarkup.Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
+                                            <!-- A part's note counts, under its difficulty letters in the same order. -->
+                                            <TextBlock Classes="muted"
+                                                       FontSize="11"
+                                                       Text="{Binding Counts}"
+                                                       IsVisible="{Binding HasCounts}"
+                                                       TextTrimming="CharacterEllipsis" />
                                             <TextBlock Classes="muted"
                                                        FontSize="11"
                                                        Text="{Binding Detail}"

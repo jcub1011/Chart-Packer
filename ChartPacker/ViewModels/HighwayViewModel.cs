@@ -47,7 +47,7 @@ namespace ChartPacker.ViewModels
         private HighwaySong? _song;
 
         // The parts of a song without a chart; one instance, so setting it again doesn't notify.
-        private static readonly IReadOnlyDictionary<string, LibraryDifficulties> NoParts = new Dictionary<string, LibraryDifficulties>();
+        private static readonly IReadOnlyDictionary<string, ChartPart> NoParts = new Dictionary<string, ChartPart>();
 
         // The chart being shown, by where it's read from, and its bytes once read.
         private string? _sourceKey;
@@ -170,11 +170,11 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// The parts the song's chart has, by <see cref="Core.Merging.MidiPart.Id"/>, with the difficulties
-        /// each has notes for: empty when it has no chart, and <see langword="null"/> while that isn't known,
+        /// each has notes for and how many: empty when it has no chart, and <see langword="null"/> while that isn't known,
         /// as with no song or several, while the chart is read, or when it can't be.
         /// </summary>
         [ObservableProperty]
-        public partial IReadOnlyDictionary<string, LibraryDifficulties>? ChartParts { get; private set; }
+        public partial IReadOnlyDictionary<string, ChartPart>? ChartParts { get; private set; }
 
         /// <summary>
         /// The offset the chart carries itself, which plays as the <c>delay</c> while song.ini sets none: zero for a
@@ -334,9 +334,10 @@ namespace ChartPacker.ViewModels
             _chartName = chart.Name;
             RequestRebuild();
 
-            // Read alongside the rebuild; the parts don't depend on the offsets or pro_drums.
+            // Read alongside the rebuild; the parts don't depend on the offsets or pro_drums. The rebuild
+            // bumps the version, so it's these bytes still being shown that says the parts are current.
             var parts = await Task.Run(() => ChartContents.ReadParts(bytes, chart.Name));
-            if (version == _version && key == _sourceKey)
+            if (key == _sourceKey && ReferenceEquals(bytes, _bytes))
                 ChartParts = parts;
         }
 

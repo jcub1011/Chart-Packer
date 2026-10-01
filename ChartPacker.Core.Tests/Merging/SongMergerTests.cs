@@ -1,6 +1,7 @@
 using System.Text;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Jobs;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Packing;
@@ -42,6 +43,31 @@ public sealed class SongMergerTests
         var drums = analysis.Sources[0].Parts.Single(p => p.Part.Id == "drums");
         Assert.AreEqual("3", drums.Difficulty);
         CollectionAssert.AreEqual(new[] { ChartDifficulty.Expert }, drums.Difficulties.ToArray());
+        CollectionAssert.AreEqual(new[] { new NoteCount(ChartDifficulty.Expert, 0, 2) }, drums.NoteCounts.ToArray());
+    }
+
+    [TestMethod]
+    public async Task AnalysisReadsTheDifficultiesAndNotesOfPartsTheNoteReaderSkips()
+    {
+        var folder = _root.CreateSubdirectory("pro keys");
+        File.WriteAllText(Path.Combine(folder.FullName, "song.ini"), "[song]\nname = Song\n");
+        File.WriteAllBytes(Path.Combine(folder.FullName, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART REAL_KEYS_X").Note(0, 60).Note(480, 62)
+            .Track("PART REAL_KEYS_E").Note(0, 60)
+            .Track("PART VOCALS").Note(0, 60)
+            .Build());
+
+        var analysis = await SongMergeAnalysis.LoadAsync([new SongEntry(SongEntryKind.SongFolder, folder.FullName, folder.Name, folder.Name)]);
+
+        var proKeys = analysis.Sources[0].Parts.Single(p => p.Part.Id == "pro_keys");
+        CollectionAssert.AreEqual(new[] { ChartDifficulty.Easy, ChartDifficulty.Expert }, proKeys.Difficulties.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { new NoteCount(ChartDifficulty.Easy, 0, 1), new NoteCount(ChartDifficulty.Expert, 0, 2) },
+            proKeys.NoteCounts.ToArray());
+        var vocals = analysis.Sources[0].Parts.Single(p => p.Part.Id == "vocals");
+        Assert.IsEmpty(vocals.Difficulties);
+        CollectionAssert.AreEqual(new[] { new NoteCount(null, 0, 1) }, vocals.NoteCounts.ToArray());
     }
 
     [TestMethod]

@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Linq;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Resources;
@@ -37,6 +39,16 @@ namespace ChartPacker.ViewModels
             ChartDifficulty.Hard => Strings.MergeDifficultyHardLetter,
             _ => Strings.MergeDifficultyExpertLetter,
         };
+
+        /// <summary>What <paramref name="count"/> is of: its difficulty, its harmony line, or, for vocals, just notes.</summary>
+        public static string NoteCountLabel(NoteCount count) =>
+            count.Difficulty is { } difficulty ? DifficultyName(difficulty)
+            : count.Line > 0 ? string.Format(CultureInfo.CurrentCulture, Strings.NoteCountHarmonyFormat, count.Line)
+            : Strings.NoteCountVocals;
+
+        /// <summary><paramref name="count"/> notes, e.g. <c>1,234 notes</c>.</summary>
+        public static string NoteCountText(int count) =>
+            count == 1 ? Strings.NoteCountOne : string.Format(CultureInfo.CurrentCulture, Strings.NoteCountFormat, count);
 
         /// <summary>The name of the instrument <paramref name="slot"/> rates, e.g. <c>Pro Drums (PS)</c>.</summary>
         public static string SlotName(DifficultySlot slot) => slot.Key switch

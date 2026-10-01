@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Jobs;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -20,7 +21,9 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartPacker.ViewModels
 {
     /// <summary>One cell of a merge choice: a source, or leaving the thing out.</summary>
-    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true) : ObservableObject
+    /// <param name="counts">A part's note counts, easiest first, e.g. <c>312 · 640 · 980</c>.</param>
+    /// <param name="toolTip">The tooltip, when there's more to it than <see cref="PlainText"/>.</param>
+    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true, string? counts = null, string? toolTip = null) : ObservableObject
     {
 
         /// <summary>The source it takes from; <see langword="null"/> to leave the thing out.</summary>
@@ -35,6 +38,12 @@ namespace ChartPacker.ViewModels
         public string? Detail { get; } = detail;
 
         public bool HasDetail => !string.IsNullOrEmpty(Detail);
+
+        public string? Counts { get; } = counts;
+
+        public bool HasCounts => !string.IsNullOrEmpty(Counts);
+
+        public string ToolTip => toolTip ?? PlainText;
 
         /// <summary>The source has the thing, so it can be chosen.</summary>
         public bool IsAvailable { get; } = isAvailable;
@@ -328,7 +337,8 @@ namespace ChartPacker.ViewModels
 
             foreach (var part in analysis.Parts)
             {
-                var row = Choice(ChartLabels.PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), i => RatingOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut);
+                var row = Choice(ChartLabels.PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), i => RatingOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut,
+                    counts: i => sources[i].Parts.First(p => p.Part.Id == part.Id).NoteCounts);
                 var with = analysis.SourcesWith(part.Id);
                 if (with.Count == 1)
                     row.Select(with[0]);
@@ -356,13 +366,20 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasNoConflicts));
         }
 
-        private MergeChoiceViewModel Choice(string label, string? key, Func<int, bool> available, Func<int, string> text, Func<int, string?>? detail, string? leaveOut)
+        /// <param name="counts">An available cell's note counts, for a part's row.</param>
+        private MergeChoiceViewModel Choice(string label, string? key, Func<int, bool> available, Func<int, string> text, Func<int, string?>? detail, string? leaveOut,
+            Func<int, IReadOnlyList<NoteCount>>? counts = null)
         {
             var row = new MergeChoiceViewModel(label, key);
             for (int i = 0; i < Sources.Count; i++)
             {
                 bool has = available(i);
-                row.Options.Add(new MergeOptionViewModel(row, i, has ? text(i) : Strings.MergeUnavailable, detail?.Invoke(i), has));
+                string shown = has ? text(i) : Strings.MergeUnavailable;
+                var noteCounts = has && counts is not null ? counts(i) : [];
+                bool counted = noteCounts.Count > 0;
+                row.Options.Add(new MergeOptionViewModel(row, i, shown, detail?.Invoke(i), has,
+                    counts: counted ? string.Join(Strings.MergeNoteCountSeparator, noteCounts.Select(c => c.Count.ToString("N0", CultureInfo.CurrentCulture))) : null,
+                    toolTip: counted ? string.Join(Environment.NewLine, [RichText.ToPlainText(shown), .. noteCounts.Select(NoteCountLine)]) : null));
             }
 
             row.Options.Add(leaveOut is null
@@ -788,6 +805,10 @@ namespace ChartPacker.ViewModels
             string letters = string.Join(" ", part.Difficulties.Select(ChartLabels.DifficultyLetter));
             return letters.Length > 0 ? letters : Strings.MergePartPresent;
         }
+
+        /// <summary>A tooltip's line for <paramref name="count"/>, e.g. <c>Expert: 1,234 notes</c>.</summary>
+        private static string NoteCountLine(NoteCount count) =>
+            string.Format(CultureInfo.CurrentCulture, Strings.NoteCountLineFormat, ChartLabels.NoteCountLabel(count), ChartLabels.NoteCountText(count.Count));
 
         /// <summary>The source's song.ini rating for the part, which comes along with it.</summary>
         private static string? RatingOf(MergeSource source, string partId) =>
