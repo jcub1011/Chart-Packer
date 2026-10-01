@@ -343,7 +343,8 @@
         <Style Selector="Button.offset PathIcon, StackPanel.timing PathIcon">
             <Setter Property="Width" Value="14" />
             <Setter Property="Height" Value="14" />
-        </Style>        <Style Selector="TextBlock.highwayHeader">
+        </Style>
+        <Style Selector="TextBlock.highwayHeader">
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Opacity" Value="0.7" />
         </Style>
@@ -760,8 +761,8 @@
                                             </StackPanel>
                                         </ToggleSplitButton>
                                     </Panel>
-                                    <!-- The video's offset, in a flyout of its own so the caption stays short; only while the one
-                                         selected song's video is shown. Focusable, so a click on its empty space or a label (or Enter
+                                    <!-- The video's offset, in a flyout of its own so the caption stays short; only while one song
+                                         is selected and it has a video, whether or not the video is what's shown. Focusable, so a click on its empty space or a label (or Enter
                                          in the box) can take focus from the box without closing the flyout. -->
                                     <Button Grid.Column="4"
                                             Classes="offset"
@@ -788,8 +789,8 @@
                                                                        Value="{Binding VideoOffset.Offset}"
                                                                        IsEnabled="{Binding VideoOffset.CanEdit}"
                                                                        Increment="1"
-                                                                       Minimum="-2147483648"
-                                                                       Maximum="2147483647"
+                                                                       Minimum="{Binding VideoOffset.MinOffset}"
+                                                                       Maximum="{Binding VideoOffset.MaxOffset}"
                                                                        FormatString="+0;-0;0"
                                                                        AutomationProperties.Name="{x:Static res:Strings.VideoOffsetName}">
                                                             <ToolTip.Tip>
@@ -1086,8 +1087,8 @@
                                                Value="{Binding AudioOffset.Offset}"
                                                IsEnabled="{Binding AudioOffset.CanEdit}"
                                                Increment="1"
-                                               Minimum="-2147483648"
-                                               Maximum="2147483647"
+                                               Minimum="{Binding AudioOffset.MinOffset}"
+                                               Maximum="{Binding AudioOffset.MaxOffset}"
                                                FormatString="+0;-0;0"
                                                ToolTip.ShowOnDisabled="True"
                                                AutomationProperties.Name="{x:Static res:Strings.AudioOffsetName}">

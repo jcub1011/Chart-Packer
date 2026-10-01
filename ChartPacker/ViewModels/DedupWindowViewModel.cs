@@ -50,6 +50,9 @@ namespace ChartPacker.ViewModels
         private int _permanentCount;
         private int _problemCount;
 
+        // Set while a whole tab is marked, so the tab's count is taken once rather than for every copy.
+        private bool _isMarking;
+
         /// <param name="request">The songs to compare, and where a merge writes.</param>
         /// <param name="drafted">The songs with unsaved metadata edits, which are never deleted.</param>
         /// <param name="settings">Holds the keep preference.</param>
@@ -275,23 +278,19 @@ namespace ChartPacker.ViewModels
 
         /// <summary>Marks every copy on the Exact tab that isn't being kept.</summary>
         [RelayCommand(CanExecute = nameof(CanMarkAll))]
-        private void MarkAll()
-        {
-            foreach (var member in ExactGroups.SelectMany(g => g.Members).Where(m => m.CanMark))
-                member.IsMarked = true;
-        }
+        private void MarkAll() => Mark(DedupTier.Exact, ExactGroups);
 
         private bool CanMarkAll() => IsReady && CanDelete && ExactGroups.Count > 0;
 
         /// <summary>Deletes every marked copy on the Exact tab.</summary>
         [RelayCommand(CanExecute = nameof(CanDeleteExact))]
-        private Task DeleteExactAsync() => DeleteAsync([.. ExactGroups.Where(g => g.MarkedCount > 0).SelectMany(g => g.PlanDeletion())]);
+        private Task DeleteExactAsync() => DeleteMarkedAsync(ExactGroups);
 
-        private bool CanDeleteExact() => IsReady && CanDelete && ExactMarkedCount > 0;
+        private bool CanDeleteExact() => CanDeleteMarked(ExactMarkedCount);
 
         /// <summary>Marks every copy of a merged group on the Same chart tab.</summary>
         [RelayCommand(CanExecute = nameof(CanMarkMergedSameChart))]
-        private void MarkMergedSameChart() => MarkMerged(SameChartGroups);
+        private void MarkMergedSameChart() => Mark(DedupTier.SameChart, SameChartGroups.Where(g => g.HasMerged));
 
         private bool CanMarkMergedSameChart() => CanMarkMerged(SameChartGroups);
 
@@ -299,11 +298,11 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanDeleteSameChart))]
         private Task DeleteSameChartAsync() => DeleteMarkedAsync(SameChartGroups);
 
-        private bool CanDeleteSameChart() => IsReady && CanDelete && SameChartMarkedCount > 0;
+        private bool CanDeleteSameChart() => CanDeleteMarked(SameChartMarkedCount);
 
         /// <summary>Marks every source of a merged group on the Merge tab.</summary>
         [RelayCommand(CanExecute = nameof(CanMarkMergedMerge))]
-        private void MarkMergedMerge() => MarkMerged(MergeGroups);
+        private void MarkMergedMerge() => Mark(DedupTier.MergeCandidate, MergeGroups.Where(g => g.HasMerged));
 
         private bool CanMarkMergedMerge() => CanMarkMerged(MergeGroups);
 
@@ -311,15 +310,28 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanDeleteMerge))]
         private Task DeleteMergeAsync() => DeleteMarkedAsync(MergeGroups);
 
-        private bool CanDeleteMerge() => IsReady && CanDelete && MergeMarkedCount > 0;
+        private bool CanDeleteMerge() => CanDeleteMarked(MergeMarkedCount);
 
-        private static void MarkMerged(IEnumerable<DedupGroupViewModel> groups)
+        /// <summary>Marks every copy in <paramref name="groups"/>, all on <paramref name="tier"/>'s tab, that can be; the tab's count follows once, after.</summary>
+        private void Mark(DedupTier tier, IEnumerable<DedupGroupViewModel> groups)
         {
-            foreach (var member in groups.Where(g => g.HasMerged).SelectMany(g => g.Members).Where(m => m.CanMark))
-                member.IsMarked = true;
+            _isMarking = true;
+            try
+            {
+                foreach (var member in groups.SelectMany(g => g.Members).Where(m => m.CanMark))
+                    member.IsMarked = true;
+            }
+            finally
+            {
+                _isMarking = false;
+            }
+
+            OnMarksChanged(tier);
         }
 
         private bool CanMarkMerged(IEnumerable<DedupGroupViewModel> groups) => IsReady && CanDelete && groups.Any(g => g.HasMerged);
+
+        private bool CanDeleteMarked(int markedCount) => IsReady && CanDelete && markedCount > 0;
 
         private Task DeleteMarkedAsync(IEnumerable<DedupGroupViewModel> groups) => DeleteAsync([.. groups.Where(g => g.MarkedCount > 0).SelectMany(g => g.PlanDeletion())]);
 
@@ -468,15 +480,32 @@ namespace ChartPacker.ViewModels
                 }
             }
 
-            OnMarksChanged();
+            OnMarksChanged(DedupTier.Exact);
+            OnMarksChanged(DedupTier.SameChart);
+            OnMarksChanged(DedupTier.MergeCandidate);
         }
 
-        /// <summary>A mark changed somewhere; each tab's count follows.</summary>
-        internal void OnMarksChanged()
+        /// <summary>
+        /// A mark changed on <paramref name="tier"/>'s tab; its count follows. While <see cref="Mark"/> marks a whole tab,
+        /// it's counted once at the end rather than for each copy.
+        /// </summary>
+        internal void OnMarksChanged(DedupTier tier)
         {
-            ExactMarkedCount = ExactGroups.Sum(g => g.MarkedCount);
-            SameChartMarkedCount = SameChartGroups.Sum(g => g.MarkedCount);
-            MergeMarkedCount = MergeGroups.Sum(g => g.MarkedCount);
+            if (_isMarking)
+                return;
+
+            switch (tier)
+            {
+                case DedupTier.Exact:
+                    ExactMarkedCount = ExactGroups.Sum(g => g.MarkedCount);
+                    break;
+                case DedupTier.SameChart:
+                    SameChartMarkedCount = SameChartGroups.Sum(g => g.MarkedCount);
+                    break;
+                case DedupTier.MergeCandidate:
+                    MergeMarkedCount = MergeGroups.Sum(g => g.MarkedCount);
+                    break;
+            }
         }
 
         /// <summary>Stops a deletion after the copy it's on; otherwise closes the window.</summary>

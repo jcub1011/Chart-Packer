@@ -19,7 +19,7 @@ public sealed record VideoTimeline(TimeSpan Start, TimeSpan? End, bool Loop)
     private const string LoopKey = "video_loop";
 
     // Kept well inside TimeSpan, so adding a song time to it can't overflow.
-    private static readonly long MaxMilliseconds = TimeSpan.FromDays(365).Ticks / TimeSpan.TicksPerMillisecond;
+    internal static readonly long MaxMilliseconds = TimeSpan.FromDays(365).Ticks / TimeSpan.TicksPerMillisecond;
 
     /// <summary>No offset, no end and no loop: the video plays alongside the song.</summary>
     public static VideoTimeline Default { get; } = new(TimeSpan.Zero, null, false);

@@ -142,10 +142,13 @@ public static class SongChartSettings
         return ParseDelay(First(pairs, "delay")) is { } ms ? TimeSpan.FromMilliseconds(ms) : chartOffset ?? TimeSpan.Zero;
     }
 
+    /// <summary>The furthest a <c>delay</c> can be either way, in milliseconds, and still be read: just under a day.</summary>
+    internal const long MaxDelayMilliseconds = 86_399_999;
+
     /// <summary>A <c>delay</c> value in milliseconds, or <see langword="null"/> when it isn't one.</summary>
     internal static long? ParseDelay(string? value) =>
         long.TryParse(value, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out long ms)
-        && Math.Abs(ms) < 86_400_000
+        && Math.Abs(ms) <= MaxDelayMilliseconds
             ? ms
             : null;
 

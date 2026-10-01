@@ -1,3 +1,5 @@
+using System.Globalization;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 
 namespace ChartPacker.Core.Tests.Metadata;
@@ -92,6 +94,53 @@ public sealed class TimingOffsetsTests
 
         Assert.AreEqual(100, TimingOffsets.OffsetOf(TimingOffsets.AudioKey, original, drafted, chartOffset));
         Assert.AreEqual(-100, TimingOffsets.OffsetOf(TimingOffsets.AudioKey, drafted, original, chartOffset));
+    }
+
+    [TestMethod]
+    public void AnAudioOffsetPastTheLimitSetsTheFurthestDelayThatsStillRead()
+    {
+        KeyValuePair<string, string>[] original = [P("delay", "0")];
+        var draft = new MetadataDraft();
+
+        TimingOffsets.Set(draft, TimingOffsets.AudioKey, original, TimeSpan.Zero, 100_000_000);
+
+        var drafted = draft.ApplyTo(original);
+        Assert.AreEqual("-86399999", drafted.Single(p => p.Key == "delay").Value);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(-86_399_999), SongChartSettings.DelayOf(drafted, TimeSpan.FromMilliseconds(500)));
+        Assert.AreEqual(86_399_999, TimingOffsets.OffsetOf(TimingOffsets.AudioKey, original, drafted, TimeSpan.Zero));
+    }
+
+    [TestMethod]
+    public void AVideoOffsetPastTheLimitSetsTheFurthestStartThatsStillRead()
+    {
+        long max = (long)TimeSpan.FromDays(365).TotalMilliseconds;
+        KeyValuePair<string, string>[] original = [P("video_start_time", (-max + 10).ToString(CultureInfo.InvariantCulture))];
+        var draft = new MetadataDraft();
+
+        TimingOffsets.Set(draft, TimingOffsets.VideoKey, original, TimeSpan.Zero, 50);
+
+        var drafted = draft.ApplyTo(original);
+        Assert.AreEqual((-max).ToString(CultureInfo.InvariantCulture), drafted.Single(p => p.Key == "video_start_time").Value);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(-max), VideoTimeline.From(drafted).Start);
+        Assert.AreEqual(10, TimingOffsets.OffsetOf(TimingOffsets.VideoKey, original, drafted, TimeSpan.Zero));
+    }
+
+    [TestMethod]
+    public void TheRangeIsTheOffsetsThatLeaveTheKeyReadable()
+    {
+        KeyValuePair<string, string>[] original = [P("delay", "100")];
+
+        Assert.AreEqual((100 - 86_399_999, 100 + 86_399_999), TimingOffsets.RangeOf(TimingOffsets.AudioKey, original, TimeSpan.Zero));
+        Assert.AreEqual((int.MinValue, int.MaxValue), TimingOffsets.RangeOf(TimingOffsets.VideoKey, original, TimeSpan.Zero));
+    }
+
+    [TestMethod]
+    public void TheRangeAlwaysHoldsZero()
+    {
+        // An unset delay counts as the chart's own offset, which needn't be one a delay can be.
+        var range = TimingOffsets.RangeOf(TimingOffsets.AudioKey, [], TimeSpan.FromDays(2));
+
+        Assert.IsTrue(range.Min <= 0 && range.Max >= 0, $"{range} doesn't hold zero.");
     }
 
     [TestMethod]

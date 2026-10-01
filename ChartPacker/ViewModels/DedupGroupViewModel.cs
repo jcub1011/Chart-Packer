@@ -396,7 +396,7 @@ namespace ChartPacker.ViewModels
         internal void OnMarksChanged()
         {
             MarkedCount = Members.Count(m => m.IsMarked);
-            _owner.OnMarksChanged();
+            _owner.OnMarksChanged(Tier);
         }
 
         internal void RefreshCommands()

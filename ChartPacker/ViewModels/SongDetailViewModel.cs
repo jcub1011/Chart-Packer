@@ -167,7 +167,7 @@ namespace ChartPacker.ViewModels
                     RemoveBackgroundCommand.NotifyCanExecuteChanged();
                 else if (e.PropertyName == nameof(BackgroundViewModel.ShownFile))
                     DownloadBackgroundCommand.NotifyCanExecuteChanged();
-                else if (e.PropertyName == nameof(BackgroundViewModel.HasVideo))
+                else if (e.PropertyName == nameof(BackgroundViewModel.HasVideoKind))
                 {
                     OnPropertyChanged(nameof(ShowVideoOffset));
                     RefreshTimingOffsetsEditable();
@@ -423,8 +423,11 @@ namespace ChartPacker.ViewModels
         /// <summary>One song is selected, so its tracks, chart and other files are shown.</summary>
         public bool ShowSongFiles => !IsBulk;
 
-        /// <summary>The background's offset button is shown: one song is selected, and its video is.</summary>
-        public bool ShowVideoOffset => ShowSongFiles && Background.HasVideo;
+        /// <summary>
+        /// The background's offset button is shown: one song is selected, and it has a video. It needn't be the one
+        /// shown, or be able to play, as the offset only sets a song.ini key.
+        /// </summary>
+        public bool ShowVideoOffset => ShowSongFiles && Background.HasVideoKind;
 
         public bool ShowNoOtherFiles => !IsBulk && Files.Count == 0;
 
@@ -1455,12 +1458,18 @@ namespace ChartPacker.ViewModels
             foreach (var song in _songs)
                 _drafts.NotifyChanged(song.Entry.FullPath);
             RebuildRows();
-            Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
-            Highway.Refresh(HighwaySongOf());
-            Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
+            RefreshPlayback();
 
             // The delay moves the chart's last note, and the video's start moves its end.
             RefreshSongLength();
+        }
+
+        /// <summary>The background, the highway and the lyrics, which play the selected songs as they're drafted, follow the drafts.</summary>
+        private void RefreshPlayback()
+        {
+            Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
+            Highway.Refresh(HighwaySongOf());
+            Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
         }
 
         /// <summary>Shows the one selected song's audio and video offsets, as its draft has its timing keys.</summary>
@@ -1489,12 +1498,12 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// The audio and video offsets can be changed, as the highway's can. The delay only moves a chart, so the
-        /// audio's needs one read; the video's needs a video shown.
+        /// audio's needs one read; the video's needs the song to have a video, shown or not.
         /// </summary>
         private void RefreshTimingOffsetsEditable()
         {
             AudioOffset.CanEdit = CanEditOffsets() && Highway.ChartOffset is not null;
-            VideoOffset.CanEdit = CanEditOffsets() && Background.HasVideo;
+            VideoOffset.CanEdit = CanEditOffsets() && Background.HasVideoKind;
         }
 
         private void Apply(LoadedSelection loaded)
@@ -1741,9 +1750,7 @@ namespace ChartPacker.ViewModels
             }
 
             (ArtFileName, ArtFileSize) = keys is [not null] ? SharedArtFile() : (null, null);
-            Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
-            Highway.Refresh(HighwaySongOf());
-            Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
+            RefreshPlayback();
             SyncTimingOffsets();
             RebuildFiles();
             OnPropertyChanged(nameof(IsArtChanged));

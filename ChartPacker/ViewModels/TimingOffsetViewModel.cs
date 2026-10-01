@@ -19,7 +19,6 @@ namespace ChartPacker.ViewModels
     {
         private MetadataDraft? _draft;
         private IReadOnlyList<KeyValuePair<string, string>> _original = [];
-        private IReadOnlyList<KeyValuePair<string, string>> _drafted = [];
         private TimeSpan _fallback;
 
         // Set while the offset is changed from here, so that doesn't read as the user changing it.
@@ -43,6 +42,14 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(RevertOffsetCommand))]
         public partial bool CanEdit { get; set; }
 
+        /// <summary>The lowest offset the box takes: past it, the key would be a value it isn't read as.</summary>
+        [ObservableProperty]
+        public partial decimal MinOffset { get; set; } = int.MinValue;
+
+        /// <summary>The highest offset the box takes, as <see cref="MinOffset"/> is the lowest.</summary>
+        [ObservableProperty]
+        public partial decimal MaxOffset { get; set; } = int.MaxValue;
+
         public bool HasOffset => Offset is { } offset && offset != 0;
 
         public string? Marker => HasOffset ? "*" : null;
@@ -56,11 +63,14 @@ namespace ChartPacker.ViewModels
         {
             _draft = draft;
             _original = original;
-            _drafted = drafted;
             _fallback = fallback;
             _isSyncing = true;
             try
             {
+                // The limits first, so the box doesn't hold the offset to the last song's.
+                (int min, int max) = draft is null ? (int.MinValue, int.MaxValue) : TimingOffsets.RangeOf(Key, original, fallback);
+                MinOffset = min;
+                MaxOffset = max;
                 Offset = draft is null ? 0 : TimingOffsets.OffsetOf(Key, original, drafted, fallback);
             }
             finally
@@ -74,20 +84,20 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanRevertOffset))]
         private void RevertOffset() => Offset = 0;
 
-        // No limit of its own, as a song can be off by any amount; only what the offset, in whole milliseconds, can hold.
+        // No limit of its own, as a song can be off by any amount; only what the key can be read as.
         partial void OnOffsetChanged(decimal? value)
         {
             if (_isSyncing || _draft is not { } draft)
                 return;
 
-            // The box is disabled then; this puts back a value that got in anyway.
+            // The box is disabled then; this puts back a value that got in anyway, as the draft has it now.
             if (!CanEdit)
             {
-                Sync(draft, _original, _drafted, _fallback);
+                Sync(draft, _original, draft.ApplyTo(_original), _fallback);
                 return;
             }
 
-            TimingOffsets.Set(draft, Key, _original, _fallback, (int)Math.Round(Math.Clamp(value ?? 0, int.MinValue, int.MaxValue)));
+            TimingOffsets.Set(draft, Key, _original, _fallback, (int)Math.Round(Math.Clamp(value ?? 0, MinOffset, MaxOffset)));
             OffsetChanged?.Invoke(this, EventArgs.Empty);
         }
     }

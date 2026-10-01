@@ -40,24 +40,53 @@ public static class TimingOffsets
     /// Changes <paramref name="key"/> in <paramref name="draft"/> so that it plays <paramref name="milliseconds"/>
     /// later than <paramref name="original"/> has it; zero forgets the change, leaving the key as it's stored.
     /// </summary>
+    /// <remarks>
+    /// The key is kept within what it can be read as, so an offset past <see cref="RangeOf"/> sets the furthest one
+    /// it can; further, the key would read as unset.
+    /// </remarks>
     /// <param name="fallback">What the key counts as when it isn't set: for <c>delay</c>, the chart's own offset.</param>
     public static void Set(MetadataDraft draft, string key, IReadOnlyList<KeyValuePair<string, string>> original, TimeSpan fallback, int milliseconds)
     {
         ArgumentNullException.ThrowIfNull(draft);
         ArgumentNullException.ThrowIfNull(original);
         if (milliseconds == 0)
+        {
             draft.Revert(key);
-        else
-            draft.Set(key, (ValueOf(key, original, fallback) - milliseconds).ToString(CultureInfo.InvariantCulture));
+            return;
+        }
+
+        long limit = LimitOf(key);
+        long value = Math.Clamp(ValueOf(key, original, fallback) - milliseconds, -limit, limit);
+        draft.Set(key, value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// The offsets <see cref="Set"/> can make to <paramref name="key"/> against <paramref name="original"/>, in
+    /// milliseconds: those that leave the key a value it's read as. Zero is always one.
+    /// </summary>
+    /// <param name="fallback">What the key counts as when it isn't set: for <c>delay</c>, the chart's own offset.</param>
+    public static (int Min, int Max) RangeOf(string key, IReadOnlyList<KeyValuePair<string, string>> original, TimeSpan fallback)
+    {
+        ArgumentNullException.ThrowIfNull(original);
+        long limit = LimitOf(key);
+        long value = ValueOf(key, original, fallback);
+        return ((int)Math.Clamp(Math.Min(0, value - limit), int.MinValue, int.MaxValue),
+            (int)Math.Clamp(Math.Max(0, value + limit), int.MinValue, int.MaxValue));
     }
 
     /// <summary><paramref name="key"/>'s value in <paramref name="pairs"/>, in milliseconds, read as the game reads it.</summary>
     private static long ValueOf(string key, IReadOnlyList<KeyValuePair<string, string>> pairs, TimeSpan fallback)
     {
         string? value = SongChartSettings.First(pairs, key);
-        long? ms = key.Equals(AudioKey, StringComparison.OrdinalIgnoreCase) ? SongChartSettings.ParseDelay(value)
-            : key.Equals(VideoKey, StringComparison.OrdinalIgnoreCase) ? VideoTimeline.ParseMilliseconds(value)
-            : throw new ArgumentException($"'{key}' isn't a timing key.", nameof(key));
+        long? ms = IsAudio(key) ? SongChartSettings.ParseDelay(value) : VideoTimeline.ParseMilliseconds(value);
         return ms ?? (long)Math.Round(fallback.TotalMilliseconds);
     }
+
+    /// <summary>The furthest <paramref name="key"/> can be either way, in milliseconds, and still be read.</summary>
+    private static long LimitOf(string key) => IsAudio(key) ? SongChartSettings.MaxDelayMilliseconds : VideoTimeline.MaxMilliseconds;
+
+    private static bool IsAudio(string key) =>
+        key.Equals(AudioKey, StringComparison.OrdinalIgnoreCase) ? true
+        : key.Equals(VideoKey, StringComparison.OrdinalIgnoreCase) ? false
+        : throw new ArgumentException($"'{key}' isn't a timing key.", nameof(key));
 }

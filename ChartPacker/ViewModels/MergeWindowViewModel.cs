@@ -420,14 +420,31 @@ namespace ChartPacker.ViewModels
                 Assets[2].Selected?.Source);
 
             // Checked here, not only when the preview is next staged, so a merge straight after a change can't take them.
-            var offsets = PreviewOffsets().Where(p => OffsetApplies(p.Key, plan)).ToDictionary(p => p.Key, p => p.Value);
+            var timing = TimingOf(plan);
+            var offsets = PreviewOffsets().Where(p => OffsetApplies(p.Key, plan, timing)).ToDictionary(p => p.Key, p => p.Value);
             var (audioOffset, videoOffset) = PreviewTimingOffsets();
             return plan with
             {
                 ChartOffsets = offsets.Count > 0 ? offsets : null,
-                AudioOffset = AudioOffsetApplies(plan) ? audioOffset : 0,
-                VideoOffset = VideoOffsetApplies(plan) ? videoOffset : 0,
+                AudioOffset = AudioOffsetApplies(plan, timing) ? audioOffset : 0,
+                VideoOffset = VideoOffsetApplies(plan, timing) ? videoOffset : 0,
             };
+        }
+
+        /// <summary>
+        /// Whether <paramref name="plan"/> stages the <c>delay</c> and the <c>video_start_time</c> as <see cref="_previewed"/>
+        /// did: an offset set against one that has since changed, as by choosing another source's value for it, no
+        /// longer means what it did.
+        /// </summary>
+        private (bool SameDelay, bool SameVideoStart) TimingOf(SongMergePlan plan)
+        {
+            if (_previewed is not { } previewed)
+                return (false, false);
+
+            var before = SongMerger.BuildMetadata(previewed);
+            var after = SongMerger.BuildMetadata(plan);
+            return (TimingOffsets.OffsetOf(TimingOffsets.AudioKey, before, after, TimeSpan.Zero) == 0,
+                TimingOffsets.OffsetOf(TimingOffsets.VideoKey, before, after, TimeSpan.Zero) == 0);
         }
 
         /// <summary>The offsets set on the preview's highway, against <see cref="_previewed"/>.</summary>
@@ -449,13 +466,20 @@ namespace ChartPacker.ViewModels
                 TimingOffsets.OffsetOf(TimingOffsets.VideoKey, staged, drafted, TimeSpan.Zero));
         }
 
-        /// <summary>Whether the audio offset set on the preview still lines the audio up in <paramref name="plan"/>: it's the same audio against the same base chart.</summary>
-        private bool AudioOffsetApplies(SongMergePlan plan) =>
-            _previewed is { } previewed && previewed.BaseSource == plan.BaseSource && previewed.AudioSource == plan.AudioSource;
+        /// <summary>
+        /// Whether the audio offset set on the preview still lines the audio up in <paramref name="plan"/>: it's the same
+        /// audio against the same base chart, with the same <c>delay</c>.
+        /// </summary>
+        private bool AudioOffsetApplies(SongMergePlan plan, (bool SameDelay, bool SameVideoStart) timing) =>
+            _previewed is { } previewed && previewed.BaseSource == plan.BaseSource && previewed.AudioSource == plan.AudioSource && timing.SameDelay;
 
-        /// <summary>Whether the video offset set on the preview still lines the video up in <paramref name="plan"/>: it's the same video against the same audio.</summary>
-        private bool VideoOffsetApplies(SongMergePlan plan) =>
-            _previewed is { } previewed && plan.VideoSource is not null && previewed.VideoSource == plan.VideoSource && previewed.AudioSource == plan.AudioSource;
+        /// <summary>
+        /// Whether the video offset set on the preview still lines the video up in <paramref name="plan"/>: it's the same
+        /// video against the same audio, with the same <c>video_start_time</c>.
+        /// </summary>
+        private bool VideoOffsetApplies(SongMergePlan plan, (bool SameDelay, bool SameVideoStart) timing) =>
+            _previewed is { } previewed && plan.VideoSource is not null && previewed.VideoSource == plan.VideoSource && previewed.AudioSource == plan.AudioSource
+            && timing.SameVideoStart;
 
         /// <summary>
         /// The preview's draft holds its audio and video offsets as changes to the keys of the song it was staged as;
@@ -476,11 +500,11 @@ namespace ChartPacker.ViewModels
         /// <summary>
         /// Whether an offset set on the preview still lines <paramref name="key"/> up in <paramref name="plan"/>:
         /// its part comes from the same song as when it was set, against the same audio and the same base
-        /// chart, whose tempo map and <c>delay</c> the notes are placed by.
+        /// chart, whose tempo map the notes are placed by, and with the same <c>delay</c>, which places them all.
         /// </summary>
-        private bool OffsetApplies(ChartTrackKey key, SongMergePlan plan)
+        private bool OffsetApplies(ChartTrackKey key, SongMergePlan plan, (bool SameDelay, bool SameVideoStart) timing)
         {
-            if (_previewed is not { } previewed || previewed.BaseSource != plan.BaseSource || previewed.AudioSource != plan.AudioSource)
+            if (_previewed is not { } previewed || previewed.BaseSource != plan.BaseSource || previewed.AudioSource != plan.AudioSource || !timing.SameDelay)
                 return false;
 
             foreach (var part in plan.Analysis.Parts.Where(p => MidiPartCatalog.InstrumentsOf(p).Contains(key.Instrument)))
@@ -711,8 +735,8 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Drops the highway offsets that no longer apply to <paramref name="plan"/>: those of a part now
-        /// taken from another song, or left out, and all of them when the audio or base chart changed.
-        /// They were set to line the chart as it was up with the audio as it was.
+        /// taken from another song, or left out, and all of them when the audio, the base chart or the
+        /// <c>delay</c> changed. They were set to line the chart as it was up with the audio as it was.
         /// </summary>
         private void ForgetStaleOffsets(SongMergePlan plan)
         {
@@ -720,7 +744,8 @@ namespace ChartPacker.ViewModels
                 return;
 
             var draft = previewDrafts.Get(folder);
-            foreach (var key in draft.ChartOffsets.Keys.Where(k => !OffsetApplies(k, plan)).ToList())
+            var timing = TimingOf(plan);
+            foreach (var key in draft.ChartOffsets.Keys.Where(k => !OffsetApplies(k, plan, timing)).ToList())
                 draft.SetChartOffset(key, 0);
         }
 

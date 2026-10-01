@@ -180,7 +180,18 @@ namespace ChartPacker.Controls
             decimal value = Math.Clamp(from + amount, box.Minimum, box.Maximum);
             if (box.Value != value)
                 box.Value = value;
+
+            // Typed past a limit, the value is already held at it, so setting it again wouldn't show it; the text is
+            // put to it instead, as the box puts it once the typing is done.
+            else if (from != value)
+                box.Text = TextOf(box, value);
         }
+
+        /// <summary><paramref name="value"/> as <paramref name="box"/> shows one, by its format string.</summary>
+        private static string TextOf(NumericUpDown box, decimal value) =>
+            box.FormatString.Contains("{0", StringComparison.Ordinal)
+                ? string.Format(box.NumberFormat, box.FormatString, value)
+                : value.ToString(box.FormatString, box.NumberFormat);
 
         private static void OnBoxPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
         {
