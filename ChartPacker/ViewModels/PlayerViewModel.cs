@@ -456,7 +456,8 @@ namespace ChartPacker.ViewModels
         /// <summary>Why there's no length yet, while there isn't; otherwise no tool tip.</summary>
         public string? LengthToolTip => IsLengthKnown ? null : Strings.LengthPendingToolTip;
 
-        public string PlayPauseToolTip => IsPlaying ? Strings.PauseToolTip : Strings.PlayToolTip;
+        /// <summary>What the play button does now, with Space, which does the same from anywhere in the window.</summary>
+        public string PlayPauseToolTip => IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip;
 
         /// <summary>
         /// Shows <paramref name="tracks"/> of <paramref name="entry"/>. When they're the tracks

@@ -632,6 +632,12 @@
   <data name="PauseToolTip" xml:space="preserve">
     <value>Pause</value>
   </data>
+  <data name="PlayShortcutToolTip" xml:space="preserve">
+    <value>Play (Space)</value>
+  </data>
+  <data name="PauseShortcutToolTip" xml:space="preserve">
+    <value>Pause (Space)</value>
+  </data>
   <data name="StopToolTip" xml:space="preserve">
     <value>Stop and go back to the start</value>
   </data>

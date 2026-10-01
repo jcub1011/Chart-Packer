@@ -17,6 +17,12 @@ namespace ChartPacker.Views
         // How far the wheel has turned with Ctrl held towards the next step, in notches.
         private double _wheelNotches;
 
+        // The window whose Space plays and pauses, while the panel is in it.
+        private TopLevel? _keysFrom;
+
+        // Space played or paused and hasn't been let go yet, so its auto-repeat doesn't toggle again.
+        private bool _isSpaceHeld;
+
         public SongDetailView()
         {
             InitializeComponent();
@@ -54,6 +60,53 @@ namespace ChartPacker.Views
                 scrubbed.AddHandler(PointerWheelChangedEvent, OnScrubWheel, RoutingStrategies.Tunnel);
 
             AddHandler(PointerPressedEvent, OnPointerPressedAnywhere, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
+
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            _keysFrom = TopLevel.GetTopLevel(this);
+            _keysFrom?.AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+            _keysFrom?.AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            _keysFrom?.RemoveHandler(KeyDownEvent, OnWindowKeyDown);
+            _keysFrom?.RemoveHandler(KeyUpEvent, OnWindowKeyUp);
+            _keysFrom = null;
+            _isSpaceHeld = false;
+            base.OnDetachedFromVisualTree(e);
+        }
+
+        /// <summary>
+        /// Space anywhere in the window plays or pauses the song shown, once a press however long it's held. Tunnelled,
+        /// so a focused button or list plays rather than taking it. Not while a text box has focus: it types a space there,
+        /// as typing reaches a box as text rather than as the key, which a key binding would also have caught.
+        /// </summary>
+        private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None || !IsEffectivelyVisible
+                || _keysFrom?.FocusManager?.GetFocusedElement() is TextBox
+                || Player is not { } player || !player.PlayPauseCommand.CanExecute(null))
+                return;
+
+            e.Handled = true;
+            if (_isSpaceHeld)
+                return;
+
+            _isSpaceHeld = true;
+            player.PlayPauseCommand.Execute(null);
+        }
+
+        /// <summary>Letting go of a Space that played or paused, so the focused control doesn't see half a press.</summary>
+        private void OnWindowKeyUp(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Space || !_isSpaceHeld)
+                return;
+
+            _isSpaceHeld = false;
+            e.Handled = true;
         }
 
         /// <summary>
