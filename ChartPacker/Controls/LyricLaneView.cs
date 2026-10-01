@@ -103,13 +103,14 @@ namespace ChartPacker.Controls
     /// Each frame the screen is drawn it reads <see cref="Clock"/>, so the lane follows the audio
     /// whether it's playing, paused or being dragged. <see cref="TimeShift"/> moves the whole part in
     /// time without the scene being built again. Behind the notes it can draw a track's <see cref="Waveform"/>.
-    /// <para>While the pointer is over it, it shows the whole part instead, squeezed into its width from the start at the
-    /// left to <see cref="LengthSeconds"/> at the right, with the phrase under the pointer written out. Pressing on it and
-    /// dragging scrubs: from <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>, <see cref="Scrubbed"/> says where to,
-    /// and the owner seeks when it ends, as it does for <see cref="WaveformView"/>.</para>
-    /// <para>While Ctrl is held the lane goes on scrolling with the audio, and a drag is fine: left moves the audio later,
-    /// as if pulling the words along, by <see cref="FineSecondsPerPixel"/> for each pixel, rather than following the pointer
-    /// across the whole part, with the pointer held still. A press with Ctrl held leaves the audio where it is.</para>
+    /// <para>Pressing on it and dragging scrubs: from <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>,
+    /// <see cref="Scrubbed"/> says where to, and the owner seeks when it ends, as it does for <see cref="WaveformView"/>. A drag
+    /// grabs the words: left moves the audio later, as far as the words scroll for it, as if pulling them along. With Ctrl
+    /// held it's fine, <see cref="FineScrubFactor"/> times less far. Either way the pointer is held still, so a drag can
+    /// go on as far as it needs, and a press leaves the audio where it is.</para>
+    /// <para>While Shift is held (and not Ctrl) over it, it fades to the whole part instead, squeezed into its width from the
+    /// start at the left to <see cref="LengthSeconds"/> at the right, with the phrase under the pointer written out, and a
+    /// press or a drag follows the pointer across it.</para>
     /// </summary>
     /// <example><c>&lt;ctl:LyricLaneView Scene="{Binding Lyrics.Scene}" Clock="{Binding Lyrics.Clock}" TimeShift="{Binding Lyrics.TimeShift}" Waveform="{Binding Lyrics.Waveform}" /&gt;</c></example>
     public sealed class LyricLaneView : Control
@@ -132,8 +133,8 @@ namespace ChartPacker.Controls
         public static readonly StyledProperty<double> LengthSecondsProperty =
             AvaloniaProperty.Register<LyricLaneView, double>(nameof(LengthSeconds));
 
-        public static readonly StyledProperty<double> FineSecondsPerPixelProperty =
-            AvaloniaProperty.Register<LyricLaneView, double>(nameof(FineSecondsPerPixel), LaneScrub.DefaultFineSecondsPerPixel);
+        public static readonly StyledProperty<double> FineScrubFactorProperty =
+            AvaloniaProperty.Register<LyricLaneView, double>(nameof(FineScrubFactor), LaneScrub.DefaultFineFactor);
 
         // Where the now line sits, as a fraction of the width from the left.
         private const double NowFraction = 0.2;
@@ -176,13 +177,15 @@ namespace ChartPacker.Controls
         private Rect? _viewport;
         private TimeSpan _drawnAt = TimeSpan.MinValue;
 
-        // Whether the whole part is shown, for the pointer over the lane, and how far across it the pointer is; NaN for not.
+        // How far across the lane the pointer is, where the whole part is scrubbed to while Shift is held; NaN for not over it.
         private double _hoverX = double.NaN;
         private bool _isScrubbing;
 
-        // Ctrl is held over the lane, or while scrubbing: it scrolls with the audio, and a drag is fine, moving the audio by
-        // how far the pointer goes, holding it still.
-        private readonly LaneFineScrub _fine;
+        // Whether Ctrl is held over the lane, or while scrubbing, making a drag fine, or Shift, showing the whole part.
+        private readonly LaneScrubMode _mode;
+
+        // How far the lane has faded to the whole part.
+        private readonly OverviewFade _fade = new();
 
         // The whole part's notes as last laid out, and the words of the phrase last written out under the pointer.
         private OverviewMarks? _overview;
@@ -251,15 +254,15 @@ namespace ChartPacker.Controls
         }
 
         /// <summary>How far a pixel dragged with Ctrl held moves the audio, in seconds, whatever the song's length.</summary>
-        public double FineSecondsPerPixel
+        public double FineScrubFactor
         {
-            get => GetValue(FineSecondsPerPixelProperty);
-            set => SetValue(FineSecondsPerPixelProperty, value);
+            get => GetValue(FineScrubFactorProperty);
+            set => SetValue(FineScrubFactorProperty, value);
         }
 
         public LyricLaneView()
         {
-            _fine = new LaneFineScrub(this, () => !double.IsNaN(_hoverX) || _isScrubbing);
+            _mode = new LaneScrubMode(this, () => !double.IsNaN(_hoverX) || _isScrubbing);
             EffectiveViewportChanged += OnEffectiveViewportChanged;
         }
 
@@ -298,14 +301,14 @@ namespace ChartPacker.Controls
             base.OnAttachedToVisualTree(e);
             RequestFrame();
 
-            // Ctrl pressed or let go with the pointer over the lane, or while scrubbing, shows it scrolling or the whole part at once.
-            _fine.Attach();
+            // Shift pressed or let go with the pointer over the lane, or while scrubbing, shows the whole part at once or it scrolling.
+            _mode.Attach();
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
-            _fine.Detach();
+            _mode.Detach();
         }
 
         public override void Render(DrawingContext context)
@@ -317,12 +320,28 @@ namespace ChartPacker.Controls
             // The time read for this frame, rather than reading the clock again.
             var clock = _drawnAt != TimeSpan.MinValue ? _drawnAt : Clock?.Invoke() ?? TimeSpan.Zero;
             double wordBand = scene.WordTimes.Length > 0 ? WordFontSize * 1.9 : 0;
-            if (!double.IsNaN(_hoverX) && !_fine.IsFine)
+
+            // Fading between them, each is drawn see-through, so one shows through the other.
+            double overview = _fade.Opacity;
+            if (overview < 1)
             {
-                DrawOverview(context, scene, bounds, clock.TotalSeconds, wordBand);
-                return;
+                using (context.PushOpacity(1 - overview))
+                    DrawScrolling(context, scene, bounds, clock, wordBand);
             }
 
+            if (overview > 0)
+            {
+                using (context.PushOpacity(overview))
+                    DrawOverview(context, scene, bounds, clock.TotalSeconds, wordBand);
+            }
+        }
+
+        /// <summary>Whether the lane is to show the whole part: Shift is held over it, or while it's scrubbed.</summary>
+        private bool IsOverviewShown => !double.IsNaN(_hoverX) && _mode.IsOverview;
+
+        /// <summary>The lane as it scrolls with the audio, at <paramref name="clock"/>: its phrases, notes and words, and the now line.</summary>
+        private void DrawScrolling(DrawingContext context, LyricScene scene, Rect bounds, TimeSpan clock, double wordBand)
+        {
             // Drawing the part later is drawing it at an earlier moment of the scene's own time.
             double now = (clock - TimeShift).TotalSeconds;
             double nowX = bounds.Width * NowFraction;
@@ -433,7 +452,7 @@ namespace ChartPacker.Controls
         /// <summary>
         /// The whole part, from the start at the left to the end of the song at the right, as it's heard: its phrases, its
         /// notes as thin bars at their pitch, and the words of the phrase under the pointer; what's been played shaded, a line
-        /// where the audio is, and one where the pointer is.
+        /// where the audio is, and one where the pointer is, or was last, so it fades out with the rest once the pointer has gone.
         /// </summary>
         /// <param name="now">Where the audio is, in seconds: <see cref="TimeShift"/> not taken off.</param>
         private void DrawOverview(DrawingContext context, LyricScene scene, Rect bounds, double now, double wordBand)
@@ -443,7 +462,7 @@ namespace ChartPacker.Controls
             double X(double sceneTime) => (sceneTime + shift) / timeline * bounds.Width;
             double noteTop = Padding;
             double noteBottom = bounds.Height - wordBand - Padding;
-            double hover = Math.Clamp(_hoverX, 0, bounds.Width);
+            double hover = double.IsNaN(_fade.PointerAt) ? 0 : Math.Clamp(_fade.PointerAt, 0, bounds.Width);
             int phrase = PhraseAt(scene, TimeAt(hover) - shift);
 
             using (context.PushClip(bounds))
@@ -565,27 +584,32 @@ namespace ChartPacker.Controls
         {
             base.OnPointerMoved(e);
             var point = e.GetPosition(this);
-            _fine.Set(e.KeyModifiers);
+            _mode.Set(e.KeyModifiers);
             SetHover(point.X);
             if (_isScrubbing)
                 Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
         }
 
         /// <summary>
-        /// Where a drag to <paramref name="point"/> moves the audio: the time there across the whole part, or while it's fine,
-        /// on from where the audio is by how far left the pointer has gone since it last moved, holding the pointer still.
+        /// Where a drag to <paramref name="point"/> moves the audio: with the whole part shown, the time there across it;
+        /// otherwise on from where the audio is by how far left the pointer has gone since it last moved, as far as the lane
+        /// scrolls for it, or while it's fine, <see cref="FineScrubFactor"/> times less far; either way holding the pointer still.
         /// </summary>
         private double ScrubTimeAt(Point point)
         {
-            if (!_fine.IsFine || Scene is not { } scene)
+            if (_mode.IsOverview || Scene is not { } scene)
             {
-                _fine.Stop();
+                _mode.Stop();
                 return TimeAt(point.X);
             }
 
             double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
-            return Math.Clamp(now - (_fine.Move(point).X * FineSecondsPerPixel), 0, TimelineOf(scene));
+            double perPixel = _mode.IsFine ? GrabSecondsPerPixel / Math.Max(1, FineScrubFactor) : GrabSecondsPerPixel;
+            return Math.Clamp(now - (_mode.Move(point).X * perPixel), 0, TimelineOf(scene));
         }
+
+        /// <summary>How far the lane scrolls in a pixel, in seconds, so a drag moves the words as far as the pointer goes.</summary>
+        private double GrabSecondsPerPixel => Bounds.Width > 0 ? Math.Max(0.5, WindowSeconds) / (Bounds.Width * (1 - NowFraction)) : 0;
 
         protected override void OnPointerExited(PointerEventArgs e)
         {
@@ -601,17 +625,17 @@ namespace ChartPacker.Controls
                 return;
 
             var point = e.GetPosition(this);
-            _fine.Set(e.KeyModifiers);
+            _mode.Set(e.KeyModifiers);
             SetHover(point.X);
             _isScrubbing = true;
             e.Pointer.Capture(this);
             ScrubStarted?.Invoke(this, EventArgs.Empty);
 
-            // A press with Ctrl held starts a fine drag from where the audio is.
-            if (_fine.IsFine)
-                _fine.Start(point);
-            else
+            // A press on the whole part moves the audio there; otherwise it starts a drag from where the audio is.
+            if (_mode.IsOverview)
                 Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.X)));
+            else
+                _mode.Start(point);
             e.Handled = true;
         }
 
@@ -622,12 +646,12 @@ namespace ChartPacker.Controls
                 return;
 
             var point = e.GetPosition(this);
-            _fine.Set(e.KeyModifiers);
+            _mode.Set(e.KeyModifiers);
             Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
             e.Pointer.Capture(null);
             EndScrub();
 
-            // Let go off the lane, it goes back to the words scrolling by.
+            // Let go off the lane, it stops showing the whole part.
             SetHover(new Rect(Bounds.Size).Contains(point) ? point.X : double.NaN);
             e.Handled = true;
         }
@@ -644,11 +668,11 @@ namespace ChartPacker.Controls
                 return;
 
             _isScrubbing = false;
-            _fine.Stop();
+            _mode.Stop();
             ScrubEnded?.Invoke(this, EventArgs.Empty);
         }
 
-        /// <summary>Shows the whole part with the pointer <paramref name="x"/> across it; NaN shows the lane as it scrolls.</summary>
+        /// <summary>Takes the pointer to be <paramref name="x"/> across the lane, which shows the whole part while Shift is held; NaN for not over it.</summary>
         private void SetHover(double x)
         {
             if (x == _hoverX || (double.IsNaN(x) && double.IsNaN(_hoverX)))
@@ -657,6 +681,8 @@ namespace ChartPacker.Controls
             if (double.IsNaN(x) != double.IsNaN(_hoverX))
                 Cursor = double.IsNaN(x) ? null : LaneScrub.HandCursor;
             _hoverX = x;
+            if (!double.IsNaN(x))
+                _fade.PointerAt = x;
             InvalidateVisual();
         }
 
@@ -749,21 +775,24 @@ namespace ChartPacker.Controls
             topLevel.RequestAnimationFrame(OnFrame);
         }
 
-        private void OnFrame(TimeSpan _)
+        private void OnFrame(TimeSpan frame)
         {
             _isFrameRequested = false;
             if (TopLevel.GetTopLevel(this) is null)
                 return;
 
-            // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view.
+            // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view, where a fade to or
+            // from the whole part is put where it's going.
             if (!IsEffectivelyVisible || !IsInViewport)
             {
+                _fade.Finish(IsOverviewShown);
                 RequestFrame();
                 return;
             }
 
+            bool isFading = _fade.Step(IsOverviewShown, frame);
             var clock = Clock?.Invoke() ?? TimeSpan.Zero;
-            if (clock != _drawnAt)
+            if (clock != _drawnAt || isFading)
             {
                 _drawnAt = clock;
                 InvalidateVisual();

@@ -94,13 +94,14 @@ namespace ChartPacker.Controls
     /// above the bottom. Each frame the screen is drawn it reads <see cref="Clock"/>, so the notes
     /// follow the audio whether it's playing, paused or being dragged. Behind each highway's notes it
     /// can draw a track's <see cref="Waveforms"/>, falling with them.
-    /// <para>While the pointer is over a highway, that one shows its whole chart instead, squeezed into its height from the
-    /// start at the bottom to <see cref="LengthSeconds"/> at the top. Pressing on it and dragging scrubs: from
-    /// <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>, <see cref="Scrubbed"/> says where to, and the owner seeks
-    /// when it ends, as it does for <see cref="WaveformView"/>.</para>
-    /// <para>While Ctrl is held the highway goes on showing the notes falling, and a drag is fine: down moves the audio
-    /// later, as if pulling the notes down, by <see cref="FineSecondsPerPixel"/> for each pixel, rather than following the
-    /// pointer up the whole chart, with the pointer held still. A press with Ctrl held leaves the audio where it is.</para>
+    /// <para>Pressing on a highway and dragging scrubs: from <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>,
+    /// <see cref="Scrubbed"/> says where to, and the owner seeks when it ends, as it does for <see cref="WaveformView"/>. A drag
+    /// grabs the notes: down moves the audio later, as far as the notes fall for it, as if pulling them down. With Ctrl held
+    /// it's fine, <see cref="FineScrubFactor"/> times less far. Either way the pointer is held still, so a drag can go
+    /// on as far as it needs, and a press leaves the audio where it is.</para>
+    /// <para>While Shift is held (and not Ctrl) over a highway, that one fades to its whole chart instead, squeezed into its
+    /// height from the start at the bottom to <see cref="LengthSeconds"/> at the top, and a press or a drag follows the
+    /// pointer up it.</para>
     /// </summary>
     /// <example><c>&lt;ctl:NoteHighwayView Scene="{Binding Highway.Scene}" Clock="{Binding Highway.Clock}" LookAhead="{Binding Highway.LookAhead}" Waveforms="{Binding Highway.LaneWaveforms}" /&gt;</c></example>
     public sealed class NoteHighwayView : Control
@@ -123,8 +124,8 @@ namespace ChartPacker.Controls
         public static readonly StyledProperty<double> LengthSecondsProperty =
             AvaloniaProperty.Register<NoteHighwayView, double>(nameof(LengthSeconds));
 
-        public static readonly StyledProperty<double> FineSecondsPerPixelProperty =
-            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(FineSecondsPerPixel), LaneScrub.DefaultFineSecondsPerPixel);
+        public static readonly StyledProperty<double> FineScrubFactorProperty =
+            AvaloniaProperty.Register<NoteHighwayView, double>(nameof(FineScrubFactor), LaneScrub.DefaultFineFactor);
 
         // Where the strike line sits, as a fraction of the height from the top; the instrument's name sits below it.
         private const double StrikeFraction = 0.87;
@@ -199,18 +200,20 @@ namespace ChartPacker.Controls
         // A cymbal's shape for each size of gem, at the origin, moved to each gem drawn.
         private readonly Dictionary<Size, StreamGeometry> _cymbals = [];
 
-        // The highway the pointer is over, drawn as its whole chart, and how far down it the pointer is; -1 and NaN for
-        // none. While scrubbing it stays the highway the press was on.
+        // The highway the pointer is over, drawn as its whole chart while Shift is held, and how far down it the pointer is;
+        // -1 and NaN for none. While scrubbing it stays the highway the press was on.
         private int _hoveredLane = -1;
         private double _hoverY = double.NaN;
         private bool _isScrubbing;
 
-        // Ctrl is held over a highway, or while scrubbing: it shows the notes falling, and a drag is fine, moving the audio by
-        // how far the pointer goes, holding it still.
-        private readonly LaneFineScrub _fine;
+        // Whether Ctrl is held over a highway, or while scrubbing, making a drag fine, or Shift, showing its whole chart.
+        private readonly LaneScrubMode _mode;
 
-        // The whole-chart marks of the highway last drawn that way, and what they were laid out for.
-        private OverviewMarks? _overview;
+        // How far each highway, by its index, has faded to its whole chart; one fading out as another fades in, both are drawn.
+        private readonly List<OverviewFade> _fades = [];
+
+        // Each highway's whole-chart marks, as last laid out, and what they were laid out for.
+        private readonly Dictionary<HighwayLane, OverviewMarks> _overviews = [];
 
         static NoteHighwayView()
         {
@@ -278,15 +281,15 @@ namespace ChartPacker.Controls
         }
 
         /// <summary>How far a pixel dragged with Ctrl held moves the audio, in seconds, whatever the song's length.</summary>
-        public double FineSecondsPerPixel
+        public double FineScrubFactor
         {
-            get => GetValue(FineSecondsPerPixelProperty);
-            set => SetValue(FineSecondsPerPixelProperty, value);
+            get => GetValue(FineScrubFactorProperty);
+            set => SetValue(FineScrubFactorProperty, value);
         }
 
         public NoteHighwayView()
         {
-            _fine = new LaneFineScrub(this, () => _hoveredLane >= 0 || _isScrubbing);
+            _mode = new LaneScrubMode(this, () => _hoveredLane >= 0 || _isScrubbing);
             EffectiveViewportChanged += OnEffectiveViewportChanged;
         }
 
@@ -294,7 +297,10 @@ namespace ChartPacker.Controls
         {
             base.OnPropertyChanged(change);
             if (change.Property == SceneProperty)
-                _overview = null;
+            {
+                _overviews.Clear();
+                _fades.Clear();
+            }
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
 
@@ -322,14 +328,14 @@ namespace ChartPacker.Controls
             base.OnAttachedToVisualTree(e);
             RequestFrame();
 
-            // Ctrl pressed or let go with the pointer over a highway, or while scrubbing, shows the notes falling or the whole chart at once.
-            _fine.Attach();
+            // Shift pressed or let go with the pointer over a highway, or while scrubbing, shows the whole chart or the notes falling.
+            _mode.Attach();
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
-            _fine.Detach();
+            _mode.Detach();
         }
 
         public override void Render(DrawingContext context)
@@ -361,15 +367,34 @@ namespace ChartPacker.Controls
 
                 // Transparent, so the whole highway takes the pointer, and the gaps between them don't.
                 context.DrawRectangle(Brushes.Transparent, null, bounds);
-                if (i == _hoveredLane && !_fine.IsFine)
+
+                // Fading between them, each is drawn see-through, so one shows through the other.
+                var fade = FadeOf(i);
+                double overview = fade.Opacity;
+                if (overview < 1)
                 {
-                    DrawOverview(context, scene.Lanes[i], bounds, now);
-                    continue;
+                    var waveform = waveforms is not null && i < waveforms.Count ? waveforms[i] : null;
+                    using (context.PushOpacity(1 - overview))
+                        DrawHighway(context, scene, scene.Lanes[i], waveform, bounds, strike, gem, now, from, to, Y);
                 }
 
-                var waveform = waveforms is not null && i < waveforms.Count ? waveforms[i] : null;
-                DrawHighway(context, scene, scene.Lanes[i], waveform, bounds, strike, gem, now, from, to, Y);
+                if (overview > 0)
+                {
+                    using (context.PushOpacity(overview))
+                        DrawOverview(context, scene.Lanes[i], bounds, now, fade.PointerAt);
+                }
             }
+        }
+
+        /// <summary>Whether the <paramref name="index"/>th highway is to show its whole chart: Shift is held over it, or while it's scrubbed.</summary>
+        private bool IsOverviewShown(int index) => index == _hoveredLane && _mode.IsOverview;
+
+        /// <summary>How far the <paramref name="index"/>th highway has faded to its whole chart.</summary>
+        private OverviewFade FadeOf(int index)
+        {
+            while (_fades.Count <= index)
+                _fades.Add(new OverviewFade());
+            return _fades[index];
         }
 
         /// <summary>
@@ -406,9 +431,10 @@ namespace ChartPacker.Controls
 
         /// <summary>
         /// A highway as its whole chart, from the start at the bottom to the end of the song at the top: the notes as small
-        /// marks in their lanes, what's been played shaded, a line where the audio is, and one where the pointer is.
+        /// marks in their lanes, what's been played shaded, a line where the audio is, and one where the pointer is, or was
+        /// last, <paramref name="pointerAt"/> down it.
         /// </summary>
-        private void DrawOverview(DrawingContext context, HighwayLane lane, Rect bounds, double now)
+        private void DrawOverview(DrawingContext context, HighwayLane lane, Rect bounds, double now, double pointerAt)
         {
             double timeline = Math.Max(0.1, Scene is { } scene ? TimelineOf(scene) : 0);
             double Y(double time) => bounds.Bottom - (time / timeline * bounds.Height);
@@ -434,9 +460,9 @@ namespace ChartPacker.Controls
                 context.DrawLine(LaneScrub.PlayheadPen, new Point(bounds.X, playhead), new Point(bounds.Right, playhead));
                 context.DrawRectangle(null, OverviewEdgePen, bounds.Deflate(0.5));
 
-                if (!double.IsNaN(_hoverY))
+                if (!double.IsNaN(pointerAt))
                 {
-                    double at = Math.Clamp(_hoverY, bounds.Top, bounds.Bottom);
+                    double at = Math.Clamp(pointerAt, bounds.Top, bounds.Bottom);
                     context.DrawLine(LaneScrub.HoverPen, new Point(bounds.X, at), new Point(bounds.Right, at));
                     LaneScrub.DrawTimeTag(context, TimeAt(at), bounds, at, isAcross: true);
                 }
@@ -454,7 +480,7 @@ namespace ChartPacker.Controls
         /// </summary>
         private List<(Rect Rect, Color Color)> OverviewMarksOf(HighwayLane lane, Size size, double timeline)
         {
-            if (_overview is { } known && ReferenceEquals(known.Lane, lane) && known.Size == size && known.Timeline == timeline)
+            if (_overviews.TryGetValue(lane, out var known) && known.Size == size && known.Timeline == timeline)
                 return known.Marks;
 
             const double GemHeight = 2;
@@ -515,7 +541,7 @@ namespace ChartPacker.Controls
                 (column < 0 ? bars : gems).Add((GemMark(column, run.Top, run.Bottom), run.Color));
 
             List<(Rect, Color)> marks = [.. bars, .. tails, .. gems];
-            _overview = new OverviewMarks(lane, size, timeline, marks);
+            _overviews[lane] = new OverviewMarks(lane, size, timeline, marks);
             return marks;
         }
 
@@ -527,7 +553,7 @@ namespace ChartPacker.Controls
         {
             base.OnPointerMoved(e);
             var point = e.GetPosition(this);
-            _fine.Set(e.KeyModifiers);
+            _mode.Set(e.KeyModifiers);
             if (_isScrubbing)
             {
                 SetHover(_hoveredLane, point.Y);
@@ -539,20 +565,25 @@ namespace ChartPacker.Controls
         }
 
         /// <summary>
-        /// Where a drag to <paramref name="point"/> moves the audio: the time there up the whole chart, or while it's fine, on
-        /// from where the audio is by how far down the pointer has gone since it last moved, holding the pointer still.
+        /// Where a drag to <paramref name="point"/> moves the audio: with the whole chart shown, the time there up it; otherwise
+        /// on from where the audio is by how far down the pointer has gone since it last moved, as far as the notes falling
+        /// move for it, or while it's fine, <see cref="FineScrubFactor"/> times less far; either way holding the pointer still.
         /// </summary>
         private double ScrubTimeAt(Point point)
         {
-            if (!_fine.IsFine || Scene is not { } scene)
+            if (_mode.IsOverview || Scene is not { } scene)
             {
-                _fine.Stop();
+                _mode.Stop();
                 return TimeAt(point.Y);
             }
 
             double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
-            return Math.Clamp(now + (_fine.Move(point).Y * FineSecondsPerPixel), 0, TimelineOf(scene));
+            double perPixel = _mode.IsFine ? GrabSecondsPerPixel / Math.Max(1, FineScrubFactor) : GrabSecondsPerPixel;
+            return Math.Clamp(now + (_mode.Move(point).Y * perPixel), 0, TimelineOf(scene));
         }
+
+        /// <summary>How far the notes falling move in a pixel, in seconds, so a drag moves the notes as far as the pointer goes.</summary>
+        private double GrabSecondsPerPixel => Bounds.Height > 0 ? Math.Max(0.1, LookAhead) / (Bounds.Height * StrikeFraction) : 0;
 
         protected override void OnPointerExited(PointerEventArgs e)
         {
@@ -570,16 +601,16 @@ namespace ChartPacker.Controls
                 return;
 
             SetHover(lane, point.Y);
-            _fine.Set(e.KeyModifiers);
+            _mode.Set(e.KeyModifiers);
             _isScrubbing = true;
             e.Pointer.Capture(this);
             ScrubStarted?.Invoke(this, EventArgs.Empty);
 
-            // A press with Ctrl held starts a fine drag from where the audio is.
-            if (_fine.IsFine)
-                _fine.Start(point);
-            else
+            // A press on the whole chart moves the audio there; otherwise it starts a drag from where the audio is.
+            if (_mode.IsOverview)
                 Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.Y)));
+            else
+                _mode.Start(point);
             e.Handled = true;
         }
 
@@ -590,12 +621,12 @@ namespace ChartPacker.Controls
                 return;
 
             var point = e.GetPosition(this);
-            _fine.Set(e.KeyModifiers);
+            _mode.Set(e.KeyModifiers);
             Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
             e.Pointer.Capture(null);
             EndScrub();
 
-            // Let go off the highway, it goes back to the notes falling.
+            // Let go off the highway, it stops showing the whole chart.
             SetHover(HighwayAt(point), point.Y);
             e.Handled = true;
         }
@@ -612,11 +643,14 @@ namespace ChartPacker.Controls
                 return;
 
             _isScrubbing = false;
-            _fine.Stop();
+            _mode.Stop();
             ScrubEnded?.Invoke(this, EventArgs.Empty);
         }
 
-        /// <summary>Shows <paramref name="lane"/>'s whole chart, with the pointer <paramref name="y"/> down it; -1 shows none.</summary>
+        /// <summary>
+        /// Takes the pointer to be over <paramref name="lane"/>, <paramref name="y"/> down it, which shows its whole chart while
+        /// Shift is held; -1 for none.
+        /// </summary>
         private void SetHover(int lane, double y)
         {
             if (lane < 0)
@@ -628,6 +662,8 @@ namespace ChartPacker.Controls
                 Cursor = lane >= 0 ? LaneScrub.HandCursor : null;
             _hoveredLane = lane;
             _hoverY = y;
+            if (lane >= 0)
+                FadeOf(lane).PointerAt = y;
             InvalidateVisual();
         }
 
@@ -1030,21 +1066,28 @@ namespace ChartPacker.Controls
             topLevel.RequestAnimationFrame(OnFrame);
         }
 
-        private void OnFrame(TimeSpan _)
+        private void OnFrame(TimeSpan frame)
         {
             _isFrameRequested = false;
             if (TopLevel.GetTopLevel(this) is null)
                 return;
 
-            // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view.
+            // Paused, nothing moves, so nothing is redrawn; nor is it while it's scrolled out of view, where a highway fading
+            // to or from its whole chart is put where it's going.
             if (!IsEffectivelyVisible || !IsInViewport)
             {
+                for (int i = 0; i < _fades.Count; i++)
+                    _fades[i].Finish(IsOverviewShown(i));
                 RequestFrame();
                 return;
             }
 
+            bool isFading = false;
+            for (int i = 0; i < _fades.Count; i++)
+                isFading |= _fades[i].Step(IsOverviewShown(i), frame);
+
             var clock = Clock?.Invoke() ?? TimeSpan.Zero;
-            if (clock != _drawnAt)
+            if (clock != _drawnAt || isFading)
             {
                 _drawnAt = clock;
                 InvalidateVisual();

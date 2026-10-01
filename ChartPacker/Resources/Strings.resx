@@ -2103,14 +2103,28 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>A choice of Ctrl+scroll step.</comment>
   </data>
   <data name="FineScrubSpeedLabel" xml:space="preserve">
-    <value>Ctrl+drag speed</value>
+    <value>Seek bar Ctrl+drag speed</value>
   </data>
   <data name="FineScrubSpeedDescription" xml:space="preserve">
-    <value>How far the song moves for each pixel dragged with Ctrl held on the seek bar, a highway or the lyrics, the same however long the song is.</value>
+    <value>How far the song moves for each pixel dragged with Ctrl held on the seek bar, the same however long the song is.</value>
   </data>
   <data name="FineScrubSpeedKeywords" xml:space="preserve">
-    <value>ctrl control drag fine scrub seek slow precise speed pixel</value>
+    <value>ctrl control drag fine scrub seek slow precise speed pixel waveform</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="LaneFineScrubLabel" xml:space="preserve">
+    <value>Highway and lyrics Ctrl+drag</value>
+  </data>
+  <data name="LaneFineScrubDescription" xml:space="preserve">
+    <value>How many times finer a drag with Ctrl held is than a plain drag on a highway or the lyrics.</value>
+  </data>
+  <data name="LaneFineScrubKeywords" xml:space="preserve">
+    <value>ctrl control drag fine scrub slow precise speed highway lyrics vocals notes lane</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="LaneFineScrubFormat" xml:space="preserve">
+    <value>{0:0}× finer</value>
+    <comment>The highway and lyrics Ctrl+drag setting's value: {0} is how many times less far a Ctrl+drag moves the song than a plain drag.</comment>
   </data>
   <data name="SeekBarScrubToolTip" xml:space="preserve">
     <value>Click or drag to seek</value>
@@ -2121,19 +2135,27 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>A line of the seek bar's tooltip.</comment>
   </data>
   <data name="HighwayScrubToolTip" xml:space="preserve">
-    <value>Drag to scrub through the chart</value>
-    <comment>First line of a highway's tooltip; the Ctrl hints follow on lines of their own.</comment>
+    <value>Drag to move through the notes</value>
+    <comment>First line of a highway's tooltip; the Shift and Ctrl hints follow on lines of their own.</comment>
+  </data>
+  <data name="HighwayOverviewToolTip" xml:space="preserve">
+    <value>Hold Shift to see the whole chart, and drag to scrub through it</value>
+    <comment>A line of a highway's tooltip.</comment>
   </data>
   <data name="HighwayFineScrubToolTip" xml:space="preserve">
-    <value>Hold Ctrl to see the notes as they play, and drag to scrub finely</value>
+    <value>Ctrl+drag to scrub finely</value>
     <comment>A line of a highway's tooltip.</comment>
   </data>
   <data name="LyricsScrubToolTip" xml:space="preserve">
-    <value>Drag to scrub through the vocals</value>
-    <comment>First line of the lyrics lane's tooltip; the Ctrl hints follow on lines of their own.</comment>
+    <value>Drag to move through the lyrics</value>
+    <comment>First line of the lyrics lane's tooltip; the Shift and Ctrl hints follow on lines of their own.</comment>
+  </data>
+  <data name="LyricsOverviewToolTip" xml:space="preserve">
+    <value>Hold Shift to see the whole part, and drag to scrub through it</value>
+    <comment>A line of the lyrics lane's tooltip.</comment>
   </data>
   <data name="LyricsFineScrubToolTip" xml:space="preserve">
-    <value>Hold Ctrl to see the lyrics as they're sung, and drag to scrub finely</value>
+    <value>Ctrl+drag to scrub finely</value>
     <comment>A line of the lyrics lane's tooltip.</comment>
   </data>
   <data name="ScrubStepToolTipFormat" xml:space="preserve">

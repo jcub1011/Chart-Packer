@@ -913,14 +913,14 @@
                                     </StackPanel>
                                     <!-- The chart's notes over whatever the background is, as a game draws them, unless the
                                          settings put them in their own row below the lyrics. A highway under the pointer shows
-                                         its whole chart, to scrub through. -->
+                                         its whole chart while Shift is held, to scrub through. -->
                                     <ctl:NoteHighwayView x:Name="HighwayOverlayView"
                                                          Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
                                                          Waveforms="{Binding Highway.LaneWaveforms}"
                                                          LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                         FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                         FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
                                                          ToolTip.Tip="{Binding Player.HighwayScrubToolTip}"
                                                          IsVisible="{Binding Highway.IsShownOverBackground}" />
                                 </Panel>
@@ -931,7 +931,7 @@
                     <TextBlock Classes="error" Text="{Binding BackgroundError}" IsVisible="{Binding HasBackgroundError}" />
 
                     <!-- The one selected song's vocals as a karaoke lane, in step with the audio, shown while it has
-                         a vocals track or vocals in its chart. Captioned and edited like the art. While the pointer is
+                         a vocals track or vocals in its chart. Captioned and edited like the art. While Shift is held
                          over the lane it shows the whole part, to scrub through. -->
                     <DockPanel Margin="0,16,0,0" IsVisible="{Binding Lyrics.IsVisible}">
                         <!-- The name, which gives way on a narrow panel, with its actions beside it, then the offset at the
@@ -1053,7 +1053,7 @@
                                                    Waveform="{Binding Lyrics.Waveform}"
                                                    Clock="{Binding Lyrics.Clock}"
                                                    LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                   FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                   FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
                                                    ToolTip.Tip="{Binding Player.LyricsScrubToolTip}"
                                                    IsVisible="{Binding Lyrics.HasLyrics}" />
                                 <TextBlock Classes="muted centered"
@@ -1109,7 +1109,7 @@
                                                      LookAhead="{Binding Highway.LookAhead}"
                                                      Waveforms="{Binding Highway.LaneWaveforms}"
                                                      LengthSeconds="{Binding Player.TimelineSeconds}"
-                                                     FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
+                                                     FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
                                                      ToolTip.Tip="{Binding Player.HighwayScrubToolTip}"
                                                      IsVisible="{Binding Highway.IsShown}" />
                             </Border>

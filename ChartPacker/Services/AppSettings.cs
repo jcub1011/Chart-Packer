@@ -28,6 +28,9 @@ namespace ChartPacker.Services
         public const double DefaultFineScrubMilliseconds = 5;
         public const double MinFineScrubMilliseconds = 0.5;
         public const double MaxFineScrubMilliseconds = 20;
+        public const double DefaultLaneFineScrubFactor = 5;
+        public const double MinLaneFineScrubFactor = 2;
+        public const double MaxLaneFineScrubFactor = 20;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
@@ -98,8 +101,11 @@ namespace ChartPacker.Services
         [JsonConverter(typeof(JsonStringEnumConverter<ScrubStep>))]
         public ScrubStep ScrubStep { get; set; } = DefaultScrubStep;
 
-        /// <summary>How far each pixel dragged with Ctrl held moves the audio, in milliseconds, whatever the song's length.</summary>
+        /// <summary>How far each pixel dragged with Ctrl held on the seek bar moves the audio, in milliseconds, whatever the song's length.</summary>
         public double FineScrubMilliseconds { get; set; } = DefaultFineScrubMilliseconds;
+
+        /// <summary>How many times less far a drag with Ctrl held moves a highway's or the lyrics' notes than a plain drag.</summary>
+        public double LaneFineScrubFactor { get; set; } = DefaultLaneFineScrubFactor;
 
         /// <summary>The difficulty last chosen for each instrument, by name. An instrument not listed shows Expert.</summary>
         public Dictionary<string, string>? HighwayDifficulties { get; set; }

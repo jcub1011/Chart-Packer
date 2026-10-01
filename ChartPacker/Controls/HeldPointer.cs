@@ -25,8 +25,8 @@ namespace ChartPacker.Controls
     }
 
     /// <summary>
-    /// A fine drag of a scrubbed lane or the seek bar: how far the pointer moves each time, with it held where the fine drag
-    /// began, hidden, so it doesn't run off as the drag goes on.
+    /// A drag of a scrubbed lane, or a fine one of the seek bar: how far the pointer moves each time, with it held where the
+    /// drag began, hidden, so it doesn't run off as the drag goes on.
     /// </summary>
     internal sealed class FineDrag(InputElement owner)
     {

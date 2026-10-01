@@ -125,6 +125,10 @@ namespace ChartPacker.Services
             settings.FineScrubMilliseconds = double.IsFinite(settings.FineScrubMilliseconds)
                 ? Math.Clamp(settings.FineScrubMilliseconds, AppSettings.MinFineScrubMilliseconds, AppSettings.MaxFineScrubMilliseconds)
                 : AppSettings.DefaultFineScrubMilliseconds;
+
+            settings.LaneFineScrubFactor = double.IsFinite(settings.LaneFineScrubFactor)
+                ? Math.Clamp(settings.LaneFineScrubFactor, AppSettings.MinLaneFineScrubFactor, AppSettings.MaxLaneFineScrubFactor)
+                : AppSettings.DefaultLaneFineScrubFactor;
         }
     }
 }

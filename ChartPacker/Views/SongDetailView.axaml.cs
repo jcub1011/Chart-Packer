@@ -44,7 +44,7 @@ namespace ChartPacker.Views
             SeekBar.ScrubStarted += (_, _) => Player?.BeginScrub();
             SeekBar.ScrubEnded += (_, _) => EndScrub();
 
-            // The lanes scrub the same way, showing their whole chart while the pointer is over them.
+            // The lanes scrub the same way, showing their whole chart while Shift is held over them.
             HighwayOverlayView.ScrubStarted += (_, _) => Player?.BeginScrub();
             HighwayOverlayView.Scrubbed += (_, e) => ScrubTo(e.Seconds);
             HighwayOverlayView.ScrubEnded += (_, _) => EndScrub();
