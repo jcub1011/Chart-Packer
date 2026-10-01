@@ -62,6 +62,24 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
         }
     }
 
+    public float Speed
+    {
+        get
+        {
+            lock (_lock)
+                return _stream is null ? 1 : SDL_GetAudioStreamFrequencyRatio(_stream);
+        }
+        set
+        {
+            lock (_lock)
+            {
+                // SDL resamples the stream on its way to the device, so it plays faster and higher, or slower and lower.
+                if (_stream is not null)
+                    SDL_SetAudioStreamFrequencyRatio(_stream, float.IsFinite(value) ? Math.Clamp(value, 0.01f, 100f) : 1f);
+            }
+        }
+    }
+
     public void Write(ReadOnlySpan<float> stereo)
     {
         lock (_lock)

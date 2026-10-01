@@ -657,6 +657,15 @@
   <data name="VolumeName" xml:space="preserve">
     <value>Master volume</value>
   </data>
+  <data name="PlaybackSpeedLabel" xml:space="preserve">
+    <value>Speed</value>
+  </data>
+  <data name="PlaybackSpeedName" xml:space="preserve">
+    <value>Playback speed</value>
+  </data>
+  <data name="PlaybackSpeedToolTip" xml:space="preserve">
+    <value>Playback speed, from 1% to 1000%; pick one or type a percent. The pitch changes with it. Shared by every song, and back to 100% when the app starts again.</value>
+  </data>
   <data name="TrackVolumeName" xml:space="preserve">
     <value>Track volume in the mix</value>
   </data>

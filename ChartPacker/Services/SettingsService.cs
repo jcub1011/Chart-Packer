@@ -22,7 +22,19 @@ namespace ChartPacker.Services
             Settings = settings;
         }
 
+        /// <summary>The slowest <see cref="PlaybackSpeed"/>: 1%.</summary>
+        public const double MinPlaybackSpeed = 0.01;
+
+        /// <summary>The fastest <see cref="PlaybackSpeed"/>: 1000%.</summary>
+        public const double MaxPlaybackSpeed = 10;
+
         public AppSettings Settings { get; }
+
+        /// <summary>
+        /// How fast the players play, as a fraction: 1 is the audio's own speed. Shared by every song and player, but
+        /// kept for this run only; never written to the settings file, so each run starts at 1.
+        /// </summary>
+        public double PlaybackSpeed { get; set; } = 1;
 
         /// <summary>Loads settings from <paramref name="filePath"/>, falling back to defaults when it's missing or unreadable.</summary>
         public static SettingsService Load(string filePath)

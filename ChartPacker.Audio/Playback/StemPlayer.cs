@@ -10,7 +10,8 @@ namespace ChartPacker.Audio.Playback;
 /// </summary>
 /// <remarks>
 /// A change to a stem's switches is heard once the audio already queued has played, so after at
-/// most <see cref="QueueMilliseconds"/>. Seeking drops the queue, so it's heard at once. The
+/// most <see cref="QueueMilliseconds"/>: the queue holds that long of playback at any
+/// <see cref="Speed"/>. Seeking drops the queue, so it's heard at once. The
 /// player owns the output but not the mixer's sources; dispose it before them.
 /// </remarks>
 public sealed class StemPlayer : IDisposable
@@ -26,6 +27,9 @@ public sealed class StemPlayer : IDisposable
     private readonly object _lock = new();
     private readonly float[] _chunk;
     private readonly int _queueTarget;
+
+    // The fewest frames mixed at a time, so a very slow speed doesn't mix a few frames at a time.
+    private readonly int _minimumChunk;
 
     // All guarded by _lock.
     private bool _playing;
@@ -54,6 +58,7 @@ public sealed class StemPlayer : IDisposable
         _output = output;
         _chunk = new float[mixer.OutputRate * ChunkMilliseconds / 1000 * 2];
         _queueTarget = mixer.OutputRate * QueueMilliseconds / 1000;
+        _minimumChunk = Math.Max(1, mixer.OutputRate / 1000);
         _thread = new Thread(Run) { IsBackground = true, Name = "Audio playback" };
         _thread.Start();
     }
@@ -126,6 +131,16 @@ public sealed class StemPlayer : IDisposable
     {
         get => _output.Volume;
         set => _output.Volume = value;
+    }
+
+    /// <summary>
+    /// How fast playback runs, from 0.01 to 100; 1 plays at the audio's own speed. The pitch moves with it. Heard at
+    /// once, queued audio included. <see cref="Position"/> stays in the audio's own time.
+    /// </summary>
+    public float Speed
+    {
+        get => _output.Speed;
+        set => _output.Speed = value;
     }
 
     /// <summary>
@@ -264,13 +279,16 @@ public sealed class StemPlayer : IDisposable
                     continue;
                 }
 
-                if (_output.QueuedFrames >= _queueTarget)
+                // The queue is counted in frames as mixed, which play faster or slower with the speed, so it's kept to
+                // as many as play in QueueMilliseconds; and no chunk is longer, so a slow speed doesn't queue seconds.
+                int target = QueueTarget();
+                if (_output.QueuedFrames >= target)
                 {
                     Wait();
                     continue;
                 }
 
-                int frames = _mixer.Mix(_chunk);
+                int frames = _mixer.Mix(_chunk.AsSpan(0, Math.Min(_chunk.Length, target * 2)));
                 if (frames > 0)
                 {
                     // Together, so Position never sees one without the other. Queuing only copies.
@@ -296,6 +314,15 @@ public sealed class StemPlayer : IDisposable
                 Stop(ended: false, error: ex.Message);
             }
         }
+    }
+
+    /// <summary>How many frames, as mixed, play in <see cref="QueueMilliseconds"/> at the current <see cref="Speed"/>; at least a millisecond's.</summary>
+    private int QueueTarget()
+    {
+        float speed = _output.Speed;
+        if (!float.IsFinite(speed) || speed <= 0)
+            speed = 1;
+        return Math.Max(_minimumChunk, (int)(_queueTarget * (double)speed));
     }
 
     /// <summary>Waits a little for the device to drain the queue, or for a request.</summary>

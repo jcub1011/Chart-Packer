@@ -194,12 +194,15 @@ namespace ChartPacker.ViewModels
         private SpectrumAnalyzer? _analyzer;
         private readonly float[] _heard = new float[SpectrumAnalyzer.FftSize];
 
-        /// <param name="settings">Where the master volume and which visualisers are shown are kept between runs.</param>
+        /// <param name="settings">
+        /// Where the master volume and which visualisers are shown are kept between runs, and the playback speed for this run.
+        /// </param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
         public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput)
         {
             _settings = settings;
             Volume = settings.Settings.MasterVolume;
+            PlaybackSpeed = settings.PlaybackSpeed;
             ShowWaveforms = settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
@@ -261,6 +264,46 @@ namespace ChartPacker.ViewModels
         /// <summary>The master volume, from 0 to 1. Kept in the settings, so it carries over to the next run.</summary>
         [ObservableProperty]
         public partial double Volume { get; set; }
+
+        /// <summary>
+        /// How fast the song plays, as a fraction from 0.01 to 10: 1 is its own speed. The pitch moves with it. Shared by
+        /// every song and player for this run, but not saved.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(PlaybackSpeedText))]
+        public partial double PlaybackSpeed { get; set; } = 1;
+
+        /// <summary>The speeds the playback speed box offers, as it shows them; any whole percent in range can be typed too.</summary>
+        public static IReadOnlyList<string> PlaybackSpeedPresets { get; } =
+            [.. new[] { 1, 10, 25, 50, 75, 90, 100, 110, 125, 150, 200, 300, 500, 1000 }.Select(FormatPercent)];
+
+        /// <summary><see cref="PlaybackSpeed"/> as the playback speed box shows it: a whole percent.</summary>
+        public string PlaybackSpeedText => FormatPercent((int)Math.Round(PlaybackSpeed * 100));
+
+        /// <summary>
+        /// Sets <see cref="PlaybackSpeed"/> from what was typed or picked in its box: a number of percent, with or without the
+        /// <c>%</c>, rounded to a whole one and kept from 1% to 1000%. Either way the box is told to show the speed again,
+        /// so what can't be read goes back to what it was.
+        /// </summary>
+        /// <returns>Whether <paramref name="text"/> could be read as a speed.</returns>
+        public bool TrySetPlaybackSpeed(string? text)
+        {
+            string trimmed = (text ?? "").Trim();
+            if (trimmed.EndsWith('%'))
+                trimmed = trimmed[..^1].TrimEnd();
+
+            bool isRead = double.TryParse(trimmed, NumberStyles.Float, CultureInfo.CurrentCulture, out double percent) && double.IsFinite(percent);
+            if (isRead)
+            {
+                percent = Math.Clamp(Math.Round(percent), SettingsService.MinPlaybackSpeed * 100, SettingsService.MaxPlaybackSpeed * 100);
+                PlaybackSpeed = percent / 100;
+            }
+
+            OnPropertyChanged(nameof(PlaybackSpeedText));
+            return isRead;
+        }
+
+        private static string FormatPercent(int percent) => string.Format(CultureInfo.CurrentCulture, "{0}%", percent);
 
         /// <summary>
         /// Whether the tracks' waveforms are read and shown. Off, no track is read ahead of playback, so the song's
@@ -401,12 +444,13 @@ namespace ChartPacker.ViewModels
             Tracks.FirstOrDefault(t => t.Track.Stem.Equals(stem, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
-        /// Takes up the settings again, as after another player sharing them changed them: the master volume, and
-        /// which visualisers are shown.
+        /// Takes up the settings again, as after another player sharing them changed them: the master volume, the
+        /// playback speed, and which visualisers are shown.
         /// </summary>
         public void ReloadSettings()
         {
             Volume = _settings.Settings.MasterVolume;
+            PlaybackSpeed = _settings.PlaybackSpeed;
             ShowWaveforms = _settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
@@ -595,7 +639,9 @@ namespace ChartPacker.ViewModels
                 return false;
 
             _analyzer ??= new SpectrumAnalyzer();
-            _analyzer.Analyze(_heard, player.Mixer.OutputRate, levels);
+            // What's heard is played faster or slower than it was mixed, and higher or lower with it.
+            int heardRate = Math.Max(1, (int)Math.Round(player.Mixer.OutputRate * PlaybackSpeed));
+            _analyzer.Analyze(_heard, heardRate, levels);
             return true;
         }
 
@@ -981,6 +1027,20 @@ namespace ChartPacker.ViewModels
                 _player.Volume = (float)value;
         }
 
+        partial void OnPlaybackSpeedChanged(double value)
+        {
+            double speed = double.IsFinite(value) ? Math.Clamp(value, SettingsService.MinPlaybackSpeed, SettingsService.MaxPlaybackSpeed) : 1;
+            if (speed != value)
+            {
+                PlaybackSpeed = speed;
+                return;
+            }
+
+            _settings.PlaybackSpeed = speed;
+            if (_player is not null)
+                _player.Speed = (float)speed;
+        }
+
         partial void OnShowWaveformsChanged(bool value)
         {
             _settings.Settings.ShowWaveforms = value;
@@ -1087,6 +1147,7 @@ namespace ChartPacker.ViewModels
                 _audio = audio;
                 _player = player;
                 player.Volume = (float)Volume;
+                player.Speed = (float)PlaybackSpeed;
                 player.CapturesHeard = ShowSpectrum;
                 foreach (var row in Tracks)
                     ApplySwitches(row);

@@ -1125,9 +1125,9 @@
                         <StackPanel.Resources>
                             <x:Double x:Key="SliderHorizontalHeight">20</x:Double>
                         </StackPanel.Resources>
-                        <!-- The audio offset and the master volume sit at the right of the header; each track has its own level
-                             in the mix below. The offset moves every track alike, as song.ini's delay does. -->
-                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                        <!-- The audio offset, the master volume and the playback speed sit at the right of the header; each track
+                             has its own level in the mix below. The offset moves every track alike, as song.ini's delay does. -->
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                             <TextBlock Grid.Column="0" Classes="section" Text="{Binding Player.TracksHeader}" />
                             <StackPanel Grid.Column="1"
                                         Classes="timing"
@@ -1180,6 +1180,37 @@
                                     IsVisible="{Binding Player.HasTracks}"
                                     ToolTip.Tip="{x:Static res:Strings.VolumeName}"
                                     AutomationProperties.Name="{x:Static res:Strings.VolumeName}" />
+                            <!-- Presets, or any whole percent typed in; what's typed takes effect on Enter or leaving the box, so
+                                 typing 150 doesn't play at 1% and 15% on the way. See SongDetailView.CommitPlaybackSpeed. -->
+                            <TextBlock Grid.Column="4"
+                                       Classes="muted"
+                                       Margin="6,0,0,0"
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding Player.HasTracks}"
+                                       Text="{x:Static res:Strings.PlaybackSpeedLabel}" />
+                            <ComboBox Grid.Column="5"
+                                      x:Name="PlaybackSpeedBox"
+                                      IsEditable="True"
+                                      Width="90"
+                                      Padding="8,0,0,0"
+                                      VerticalAlignment="Center"
+                                      VerticalContentAlignment="Center"
+                                      ItemsSource="{x:Static vm:PlayerViewModel.PlaybackSpeedPresets}"
+                                      Text="{Binding Player.PlaybackSpeedText, Mode=OneWay}"
+                                      IsVisible="{Binding Player.HasTracks}"
+                                      ToolTip.Tip="{x:Static res:Strings.PlaybackSpeedToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.PlaybackSpeedName}">
+                                <!-- Fluent pads a ComboBox unevenly for its selection text and gives a text box a minimum height of
+                                     its own, which together leave the typed text off centre; the box's text is centred instead. -->
+                                <ComboBox.Styles>
+                                    <Style Selector="ComboBox /template/ TextBox#PART_EditableTextBox">
+                                        <Setter Property="MinHeight" Value="0" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="VerticalAlignment" Value="Stretch" />
+                                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                                    </Style>
+                                </ComboBox.Styles>
+                            </ComboBox>
                         </Grid>
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.NoTracks}" IsVisible="{Binding !Player.HasTracks}" />
 

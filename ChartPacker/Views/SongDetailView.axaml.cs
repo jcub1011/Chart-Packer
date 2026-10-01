@@ -59,7 +59,47 @@ namespace ChartPacker.Views
             foreach (var scrubbed in (Control[])[SeekBar, HighwayOverlayView, HighwayRowView, LyricLane])
                 scrubbed.AddHandler(PointerWheelChangedEvent, OnScrubWheel, RoutingStrategies.Tunnel);
 
+            // The speed box takes what was typed on Enter or on leaving it, and a preset once the list closes; not as
+            // it's typed, which would play at 1% then 15% on the way to 150%. Posted, so the box's text has caught up.
+            PlaybackSpeedBox.DropDownClosed += (_, _) => Dispatcher.UIThread.Post(() => CommitPlaybackSpeed(leave: true), DispatcherPriority.Input);
+            PlaybackSpeedBox.LostFocus += (_, _) => CommitPlaybackSpeed(leave: false);
+            PlaybackSpeedBox.AddHandler(KeyDownEvent, OnPlaybackSpeedKeyDown, RoutingStrategies.Tunnel);
+
             AddHandler(PointerPressedEvent, OnPointerPressedAnywhere, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
+
+        /// <summary>Sets the playback speed from the speed box, then shows it there as it was taken: tidied, kept in range, or as before.</summary>
+        /// <param name="leave">
+        /// Whether a speed was settled on, picked or entered, so focus goes back to the panel, as a click outside a text box
+        /// does: Space plays again rather than typing into the box.
+        /// </param>
+        private void CommitPlaybackSpeed(bool leave)
+        {
+            if (Player is not { } player)
+                return;
+
+            player.TrySetPlaybackSpeed(PlaybackSpeedBox.Text ?? PlaybackSpeedBox.SelectedItem as string);
+            PlaybackSpeedBox.SetCurrentValue(ComboBox.TextProperty, player.PlaybackSpeedText);
+            if (leave && PlaybackSpeedBox.IsKeyboardFocusWithin)
+                Focus();
+        }
+
+        /// <summary>Enter takes what's typed in the speed box and Escape puts back the speed, unless its list is open, which they close.</summary>
+        private void OnPlaybackSpeedKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (PlaybackSpeedBox.IsDropDownOpen || Player is not { } player)
+                return;
+
+            if (e.Key == Key.Enter)
+            {
+                CommitPlaybackSpeed(leave: true);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                PlaybackSpeedBox.SetCurrentValue(ComboBox.TextProperty, player.PlaybackSpeedText);
+                e.Handled = true;
+            }
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
