@@ -132,7 +132,9 @@ namespace ChartPacker.Views
         /// </summary>
         private void OnScrubWheel(object? sender, PointerWheelEventArgs e)
         {
-            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || DataContext is not SongDetailViewModel { Player: { IsScrubbing: false } player } vm)
+            // A sideways scroll, as a touchpad gives, scrolls the panel and leaves a part-turned notch as it is.
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.Delta.Y == 0
+                || DataContext is not SongDetailViewModel { Player: { IsScrubbing: false } player } vm)
                 return;
 
             e.Handled = true;

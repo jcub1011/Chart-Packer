@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Scanning;
 
 namespace ChartPacker.Core.Library;
@@ -60,6 +61,17 @@ public enum LibraryDifficulties
     Medium = 1 << 1,
     Hard = 1 << 2,
     Expert = 1 << 3,
+}
+
+/// <summary>Between a <see cref="ChartDifficulty"/> and its <see cref="LibraryDifficulties"/> flag.</summary>
+public static class LibraryDifficultiesExtensions
+{
+    /// <summary>The flag of <paramref name="difficulty"/>, e.g. <see cref="LibraryDifficulties.Hard"/> for <see cref="ChartDifficulty.Hard"/>.</summary>
+    public static LibraryDifficulties ToFlag(this ChartDifficulty difficulty) => (LibraryDifficulties)(1 << (int)difficulty);
+
+    /// <summary>The difficulties <paramref name="difficulties"/> has the flags of, easiest first.</summary>
+    public static List<ChartDifficulty> ToDifficulties(this LibraryDifficulties difficulties) =>
+        [.. Enum.GetValues<ChartDifficulty>().Where(d => difficulties.HasFlag(d.ToFlag()))];
 }
 
 /// <summary>A song's audio stems, grouped: <see cref="Drums"/> is <c>drums</c> and <c>drums_1</c>–<c>drums_4</c>, and so on.</summary>

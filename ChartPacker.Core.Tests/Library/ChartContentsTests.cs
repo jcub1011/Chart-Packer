@@ -223,6 +223,34 @@ public sealed class ChartContentsTests
     }
 
     [TestMethod]
+    public void ContentsMatchThePartsWithTheirNotesCounted()
+    {
+        // Read stops counting at a track's first note; it must still find what counting them all finds.
+        byte[] midi = new MidiBuilder()
+            .Track().Tempo(0, 120)
+            .Track("PART GUITAR").Note(0, 60).Note(480, 61).Note(0, 96)
+            .Track("PART DRUMS").Note(0, 95)
+            .Track("PART REAL_KEYS_H").Note(0, 116)
+            .Track("PART REAL_KEYS_X").Note(0, 47).Note(480, 48)
+            .Track("PART REAL_GUITAR").Note(0, 60).Note(480, 30).Note(960, 101)
+            .Track("HARM2").Note(0, 105).Note(480, 64)
+            .Build();
+
+        AssertContentsMatchParts(midi, ChartFiles.MidiName);
+        AssertContentsMatchParts(Encoding.UTF8.GetBytes(ChartReaderTests.Chart), ChartFiles.ChartName);
+    }
+
+    private static void AssertContentsMatchParts(byte[] bytes, string storedName)
+    {
+        var parts = ChartContents.ReadParts(bytes, storedName);
+        Assert.IsNotNull(parts);
+
+        var instruments = parts.Keys.Aggregate(LibraryInstruments.None, (all, id) => all | ChartContents.FlagOf(id));
+        var difficulties = parts.Values.Aggregate(LibraryDifficulties.None, (all, part) => all | part.Difficulties);
+        Assert.AreEqual(new ChartContents(instruments, difficulties), ChartContents.Read(bytes, storedName), storedName);
+    }
+
+    [TestMethod]
     public void MalformedChartHasNoParts() =>
         Assert.IsNull(ChartContents.ReadParts([0x4D, 0x54, 0x68, 0x64], ChartFiles.MidiName));
 

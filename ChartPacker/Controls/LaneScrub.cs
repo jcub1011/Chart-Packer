@@ -1,7 +1,9 @@
 using System;
 using System.Globalization;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartPacker.Core.Metadata;
@@ -76,6 +78,74 @@ namespace ChartPacker.Controls
             var tag = new Rect(origin, size);
             context.DrawRectangle(TagBrush, null, tag, 3, 3);
             context.DrawText(text, new Point(tag.X + 3, tag.Y + 1));
+        }
+    }
+
+    /// <summary>
+    /// Whether Ctrl makes a scrubbed lane fine, for <see cref="NoteHighwayView"/> and <see cref="LyricLaneView"/>: it's
+    /// watched in the window's keys while <paramref name="watchesCtrl"/> says so (the pointer is over the lane, or it's
+    /// being scrubbed), so it's seen with the pointer still, whatever has focus. A fine drag holds the pointer still.
+    /// </summary>
+    /// <param name="owner">The lane, drawn again whenever it turns fine or back.</param>
+    internal sealed class LaneFineScrub(Control owner, Func<bool> watchesCtrl)
+    {
+        private readonly FineDrag _drag = new(owner);
+
+        // The window whose keys say when Ctrl is pressed or let go with the pointer still.
+        private TopLevel? _keysFrom;
+
+        /// <summary>Ctrl is held over the lane, or while it's scrubbed.</summary>
+        public bool IsFine { get; private set; }
+
+        /// <summary>Starts watching the keys of the window the lane is now in.</summary>
+        public void Attach()
+        {
+            // Tunnelled, and handled ones too, so Ctrl is seen whatever has focus.
+            _keysFrom = TopLevel.GetTopLevel(owner);
+            _keysFrom?.AddHandler(InputElement.KeyDownEvent, OnModifierKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+            _keysFrom?.AddHandler(InputElement.KeyUpEvent, OnModifierKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+        }
+
+        public void Detach()
+        {
+            _keysFrom?.RemoveHandler(InputElement.KeyDownEvent, OnModifierKey);
+            _keysFrom?.RemoveHandler(InputElement.KeyUpEvent, OnModifierKey);
+            _keysFrom = null;
+        }
+
+        /// <summary>Takes whether Ctrl is held from <paramref name="modifiers"/>, as a pointer event has them.</summary>
+        public void Set(KeyModifiers modifiers) => Set(LaneScrub.IsFine(modifiers));
+
+        /// <summary>Turns fine or back, ending a fine drag when it's no longer fine.</summary>
+        public void Set(bool isFine)
+        {
+            if (isFine == IsFine)
+                return;
+
+            IsFine = isFine;
+            if (!isFine)
+                _drag.Stop();
+            owner.InvalidateVisual();
+        }
+
+        /// <summary>Starts a fine drag with the pointer at <paramref name="at"/>, in the lane; already started, it goes on as it is.</summary>
+        public void Start(Point at) => _drag.Start(at);
+
+        /// <summary>How far the pointer has moved to <paramref name="at"/> since it was last seen, starting a fine drag if there isn't one.</summary>
+        public Vector Move(Point at)
+        {
+            _drag.Start(at);
+            return _drag.Move(at);
+        }
+
+        /// <summary>Ends a fine drag, showing the pointer again; the lane stays fine while Ctrl is held.</summary>
+        public void Stop() => _drag.Stop();
+
+        /// <summary>Ctrl pressed or let go with the pointer over the lane, or while it's scrubbed.</summary>
+        private void OnModifierKey(object? sender, KeyEventArgs e)
+        {
+            if (watchesCtrl())
+                Set(LaneScrub.IsFine(e));
         }
     }
 }

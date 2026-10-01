@@ -570,7 +570,15 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>The seek slider is held: the position stops following playback until <see cref="EndScrub"/>.</summary>
-        public void BeginScrub() => IsScrubbing = true;
+        public void BeginScrub()
+        {
+            IsScrubbing = true;
+
+            // From where the audio is, rather than where the timer last left the position, so a press that isn't
+            // moved leaves playback where it is instead of a tick back.
+            if (_player is { } player)
+                SetPosition(player.Position.TotalSeconds);
+        }
 
         /// <summary>The seek slider was let go: playback moves to where it was left.</summary>
         public void EndScrub()

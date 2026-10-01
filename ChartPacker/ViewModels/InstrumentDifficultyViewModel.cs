@@ -161,9 +161,7 @@ namespace ChartPacker.ViewModels
                 ChartPart? read = null;
                 bool charted = Slot.PartId is { } part ? parts.TryGetValue(part, out read) : parts.Count > 0;
                 IsCharted = charted;
-                var difficulties = read?.Difficulties ?? LibraryDifficulties.None;
-                var letters = Enum.GetValues<ChartDifficulty>()
-                    .Where(d => difficulties.HasFlag((LibraryDifficulties)(1 << (int)d)))
+                var letters = (read?.Difficulties ?? LibraryDifficulties.None).ToDifficulties()
                     .Select(d => new DifficultyLetter(d, ChartLabels.DifficultyLetter(d)))
                     .ToList();
                 if (!letters.SequenceEqual(Letters))

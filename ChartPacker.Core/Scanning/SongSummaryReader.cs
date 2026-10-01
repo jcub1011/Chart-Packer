@@ -46,15 +46,19 @@ public static class SongSummaryReader
         return Task.Run(() => ReadCoreAsync(entry, cancellationToken), cancellationToken);
     }
 
-    /// <summary>Like <see cref="ReadAsync"/>, but <see langword="null"/> when the song can't be read.</summary>
+    /// <summary>
+    /// Like <see cref="ReadAsync"/>, but <see langword="null"/> when the song can't be read, for whatever reason: a
+    /// malformed file can fail in ways other than an IO error, and one song shouldn't stop a library scan.
+    /// </summary>
     /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
     public static async Task<SongSummary?> TryReadAsync(SongEntry entry, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         try
         {
             return await ReadAsync(entry, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return null;
         }

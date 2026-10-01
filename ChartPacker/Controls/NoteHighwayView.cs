@@ -5,7 +5,6 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
@@ -208,11 +207,7 @@ namespace ChartPacker.Controls
 
         // Ctrl is held over a highway, or while scrubbing: it shows the notes falling, and a drag is fine, moving the audio by
         // how far the pointer goes, holding it still.
-        private bool _isFine;
-        private readonly FineDrag _fine;
-
-        // The window whose keys say when Ctrl is pressed or let go with the pointer still.
-        private TopLevel? _keysFrom;
+        private readonly LaneFineScrub _fine;
 
         // The whole-chart marks of the highway last drawn that way, and what they were laid out for.
         private OverviewMarks? _overview;
@@ -291,7 +286,7 @@ namespace ChartPacker.Controls
 
         public NoteHighwayView()
         {
-            _fine = new FineDrag(this);
+            _fine = new LaneFineScrub(this, () => _hoveredLane >= 0 || _isScrubbing);
             EffectiveViewportChanged += OnEffectiveViewportChanged;
         }
 
@@ -327,36 +322,14 @@ namespace ChartPacker.Controls
             base.OnAttachedToVisualTree(e);
             RequestFrame();
 
-            // Tunnelled, and handled ones too, so Ctrl is seen whatever has focus.
-            _keysFrom = TopLevel.GetTopLevel(this);
-            _keysFrom?.AddHandler(KeyDownEvent, OnModifierKey, RoutingStrategies.Tunnel, handledEventsToo: true);
-            _keysFrom?.AddHandler(KeyUpEvent, OnModifierKey, RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Ctrl pressed or let go with the pointer over a highway, or while scrubbing, shows the notes falling or the whole chart at once.
+            _fine.Attach();
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
-            _keysFrom?.RemoveHandler(KeyDownEvent, OnModifierKey);
-            _keysFrom?.RemoveHandler(KeyUpEvent, OnModifierKey);
-            _keysFrom = null;
-        }
-
-        /// <summary>Ctrl pressed or let go with the pointer over a highway, or while scrubbing, shows the notes falling or the whole chart at once.</summary>
-        private void OnModifierKey(object? sender, KeyEventArgs e)
-        {
-            if (_hoveredLane >= 0 || _isScrubbing)
-                SetFine(LaneScrub.IsFine(e));
-        }
-
-        private void SetFine(bool isFine)
-        {
-            if (isFine == _isFine)
-                return;
-
-            _isFine = isFine;
-            if (!isFine)
-                _fine.Stop();
-            InvalidateVisual();
+            _fine.Detach();
         }
 
         public override void Render(DrawingContext context)
@@ -388,7 +361,7 @@ namespace ChartPacker.Controls
 
                 // Transparent, so the whole highway takes the pointer, and the gaps between them don't.
                 context.DrawRectangle(Brushes.Transparent, null, bounds);
-                if (i == _hoveredLane && !_isFine)
+                if (i == _hoveredLane && !_fine.IsFine)
                 {
                     DrawOverview(context, scene.Lanes[i], bounds, now);
                     continue;
@@ -554,7 +527,7 @@ namespace ChartPacker.Controls
         {
             base.OnPointerMoved(e);
             var point = e.GetPosition(this);
-            SetFine(LaneScrub.IsFine(e.KeyModifiers));
+            _fine.Set(e.KeyModifiers);
             if (_isScrubbing)
             {
                 SetHover(_hoveredLane, point.Y);
@@ -571,13 +544,12 @@ namespace ChartPacker.Controls
         /// </summary>
         private double ScrubTimeAt(Point point)
         {
-            if (!_isFine || Scene is not { } scene)
+            if (!_fine.IsFine || Scene is not { } scene)
             {
                 _fine.Stop();
                 return TimeAt(point.Y);
             }
 
-            _fine.Start(point);
             double now = (Clock?.Invoke() ?? TimeSpan.Zero).TotalSeconds;
             return Math.Clamp(now + (_fine.Move(point).Y * FineSecondsPerPixel), 0, TimelineOf(scene));
         }
@@ -598,13 +570,13 @@ namespace ChartPacker.Controls
                 return;
 
             SetHover(lane, point.Y);
-            SetFine(LaneScrub.IsFine(e.KeyModifiers));
+            _fine.Set(e.KeyModifiers);
             _isScrubbing = true;
             e.Pointer.Capture(this);
             ScrubStarted?.Invoke(this, EventArgs.Empty);
 
             // A press with Ctrl held starts a fine drag from where the audio is.
-            if (_isFine)
+            if (_fine.IsFine)
                 _fine.Start(point);
             else
                 Scrubbed?.Invoke(this, new ScrubEventArgs(TimeAt(point.Y)));
@@ -618,7 +590,7 @@ namespace ChartPacker.Controls
                 return;
 
             var point = e.GetPosition(this);
-            SetFine(LaneScrub.IsFine(e.KeyModifiers));
+            _fine.Set(e.KeyModifiers);
             Scrubbed?.Invoke(this, new ScrubEventArgs(ScrubTimeAt(point)));
             e.Pointer.Capture(null);
             EndScrub();

@@ -98,6 +98,14 @@
     <value>Read {0:N0} of {1:N0}…</value>
     <comment>{0} is the number of songs whose details have been read, {1} the number found. Shown once every folder has been searched.</comment>
   </data>
+  <data name="ScanSearchingFilteredProgressFormat" xml:space="preserve">
+    <value>{2:N0} shown · read {0:N0} of {1:N0} found · still searching…</value>
+    <comment>{0} is the number of songs whose details have been read, {1} the number found so far, {2} the number the search and filters show. Shown while folders are still being searched.</comment>
+  </data>
+  <data name="ScanReadingFilteredProgressFormat" xml:space="preserve">
+    <value>{2:N0} shown · read {0:N0} of {1:N0}…</value>
+    <comment>{0} is the number of songs whose details have been read, {1} the number found, {2} the number the search and filters show. Shown once every folder has been searched.</comment>
+  </data>
   <data name="SongCountOne" xml:space="preserve">
     <value>1 song</value>
   </data>

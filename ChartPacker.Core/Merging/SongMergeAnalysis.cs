@@ -256,10 +256,9 @@ public sealed class SongMergeAnalysis
             .Select(p =>
             {
                 var read = contents.GetValueOrDefault(p.Id);
-                var difficulties = read?.Difficulties ?? LibraryDifficulties.None;
                 return new MergeSourcePart(
                     p,
-                    Enum.GetValues<ChartDifficulty>().Where(d => difficulties.HasFlag((LibraryDifficulties)(1 << (int)d))).ToList(),
+                    (read?.Difficulties ?? LibraryDifficulties.None).ToDifficulties(),
                     p.Keys.Count > 0 ? source.Value(p.Keys[0]) : null,
                     read?.NoteCounts ?? []);
             })

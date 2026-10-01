@@ -269,8 +269,8 @@ namespace ChartPacker.ViewModels
         public bool ShowStatus => HasScanned && !HasError && (IsScanning || _allItems.Count > 0);
 
         /// <summary>
-        /// While scanning, how many of the songs found have been read; then the song count, or
-        /// "shown/total" while the search or a filter may hide some.
+        /// While scanning, how many of the songs found have been read, and how many show while the search or a filter
+        /// may hide some; then the song count, or "shown/total".
         /// </summary>
         public string StatusText
         {
@@ -278,8 +278,14 @@ namespace ChartPacker.ViewModels
             {
                 if (IsScanning)
                 {
-                    string format = IsSearching ? Strings.ScanSearchingProgressFormat : Strings.ScanReadingProgressFormat;
-                    return string.Format(CultureInfo.CurrentCulture, format, ScanRead, ScanFound);
+                    string format = (IsSearching, Filter.Query.IsFiltering) switch
+                    {
+                        (true, true) => Strings.ScanSearchingFilteredProgressFormat,
+                        (true, false) => Strings.ScanSearchingProgressFormat,
+                        (false, true) => Strings.ScanReadingFilteredProgressFormat,
+                        (false, false) => Strings.ScanReadingProgressFormat,
+                    };
+                    return string.Format(CultureInfo.CurrentCulture, format, ScanRead, ScanFound, Entries.Count);
                 }
 
                 if (Filter.Query.IsFiltering)
@@ -668,9 +674,9 @@ namespace ChartPacker.ViewModels
             {
                 _itemsByPath[item.Entry.FullPath] = item;
                 item.FactsChanged += OnItemFactsChanged;
-                int at = _allItems.BinarySearch(item, ByPosition);
-                _allItems.Insert(at < 0 ? ~at : at, item);
             }
+
+            MergeByPosition(items);
 
             // A re-apply on its way lists them along with everything else.
             if (!IsApplyPending)
@@ -684,6 +690,25 @@ namespace ChartPacker.ViewModels
             }
 
             RefreshPreviewing();
+        }
+
+        /// <summary>
+        /// Puts <paramref name="items"/> into <see cref="_allItems"/> in scan order, in one pass from the back rather than an
+        /// insert apiece, each of which would move every song after it.
+        /// </summary>
+        private void MergeByPosition(List<LibraryItemViewModel> items)
+        {
+            var added = items.ToArray();
+            Array.Sort(added, ByPosition);
+
+            int old = _allItems.Count - 1;
+            _allItems.AddRange(added);
+            for (int to = _allItems.Count - 1, from = added.Length - 1; from >= 0; to--)
+            {
+                _allItems[to] = old >= 0 && ByPosition.Compare(_allItems[old], added[from]) > 0
+                    ? _allItems[old--]
+                    : added[from--];
+            }
         }
 
         /// <summary>Inserts <paramref name="sorted"/> into <see cref="Entries"/>, which <paramref name="order"/> already sorts.</summary>
