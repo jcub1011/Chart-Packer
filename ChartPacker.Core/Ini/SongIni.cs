@@ -55,6 +55,19 @@ public static class SongIni
     private const string SongSection = "song";
 
     /// <summary>
+    /// The <c>song.ini</c> directly in <paramref name="folder"/>, matched ignoring case, or <see langword="null"/>
+    /// when it has none. One in a subfolder belongs to something else.
+    /// </summary>
+    /// <exception cref="IOException">The folder can't be listed.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access to the folder is denied.</exception>
+    public static string? FindIn(string folder)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folder);
+        return Directory.EnumerateFiles(folder)
+            .FirstOrDefault(f => Path.GetFileName(f).Equals(FileName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// Parses INI text and returns the <c>[song]</c> section's pairs, or <see langword="null"/>
     /// when there is no <c>[song]</c> section.
     /// </summary>

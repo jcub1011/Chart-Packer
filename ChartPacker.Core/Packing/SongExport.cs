@@ -90,6 +90,5 @@ public static class SongExport
 
     /// <summary>The folder's <c>song.ini</c>, matched ignoring case, or where a new one goes.</summary>
     private static string SongIniIn(string folder) =>
-        Directory.EnumerateFiles(folder).FirstOrDefault(p => Path.GetFileName(p).Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase))
-        ?? Path.Combine(folder, SongIni.FileName);
+        SongIni.FindIn(folder) ?? Path.Combine(folder, SongIni.FileName);
 }

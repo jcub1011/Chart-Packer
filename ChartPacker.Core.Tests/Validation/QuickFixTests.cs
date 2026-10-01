@@ -1,3 +1,4 @@
+using ChartPacker.Core.Ini;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Validation;
 using ChartPacker.Core.Validation.QuickFixes;
@@ -80,8 +81,41 @@ public sealed class QuickFixTests
         Assert.IsTrue(QuickFixRegistry.IsSupported(SngRules.Sng061));
         Assert.IsTrue(QuickFixRegistry.IsSupported(SngRules.Sng021));
         Assert.IsTrue(QuickFixRegistry.IsSupported(SngRules.Sng025));
+        Assert.IsTrue(QuickFixRegistry.IsSupported(SngRules.Sng022));
         Assert.IsFalse(QuickFixRegistry.IsSupported(SngRules.Sng024));
-        Assert.IsFalse(QuickFixRegistry.IsSupported(SngRules.Sng022));
+    }
+
+    [TestMethod]
+    public void ARepeatedSongIniKeyIsSetOnceToTheValueItHas()
+    {
+        var fix = QuickFixRegistry.ProposeAll([P("name", "B")], ["name"]).Single(f => f.RuleId == SngRules.Sng022);
+
+        CollectionAssert.AreEqual(new[] { new MetadataEdit("name", "B") }, fix.Edits.ToArray());
+    }
+
+    [TestMethod]
+    public void AnSngsRepeatsThatAgreeAreSetOnce()
+    {
+        var fix = Single([P("name", "A"), P("Name", "A")], SngRules.Sng022);
+
+        CollectionAssert.AreEqual(new[] { new MetadataEdit("name", "A") }, fix.Edits.ToArray());
+    }
+
+    [TestMethod]
+    public void AnSngsRepeatsThatDifferHaveNoFix() =>
+        Assert.IsFalse(QuickFixRegistry.ProposeAll([P("name", "A"), P("Name", "B")]).Any(f => f.RuleId == SngRules.Sng022));
+
+    [TestMethod]
+    public void FixingARepeatedSongIniKeyClearsItAndSavesItOnce()
+    {
+        IReadOnlyList<KeyValuePair<string, string>> original = [P("name", "A")];
+        var item = new MetadataItem(original, new MetadataDraft(), ["name"]);
+
+        Assert.AreEqual(1, QuickFixRegistry.FixKey(item, "name"));
+
+        var findings = MetadataValidator.Validate(item.Draft.ApplyTo(original), item.RemainingDuplicateKeys());
+        Assert.IsFalse(findings.Any(f => f.RuleId == SngRules.Sng022));
+        Assert.AreEqual("[song]\nname = A\n", SongIni.ApplyEdits("[song]\nname = B\nname = A\n", item.Draft));
     }
 
     [TestMethod]

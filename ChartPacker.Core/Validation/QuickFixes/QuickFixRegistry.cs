@@ -20,6 +20,7 @@ public static class QuickFixRegistry
         new EmptyValueFix(),
         new ForbiddenValueCharacterFix(),
         new LegacyKeyFix(),
+        new DuplicateKeyFix(),
     ];
 
     private static readonly Dictionary<string, IQuickFixStrategy> ByRule = Strategies.ToDictionary(s => s.RuleId, StringComparer.Ordinal);
@@ -66,12 +67,11 @@ public static class QuickFixRegistry
     /// applied one at a time, each worked out from the metadata as the last left it, failures before hints, so two
     /// fixes to one pair (stripping a legacy key's value, then renaming it) don't undo each other.
     /// </summary>
-    /// <param name="item">The song's saved metadata and its draft, which the fixes go into.</param>
+    /// <param name="item">The song's saved metadata, the keys its <c>song.ini</c> repeats, and its draft, which the fixes go into.</param>
     /// <param name="key">The key whose findings to fix, ignoring case.</param>
-    /// <param name="duplicateKeys">The keys a <c>song.ini</c> repeats, as for <see cref="MetadataValidator.Validate"/>.</param>
     /// <param name="includeHints">Whether to fix hints, such as a legacy key, as well as failures.</param>
     /// <returns>How many fixes were applied.</returns>
-    public static int FixKey(MetadataItem item, string key, IReadOnlyCollection<string>? duplicateKeys = null, bool includeHints = true)
+    public static int FixKey(MetadataItem item, string key, bool includeHints = true)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(key);
@@ -79,7 +79,7 @@ public static class QuickFixRegistry
         // Each fix clears its finding, so this is only a guard against two strategies undoing each other forever.
         int maxFixes = Strategies.Count * 2;
         int applied = 0;
-        while (applied < maxFixes && NextFix(item, key, duplicateKeys, includeHints) is { } fix)
+        while (applied < maxFixes && NextFix(item, key, includeHints) is { } fix)
         {
             fix.ApplyTo(item);
             applied++;
@@ -88,10 +88,10 @@ public static class QuickFixRegistry
         return applied;
     }
 
-    private static QuickFix? NextFix(MetadataItem item, string key, IReadOnlyCollection<string>? duplicateKeys, bool includeHints)
+    private static QuickFix? NextFix(MetadataItem item, string key, bool includeHints)
     {
         var pairs = item.Draft.ApplyTo(item.Original);
-        var findings = MetadataValidator.Validate(pairs, duplicateKeys)
+        var findings = MetadataValidator.Validate(pairs, item.RemainingDuplicateKeys())
             .Where(f => f.Key is not null && f.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
             .Where(f => includeHints || MetadataValidator.IsFailing(f))
             .OrderBy(f => MetadataValidator.IsFailing(f) ? 0 : 1);

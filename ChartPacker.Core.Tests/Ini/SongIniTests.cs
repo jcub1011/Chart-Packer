@@ -15,6 +15,24 @@ public sealed class SongIniTests
     public void DeleteRoot() => _root.Delete(recursive: true);
 
     [TestMethod]
+    public void FindInMatchesTheFolderOwnSongIniIgnoringCase()
+    {
+        string path = Path.Combine(_root.FullName, "Song.INI");
+        File.WriteAllText(path, "[song]\n");
+
+        Assert.AreEqual(path, SongIni.FindIn(_root.FullName));
+    }
+
+    [TestMethod]
+    public void FindInIgnoresASongIniInASubfolder()
+    {
+        var sub = _root.CreateSubdirectory("Other");
+        File.WriteAllText(Path.Combine(sub.FullName, "song.ini"), "[song]\n");
+
+        Assert.IsNull(SongIni.FindIn(_root.FullName));
+    }
+
+    [TestMethod]
     public void WriteProducesOneSongSectionThatParsesBack()
     {
         var pairs = new[] { P("name", "Title"), P("loading_phrase", "a = b"), P("delay", "0") };

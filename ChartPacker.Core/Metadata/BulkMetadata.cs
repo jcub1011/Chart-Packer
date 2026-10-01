@@ -19,7 +19,22 @@ public enum MetadataRowState
 /// <summary>One song's saved metadata together with its unsaved changes.</summary>
 /// <param name="Original">The pairs as stored, in order.</param>
 /// <param name="Draft">The pending changes. Edits through <see cref="BulkMetadata"/> write to it.</param>
-public sealed record MetadataItem(IReadOnlyList<KeyValuePair<string, string>> Original, MetadataDraft Draft);
+/// <param name="DuplicateKeys">
+/// The keys a <c>song.ini</c> repeats, which its reader merged out of <paramref name="Original"/>; none for a
+/// <c>.sng</c>, whose repeats stay in <paramref name="Original"/>.
+/// </param>
+public sealed record MetadataItem(
+    IReadOnlyList<KeyValuePair<string, string>> Original,
+    MetadataDraft Draft,
+    IReadOnlyCollection<string>? DuplicateKeys = null)
+{
+    /// <summary>
+    /// The keys the <c>song.ini</c> repeats that saving the draft would leave repeated: those it doesn't change, as
+    /// saving a key writes it once and removing it drops every line of it.
+    /// </summary>
+    public IReadOnlyList<string> RemainingDuplicateKeys() =>
+        DuplicateKeys is null or { Count: 0 } ? [] : [.. DuplicateKeys.Where(k => !Draft.TryGetChange(k, out _))];
+}
 
 /// <summary>A row of the metadata editor, merged across every selected item.</summary>
 /// <param name="Key">The key, as first seen.</param>
@@ -103,7 +118,10 @@ public static class BulkMetadata
     }
 
     /// <summary>Sets <paramref name="key"/> to <paramref name="value"/> in every item, adding it where it's missing.</summary>
-    /// <remarks>An item that already stores exactly <paramref name="value"/> has its change reverted instead, so a no-op edit doesn't mark it.</remarks>
+    /// <remarks>
+    /// An item that already stores exactly <paramref name="value"/> has its change reverted instead, so a no-op edit
+    /// doesn't mark it, unless it stores the key more than once: then the change stays, as saving it removes the repeats.
+    /// </remarks>
     public static void Set(IReadOnlyList<MetadataItem> items, string key, string value)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -226,6 +244,8 @@ public static class BulkMetadata
         return false;
     }
 
+    /// <summary>Whether the item stores <paramref name="key"/> more than once, so saving it, even unchanged, collapses the repeats.</summary>
     private static bool HasDuplicates(MetadataItem item, string key) =>
-        item.Original.Count(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) > 1;
+        item.Original.Count(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) > 1
+        || item.DuplicateKeys?.Contains(key, StringComparer.OrdinalIgnoreCase) == true;
 }

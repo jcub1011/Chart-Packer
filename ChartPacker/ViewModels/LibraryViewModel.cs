@@ -144,7 +144,7 @@ namespace ChartPacker.ViewModels
             Selection = new SelectionModel<LibraryItemViewModel> { SingleSelect = false, Source = Entries };
             Selection.PropertyChanged += OnSelectionPropertyChanged;
 
-            _drafts.DraftsChanged += path =>
+            _drafts.DraftsChanged += (path, change) =>
             {
                 if (!_itemsByPath.TryGetValue(path, out var item))
                     return;

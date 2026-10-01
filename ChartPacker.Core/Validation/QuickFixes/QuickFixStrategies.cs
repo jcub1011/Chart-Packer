@@ -84,6 +84,27 @@ public sealed class ForbiddenValueCharacterFix : IQuickFixStrategy
 }
 
 /// <summary>
+/// A key stored more than once (SNG022): it's set once, to the value it has, which saving writes on one line. A
+/// <c>song.ini</c>'s repeats are merged to the last one, which is what games read, so it always has a fix; a
+/// <c>.sng</c>'s are kept, and only have one when they all agree.
+/// </summary>
+public sealed class DuplicateKeyFix : IQuickFixStrategy
+{
+    public string RuleId => SngRules.Sng022;
+
+    public QuickFix? Propose(Finding finding, IReadOnlyList<KeyValuePair<string, string>> pairs)
+    {
+        if (!QuickFixRegistry.TryGetValue(finding, pairs, out string? key, out string? value)
+            || pairs.Any(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase) && !string.Equals(p.Value, value, StringComparison.Ordinal)))
+        {
+            return null;
+        }
+
+        return new QuickFix(RuleId, key, FindingMessages.QuickFixMergeDuplicates, [new MetadataEdit(key, value)]);
+    }
+}
+
+/// <summary>
 /// A legacy key (SNG025): it's renamed to the key that replaced it, keeping its value. When the song already has
 /// the new key, the two values could disagree, so there's no fix.
 /// </summary>

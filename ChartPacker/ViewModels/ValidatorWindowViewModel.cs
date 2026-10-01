@@ -50,6 +50,14 @@ namespace ChartPacker.ViewModels
         // Set while many issues are ticked at once, so the counts are worked out once at the end.
         private bool _selectingAll;
 
+        // A refresh of the counts is posted and not yet run, so a burst of songs read or fixed counts them once.
+        private bool _refreshPending;
+
+        // The counts, as last worked out: the listed songs that still fail, their issues with a quick fix, and how many of those are ticked.
+        private int _failingCount;
+        private int _fixableCount;
+        private int _selectedFixCount;
+
         /// <param name="entries">The songs to check, in the order they're listed.</param>
         /// <param name="drafts">The main window's drafts, which the songs are checked as.</param>
         /// <param name="inspector">The inspector the picked song is shown in, sharing <paramref name="drafts"/>.</param>
@@ -113,7 +121,7 @@ namespace ChartPacker.ViewModels
         public int Total => _entries.Count;
 
         /// <summary>How many listed songs still fail.</summary>
-        public int FailingCount => Songs.Count(s => !s.IsFixed);
+        public int FailingCount => _failingCount;
 
         public string StatusText =>
             IsChecking ? string.Format(CultureInfo.CurrentCulture, Strings.ValidatorCheckingFormat, Checked, Total)
@@ -128,10 +136,10 @@ namespace ChartPacker.ViewModels
         public bool ShowPickPrompt => SelectedSong is null;
 
         /// <summary>Some listed issue has a quick fix.</summary>
-        public bool HasFixes => FixableIssues.Any();
+        public bool HasFixes => _fixableCount > 0;
 
         /// <summary>How many ticked issues Fix selected would fix.</summary>
-        public int SelectedFixCount => FixableIssues.Count(i => i.IsSelected);
+        public int SelectedFixCount => _selectedFixCount;
 
         public string FixSelectedText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorFixSelectedFormat, SelectedFixCount);
 
@@ -142,18 +150,7 @@ namespace ChartPacker.ViewModels
         /// </summary>
         public bool? AllFixesSelected
         {
-            get
-            {
-                int fixable = 0, selected = 0;
-                foreach (var issue in FixableIssues)
-                {
-                    fixable++;
-                    if (issue.IsSelected)
-                        selected++;
-                }
-
-                return selected == 0 ? false : selected == fixable ? true : null;
-            }
+            get => _selectedFixCount == 0 ? false : _selectedFixCount == _fixableCount ? true : null;
             set
             {
                 bool select = value ?? true;
@@ -197,6 +194,7 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
+            RefreshCounts();
             IsChecking = false;
         }
 
@@ -213,8 +211,12 @@ namespace ChartPacker.ViewModels
             Inspector.Player.Dispose();
         }
 
-        partial void OnSelectedSongChanged(ValidatorSongViewModel? value) =>
-            _ = Inspector.ShowAsync(value is null ? [] : [value.Entry]);
+        partial void OnSelectedSongChanged(ValidatorSongViewModel? value)
+        {
+            // While saving, the inspector holds no files open; it shows the song picked once the save is done.
+            if (!IsSaving)
+                _ = Inspector.ShowAsync(value is null ? [] : [value.Entry]);
+        }
 
         // Drafts mustn't change while either this window or the inspector is writing them.
         private bool CanFixSelected() => !IsSaving && !Inspector.IsSaving && SelectedFixCount > 0;
@@ -234,17 +236,17 @@ namespace ChartPacker.ViewModels
 
             foreach (var (song, keys) in work)
             {
-                var item = new MetadataItem(song.Report.Pairs, _drafts.Get(song.Path));
+                var item = new MetadataItem(song.Report.Pairs, _drafts.Get(song.Path), song.Report.DuplicateKeys);
                 foreach (string key in keys)
-                    QuickFixRegistry.FixKey(item, key, song.Report.DuplicateKeys, includeHints: false);
+                    QuickFixRegistry.FixKey(item, key, includeHints: false);
 
-                // Checks the song again, here and in any inspector showing it.
-                _drafts.NotifyChanged(song.Path);
+                // Checks the song again, here and in any inspector showing it, which only has its rows to rebuild.
+                _drafts.NotifyChanged(song.Path, DraftChange.Keys);
             }
         }
 
         /// <summary>The listed songs that can be saved and have something to save.</summary>
-        private IEnumerable<ValidatorSongViewModel> SongsToSave => Songs.Where(s => s.Report.ReadError is null && _drafts.HasDrafts(s.Path));
+        private IEnumerable<ValidatorSongViewModel> SongsToSave => Songs.Where(s => s.Report.CanEdit && _drafts.HasDrafts(s.Path));
 
         private bool CanSaveAll() => !IsSaving && !Inspector.IsSaving && !_job.IsRunning && SongsToSave.Any();
 
@@ -276,17 +278,19 @@ namespace ChartPacker.ViewModels
             IReadOnlyList<string> failures;
             try
             {
-                // The inspector's player and background video hold the picked song's files open.
-                await Inspector.ReleaseFilesAsync();
-                failures = await _saver.SaveAsync(targets, entry => _drafts.NotifyChanged(entry.FullPath));
+                // The inspector's player and background video hold the picked song's files open, and mustn't open
+                // them again, as for another song saved, until every song is saved.
+                await Inspector.SuspendAsync();
+                failures = await _saver.SaveAsync(targets, entry => _drafts.NotifyChanged(entry.FullPath, DraftChange.Saved));
             }
             finally
             {
                 IsSaving = false;
+
+                // The inspector let go of its song's files whether or not it was saved, so it's shown again, once.
+                await Inspector.ResumeAsync(SelectedSong is null ? [] : [SelectedSong.Entry]);
             }
 
-            // The inspector let go of its song's files whether or not it was saved, so it's shown again.
-            await Inspector.ShowAsync(SelectedSong is null ? [] : [SelectedSong.Entry]);
             if (failures.Count > 0)
                 SaveError = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, string.Join(Environment.NewLine, failures));
         }
@@ -302,17 +306,24 @@ namespace ChartPacker.ViewModels
             if (song.IsFixed)
                 return;
 
-            // Reads finish in any order; the list keeps the selection's.
-            int at = 0;
-            while (at < Songs.Count && Songs[at].Index < index)
-                at++;
-            Songs.Insert(at, song);
+            // Reads finish in any order; the list keeps the selection's, which it's sorted by.
+            int low = 0, high = Songs.Count;
+            while (low < high)
+            {
+                int mid = (low + high) / 2;
+                if (Songs[mid].Index < index)
+                    low = mid + 1;
+                else
+                    high = mid;
+            }
+
+            Songs.Insert(low, song);
             _byPath[report.Entry.FullPath] = song;
-            RefreshCounts();
+            ScheduleRefreshCounts();
         }
 
         /// <summary>A listed song's draft changed, here or anywhere: it's checked again, from disk once the draft is gone.</summary>
-        private void OnDraftsChanged(string path)
+        private void OnDraftsChanged(string path, DraftChange change)
         {
             if (!_byPath.TryGetValue(path, out var song))
                 return;
@@ -320,7 +331,7 @@ namespace ChartPacker.ViewModels
             if (_drafts.HasDrafts(path))
             {
                 song.Check(DraftOf(song.Entry));
-                RefreshCounts();
+                ScheduleRefreshCounts();
             }
             else
             {
@@ -334,7 +345,7 @@ namespace ChartPacker.ViewModels
             {
                 var report = await SongMetadataCheck.ReadAsync(song.Entry, _closing.Token);
                 song.Update(report, DraftOf(song.Entry));
-                RefreshCounts();
+                ScheduleRefreshCounts();
             }
             catch (OperationCanceledException)
             {
@@ -364,8 +375,23 @@ namespace ChartPacker.ViewModels
 
         private MetadataDraft? DraftOf(SongEntry entry) => _drafts.HasDrafts(entry.FullPath) ? _drafts.Get(entry.FullPath) : null;
 
+        /// <summary>
+        /// Counts the songs and issues again once the songs read or changed so far are in: each walks the whole list,
+        /// so a burst of them, such as checking or fixing many songs, counts once rather than once per song.
+        /// </summary>
+        private void ScheduleRefreshCounts()
+        {
+            if (_refreshPending)
+                return;
+
+            _refreshPending = true;
+            Dispatcher.UIThread.Post(RefreshCounts, DispatcherPriority.Background);
+        }
+
         private void RefreshCounts()
         {
+            _refreshPending = false;
+            _failingCount = Songs.Count(s => !s.IsFixed);
             OnPropertyChanged(nameof(FailingCount));
             OnPropertyChanged(nameof(StatusText));
             OnPropertyChanged(nameof(ShowAllPass));
@@ -375,6 +401,16 @@ namespace ChartPacker.ViewModels
 
         private void RefreshSelection()
         {
+            int fixable = 0, selected = 0;
+            foreach (var issue in FixableIssues)
+            {
+                fixable++;
+                if (issue.IsSelected)
+                    selected++;
+            }
+
+            _fixableCount = fixable;
+            _selectedFixCount = selected;
             OnPropertyChanged(nameof(HasFixes));
             OnPropertyChanged(nameof(SelectedFixCount));
             OnPropertyChanged(nameof(FixSelectedText));
@@ -440,10 +476,14 @@ namespace ChartPacker.ViewModels
             Check(draft);
         }
 
-        /// <summary>Checks the metadata as <paramref name="draft"/> would save it. Issues ticked before stay ticked while they're still fixable.</summary>
+        /// <summary>
+        /// Checks the metadata as <paramref name="draft"/> would save it. Issues ticked before stay ticked while they're
+        /// still fixable. A song that can't be edited, such as a <c>.sng</c> with structural errors, has no fixes.
+        /// </summary>
         public void Check(MetadataDraft? draft)
         {
-            var pairs = draft?.ApplyTo(_report.Pairs) ?? _report.Pairs;
+            var item = new MetadataItem(_report.Pairs, draft ?? new MetadataDraft(), _report.DuplicateKeys);
+            var pairs = item.Draft.ApplyTo(item.Original);
             var headline = SongHeadline.From(pairs);
             Title = headline switch
             {
@@ -464,16 +504,23 @@ namespace ChartPacker.ViewModels
             }
 
             // One line per failing key, its messages joined, with what its quick fixes do.
-            var byKey = MetadataValidator.Validate(pairs, _report.DuplicateKeys)
+            var byKey = MetadataValidator.Validate(pairs, item.RemainingDuplicateKeys())
                 .Where(MetadataValidator.IsFailing)
                 .GroupBy(f => f.Key ?? "", StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             var issues = new List<ValidatorIssueViewModel>();
+            // Only a .sng with structural errors is read but can't be edited; the rest that can't couldn't be read.
+            if (!_report.CanEdit && byKey.Count > 0)
+            {
+                string reason = string.Format(CultureInfo.CurrentCulture, Strings.SngHasErrorsFormat, _report.Entry.DisplayName);
+                issues.Add(new ValidatorIssueViewModel("", reason, null, false, _selectionChanged));
+            }
+
             int unfixableListed = 0, unlisted = 0;
             foreach (var group in byKey)
             {
-                var fixes = group
+                List<string> fixes = !_report.CanEdit ? [] : group
                     .Select(f => QuickFixRegistry.Propose(f, pairs)?.Description)
                     .OfType<string>()
                     .Distinct(StringComparer.Ordinal)

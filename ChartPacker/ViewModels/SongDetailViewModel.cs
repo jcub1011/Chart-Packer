@@ -110,9 +110,14 @@ namespace ChartPacker.ViewModels
         private bool _notifyingDrafts;
 
         // Another panel sharing the drafts, such as the Validator window's, changed a song shown here: what's shown is
-        // read again once it's been still a moment, so a drag of an offset there reloads once.
+        // brought up to date once it's been still a moment, so a drag of an offset there updates it once. Only key
+        // changes are rebuilt from the shared drafts; anything else, such as a save, is read again from disk.
         private readonly DispatcherTimer _externalChangeTimer;
         private static readonly TimeSpan ExternalChangeDelay = TimeSpan.FromMilliseconds(250);
+        private bool _externalNeedsReload;
+
+        // Holds none of its songs' files open and doesn't follow other panels' changes, until it's resumed.
+        private bool _suspended;
 
         // The download command of each of the one selected song's files, by file, so a row rebuilt for the same file is equal to it.
         private readonly Dictionary<SongFileSource, IAsyncRelayCommand> _downloadCommands = [];
@@ -535,6 +540,9 @@ namespace ChartPacker.ViewModels
         /// <summary>Loads <paramref name="entries"/>, replacing whatever is shown. A newer call cancels an older one.</summary>
         public async Task ShowAsync(IReadOnlyList<SongEntry> entries)
         {
+            // This reads what's shown afresh, so a reload another panel's change was waiting on is done by it.
+            _externalChangeTimer.Stop();
+            _externalNeedsReload = false;
             _loadCts?.Cancel();
             _autoLengthCts?.Cancel();
             using var cts = new CancellationTokenSource();
@@ -693,7 +701,7 @@ namespace ChartPacker.ViewModels
         {
             bool applied = false;
             foreach (var song in _songs)
-                applied |= QuickFixRegistry.FixKey(song.Item, key, song.DuplicateKeys) > 0;
+                applied |= QuickFixRegistry.FixKey(song.Item, key) > 0;
             if (applied)
                 OnDraftsChanged();
         }
@@ -1407,9 +1415,11 @@ namespace ChartPacker.ViewModels
             var dirty = _songs.Where(s => !s.Item.Draft.IsEmpty).ToList();
             IReadOnlyList<string> failures = [];
 
-            if (HasValidationIssues && _confirmation is not null)
+            // Only the songs being saved count: a selected song without a draft isn't written.
+            int failingKeys = FailingKeyCount(dirty);
+            if (failingKeys > 0 && _confirmation is not null)
             {
-                string message = string.Format(CultureInfo.CurrentCulture, Strings.SaveInvalidMessageFormat, FailingFieldCount);
+                string message = string.Format(CultureInfo.CurrentCulture, Strings.SaveInvalidMessageFormat, failingKeys);
                 if (!await _confirmation.ConfirmAsync(Strings.SaveInvalidTitle, message, Strings.SaveAnywayButton))
                     return;
 
@@ -1444,6 +1454,23 @@ namespace ChartPacker.ViewModels
                 SaveError = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, string.Join(Environment.NewLine, failures));
         }
 
+        /// <summary>How many keys fail validation in <paramref name="songs"/>, as drafted: the rows saving them would leave marked.</summary>
+        private static int FailingKeyCount(IEnumerable<EditableSong> songs)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var song in songs)
+            {
+                var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
+                foreach (var finding in MetadataValidator.Validate(pairs, song.Item.RemainingDuplicateKeys()))
+                {
+                    if (MetadataValidator.IsFailing(finding))
+                        keys.Add(finding.Key ?? "");
+                }
+            }
+
+            return keys.Count;
+        }
+
         private bool CanDiscard() => HasDrafts && !IsSaving;
 
         [RelayCommand(CanExecute = nameof(CanDiscard))]
@@ -1464,7 +1491,7 @@ namespace ChartPacker.ViewModels
         /// Lets go of every file of the shown songs this panel holds open, which would stop them being replaced or
         /// deleted: playback's, and the background video's. They're opened again when the songs are next shown.
         /// </summary>
-        internal async Task ReleaseFilesAsync()
+        private async Task ReleaseFilesAsync()
         {
             Player.Unload();
             Background.Unload();
@@ -1517,14 +1544,16 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Another panel sharing the drafts changed one: if it's a song shown here, what's shown is read again
-        /// shortly, as it may have been saved, or have staged files this panel hasn't read.
+        /// Another panel sharing the drafts changed one: if it's a song shown here, what's shown is brought up to date
+        /// shortly. A change to its keys alone is rebuilt from the shared draft; anything else is read again, as the
+        /// song may have been saved, or have staged files this panel hasn't read.
         /// </summary>
-        private void OnDraftsChangedElsewhere(string path)
+        private void OnDraftsChangedElsewhere(string path, DraftChange change)
         {
-            if (_notifyingDrafts || !_entries.Any(e => e.FullPath.Equals(path, StringComparison.Ordinal)))
+            if (_notifyingDrafts || _suspended || !_entries.Any(e => e.FullPath.Equals(path, StringComparison.Ordinal)))
                 return;
 
+            _externalNeedsReload |= change != DraftChange.Keys;
             _externalChangeTimer.Stop();
             _externalChangeTimer.Start();
         }
@@ -1532,6 +1561,8 @@ namespace ChartPacker.ViewModels
         private void OnExternalChangeSettled()
         {
             _externalChangeTimer.Stop();
+            if (_suspended)
+                return;
 
             // Never under an edit in progress here: try again once it's done.
             if (IsSaving || IsAdding || Metadata.Any(r => r.IsEditing))
@@ -1540,7 +1571,36 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            _ = ShowAsync(_entries);
+            if (_externalNeedsReload)
+            {
+                _ = ShowAsync(_entries);
+                return;
+            }
+
+            // The drafts are shared, so a key change is rebuilt from them as an edit made here is, and playback carries on.
+            RebuildRows();
+            RefreshArt();
+        }
+
+        /// <summary>
+        /// Lets go of the shown songs' files and stops following other panels' changes, as while another window that
+        /// shares the drafts may save them. <see cref="ResumeAsync"/> shows the songs again.
+        /// </summary>
+        internal async Task SuspendAsync()
+        {
+            _suspended = true;
+            _externalChangeTimer.Stop();
+            _externalNeedsReload = false;
+            _loadCts?.Cancel();
+            _autoLengthCts?.Cancel();
+            await ReleaseFilesAsync();
+        }
+
+        /// <summary>Follows other panels' changes again, and shows <paramref name="entries"/>, or what was shown, read afresh.</summary>
+        internal Task ResumeAsync(IReadOnlyList<SongEntry>? entries = null)
+        {
+            _suspended = false;
+            return ShowAsync(entries ?? _entries);
         }
 
         /// <summary>Stops following the shared drafts and job, for a panel whose window has closed.</summary>
@@ -1628,7 +1688,7 @@ namespace ChartPacker.ViewModels
                 .Select((s, i) => (Song: s, ArtHash: loaded.Art.DiskHashes[i], Backgrounds: loaded.Backgrounds.Stored.ElementAtOrDefault(i) ?? StoredBackgrounds.None))
                 .Where(x => x.Song.Pairs is not null)
                 .Select(x => new EditableSong(
-                    x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath)), x.Song.SongIniPath, x.ArtHash, x.Backgrounds, x.Song.DuplicateKeys ?? []))
+                    x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath), x.Song.DuplicateKeys), x.Song.SongIniPath, x.ArtHash, x.Backgrounds))
                 .ToList();
             _artImages = loaded.Art.Images;
             _stagedArt = loaded.Art.Staged;
@@ -1715,7 +1775,7 @@ namespace ChartPacker.ViewModels
             {
                 var song = _songs[i];
                 var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
-                foreach (var finding in MetadataValidator.Validate(pairs, song.DuplicateKeys))
+                foreach (var finding in MetadataValidator.Validate(pairs, song.Item.RemainingDuplicateKeys()))
                 {
                     string key = finding.Key ?? "";
                     if (QuickFixRegistry.Propose(finding, pairs) is { } fix)
@@ -1835,7 +1895,7 @@ namespace ChartPacker.ViewModels
                 ulong size = (ulong)new FileInfo(entry.FullPath).Length;
 
                 return new LoadedSelection(
-                    [SngSong(entry, result)],
+                    [LoadedSongOf(SongMetadataCheck.FromSng(entry, result)).Song],
                     size,
                     result.Files.Select(f => new DiskFile(f.Name, f.Length)).ToList(),
                     result.Findings.Select(f => new FindingRow(f.RuleId, f.Message, f.Severity == Severity.Error)).ToList(),
@@ -1846,8 +1906,8 @@ namespace ChartPacker.ViewModels
 
             // Only a song.ini directly in the folder counts; one in a subfolder belongs to something else.
             var songIni = files.FirstOrDefault(f => f.RelativePath.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase));
-            var (song, note) = await LoadFolderSongAsync(
-                entry, songIni is null ? null : Path.Combine(entry.FullPath, songIni.RelativePath), cancellationToken).ConfigureAwait(false);
+            var (song, note) = LoadedSongOf(await SongMetadataCheck.ReadFolderAsync(
+                entry, songIni is null ? null : Path.Combine(entry.FullPath, songIni.RelativePath), cancellationToken).ConfigureAwait(false));
 
             return new LoadedSelection(
                 [song],
@@ -1868,9 +1928,10 @@ namespace ChartPacker.ViewModels
                 var entry = entries[i];
                 try
                 {
-                    songs[i] = entry.Kind == SongEntryKind.SngFile
-                        ? SngSong(entry, await SngReader.ReadAsync(entry.FullPath, token).ConfigureAwait(false))
-                        : (await LoadFolderSongAsync(entry, FindSongIni(entry.FullPath), token).ConfigureAwait(false)).Song;
+                    var report = entry.Kind == SongEntryKind.SngFile
+                        ? SongMetadataCheck.FromSng(entry, await SngReader.ReadAsync(entry.FullPath, token).ConfigureAwait(false))
+                        : await SongMetadataCheck.ReadFolderAsync(entry, SongIni.FindIn(entry.FullPath), token).ConfigureAwait(false);
+                    songs[i] = LoadedSongOf(report).Song;
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -1882,33 +1943,26 @@ namespace ChartPacker.ViewModels
             return new LoadedSelection(songs, 0, [], [], MetadataNote: null);
         }
 
-        private static LoadedSong SngSong(SongEntry entry, SngReadResult result) => new(
-            entry,
-            result.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList(),
-            SongIniPath: null,
-            result.HasErrors ? string.Format(CultureInfo.CurrentCulture, Strings.SngHasErrorsFormat, entry.DisplayName) : null);
-
-        /// <summary>Reads a folder's song.ini. With none, the metadata is empty and saving creates one.</summary>
-        private static async Task<(LoadedSong Song, string? Note)> LoadFolderSongAsync(SongEntry entry, string? songIniPath, CancellationToken cancellationToken)
+        /// <summary>
+        /// A song's metadata as read, with why it can't be edited, if it can't, and why it has none, if it hasn't. A
+        /// folder without a song.ini, or whose song.ini has no [song] section, has empty metadata, which saving adds to.
+        /// </summary>
+        private static (LoadedSong Song, string? Note) LoadedSongOf(SongMetadataReport report)
         {
-            if (songIniPath is null)
-                return (new LoadedSong(entry, [], Path.Combine(entry.FullPath, SongIni.FileName), null), Strings.NoSongIni);
-
-            var result = await SongIni.ReadAsync(songIniPath, cancellationToken).ConfigureAwait(false);
-            return result.Status switch
+            var entry = report.Entry;
+            return report.Status switch
             {
-                SongIniStatus.TooLarge => (
-                    new LoadedSong(entry, [], songIniPath, string.Format(CultureInfo.CurrentCulture, Strings.SongIniTooLargeFormat, entry.DisplayName)),
+                SongMetadataStatus.NoSongIni => (new LoadedSong(entry, [], report.SongIniPath, null), Strings.NoSongIni),
+                SongMetadataStatus.NoSongSection => (new LoadedSong(entry, [], report.SongIniPath, null), Strings.SongIniNoSongSection),
+                SongMetadataStatus.SongIniTooLarge => (
+                    new LoadedSong(entry, [], report.SongIniPath, string.Format(CultureInfo.CurrentCulture, Strings.SongIniTooLargeFormat, entry.DisplayName)),
                     Strings.SongIniTooLarge),
-                SongIniStatus.NoSongSection => (new LoadedSong(entry, [], songIniPath, null), Strings.SongIniNoSongSection),
-                _ => (new LoadedSong(entry, result.Pairs, songIniPath, null, result.DuplicateKeys), null),
+                SongMetadataStatus.SngHasErrors => (
+                    new LoadedSong(entry, report.Pairs, null, string.Format(CultureInfo.CurrentCulture, Strings.SngHasErrorsFormat, entry.DisplayName)),
+                    null),
+                _ => (new LoadedSong(entry, report.Pairs, report.SongIniPath, null, report.DuplicateKeys), null),
             };
         }
-
-        /// <summary>The folder's own song.ini, matched ignoring case, without listing the whole folder.</summary>
-        private static string? FindSongIni(string folder) =>
-            Directory.EnumerateFiles(folder)
-                .FirstOrDefault(f => Path.GetFileName(f).Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
         /// The key of the art <paramref name="song"/> will have once its draft is saved: an image
@@ -2544,9 +2598,9 @@ namespace ChartPacker.ViewModels
         /// <summary>A selected song whose metadata was read, with its draft.</summary>
         /// <param name="SongIniPath">For a folder, the song.ini to edit (which may not exist yet).</param>
         /// <param name="DiskArtHash">The hash of its album art as stored, or <see langword="null"/> when it has none that could be read.</param>
+        /// <param name="Item">Its metadata as stored, with the keys its song.ini repeats, and its draft.</param>
         /// <param name="Backgrounds">Its background image and video as stored.</param>
-        /// <param name="DuplicateKeys">The keys its song.ini repeats, which reading it merged.</param>
-        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath, string? DiskArtHash, StoredBackgrounds Backgrounds, IReadOnlyList<string> DuplicateKeys);
+        private sealed record EditableSong(SongEntry Entry, MetadataItem Item, string? SongIniPath, string? DiskArtHash, StoredBackgrounds Backgrounds);
 
         /// <summary>A file of the one selected song, as stored.</summary>
         private sealed record DiskFile(string Path, ulong Length);

@@ -280,7 +280,7 @@ namespace ChartPacker.Controls
             set => SetValue(LengthSecondsProperty, value);
         }
 
-        /// <summary>How far a pixel dragged with Ctrl held moves the audio, in seconds, whatever the song's length.</summary>
+        /// <summary>How many times less far a drag with Ctrl held moves the notes than a plain drag; see <see cref="LaneScrub.DefaultFineFactor"/>.</summary>
         public double FineScrubFactor
         {
             get => GetValue(FineScrubFactorProperty);

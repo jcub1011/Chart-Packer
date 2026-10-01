@@ -254,6 +254,10 @@
     <value>Rename to {0}</value>
     <comment>A quick fix that renames a legacy key. {0} is the key that replaced it.</comment>
   </data>
+  <data name="QuickFixMergeDuplicates" xml:space="preserve">
+    <value>Remove the repeats</value>
+    <comment>A quick fix that keeps one line of a key stored more than once, with the value it has.</comment>
+  </data>
   <data name="NoSongIni" xml:space="preserve">
     <value>There's no song.ini, so the .sng will have no metadata.</value>
   </data>

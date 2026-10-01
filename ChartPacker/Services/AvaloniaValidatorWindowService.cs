@@ -14,8 +14,10 @@ namespace ChartPacker.Services
     /// <param name="job">The main window's job: nothing is saved while one runs.</param>
     /// <param name="settings">The settings the inspector's player and highway share with the main ones.</param>
     /// <param name="openOutput">Opens an audio device, for the inspector's own player.</param>
-    /// <param name="mainPlayer">The main window's player, stopped while the Validator can play, which takes up the settings it changed.</param>
-    /// <param name="mainHighway">The main window's highway, which takes up the settings the Validator's changed.</param>
+    /// <param name="mainDetail">
+    /// The main window's panel. It lets go of its songs' files while the Validator is open, as the Validator may save
+    /// them, and shows them again afterwards; its player and highway then take up the settings the Validator's changed.
+    /// </param>
     /// <param name="notice">Where downloads report, under the main window's toolbar.</param>
     /// <param name="songFiles">Keeps saving a song apart from copies of it being downloaded, in either window.</param>
     public sealed class AvaloniaValidatorWindowService(
@@ -24,8 +26,7 @@ namespace ChartPacker.Services
         JobViewModel job,
         SettingsService settings,
         Func<int, IAudioOutput> openOutput,
-        PlayerViewModel mainPlayer,
-        HighwayViewModel mainHighway,
+        SongDetailViewModel mainDetail,
         IVideoDurationProbe video,
         NoticeViewModel notice,
         SongFileGate songFiles) : IValidatorWindowService
@@ -35,8 +36,7 @@ namespace ChartPacker.Services
             if (owner() is not { } window)
                 return;
 
-            if (mainPlayer.StopCommand.CanExecute(null))
-                mainPlayer.StopCommand.Execute(null);
+            await mainDetail.SuspendAsync();
 
             // The inspector is the main one in full, with a player and highway of its own. Its pickers and prompts
             // belong to this window, so they come up over it; its drafts and file gate are the main window's.
@@ -68,8 +68,9 @@ namespace ChartPacker.Services
             await dialog.ShowDialog(window);
 
             await viewModel.ShutdownAsync();
-            mainPlayer.ReloadSettings();
-            mainHighway.ReloadSettings();
+            mainDetail.Player.ReloadSettings();
+            mainDetail.Highway.ReloadSettings();
+            await mainDetail.ResumeAsync();
         }
     }
 }
