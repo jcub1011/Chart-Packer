@@ -37,6 +37,9 @@ namespace ChartPacker.ViewModels
             };
         }
 
+        /// <summary>The window title, with the program version from the project file.</summary>
+        public string Title { get; } = string.Format(CultureInfo.CurrentCulture, Strings.MainWindowTitleFormat, AppVersion.Semantic);
+
         public LibraryViewModel Library { get; }
 
         public SongDetailViewModel Detail { get; }

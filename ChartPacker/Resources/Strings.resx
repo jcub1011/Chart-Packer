@@ -291,6 +291,10 @@
   <data name="JobDetailsToolTip" xml:space="preserve">
     <value>Show details</value>
   </data>
+  <data name="MainWindowTitleFormat" xml:space="preserve">
+    <value>Chart Packer - v{0}</value>
+    <comment>{0} is the program's semantic version, e.g. 1.2.0.</comment>
+  </data>
   <data name="JobProgressWindowTitle" xml:space="preserve">
     <value>Job progress</value>
   </data>

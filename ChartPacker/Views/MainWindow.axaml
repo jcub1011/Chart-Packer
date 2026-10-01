@@ -9,7 +9,7 @@
         x:Class="ChartPacker.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Chart-Packer"
+        Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1000" Height="640"
         MinWidth="640" MinHeight="360">
