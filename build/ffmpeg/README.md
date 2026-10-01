@@ -20,7 +20,7 @@ managed decoders.
 
 ## For a release: `build.sh <rid>`
 
-This builds FFmpeg from the `n9.0` tag with only what the app needs, and nothing GPL or non-free:
+This builds FFmpeg from the `n9.0.2` tag with only what the app needs, and nothing GPL or non-free:
 
 - the demuxers and decoders of the registered video formats (sng-spec §8);
 - the decoders of the registered audio formats: `vorbis`, `opus`, `mp1float`, `mp2float` and

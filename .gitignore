@@ -404,5 +404,8 @@ FodyWeavers.xsd
 ChartPacker.Ffmpeg/runtimes/
 build/ffmpeg/.work/
 
+# Installer and portable zip, built by installer/ChartPacker.iss and the Release workflow
+/dist/
+
 # Playwright output
 /.playwright-mcp
