@@ -11,8 +11,10 @@
              x:Class="ChartPacker.Views.SongDetailView"
              x:DataType="vm:SongDetailViewModel"
              Focusable="True"
-             FocusAdorner="{x:Null}">
-    <!-- Focusable so a click on empty space can take focus from an edit box, which commits it. -->
+             FocusAdorner="{x:Null}"
+             ToolTip.ServiceEnabled="False">
+    <!-- Focusable so a click on empty space can take focus from an edit box, which commits it. Tooltips don't pop up
+         over the panel: TipStrip shows them along its bottom instead. -->
 
     <UserControl.Resources>
         <conv:DifficultyGlyphConverter x:Key="DifficultyGlyph"
@@ -169,6 +171,20 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
+        <!-- A flyout floats over the panel, and can cover the tip strip, so its tips pop up as usual. -->
+        <Style Selector="FlyoutPresenter">
+            <Setter Property="ToolTip.ServiceEnabled" Value="True" />
+        </Style>
+        <!-- The tip of what's under the pointer, over the bottom of the panel: its background is see-through, so the
+             rows under it still show, its words aren't. -->
+        <Style Selector="ctl|ToolTipStrip">
+            <Setter Property="Background" Value="{DynamicResource ToolTipStripBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="20,8" />
+            <Setter Property="TextElement.FontSize" Value="12" />
+        </Style>
+
         <Style Selector="TextBlock.section">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -881,11 +897,8 @@
                                                          Waveforms="{Binding Highway.LaneWaveforms}"
                                                          LengthSeconds="{Binding Player.TimelineSeconds}"
                                                          FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
-                                                         IsVisible="{Binding Highway.IsShownOverBackground}">
-                                        <ToolTip.Tip>
-                                            <ToolTip Classes="lane" Content="{Binding Player.HighwayScrubToolTip}" />
-                                        </ToolTip.Tip>
-                                    </ctl:NoteHighwayView>
+                                                         ToolTip.Tip="{Binding Player.HighwayScrubToolTip}"
+                                                         IsVisible="{Binding Highway.IsShownOverBackground}" />
                                 </Panel>
                             </Border>
                         </DockPanel>
@@ -986,7 +999,7 @@
                                                    FormatString="+0;-0;0"
                                                    AutomationProperties.Name="{x:Static res:Strings.LyricsOffsetName}">
                                         <ToolTip.Tip>
-                                            <StackPanel MaxWidth="320" Spacing="6">
+                                            <StackPanel Spacing="6">
                                                 <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.LyricsOffsetToolTip}" />
                                                 <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
                                             </StackPanel>
@@ -1017,11 +1030,8 @@
                                                    Clock="{Binding Lyrics.Clock}"
                                                    LengthSeconds="{Binding Player.TimelineSeconds}"
                                                    FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
-                                                   IsVisible="{Binding Lyrics.HasLyrics}">
-                                    <ToolTip.Tip>
-                                        <ToolTip Classes="lane" Content="{Binding Player.LyricsScrubToolTip}" />
-                                    </ToolTip.Tip>
-                                </ctl:LyricLaneView>
+                                                   ToolTip.Tip="{Binding Player.LyricsScrubToolTip}"
+                                                   IsVisible="{Binding Lyrics.HasLyrics}" />
                                 <TextBlock Classes="muted centered"
                                            VerticalAlignment="Center"
                                            Margin="12"
@@ -1076,11 +1086,8 @@
                                                      Waveforms="{Binding Highway.LaneWaveforms}"
                                                      LengthSeconds="{Binding Player.TimelineSeconds}"
                                                      FineSecondsPerPixel="{Binding Player.FineScrubSecondsPerPixel}"
-                                                     IsVisible="{Binding Highway.IsShown}">
-                                    <ToolTip.Tip>
-                                        <ToolTip Classes="lane" Content="{Binding Player.HighwayScrubToolTip}" />
-                                    </ToolTip.Tip>
-                                </ctl:NoteHighwayView>
+                                                     ToolTip.Tip="{Binding Player.HighwayScrubToolTip}"
+                                                     IsVisible="{Binding Highway.IsShown}" />
                             </Border>
                         </DockPanel>
                     </Panel>
@@ -1120,7 +1127,7 @@
                                                ToolTip.ShowOnDisabled="True"
                                                AutomationProperties.Name="{x:Static res:Strings.AudioOffsetName}">
                                     <ToolTip.Tip>
-                                        <StackPanel MaxWidth="320" Spacing="6">
+                                        <StackPanel Spacing="6">
                                             <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.AudioOffsetToolTip}" />
                                             <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
                                         </StackPanel>
@@ -1597,7 +1604,7 @@
                                             ToolTip.ShowOnDisabled="True"
                                             AutomationProperties.Name="{Binding AccessibleName}">
                                         <ToolTip.Tip>
-                                            <StackPanel MaxWidth="320" Spacing="2">
+                                            <StackPanel Spacing="2">
                                                 <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Name}" />
                                                 <TextBlock Classes="muted" Text="{Binding Key}" />
                                                 <TextBlock TextWrapping="Wrap"
@@ -1753,7 +1760,7 @@
                                                Text="{Binding Key}">
                                         <!-- The key in full (it may be trimmed), and what it does when it's a known key. -->
                                         <ToolTip.Tip>
-                                            <StackPanel MaxWidth="320" Spacing="2">
+                                            <StackPanel Spacing="2">
                                                 <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Key}" />
                                                 <TextBlock TextWrapping="Wrap" Text="{Binding KeyDescription}" IsVisible="{Binding HasKeyDescription}" />
                                             </StackPanel>
@@ -1907,5 +1914,8 @@
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>
+
+        <!-- In front of everything, along the bottom: the tip of whatever's under the pointer, as tall as it needs. -->
+        <ctl:ToolTipStrip x:Name="TipStrip" VerticalAlignment="Bottom" />
     </Panel>
 </UserControl>

@@ -21,6 +21,9 @@ namespace ChartPacker.Views
         {
             InitializeComponent();
 
+            // The tips of everything in the panel show along its bottom rather than beside the pointer.
+            TipStrip.Region = this;
+
             // The new-row key box acts as a dropdown of known keys: it opens when the editor appears
             // and whenever the box is clicked, not only on Down/F4 as AutoCompleteBox does by itself.
             NewKeyBox.PropertyChanged += (_, e) =>
