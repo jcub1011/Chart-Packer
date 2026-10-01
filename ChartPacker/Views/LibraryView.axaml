@@ -443,13 +443,25 @@
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                 IsVisible="{Binding ShowStatus}">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-                <Arc Classes="spinner"
-                     Classes.active="{Binding IsScanning}"
-                     IsVisible="{Binding IsScanning}"
-                     Width="10" Height="10" StrokeThickness="2"
-                     VerticalAlignment="Center" />
-                <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center" />
+            <StackPanel Spacing="5">
+                <!-- How many of the songs found so far have been read. The spinner shows while folders are still being searched. -->
+                <ProgressBar IsVisible="{Binding IsScanning}"
+                             IsIndeterminate="{Binding IsScanProgressIndeterminate}"
+                             Minimum="0"
+                             Maximum="{Binding ScanFound}"
+                             Value="{Binding ScanRead}"
+                             MinWidth="0"
+                             MinHeight="3"
+                             Height="3"
+                             AutomationProperties.Name="{Binding StatusText}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Arc Classes="spinner"
+                         Classes.active="{Binding IsSearching}"
+                         IsVisible="{Binding IsSearching}"
+                         Width="10" Height="10" StrokeThickness="2"
+                         VerticalAlignment="Center" />
+                    <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center" />
+                </StackPanel>
             </StackPanel>
         </Border>
 

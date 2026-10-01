@@ -129,9 +129,12 @@ public sealed class SongLibraryScannerTests
         string missing = Path.Combine(_root.FullName, "nope");
 
         Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongLibraryScanner.Enumerate(missing, 2));
-        Assert.ThrowsExactly<DirectoryNotFoundException>(
-            () => SongLibraryScanner.ScanAsync(missing, 2, new Progress<IReadOnlyList<SongEntry>>()));
+        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongLibraryScanner.ScanAsync(missing, 2, 4, _ => { }));
     }
+
+    [TestMethod]
+    public void ParallelismBelowOneThrows() =>
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => SongLibraryScanner.ScanAsync(_root.FullName, 2, 0, _ => { }));
 
     [TestMethod]
     public void NegativeMaxDepthThrows() =>
@@ -156,27 +159,67 @@ public sealed class SongLibraryScannerTests
         cts.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => SongLibraryScanner.ScanAsync(_root.FullName, 2, new SyncProgress(_ => { }), cts.Token));
+            () => SongLibraryScanner.ScanAsync(_root.FullName, 2, 4, _ => { }, cts.Token));
     }
 
     [TestMethod]
-    public async Task ScanAsyncBatchesMatchEnumerate()
+    [DataRow(1)]
+    [DataRow(4)]
+    [DataRow(int.MaxValue)]
+    public async Task ScanAsyncInPositionOrderMatchesEnumerate(int parallelism)
     {
-        // More entries than one batch holds, so at least two reports are made.
         for (int i = 0; i < 300; i++)
             Touch($"f{i / 50}/song{i:D3}.sng");
         for (int i = 0; i < 20; i++)
             Touch($"f{i}/folder/song.ini");
+        Touch("b/song.ini");
+        Touch("A/z.sng");
+        Touch("A/a.sng");
+        Touch("A/Nested/song.ini");
+        Touch("A/Nested/Deeper/ignored.sng");
+        Touch("c.sng");
+        Touch("B2.sng");
+        Touch("__MACOSX/._song.sng");
+        Touch("x/y/z/too-deep.sng");
 
-        var batches = new List<IReadOnlyList<SongEntry>>();
-        int total = await SongLibraryScanner.ScanAsync(_root.FullName, 2, new SyncProgress(batches.Add));
+        var found = await ScanAllAsync(maxDepth: 2, parallelism);
 
         var expected = SongLibraryScanner.Enumerate(_root.FullName, 2).ToList();
-        Assert.HasCount(320, expected);
-        Assert.AreEqual(expected.Count, total);
-        Assert.IsGreaterThanOrEqualTo(2, batches.Count);
-        Assert.IsTrue(batches.All(b => b.Count > 0));
-        CollectionAssert.AreEqual(expected, batches.SelectMany(b => b).ToList());
+        Assert.HasCount(326, expected);
+        CollectionAssert.AreEqual(expected, found.OrderBy(s => s.Position).Select(s => s.Entry).ToList());
+    }
+
+    [TestMethod]
+    public async Task ScanAsyncGivesEachSongItsOwnPosition()
+    {
+        Touch("a.sng");
+        Touch("b/c.sng");
+        Touch("b/d/song.ini");
+
+        var found = await ScanAllAsync(maxDepth: 2, parallelism: 4);
+
+        Assert.HasCount(3, found);
+        Assert.HasCount(3, found.Select(s => s.Position).Distinct().ToList());
+    }
+
+    [TestMethod]
+    public async Task RootThatIsASongFolderIsAtTheRootPosition()
+    {
+        Touch("song.ini");
+        Touch("sub/deeper.sng");
+
+        var found = await ScanAllAsync(maxDepth: 2, parallelism: 4);
+
+        Assert.AreEqual(ScanPosition.Root, found.Single().Position);
+        Assert.AreEqual(".", found.Single().Entry.RelativePath);
+    }
+
+    private async Task<List<ScannedSong>> ScanAllAsync(int maxDepth, int parallelism)
+    {
+        var found = new System.Collections.Concurrent.ConcurrentBag<ScannedSong>();
+        int total = await SongLibraryScanner.ScanAsync(_root.FullName, maxDepth, parallelism, found.Add);
+        Assert.AreEqual(found.Count, total);
+        return [.. found];
     }
 
     private string[] RelativePaths(int maxDepth) =>
@@ -189,11 +232,5 @@ public sealed class SongLibraryScannerTests
         string path = Path.Combine(_root.FullName, P(relative));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, []);
-    }
-
-    /// <summary>Reports on the calling thread, unlike <see cref="Progress{T}"/>, so tests see every batch before the scan completes.</summary>
-    private sealed class SyncProgress(Action<IReadOnlyList<SongEntry>> onReport) : IProgress<IReadOnlyList<SongEntry>>
-    {
-        public void Report(IReadOnlyList<SongEntry> value) => onReport(value);
     }
 }

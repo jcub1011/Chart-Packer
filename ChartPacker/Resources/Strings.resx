@@ -90,9 +90,13 @@
   <data name="Scanning" xml:space="preserve">
     <value>Scanning…</value>
   </data>
-  <data name="ScanningCountFormat" xml:space="preserve">
-    <value>Scanning… {0:N0} found</value>
-    <comment>{0} is the number of songs found so far.</comment>
+  <data name="ScanSearchingProgressFormat" xml:space="preserve">
+    <value>Read {0:N0} of {1:N0} found · still searching…</value>
+    <comment>{0} is the number of songs whose details have been read, {1} the number found so far. Shown while folders are still being searched.</comment>
+  </data>
+  <data name="ScanReadingProgressFormat" xml:space="preserve">
+    <value>Read {0:N0} of {1:N0}…</value>
+    <comment>{0} is the number of songs whose details have been read, {1} the number found. Shown once every folder has been searched.</comment>
   </data>
   <data name="SongCountOne" xml:space="preserve">
     <value>1 song</value>
@@ -878,6 +882,16 @@
     <value>depth levels subfolders recursive</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="ScanParallelismLabel" xml:space="preserve">
+    <value>Parallel reads</value>
+  </data>
+  <data name="ScanParallelismDescription" xml:space="preserve">
+    <value>How many folders a scan searches, and how many songs it reads, at once. Higher can be faster on SSDs and network drives; 1 reads one at a time.</value>
+  </data>
+  <data name="ScanParallelismKeywords" xml:space="preserve">
+    <value>threads parallel parallelism concurrency workers speed performance</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
   <data name="OutputFolderLabel" xml:space="preserve">
     <value>Output folder</value>
   </data>
@@ -933,10 +947,6 @@
   <data name="FilteredSongCountFormat" xml:space="preserve">
     <value>{0:N0}/{1:N0} songs</value>
     <comment>{0} is the number of songs shown, {1} the number found. Shown while a search or filter hides some.</comment>
-  </data>
-  <data name="ScanningFilteredCountFormat" xml:space="preserve">
-    <value>Scanning… {0:N0}/{1:N0} songs</value>
-    <comment>{0} is the number of songs shown so far, {1} the number found so far.</comment>
   </data>
   <data name="SearchWatermark" xml:space="preserve">
     <value>Search title, artist or file name</value>

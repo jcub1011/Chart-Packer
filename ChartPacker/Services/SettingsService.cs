@@ -75,6 +75,9 @@ namespace ChartPacker.Services
 
             settings.ScanMaxDepth = Math.Clamp(settings.ScanMaxDepth, 0, AppSettings.MaxScanMaxDepth);
 
+            if (settings.ScanParallelism < AppSettings.MinScanParallelism)
+                settings.ScanParallelism = AppSettings.DefaultScanParallelism;
+
             if (string.IsNullOrWhiteSpace(settings.LastFolder))
                 settings.LastFolder = null;
 

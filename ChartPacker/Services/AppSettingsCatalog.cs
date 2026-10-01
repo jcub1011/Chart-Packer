@@ -50,6 +50,19 @@ namespace ChartPacker.Services
                         Get = () => library.ScanDepth is { } depth ? (int)depth : AppSettings.DefaultScanMaxDepth,
                         Set = depth => library.ScanDepth = depth,
                     },
+                    new IntegerSetting
+                    {
+                        Id = "library.scanParallelism",
+                        Category = scanning,
+                        Label = Strings.ScanParallelismLabel,
+                        Description = Strings.ScanParallelismDescription,
+                        Keywords = Words(Strings.ScanParallelismKeywords),
+                        DefaultValue = AppSettings.DefaultScanParallelism,
+                        Minimum = AppSettings.MinScanParallelism,
+                        Maximum = int.MaxValue,
+                        Get = () => library.ScanParallelism,
+                        Set = parallelism => library.ScanParallelism = parallelism,
+                    },
                     new ChoiceSetting<DedupKindPreference>
                     {
                         Id = "library.dedupKeep",

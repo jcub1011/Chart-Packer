@@ -14,6 +14,8 @@ namespace ChartPacker.Services
         public const double MinLibraryPaneWidth = 200;
         public const int DefaultScanMaxDepth = 2;
         public const int MaxScanMaxDepth = 10;
+        public const int DefaultScanParallelism = 4;
+        public const int MinScanParallelism = 1;
         public const double DefaultMasterVolume = 1;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
         public const DedupKindPreference DefaultDedupKeepPreference = DedupKindPreference.PreferSng;
@@ -32,6 +34,9 @@ namespace ChartPacker.Services
 
         /// <summary>How many folder levels below the picked folder the library scan searches.</summary>
         public int ScanMaxDepth { get; set; } = DefaultScanMaxDepth;
+
+        /// <summary>How many folders the library scan searches, and how many songs it reads, at once.</summary>
+        public int ScanParallelism { get; set; } = DefaultScanParallelism;
 
         /// <summary>The last folder picked in the library panel. It is restored at launch but not scanned.</summary>
         public string? LastFolder { get; set; }

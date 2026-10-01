@@ -46,6 +46,20 @@ public static class SongSummaryReader
         return Task.Run(() => ReadCoreAsync(entry, cancellationToken), cancellationToken);
     }
 
+    /// <summary>Like <see cref="ReadAsync"/>, but <see langword="null"/> when the song can't be read.</summary>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    public static async Task<SongSummary?> TryReadAsync(SongEntry entry, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await ReadAsync(entry, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     private static async Task<SongSummary> ReadCoreAsync(SongEntry entry, CancellationToken cancellationToken)
     {
         if (entry.Kind == SongEntryKind.SngFile)

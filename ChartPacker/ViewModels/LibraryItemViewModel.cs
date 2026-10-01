@@ -14,13 +14,16 @@ namespace ChartPacker.ViewModels
     /// The title and detail line come from the song's metadata once <see cref="SetSummary"/> has
     /// been called, with any unsaved draft applied so edits show before they're saved.
     /// </remarks>
-    public sealed partial class LibraryItemViewModel(SongEntry entry, bool hasDrafts) : ObservableObject
+    public sealed partial class LibraryItemViewModel(SongEntry entry, ScanPosition position, bool hasDrafts) : ObservableObject
     {
         private SongSummary? _summary;
         private bool _summaryRead;
         private volatile bool _isRealized;
 
         public SongEntry Entry { get; } = entry;
+
+        /// <summary>Where the song comes in scan order.</summary>
+        public ScanPosition Position { get; } = position;
 
         /// <summary>What the list's search, filters and sort look at, with unsaved changes applied.</summary>
         public LibrarySongFacts Facts { get; private set; } = LibrarySongFacts.For(entry, hasDrafts);

@@ -126,32 +126,48 @@ public sealed record LibraryQuery
         ArgumentNullException.ThrowIfNull(scanOrdered);
         ArgumentNullException.ThrowIfNull(factsOf);
 
-        var words = SplitWords(Search);
+        var matcher = CreateMatcher();
         var matches = new List<(T Item, LibrarySongFacts Facts, int Index)>(scanOrdered.Count);
         for (int i = 0; i < scanOrdered.Count; i++)
         {
             var facts = factsOf(scanOrdered[i]);
-            if (Matches(facts, words))
+            if (matcher(facts))
                 matches.Add((scanOrdered[i], facts, i));
         }
 
-        if (SortField == LibrarySortField.ScanOrder)
-        {
-            if (Descending)
-                matches.Reverse();
-        }
-        else
-        {
-            var compare = StringComparer.Create(CultureInfo.CurrentCulture, CompareOptions.IgnoreCase);
-            int direction = Descending ? -1 : 1;
-            matches.Sort((a, b) =>
-            {
-                int result = CompareBy(a.Facts, b.Facts, compare, direction);
-                return result != 0 ? result : a.Index.CompareTo(b.Index);
-            });
-        }
-
+        var byIndex = Comparer<(T Item, LibrarySongFacts Facts, int Index)>.Create((a, b) => a.Index.CompareTo(b.Index));
+        matches.Sort(CreateComparer(m => m.Facts, byIndex));
         return matches.ConvertAll(m => m.Item);
+    }
+
+    /// <summary>Whether a song passes the search and every filter, with the search split into words once.</summary>
+    public Func<LibrarySongFacts, bool> CreateMatcher()
+    {
+        var words = SplitWords(Search);
+        return facts =>
+        {
+            ArgumentNullException.ThrowIfNull(facts);
+            return Matches(facts, words);
+        };
+    }
+
+    /// <summary>The order <see cref="Apply"/> sorts in, for placing items into an already sorted list.</summary>
+    /// <param name="scanOrder">Orders items as the scan found them.</param>
+    public IComparer<T> CreateComparer<T>(Func<T, LibrarySongFacts> factsOf, IComparer<T> scanOrder)
+    {
+        ArgumentNullException.ThrowIfNull(factsOf);
+        ArgumentNullException.ThrowIfNull(scanOrder);
+
+        if (SortField == LibrarySortField.ScanOrder)
+            return Descending ? Comparer<T>.Create((a, b) => scanOrder.Compare(b, a)) : scanOrder;
+
+        var compare = StringComparer.Create(CultureInfo.CurrentCulture, CompareOptions.IgnoreCase);
+        int direction = Descending ? -1 : 1;
+        return Comparer<T>.Create((a, b) =>
+        {
+            int result = CompareBy(factsOf(a), factsOf(b), compare, direction);
+            return result != 0 ? result : scanOrder.Compare(a, b);
+        });
     }
 
     private int CompareBy(LibrarySongFacts a, LibrarySongFacts b, StringComparer compare, int direction) => SortField switch

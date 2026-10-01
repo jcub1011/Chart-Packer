@@ -246,5 +246,37 @@ public sealed class LibraryQueryTests
         Assert.IsFalse(query.Matches(Bravo));
     }
 
+    [TestMethod]
+    public void CreateMatcherAgreesWithMatches()
+    {
+        var query = new LibraryQuery { Search = "alpha", GenreContains = "pop" };
+        var matcher = query.CreateMatcher();
+
+        foreach (var facts in All)
+            Assert.AreEqual(query.Matches(facts), matcher(facts));
+    }
+
+    [TestMethod]
+    public void CreateComparerSortsLikeApply()
+    {
+        // Two songs alike in every sorted value but the file name, so ties have to fall back to scan order.
+        var echo = new LibrarySongFacts(SongEntryKind.SngFile, "echo_file", "Alpha", "Beyoncé", "First Album", "Pop", "Charter One", 2004, 180_000, 10_000_000);
+        LibrarySongFacts[] scanOrdered = [.. All, echo, Charlie with { FileName = "charlie_two" }];
+        var indexOf = scanOrdered.Select((facts, i) => (facts, i)).ToDictionary(p => (object)p.facts, p => p.i, ReferenceEqualityComparer.Instance);
+        var byScanOrder = Comparer<LibrarySongFacts>.Create((a, b) => indexOf[a].CompareTo(indexOf[b]));
+
+        foreach (var field in Enum.GetValues<LibrarySortField>())
+        {
+            foreach (bool descending in new[] { false, true })
+            {
+                var query = new LibraryQuery { SortField = field, Descending = descending };
+                var sorted = scanOrdered.ToList();
+                sorted.Sort(query.CreateComparer(f => f, byScanOrder));
+
+                CollectionAssert.AreEqual(query.Apply(scanOrdered, f => f), sorted, $"{field}, descending: {descending}");
+            }
+        }
+    }
+
     private static List<LibrarySongFacts> Apply(LibraryQuery query) => query.Apply(All, f => f);
 }

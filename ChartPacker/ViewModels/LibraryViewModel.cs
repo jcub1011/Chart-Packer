@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Controls.Selection;
@@ -36,10 +37,16 @@ namespace ChartPacker.ViewModels
     /// </remarks>
     public partial class LibraryViewModel : ViewModelBase
     {
-        private const int SummaryParallelism = 4;
+        // Songs a scan has read are put in the list a chunk at a time, for at most this long per UI
+        // turn, so drawing and input keep up however fast they arrive.
+        private const int ListChunkSize = 64;
+        private static readonly TimeSpan ListBudget = TimeSpan.FromMilliseconds(8);
 
-        // Metadata arrives a song at a time; re-sorting for each would redo the list hundreds of times.
+        // Edits change a song's facts a keystroke at a time; re-sorting for each would redo the list over and over.
         private static readonly TimeSpan MetadataApplyDelay = TimeSpan.FromMilliseconds(250);
+
+        private static readonly IComparer<LibraryItemViewModel> ByPosition =
+            Comparer<LibraryItemViewModel>.Create((a, b) => a.Position.CompareTo(b.Position));
 
         private readonly IFolderPickerService _folderPicker;
         private readonly SettingsService _settings;
@@ -50,7 +57,7 @@ namespace ChartPacker.ViewModels
         private readonly IDownloadService _downloads;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
-        // Every scanned song, in scan order, whether or not it passes the filters.
+        // Every scanned song, in scan order (by Position), whether or not it passes the filters.
         private readonly List<LibraryItemViewModel> _allItems = [];
 
         // Re-applies the query once metadata has stopped arriving for a moment.
@@ -63,10 +70,12 @@ namespace ChartPacker.ViewModels
         private bool _syncingSelection;
         private CancellationTokenSource? _scanCts;
 
+        // Where the running scan's read songs wait to be listed; null when no scan is running.
+        private ScanSink? _scanSink;
+
         private readonly AlbumArtLoader _albumArt;
 
-        // Per-item background loads (metadata and album art) for the current list. They outlive
-        // the scan, so the list is usable meanwhile.
+        // Per-item background loads (metadata re-reads and album art) for the current list.
         private CancellationTokenSource _itemsCts = new();
 
         // What the list currently reflects: the folder and depth of the most recent scan.
@@ -189,6 +198,22 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(DeduplicateCommand))]
         public partial bool IsScanning { get; set; }
 
+        /// <summary>How many songs the scan has found so far.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsScanProgressIndeterminate))]
+        public partial int ScanFound { get; set; }
+
+        /// <summary>How many of the songs found have been read and listed.</summary>
+        [ObservableProperty]
+        public partial int ScanRead { get; set; }
+
+        /// <summary>The scan is still searching folders, so <see cref="ScanFound"/> may grow.</summary>
+        [ObservableProperty]
+        public partial bool IsSearching { get; set; }
+
+        /// <summary>Nothing has been found yet, so the progress bar can't show how far along the scan is.</summary>
+        public bool IsScanProgressIndeterminate => ScanFound == 0;
+
         [ObservableProperty]
         public partial string? ErrorMessage { get; set; }
 
@@ -237,19 +262,34 @@ namespace ChartPacker.ViewModels
         /// <summary>The search box and filter button, once there's a list to narrow down.</summary>
         public bool ShowFilterBar => HasScanned;
 
-        /// <summary>The bottom status line; hidden while a centered state (spinner, empty, error) says it instead.</summary>
-        public bool ShowStatus => HasScanned && !HasError && _allItems.Count > 0;
+        /// <summary>
+        /// The bottom status line, with the progress bar while scanning; hidden while a centered state
+        /// (empty, error) says it instead.
+        /// </summary>
+        public bool ShowStatus => HasScanned && !HasError && (IsScanning || _allItems.Count > 0);
 
-        /// <summary>The song count, or "shown/total" while the search or a filter may hide some.</summary>
-        public string StatusText => (IsScanning, Filter.Query.IsFiltering) switch
+        /// <summary>
+        /// While scanning, how many of the songs found have been read; then the song count, or
+        /// "shown/total" while the search or a filter may hide some.
+        /// </summary>
+        public string StatusText
         {
-            (true, true) => string.Format(CultureInfo.CurrentCulture, Strings.ScanningFilteredCountFormat, Entries.Count, _allItems.Count),
-            (true, false) => string.Format(CultureInfo.CurrentCulture, Strings.ScanningCountFormat, _allItems.Count),
-            (false, true) => string.Format(CultureInfo.CurrentCulture, Strings.FilteredSongCountFormat, Entries.Count, _allItems.Count),
-            _ => _allItems.Count == 1
-                ? Strings.SongCountOne
-                : string.Format(CultureInfo.CurrentCulture, Strings.SongCountFormat, _allItems.Count),
-        };
+            get
+            {
+                if (IsScanning)
+                {
+                    string format = IsSearching ? Strings.ScanSearchingProgressFormat : Strings.ScanReadingProgressFormat;
+                    return string.Format(CultureInfo.CurrentCulture, format, ScanRead, ScanFound);
+                }
+
+                if (Filter.Query.IsFiltering)
+                    return string.Format(CultureInfo.CurrentCulture, Strings.FilteredSongCountFormat, Entries.Count, _allItems.Count);
+
+                return _allItems.Count == 1
+                    ? Strings.SongCountOne
+                    : string.Format(CultureInfo.CurrentCulture, Strings.SongCountFormat, _allItems.Count);
+            }
+        }
 
         /// <summary>Where Pack, Unpack and Merge write: the chosen output folder, or else the scanned folder.</summary>
         public string? EffectiveOutputFolder => OutputFolder ?? _scannedFolder ?? FolderPath;
@@ -266,6 +306,13 @@ namespace ChartPacker.ViewModels
         }
 
         public bool HasCustomOutputFolder => OutputFolder is not null;
+
+        /// <summary>How many folders a scan searches, and how many songs it reads, at once. Taken when a scan starts.</summary>
+        public int ScanParallelism
+        {
+            get => _settings.Settings.ScanParallelism;
+            set => _settings.Settings.ScanParallelism = Math.Max(value, AppSettings.MinScanParallelism);
+        }
 
         /// <summary>Which copy the Deduplicate window keeps by default when a song is both a folder and a .sng.</summary>
         public DedupKindPreference DedupKeepPreference
@@ -456,12 +503,12 @@ namespace ChartPacker.ViewModels
             using var cts = new CancellationTokenSource();
             _scanCts = cts;
 
+            var sink = new ScanSink(this);
+            _scanSink = sink;
+
             _itemsCts.Cancel();
             _itemsCts.Dispose();
             _itemsCts = new CancellationTokenSource();
-            var itemsToken = _itemsCts.Token;
-            var summaryQueue = Channel.CreateUnbounded<LibraryItemViewModel>(new UnboundedChannelOptions { SingleWriter = true });
-            _ = LoadSummariesAsync(summaryQueue.Reader, itemsToken);
 
             _scannedFolder = folder;
             _scannedDepth = depth;
@@ -471,83 +518,155 @@ namespace ChartPacker.ViewModels
             _allItems.Clear();
             _itemsByPath.Clear();
             _previewingItem = null;
-            _albumArt.Reset(itemsToken);
+            _albumArt.Reset(_itemsCts.Token);
             ErrorMessage = null;
+            ScanFound = 0;
+            ScanRead = 0;
+            IsSearching = true;
             IsScanning = true;
             RefreshState();
 
-            // Progress<T> posts to the UI thread in order, ahead of this method's continuation,
-            // so every batch has landed by the time IsScanning is cleared below.
-            var progress = new Progress<IReadOnlyList<SongEntry>>(batch =>
-            {
-                if (_scanCts != cts)
-                    return;
-                var items = batch.Select(e => new LibraryItemViewModel(e, _drafts.HasDrafts(e.FullPath))).ToList();
-                foreach (var item in items)
-                {
-                    _itemsByPath[item.Entry.FullPath] = item;
-                    item.FactsChanged += OnItemFactsChanged;
-                }
-                _allItems.AddRange(items);
-
-                // In scan order with nothing hidden, the new songs simply go on the end.
-                if (Filter.Query.KeepsScanOrder && !IsApplyPending)
-                    Entries.AddRange(items);
-                else
-                    ScheduleApply(immediate: false);
-                RefreshPreviewing();
-                foreach (var item in items)
-                    summaryQueue.Writer.TryWrite(item);
-                RefreshState();
-            });
-
             try
             {
-                await SongLibraryScanner.ScanAsync(folder, depth, progress, cts.Token);
+                await SongLibraryLoader.LoadAsync(folder, depth, ScanParallelism, sink, cts.Token);
 
-                // Drafts for songs that were deleted or moved can never be saved.
-                if (_scanCts == cts)
-                    _drafts.DiscardMissing();
+                // Every song read is queued by now; the scan ends once the last of them is listed.
+                if (_scanSink == sink)
+                {
+                    sink.IsLoaded = true;
+                    sink.RequestList();
+                }
             }
             catch (OperationCanceledException)
             {
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                if (_scanCts == cts)
+                if (_scanSink == sink)
                     ErrorMessage = string.Format(CultureInfo.CurrentCulture, Strings.FolderUnreadableFormat, ex.Message);
             }
             finally
             {
-                summaryQueue.Writer.TryComplete();
                 if (_scanCts == cts)
-                {
                     _scanCts = null;
-                    IsScanning = false;
-                }
+                if (_scanSink == sink && !sink.IsLoaded)
+                    EndScan(completed: false);
             }
         }
 
-        /// <summary>Reads the metadata of each item as the scan queues it, a few at a time, and shows it.</summary>
-        private async Task LoadSummariesAsync(ChannelReader<LibraryItemViewModel> queue, CancellationToken cancellationToken)
+        /// <summary>
+        /// Lists the songs the scan has read since last time, a chunk at a time for as long as
+        /// <see cref="ListBudget"/> allows, and asks to come back for the rest.
+        /// </summary>
+        private void ListArrived(ScanSink sink)
         {
-            // Progress<T> posts back to the UI thread, where the items live.
-            var loaded = new Progress<(LibraryItemViewModel Item, SongSummary? Summary)>(result =>
-            {
-                if (!cancellationToken.IsCancellationRequested)
-                    result.Item.SetSummary(result.Summary, DraftFor(result.Item.Entry.FullPath));
-            });
-            IProgress<(LibraryItemViewModel, SongSummary?)> report = loaded;
-            var options = new ParallelOptions { MaxDegreeOfParallelism = SummaryParallelism, CancellationToken = cancellationToken };
+            if (sink != _scanSink)
+                return;
 
-            try
+            var watch = Stopwatch.StartNew();
+            var chunk = new List<LibraryItemViewModel>(ListChunkSize);
+            do
             {
-                await Parallel.ForEachAsync(queue.ReadAllAsync(cancellationToken), options, async (item, token) =>
-                    report.Report((item, await TryReadSummaryAsync(item.Entry, token).ConfigureAwait(false)))).ConfigureAwait(false);
+                chunk.Clear();
+                while (chunk.Count < ListChunkSize && sink.Songs.TryDequeue(out var song))
+                    chunk.Add(CreateItem(song));
+                if (chunk.Count > 0)
+                    AddItems(chunk);
             }
-            catch (OperationCanceledException)
+            while (chunk.Count == ListChunkSize && watch.Elapsed < ListBudget);
+
+            ScanFound = sink.Found;
+            ScanRead = _allItems.Count;
+            IsSearching = !sink.SearchComplete;
+
+            if (!sink.Songs.IsEmpty)
+                sink.RequestList();
+            else if (sink.IsLoaded)
+                EndScan(completed: true);
+
+            RefreshState();
+        }
+
+        private void EndScan(bool completed)
+        {
+            _scanSink = null;
+
+            // Drafts for songs that were deleted or moved can never be saved.
+            if (completed)
+                _drafts.DiscardMissing();
+
+            IsSearching = false;
+            IsScanning = false;
+        }
+
+        /// <summary>A list item for a song the scan read, showing what was read.</summary>
+        private LibraryItemViewModel CreateItem(LoadedSong song)
+        {
+            string path = song.Entry.FullPath;
+            var item = new LibraryItemViewModel(song.Entry, song.Position, _drafts.HasDrafts(path));
+            item.SetSummary(song.Summary, DraftFor(path));
+            return item;
+        }
+
+        /// <summary>Puts newly read songs in the list where the sort and filters place them. Songs already listed don't move.</summary>
+        private void AddItems(List<LibraryItemViewModel> items)
+        {
+            foreach (var item in items)
             {
+                _itemsByPath[item.Entry.FullPath] = item;
+                item.FactsChanged += OnItemFactsChanged;
+                int at = _allItems.BinarySearch(item, ByPosition);
+                _allItems.Insert(at < 0 ? ~at : at, item);
             }
+
+            // A re-apply on its way lists them along with everything else.
+            if (!IsApplyPending)
+            {
+                var query = Filter.Query;
+                var matches = query.CreateMatcher();
+                var order = query.CreateComparer(item => item.Facts, ByPosition);
+                var shown = items.Where(item => matches(item.Facts)).ToList();
+                shown.Sort(order);
+                InsertSorted(shown, order);
+            }
+
+            RefreshPreviewing();
+        }
+
+        /// <summary>Inserts <paramref name="sorted"/> into <see cref="Entries"/>, which <paramref name="order"/> already sorts.</summary>
+        private void InsertSorted(List<LibraryItemViewModel> sorted, IComparer<LibraryItemViewModel> order)
+        {
+            // Each song's place is found in the list as it is now, then the songs go in from the last
+            // place back so the earlier places stay right. Songs sharing a place go in together.
+            var places = new int[sorted.Count];
+            int low = 0;
+            for (int i = 0; i < sorted.Count; i++)
+                low = places[i] = LowerBound(Entries, sorted[i], order, low);
+
+            for (int end = sorted.Count; end > 0;)
+            {
+                int start = end - 1;
+                while (start > 0 && places[start - 1] == places[start])
+                    start--;
+                Entries.InsertRange(places[start], sorted.GetRange(start, end - start));
+                end = start;
+            }
+        }
+
+        /// <summary>The first index at or after <paramref name="low"/> whose item doesn't sort before <paramref name="item"/>.</summary>
+        private static int LowerBound(AvaloniaList<LibraryItemViewModel> list, LibraryItemViewModel item, IComparer<LibraryItemViewModel> order, int low)
+        {
+            int high = list.Count;
+            while (low < high)
+            {
+                int mid = low + (high - low) / 2;
+                if (order.Compare(list[mid], item) < 0)
+                    low = mid + 1;
+                else
+                    high = mid;
+            }
+
+            return low;
         }
 
         /// <summary>Re-reads one item's metadata, e.g. after its changes were saved.</summary>
@@ -556,25 +675,12 @@ namespace ChartPacker.ViewModels
             var token = _itemsCts.Token;
             try
             {
-                var summary = await TryReadSummaryAsync(item.Entry, token);
+                var summary = await SongSummaryReader.TryReadAsync(item.Entry, token);
                 if (!token.IsCancellationRequested)
                     item.SetSummary(summary, DraftFor(item.Entry.FullPath));
             }
             catch (OperationCanceledException)
             {
-            }
-        }
-
-        /// <summary>The entry's summary, or <see langword="null"/> when it can't be read.</summary>
-        private static async Task<SongSummary?> TryReadSummaryAsync(SongEntry entry, CancellationToken cancellationToken)
-        {
-            try
-            {
-                return await SongSummaryReader.ReadAsync(entry, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                return null;
             }
         }
 
@@ -733,6 +839,50 @@ namespace ChartPacker.ViewModels
             UnpackCommand.NotifyCanExecuteChanged();
             MergeCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
+        }
+
+        /// <summary>
+        /// Takes one scan's reports on the thread pool and has the UI thread list the songs once
+        /// input and drawing are done.
+        /// </summary>
+        private sealed class ScanSink(LibraryViewModel owner) : IProgress<LibraryLoadProgress>
+        {
+            private int _listPosted;
+            private volatile int _found;
+            private volatile bool _searchComplete;
+
+            /// <summary>Songs read but not listed yet.</summary>
+            public ConcurrentQueue<LoadedSong> Songs { get; } = new();
+
+            public int Found => _found;
+
+            public bool SearchComplete => _searchComplete;
+
+            /// <summary>The load has finished, so every song it read is listed or in <see cref="Songs"/>. UI thread only.</summary>
+            public bool IsLoaded { get; set; }
+
+            public void Report(LibraryLoadProgress value)
+            {
+                // Counted before queued, so the found count is never behind the songs listed.
+                _found = value.Found;
+                _searchComplete = value.SearchComplete;
+                foreach (var song in value.Songs)
+                    Songs.Enqueue(song);
+                RequestList();
+            }
+
+            /// <summary>Has the UI thread list what's queued, unless that's already on its way.</summary>
+            public void RequestList()
+            {
+                if (Interlocked.Exchange(ref _listPosted, 1) != 0)
+                    return;
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    Volatile.Write(ref _listPosted, 0);
+                    owner.ListArrived(this);
+                }, DispatcherPriority.Background);
+            }
         }
     }
 }
