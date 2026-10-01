@@ -399,3 +399,10 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# FFmpeg shared libraries, built or fetched by build/ffmpeg
+ChartPacker.Ffmpeg/runtimes/
+build/ffmpeg/.work/
+
+# Playwright output
+/.playwright-mcp

@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +22,10 @@
       <StronglyTypedFileName>$(IntermediateOutputPath)KnownKeyDescriptions.Designer.cs</StronglyTypedFileName>
       <PublicClass>false</PublicClass>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChartPacker.Core.Tests" />
   </ItemGroup>
 
   <ItemGroup>

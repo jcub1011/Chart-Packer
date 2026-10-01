@@ -6,7 +6,7 @@ namespace ChartPacker.Core.Tests.Sng;
 [TestClass]
 public sealed class SngEntryStreamTests
 {
-    private static readonly byte[] Data = Enumerable.Range(0, 600).Select(i => (byte)(i * 7)).ToArray();
+    private static readonly byte[] Data = [.. Enumerable.Range(0, 600).Select(i => (byte)(i * 7))];
 
     private string _path = null!;
 
@@ -14,7 +14,7 @@ public sealed class SngEntryStreamTests
     public void WriteSng()
     {
         var builder = new SngBuilder();
-        byte[] masked = Data.ToArray();
+        byte[] masked = [.. Data];
         SngMask.Apply(masked, builder.Mask);
         builder.AddFile("other.bin", [1, 2, 3]).AddFile("data.bin", masked);
 

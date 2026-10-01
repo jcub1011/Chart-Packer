@@ -1,4 +1,7 @@
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Core.Sng;
+using ChartPacker.Core.Tests.Charts;
 using ChartPacker.Core.Tests.Sng;
 
 namespace ChartPacker.Core.Tests;
@@ -80,6 +83,64 @@ public sealed class SongSummaryReaderTests
         Write(folder, "song.ini", "[other]\nname = Song\n");
 
         Assert.IsEmpty((await SongSummaryReader.ReadAsync(Folder(folder))).Pairs);
+    }
+
+    [TestMethod]
+    public async Task FolderGivesItsTopLevelNamesAndChart()
+    {
+        string folder = CreateFolder("Song");
+        Write(folder, "notes.chart", ChartReaderTests.Chart);
+        Write(folder, "guitar.ogg", "x");
+        Write(folder, "drums_1.ogg", "x");
+        Write(folder, "video.webm", "x");
+        Write(folder, "album.png", "x");
+        Write(folder, "stems/bass.ogg", "x");
+
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+
+        CollectionAssert.AreEquivalent(new[] { "album.png", "drums_1.ogg", "guitar.ogg", "notes.chart", "video.webm" }, summary.StoredNames.ToArray());
+        Assert.AreEqual(LibraryDifficulties.Hard | LibraryDifficulties.Expert, summary.Chart?.Difficulties);
+        Assert.IsTrue(summary.Chart!.Instruments.HasFlag(LibraryInstruments.Drums));
+    }
+
+    [TestMethod]
+    public async Task SngGivesItsTopLevelNamesAndChart()
+    {
+        var builder = new SngBuilder();
+        // The builder stores data as given, so the chart is masked the way a real .sng stores it.
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART VOCALS").Note(0, 60).Build();
+        SngMask.Apply(midi, builder.Mask);
+        byte[] bytes = builder
+            .AddMetadata("song_length", "1000")
+            .AddFile("notes.mid", midi)
+            .AddFile("vocals.ogg", new byte[4])
+            .AddFile("extras/readme.txt", new byte[4])
+            .Build();
+        string path = Path.Combine(_root.FullName, "Song.sng");
+        File.WriteAllBytes(path, bytes);
+
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"));
+
+        CollectionAssert.AreEquivalent(new[] { "notes.mid", "vocals.ogg" }, summary.StoredNames.ToArray());
+        Assert.AreEqual(new ChartContents(LibraryInstruments.Vocals, LibraryDifficulties.None), summary.Chart);
+    }
+
+    [TestMethod]
+    public async Task SongWithoutChartHasNone()
+    {
+        string folder = CreateFolder("Song");
+        Write(folder, "song.ogg", "x");
+
+        Assert.AreEqual(ChartContents.None, (await SongSummaryReader.ReadAsync(Folder(folder))).Chart);
+    }
+
+    [TestMethod]
+    public async Task MalformedChartIsUnknown()
+    {
+        string folder = CreateFolder("Song");
+        Write(folder, "notes.mid", "not a midi file");
+
+        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder))).Chart);
     }
 
     [TestMethod]

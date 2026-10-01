@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- The FFmpeg bindings take pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <!-- FFmpeg's bindings and shared libraries. -->
+    <ProjectReference Include="..\ChartPacker.Ffmpeg\ChartPacker.Ffmpeg.csproj" />
+  </ItemGroup>
+</Project>

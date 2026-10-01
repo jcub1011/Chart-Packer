@@ -1,6 +1,5 @@
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Sng;
-using Microsoft.Win32.SafeHandles;
 
 namespace ChartPacker.Core.Scanning;
 
@@ -36,66 +35,23 @@ public static class AlbumArt
     /// album-art file directly in it is deleted, and a replacement is copied in as
     /// <see cref="StoredNameFor"/> names it. Art in subfolders is left alone.
     /// </summary>
-    /// <remarks>
-    /// The replacement is copied to a temp file before anything is deleted, so a copy that fails
-    /// leaves the old art in place, and the source may be one of the files being replaced.
-    /// </remarks>
+    /// <remarks>See <see cref="FileSlot.ApplyToFolderAsync"/>: a failed copy leaves the old art in place.</remarks>
     /// <exception cref="ArgumentException">The replacement isn't a png, jpg or jpeg.</exception>
     /// <exception cref="IOException">A file can't be read, written or deleted.</exception>
     /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
     /// <exception cref="OperationCanceledException">Cancelled before anything was deleted.</exception>
-    public static async Task ApplyToFolderAsync(string folder, AlbumArtChange change, CancellationToken cancellationToken = default)
+    public static Task ApplyToFolderAsync(string folder, AlbumArtChange change, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folder);
 
-        string? target = null;
-        string? tempPath = null;
+        string? name = null;
         if (change.SourcePath is { } source)
         {
-            string name = StoredNameFor(source)
+            name = StoredNameFor(source)
                 ?? throw new ArgumentException($"'{source}' isn't a png, jpg or jpeg image.", nameof(change));
-            target = Path.Combine(folder, name);
-            tempPath = target + ".tmp";
-
-            try
-            {
-                await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 1, useAsync: true))
-                await using (var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 64 * 1024, useAsync: true))
-                    await input.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
-            }
-            catch
-            {
-                TryDelete(tempPath);
-                throw;
-            }
         }
 
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (string path in Directory.EnumerateFiles(folder).Where(p => IsAlbumArtName(Path.GetFileName(p))).ToList())
-                File.Delete(path);
-
-            if (tempPath is not null)
-                File.Move(tempPath, target!, overwrite: true);
-        }
-        catch
-        {
-            if (tempPath is not null)
-                TryDelete(tempPath);
-            throw;
-        }
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        return FileSlot.ApplyToFolderAsync(folder, IsAlbumArtName, name, change.SourcePath, cancellationToken);
     }
 
     /// <summary>
@@ -113,44 +69,38 @@ public static class AlbumArt
 
         return Task.Run(
             () => entry.Kind == SongEntryKind.SngFile
-                ? Task.FromResult(ReadFromSng(entry.FullPath, maxBytes, cancellationToken))
+                ? ReadFromSng(entry.FullPath, maxBytes, cancellationToken)
                 : ReadFromFolderAsync(entry.FullPath, maxBytes, cancellationToken),
             cancellationToken);
     }
 
-    private static async Task<byte[]?> ReadFromFolderAsync(string folder, long maxBytes, CancellationToken cancellationToken)
+    private static Task<byte[]?> ReadFromFolderAsync(string folder, long maxBytes, CancellationToken cancellationToken)
     {
         var files = Directory.EnumerateFiles(folder).ToList();
         string? path = Pick(files, Path.GetFileName);
-        if (path is null || new FileInfo(path).Length > maxBytes)
-            return null;
-
-        return await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+        return path is null ? Task.FromResult<byte[]?>(null) : SongFile.ReadFileAsync(path, maxBytes, cancellationToken);
     }
 
-    private static byte[]? ReadFromSng(string path, long maxBytes, CancellationToken cancellationToken)
+    private static Task<byte[]?> ReadFromSng(string path, long maxBytes, CancellationToken cancellationToken)
     {
         var read = SngReader.Read(path, cancellationToken);
         if (read.Header is not { } header)
-            return null;
+            return Task.FromResult<byte[]?>(null);
 
-        // Capped so the length always fits a byte array.
         var file = Pick(read.Files, f => f.Name);
-        if (file is null || file.Length > (ulong)Math.Min(maxBytes, Array.MaxLength))
-            return null;
-
-        using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var data = new MemoryStream((int)file.Length);
-        SngFileData.CopyUnmasked(handle, file, header.Mask.Span, data, cancellationToken);
-        return data.ToArray();
+        return Task.FromResult(file is null ? null : SongFile.ReadFromSng(path, header, file, maxBytes, cancellationToken));
     }
 
     /// <summary>The first of <paramref name="items"/> whose name is the most preferred album-art name.</summary>
-    private static T? Pick<T>(IReadOnlyList<T> items, Func<T, string> name) where T : class
+    public static T? Pick<T>(IEnumerable<T> items, Func<T, string> name) where T : class
     {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(name);
+
+        var list = items as IReadOnlyList<T> ?? items.ToList();
         foreach (string candidate in Names)
         {
-            foreach (T item in items)
+            foreach (T item in list)
             {
                 if (name(item).Equals(candidate, StringComparison.OrdinalIgnoreCase))
                     return item;

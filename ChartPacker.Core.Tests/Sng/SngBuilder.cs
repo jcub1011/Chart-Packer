@@ -17,7 +17,7 @@ internal sealed class SngBuilder
 
     public uint Version { get; set; } = 1;
 
-    public byte[] Mask { get; set; } = Enumerable.Range(0x10, 16).Select(b => (byte)b).ToArray();
+    public byte[] Mask { get; set; } = [.. Enumerable.Range(0x10, 16).Select(b => (byte)b)];
 
     public ulong? MetadataLen { get; set; }
 
@@ -100,7 +100,7 @@ internal sealed class SngBuilder
         foreach (var (_, data) in _files)
             bytes.AddRange(data);
         bytes.AddRange(Trailing);
-        return bytes.ToArray();
+        return [.. bytes];
     }
 
     private static void AppendUInt32(List<byte> bytes, uint value)

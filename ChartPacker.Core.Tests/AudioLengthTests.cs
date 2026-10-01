@@ -145,7 +145,7 @@ public sealed class AudioLengthTests
 
     private static byte[] Masked(SngBuilder builder, byte[] data)
     {
-        byte[] copy = data.ToArray();
+        byte[] copy = [.. data];
         SngMask.Apply(copy, builder.Mask);
         return copy;
     }

@@ -1,4 +1,5 @@
 using ChartPacker.Core.Packing;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Validation;
 
 namespace ChartPacker.Core.Tests.Packing;
@@ -141,6 +142,24 @@ public sealed class PackPlannerTests
         var plan = await PackPlanner.PlanAsync(_root.FullName);
 
         Assert.AreEqual(SngRules.Sng032, plan.Findings.Single(f => f.Severity == Severity.Error).RuleId);
+    }
+
+    [TestMethod]
+    public async Task PlanFromAListingMatchesPlanFromTheFolder()
+    {
+        Write("song.ini", "[song]\nname = Test\n");
+        Write("notes.chart", "x");
+        Write("Song.OGG", "audio");
+        Write("stems/extra.ogg", "more");
+        Write("desktop.ini", "junk");
+        var options = new PackOptions(IncludeSubfolders: true);
+
+        var fromFolder = await PackPlanner.PlanAsync(_root.FullName, options);
+        var fromListing = await PackPlanner.PlanAsync(_root.FullName, SongFolderListing.List(_root.FullName), options);
+
+        CollectionAssert.AreEqual(fromFolder.Included.ToArray(), fromListing.Included.ToArray());
+        CollectionAssert.AreEqual(fromFolder.Excluded.ToArray(), fromListing.Excluded.ToArray());
+        CollectionAssert.AreEqual(fromFolder.Metadata.ToArray(), fromListing.Metadata.ToArray());
     }
 
     private void Write(string relative, string content)

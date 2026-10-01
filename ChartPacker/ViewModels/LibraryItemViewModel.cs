@@ -1,5 +1,6 @@
-using System.Collections.Generic;
+using System;
 using Avalonia.Media.Imaging;
+using ChartPacker.Core.Library;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Formatting;
@@ -13,13 +14,22 @@ namespace ChartPacker.ViewModels
     /// The title and detail line come from the song's metadata once <see cref="SetSummary"/> has
     /// been called, with any unsaved draft applied so edits show before they're saved.
     /// </remarks>
-    public sealed partial class LibraryItemViewModel(SongEntry entry, bool hasDrafts) : ObservableObject
+    public sealed partial class LibraryItemViewModel(SongEntry entry, ScanPosition position, bool hasDrafts) : ObservableObject
     {
         private SongSummary? _summary;
         private bool _summaryRead;
         private volatile bool _isRealized;
 
         public SongEntry Entry { get; } = entry;
+
+        /// <summary>Where the song comes in scan order.</summary>
+        public ScanPosition Position { get; } = position;
+
+        /// <summary>What the list's search, filters and sort look at, with unsaved changes applied.</summary>
+        public LibrarySongFacts Facts { get; private set; } = LibrarySongFacts.For(entry, hasDrafts);
+
+        /// <summary><see cref="Facts"/> changed, so the song may now sort or filter differently.</summary>
+        public event Action<LibraryItemViewModel>? FactsChanged;
 
         public bool IsSng => Entry.Kind == SongEntryKind.SngFile;
 
@@ -50,30 +60,59 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The song has metadata changes that haven't been saved.</summary>
         [ObservableProperty]
-        private bool _hasDrafts = hasDrafts;
+        public partial bool HasDrafts { get; set; } = hasDrafts;
 
         /// <summary>The song's name, or the file or folder name when it has none.</summary>
         [ObservableProperty]
-        private string _title = entry.DisplayName;
+        public partial string Title { get; set; } = entry.DisplayName;
 
-        /// <summary>Artist and charter; a loading note until the metadata is read.</summary>
+        /// <summary>A loading note until the metadata is read, or the relative path when it couldn't be; otherwise empty.</summary>
         [ObservableProperty]
-        private string _details = Strings.MetadataLoading;
+        [NotifyPropertyChangedFor(nameof(ShowDetails))]
+        public partial string Details { get; set; } = Strings.MetadataLoading;
+
+        /// <summary>The artist, without rich-text tags; null when there is none.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(BylinePrefix), nameof(ShowByline), nameof(ShowDetails))]
+        public partial string? Artist { get; set; }
+
+        /// <summary>The charter with its rich-text tags left in, for the view to render; null when there is none.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(BylinePrefix), nameof(ShowByline), nameof(ShowDetails))]
+        public partial string? Charter { get; set; }
+
+        /// <summary>This song is the one the player is playing, so the play button on its art shows a stop button.</summary>
+        [ObservableProperty]
+        public partial bool IsPreviewing { get; set; }
+
+        /// <summary>
+        /// The plain text before the charter on the byline: the artist, with the separator when a charter
+        /// follows. The line is one text, so a long one is cut short with an ellipsis as a whole.
+        /// </summary>
+        public string? BylinePrefix =>
+            Artist is null ? null
+            : Charter is null ? Artist
+            : Artist + Strings.ListDetailSeparator;
+
+        /// <summary>The line shows the artist and charter rather than <see cref="Details"/>.</summary>
+        public bool ShowByline => Artist is not null || Charter is not null;
+
+        public bool ShowDetails => !ShowByline;
 
         /// <summary>The song length, for the chip before the size chip; null until read or when unknown.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasLength))]
-        private string? _lengthText;
+        public partial string? LengthText { get; set; }
 
         /// <summary>The file's or folder's total size, for the chip at the end of the detail line; null until read.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasSize))]
-        private string? _sizeText;
+        public partial string? SizeText { get; set; }
 
         /// <summary>The album-art thumbnail, once <see cref="AlbumArtLoader"/> has read it. Owned by the loader.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasAlbumArt))]
-        private Bitmap? _albumArt;
+        public partial Bitmap? AlbumArt { get; set; }
 
         /// <summary>Shows what was read from disk, or <see langword="null"/> when the song couldn't be read.</summary>
         public void SetSummary(SongSummary? summary, MetadataDraft? draft)
@@ -92,25 +131,37 @@ namespace ChartPacker.ViewModels
             if (_summary is null)
             {
                 Title = Entry.DisplayName;
+                Artist = null;
+                Charter = null;
                 Details = Entry.RelativePath;
                 LengthText = null;
                 SizeText = null;
+                SetFacts(LibrarySongFacts.For(Entry, HasDrafts));
                 return;
             }
 
-            var headline = SongHeadline.From(draft?.ApplyTo(_summary.Pairs) ?? _summary.Pairs);
+            var pairs = draft?.ApplyTo(_summary.Pairs) ?? _summary.Pairs;
+            var headline = SongHeadline.From(pairs);
             Title = headline.Name ?? Entry.DisplayName;
-
-            var parts = new List<string>(2);
-            if (headline.Artist is { } artist)
-                parts.Add(artist);
-            if (headline.Charter is { } charter)
-                parts.Add(charter);
-            Details = string.Join(Strings.ListDetailSeparator, parts);
+            Artist = headline.Artist;
+            Charter = SongHeadline.CharterMarkup(pairs);
+            Details = string.Empty;
 
             // Without a song_length, the longest audio file stands in.
             LengthText = (headline.LengthMs ?? _summary.FallbackLengthMs) is { } length ? MetadataTimes.FormatDuration(length) : null;
             SizeText = ByteSizeFormatter.Format(_summary.TotalSize);
+            SetFacts(LibrarySongFacts.From(Entry, _summary, draft, HasDrafts));
+        }
+
+        partial void OnHasDraftsChanged(bool value) => SetFacts(Facts with { HasDrafts = value });
+
+        private void SetFacts(LibrarySongFacts facts)
+        {
+            if (facts == Facts)
+                return;
+
+            Facts = facts;
+            FactsChanged?.Invoke(this);
         }
     }
 }

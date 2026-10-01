@@ -6,13 +6,23 @@ namespace ChartPacker.Core.Tests.Metadata;
 public sealed class BulkMetadataTests
 {
     [TestMethod]
-    public void RowsAreTheUnionInFirstSeenOrder()
+    public void RowsAreTheUnionSortedByKey()
     {
         var items = Items([P("name", "A"), P("artist", "X")], [P("album", "Z"), P("NAME", "A")]);
 
         var rows = BulkMetadata.BuildRows(items);
 
-        CollectionAssert.AreEqual(new[] { "name", "artist", "album" }, rows.Select(r => r.Key).ToArray());
+        CollectionAssert.AreEqual(new[] { "album", "artist", "name" }, rows.Select(r => r.Key).ToArray());
+    }
+
+    [TestMethod]
+    public void DraftedKeySortsAmongSavedKeys()
+    {
+        var items = Items([P("name", "A"), P("Charter", "C")]);
+
+        BulkMetadata.Set(items, "album", "Z");
+
+        CollectionAssert.AreEqual(new[] { "album", "Charter", "name" }, BulkMetadata.BuildRows(items).Select(r => r.Key).ToArray());
     }
 
     [TestMethod]
@@ -22,8 +32,8 @@ public sealed class BulkMetadataTests
 
         var rows = BulkMetadata.BuildRows(items);
 
-        Assert.AreEqual(new BulkMetadataRow("name", "Same", MetadataRowState.Unchanged), rows[0]);
-        Assert.IsTrue(rows[1].IsDistinct);
+        Assert.AreEqual(new BulkMetadataRow("name", "Same", MetadataRowState.Unchanged), rows.Single(r => r.Key == "name"));
+        Assert.IsTrue(rows.Single(r => r.Key == "artist").IsDistinct);
     }
 
     [TestMethod]
@@ -115,7 +125,7 @@ public sealed class BulkMetadataTests
         var items = Items([P("name", "A")], [P("name", "B")]);
 
         BulkMetadata.Set(items, "genre", "Rock");
-        Assert.AreEqual(new BulkMetadataRow("genre", "Rock", MetadataRowState.Added), BulkMetadata.BuildRows(items)[^1]);
+        Assert.AreEqual(new BulkMetadataRow("genre", "Rock", MetadataRowState.Added), BulkMetadata.BuildRows(items).Single(r => r.Key == "genre"));
 
         BulkMetadata.Remove(items, "genre");
         Assert.IsFalse(BulkMetadata.BuildRows(items).Any(r => r.Key == "genre"));
@@ -144,7 +154,7 @@ public sealed class BulkMetadataTests
 
         BulkMetadata.Set(items, "diff_bass", "3");
 
-        Assert.AreEqual(new BulkMetadataRow("diff_bass", "3", MetadataRowState.Edited), BulkMetadata.BuildRows(items)[^1]);
+        Assert.AreEqual(new BulkMetadataRow("diff_bass", "3", MetadataRowState.Edited), BulkMetadata.BuildRows(items).Single(r => r.Key == "diff_bass"));
     }
 
     [TestMethod]
@@ -167,12 +177,35 @@ public sealed class BulkMetadataTests
         BulkMetadata.Remove(items, "artist");
 
         var rows = BulkMetadata.BuildRows(items);
-        Assert.AreEqual(new BulkMetadataRow("name", "B", MetadataRowState.Edited), rows[0]);
-        Assert.AreEqual(new BulkMetadataRow("artist", "X", MetadataRowState.Removed), rows[1]);
+        Assert.AreEqual(new BulkMetadataRow("artist", "X", MetadataRowState.Removed), rows[0]);
+        Assert.AreEqual(new BulkMetadataRow("name", "B", MetadataRowState.Edited), rows[1]);
     }
 
+    [TestMethod]
+    public void ExcludedKeysHaveNoRow()
+    {
+        var items = Items([P("name", "A"), P("diff_guitar", "4"), P("diff_foo", "2")]);
+
+        var rows = BulkMetadata.BuildRows(items, DifficultySlots.Contains);
+
+        CollectionAssert.AreEqual(new[] { "diff_foo", "name" }, rows.Select(r => r.Key).ToArray());
+    }
+
+    [TestMethod]
+    public void RowOfKeepsAnUnsetDifficulty()
+    {
+        var items = Items([P("diff_guitar", "-1")]);
+
+        Assert.AreEqual(new BulkMetadataRow("diff_guitar", "-1", MetadataRowState.Unchanged), BulkMetadata.RowOf(items, "diff_guitar"));
+        Assert.IsFalse(BulkMetadata.BuildRows(items).Any(r => r.Key == "diff_guitar"));
+    }
+
+    [TestMethod]
+    public void RowOfAKeyNoItemHasIsNull() =>
+        Assert.IsNull(BulkMetadata.RowOf(Items([P("name", "A")]), "diff_guitar"));
+
     private static MetadataItem[] Items(params KeyValuePair<string, string>[][] originals) =>
-        originals.Select(o => new MetadataItem(o, new MetadataDraft())).ToArray();
+        [.. originals.Select(o => new MetadataItem(o, new MetadataDraft()))];
 
     private static KeyValuePair<string, string> P(string key, string value) => KeyValuePair.Create(key, value);
 }

@@ -16,20 +16,14 @@ namespace ChartPacker.Core.Scanning;
 /// </remarks>
 public static class AudioLength
 {
-    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase) { ".mp3", ".ogg", ".opus", ".wav" };
-
     static AudioLength()
     {
         // ATL writes the stack trace of every file it can't parse to the console by default.
-        Settings.OutputStacktracesToConsole = false;
+        ATL.Settings.OutputStacktracesToConsole = false;
     }
 
     /// <summary>Whether <paramref name="name"/>, a path relative to the song folder, is an audio file that counts.</summary>
-    public static bool IsAudioFile(string name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        return !name.Contains('/') && AudioExtensions.Contains(Path.GetExtension(name));
-    }
+    public static bool IsAudioFile(string name) => AudioStems.IsAudioFile(name);
 
     /// <summary>The longest of the folder's audio files, in milliseconds.</summary>
     /// <param name="folder">The song folder.</param>
@@ -48,7 +42,7 @@ public static class AudioLength
             try
             {
                 using var stream = new FileStream(Path.Combine(folder, file.RelativePath), FileMode.Open, FileAccess.Read, FileShare.Read);
-                longest = Max(longest, Measure(stream, file.RelativePath));
+                longest = Max(longest, MeasureMs(stream, file.RelativePath));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -78,7 +72,7 @@ public static class AudioLength
             try
             {
                 using var stream = new SngEntryStream(sng, file, header.Mask.Span);
-                longest = Max(longest, Measure(stream, file.Name));
+                longest = Max(longest, MeasureMs(stream, file.Name));
             }
             catch (Exception ex) when (ex is IOException or ArgumentOutOfRangeException)
             {
@@ -90,7 +84,7 @@ public static class AudioLength
     }
 
     /// <summary>The stream's duration in whole milliseconds, or <see langword="null"/> when it isn't known.</summary>
-    private static long? Measure(Stream stream, string name)
+    internal static long? MeasureMs(Stream stream, string name)
     {
         double ms;
         try

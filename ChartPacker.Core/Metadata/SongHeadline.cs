@@ -32,8 +32,21 @@ public sealed record SongHeadline(string? Name, string? Artist, string? Charter,
             Length(pairs));
     }
 
-    private static string? Text(IReadOnlyList<KeyValuePair<string, string>> pairs, string key) =>
-        Find(pairs, key) is { } value && RichText.ToPlainText(value).Trim() is { Length: > 0 } plain ? plain : null;
+    /// <summary>
+    /// The charter as stored (from <c>charter</c> or else the legacy <c>frets</c>), trimmed, with its rich-text tags
+    /// left in for a view to render; <see langword="null"/> when there is no visible text.
+    /// </summary>
+    public static string? CharterMarkup(IReadOnlyList<KeyValuePair<string, string>> pairs)
+    {
+        ArgumentNullException.ThrowIfNull(pairs);
+
+        return Markup(pairs, CharterKey) ?? Markup(pairs, LegacyCharterKey);
+    }
+
+    private static string? Markup(IReadOnlyList<KeyValuePair<string, string>> pairs, string key) =>
+        Find(pairs, key) is { } value && RichText.ToPlainText(value).Trim().Length > 0 ? value.Trim() : null;
+
+    private static string? Text(IReadOnlyList<KeyValuePair<string, string>> pairs, string key) => MetadataPairs.Text(pairs, key);
 
     private static long? Length(IReadOnlyList<KeyValuePair<string, string>> pairs) =>
         Find(pairs, LengthKey) is { } value
@@ -42,14 +55,5 @@ public sealed record SongHeadline(string? Name, string? Artist, string? Charter,
             ? ms
             : null;
 
-    private static string? Find(IReadOnlyList<KeyValuePair<string, string>> pairs, string key)
-    {
-        foreach (var pair in pairs)
-        {
-            if (pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
-                return pair.Value;
-        }
-
-        return null;
-    }
+    private static string? Find(IReadOnlyList<KeyValuePair<string, string>> pairs, string key) => MetadataPairs.Find(pairs, key);
 }

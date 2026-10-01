@@ -301,7 +301,7 @@ public sealed class SngReaderTests
         return path;
     }
 
-    private static string[] RuleIds(SngReadResult result) => result.Findings.Select(f => f.RuleId).Distinct().ToArray();
+    private static string[] RuleIds(SngReadResult result) => [.. result.Findings.Select(f => f.RuleId).Distinct()];
 
     private static void AssertOnly(SngReadResult result, string ruleId) =>
         CollectionAssert.AreEqual(

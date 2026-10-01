@@ -5,7 +5,7 @@ namespace ChartPacker.Core.Tests.Sng;
 [TestClass]
 public sealed class SngMaskTests
 {
-    private static readonly byte[] ExampleMask = Enumerable.Range(0x10, 16).Select(b => (byte)b).ToArray();
+    private static readonly byte[] ExampleMask = [.. Enumerable.Range(0x10, 16).Select(b => (byte)b)];
 
     [TestMethod]
     public void WorkedExampleMasksAbc()
@@ -23,7 +23,7 @@ public sealed class SngMaskTests
         byte[] mask = SngMask.Generate();
         byte[] data = new byte[1000];
         new Random(7).NextBytes(data);
-        byte[] expected = data.Select((b, i) => (byte)(b ^ mask[i % 16] ^ (i & 0xFF))).ToArray();
+        byte[] expected = [.. data.Select((b, i) => (byte)(b ^ mask[i % 16] ^ (i & 0xFF)))];
 
         SngMask.Apply(data, mask);
 

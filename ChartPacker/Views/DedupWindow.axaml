@@ -1,0 +1,289 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:ChartPacker.ViewModels"
+        xmlns:res="using:ChartPacker.Resources"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="760"
+        x:Class="ChartPacker.Views.DedupWindow"
+        x:DataType="vm:DedupWindowViewModel"
+        Title="{x:Static res:Strings.DedupWindowTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="1100" Height="760"
+        MinWidth="720" MinHeight="460"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.description">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.error">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="Border.group-card">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style Selector="Border.member-row.keeper">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        </Style>
+        <Style Selector="Border.member-row">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,4" />
+        </Style>
+        <Style Selector="Expander">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+    </Window.Styles>
+
+    <Window.DataTemplates>
+        <!-- One copy (or variant, or chart): keep it, or mark it for deletion. -->
+        <DataTemplate DataType="vm:DedupMemberViewModel">
+            <Border Classes="member-row" Classes.keeper="{Binding IsKeeper}">
+                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+                    <RadioButton Grid.Column="0"
+                                 VerticalAlignment="Top"
+                                 GroupName="{Binding GroupName}"
+                                 IsChecked="{Binding IsKeeper}"
+                                 IsVisible="{Binding ShowKeeper}"
+                                 Content="{x:Static res:Strings.DedupKeep}"
+                                 AutomationProperties.Name="{x:Static res:Strings.DedupKeep}" />
+                    <CheckBox Grid.Column="1"
+                              VerticalAlignment="Top"
+                              IsChecked="{Binding IsMarked}"
+                              IsEnabled="{Binding CanMark}"
+                              Content="{x:Static res:Strings.DedupDelete}"
+                              AutomationProperties.Name="{x:Static res:Strings.DedupDelete}" />
+                    <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                        <SelectableTextBlock Text="{Binding Path}" FontWeight="SemiBold" TextWrapping="Wrap" ToolTip.Tip="{Binding FullPath}" />
+                        <WrapPanel Orientation="Horizontal">
+                            <TextBlock Classes="muted" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Text="{Binding DetailText}" />
+                            <TextBlock Classes="muted" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Text="{Binding CopiesText}" IsVisible="{Binding HasCopies}" />
+                            <TextBlock Classes="muted" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Text="{Binding OtherVersionsText}" IsVisible="{Binding HasOtherVersions}" />
+                            <Border Classes="chip" Margin="0,0,6,0" IsVisible="{Binding HasSuffix}">
+                                <TextBlock Text="{x:Static res:Strings.DedupTagSuffix}" />
+                            </Border>
+                            <Border Classes="chip" Margin="0,0,6,0" IsVisible="{Binding HasDrafts}">
+                                <TextBlock Text="{x:Static res:Strings.DedupTagUnsaved}" />
+                            </Border>
+                            <Border Classes="chip" Margin="0,0,6,0" IsVisible="{Binding HasExtras}">
+                                <TextBlock Text="{Binding ExtrasText}" />
+                            </Border>
+                        </WrapPanel>
+                        <TextBlock FontSize="12" TextWrapping="Wrap" Opacity="0.85" Text="{Binding DifferenceText}" IsVisible="{Binding HasDifference}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- A group: its title, its own buttons, and its copies. -->
+        <DataTemplate DataType="vm:DedupGroupViewModel">
+            <Border Classes="group-card">
+                <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                            <Button Content="{x:Static res:Strings.DedupOpenInMerge}"
+                                    Command="{Binding OpenInMergeCommand}"
+                                    IsVisible="{Binding ShowOpenInMerge}"
+                                    AutomationProperties.Name="{x:Static res:Strings.DedupOpenInMerge}" />
+                            <Button Content="{Binding DeleteLabel}"
+                                    Command="{Binding DeleteCommand}"
+                                    IsVisible="{Binding ShowGroupDelete}"
+                                    AutomationProperties.Name="{Binding DeleteLabel}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding MergedText}" IsVisible="{Binding HasMerged}" />
+                    <ItemsControl ItemsSource="{Binding Members}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:DedupResultRow">
+            <Grid ColumnDefinitions="*,2*" ColumnSpacing="10" Margin="0,2">
+                <TextBlock Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" />
+                <TextBlock Grid.Column="1" TextWrapping="Wrap" Classes.warning="{Binding IsProblem}" Text="{Binding Status}" />
+            </Grid>
+        </DataTemplate>
+    </Window.DataTemplates>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- What's kept by default, and anything stopping deletes. -->
+        <Border Grid.Row="0" Classes="toolbar" BorderThickness="0,0,0,1">
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DedupKeepLabel}" />
+                    <ComboBox MinWidth="140"
+                              ItemsSource="{Binding KeepOptions}"
+                              SelectedItem="{Binding SelectedKeepOption}"
+                              IsEnabled="{Binding IsReady}"
+                              ToolTip.Tip="{x:Static res:Strings.DedupKeepDescription}"
+                              AutomationProperties.Name="{x:Static res:Strings.DedupKeepLabel}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DedupKeepOption">
+                                <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+                <TextBlock Classes="warning" Text="{x:Static res:Strings.DedupTrashUnsupported}" IsVisible="{Binding TrashUnavailable}" />
+                <TextBlock Classes="error" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" />
+            </StackPanel>
+        </Border>
+
+        <Panel Grid.Row="1">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="420"
+                        Spacing="8"
+                        IsVisible="{Binding IsAnalyzing}">
+                <TextBlock HorizontalAlignment="Center" Text="{Binding ProgressText}" />
+                <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressValue}" IsIndeterminate="{Binding IsProgressIndeterminate}" />
+            </StackPanel>
+
+            <DockPanel IsVisible="{Binding IsLoaded}">
+                <Expander DockPanel.Dock="Bottom" Margin="16,0,16,8" IsVisible="{Binding HasSkipped}">
+                    <Expander.Header>
+                        <TextBlock Classes="warning" Text="{Binding SkippedHeader}" />
+                    </Expander.Header>
+                    <ScrollViewer MaxHeight="140" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Skipped}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Expander>
+
+                <TabControl Margin="8,4,8,0">
+                    <TabItem Header="{Binding ExactHeader}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="8,8,8,16" Spacing="10">
+                                <TextBlock Classes="description" Text="{x:Static res:Strings.DedupExactDescription}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoExact}">
+                                    <Button Content="{x:Static res:Strings.DedupMarkAll}"
+                                            Command="{Binding MarkAllCommand}"
+                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkAll}" />
+                                    <Button Classes="accent"
+                                            Content="{Binding DeleteMarkedLabel}"
+                                            Command="{Binding DeleteExactCommand}"
+                                            AutomationProperties.Name="{Binding DeleteMarkedLabel}" />
+                                </StackPanel>
+                                <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoExact}" IsVisible="{Binding HasNoExact}" />
+                                <ItemsControl ItemsSource="{Binding ExactGroups}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="8" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="{Binding SameChartHeader}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="8,8,8,16" Spacing="10">
+                                <TextBlock Classes="description" Text="{x:Static res:Strings.DedupSameChartDescription}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoSameChart}">
+                                    <Button Content="{x:Static res:Strings.DedupMarkMerged}"
+                                            Command="{Binding MarkMergedSameChartCommand}"
+                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkMerged}" />
+                                    <Button Classes="accent"
+                                            Content="{Binding SameChartDeleteMarkedLabel}"
+                                            Command="{Binding DeleteSameChartCommand}"
+                                            AutomationProperties.Name="{Binding SameChartDeleteMarkedLabel}" />
+                                </StackPanel>
+                                <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoSameChart}" IsVisible="{Binding HasNoSameChart}" />
+                                <ItemsControl ItemsSource="{Binding SameChartGroups}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="8" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="{Binding MergeHeader}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="8,8,8,16" Spacing="10">
+                                <TextBlock Classes="description" Text="{x:Static res:Strings.DedupMergeDescription}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoMerge}">
+                                    <Button Content="{x:Static res:Strings.DedupMarkMerged}"
+                                            Command="{Binding MarkMergedMergeCommand}"
+                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkMerged}" />
+                                    <Button Classes="accent"
+                                            Content="{Binding MergeDeleteMarkedLabel}"
+                                            Command="{Binding DeleteMergeCommand}"
+                                            AutomationProperties.Name="{Binding MergeDeleteMarkedLabel}" />
+                                </StackPanel>
+                                <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoMerge}" IsVisible="{Binding HasNoMerge}" />
+                                <ItemsControl ItemsSource="{Binding MergeGroups}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="8" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+            </DockPanel>
+        </Panel>
+
+        <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsDeleting}">
+                        <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DedupDeleting}" />
+                    </StackPanel>
+                    <Expander IsVisible="{Binding HasResults}">
+                        <Expander.Header>
+                            <TextBlock FontWeight="SemiBold" Text="{Binding ResultSummary}" />
+                        </Expander.Header>
+                        <ScrollViewer MaxHeight="160" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Results}" />
+                        </ScrollViewer>
+                    </Expander>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        MinWidth="80"
+                        VerticalAlignment="Bottom"
+                        HorizontalContentAlignment="Center"
+                        Content="{Binding CloseLabel}"
+                        Command="{Binding CloseCommand}"
+                        IsCancel="True"
+                        AutomationProperties.Name="{Binding CloseLabel}" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

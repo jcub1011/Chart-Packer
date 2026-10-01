@@ -17,41 +17,128 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartPacker.ViewModels
 {
     /// <summary>A warning or error under a job item.</summary>
-    public sealed record JobMessageRow(string Text, bool IsError);
+    /// <param name="RuleId">The validation rule that raised it.</param>
+    public sealed record JobMessageRow(string RuleId, string Message, bool IsError);
 
     /// <summary>One item's outcome in the results panel.</summary>
     /// <param name="Name">The item's name.</param>
     /// <param name="Detail">What happened, e.g. where it was written or why it was skipped.</param>
     /// <param name="Status">How it ended.</param>
     /// <param name="Messages">The item's warnings and errors. Info findings are left out.</param>
-    public sealed record JobItemRow(string Name, string Detail, JobItemStatus Status, IReadOnlyList<JobMessageRow> Messages)
+    /// <param name="IsCanceled">The job was cancelled before this item finished, so it has no result.</param>
+    public sealed record JobItemRow(string Name, string Detail, JobItemStatus Status, IReadOnlyList<JobMessageRow> Messages, bool IsCanceled = false)
     {
-        public bool IsFailed => Status == JobItemStatus.Failed;
+        public bool IsFailed => Status == JobItemStatus.Failed && !IsCanceled;
 
         /// <summary>Finished, but with something the user should look at.</summary>
         public bool IsAttention => Status is JobItemStatus.Skipped or JobItemStatus.SucceededWithWarnings or JobItemStatus.CompletedWithErrors;
 
         public bool HasMessages => Messages.Count > 0;
 
-        public string Glyph => Status switch
+        public string Glyph => IsCanceled ? "⊘" : Status switch
         {
             JobItemStatus.Succeeded => "✓",
             JobItemStatus.SucceededWithWarnings or JobItemStatus.CompletedWithErrors => "!",
             JobItemStatus.Skipped => "–",
             _ => "✕",
         };
+
+        /// <summary>Whether the name, detail or any message contains <paramref name="query"/>, ignoring case.</summary>
+        public bool Matches(string query) =>
+            Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || Detail.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || Messages.Any(m => m.RuleId.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || m.Message.Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>One tab of rows in the progress window, e.g. everything that was skipped, with its own search.</summary>
+    /// <param name="titleFormat">The heading's format; <c>{0}</c> is the number of rows.</param>
+    public sealed partial class JobResultGroup(string titleFormat) : ViewModelBase
+    {
+        private readonly List<JobItemRow> _all = [];
+
+        /// <summary>The rows that match the search; every row while there's no search.</summary>
+        public AvaloniaList<JobItemRow> Rows { get; } = [];
+
+        [ObservableProperty]
+        public partial string SearchText { get; set; } = "";
+
+        /// <summary>The heading, with the number of rows, whatever the search.</summary>
+        public string Title => Format(TitleFormat, _all.Count);
+
+        public bool HasRows => _all.Count > 0;
+
+        public bool IsSearching => Query.Length > 0;
+
+        /// <summary>There are rows, but none match the search.</summary>
+        public bool HasNoMatches => HasRows && Rows.Count == 0;
+
+        public string NoMatchesText => Format(Strings.JobSearchNoMatchesFormat, Query);
+
+        /// <summary>How many rows match, out of how many, e.g. "3 of 120".</summary>
+        public string MatchCountText => Format(Strings.JobSearchCountFormat, Rows.Count, _all.Count);
+
+        private string Query => SearchText?.Trim() ?? "";
+
+        internal string TitleFormat
+        {
+            get;
+            set
+            {
+                field = value;
+                OnPropertyChanged(nameof(Title));
+            }
+        } = titleFormat;
+
+        internal void Add(JobItemRow row)
+        {
+            _all.Add(row);
+            if (row.Matches(Query))
+                Rows.Add(row);
+            Refresh();
+        }
+
+        internal void Clear()
+        {
+            _all.Clear();
+            Rows.Clear();
+            SearchText = "";
+            Refresh();
+        }
+
+        // Only while searching, so Escape in an empty search box still reaches the window's Close button.
+        [RelayCommand(CanExecute = nameof(IsSearching))]
+        private void ClearSearch() => SearchText = "";
+
+        partial void OnSearchTextChanged(string value)
+        {
+            string query = Query;
+            Rows.Clear();
+            Rows.AddRange(_all.Where(r => r.Matches(query)));
+            OnPropertyChanged(nameof(IsSearching));
+            ClearSearchCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(NoMatchesText));
+            Refresh();
+        }
+
+        private void Refresh()
+        {
+            OnPropertyChanged(nameof(Title));
+            OnPropertyChanged(nameof(HasRows));
+            OnPropertyChanged(nameof(HasNoMatches));
+            OnPropertyChanged(nameof(MatchCountText));
+        }
+
+        private static string Format(string format, params object[] args) => string.Format(CultureInfo.CurrentCulture, format, args);
     }
 
     /// <summary>
-    /// The results panel along the bottom of the window. It is always shown: it waits for a job, shows
-    /// progress while a pack or unpack job runs, then a summary and one row per item until the next job.
+    /// The pack/unpack job: the summary line along the bottom of the window and the progress window it
+    /// opens. It waits for a job, shows progress while a pack or unpack job runs, then a summary and one
+    /// row per item, grouped by outcome, until the next job.
     /// </summary>
-    /// <remarks>
-    /// Only the user expands or collapses the item rows; a job starting leaves them as they were.
-    /// </remarks>
-    public partial class JobViewModel : ViewModelBase
+    public partial class JobViewModel(IJobProgressWindowService details) : ViewModelBase
     {
-        private readonly SettingsService _settings;
         private CancellationTokenSource? _cts;
         private JobKind _kind;
         private int _total;
@@ -63,28 +150,22 @@ namespace ChartPacker.ViewModels
         // A job has run (or is running) this session, so there's a summary to show.
         private bool _hasRun;
 
-        public JobViewModel(SettingsService settings)
-        {
-            _settings = settings;
-            _isExpanded = settings.Settings.JobPanelExpanded;
-        }
+        /// <summary>Items that were packed or unpacked, including those with warnings or left-out files.</summary>
+        public JobResultGroup Completed { get; } = new(Strings.JobGroupPackedFormat);
 
-        public AvaloniaList<JobItemRow> Items { get; } = new();
+        public JobResultGroup Skipped { get; } = new(Strings.JobGroupSkippedFormat);
+
+        /// <summary>Items that failed, and those a cancelled job never finished.</summary>
+        public JobResultGroup Failed { get; } = new(Strings.JobGroupFailedFormat);
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
-        private bool _isRunning;
-
-        /// <summary>The item rows are shown, and the panel can be resized.</summary>
-        [ObservableProperty]
-        private bool _isExpanded;
+        public partial bool IsRunning { get; set; }
 
         private int Done => _succeeded + _skipped + _failed;
 
         /// <summary>Items finished, as a percentage.</summary>
         public double Progress => _total == 0 ? 0 : 100.0 * Done / _total;
-
-        public string ExpandButtonText => IsExpanded ? Strings.CollapseButton : Strings.ExpandButton;
 
         /// <summary>No job has run yet, so the panel only says it's waiting.</summary>
         public bool IsWaiting => !_hasRun;
@@ -126,7 +207,10 @@ namespace ChartPacker.ViewModels
             _succeeded = _skipped = _failed = 0;
             _cancelled = false;
             _hasRun = true;
-            Items.Clear();
+            Completed.TitleFormat = kind == JobKind.Pack ? Strings.JobGroupPackedFormat : Strings.JobGroupUnpackedFormat;
+            Completed.Clear();
+            Skipped.Clear();
+            Failed.Clear();
             IsRunning = true;
             RefreshState();
 
@@ -140,6 +224,7 @@ namespace ChartPacker.ViewModels
             catch (OperationCanceledException)
             {
                 _cancelled = true;
+                AddCanceled(kind, entries);
             }
             finally
             {
@@ -153,13 +238,7 @@ namespace ChartPacker.ViewModels
         private void Cancel() => _cts?.Cancel();
 
         [RelayCommand]
-        private void ToggleExpanded() => IsExpanded = !IsExpanded;
-
-        partial void OnIsExpandedChanged(bool value)
-        {
-            _settings.Settings.JobPanelExpanded = value;
-            OnPropertyChanged(nameof(ExpandButtonText));
-        }
+        private void ShowDetails() => details.Show(this);
 
         private void Add(JobKind kind, JobItemResult result)
         {
@@ -178,11 +257,29 @@ namespace ChartPacker.ViewModels
 
             var messages = result.Findings
                 .Where(f => f.Severity != Severity.Info)
-                .Select(f => new JobMessageRow($"{f.RuleId}: {f.Message}", f.Severity == Severity.Error))
+                .Select(f => new JobMessageRow(f.RuleId, f.Message, f.Severity == Severity.Error))
                 .ToList();
 
-            Items.Add(new JobItemRow(result.Entry.DisplayName, Describe(kind, result), result.Status, messages));
+            var row = new JobItemRow(result.Entry.DisplayName, Describe(kind, result), result.Status, messages);
+            JobResultGroup group = result.Status switch
+            {
+                JobItemStatus.Skipped => Skipped,
+                JobItemStatus.Failed => Failed,
+                _ => Completed,
+            };
+            group.Add(row);
             RefreshState();
+        }
+
+        /// <summary>
+        /// Adds a row for each item the job didn't finish. Results arrive in entry order, one per finished
+        /// item, so those are the ones after the first <see cref="Done"/>.
+        /// </summary>
+        private void AddCanceled(JobKind kind, IReadOnlyList<SongEntry> entries)
+        {
+            string detail = kind == JobKind.Pack ? Strings.JobCanceledPack : Strings.JobCanceledUnpack;
+            foreach (SongEntry entry in entries.Skip(Done))
+                Failed.Add(new JobItemRow(entry.DisplayName, detail, JobItemStatus.Failed, [], IsCanceled: true));
         }
 
         private static string Describe(JobKind kind, JobItemResult result) => result.Status switch

@@ -14,9 +14,37 @@
         <SolidColorBrush x:Key="AccentTintBrush" Color="#408B5CF6" />
         <SolidColorBrush x:Key="AccentTextBrush" Color="#C4B5FD" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
+        <!-- Something left out, e.g. a filter chip set to Excludes: the rose of the spectrum's bass. -->
+        <SolidColorBrush x:Key="ExcludeTintBrush" Color="#40F2587A" />
+        <SolidColorBrush x:Key="ExcludeTextBrush" Color="#FDA4AF" />
+        <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
+        <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
+        <!-- Behind the tip strip along the bottom of the details panel: 90% opaque, so the rows only faintly show past it. -->
+        <SolidColorBrush x:Key="ToolTipStripBrush" Color="#E61D1E29" />
+        <!-- The spectrum behind the details panel while a song plays: a shade for each bar, stepped from rose at
+             the bass through a periwinkle near the accent to orchid at the treble. SpectrumView sets how faint. -->
+        <Color x:Key="SpectrumLowColor">#F2587A</Color>
+        <Color x:Key="SpectrumMiddleColor">#6E8BF7</Color>
+        <Color x:Key="SpectrumHighColor">#E27BF2</Color>
         <!-- Manila folder, for the FOLDER chip in the library list. -->
         <SolidColorBrush x:Key="FolderTintBrush" Color="#40E4C98F" />
         <SolidColorBrush x:Key="FolderTextBrush" Color="#F0DBAE" />
+        <!-- The chart's difficulties, as the games colour them: Easy green, Medium yellow, Hard red, Expert purple. -->
+        <SolidColorBrush x:Key="DifficultyEasyBrush" Color="#4ADE80" />
+        <SolidColorBrush x:Key="DifficultyMediumBrush" Color="#FACC15" />
+        <SolidColorBrush x:Key="DifficultyHardBrush" Color="#F87171" />
+        <SolidColorBrush x:Key="DifficultyExpertBrush" Color="#C084FC" />
+        <!-- A song.ini difficulty's tier, 0 to 6 (anything higher is 6), from cool to hot, on the badge of its
+             instrument; an unset one is a neutral grey. The badge's number is dark on every tier. -->
+        <SolidColorBrush x:Key="DifficultyTier0Brush" Color="#94A3B8" />
+        <SolidColorBrush x:Key="DifficultyTier1Brush" Color="#38BDF8" />
+        <SolidColorBrush x:Key="DifficultyTier2Brush" Color="#34D399" />
+        <SolidColorBrush x:Key="DifficultyTier3Brush" Color="#A3E635" />
+        <SolidColorBrush x:Key="DifficultyTier4Brush" Color="#FACC15" />
+        <SolidColorBrush x:Key="DifficultyTier5Brush" Color="#FB923C" />
+        <SolidColorBrush x:Key="DifficultyTier6Brush" Color="#F43F5E" />
+        <SolidColorBrush x:Key="DifficultyUnsetBrush" Color="#3A3C4E" />
+        <SolidColorBrush x:Key="DifficultyBadgeTextBrush" Color="#0E0F14" />
 
         <SolidColorBrush x:Key="AccentButtonBackground" Color="#8B5CF6" />
         <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#9D74F8" />
@@ -98,6 +126,29 @@
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.55" />
+    </Style>
+
+    <!-- Small right-aligned labels at the end of a line: a song's kind, length or size, or its charter.
+         "large" is for the detail panel's header lines. -->
+    <Style Selector="Border.chip">
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="Border.chip > TextBlock">
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+    <Style Selector="Border.chip.large">
+        <Setter Property="Padding" Value="6,1" />
+    </Style>
+    <Style Selector="Border.chip.large > TextBlock">
+        <Setter Property="FontSize" Value="11" />
     </Style>
 
     <!-- An inline notice: accent-tinted, or red for an error. -->

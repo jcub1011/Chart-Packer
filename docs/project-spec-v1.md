@@ -32,10 +32,10 @@ Goals:
 - Audio transcoding (e.g. Opus), image re-encoding (JPEG) and album-art resizing. Files are
   stored exactly as they are. See [§12 Future](#future).
 - Parsing or checking the *content* of `notes.chart`, `notes.mid`, audio, image or video files.
-  The one exception is reading the `[Song]` section of `notes.chart` as fallback metadata
-  (F1.4).
-- Editing charts, or managing, searching or scanning a song library beyond what batch
-  processing needs.
+  The exceptions are reading the `[Song]` section of `notes.chart` as fallback metadata
+  (F1.4), and decoding audio to play it (F7).
+- Editing charts, or managing or scanning a song library beyond what batch processing needs.
+  Finding songs in the scanned list is covered by [F8](#f8-library-search-sort-and-filter).
 - Reading pre-version-1 `.sng` files ([sng-spec.md §9.1](sng-spec.md#reference-behaviour)).
 - A command-line interface. The Core library is designed so one can be added later.
 
@@ -56,8 +56,9 @@ Goals:
 ```txt
 Chart-Packer.slnx
 ├── ChartPacker/              Avalonia desktop app (MVVM)            (exists)
+├── ChartPacker.Audio/        Audio decoding, mixing and playback (F7)
 ├── ChartPacker.Core/         UI-free library: format, validation, pack/unpack pipelines
-└── ChartPacker.Core.Tests/   MSTest tests for Core
+└── ChartPacker.Core.Tests/   MSTest tests for Core and Audio
 ```
 
 ### 4.1 `ChartPacker.Core`
@@ -97,7 +98,7 @@ through `IProgress<T>`.
 | Constraint | How it is enforced |
 | ---------- | ------------------ |
 | AOT publish | `<PublishAot>true</PublishAot>` on `ChartPacker` (already set in the scaffold) |
-| AOT-safe library | `<IsAotCompatible>true</IsAotCompatible>` on `ChartPacker.Core`, which turns on the trim, AOT and single-file analyzers |
+| AOT-safe library | `<IsAotCompatible>true</IsAotCompatible>` on `ChartPacker.Core` and `ChartPacker.Audio`, which turns on the trim, AOT and single-file analyzers |
 | No warnings | Trim and AOT warnings (`IL2xxx`, `IL3xxx`) are **errors** in Release builds |
 | Compiled bindings only | `<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>`. Reflection bindings are not used. |
 | Source-generated MVVM | CommunityToolkit.Mvvm generators only. No reflection-based `INotifyPropertyChanged` helpers. |
@@ -113,7 +114,42 @@ through `IProgress<T>`.
   it from other configurations).
 - Tests may use MSTest (via `MSTest.Sdk`) and Microsoft.Testing.Platform, opted into for
   `dotnet test` in `global.json`.
+- `tools/DecodeBench` times the audio decoders against FFmpeg's, and uses `BenchmarkDotNet`
+  (MIT) for warm-up, iterations and statistics, on the JIT and on Native AOT as the app ships.
+  It's a developer tool that's never shipped or referenced by the app, so the trim and AOT rule
+  below doesn't apply to it.
 - Image preview uses Avalonia's built-in Skia `Bitmap`.
+- The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
+  durations from file headers, for the library list's length when a song has no `song_length`.
+- `ChartPacker.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:
+  - FFmpeg's `vorbis`, `opus` and `mp1float`/`mp2float`/`mp3float` decoders, through
+    `ChartPacker.Ffmpeg`, for mono and stereo streams when the libraries have them. Decoding is
+    nearly all of a waveform read's time, and they're about 2× (Opus), 3× (Vorbis) and 8× (MP3)
+    faster per core than the managed decoders (`tools/DecodeBench/RESULTS.md`). Only packets go to
+    FFmpeg: the Ogg container, the MP3 frame index and gapless trim, and WAV are read in-house on
+    either decoder, so timing, trims and seeks are the same on both.
+  - `NVorbis` (MIT) to decode Vorbis, `NLayer` (MIT) to decode MPEG audio frames, and
+    `Concentus` (BSD) to decode Opus packets, all managed code, when FFmpeg can't: its libraries
+    are missing or built for video alone, or the stream has more than two channels (FFmpeg
+    reorders those, and the mixer takes the order the managed decoders give).
+  - `ppy.SDL3-CS` (MIT, with SDL itself under zlib) for audio output on every platform. Only
+    SDL's audio subsystem is initialised. It ships SDL's native library for each RID, which
+    publishes beside the executable.
+  - `NVorbis` is a 1.0 release candidate: 0.10.x lands seeks hundreds of samples late.
+- `ChartPacker.Video` decodes background videos for the detail panel's background tile (F5). It
+  keeps native code out of Core, and has no packages. No managed library decodes H.264, VP8/VP9,
+  Theora and MPEG video. LibVLC was considered, but it's far larger and doesn't fit the lockstep
+  stem mixer.
+- `ChartPacker.Ffmpeg` binds, by hand with `[LibraryImport]`, the few functions Video and Audio
+  need from FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`, `swscale` and
+  `swresample`, LGPL 2.1+), and has no packages. Audio uses it through a safe wrapper,
+  `FfmpegAudioDecoder`; Video calls the bindings directly.
+  - The libraries are built by `build/ffmpeg/build.sh` with only the registered video formats'
+    demuxers and decoders, the registered audio formats' decoders, and swresample (which the Opus
+    decoder needs), nothing GPL or non-free. They ship beside the executable like SDL's. Without
+    them the app still runs: videos aren't previewed, and audio is decoded by the managed
+    decoders.
+  - The bindings are written for one major version of each library, which is checked at load.
 - Any new dependency must be trim- and AOT-compatible, and the reason for it must be added to
   this section.
 
@@ -307,11 +343,25 @@ Behaviour:
      - Comments, other sections, unedited lines, the encoding and the line endings are kept.
      - New keys go at the end of `[song]`.
      - A folder without a `song.ini` gets one.
-   - Time values are edited in milliseconds. Unset difficulties (`diff_* = -1`) stay hidden, and
-     adding one edits its stored value.
+   - Time values are edited in milliseconds.
+   - **Instrument difficulties.** The known `diff_*` keys are shown as a row of round instrument
+     icons at the top of the metadata, not as rows, and aren't offered as new keys.
+     - Each icon has its difficulty in a badge at its bottom right, tinted by tier from 0 to 6.
+       The badge shows `?` when the key is missing, negative or not an integer, and `*` when the
+       selected songs differ. Pro, 22-fret, six-fret (GHL), Phase Shift and co-op variants get a
+       small tag.
+     - Under each icon are the instrument's name and the difficulties its chart has notes for, as
+       coloured letters, e.g. "Guitar - EMHX". An icon whose part the chart doesn't have is greyed
+       out. With several songs selected, the charts aren't read, so no icon is greyed out and
+       there are no letters.
+     - Icons that aren't charted, have no difficulty set and have no pending change are hidden
+       behind **Show all**.
+     - Clicking an icon opens a flyout with `?` and 0–6 buttons, a number box for higher tiers,
+       and a revert button while it's edited. `?` writes `-1` where a difficulty is stored and
+       leaves the others unchanged. An edited icon is ringed in the accent colour.
    - **Album art.** A tile at the top of the panel shows the album art. Hovering it shows icon
-     buttons in its bottom-right corner: replace (a png, jpg or jpeg up to 16 MB) and remove. With
-     one song selected, its file list sits to the right of the tile.
+     buttons in its bottom-right corner: replace (a png, jpg or jpeg up to 16 MB) and remove. The
+     background tile sits to its right, and with one song selected, its file list is below them.
      - An art change is staged in the draft like a metadata edit. The tile is marked `*` and gets a
        revert button. The file list strikes through the `album.*` files it removes and marks the
        one it adds `+`. The library thumbnail shows the staged image, or no art, before saving.
@@ -323,6 +373,28 @@ Behaviour:
        metadata (item 5): the new image is masked with the existing mask. In a folder the old files
        are deleted permanently, and a folder without a `song.ini` doesn't get one for an art-only
        change.
+   - **Background.** A 16:9 tile beside the art shows the background video (`video.mp4`, `.avi`,
+     `.webm`, `.vp8`, `.ogv` or `.mpeg`) or background image (`background.png`, `.jpg` or `.jpeg`),
+     or "No background set". A song can have both, as games play the video when video
+     backgrounds are on and the image otherwise. Then the video is shown first, and an
+     **Image | Video** switch on the tile picks which one is shown.
+     - Hovering shows the same buttons as the art: new (one picker for every image and video
+       type; the file's extension decides which kind it replaces), remove (the kind shown) and,
+       while there's a change, revert. Changes are staged in the draft like the art's, with the
+       same `*` marker and struck-through and `+` rows in the file list. Names of either kind
+       added through **Add files** go through the same change.
+     - The video follows the audio player: it shows the frame due at the player's position,
+       shifted by `video_start_time`, held at `video_end_time` (or the end), and looped from the
+       start when `video_loop` is true. A `.sng`'s video is decoded straight out of the
+       container, without extracting it.
+     - With several items selected, each kind is shown when every song's is identical, and
+       "Backgrounds differ" otherwise. Images are compared by SHA-256. Videos are compared by
+       length first, and by SHA-256 only when every length is the same. New and Remove apply to
+       all of them.
+     - Saving replaces, or removes, every top-level file of the changed kind only, the way the
+       art is saved. Nothing is written before then.
+     - Video needs FFmpeg's libraries beside the executable (§4). Without them the tile says
+       "Video preview unavailable", and new and remove still work.
    - **Files.** With one song selected, **Add files** under the file list picks any number of
      files, and each row has a remove button. Changes are staged in the draft like the art, so they
      survive a change of selection, and **Discard** or closing without saving drops them.
@@ -380,8 +452,9 @@ Behaviour:
    - *Extract selected…* (the same safety rules as F2)
    - *Extract all* (runs F2)
    - *Copy details*
-5. **Preview:** album, background and highway images are shown in the app. Other files show
-   their size and a hex view of the first bytes.
+5. **Preview:** album, background and highway images are shown in the app, and the background
+   video plays in the detail panel's background tile (F5). Other files show their size and a hex
+   view of the first bytes.
 6. **Findings panel:** the F3 report inline, with each finding linked to the row or field it
    refers to.
 7. **Layout view:** a bar showing the section and file byte ranges to scale, so gaps and
@@ -393,6 +466,104 @@ Acceptance criteria:
   an SSD. File data is not read until it's needed.
 - **AC6.2** Extracting a single file produces bytes identical to what a full unpack gives for
   that file.
+
+### F7. Audio playback
+
+**Input:** the one song selected in the library, a `.sng` or a folder.
+
+Behaviour:
+
+1. **Tracks.** The song's audio tracks are its registered audio stems
+   ([sng-spec §8](sng-spec.md#filename-registry)) in any of `.ogg` (Vorbis), `.opus`, `.mp3` and
+   `.wav`, in stem order. The draft's changes apply: a track it removes isn't listed, and a track
+   it adds (marked `+`) plays from the file it will be copied from, so a change can be heard
+   before it's saved.
+2. **Playing.** Play, pause, stop, a seek bar, a volume slider, and **Preview** to play from
+   `preview_start_time` when the song sets one. Every track plays together, sample-aligned: each
+   step reads the same number of frames from every track, heard or not. Tracks at another sample
+   rate are resampled to the rate most tracks share. The sum is clipped.
+3. **Mute and solo.** Each track can be muted, or soloed; while any track is soloed only the
+   soloed tracks are heard. `preview.*`, a separate clip, starts muted.
+4. **Sync across formats.** Opus pre-skip and end trimming follow RFC 7845. An MP3's LAME tag
+   encoder delay and padding are trimmed, plus the decoder's 529-sample delay, as mpg123 and
+   FFmpeg do. Vorbis's start and end are trimmed by its granule positions (Vorbis I §A.2). Seeks
+   are sample-exact: each decoder restarts before the target and discards up to it. The trims
+   are made by the app's own container code, so a stream is the same length and lines up the
+   same whether FFmpeg or a managed decoder decodes its packets (§4).
+5. **Adding and removing tracks.** **Add track** lists every stem; one the song has already reads
+   "Replace". It picks one audio file, decodes a little of it to check that it's what its
+   extension says, and stages it as `<stem>.<ext>`, staging every other file of that stem, in any
+   format, for removal. Each track row has a remove button. These are file changes (F5 item 1,
+   Files): saved, discarded and shown in the file list the same way.
+6. **Files stay free.** Nothing is opened until the first play. Changing the selection, or
+   saving, stops playback and closes every file first, so saving can replace or delete them.
+7. **Failures.** A track that can't be opened or decoded says why on its row and stays silent;
+   the others play on. No audio device is reported without affecting the rest of the app.
+
+Acceptance criteria:
+
+- **AC7.1** A song whose tracks are in all four formats plays them in step: a signal present in
+  every track is heard once, not smeared.
+- **AC7.2** Seeking, muting, soloing and changing the selection while playing never leaves a
+  file open: the song can be saved straight away.
+- **AC7.3** Replacing `guitar.ogg` with an `.opus` file and saving leaves `guitar.opus` and no
+  `guitar.ogg`, in a `.sng` and in a folder.
+
+### F8. Library search, sort and filter
+
+**Input:** the songs found by the last scan.
+
+Behaviour:
+
+1. **Search.** A search box above the list (Ctrl+F; Escape clears it) shows only songs where every
+   word typed appears in the file or folder name, the title or the artist. Matching ignores case
+   and accents.
+2. **Sort.** A flyout from the filter button sorts by scan order (the default), title, artist,
+   album, genre, charter, year, length, size, type (`.sng` files first) or file name, either
+   way. Songs without the value sort last in both directions, and ties keep scan order. The sort
+   is remembered (§8); the search and filters start empty each launch.
+3. **Filters.** The same flyout filters by type (`.sng` files, song folders), text contained in
+   the title, artist, album, genre or charter, a year, length (minutes) and size (MB) range, and
+   having unsaved changes. Every filter must pass. A song without the filtered value doesn't
+   pass. The button shows how many filters are on; **Reset filters** turns them all off.
+4. **Content filters.** The flyout also filters by what the song has, with a chip per item that
+   cycles **Either** (off), **Includes** and **Excludes**; right-clicking a chip puts it straight
+   back to Either:
+   - **Instruments**: every chart part in the MIDI part catalogue, from guitar to dance, that has
+     at least one note, so a template's empty tracks don't count.
+   - **Difficulties**: Easy, Medium, Hard and Expert, having notes on any part.
+   - **Audio stems**: song, guitar, rhythm, bass, keys, drums (`drums` and `drums_1`–`drums_4`),
+     vocals (`vocals`, `vocals_1`, `vocals_2`), crowd and preview.
+   - **Backgrounds and art**: a background video, a background image, album art.
+
+   A song with any excluded item doesn't pass. The first three groups each have an **All** /
+   **Any** switch for their included items: All needs every one, Any needs at least one. So
+   "only these" is the wanted items included and the rest excluded. Each group, and each
+   background or art chip, counts as one filter.
+5. **Unsaved changes count.** Values come from the metadata with the song's draft applied, so an
+   edit re-sorts and re-filters the list before it's saved. The same goes for the stems,
+   backgrounds and album art a draft adds or removes. A chart a draft adds hasn't been read, so
+   its instruments and difficulties aren't known until it's saved. The year is the first
+   four-digit number in `year`, which handles Clone Hero's `", 2004"`.
+6. **While scanning.** Songs join the list as their metadata and chart are read. The list is
+   re-sorted and re-filtered at most a few times a second.
+7. **Selection.** A selected song the filters hide is deselected, so Pack and Unpack only act on
+   songs that can be seen. Selected songs that still show stay selected.
+8. **Counts.** While the search or a filter is on, the status line reads `shown/total songs`.
+   When nothing matches, the list says so, with a button that clears the search and filters.
+
+Acceptance criteria:
+
+- **AC8.1** Searching for an artist shows only that artist's songs, and the status reads
+  `n/total songs`. Clearing the search shows every song again, in the chosen sort.
+- **AC8.2** Sorting by year in either direction lists songs without a year last.
+- **AC8.3** Selecting three songs and then filtering one of them out leaves two selected, and
+  Pack acts on those two.
+- **AC8.4** Setting Drums to Includes and Vocals to Excludes, with All, shows only songs whose
+  chart has drum notes and no vocal notes. Switching Instruments to Any with Guitar and Bass
+  included shows songs with either part.
+- **AC8.5** Adding a background video to a song without saving it takes the song out of the list
+  while Video is set to Excludes.
 
 ---
 
@@ -548,6 +719,7 @@ Settings are stored as JSON (source-generated serialization) in the per-user con
 | Verify after write | On |
 | Batch parallelism | Half the logical cores, at least 1 |
 | Theme | Follow OS |
+| Library sort ([F8](#f8-library-search-sort-and-filter)) | Scan order, first to last |
 
 ## 9. Non-functional requirements
 
@@ -593,7 +765,7 @@ temp files and folders only. Two things enforce this:
 | --------- | -------- | ------------- |
 | **M1: Core** | `SngMask`, `SngReader`, `SngWriter`, `SongIni`, `FilenameRules`, `SngValidator` (full catalogue), tests. AOT analyzers on from the first commit. | Every Core test passes; zero AOT warnings; interop golden files pass |
 | **M2: Pack / Unpack / Validate UI** | App shell, F1–F3, settings, logging, `--self-test` | AC1.x–AC3.x pass; first footprint baselines recorded in §9 |
-| **M3: Inspector and metadata editor** | F5, F6 | AC5.x, AC6.x pass |
+| **M3: Inspector and metadata editor** | F5, F6, F7 | AC5.x, AC6.x, AC7.x pass |
 | **M4: Batch** | F4 | AC4.x pass |
 | **M5: Packaging and release** | Per-RID AOT builds: Windows zip, macOS `.app`/`.dmg`, Linux tarball or AppImage | CI builds all six RIDs. Native AOT can't cross-compile between operating systems, so there is one runner per OS (Windows, macOS, Linux). |
 

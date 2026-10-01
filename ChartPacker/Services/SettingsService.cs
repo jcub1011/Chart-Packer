@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
-using ChartPacker.Core.Jobs;
+using ChartPacker.Core.Library;
 
 namespace ChartPacker.Services
 {
@@ -73,10 +73,10 @@ namespace ChartPacker.Services
             if (!double.IsFinite(settings.LibraryPaneWidth) || settings.LibraryPaneWidth < AppSettings.MinLibraryPaneWidth)
                 settings.LibraryPaneWidth = AppSettings.DefaultLibraryPaneWidth;
 
-            if (!double.IsFinite(settings.JobPanelHeight) || settings.JobPanelHeight < AppSettings.MinJobPanelHeight)
-                settings.JobPanelHeight = AppSettings.DefaultJobPanelHeight;
-
             settings.ScanMaxDepth = Math.Clamp(settings.ScanMaxDepth, 0, AppSettings.MaxScanMaxDepth);
+
+            if (settings.ScanParallelism < AppSettings.MinScanParallelism)
+                settings.ScanParallelism = AppSettings.DefaultScanParallelism;
 
             if (string.IsNullOrWhiteSpace(settings.LastFolder))
                 settings.LastFolder = null;
@@ -84,8 +84,35 @@ namespace ChartPacker.Services
             if (string.IsNullOrWhiteSpace(settings.OutputFolder))
                 settings.OutputFolder = null;
 
+            if (string.IsNullOrWhiteSpace(settings.DownloadFolder))
+                settings.DownloadFolder = null;
+
             if (!Enum.IsDefined(settings.OverwritePolicy))
-                settings.OverwritePolicy = OverwritePolicy.Skip;
+                settings.OverwritePolicy = AppSettings.DefaultOverwritePolicy;
+
+            if (!Enum.IsDefined(settings.DedupKeepPreference))
+                settings.DedupKeepPreference = AppSettings.DefaultDedupKeepPreference;
+
+            if (!Enum.IsDefined(settings.WaveformFidelity))
+                settings.WaveformFidelity = AppSettings.DefaultWaveformFidelity;
+
+            if (!Enum.IsDefined(settings.ScrubStep))
+                settings.ScrubStep = AppSettings.DefaultScrubStep;
+
+            if (!Enum.IsDefined(settings.LibrarySortField))
+                settings.LibrarySortField = LibrarySortField.ScanOrder;
+
+            settings.MasterVolume = double.IsFinite(settings.MasterVolume)
+                ? Math.Clamp(settings.MasterVolume, 0, 1)
+                : AppSettings.DefaultMasterVolume;
+
+            settings.HighwayNoteSpeed = double.IsFinite(settings.HighwayNoteSpeed)
+                ? Math.Clamp(settings.HighwayNoteSpeed, AppSettings.MinHighwayNoteSpeed, AppSettings.MaxHighwayNoteSpeed)
+                : AppSettings.DefaultHighwayNoteSpeed;
+
+            settings.FineScrubMilliseconds = double.IsFinite(settings.FineScrubMilliseconds)
+                ? Math.Clamp(settings.FineScrubMilliseconds, AppSettings.MinFineScrubMilliseconds, AppSettings.MaxFineScrubMilliseconds)
+                : AppSettings.DefaultFineScrubMilliseconds;
         }
     }
 }

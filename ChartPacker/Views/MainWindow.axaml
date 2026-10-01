@@ -2,25 +2,26 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:views="using:ChartPacker.Views"
+        xmlns:res="using:ChartPacker.Resources"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="640"
         x:Class="ChartPacker.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Chart-Packer"
+        Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1000" Height="640"
         MinWidth="640" MinHeight="360">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
+        <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
     </Window.KeyBindings>
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <!-- Toolbar (0), panels (1), splitter (2), results (3). MainWindow.axaml.cs indexes these
-                 and sizes the results row: its own height while collapsed, the user's while expanded. -->
+            <!-- Toolbar (0), panels (1), download notice (2), job summary line (3). -->
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="160" />
             <RowDefinition Height="Auto" />
@@ -47,15 +48,51 @@
 
         <ContentControl Grid.Row="1" Grid.Column="2" Content="{Binding Detail}" />
 
-        <!-- Pack/unpack results, always under both panels. Resizable only while expanded. -->
-        <GridSplitter Grid.Row="2"
-                      Grid.Column="0"
-                      Grid.ColumnSpan="3"
-                      ResizeDirection="Rows"
-                      Height="4"
-                      Background="{DynamicResource SubtleBorderBrush}"
-                      IsVisible="{Binding Job.IsExpanded}" />
+        <!-- What the latest download did, for a few seconds: where it saved, or why it couldn't. -->
+        <Border Grid.Row="2"
+                Grid.ColumnSpan="3"
+                IsVisible="{Binding Notice.IsVisible}"
+                BorderThickness="0,1,0,0"
+                Background="{DynamicResource ToolbarBrush}"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                Padding="12,4">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                <Arc Grid.Column="0"
+                     Classes="spinner"
+                     Classes.active="{Binding Notice.IsBusy}"
+                     IsVisible="{Binding Notice.IsBusy}"
+                     Width="14" Height="14" StrokeThickness="2"
+                     VerticalAlignment="Center" />
+                <SelectableTextBlock Grid.Column="1"
+                                     Text="{Binding Notice.Message}"
+                                     TextTrimming="CharacterEllipsis"
+                                     ToolTip.Tip="{Binding Notice.Message}"
+                                     Classes.error="{Binding Notice.IsError}"
+                                     VerticalAlignment="Center">
+                    <SelectableTextBlock.Styles>
+                        <Style Selector="SelectableTextBlock.error">
+                            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+                        </Style>
+                    </SelectableTextBlock.Styles>
+                </SelectableTextBlock>
+                <Button Grid.Column="2"
+                        Content="{x:Static vm:NoticeViewModel.RevealLabel}"
+                        Command="{Binding Notice.RevealCommand}"
+                        IsVisible="{Binding Notice.CanReveal}"
+                        Padding="10,2"
+                        VerticalAlignment="Center" />
+                <Button Grid.Column="3"
+                        Classes="tool"
+                        Content="✕"
+                        Command="{Binding Notice.DismissCommand}"
+                        IsVisible="{Binding !Notice.IsBusy}"
+                        ToolTip.Tip="{x:Static res:Strings.NoticeDismissToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.NoticeDismissToolTip}"
+                        VerticalAlignment="Center" />
+            </Grid>
+        </Border>
 
+        <!-- Pack/unpack summary, always under both panels. Clicking it opens the progress window. -->
         <ContentControl Grid.Row="3"
                         Grid.Column="0"
                         Grid.ColumnSpan="3"

@@ -57,7 +57,31 @@ public static class PackPlanner
 
         string folder = Path.GetFullPath(songFolder);
         var listing = await SongFolderListing.ListAsync(folder, cancellationToken).ConfigureAwait(false);
+        return await PlanAsync(folder, listing, options, cancellationToken).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// Plans packing <paramref name="songFolder"/> from a listing of it already taken with
+    /// <see cref="SongFolderListing"/>, so a caller that needs the listing too reads the folder once.
+    /// </summary>
+    /// <param name="songFolder">The song folder.</param>
+    /// <param name="listing">Its files, as <see cref="SongFolderListing.List"/> returns them.</param>
+    /// <param name="options">What to include.</param>
+    /// <param name="cancellationToken">Cancels planning.</param>
+    /// <exception cref="IOException">The folder's <c>song.ini</c> can't be read.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">Planning was cancelled.</exception>
+    public static async Task<PackPlan> PlanAsync(
+        string songFolder,
+        IReadOnlyList<FolderFileEntry> listing,
+        PackOptions? options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(songFolder);
+        ArgumentNullException.ThrowIfNull(listing);
+        options ??= PackOptions.Default;
+
+        string folder = Path.GetFullPath(songFolder);
         var findings = new List<Finding>();
         var included = new List<SngSourceFile>();
         var excluded = new List<string>();

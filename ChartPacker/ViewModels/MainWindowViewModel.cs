@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
@@ -10,19 +11,24 @@ namespace ChartPacker.ViewModels
         private readonly SettingsService _settings;
         private readonly MetadataDraftStore _drafts;
         private readonly IConfirmationService _confirmation;
+        private readonly ISettingsWindowService _settingsWindow;
 
         public MainWindowViewModel(
             LibraryViewModel library,
             SongDetailViewModel detail,
             SettingsService settings,
             MetadataDraftStore drafts,
-            IConfirmationService confirmation)
+            IConfirmationService confirmation,
+            ISettingsWindowService settingsWindow,
+            NoticeViewModel notice)
         {
             Library = library;
             Detail = detail;
             _settings = settings;
             _drafts = drafts;
             _confirmation = confirmation;
+            _settingsWindow = settingsWindow;
+            Notice = notice;
 
             Library.PropertyChanged += (_, e) =>
             {
@@ -31,9 +37,15 @@ namespace ChartPacker.ViewModels
             };
         }
 
+        /// <summary>The window title, with the program version from the project file.</summary>
+        public string Title { get; } = string.Format(CultureInfo.CurrentCulture, Strings.MainWindowTitleFormat, AppVersion.Semantic);
+
         public LibraryViewModel Library { get; }
 
         public SongDetailViewModel Detail { get; }
+
+        /// <summary>What the latest download did, shown along the bottom for a few seconds.</summary>
+        public NoticeViewModel Notice { get; }
 
         /// <summary>The pack/unpack results panel, always shown under both panels.</summary>
         public JobViewModel Job => Library.Job;
@@ -45,12 +57,8 @@ namespace ChartPacker.ViewModels
             set => _settings.Settings.LibraryPaneWidth = value;
         }
 
-        /// <summary>Persisted height of the results panel while expanded. The view applies it on expand and writes it back on collapse and close.</summary>
-        public double JobPanelHeight
-        {
-            get => _settings.Settings.JobPanelHeight;
-            set => _settings.Settings.JobPanelHeight = value;
-        }
+        [RelayCommand]
+        private Task OpenSettingsAsync() => _settingsWindow.ShowAsync();
 
         /// <summary>Some song has metadata changes that closing would lose.</summary>
         public bool HasUnsavedDrafts => _drafts.DirtyCount > 0;
