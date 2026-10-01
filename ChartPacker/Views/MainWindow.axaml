@@ -5,13 +5,13 @@
         xmlns:res="using:ChartPacker.Resources"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="640"
+        mc:Ignorable="d" d:DesignWidth="1080" d:DesignHeight="800"
         x:Class="ChartPacker.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
-        Width="1000" Height="640"
+        Width="1080" Height="800"
         MinWidth="640" MinHeight="360">
 
     <Window.KeyBindings>
