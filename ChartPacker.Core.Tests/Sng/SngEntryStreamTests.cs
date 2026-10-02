@@ -35,7 +35,7 @@ public sealed class SngEntryStreamTests
         stream.CopyTo(copy, bufferSize: 97);
 
         Assert.AreEqual(Data.Length, stream.Length);
-        CollectionAssert.AreEqual(Data, copy.ToArray());
+        Assert.AreSequenceEqual(Data, copy.ToArray());
     }
 
     [TestMethod]
@@ -49,12 +49,12 @@ public sealed class SngEntryStreamTests
         int read = stream.Read(tail);
 
         Assert.AreEqual(10, read);
-        CollectionAssert.AreEqual(Data[^10..], tail[..10]);
+        Assert.AreSequenceEqual(Data[^10..], tail[..10]);
 
         stream.Position = 300;
         byte[] middle = new byte[5];
         stream.ReadExactly(middle);
-        CollectionAssert.AreEqual(Data[300..305], middle);
+        Assert.AreSequenceEqual(Data[300..305], middle);
     }
 
     [TestMethod]

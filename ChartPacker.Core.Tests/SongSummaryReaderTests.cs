@@ -28,9 +28,9 @@ public sealed class SongSummaryReaderTests
         string path = Path.Combine(_root.FullName, "Song.sng");
         File.WriteAllBytes(path, bytes);
 
-        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"));
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { KeyValuePair.Create("name", "Song"), KeyValuePair.Create("artist", "Band") }, summary.Pairs.ToArray());
+        Assert.AreSequenceEqual([KeyValuePair.Create("name", "Song"), KeyValuePair.Create("artist", "Band")], [.. summary.Pairs]);
         Assert.AreEqual((ulong)bytes.Length, summary.TotalSize);
     }
 
@@ -41,7 +41,7 @@ public sealed class SongSummaryReaderTests
         string path = Path.Combine(_root.FullName, "Broken.sng");
         File.WriteAllBytes(path, bytes);
 
-        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Broken.sng", "Broken"));
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Broken.sng", "Broken"), TestContext.CancellationToken);
 
         Assert.AreEqual("Song", summary.Pairs.Single().Value);
         Assert.AreEqual((ulong)bytes.Length, summary.TotalSize);
@@ -57,9 +57,9 @@ public sealed class SongSummaryReaderTests
         // A song.ini in a subfolder belongs to something else.
         Write(folder, "stems/song.ini", "[song]\nname = Other\n");
 
-        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { KeyValuePair.Create("name", "Song"), KeyValuePair.Create("charter", "Someone") }, summary.Pairs.ToArray());
+        Assert.AreSequenceEqual([KeyValuePair.Create("name", "Song"), KeyValuePair.Create("charter", "Someone")], [.. summary.Pairs]);
         ulong expected = (ulong)Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
         Assert.AreEqual(expected, summary.TotalSize);
     }
@@ -70,7 +70,7 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "stems/song.ini", "[song]\nname = Other\n");
 
-        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken);
 
         Assert.IsEmpty(summary.Pairs);
         Assert.AreEqual((ulong)new FileInfo(Path.Combine(folder, "stems", "song.ini")).Length, summary.TotalSize);
@@ -82,7 +82,7 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "song.ini", "[other]\nname = Song\n");
 
-        Assert.IsEmpty((await SongSummaryReader.ReadAsync(Folder(folder))).Pairs);
+        Assert.IsEmpty((await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).Pairs);
     }
 
     [TestMethod]
@@ -96,9 +96,9 @@ public sealed class SongSummaryReaderTests
         Write(folder, "album.png", "x");
         Write(folder, "stems/bass.ogg", "x");
 
-        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "album.png", "drums_1.ogg", "guitar.ogg", "notes.chart", "video.webm" }, summary.StoredNames.ToArray());
+        Assert.AreSequenceEqual(["album.png", "drums_1.ogg", "guitar.ogg", "notes.chart", "video.webm"], [.. summary.StoredNames], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.AreEqual(LibraryDifficulties.Hard | LibraryDifficulties.Expert, summary.Chart?.Difficulties);
         Assert.IsTrue(summary.Chart!.Instruments.HasFlag(LibraryInstruments.Drums));
     }
@@ -119,9 +119,9 @@ public sealed class SongSummaryReaderTests
         string path = Path.Combine(_root.FullName, "Song.sng");
         File.WriteAllBytes(path, bytes);
 
-        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"));
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.mid", "vocals.ogg" }, summary.StoredNames.ToArray());
+        Assert.AreSequenceEqual(["notes.mid", "vocals.ogg"], [.. summary.StoredNames], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.AreEqual(new ChartContents(LibraryInstruments.Vocals, LibraryDifficulties.None), summary.Chart);
     }
 
@@ -131,7 +131,7 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "song.ogg", "x");
 
-        Assert.AreEqual(ChartContents.None, (await SongSummaryReader.ReadAsync(Folder(folder))).Chart);
+        Assert.AreEqual(ChartContents.None, (await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).Chart);
     }
 
     [TestMethod]
@@ -140,12 +140,12 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "notes.mid", "not a midi file");
 
-        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder))).Chart);
+        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).Chart);
     }
 
     [TestMethod]
     public async Task MissingFolderThrows() =>
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(() => SongSummaryReader.ReadAsync(Folder(Path.Combine(_root.FullName, "nope"))));
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(() => SongSummaryReader.ReadAsync(Folder(Path.Combine(_root.FullName, "nope")), TestContext.CancellationToken));
 
     [TestMethod]
     public async Task CancelledReadThrows()
@@ -168,4 +168,6 @@ public sealed class SongSummaryReaderTests
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, text);
     }
+
+    public TestContext TestContext { get; set; }
 }

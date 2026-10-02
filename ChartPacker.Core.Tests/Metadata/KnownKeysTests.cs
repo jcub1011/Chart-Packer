@@ -33,9 +33,8 @@ public sealed class KnownKeysTests
     [TestMethod]
     public void CommonKeysComeFirst()
     {
-        CollectionAssert.AreEqual(
-            new[] { "name", "artist", "album", "genre", "year", "charter", "song_length", "preview_start_time", "delay" },
-            KnownKeys.All.Take(9).Select(k => k.Key).ToArray());
+        Assert.AreSequenceEqual(
+            ["name", "artist", "album", "genre", "year", "charter", "song_length", "preview_start_time", "delay"], [.. KnownKeys.All.Take(9).Select(k => k.Key)]);
         Assert.StartsWith("diff_", KnownKeys.All[9].Key);
     }
 

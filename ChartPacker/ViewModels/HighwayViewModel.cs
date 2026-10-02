@@ -60,7 +60,7 @@ namespace ChartPacker.ViewModels
 
         // The chart as stored, which the rows are built from, and as the draft moves it, which is drawn.
         private ChartDocument? _original;
-        private (byte[] Bytes, bool ProDrums)? _originalOf;
+        private (byte[] Bytes, ChartReadOptions Options)? _originalOf;
         private ChartDocument? _shown;
         private TimeSpan _delay;
 
@@ -69,7 +69,7 @@ namespace ChartPacker.ViewModels
 
         // What the latest rebuild was of, so a draft change that touches neither doesn't rebuild.
         private Dictionary<ChartTrackKey, int>? _builtOffsets;
-        private bool _builtProDrums;
+        private ChartReadOptions? _builtOptions;
 
         // One rebuild runs at a time; changes while it runs make one more, of the draft as it is then.
         private bool _rebuilding;
@@ -359,12 +359,15 @@ namespace ChartPacker.ViewModels
                 ChartParts = parts;
         }
 
-        /// <summary>Whether what's shown, or the rebuild under way, is of <paramref name="song"/>'s offsets and <c>pro_drums</c>.</summary>
+        /// <summary>
+        /// Whether what's shown, or the rebuild under way, is of <paramref name="song"/>'s offsets and the
+        /// settings it's read with: <c>pro_drums</c>, <c>sustain_cutoff_threshold</c> and <c>hopo_frequency</c>.
+        /// </summary>
         private bool IsBuiltFor(HighwaySong song)
         {
             var offsets = song.Draft.ChartOffsets;
             return _builtOffsets is { } built
-                && _builtProDrums == ChartReadOptions.From(song.Metadata).ProDrums
+                && _builtOptions == ChartReadOptions.From(song.Metadata)
                 && built.Count == offsets.Count
                 && built.All(p => offsets.TryGetValue(p.Key, out int ms) && ms == p.Value);
         }
@@ -417,8 +420,8 @@ namespace ChartPacker.ViewModels
             var offsets = new Dictionary<ChartTrackKey, int>(song.Draft.ChartOffsets);
             var options = ChartReadOptions.From(song.Metadata);
             _builtOffsets = offsets;
-            _builtProDrums = options.ProDrums;
-            var cached = _originalOf is { } of && ReferenceEquals(of.Bytes, bytes) && of.ProDrums == options.ProDrums ? _original : null;
+            _builtOptions = options;
+            var cached = _originalOf is { } of && ReferenceEquals(of.Bytes, bytes) && of.Options == options ? _original : null;
 
             (ChartDocument Original, ChartDocument Shown, string? Problem) result;
             try
@@ -463,7 +466,7 @@ namespace ChartPacker.ViewModels
             if (!ReferenceEquals(result.Original, _original))
             {
                 _original = result.Original;
-                _originalOf = (bytes, options.ProDrums);
+                _originalOf = (bytes, options);
                 BuildRows(result.Original);
             }
 

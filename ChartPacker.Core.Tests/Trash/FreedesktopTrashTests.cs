@@ -35,7 +35,7 @@ public sealed class FreedesktopTrashTests
         Assert.IsTrue(File.Exists(Path.Combine(trash, "files", "Song ü.sng")));
         string info = File.ReadAllText(Path.Combine(trash, "info", "Song ü.sng.trashinfo"));
         Assert.AreEqual($"[Trash Info]\nPath={FreedesktopTrash.Escape(song)}\nDeletionDate=2026-09-30T12:34:56\n", info);
-        StringAssert.Contains(info, "Song%20%C3%BC.sng");
+        Assert.Contains("Song%20%C3%BC.sng", info);
     }
 
     [TestMethod]
@@ -63,7 +63,7 @@ public sealed class FreedesktopTrashTests
         Assert.AreEqual(TrashStatus.Trashed, result.Status);
         string trash = Path.Combine(_drive, ".Trash-1000");
         Assert.IsTrue(File.Exists(Path.Combine(trash, "files", "Song", "notes.chart")));
-        StringAssert.Contains(File.ReadAllText(Path.Combine(trash, "info", "Song.trashinfo")), "Path=Songs/Song\n");
+        Assert.Contains("Path=Songs/Song\n", File.ReadAllText(Path.Combine(trash, "info", "Song.trashinfo")));
     }
 
     [TestMethod]
@@ -81,7 +81,7 @@ public sealed class FreedesktopTrashTests
         Assert.AreEqual(TrashStatus.Trashed, result.Status);
         string trash = Path.Combine(_drive, ".Trash-1000");
         Assert.IsTrue(File.Exists(Path.Combine(trash, "files", "Song.sng")));
-        StringAssert.Contains(File.ReadAllText(Path.Combine(trash, "info", "Song.sng.trashinfo")), "Path=real/Song.sng\n");
+        Assert.Contains("Path=real/Song.sng\n", File.ReadAllText(Path.Combine(trash, "info", "Song.sng.trashinfo")));
         Assert.IsFalse(Directory.Exists(Path.Combine(_home, "Trash")));
     }
 

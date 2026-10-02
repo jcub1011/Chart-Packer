@@ -43,7 +43,7 @@ public sealed class SongAudio : IDisposable
 
     /// <summary>The tracks that could be opened, by stored name, for a <see cref="Mixing.StemMixer"/>.</summary>
     public IReadOnlyList<KeyValuePair<string, IPcmSource>> Sources =>
-        _tracks.Where(t => t.Source is not null).Select(t => KeyValuePair.Create(t.Track.StoredName, t.Source!)).ToList();
+        [.. _tracks.Where(t => t.Source is not null).Select(t => KeyValuePair.Create(t.Track.StoredName, t.Source!))];
 
     /// <summary>Opens <paramref name="tracks"/> of <paramref name="entry"/>. A track that can't be opened is kept, with the reason.</summary>
     /// <exception cref="IOException">The <c>.sng</c> can't be read.</exception>

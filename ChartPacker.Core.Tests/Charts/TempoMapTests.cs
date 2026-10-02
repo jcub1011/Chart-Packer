@@ -30,7 +30,7 @@ public sealed class TempoMapTests
         var map = new TempoMap(192, [], []);
 
         Assert.AreEqual(0.5, map.SecondsAt(192), 1e-9);
-        CollectionAssert.AreEqual(new[] { new TimeSignature(0, 4, 4) }, map.TimeSignatures.ToArray());
+        Assert.AreSequenceEqual([new TimeSignature(0, 4, 4)], [.. map.TimeSignatures]);
     }
 
     [TestMethod]
@@ -49,9 +49,8 @@ public sealed class TempoMapTests
 
         var lines = map.BeatLines(0, 500).ToList();
 
-        CollectionAssert.AreEqual(
-            new[] { new BeatLine(0, true), new BeatLine(100, false), new BeatLine(200, false), new BeatLine(300, true), new BeatLine(350, false), new BeatLine(400, true), new BeatLine(450, false), new BeatLine(500, true) },
-            lines);
+        Assert.AreSequenceEqual(
+            [new BeatLine(0, true), new BeatLine(100, false), new BeatLine(200, false), new BeatLine(300, true), new BeatLine(350, false), new BeatLine(400, true), new BeatLine(450, false), new BeatLine(500, true)], lines);
         Assert.AreEqual(new BeatLine(400, true), map.BeatLines(390, 420).Single());
     }
 

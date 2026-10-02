@@ -21,9 +21,8 @@ public sealed class SongLibraryScannerTests
         Touch("a/b/two.sng");
         Touch("a/b/c/three.sng");
 
-        CollectionAssert.AreEqual(
-            new[] { "root.sng", P("a/one.sng"), P("a/b/two.sng") },
-            RelativePaths(maxDepth: 2));
+        Assert.AreSequenceEqual(
+            ["root.sng", P("a/one.sng"), P("a/b/two.sng")], RelativePaths(maxDepth: 2));
     }
 
     [TestMethod]
@@ -33,7 +32,7 @@ public sealed class SongLibraryScannerTests
         Touch("a/one.sng");
         Touch("b/song.ini");
 
-        CollectionAssert.AreEqual(new[] { "root.sng" }, RelativePaths(maxDepth: 0));
+        Assert.AreSequenceEqual(["root.sng"], RelativePaths(maxDepth: 0));
     }
 
     [TestMethod]
@@ -44,7 +43,7 @@ public sealed class SongLibraryScannerTests
         Touch("Artist - Title/inner.sng");
         Touch("Artist - Title/stems/song.ini");
 
-        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth: 2).ToList();
+        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth: 2, TestContext.CancellationToken).ToList();
 
         Assert.HasCount(1, entries);
         Assert.AreEqual(SongEntryKind.SongFolder, entries[0].Kind);
@@ -60,7 +59,7 @@ public sealed class SongLibraryScannerTests
         Touch("other.sng");
         Touch("sub/deeper.sng");
 
-        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth: 2).ToList();
+        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth: 2, TestContext.CancellationToken).ToList();
 
         Assert.HasCount(1, entries);
         Assert.AreEqual(SongEntryKind.SongFolder, entries[0].Kind);
@@ -74,7 +73,7 @@ public sealed class SongLibraryScannerTests
         Touch("Upper/SONG.INI");
         Touch("Loud.SNG");
 
-        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth: 2).ToList();
+        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth: 2, TestContext.CancellationToken).ToList();
 
         Assert.HasCount(2, entries);
         Assert.AreEqual(new SongEntry(SongEntryKind.SngFile, Path.Combine(_root.FullName, "Loud.SNG"), "Loud.SNG", "Loud"), entries[0]);
@@ -105,7 +104,7 @@ public sealed class SongLibraryScannerTests
         Touch("__MACOSX/Song/song.ini");
         Touch("real.sng");
 
-        CollectionAssert.AreEqual(new[] { "real.sng" }, RelativePaths(maxDepth: 2));
+        Assert.AreSequenceEqual(["real.sng"], RelativePaths(maxDepth: 2));
     }
 
     [TestMethod]
@@ -118,9 +117,8 @@ public sealed class SongLibraryScannerTests
         Touch("c.sng");
         Touch("B2.sng");
 
-        CollectionAssert.AreEqual(
-            new[] { "B2.sng", "c.sng", P("A/a.sng"), P("A/z.sng"), P("A/Nested"), "b" },
-            RelativePaths(maxDepth: 2));
+        Assert.AreSequenceEqual(
+            ["B2.sng", "c.sng", P("A/a.sng"), P("A/z.sng"), P("A/Nested"), "b"], RelativePaths(maxDepth: 2));
     }
 
     [TestMethod]
@@ -128,17 +126,17 @@ public sealed class SongLibraryScannerTests
     {
         string missing = Path.Combine(_root.FullName, "nope");
 
-        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongLibraryScanner.Enumerate(missing, 2));
-        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongLibraryScanner.ScanAsync(missing, 2, 4, _ => { }));
+        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongLibraryScanner.Enumerate(missing, 2, TestContext.CancellationToken));
+        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongLibraryScanner.ScanAsync(missing, 2, 4, _ => { }, TestContext.CancellationToken));
     }
 
     [TestMethod]
     public void ParallelismBelowOneThrows() =>
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => SongLibraryScanner.ScanAsync(_root.FullName, 2, 0, _ => { }));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => SongLibraryScanner.ScanAsync(_root.FullName, 2, 0, _ => { }, TestContext.CancellationToken));
 
     [TestMethod]
     public void NegativeMaxDepthThrows() =>
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => SongLibraryScanner.Enumerate(_root.FullName, -1));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => SongLibraryScanner.Enumerate(_root.FullName, -1, TestContext.CancellationToken));
 
     [TestMethod]
     public void CancelledEnumerateThrows()
@@ -184,9 +182,9 @@ public sealed class SongLibraryScannerTests
 
         var found = await ScanAllAsync(maxDepth: 2, parallelism);
 
-        var expected = SongLibraryScanner.Enumerate(_root.FullName, 2).ToList();
+        var expected = SongLibraryScanner.Enumerate(_root.FullName, 2, TestContext.CancellationToken).ToList();
         Assert.HasCount(326, expected);
-        CollectionAssert.AreEqual(expected, found.OrderBy(s => s.Position).Select(s => s.Entry).ToList());
+        Assert.AreSequenceEqual(expected, [.. found.OrderBy(s => s.Position).Select(s => s.Entry)]);
     }
 
     [TestMethod]
@@ -217,13 +215,13 @@ public sealed class SongLibraryScannerTests
     private async Task<List<ScannedSong>> ScanAllAsync(int maxDepth, int parallelism)
     {
         var found = new System.Collections.Concurrent.ConcurrentBag<ScannedSong>();
-        int total = await SongLibraryScanner.ScanAsync(_root.FullName, maxDepth, parallelism, found.Add);
+        int total = await SongLibraryScanner.ScanAsync(_root.FullName, maxDepth, parallelism, found.Add, TestContext.CancellationToken);
         Assert.AreEqual(found.Count, total);
         return [.. found];
     }
 
     private string[] RelativePaths(int maxDepth) =>
-        [.. SongLibraryScanner.Enumerate(_root.FullName, maxDepth).Select(e => e.RelativePath)];
+        [.. SongLibraryScanner.Enumerate(_root.FullName, maxDepth, TestContext.CancellationToken).Select(e => e.RelativePath)];
 
     private static string P(string relative) => relative.Replace('/', Path.DirectorySeparatorChar);
 
@@ -233,4 +231,6 @@ public sealed class SongLibraryScannerTests
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, []);
     }
+
+    public TestContext TestContext { get; set; }
 }

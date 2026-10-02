@@ -22,7 +22,7 @@ public sealed class SpectrumTests
         for (int band = 0; band < levels.Length; band++)
         {
             if (Math.Abs(band - loudest) > 3)
-                Assert.IsTrue(levels[band] < 0.2f, $"Band {band} is at {levels[band]}.");
+                Assert.IsLessThan(0.2f, levels[band], $"Band {band} is at {levels[band]}.");
         }
     }
 
@@ -99,11 +99,11 @@ public sealed class SpectrumTests
 
         bars.Update([], TimeSpan.FromSeconds(0.3));
         Assert.AreEqual(1f, bars.Peaks[0]);
-        Assert.IsTrue(bars.Levels[0] < 1f);
+        Assert.IsLessThan(1f, bars.Levels[0]);
 
         bars.Update([], TimeSpan.FromSeconds(0.2));
-        Assert.IsTrue(bars.Peaks[0] < 1f);
-        Assert.IsTrue(bars.Peaks[0] >= bars.Levels[0]);
+        Assert.IsLessThan(1f, bars.Peaks[0]);
+        Assert.IsGreaterThanOrEqualTo(bars.Levels[0], bars.Peaks[0]);
     }
 
     [TestMethod]
@@ -150,9 +150,9 @@ public sealed class SpectrumTests
 
         // 12 frames written; the last 8, frames 4 to 11, are held.
         Assert.IsTrue(tap.TryRead(12, mono));
-        CollectionAssert.AreEqual(new[] { 8f, 9f, 10f, 11f }, mono);
+        Assert.AreSequenceEqual([8f, 9f, 10f, 11f], mono);
         Assert.IsTrue(tap.TryRead(8, mono));
-        CollectionAssert.AreEqual(new[] { 4f, 5f, 6f, 7f }, mono);
+        Assert.AreSequenceEqual([4f, 5f, 6f, 7f], mono);
 
         Assert.IsFalse(tap.TryRead(7, mono), "Frame 3 isn't held any more.");
         Assert.IsFalse(tap.TryRead(13, mono), "Frame 12 hasn't been written.");
@@ -167,7 +167,7 @@ public sealed class SpectrumTests
         var mono = new float[2];
 
         Assert.IsTrue(tap.TryRead(2, mono));
-        CollectionAssert.AreEqual(new[] { 0.125f, 0.5f }, mono);
+        Assert.AreSequenceEqual([0.125f, 0.5f], mono);
     }
 
     [TestMethod]
@@ -184,7 +184,7 @@ public sealed class SpectrumTests
         tap.Write(Stereo(100, 3), 100);
         Assert.IsFalse(tap.TryRead(6, mono));
         Assert.IsTrue(tap.TryRead(103, mono));
-        CollectionAssert.AreEqual(new[] { 101f, 102f }, mono);
+        Assert.AreSequenceEqual([101f, 102f], mono);
     }
 
     /// <summary>The band a frequency falls in, from the bands' spacing: even in pitch from 40 Hz to 16 kHz.</summary>

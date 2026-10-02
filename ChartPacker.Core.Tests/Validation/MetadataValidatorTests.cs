@@ -59,7 +59,7 @@ public sealed class MetadataValidatorTests
 
         Assert.AreEqual(SngRules.Sng060, finding.RuleId);
         Assert.AreEqual(Severity.Warning, finding.Severity);
-        StringAssert.Contains(finding.Message, canonical);
+        Assert.Contains(canonical, finding.Message);
     }
 
     [TestMethod]
@@ -91,7 +91,7 @@ public sealed class MetadataValidatorTests
 
         Assert.AreEqual(SngRules.Sng025, finding.RuleId);
         Assert.AreEqual(Severity.Info, finding.Severity);
-        StringAssert.Contains(finding.Message, "charter");
+        Assert.Contains("charter", finding.Message);
         Assert.IsFalse(MetadataValidator.IsFailing(finding));
     }
 
@@ -119,9 +119,8 @@ public sealed class MetadataValidatorTests
     {
         var findings = MetadataValidator.Validate([P("name", "Song"), P("diff_guitar", "hard"), P("pro_drums", "1"), P("frets", "X")]);
 
-        CollectionAssert.AreEqual(
-            new[] { ("diff_guitar", SngRules.Sng024), ("pro_drums", SngRules.Sng060), ("frets", SngRules.Sng025) },
-            findings.Select(f => (f.Key, f.RuleId)).ToArray());
+        Assert.AreSequenceEqual(
+            new (string?, string)[] { ("diff_guitar", SngRules.Sng024), ("pro_drums", SngRules.Sng060), ("frets", SngRules.Sng025) }, [.. findings.Select(f => (f.Key, f.RuleId))]);
     }
 
     [TestMethod]

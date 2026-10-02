@@ -12,7 +12,7 @@
     <PackageReference Include="Concentus" Version="2.2.2" />
     <PackageReference Include="NLayer" Version="3.0.0" />
     <PackageReference Include="NVorbis" Version="1.0.0-rc.2" />
-    <PackageReference Include="ppy.SDL3-CS" Version="2026.722.0" />
+    <PackageReference Include="ppy.SDL3-CS" Version="2026.1002.1" />
   </ItemGroup>
 
   <ItemGroup>

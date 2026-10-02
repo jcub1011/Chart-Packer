@@ -172,7 +172,7 @@ public sealed class SongJobTests
         Assert.AreEqual(P("Song.sng"), results[1].OutputPath);
         Assert.AreEqual(results[0].Entry, results[1].ConflictsWith);
         // The first item's output wasn't overwritten by the second.
-        Assert.AreEqual("From A", SngReader.Read(P("Song.sng")).Metadata.Single().Value);
+        Assert.AreEqual("From A", SngReader.Read(P("Song.sng"), TestContext.CancellationToken).Metadata.Single().Value);
     }
 
     [TestMethod]
@@ -184,9 +184,8 @@ public sealed class SongJobTests
 
         var results = await RunAsync(JobKind.Pack, OverwritePolicy.Rename, layout: OutputLayout.Flat);
 
-        CollectionAssert.AreEqual(
-            new[] { P("Song.sng"), P("Song (2).sng"), P("Song (3).sng") },
-            results.Select(r => r.OutputPath).ToArray());
+        Assert.AreSequenceEqual(
+            [P("Song.sng"), P("Song (2).sng"), P("Song (3).sng")], results.Select(r => r.OutputPath).ToArray());
         Assert.IsTrue(results.All(r => r.Status == JobItemStatus.Succeeded));
     }
 
@@ -249,7 +248,7 @@ public sealed class SongJobTests
             results.Add(r);
             cts.Cancel();
         });
-        var entries = SongLibraryScanner.Enumerate(_root.FullName, 2).ToList();
+        var entries = SongLibraryScanner.Enumerate(_root.FullName, 2, TestContext.CancellationToken).ToList();
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             SongJob.RunAsync(JobKind.Pack, entries, _root.FullName, _root.FullName, OverwritePolicy.Skip, progress, cancellationToken: cts.Token));
@@ -266,9 +265,9 @@ public sealed class SongJobTests
         string? destination = null,
         OutputLayout layout = OutputLayout.Mirror)
     {
-        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth).ToList();
+        var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth, TestContext.CancellationToken).ToList();
         var results = new List<JobItemResult>();
-        await SongJob.RunAsync(kind, entries, _root.FullName, destination ?? _root.FullName, policy, new SyncProgress(results.Add), layout);
+        await SongJob.RunAsync(kind, entries, _root.FullName, destination ?? _root.FullName, policy, new SyncProgress(results.Add), layout, cancellationToken: TestContext.CancellationToken);
         return results;
     }
 
@@ -296,4 +295,6 @@ public sealed class SongJobTests
     {
         public void Report(JobItemResult value) => report(value);
     }
+
+    public TestContext TestContext { get; set; }
 }

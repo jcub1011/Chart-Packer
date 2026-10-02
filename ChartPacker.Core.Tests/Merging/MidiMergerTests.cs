@@ -30,12 +30,12 @@ public sealed class MidiMergerTests
         var result = MidiMerger.Merge(baseChart, [(baseChart, Guitar), (other, Drums)]);
         var merged = ChartReader.Read(result.Midi, "notes.mid");
 
-        CollectionAssert.AreEqual(ChartReaderTests.Notes(Read(baseChart), ChartInstrument.Guitar), ChartReaderTests.Notes(merged, ChartInstrument.Guitar));
-        CollectionAssert.AreEqual(ChartReaderTests.Notes(Read(other), ChartInstrument.Drums), ChartReaderTests.Notes(merged, ChartInstrument.Drums));
-        CollectionAssert.AreEqual(new[] { ChartInstrument.Guitar, ChartInstrument.Drums }, merged.Instruments.ToArray());
+        Assert.AreSequenceEqual(ChartReaderTests.Notes(Read(baseChart), ChartInstrument.Guitar), ChartReaderTests.Notes(merged, ChartInstrument.Guitar));
+        Assert.AreSequenceEqual(ChartReaderTests.Notes(Read(other), ChartInstrument.Drums), ChartReaderTests.Notes(merged, ChartInstrument.Drums));
+        Assert.AreSequenceEqual([ChartInstrument.Guitar, ChartInstrument.Drums], [.. merged.Instruments]);
 
         string text = Encoding.Latin1.GetString(result.Midi);
-        StringAssert.Contains(text, "[section Base]");
+        Assert.Contains("[section Base]", text);
         Assert.DoesNotContain("[section Other]", text);
         Assert.IsEmpty(result.Warnings);
     }
@@ -50,8 +50,96 @@ public sealed class MidiMergerTests
         var merged = ChartReader.Read(MidiMerger.Merge(baseChart, [(other, Bass)]).Midi, "notes.mid");
 
         Assert.AreEqual(480, merged.Tempo.Resolution);
-        CollectionAssert.AreEqual(new[] { new ChartNote(960, 960, 0, NoteFlags.None) }, ChartReaderTests.Notes(merged, ChartInstrument.Bass));
-        Assert.IsFalse(merged.Tracks.Keys.Any(k => k.Instrument == ChartInstrument.Guitar));
+        Assert.AreSequenceEqual([new ChartNote(960, 960, 0, NoteFlags.None)], ChartReaderTests.Notes(merged, ChartInstrument.Bass));
+        Assert.DoesNotContain(k => k.Instrument == ChartInstrument.Guitar, merged.Tracks.Keys);
+    }
+
+    [TestMethod]
+    public void ChartPartWithShortSustainsSetsTheCutoffAndOtherPartsKeepReadingTheSame()
+    {
+        // The base's bass note is held just under its default cutoff of 160: a note, not a sustain.
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART BASS").Note(0, 96, 159).Note(480, 97, 480).Build());
+        // A third of a beat at 192 is 160 ticks at 480: a sustain of exactly the default cutoff.
+        var (guitar, _) = MidiChart.Load(Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
+            }
+            [ExpertSingle]
+            {
+              0 = N 0 64
+              192 = N 1 0
+            }
+            """), "notes.chart", []);
+
+        var result = MidiMerger.Merge(baseChart, [(baseChart, Bass), (guitar, Guitar)]);
+        var merged = ChartReader.Read(result.Midi, "notes.mid", new ChartReadOptions(SustainCutoff: result.SustainCutoff));
+
+        Assert.AreEqual(159L, result.SustainCutoff);
+        Assert.AreSequenceEqual([160, 0], [.. ChartReaderTests.Notes(merged, ChartInstrument.Guitar).Select(n => n.Length)]);
+        Assert.AreSequenceEqual([0, 480], [.. ChartReaderTests.Notes(merged, ChartInstrument.Bass).Select(n => n.Length)]);
+        Assert.IsEmpty(result.Warnings);
+    }
+
+    [TestMethod]
+    public void PartsWithLongSustainsNeedNoCutoff()
+    {
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 480).Build());
+
+        var result = MidiMerger.Merge(baseChart, [(baseChart, Guitar)]);
+
+        Assert.IsNull(result.SustainCutoff);
+    }
+
+    [TestMethod]
+    public void WarningsSayWhereInTheSourceChart()
+    {
+        // The source plays half a second later, so its notes are placed a beat on; at 1920 ticks a beat,
+        // its notes at 0 and 1 land on the same tick at 480 and become one.
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());
+        var other = new MidiChart(
+            new MidiBuilder(1920).Track("tempo").Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 1).Note(1, 96).Build(),
+            TimeSpan.FromMilliseconds(500),
+            ChartReadOptions.Default);
+
+        var result = MidiMerger.Merge(baseChart, [(other, Guitar)]);
+
+        var warning = result.Warnings.Single();
+        Assert.AreEqual(ChartMergeIssue.NotesLost, warning.Issue);
+        Assert.AreEqual(0, warning.Times.Single().TotalSeconds, 0.002);
+    }
+
+    [TestMethod]
+    public void StarPowerOn103IsMovedTo116()
+    {
+        // The merged song.ini has no multiplier_note, so a source's star power on 103 moves to 116, and what was on 116 goes.
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());
+        var other = new MidiChart(
+            new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART GUITAR").Note(0, 103, 480).Note(0, 96).Note(960, 116, 100).Note(960, 97).Build(),
+            TimeSpan.Zero,
+            ChartReadOptions.From([new("multiplier_note", "103")]));
+
+        var result = MidiMerger.Merge(baseChart, [(other, Guitar)]);
+        var notes = ChartReaderTests.Notes(ChartReader.Read(result.Midi, "notes.mid"), ChartInstrument.Guitar);
+
+        Assert.AreSequenceEqual([NoteFlags.StarPower, NoteFlags.None], [.. notes.Select(n => n.Flags)]);
+        Assert.IsEmpty(result.Warnings);
+    }
+
+    [TestMethod]
+    public void TheLaterPartGuitarIsTheOneMerged()
+    {
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());
+        var other = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART GUITAR").Note(0, 96).Track("PART GUITAR").Note(0, 97).Build());
+
+        var result = MidiMerger.Merge(baseChart, [(other, Guitar)]);
+
+        Assert.AreEqual(1, ChartReaderTests.Notes(ChartReader.Read(result.Midi, "notes.mid"), ChartInstrument.Guitar).Single().Lane);
+        Assert.IsEmpty(result.Warnings);
     }
 
     [TestMethod]
@@ -109,9 +197,9 @@ public sealed class MidiMergerTests
         var result = MidiMerger.Merge(baseChart, [(other, MidiPartCatalog.PartOf("HARM1")!)]);
         string text = Encoding.Latin1.GetString(result.Midi);
 
-        StringAssert.Contains(text, "HARM1");
-        StringAssert.Contains(text, "HARM2");
-        StringAssert.Contains(text, "HARM3");
+        Assert.Contains("HARM1", text);
+        Assert.Contains("HARM2", text);
+        Assert.Contains("HARM3", text);
         Assert.IsTrue(ChartReader.Read(result.Midi, "notes.mid").Tempo.SameAs(Read(baseChart).Tempo));
     }
 

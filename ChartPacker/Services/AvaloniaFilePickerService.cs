@@ -14,7 +14,7 @@ namespace ChartPacker.Services
     {
         private static readonly FilePickerFileType Audio = new(Strings.AudioFileTypeName)
         {
-            Patterns = AudioStems.Extensions.Select(e => "*" + e).ToList(),
+            Patterns = [.. AudioStems.Extensions.Select(e => "*" + e)],
             MimeTypes = ["audio/ogg", "audio/opus", "audio/mpeg", "audio/wav"],
         };
 
@@ -50,7 +50,7 @@ namespace ChartPacker.Services
                 AllowMultiple = true,
             });
 
-            return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
+            return [.. files.Select(f => f.TryGetLocalPath()).OfType<string>()];
         }
 
         public async Task<string?> PickAudioAsync(string title)
@@ -105,7 +105,7 @@ namespace ChartPacker.Services
         private static FilePickerFileType FileType(string nameFormat, IReadOnlyList<string> extensions, IReadOnlyList<string> mimeTypes) =>
             new(string.Format(CultureInfo.CurrentCulture, nameFormat, string.Join(", ", extensions.Select(e => e.TrimStart('.')))))
             {
-                Patterns = extensions.Select(e => "*" + e).ToList(),
+                Patterns = [.. extensions.Select(e => "*" + e)],
                 MimeTypes = mimeTypes,
             };
     }

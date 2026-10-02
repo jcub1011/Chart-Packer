@@ -193,7 +193,7 @@ public sealed class DeletionExecutorTests
         int calls = 0;
 
         // Clean when the plan is checked, edited by the time the copy is reached.
-        var outcomes = await DeletionExecutor.RunAsync(items, new FakeTrash(_root.CreateSubdirectory("bin")), new DeletionLog(_logPath), _ => calls++ > 0);
+        var outcomes = await DeletionExecutor.RunAsync(items, new FakeTrash(_root.CreateSubdirectory("bin")), new DeletionLog(_logPath), _ => calls++ > 0, cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(DeletionSkipReason.HasUnsavedChanges, outcomes.Single().Reason);
     }
@@ -225,20 +225,20 @@ public sealed class DeletionExecutorTests
         File.WriteAllText(blocker, "a file where the log's folder should be");
 
         var items = DeletionPlan.Create(DedupTier.Exact, DeletionKeeper.Of(keeper), [copy]);
-        await Assert.ThrowsAsync<IOException>(() => DeletionExecutor.RunAsync(items, new FakeTrash(_root.CreateSubdirectory("bin")), new DeletionLog(Path.Combine(blocker, "log.jsonl"))));
+        await Assert.ThrowsAsync<IOException>(() => DeletionExecutor.RunAsync(items, new FakeTrash(_root.CreateSubdirectory("bin")), new DeletionLog(Path.Combine(blocker, "log.jsonl")), cancellationToken: TestContext.CancellationToken));
 
         Assert.IsTrue(File.Exists(copy.Entry.FullPath));
     }
 
     private Task<IReadOnlyList<DeletionOutcome>> RunAsync(ITrash trash, IReadOnlyList<DeletionItem> items) =>
-        DeletionExecutor.RunAsync(items, trash, new DeletionLog(_logPath));
+        DeletionExecutor.RunAsync(items, trash, new DeletionLog(_logPath), cancellationToken: TestContext.CancellationToken);
 
     /// <summary>A folder and the <c>.sng</c> packed from it, fingerprinted.</summary>
     private async Task<(SongFingerprint Folder, SongFingerprint Sng)> PairAsync()
     {
         var folder = Song(_root, "Song");
         var sng = await PackAsync(folder, Path.Combine(_root.FullName, "Song (1).sng"));
-        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng], cancellationToken: TestContext.CancellationToken);
         var entries = analysis.Exact.Single().Entries;
         return (entries.Single(e => e.Entry.Kind == SongEntryKind.SongFolder), entries.Single(e => e.Entry.Kind == SongEntryKind.SngFile));
     }
@@ -247,7 +247,7 @@ public sealed class DeletionExecutorTests
     {
         string path = Path.Combine(_root.FullName, name);
         File.Copy(sng.Entry.FullPath, path);
-        var analysis = await DedupAnalyzer.AnalyzeAsync([sng.Entry, SngEntry(path)]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([sng.Entry, SngEntry(path)], cancellationToken: TestContext.CancellationToken);
         return analysis.Exact.Single().Entries.Single(e => e.Entry.FullPath == path);
     }
 
@@ -277,6 +277,8 @@ public sealed class DeletionExecutorTests
             return Result ?? TrashResult.Trashed;
         }
     }
+
+    public TestContext TestContext { get; set; }
 }
 
 [TestClass]
@@ -294,36 +296,38 @@ public sealed class EntryStampsTests
     public void AFolderStampChangesWithAnyFileInside()
     {
         var song = Folder(_root, "Song", IniFor("A", "T"), ("stems/guitar.ogg", Bytes(10, 1)));
-        var before = EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder);
+        var before = EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder, TestContext.CancellationToken);
 
-        Assert.AreEqual(before, EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder));
+        Assert.AreEqual(before, EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder, TestContext.CancellationToken));
 
         File.SetLastWriteTimeUtc(Path.Combine(song.FullPath, "stems", "guitar.ogg"), DateTime.UtcNow.AddMinutes(1));
-        var touched = EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder);
+        var touched = EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder, TestContext.CancellationToken);
         Assert.AreNotEqual(before, touched);
 
         File.WriteAllText(Path.Combine(song.FullPath, "extra.txt"), "");
-        Assert.AreNotEqual(touched, EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder));
+        Assert.AreNotEqual(touched, EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder, TestContext.CancellationToken));
     }
 
     [TestMethod]
     public void JunkTheOsWritesDoesNotChangeAFolderStamp()
     {
         var song = Folder(_root, "Song", IniFor("A", "T"), ("notes.chart", Utf8(Chart)));
-        var before = EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder);
+        var before = EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder, TestContext.CancellationToken);
 
         File.WriteAllText(Path.Combine(song.FullPath, "Thumbs.db"), "thumbnails");
         File.WriteAllText(Path.Combine(song.FullPath, ".DS_Store"), "view settings");
         Directory.CreateDirectory(Path.Combine(song.FullPath, "__MACOSX"));
         File.WriteAllText(Path.Combine(song.FullPath, "__MACOSX", "._notes.chart"), "resource fork");
 
-        Assert.AreEqual(before, EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder));
+        Assert.AreEqual(before, EntryStamps.Capture(song.FullPath, SongEntryKind.SongFolder, TestContext.CancellationToken));
     }
 
     [TestMethod]
     public void AMissingSongHasNoStamp()
     {
-        Assert.IsNull(EntryStamps.Capture(Path.Combine(_root.FullName, "gone"), SongEntryKind.SongFolder));
-        Assert.IsNull(EntryStamps.Capture(Path.Combine(_root.FullName, "gone.sng"), SongEntryKind.SngFile));
+        Assert.IsNull(EntryStamps.Capture(Path.Combine(_root.FullName, "gone"), SongEntryKind.SongFolder, TestContext.CancellationToken));
+        Assert.IsNull(EntryStamps.Capture(Path.Combine(_root.FullName, "gone.sng"), SongEntryKind.SngFile, TestContext.CancellationToken));
     }
+
+    public TestContext TestContext { get; set; }
 }

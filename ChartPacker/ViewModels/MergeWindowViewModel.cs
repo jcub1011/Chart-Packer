@@ -829,6 +829,9 @@ namespace ChartPacker.ViewModels
                 .. (plan.SourceOffsets ?? new Dictionary<int, int>()).OrderBy(p => p.Key).Select(p => $"@{p.Key}={p.Value}"),
             ]);
 
+        // How many of a warning's places it lists before saying how many more there are.
+        private const int WarningTimesShown = 5;
+
         private static string Describe(ChartMergeWarning warning)
         {
             string format = warning.Issue switch
@@ -838,7 +841,15 @@ namespace ChartPacker.ViewModels
                 ChartMergeIssue.NotesChanged => Strings.MergeIssueNotesChangedFormat,
                 _ => Strings.MergeIssueNotesLostFormat,
             };
-            return string.Format(CultureInfo.CurrentCulture, format, TrackName(warning.TrackName), ChartLabels.DifficultyName(warning.Difficulty));
+            string text = string.Format(CultureInfo.CurrentCulture, format, TrackName(warning.TrackName), ChartLabels.DifficultyName(warning.Difficulty));
+            if (warning.Times.Count == 0)
+                return text;
+
+            // Where, as song time in the source chart, so they can be found in a chart editor.
+            string times = string.Join(", ", warning.Times.Take(WarningTimesShown).Select(t => Controls.AlignmentTimelineView.FormatTime(t.TotalSeconds, 1)));
+            if (warning.Times.Count > WarningTimesShown)
+                times = string.Format(CultureInfo.CurrentCulture, Strings.MergeIssueMoreTimesFormat, times, warning.Times.Count - WarningTimesShown);
+            return string.Format(CultureInfo.CurrentCulture, Strings.MergeIssueTimesFormat, text, times);
         }
 
         private static string TrackName(string track) => MidiPartCatalog.PartOf(track) is { IsKnown: true } part ? ChartLabels.PartName(part) : track;

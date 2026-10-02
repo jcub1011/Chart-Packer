@@ -109,11 +109,10 @@ public sealed class LibraryContentFiltersTests
     public void DifficultiesAndTheirFlagsGoBothWays()
     {
         foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
-            CollectionAssert.AreEqual(new[] { difficulty }, difficulty.ToFlag().ToDifficulties(), difficulty.ToString());
+            Assert.AreSequenceEqual([difficulty], difficulty.ToFlag().ToDifficulties(), difficulty.ToString());
 
-        CollectionAssert.AreEqual(
-            new[] { ChartDifficulty.Easy, ChartDifficulty.Hard },
-            (LibraryDifficulties.Hard | LibraryDifficulties.Easy).ToDifficulties());
+        Assert.AreSequenceEqual(
+            [ChartDifficulty.Easy, ChartDifficulty.Hard], (LibraryDifficulties.Hard | LibraryDifficulties.Easy).ToDifficulties());
         Assert.IsEmpty(LibraryDifficulties.None.ToDifficulties());
     }
 }

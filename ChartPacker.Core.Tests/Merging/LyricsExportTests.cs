@@ -26,16 +26,16 @@ public sealed class LyricsExportTests
 
         byte[] exported = LyricsExport.ToMidi(midi, "notes.mid", NoMetadata);
 
-        CollectionAssert.AreEqual(new[] { null, "PART VOCALS", "HARM1" }, TrackNames(exported).ToArray());
+        Assert.AreSequenceEqual([null, "PART VOCALS", "HARM1"], [.. TrackNames(exported)]);
         var before = VocalReader.Read(midi, "notes.mid");
         var after = VocalReader.Read(exported, "notes.mid");
         Assert.IsTrue(after.Tempo.SameAs(before.Tempo));
         Assert.HasCount(2, after.Parts);
         for (int i = 0; i < before.Parts.Count; i++)
         {
-            CollectionAssert.AreEqual(before.Parts[i].Notes.ToArray(), after.Parts[i].Notes.ToArray());
-            CollectionAssert.AreEqual(before.Parts[i].Lyrics.ToArray(), after.Parts[i].Lyrics.ToArray());
-            CollectionAssert.AreEqual(before.Parts[i].Phrases.ToArray(), after.Parts[i].Phrases.ToArray());
+            Assert.AreSequenceEqual([.. before.Parts[i].Notes], [.. after.Parts[i].Notes]);
+            Assert.AreSequenceEqual([.. before.Parts[i].Lyrics], [.. after.Parts[i].Lyrics]);
+            Assert.AreSequenceEqual([.. before.Parts[i].Phrases], [.. after.Parts[i].Phrases]);
         }
 
         // Events the vocals model doesn't read come along too.
@@ -55,9 +55,9 @@ public sealed class LyricsExportTests
         byte[] exported = LyricsExport.ToMidi(midi, "notes.mid", metadata, TimeSpan.FromMilliseconds(250));
 
         var part = VocalReader.Read(exported, "notes.mid").Main!;
-        CollectionAssert.AreEqual(new[] { new VocalLyric(480, "one") }, part.Lyrics.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalNote(480, 240, 60) }, part.Notes.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalPhrase(480, 480) }, part.Phrases.ToArray());
+        Assert.AreSequenceEqual([new VocalLyric(480, "one")], [.. part.Lyrics]);
+        Assert.AreSequenceEqual([new VocalNote(480, 240, 60)], [.. part.Notes]);
+        Assert.AreSequenceEqual([new VocalPhrase(480, 480)], [.. part.Phrases]);
     }
 
     [TestMethod]
@@ -104,9 +104,9 @@ public sealed class LyricsExportTests
 
         var vocals = VocalReader.Read(exported, "notes.mid");
         Assert.AreEqual(192, vocals.Tempo.Resolution);
-        CollectionAssert.AreEqual(new[] { new VocalLyric(192, "Hel-"), new VocalLyric(288, "lo") }, vocals.Main!.Lyrics.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalPhrase(192, 192) }, vocals.Main.Phrases.ToArray());
-        CollectionAssert.AreEqual(new[] { null, "PART VOCALS" }, TrackNames(exported).ToArray());
+        Assert.AreSequenceEqual([new VocalLyric(192, "Hel-"), new VocalLyric(288, "lo")], [.. vocals.Main!.Lyrics]);
+        Assert.AreSequenceEqual([new VocalPhrase(192, 192)], [.. vocals.Main.Phrases]);
+        Assert.AreSequenceEqual([null, "PART VOCALS"], [.. TrackNames(exported)]);
     }
 
     private static List<string?> TrackNames(byte[] midi)

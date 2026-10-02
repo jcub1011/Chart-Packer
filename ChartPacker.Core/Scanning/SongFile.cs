@@ -22,9 +22,7 @@ public static class SongFile
 
         if (entry.Kind != SongEntryKind.SngFile)
         {
-            return new DirectoryInfo(entry.FullPath).EnumerateFiles()
-                .Select(f => new StoredFile(f.Name, f.Length))
-                .ToList();
+            return [.. new DirectoryInfo(entry.FullPath).EnumerateFiles().Select(f => new StoredFile(f.Name, f.Length))];
         }
 
         var read = SngReader.Read(entry.FullPath, cancellationToken);

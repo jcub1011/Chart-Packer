@@ -22,9 +22,9 @@ public sealed class VocalReaderTests
         var part = VocalReader.Read(midi, "notes.mid").Main!;
 
         Assert.AreEqual("PART VOCALS", part.TrackName);
-        CollectionAssert.AreEqual(new[] { new VocalNote(0, 240, 60), new VocalNote(480, 240, 64) }, part.Notes.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalLyric(0, "Hel-"), new VocalLyric(480, "lo") }, part.Lyrics.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalPhrase(0, 960) }, part.Phrases.ToArray());
+        Assert.AreSequenceEqual([new VocalNote(0, 240, 60), new VocalNote(480, 240, 64)], [.. part.Notes]);
+        Assert.AreSequenceEqual([new VocalLyric(0, "Hel-"), new VocalLyric(480, "lo")], [.. part.Lyrics]);
+        Assert.AreSequenceEqual([new VocalPhrase(0, 960)], [.. part.Phrases]);
     }
 
     [TestMethod]
@@ -36,7 +36,7 @@ public sealed class VocalReaderTests
 
         var part = VocalReader.Read(midi, "notes.mid").Main!;
 
-        CollectionAssert.AreEqual(new[] { new VocalLyric(0, "Hey") }, part.Lyrics.ToArray());
+        Assert.AreSequenceEqual([new VocalLyric(0, "Hey")], [.. part.Lyrics]);
     }
 
     [TestMethod]
@@ -51,7 +51,7 @@ public sealed class VocalReaderTests
 
         var vocals = VocalReader.Read(midi, "notes.mid");
 
-        CollectionAssert.AreEqual(new[] { "PART VOCALS", "HARM1", "HARM2" }, vocals.Parts.Select(p => p.TrackName).ToArray());
+        Assert.AreSequenceEqual(["PART VOCALS", "HARM1", "HARM2"], [.. vocals.Parts.Select(p => p.TrackName)]);
         Assert.AreEqual(64, vocals.Main!.Notes.Single().Pitch);
     }
 
@@ -106,7 +106,7 @@ public sealed class VocalReaderTests
             .Note(480, 60).Meta(480, 0x05, [0xE9])
             .Build();
 
-        CollectionAssert.AreEqual(new[] { "é", "é" }, VocalReader.Read(midi, "notes.mid").Main!.Lyrics.Select(l => l.Text).ToArray());
+        Assert.AreSequenceEqual(["é", "é"], [.. VocalReader.Read(midi, "notes.mid").Main!.Lyrics.Select(l => l.Text)]);
     }
 
     [TestMethod]
@@ -148,9 +148,9 @@ public sealed class VocalReaderTests
 
         Assert.AreEqual(192, vocals.Tempo.Resolution);
         Assert.IsEmpty(part.Notes);
-        CollectionAssert.AreEqual(new[] { new VocalLyric(192, "Hel-"), new VocalLyric(288, "lo"), new VocalLyric(400, "bye") }, part.Lyrics.ToArray());
+        Assert.AreSequenceEqual([new VocalLyric(192, "Hel-"), new VocalLyric(288, "lo"), new VocalLyric(400, "bye")], [.. part.Lyrics]);
         // An open phrase ends a beat after the last event.
-        CollectionAssert.AreEqual(new[] { new VocalPhrase(192, 192), new VocalPhrase(400, 192) }, part.Phrases.ToArray());
+        Assert.AreSequenceEqual([new VocalPhrase(192, 192), new VocalPhrase(400, 192)], [.. part.Phrases]);
     }
 
     [TestMethod]

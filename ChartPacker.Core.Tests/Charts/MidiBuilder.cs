@@ -36,6 +36,13 @@ internal sealed class MidiBuilder(int resolution = 480)
         return this;
     }
 
+    /// <summary>An event of the given bytes, its status first: for a note-on or note-off on its own.</summary>
+    public MidiBuilder Raw(long tick, params byte[] bytes)
+    {
+        Current.Add((tick, bytes));
+        return this;
+    }
+
     /// <summary>A Phase Shift sysex event: 'P' 'S' 0 0 difficulty type enable.</summary>
     public MidiBuilder PhaseShift(long tick, byte difficulty, byte type, bool enable)
     {

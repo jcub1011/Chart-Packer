@@ -520,11 +520,10 @@ namespace ChartPacker.ViewModels
             int unfixableListed = 0, unlisted = 0;
             foreach (var group in byKey)
             {
-                List<string> fixes = !_report.CanEdit ? [] : group
+                List<string> fixes = !_report.CanEdit ? [] : [.. group
                     .Select(f => QuickFixRegistry.Propose(f, pairs)?.Description)
                     .OfType<string>()
-                    .Distinct(StringComparer.Ordinal)
-                    .ToList();
+                    .Distinct(StringComparer.Ordinal)];
                 string? fix = fixes.Count == 0 ? null : string.Join(", ", fixes);
 
                 if (fix is null && unfixableListed == ListedIssues)

@@ -42,6 +42,6 @@ public static class ChartFiles
     public static IReadOnlyList<string> FilesOf(IEnumerable<string> storedNames)
     {
         ArgumentNullException.ThrowIfNull(storedNames);
-        return storedNames.Where(IsChartName).ToList();
+        return [.. storedNames.Where(IsChartName)];
     }
 }

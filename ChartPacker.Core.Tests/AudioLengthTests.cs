@@ -40,7 +40,7 @@ public sealed class AudioLengthTests
             ("song.wav", Wav(2500)),
             ("preview.wav", Wav(500)));
 
-        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken);
 
         Assert.AreEqual(2500L, summary.FallbackLengthMs);
     }
@@ -50,7 +50,7 @@ public sealed class AudioLengthTests
     {
         string folder = CreateFolder(("guitar.wav", Wav(1500)));
 
-        Assert.AreEqual(1500L, (await SongSummaryReader.ReadAsync(Folder(folder))).FallbackLengthMs);
+        Assert.AreEqual(1500L, (await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     [TestMethod]
@@ -60,7 +60,7 @@ public sealed class AudioLengthTests
             ("song.ini", Encoding.UTF8.GetBytes("[song]\nsong_length = 60000\n")),
             ("guitar.wav", Wav(1000)));
 
-        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder))).FallbackLengthMs);
+        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     [TestMethod]
@@ -70,7 +70,7 @@ public sealed class AudioLengthTests
             ("song.ini", Encoding.UTF8.GetBytes("[song]\nsong_length = 0\n")),
             ("guitar.wav", Wav(1000)));
 
-        Assert.AreEqual(1000L, (await SongSummaryReader.ReadAsync(Folder(folder))).FallbackLengthMs);
+        Assert.AreEqual(1000L, (await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     [TestMethod]
@@ -81,7 +81,7 @@ public sealed class AudioLengthTests
             ("bass.ogg", [1, 2, 3, 4]),
             ("old/song.wav", Wav(9000)));
 
-        Assert.AreEqual(1000L, (await SongSummaryReader.ReadAsync(Folder(folder))).FallbackLengthMs);
+        Assert.AreEqual(1000L, (await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     [TestMethod]
@@ -89,7 +89,7 @@ public sealed class AudioLengthTests
     {
         string folder = CreateFolder(("notes.chart", [1]), ("song.ogg", [0, 0, 0]));
 
-        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder))).FallbackLengthMs);
+        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     [TestMethod]
@@ -98,7 +98,7 @@ public sealed class AudioLengthTests
         var builder = new SngBuilder().AddMetadata("name", "Song");
         builder.AddFile("guitar.wav", Masked(builder, Wav(1200))).AddFile("song.wav", Masked(builder, Wav(3400)));
 
-        Assert.AreEqual(3400L, (await SongSummaryReader.ReadAsync(WriteSng(builder))).FallbackLengthMs);
+        Assert.AreEqual(3400L, (await SongSummaryReader.ReadAsync(WriteSng(builder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     [TestMethod]
@@ -107,7 +107,7 @@ public sealed class AudioLengthTests
         var builder = new SngBuilder().AddMetadata("song_length", "5000");
         builder.AddFile("song.wav", Masked(builder, Wav(3400)));
 
-        Assert.IsNull((await SongSummaryReader.ReadAsync(WriteSng(builder))).FallbackLengthMs);
+        Assert.IsNull((await SongSummaryReader.ReadAsync(WriteSng(builder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     [TestMethod]
@@ -117,7 +117,7 @@ public sealed class AudioLengthTests
         builder.AddFile("guitar.wav", Masked(builder, Wav(800))).AddFile("song.wav", Masked(builder, Wav(3400)));
         builder.LengthOverrides[1] = 10_000_000;
 
-        Assert.AreEqual(800L, (await SongSummaryReader.ReadAsync(WriteSng(builder))).FallbackLengthMs);
+        Assert.AreEqual(800L, (await SongSummaryReader.ReadAsync(WriteSng(builder), TestContext.CancellationToken)).FallbackLengthMs);
     }
 
     /// <summary>A silent 16-bit mono PCM WAV lasting <paramref name="ms"/> milliseconds.</summary>
@@ -172,4 +172,6 @@ public sealed class AudioLengthTests
 
     private SongEntry Folder(string path) =>
         new(SongEntryKind.SongFolder, path, Path.GetRelativePath(_root.FullName, path), Path.GetFileName(path));
+
+    public TestContext TestContext { get; set; }
 }

@@ -10,7 +10,7 @@ public sealed class RichTextTests
     [TestMethod]
     public void PlainTextIsOneUnstyledSpan()
     {
-        CollectionAssert.AreEqual(new[] { new RichTextSpan("Vivv", Plain) }, Parse("Vivv"));
+        Assert.AreSequenceEqual([new RichTextSpan("Vivv", Plain)], Parse("Vivv"));
         Assert.IsFalse(RichText.HasMarkup("Vivv"));
     }
 
@@ -20,24 +20,21 @@ public sealed class RichTextTests
     [TestMethod]
     public void UnclosedColorRunsToTheEnd()
     {
-        CollectionAssert.AreEqual(
-            new[] { new RichTextSpan("Vivv", Plain with { Color = 0xFFFDFD96 }) },
-            Parse("<color=#FDFD96FF>Vivv"));
+        Assert.AreSequenceEqual(
+            [new RichTextSpan("Vivv", Plain with { Color = 0xFFFDFD96 })], Parse("<color=#FDFD96FF>Vivv"));
         Assert.IsTrue(RichText.HasMarkup("<color=#FDFD96FF>Vivv"));
     }
 
     [TestMethod]
     public void ColorStackRestoresOuterColor()
     {
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Assert.AreSequenceEqual(
+            [
                 new RichTextSpan("a", Plain with { Color = 0xFFFF0000 }),
                 new RichTextSpan("b", Plain with { Color = 0xFF0000FF }),
                 new RichTextSpan("c", Plain with { Color = 0xFFFF0000 }),
                 new RichTextSpan("d", Plain),
-            },
-            Parse("<color=red>a<color=#00F>b</color>c</color>d"));
+            ], Parse("<color=red>a<color=#00F>b</color>c</color>d"));
     }
 
     [TestMethod]
@@ -75,32 +72,29 @@ public sealed class RichTextTests
     [DataRow("<color=>x")]
     public void InvalidColorTagIsShownAsText(string text)
     {
-        CollectionAssert.AreEqual(new[] { new RichTextSpan(text, Plain) }, Parse(text));
+        Assert.AreSequenceEqual([new RichTextSpan(text, Plain)], Parse(text));
         Assert.IsFalse(RichText.HasMarkup(text));
     }
 
     [TestMethod]
     public void BoldItalicUnderlineStrikethroughNest()
     {
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Assert.AreSequenceEqual(
+            [
                 new RichTextSpan("a", Plain with { Bold = true }),
                 new RichTextSpan("b", Plain with { Bold = true, Italic = true, Underline = true, Strikethrough = true }),
                 new RichTextSpan("c", Plain),
-            },
-            Parse("<B>a<i><u><s>b</s></u></i></b>c"));
+            ], Parse("<B>a<i><u><s>b</s></u></i></b>c"));
     }
 
     [TestMethod]
     public void StrayClosingTagIsHarmless() =>
-        CollectionAssert.AreEqual(new[] { new RichTextSpan("ab", Plain) }, Parse("a</b></color>b"));
+        Assert.AreSequenceEqual([new RichTextSpan("ab", Plain)], Parse("a</b></color>b"));
 
     [TestMethod]
     public void LineBreakBecomesNewlineSpan() =>
-        CollectionAssert.AreEqual(
-            new[] { new RichTextSpan("one", Plain), new RichTextSpan("\n", Plain), new RichTextSpan("two", Plain) },
-            Parse("one<br>two"));
+        Assert.AreSequenceEqual(
+            [new RichTextSpan("one", Plain), new RichTextSpan("\n", Plain), new RichTextSpan("two", Plain)], Parse("one<br>two"));
 
     [TestMethod]
     public void OtherTextMeshProTagsAreRemoved() =>
@@ -121,9 +115,8 @@ public sealed class RichTextTests
     [TestMethod]
     public void NoParseKeepsTagsLiteral()
     {
-        CollectionAssert.AreEqual(
-            new[] { new RichTextSpan("<b>not bold</b>", Plain), new RichTextSpan("bold", Plain with { Bold = true }) },
-            Parse("<noparse><b>not bold</b></noparse><b>bold"));
+        Assert.AreSequenceEqual(
+            [new RichTextSpan("<b>not bold</b>", Plain), new RichTextSpan("bold", Plain with { Bold = true })], Parse("<noparse><b>not bold</b></noparse><b>bold"));
     }
 
     private static RichTextSpan[] Parse(string text) => [.. RichText.Parse(text)];

@@ -108,7 +108,7 @@ public static class SongMerger
             }
         }
 
-        foreach (string key in (string[])["charter", "pro_drums", "delay"])
+        foreach (string key in (string[])["charter", "pro_drums", "five_lane_drums", "delay"])
         {
             if (seen.Add(key))
                 keys.Add(key);
@@ -129,17 +129,27 @@ public static class SongMerger
                     if (!plan.Parts.TryGetValue(owner.Id, out int partSource))
                         return null;
 
-                    // A converted .chart's cymbals only read as cymbals with pro_drums set.
-                    if (key.Equals("pro_drums", StringComparison.OrdinalIgnoreCase) && sources[partSource].Chart?.Options.ProDrums == true)
-                        return sources[partSource].Value(key) ?? "True";
+                    // A converted .chart's drums keep their layout with the settings its conversion gives.
+                    if (sources[partSource] is { Format: MergeChartFormat.Chart, Chart.Options: var converted } && key.ToLowerInvariant() is "pro_drums" or "pro_drum" or "five_lane_drums")
+                    {
+                        bool? value = key.Equals("five_lane_drums", StringComparison.OrdinalIgnoreCase) ? converted.FiveLaneDrums
+                            : key.Equals("pro_drums", StringComparison.OrdinalIgnoreCase) ? converted.ProDrums
+                            : null;
+                        return value is { } set ? (set ? "True" : "False") : null;
+                    }
+
                     return sources[partSource].Value(key);
 
                 case MergeKeyRule.Base:
                     return baseSource.Value(key);
 
                 case MergeKeyRule.Delay:
-                    if (baseSource.Value(key) is { } delay)
-                        return delay;
+                    // The merged chart is a MIDI file without an offset, so delay carries what the base chart plays with,
+                    // which YARG takes from delay unless it's 0, then delay_seconds, then the chart's offset.
+                    if (!key.Equals("delay", StringComparison.OrdinalIgnoreCase))
+                        return null;
+                    if (SongIniValues.Integer(baseSource.Value(key)) is { } ms && ms != 0)
+                        return baseSource.Value(key);
                     return baseSource.Chart is { Delay: var offset } && offset != TimeSpan.Zero
                         ? Math.Round(offset.TotalMilliseconds, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture)
                         : null;
@@ -153,6 +163,7 @@ public static class SongMerger
                 case MergeKeyRule.Video:
                     return From(plan.VideoSource, key);
                 case MergeKeyRule.SongLength:
+                case MergeKeyRule.FromChart:
                     return null;
                 default:
                     if (!conflicts.ContainsKey(key))
@@ -161,11 +172,10 @@ public static class SongMerger
             }
         }
 
-        return keys
+        return [.. keys
             .Select(k => (Key: k, Value: ValueOf(k)))
             .Where(p => p.Value is not null)
-            .Select(p => KeyValuePair.Create(p.Key, p.Value!))
-            .ToList();
+            .Select(p => KeyValuePair.Create(p.Key, p.Value!))];
     }
 
     /// <summary>
@@ -350,6 +360,8 @@ public static class SongMerger
             .Concat(merged.Warnings)
             .ToList();
         var pairs = BuildMetadata(plan).ToList();
+        if (merged.SustainCutoff is { } cutoff)
+            pairs.Add(KeyValuePair.Create(SongMergeAnalysis.SustainCutoffKey, cutoff.ToString(CultureInfo.InvariantCulture)));
         if (applyOffsets)
             pairs = WithTimingOffsets(pairs, plan);
 

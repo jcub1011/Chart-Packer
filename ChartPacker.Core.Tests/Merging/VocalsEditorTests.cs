@@ -30,12 +30,12 @@ public sealed class VocalsEditorTests
         var vocals = VocalReader.Read(result.Bytes, "notes.mid");
 
         Assert.IsFalse(result.LyricsOnly);
-        CollectionAssert.AreEqual(new[] { "PART VOCALS", "HARM1" }, vocals.Parts.Select(p => p.TrackName).ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalLyric(960, "new") }, vocals.Main!.Lyrics.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalNote(960, 480, 62) }, vocals.Main.Notes.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalPhrase(960, 960) }, vocals.Main.Phrases.ToArray());
-        CollectionAssert.AreEqual(TrackChunk(target, "PART GUITAR"), TrackChunk(result.Bytes, "PART GUITAR"));
-        CollectionAssert.AreEqual(TrackChunk(target, "EVENTS"), TrackChunk(result.Bytes, "EVENTS"));
+        Assert.AreSequenceEqual(["PART VOCALS", "HARM1"], [.. vocals.Parts.Select(p => p.TrackName)]);
+        Assert.AreSequenceEqual([new VocalLyric(960, "new")], [.. vocals.Main!.Lyrics]);
+        Assert.AreSequenceEqual([new VocalNote(960, 480, 62)], [.. vocals.Main.Notes]);
+        Assert.AreSequenceEqual([new VocalPhrase(960, 960)], [.. vocals.Main.Phrases]);
+        Assert.AreSequenceEqual(TrackChunk(target, "PART GUITAR"), TrackChunk(result.Bytes, "PART GUITAR"));
+        Assert.AreSequenceEqual(TrackChunk(target, "EVENTS"), TrackChunk(result.Bytes, "EVENTS"));
         Assert.IsTrue(ChartReader.Read(result.Bytes, "notes.mid").Tempo.SameAs(ChartReader.Read(target, "notes.mid").Tempo));
     }
 
@@ -47,7 +47,7 @@ public sealed class VocalsEditorTests
 
         var vocals = VocalReader.Read(VocalsEditor.Apply(target, "notes.mid", NoMetadata, Chart(source)).Bytes, "notes.mid");
 
-        CollectionAssert.AreEqual(new[] { new VocalLyric(480, "hi") }, vocals.Main!.Lyrics.ToArray());
+        Assert.AreSequenceEqual([new VocalLyric(480, "hi")], [.. vocals.Main!.Lyrics]);
     }
 
     [TestMethod]
@@ -101,18 +101,21 @@ public sealed class VocalsEditorTests
         byte[] result = VocalsEditor.Apply(target, "notes.mid", NoMetadata, null).Bytes;
 
         Assert.IsEmpty(VocalReader.Read(result, "notes.mid").Parts);
-        CollectionAssert.AreEqual(TrackChunk(target, "PART GUITAR"), TrackChunk(result, "PART GUITAR"));
+        Assert.AreSequenceEqual(TrackChunk(target, "PART GUITAR"), TrackChunk(result, "PART GUITAR"));
     }
 
     [TestMethod]
-    public void TempoInTheVocalTrackCantBeDropped()
+    public void TempoInTheVocalTrackIsNoTempoSoTheTrackCanBeDropped()
     {
+        // YARG reads the tempo map from the first track only.
         byte[] target = new MidiBuilder()
             .Track("tempo").Tempo(0, 120)
             .Track("PART VOCALS").Tempo(480, 90).Note(0, 60)
             .Build();
 
-        Assert.ThrowsExactly<ChartFormatException>(() => VocalsEditor.Apply(target, "notes.mid", NoMetadata, null));
+        byte[] result = VocalsEditor.Apply(target, "notes.mid", NoMetadata, null).Bytes;
+
+        Assert.IsTrue(ChartReader.Read(result, "notes.mid").Tempo.SameAs(ChartReader.Read(target, "notes.mid").Tempo));
     }
 
     [TestMethod]
@@ -144,14 +147,14 @@ public sealed class VocalsEditorTests
         Assert.IsTrue(result.LyricsOnly);
         Assert.DoesNotContain("lyric old", text);
         Assert.DoesNotContain("96 = E", text);
-        StringAssert.Contains(text, """
+        Assert.Contains("""
               0 = E "section Intro"
               192 = E "phrase_start"
               192 = E "lyric newer"
               384 = E "phrase_end"
               768 = E "end"
-            """.ReplaceLineEndings("\n"));
-        CollectionAssert.AreEqual(new[] { new VocalLyric(192, "newer") }, VocalReader.Read(result.Bytes, "notes.chart").Main!.Lyrics.ToArray());
+            """.ReplaceLineEndings("\n"), text);
+        Assert.AreSequenceEqual([new VocalLyric(192, "newer")], [.. VocalReader.Read(result.Bytes, "notes.chart").Main!.Lyrics]);
     }
 
     [TestMethod]
@@ -168,8 +171,8 @@ public sealed class VocalsEditorTests
         var result = VocalsEditor.Apply(target, "notes.chart", NoMetadata, Chart(source));
 
         Assert.IsFalse(result.LyricsOnly);
-        CollectionAssert.AreEqual(new[] { new VocalLyric(192, "hi") }, VocalReader.Read(result.Bytes, "notes.chart").Main!.Lyrics.ToArray());
-        Assert.AreEqual(1, ChartReaderTests.Notes(ChartReader.Read(result.Bytes, "notes.chart"), ChartInstrument.Guitar).Length);
+        Assert.AreSequenceEqual([new VocalLyric(192, "hi")], [.. VocalReader.Read(result.Bytes, "notes.chart").Main!.Lyrics]);
+        Assert.HasCount(1, ChartReaderTests.Notes(ChartReader.Read(result.Bytes, "notes.chart"), ChartInstrument.Guitar));
     }
 
     [TestMethod]
@@ -206,11 +209,11 @@ public sealed class VocalsEditorTests
         byte[] result = VocalsEditor.Shift(target, "notes.mid", NoMetadata, TimeSpan.FromMilliseconds(500)).Bytes;
         var vocals = VocalReader.Read(result, "notes.mid");
 
-        CollectionAssert.AreEqual(new[] { new VocalLyric(960, "hi") }, vocals.Main!.Lyrics.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalNote(960, 240, 60) }, vocals.Main.Notes.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalPhrase(960, 960) }, vocals.Main.Phrases.ToArray());
+        Assert.AreSequenceEqual([new VocalLyric(960, "hi")], [.. vocals.Main!.Lyrics]);
+        Assert.AreSequenceEqual([new VocalNote(960, 240, 60)], [.. vocals.Main.Notes]);
+        Assert.AreSequenceEqual([new VocalPhrase(960, 960)], [.. vocals.Main.Phrases]);
         Assert.AreEqual(960, vocals.Parts.Single(p => p.TrackName == "HARM1").Notes.Single().Tick);
-        CollectionAssert.AreEqual(TrackChunk(target, "PART GUITAR"), TrackChunk(result, "PART GUITAR"));
+        Assert.AreSequenceEqual(TrackChunk(target, "PART GUITAR"), TrackChunk(result, "PART GUITAR"));
     }
 
     [TestMethod]
@@ -230,9 +233,9 @@ public sealed class VocalsEditorTests
         byte[] result = VocalsEditor.Shift(target, "notes.chart", NoMetadata, TimeSpan.FromMilliseconds(-250)).Bytes;
         var part = VocalReader.Read(result, "notes.chart").Main!;
 
-        CollectionAssert.AreEqual(new[] { new VocalLyric(96, "hi") }, part.Lyrics.ToArray());
-        CollectionAssert.AreEqual(new[] { new VocalPhrase(96, 192) }, part.Phrases.ToArray());
-        StringAssert.Contains(Encoding.UTF8.GetString(result), "0 = E \"section Intro\"");
+        Assert.AreSequenceEqual([new VocalLyric(96, "hi")], [.. part.Lyrics]);
+        Assert.AreSequenceEqual([new VocalPhrase(96, 192)], [.. part.Phrases]);
+        Assert.Contains("0 = E \"section Intro\"", Encoding.UTF8.GetString(result));
     }
 
     [TestMethod]

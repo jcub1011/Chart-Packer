@@ -40,7 +40,7 @@ public sealed class SettingsCatalogTests
     [TestMethod]
     public void CategoryPathRunsFromTheTopLevelDown()
     {
-        CollectionAssert.AreEqual(new[] { "Output", "Pack & Unpack" }, Packing.Path.ToArray());
+        Assert.AreSequenceEqual(["Output", "Pack & Unpack"], [.. Packing.Path]);
     }
 
     [TestMethod]
@@ -48,9 +48,9 @@ public sealed class SettingsCatalogTests
     {
         var catalog = Sample();
 
-        CollectionAssert.AreEqual(new[] { Library, Output }, catalog.RootCategories.ToArray());
-        CollectionAssert.AreEqual(new[] { Packing }, catalog.ChildrenOf(Output).ToArray());
-        CollectionAssert.AreEqual(new[] { "flat", "overwrite" }, Ids(catalog.DefinitionsIn(Packing)));
+        Assert.AreSequenceEqual([Library, Output], [.. catalog.RootCategories]);
+        Assert.AreSequenceEqual([Packing], [.. catalog.ChildrenOf(Output)]);
+        Assert.AreSequenceEqual(["flat", "overwrite"], Ids(catalog.DefinitionsIn(Packing)));
         Assert.IsEmpty(catalog.DefinitionsIn(Library));
     }
 
@@ -58,7 +58,7 @@ public sealed class SettingsCatalogTests
     public void DefinitionsAreInTreeOrder()
     {
         // "café" was declared last but sits directly in Output, so it comes before Output's children.
-        CollectionAssert.AreEqual(new[] { "depth", "café", "flat", "overwrite" }, Ids(Sample().Definitions));
+        Assert.AreSequenceEqual(["depth", "café", "flat", "overwrite"], Ids(Sample().Definitions));
     }
 
     [TestMethod]
@@ -150,7 +150,7 @@ public sealed class SettingsCatalogTests
     {
         var catalog = Sample();
 
-        CollectionAssert.AreEqual(Ids(catalog.Definitions), Ids(catalog.Search(query)));
+        Assert.AreSequenceEqual(Ids(catalog.Definitions), Ids(catalog.Search(query)));
     }
 
     [TestMethod]
@@ -161,13 +161,13 @@ public sealed class SettingsCatalogTests
     [DataRow("cafe", "café")]             // ignoring accents
     public void SearchMatchesEachField(string query, string expectedId)
     {
-        CollectionAssert.AreEqual(new[] { expectedId }, Ids(Sample().Search(query)));
+        Assert.AreSequenceEqual([expectedId], Ids(Sample().Search(query)));
     }
 
     [TestMethod]
     public void SearchMatchesParentCategoryLabels()
     {
-        CollectionAssert.AreEqual(new[] { "café", "flat", "overwrite" }, Ids(Sample().Search("output")));
+        Assert.AreSequenceEqual(["café", "flat", "overwrite"], Ids(Sample().Search("output")));
     }
 
     [TestMethod]
@@ -175,7 +175,7 @@ public sealed class SettingsCatalogTests
     {
         var catalog = Sample();
 
-        CollectionAssert.AreEqual(new[] { "overwrite" }, Ids(catalog.Search("pack  rename")));
+        Assert.AreSequenceEqual(["overwrite"], Ids(catalog.Search("pack  rename")));
         Assert.IsEmpty(catalog.Search("depth rename"));
     }
 

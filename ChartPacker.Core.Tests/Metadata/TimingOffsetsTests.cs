@@ -44,7 +44,7 @@ public sealed class TimingOffsetsTests
         TimingOffsets.Set(draft, TimingOffsets.AudioKey, stored, TimeSpan.Zero, 0);
 
         Assert.IsTrue(draft.IsEmpty);
-        CollectionAssert.AreEqual(stored, draft.ApplyTo(stored).ToArray());
+        Assert.AreSequenceEqual(stored, [.. draft.ApplyTo(stored)]);
     }
 
     [TestMethod]

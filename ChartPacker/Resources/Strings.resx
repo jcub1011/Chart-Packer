@@ -1357,6 +1357,12 @@
   <data name="InstrumentGhlBass" xml:space="preserve">
     <value>GHL Bass</value>
   </data>
+  <data name="InstrumentGhlRhythm" xml:space="preserve">
+    <value>GHL Rhythm</value>
+  </data>
+  <data name="InstrumentGhlCoop" xml:space="preserve">
+    <value>GHL Guitar Co-op</value>
+  </data>
   <data name="InstrumentProDrums" xml:space="preserve">
     <value>Pro Drums</value>
   </data>
@@ -1809,6 +1815,12 @@
   </data>
   <data name="MergeIssueNotesLostFormat" xml:space="preserve">
     <value>{0} {1}: some notes landed on the same tick and were combined</value>
+  </data>
+  <data name="MergeIssueTimesFormat" xml:space="preserve">
+    <value>{0}, at {1}</value>
+  </data>
+  <data name="MergeIssueMoreTimesFormat" xml:space="preserve">
+    <value>{0} and {1} more</value>
   </data>
   <data name="MergePartProKeys" xml:space="preserve">
     <value>Pro Keys</value>

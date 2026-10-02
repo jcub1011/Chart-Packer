@@ -54,8 +54,8 @@ public sealed class DraftChartTests
         File.WriteAllBytes(staged, [3]);
         var entry = new SongEntry(SongEntryKind.SongFolder, folder, "Song", "Song");
 
-        CollectionAssert.AreEqual(new byte[] { 1, 2 }, await new DraftChart("notes.chart", null).ReadAsync(entry));
-        CollectionAssert.AreEqual(new byte[] { 3 }, await new DraftChart("notes.mid", staged).ReadAsync(entry));
+        Assert.AreSequenceEqual(new byte[] { 1, 2 }, await new DraftChart("notes.chart", null).ReadAsync(entry, TestContext.CancellationToken));
+        Assert.AreSequenceEqual(new byte[] { 3 }, await new DraftChart("notes.mid", staged).ReadAsync(entry, TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -66,6 +66,8 @@ public sealed class DraftChartTests
             stream.SetLength(ChartReader.MaxBytes + 1);
         var entry = new SongEntry(SongEntryKind.SongFolder, _root.FullName, "Song", "Song");
 
-        Assert.IsNull(await new DraftChart("notes.mid", staged).ReadAsync(entry));
+        Assert.IsNull(await new DraftChart("notes.mid", staged).ReadAsync(entry, TestContext.CancellationToken));
     }
+
+    public TestContext TestContext { get; set; }
 }
