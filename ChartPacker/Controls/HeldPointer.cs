@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
 
 namespace ChartPacker.Controls
@@ -19,6 +20,18 @@ namespace ChartPacker.Controls
 
         /// <summary>Puts the pointer back at <paramref name="screen"/>, in screen pixels; the move that makes comes back with no distance.</summary>
         public static void Return(PixelPoint screen) => _ = SetCursorPos(screen.X, screen.Y);
+
+        /// <summary>
+        /// How far <paramref name="at"/>, in <paramref name="owner"/>, is from <paramref name="screen"/>, where the pointer is held, in the
+        /// owner's units. It's measured in whole screen pixels, so the move that putting the pointer back makes is exactly none, even when
+        /// the held pixel isn't a whole number of the owner's units or the owner has moved on the screen since.
+        /// </summary>
+        public static Vector From(Visual owner, Point at, PixelPoint screen)
+        {
+            var pixel = owner.PointToScreen(at);
+            double scale = TopLevel.GetTopLevel(owner)?.RenderScaling ?? 1;
+            return new Vector((pixel.X - screen.X) / scale, (pixel.Y - screen.Y) / scale);
+        }
 
         [DllImport("user32.dll")]
         private static extern int SetCursorPos(int x, int y);
@@ -56,11 +69,15 @@ namespace ChartPacker.Controls
         /// <summary>How far the pointer has moved to <paramref name="at"/> since it was last seen, putting it back while it's held.</summary>
         public Vector Move(Point at)
         {
-            var moved = new Vector(at.X - _last.X, at.Y - _last.Y);
             if (HeldPointer.CanHold)
+            {
+                var held = HeldPointer.From(owner, at, _screen);
                 HeldPointer.Return(_screen);
-            else
-                _last = at;
+                return held;
+            }
+
+            var moved = new Vector(at.X - _last.X, at.Y - _last.Y);
+            _last = at;
             return moved;
         }
 

@@ -256,15 +256,16 @@ namespace ChartPacker.Controls
                 SetCursor(box, HeldPointer.CanHold ? HeldPointer.Hidden : Sideways);
             }
 
-            double dx = at.X - drag.Last.X;
+            double dx;
             if (HeldPointer.CanHold)
             {
-                // Put the pointer back where the drag began; the move that makes comes back with no distance.
+                // Measured from the held pixel, then the pointer is put back there; the move that makes comes back with no distance.
+                dx = HeldPointer.From(box, at, drag.ScreenStart).X;
                 HeldPointer.Return(drag.ScreenStart);
-                drag.Last = drag.Start;
             }
             else
             {
+                dx = at.X - drag.Last.X;
                 drag.Last = at;
             }
 
