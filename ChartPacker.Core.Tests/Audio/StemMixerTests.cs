@@ -289,7 +289,7 @@ public sealed class StemMixerTests
     private static float RampValue(long frame) => frame / 48000f;
 
     private static StemMixer Mixer(params (string Name, IPcmSource Source)[] stems) =>
-        new(stems.Select(s => KeyValuePair.Create(s.Name, s.Source)).ToList());
+        new([.. stems.Select(s => KeyValuePair.Create(s.Name, s.Source))]);
 
     private static float[] Mix(StemMixer mixer, int frames)
     {

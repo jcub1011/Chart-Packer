@@ -142,15 +142,15 @@ public sealed class SourceAlignerTests
         var (a, b) = IntroAndRiff();
         var audio = Audio(0, 1, 2490, match: 0.8);
 
-        var withAudio = SourceAligner.Links([a, b], audio).Single(l => l.From == 0).Estimate(AlignmentMethod.NotePattern);
-        var weakAudio = SourceAligner.Links([a, b], Audio(0, 1, 2490, match: 0.1)).Single(l => l.From == 0).Estimate(AlignmentMethod.NotePattern);
+        var withAudio = SourceAligner.Links([a, b], audio, TestContext.CancellationToken).Single(l => l.From == 0).Estimate(AlignmentMethod.NotePattern);
+        var weakAudio = SourceAligner.Links([a, b], Audio(0, 1, 2490, match: 0.1), TestContext.CancellationToken).Single(l => l.From == 0).Estimate(AlignmentMethod.NotePattern);
 
         Assert.IsTrue(withAudio.IsReliable);
         Assert.AreEqual(2500, withAudio.OffsetMs);
         Assert.IsFalse(weakAudio.IsReliable);
 
         // The audio isn't taken over the chart's own pattern: its link still lines the charts up, and Solve picks it.
-        var choice = SourceAligner.Solve(0, [.. SourceAligner.Links([a, b], audio), .. audio])[1];
+        var choice = SourceAligner.Solve(0, [.. SourceAligner.Links([a, b], audio, TestContext.CancellationToken), .. audio])[1];
         Assert.AreEqual(AlignmentMethod.NotePattern, choice.Method);
         Assert.AreEqual(2500, choice.OffsetMs);
     }
@@ -203,7 +203,7 @@ public sealed class SourceAlignerTests
         var a = Vocals(rhythm, delayMs: 300);
         var b = Vocals(rhythm);
 
-        CollectionAssert.AreEqual(new[] { "vocals" }, a.PartIds.ToArray());
+        Assert.AreSequenceEqual(["vocals"], [.. a.PartIds]);
         Assert.AreEqual(300, SourceAligner.NotePattern(a, b, "vocals", null).OffsetMs);
     }
 
@@ -223,13 +223,13 @@ public sealed class SourceAlignerTests
         var b = Of(Midi(84));
         var c = Of(new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART DRUMS").Note(0, 96).Build());
 
-        var links = SourceAligner.Links([a, b, c, null]);
+        var links = SourceAligner.Links([a, b, c, null], cancellationToken: TestContext.CancellationToken);
 
         Assert.HasCount(4, links);
         var guitar = links.Single(l => l.From == 0 && l.To == 1 && l.PartId == "guitar");
         Assert.AreEqual(ChartDifficulty.Hard, guitar.Difficulty);
-        Assert.IsTrue(links.Any(l => l.From == 1 && l.To == 0 && l.PartId == "bass"));
-        Assert.IsFalse(links.Any(l => l.From == 2 || l.To == 2));
+        Assert.Contains(l => l.From == 1 && l.To == 0 && l.PartId == "bass", links);
+        Assert.DoesNotContain(l => l.From == 2 || l.To == 2, links);
     }
 
     [TestMethod]
@@ -241,16 +241,16 @@ public sealed class SourceAlignerTests
         var b = Of(Midi(guitar: rhythm, drums: rhythm));
         var c = Of(Midi(drums: rhythm), delayMs: 100);
 
-        var links = SourceAligner.Links([a, b, c]);
+        var links = SourceAligner.Links([a, b, c], cancellationToken: TestContext.CancellationToken);
         var choices = SourceAligner.Solve(0, links);
 
         Assert.AreEqual(0, choices[1].Link.From);
         Assert.AreEqual(1, choices[2].Link.From);
         Assert.AreEqual(AlignmentMethod.NotePattern, choices[2].Method);
-        CollectionAssert.AreEqual(new[] { 0, 250, 150 }, SourceAligner.OffsetsOf(3, 0, choices));
+        Assert.AreSequenceEqual([0, 250, 150], SourceAligner.OffsetsOf(3, 0, choices));
 
         // A song nudged moves those lined up through it with it.
-        CollectionAssert.AreEqual(new[] { 0, 260, 160 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 10 }));
+        Assert.AreSequenceEqual([0, 260, 160], SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 10 }));
     }
 
     [TestMethod]
@@ -260,18 +260,18 @@ public sealed class SourceAlignerTests
         var a = Of(Midi(guitar: rhythm), delayMs: 250);
         var b = Of(Midi(guitar: rhythm, drums: rhythm));
         var c = Of(Midi(drums: rhythm), delayMs: 100);
-        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c])).ToDictionary();
+        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c], cancellationToken: TestContext.CancellationToken)).ToDictionary();
 
         // B is set by hand where its link had it: C, lined up with B, stays where it was, and follows B when it moves.
         choices.Remove(1);
         var byHand = new HashSet<int> { 1 };
         Assert.IsTrue(SourceAligner.IsLinked(2, 0, choices, new HashSet<int>(), byHand));
-        CollectionAssert.AreEqual(new[] { 0, 250, 150 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 250 }, byHand));
-        CollectionAssert.AreEqual(new[] { 0, 300, 200 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 300 }, byHand));
+        Assert.AreSequenceEqual([0, 250, 150], SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 250 }, byHand));
+        Assert.AreSequenceEqual([0, 300, 200], SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 300 }, byHand));
 
         // Lined up with nothing, B no longer places C.
         Assert.IsFalse(SourceAligner.IsLinked(2, 0, choices, new HashSet<int>()));
-        CollectionAssert.AreEqual(new[] { 0, 250, 0 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 250 }));
+        Assert.AreSequenceEqual([0, 250, 0], SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 250 }));
     }
 
     [TestMethod]
@@ -281,11 +281,11 @@ public sealed class SourceAlignerTests
         var a = Of(Midi(guitar: rhythm), delayMs: 250);
         var b = Of(Midi(guitar: rhythm, drums: rhythm));
         var c = Of(Midi(drums: rhythm), delayMs: 100);
-        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c]));
+        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c], cancellationToken: TestContext.CancellationToken));
 
         var offsets = SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = int.MaxValue, [2] = int.MaxValue });
 
-        CollectionAssert.AreEqual(new[] { 0, int.MaxValue, int.MaxValue }, offsets);
+        Assert.AreSequenceEqual([0, int.MaxValue, int.MaxValue], offsets);
     }
 
     [TestMethod]
@@ -296,7 +296,7 @@ public sealed class SourceAlignerTests
         var b = Of(Midi(guitar: rhythm, drums: rhythm));
         var c = Of(Midi(drums: rhythm, bass: rhythm), delayMs: -80);
 
-        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c]));
+        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c], cancellationToken: TestContext.CancellationToken));
 
         Assert.AreEqual(0, choices[2].Link.From);
         Assert.AreEqual("bass", choices[2].Link.PartId);
@@ -310,17 +310,17 @@ public sealed class SourceAlignerTests
         var a = Of(Midi(guitar: rhythm));
         var b = Of(Midi(drums: rhythm));
 
-        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, null]));
+        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, null], cancellationToken: TestContext.CancellationToken));
 
         Assert.IsEmpty(choices);
-        CollectionAssert.AreEqual(new[] { 0, 0, -30 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [0] = 99, [2] = -30 }));
+        Assert.AreSequenceEqual([0, 0, -30], SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [0] = 99, [2] = -30 }));
     }
 
     [TestMethod]
     public void SongsLinedUpWithEachOtherInACircleMoveOnlyByTheirNudges()
     {
         long[] rhythm = Rhythm(20, seed: 11);
-        var links = SourceAligner.Links([Of(Midi(guitar: rhythm)), Of(Midi(drums: rhythm)), Of(Midi(drums: rhythm), delayMs: 40)]);
+        var links = SourceAligner.Links([Of(Midi(guitar: rhythm)), Of(Midi(drums: rhythm)), Of(Midi(drums: rhythm), delayMs: 40)], cancellationToken: TestContext.CancellationToken);
         var choices = new Dictionary<int, AlignmentChoice>
         {
             [1] = new(links.Single(l => l.From == 2 && l.To == 1), AlignmentMethod.FirstNote),
@@ -328,27 +328,27 @@ public sealed class SourceAlignerTests
         };
 
         Assert.IsFalse(SourceAligner.IsLinked(1, 0, choices, new HashSet<int>()));
-        CollectionAssert.AreEqual(new[] { 0, 5, 0 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 5 }));
+        Assert.AreSequenceEqual([0, 5, 0], SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 5 }));
     }
 
     [TestMethod]
     public void AudioLinesUpSongsThatShareNoPart()
     {
         long[] rhythm = Rhythm(20, seed: 13);
-        var links = SourceAligner.Links([Of(Midi(guitar: rhythm)), Of(Midi(drums: rhythm))]).Concat(Audio(0, 1, 120, match: 0.9)).ToList();
+        var links = SourceAligner.Links([Of(Midi(guitar: rhythm)), Of(Midi(drums: rhythm))], cancellationToken: TestContext.CancellationToken).Concat(Audio(0, 1, 120, match: 0.9)).ToList();
 
         var choices = SourceAligner.Solve(0, links);
 
         Assert.AreEqual(AlignmentMethod.Audio, choices[1].Method);
         Assert.IsTrue(choices[1].Link.IsAudio);
-        CollectionAssert.AreEqual(new[] { 0, 120 }, SourceAligner.OffsetsOf(2, 0, choices));
+        Assert.AreSequenceEqual([0, 120], SourceAligner.OffsetsOf(2, 0, choices));
     }
 
     [TestMethod]
     public void AReliableNotePatternComesBeforeAudio()
     {
         long[] rhythm = Rhythm(60, seed: 14);
-        var links = SourceAligner.Links([Guitar(rhythm), Guitar(rhythm, delayMs: -50)]).Concat(Audio(0, 1, 70, match: 0.95)).ToList();
+        var links = SourceAligner.Links([Guitar(rhythm), Guitar(rhythm, delayMs: -50)], cancellationToken: TestContext.CancellationToken).Concat(Audio(0, 1, 70, match: 0.95)).ToList();
 
         var choice = SourceAligner.Solve(0, links)[1];
 
@@ -360,7 +360,7 @@ public sealed class SourceAlignerTests
     public void ReliableAudioComesBeforeFirstNotes()
     {
         // Two notes are too few for a note pattern to be reliable.
-        var links = SourceAligner.Links([Guitar([0, 480]), Guitar([0, 480], delayMs: -50)]).Concat(Audio(0, 1, 70, match: 0.6)).ToList();
+        var links = SourceAligner.Links([Guitar([0, 480]), Guitar([0, 480], delayMs: -50)], cancellationToken: TestContext.CancellationToken).Concat(Audio(0, 1, 70, match: 0.6)).ToList();
 
         Assert.AreEqual(AlignmentMethod.Audio, SourceAligner.Solve(0, links)[1].Method);
     }
@@ -368,7 +368,7 @@ public sealed class SourceAlignerTests
     [TestMethod]
     public void AudioThatIsntReliableIsTheLastResort()
     {
-        var links = SourceAligner.Links([Guitar([0, 480]), Guitar([0, 480], delayMs: -50)]).Concat(Audio(0, 1, 70, match: 0.1)).ToList();
+        var links = SourceAligner.Links([Guitar([0, 480]), Guitar([0, 480], delayMs: -50)], cancellationToken: TestContext.CancellationToken).Concat(Audio(0, 1, 70, match: 0.1)).ToList();
         Assert.AreEqual(AlignmentMethod.FirstNote, SourceAligner.Solve(0, links)[1].Method);
 
         var audioOnly = SourceAligner.Solve(0, Audio(0, 1, 70, match: 0.1));
@@ -381,7 +381,7 @@ public sealed class SourceAlignerTests
     {
         var link = Audio(0, 1, 70, match: 0.9)[0];
 
-        CollectionAssert.AreEqual(new[] { AlignmentMethod.Audio }, link.Methods.ToArray());
+        Assert.AreSequenceEqual([AlignmentMethod.Audio], [.. link.Methods]);
         Assert.ThrowsExactly<ArgumentException>(() => link.Estimate(AlignmentMethod.NotePattern));
         Assert.AreEqual(-70, link.Reversed().Estimate(AlignmentMethod.Audio).OffsetMs);
     }
@@ -390,7 +390,7 @@ public sealed class SourceAlignerTests
     public void EstimatesTurnAroundWithTheirLinks()
     {
         long[] rhythm = Rhythm(60, seed: 12);
-        var link = SourceAligner.Links([Guitar(rhythm), Guitar(rhythm, delayMs: 90)]).Single(l => l.From == 0);
+        var link = SourceAligner.Links([Guitar(rhythm), Guitar(rhythm, delayMs: 90)], cancellationToken: TestContext.CancellationToken).Single(l => l.From == 0);
         var back = link.Reversed();
 
         Assert.AreEqual(-90, link.Estimate(AlignmentMethod.NotePattern).OffsetMs);
@@ -469,4 +469,6 @@ public sealed class SourceAlignerTests
 
     private static AlignmentChart Of(byte[] midi, int delayMs = 0) =>
         AlignmentChart.Of(new MidiChart(midi, TimeSpan.FromMilliseconds(delayMs), ChartReadOptions.Default));
+
+    public TestContext TestContext { get; set; }
 }

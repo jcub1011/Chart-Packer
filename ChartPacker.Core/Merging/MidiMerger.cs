@@ -25,7 +25,7 @@ public sealed record MidiChart(byte[] Midi, TimeSpan Delay, ChartReadOptions Opt
             return (new MidiChart(bytes, delay, options), null);
 
         var conversion = ChartToMidi.Convert(bytes, options);
-        return (new MidiChart(conversion.Midi, delay, new ChartReadOptions(conversion.ProDrums, conversion.SustainCutoff, options.HopoThreshold)), conversion);
+        return (new MidiChart(conversion.Midi, delay, conversion.Options), conversion);
     }
 }
 
@@ -76,21 +76,29 @@ public static class MidiMerger
             var file = ReferenceEquals(source, baseChart) ? baseFile : Parse(source.Midi);
             var map = MapOf(file.Tempo, source.Delay, baseFile.Tempo, baseChart.Delay);
 
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // One track of each name: as YARG reads them, the last PART GUITAR or PART DRUMS, otherwise the first.
+            var chosen = new Dictionary<string, ParsedTrack>(StringComparer.Ordinal);
             foreach (var track in file.Tracks)
             {
-                if (track.Name is not { } name || !part.Has(name) || !seen.Add(name))
+                if (track.Name is not { } name || !part.Has(name) || (chosen.ContainsKey(name) && !MidiLayout.OverridingTrackNames.Contains(name)))
                     continue;
-                placed.Add(new PlacedTrack(name, Place(source.Midi, track.Events, map), source, map, GemsOf(name, source, file, track.Events)));
+                chosen[name] = track;
             }
+
+            foreach (var track in file.Tracks.Where(t => t.Name is { } n && chosen.TryGetValue(n, out var c) && ReferenceEquals(c, t)))
+                placed.Add(new PlacedTrack(track.Name!, Place(source.Midi, track.Events, map), source, map, GemsOf(track.Name!, source, file, track.Events)));
         }
 
         long? cutoff = SustainCutoff.For(baseFile.Division, placed.SelectMany(t => t.Gems.Sustains.Select(n => t.Messages[n.Off].Tick - t.Messages[n.On].Tick)).Cast<long?>().Min());
         foreach (var track in placed)
+        {
             SustainCutoff.Normalize(track.Messages, track.Gems.Notes, track.Gems.Sustains.Contains, SustainCutoff.Of(baseFile.Division, cutoff));
+            MoveStarPower(track.Messages, track.Source.Options.MidiStarPowerPitch);
+        }
 
+        // As merged, the drums read as their source's song.ini has them, the HOPOs as the base's, and star power is on 116.
         var drums = parts.FirstOrDefault(p => p.Part.Id == "drums").Source?.Options ?? baseChart.Options;
-        var readOptions = new ChartReadOptions(drums.ProDrums, cutoff, baseChart.Options.HopoThreshold);
+        var readOptions = baseChart.Options with { ProDrums = drums.ProDrums, FiveLaneDrums = drums.FiveLaneDrums, SustainCutoff = cutoff, MultiplierNote = null };
         byte[] midi = Build(baseFile.Division, structural, placed);
         var docs = new Dictionary<MidiChart, ChartDocument>(ReferenceEqualityComparer.Instance);
         var warnings = new List<ChartMergeWarning>();
@@ -98,7 +106,7 @@ public static class MidiMerger
         for (int pass = 0; ; pass++)
         {
             var (_, _, chunks) = MidiFile.ReadChunks(midi);
-            var tempo = MidiChartReader.TempoOf(midi, baseFile.Division, chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.ReadEvents(midi, c)).ToList());
+            var tempo = MidiChartReader.TempoOf(midi, baseFile.Division, [.. chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.ReadEvents(midi, c))]);
             if (!tempo.SameAs(baseFile.Tempo))
                 throw new ChartFormatException("The base chart keeps tempo changes in a part that isn't being kept, so its tempo map can't be.");
 
@@ -107,10 +115,11 @@ public static class MidiMerger
             bool fixedAny = false;
             warnings.Clear();
 
-            foreach (var track in placed)
+            foreach (var track in placed.Where(t => MidiLayout.TrackNames.ContainsKey(t.Name)).GroupBy(t => MidiLayout.TrackNames[t.Name]).Select(Read))
             {
-                // The reader takes the first track of each instrument, so only that one needs checking.
-                if (!MidiLayout.TrackNames.TryGetValue(track.Name, out var instrument) || !done.Add(instrument))
+                // Only the track the reader takes of each instrument needs checking.
+                var instrument = MidiLayout.TrackNames[track.Name];
+                if (!done.Add(instrument))
                     continue;
 
                 if (!docs.TryGetValue(track.Source, out var sourceDoc))
@@ -144,6 +153,28 @@ public static class MidiMerger
         }
     }
 
+    /// <summary>The track of an instrument YARG reads: the last <c>PART GUITAR</c> or <c>PART DRUMS</c>, otherwise the first.</summary>
+    private static PlacedTrack Read(IEnumerable<PlacedTrack> tracks) =>
+        tracks.LastOrDefault(t => MidiLayout.OverridingTrackNames.Contains(t.Name)) ?? tracks.First();
+
+    /// <summary>
+    /// Puts a source's star power on 116, as the merged song.ini has no <c>multiplier_note</c>: from 103, where its
+    /// song.ini had it there, leaving out what was on 116, which wasn't star power.
+    /// </summary>
+    private static void MoveStarPower(List<MidiMessage> messages, int starPowerPitch)
+    {
+        if (starPowerPitch == MidiLayout.StarPowerPitch)
+            return;
+
+        static bool IsNote(MidiMessage m, int pitch) => m.Bytes.Length >= 3 && (m.Status & 0xF0) is 0x80 or 0x90 && m.Bytes[1] == pitch;
+        messages.RemoveAll(m => IsNote(m, MidiLayout.StarPowerPitch));
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (IsNote(messages[i], starPowerPitch))
+                messages[i] = messages[i] with { Bytes = [messages[i].Bytes[0], MidiLayout.StarPowerPitch, .. messages[i].Bytes[2..]] };
+        }
+    }
+
     /// <summary>
     /// The gems of the track <paramref name="name"/> of <paramref name="source"/>, if it's a fret
     /// track, as its messages placed by <see cref="Place"/> have them, and the ones its source reads as sustains.
@@ -158,7 +189,7 @@ public static class MidiMerger
 
         // Placed where they are, the messages are those Place gives in the same order, with their own ticks.
         var original = Place(source.Midi, events, tick => tick);
-        bool opens = original.Any(m => m.Bytes is [0xFF, 0x01, ..] && System.Text.Encoding.Latin1.GetString(m.Bytes).Contains("ENHANCED_OPENS", StringComparison.OrdinalIgnoreCase));
+        bool opens = original.Any(m => m.Bytes is [0xFF, 0x01 or (>= 0x04 and <= 0x09), ..] && ChartTextEvents.Normalize(System.Text.Encoding.Latin1.GetString(m.Bytes.AsSpan(3))) == "ENHANCED_OPENS");
         var notes = SustainCutoff.NotesOf(original, SustainCutoff.GemPitches(kind, opens));
         long cutoff = SustainCutoff.Of(file.Division, source.Options.SustainCutoff);
         return new TrackGems(notes, notes.Where(n => original[n.Off].Tick - original[n.On].Tick >= cutoff).ToHashSet());
@@ -190,10 +221,9 @@ public static class MidiMerger
     /// and end-of-track events left out.
     /// </summary>
     internal static List<MidiMessage> Place(byte[] midi, List<MidiEvent> events, Func<long, long> map) =>
-        events
+        [.. events
             .Where(e => !IsTempoOrEnd(midi, e))
-            .Select(e => MidiMessage.Of(midi, e) with { Tick = IsName(midi, e) ? 0 : map(e.Tick) })
-            .ToList();
+            .Select(e => MidiMessage.Of(midi, e) with { Tick = IsName(midi, e) ? 0 : map(e.Tick) })];
 
     private static byte[] Build(int division, List<byte[]> structural, List<PlacedTrack> placed) =>
         MidiWriter.WriteFile(division, [.. structural, .. placed.Select(t => MidiWriter.Track(t.Messages))]);
@@ -214,7 +244,7 @@ public static class MidiMerger
                 return new ParsedTrack(c, events, MidiFile.NameOf(midi, events));
             })
             .ToList();
-        return new ParsedFile(division, tracks, MidiChartReader.TempoOf(midi, division, tracks.Select(t => t.Events).ToList()));
+        return new ParsedFile(division, tracks, MidiChartReader.TempoOf(midi, division, [.. tracks.Select(t => t.Events)]));
     }
 
     private sealed record ParsedTrack(MidiChunk Chunk, List<MidiEvent> Events, string? Name);

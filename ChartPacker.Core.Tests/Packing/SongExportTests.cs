@@ -26,13 +26,13 @@ public sealed class SongExportTests
         byte[] before = File.ReadAllBytes(sng);
         string target = Path.Combine(_root.FullName, "out", "Artist - Song");
 
-        var result = await SongExport.ExportFolderAsync(Sng(sng), null, target);
+        var result = await SongExport.ExportFolderAsync(Sng(sng), null, target, TestContext.CancellationToken);
 
         Assert.IsTrue(result.Extracted);
-        CollectionAssert.AreEqual(new byte[] { 1, 2 }, File.ReadAllBytes(Path.Combine(target, "notes.chart")));
-        CollectionAssert.AreEqual(new byte[] { 3 }, File.ReadAllBytes(Path.Combine(target, "extras", "readme.txt")));
+        Assert.AreSequenceEqual(new byte[] { 1, 2 }, File.ReadAllBytes(Path.Combine(target, "notes.chart")));
+        Assert.AreSequenceEqual(new byte[] { 3 }, File.ReadAllBytes(Path.Combine(target, "extras", "readme.txt")));
         StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "name = Song");
-        CollectionAssert.AreEqual(before, File.ReadAllBytes(sng));
+        Assert.AreSequenceEqual(before, File.ReadAllBytes(sng));
         AssertOnlyTarget(target);
     }
 
@@ -42,13 +42,12 @@ public sealed class SongExportTests
         string folder = CreateFolder("Song", ("notes.mid", [1]), ("song.ini", "[song]\nname = Song\n"u8.ToArray()), ("stems/drums.ogg", [2, 2]));
         string target = Path.Combine(_root.FullName, "out", "Song");
 
-        var result = await SongExport.ExportFolderAsync(FolderEntry(folder), null, target);
+        var result = await SongExport.ExportFolderAsync(FolderEntry(folder), null, target, TestContext.CancellationToken);
 
         Assert.IsTrue(result.Extracted);
-        CollectionAssert.AreEquivalent(
-            new[] { "notes.mid", "song.ini", "stems/drums.ogg" },
-            SongFolderListing.List(target).Select(f => f.RelativePath).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 2, 2 }, File.ReadAllBytes(Path.Combine(target, "stems", "drums.ogg")));
+        Assert.AreSequenceEqual(
+            ["notes.mid", "song.ini", "stems/drums.ogg"], [.. SongFolderListing.List(target, TestContext.CancellationToken).Select(f => f.RelativePath)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 2, 2 }, File.ReadAllBytes(Path.Combine(target, "stems", "drums.ogg")));
         Assert.IsTrue(File.Exists(Path.Combine(folder, "notes.mid")));
         AssertOnlyTarget(target);
     }
@@ -65,9 +64,9 @@ public sealed class SongExportTests
         draft.AddFile(new AddedFile("guitar.ogg", source, 2));
         string target = Path.Combine(_root.FullName, "out", "Band - Song");
 
-        await SongExport.ExportFolderAsync(FolderEntry(folder), draft, target);
+        await SongExport.ExportFolderAsync(FolderEntry(folder), draft, target, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.mid", "song.ini", "guitar.ogg" }, Directory.GetFiles(target).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(["notes.mid", "song.ini", "guitar.ogg"], Directory.GetFiles(target).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "artist = Band");
         // The song and the staged file are as they were, so the draft can still be saved.
         Assert.IsTrue(File.Exists(Path.Combine(folder, "video.mp4")));
@@ -81,7 +80,7 @@ public sealed class SongExportTests
         string folder = CreateFolder("Song", ("notes.mid", [1]));
         string target = Directory.CreateDirectory(Path.Combine(_root.FullName, "out", "Song")).FullName;
 
-        await Assert.ThrowsAsync<IOException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), null, target));
+        await Assert.ThrowsAsync<IOException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), null, target, TestContext.CancellationToken));
 
         Assert.IsEmpty(Directory.GetFileSystemEntries(target));
         AssertOnlyTarget(target);
@@ -95,7 +94,7 @@ public sealed class SongExportTests
         draft.AddFile(new AddedFile("guitar.ogg", Path.Combine(_root.FullName, "missing.ogg"), 2));
         string target = Path.Combine(_root.FullName, "out", "Song");
 
-        await Assert.ThrowsAsync<IOException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), draft, target));
+        await Assert.ThrowsAsync<IOException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), draft, target, TestContext.CancellationToken));
 
         Assert.IsFalse(Directory.Exists(target));
         Assert.IsEmpty(Directory.GetFileSystemEntries(Path.Combine(_root.FullName, "out")));
@@ -117,7 +116,7 @@ public sealed class SongExportTests
 
         try
         {
-            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), null, target));
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => SongExport.ExportFolderAsync(FolderEntry(folder), null, target, TestContext.CancellationToken));
         }
         finally
         {
@@ -133,7 +132,7 @@ public sealed class SongExportTests
     private static void AssertOnlyTarget(string target)
     {
         string parent = Path.GetDirectoryName(target)!;
-        CollectionAssert.AreEqual(new[] { target }, Directory.GetFileSystemEntries(parent));
+        Assert.AreSequenceEqual([target], Directory.GetFileSystemEntries(parent));
     }
 
     private async Task<string> CreateSngAsync(IReadOnlyList<KeyValuePair<string, string>> metadata, params (string Name, byte[] Data)[] files)
@@ -145,7 +144,7 @@ public sealed class SongExportTests
             return new SngSourceFile(f.Name, path, f.Data.Length);
         }).ToList();
         string sng = Path.Combine(_root.FullName, "song.sng");
-        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata, sources, overwrite: false);
+        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata, sources, overwrite: false, cancellationToken: TestContext.CancellationToken);
         return sng;
     }
 
@@ -165,4 +164,6 @@ public sealed class SongExportTests
     private static SongEntry Sng(string path) => new(SongEntryKind.SngFile, path, Path.GetFileName(path), Path.GetFileNameWithoutExtension(path));
 
     private static SongEntry FolderEntry(string path) => new(SongEntryKind.SongFolder, path, Path.GetFileName(path), Path.GetFileName(path));
+
+    public TestContext TestContext { get; set; }
 }

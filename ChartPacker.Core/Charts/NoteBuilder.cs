@@ -7,29 +7,35 @@ internal readonly record struct Gem(long Tick, long Length, int Lane);
 /// <param name="Toggle">A <c>.chart</c> forced flag: a natural HOPO becomes a strum and a strum a HOPO.</param>
 internal readonly record struct FretMarks(bool Toggle, bool ForceHopo, bool ForceStrum, bool Tap);
 
-/// <summary>Turns a track's gems into <see cref="ChartNote"/>s, the same way for <c>.chart</c> and MIDI.</summary>
+/// <summary>
+/// Turns a track's gems into <see cref="ChartNote"/>s, as YARG works out each note's state
+/// (<c>MoonNote</c> and <c>MoonSongLoader</c> in YARG.Core).
+/// </summary>
 internal static class NoteBuilder
 {
     /// <summary>
-    /// Fret notes: a single note is a natural HOPO when it follows a different chord or note within
-    /// <paramref name="hopoThreshold"/> ticks; <paramref name="marks"/> can toggle or force it, or make it a tap.
+    /// Fret notes, every gem kept in the order given at its tick. A single note is a natural HOPO when it's no
+    /// more than <paramref name="hopoThreshold"/> ticks after the chord or note before, unless that was the same
+    /// single note; or, with <paramref name="midiChordRule"/>, a chord that has its lane. More than one gem at a
+    /// tick is a chord, even on one lane. <paramref name="marks"/> can toggle or force it, or make it a tap;
+    /// forcing it a HOPO wins over forcing it a strum, and a tap over both.
     /// </summary>
-    public static List<ChartNote> Frets(IEnumerable<Gem> gems, long hopoThreshold, Func<long, FretMarks> marks, IReadOnlyList<StarPowerPhrase> starPower)
+    /// <param name="midiChordRule">Whether a note contained in the chord before is a strum: MIDI's rule, not a <c>.chart</c>'s.</param>
+    public static List<ChartNote> Frets(IEnumerable<Gem> gems, long hopoThreshold, Func<long, FretMarks> marks, IReadOnlyList<StarPowerPhrase> starPower, bool midiChordRule)
     {
         var notes = new List<ChartNote>();
         long? previousTick = null;
-        HashSet<int> previousLanes = [];
+        List<Gem> previous = [];
 
-        foreach (var chord in gems.GroupBy(g => g.Tick).OrderBy(g => g.Key))
+        foreach (var group in gems.GroupBy(g => g.Tick).OrderBy(g => g.Key))
         {
-            var lanes = chord.Select(g => g.Lane).ToHashSet();
-            bool isChord = lanes.Count > 1;
-            bool natural = !isChord
+            var chord = group.ToList();
+            bool natural = chord.Count == 1
                 && previousTick is { } before
-                && chord.Key - before <= hopoThreshold
-                && !previousLanes.Contains(lanes.First());
+                && chord[0].Tick - before <= hopoThreshold
+                && (previous.Count == 1 ? previous[0].Lane != chord[0].Lane : !midiChordRule || previous.All(g => g.Lane != chord[0].Lane));
 
-            var mark = marks(chord.Key);
+            var mark = marks(group.Key);
             var flags = NoteFlags.None;
             if (mark.Tap)
             {
@@ -37,59 +43,52 @@ internal static class NoteBuilder
             }
             else
             {
-                bool hopo = natural != mark.Toggle;
-                if (mark.ForceHopo)
-                    hopo = true;
-                if (mark.ForceStrum)
-                    hopo = false;
+                bool hopo = mark.ForceHopo || (!mark.ForceStrum && natural != mark.Toggle);
                 if (hopo)
                     flags = NoteFlags.Hopo;
             }
 
-            if (InStarPower(starPower, chord.Key))
+            if (InStarPower(starPower, group.Key))
                 flags |= NoteFlags.StarPower;
 
-            foreach (var gem in chord.GroupBy(g => g.Lane).Select(g => g.Last()).OrderBy(g => g.Lane))
+            foreach (var gem in chord.OrderBy(g => g.Lane))
                 notes.Add(new ChartNote(gem.Tick, gem.Length, gem.Lane, flags));
 
-            previousTick = chord.Key;
-            previousLanes = lanes;
+            previousTick = group.Key;
+            previous = chord;
         }
 
         return notes;
     }
 
     /// <summary>
-    /// Drum notes, one per tick and lane, without sustains. Where a lane has more than one gem at a
-    /// tick their flags are combined, except that a kick is only a double kick when every kick there is.
+    /// Drum notes without sustains, one for each gem with the flags given, in tick then lane order; two at
+    /// the same tick and lane are both kept, as YARG keeps them.
     /// </summary>
-    public static List<ChartNote> Drums(IEnumerable<(Gem Gem, NoteFlags Flags)> gems, IReadOnlyList<StarPowerPhrase> starPower)
-    {
-        var notes = new List<ChartNote>();
-        foreach (var at in gems.GroupBy(g => (g.Gem.Tick, g.Gem.Lane)).OrderBy(g => g.Key.Tick).ThenBy(g => g.Key.Lane))
-        {
-            var flags = at.Aggregate(NoteFlags.None, (all, g) => all | g.Flags);
-            if (at.Any(g => (g.Flags & NoteFlags.DoubleKick) == 0))
-                flags &= ~NoteFlags.DoubleKick;
-            if (InStarPower(starPower, at.Key.Tick))
-                flags |= NoteFlags.StarPower;
-            notes.Add(new ChartNote(at.Key.Tick, 0, at.Key.Lane, flags));
-        }
+    public static List<ChartNote> Drums(IEnumerable<(Gem Gem, NoteFlags Flags)> gems, IReadOnlyList<StarPowerPhrase> starPower) =>
+    [
+        .. gems
+            .OrderBy(g => g.Gem.Tick)
+            .ThenBy(g => g.Gem.Lane)
+            .ThenBy(g => g.Flags)
+            .Select(g => new ChartNote(g.Gem.Tick, 0, g.Gem.Lane, InStarPower(starPower, g.Gem.Tick) ? g.Flags | NoteFlags.StarPower : g.Flags)),
+    ];
 
-        return notes;
-    }
-
-    /// <summary>Whether <paramref name="tick"/> is inside one of <paramref name="phrases"/>, which are in order.</summary>
+    /// <summary>
+    /// Whether <paramref name="tick"/> is in star power, as YARG takes it: in the phrase, of <paramref name="phrases"/>
+    /// in order, that started last at or before it, the last given of those that start together. A phrase's end
+    /// isn't in it, and one without a length has only its start.
+    /// </summary>
     public static bool InStarPower(IReadOnlyList<StarPowerPhrase> phrases, long tick)
     {
+        StarPowerPhrase? current = null;
         foreach (var phrase in phrases)
         {
             if (phrase.Tick > tick)
-                return false;
-            if (tick < phrase.Tick + Math.Max(1, phrase.Length))
-                return true;
+                break;
+            current = phrase;
         }
 
-        return false;
+        return current is { } p && (p.Length == 0 ? tick == p.Tick : tick < p.Tick + p.Length);
     }
 }

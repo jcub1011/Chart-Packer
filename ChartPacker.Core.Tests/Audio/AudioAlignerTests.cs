@@ -72,7 +72,7 @@ public sealed class AudioAlignerTests
 
         Assert.AreEqual(AlignmentMethod.Audio, estimate.Method);
         Assert.AreEqual(730, estimate.OffsetMs, 3);
-        Assert.IsTrue(estimate.Match > 0.8, $"Match was {estimate.Match}.");
+        Assert.IsGreaterThan(0.8, estimate.Match, $"Match was {estimate.Match}.");
         Assert.IsTrue(estimate.IsReliable);
         Assert.IsNotNull(estimate.DriftMs);
         Assert.AreEqual(0, estimate.DriftMs.Value, 3);
@@ -150,7 +150,7 @@ public sealed class AudioAlignerTests
         var a = Audio(Clicks(times, 40, seed: 21));
         var b = Audio(Clicks(times.Select(t => t - 0.25), 40, seed: 22));
 
-        var links = AudioAligner.Links([a, null, b]);
+        var links = AudioAligner.Links([a, null, b], TestContext.CancellationToken);
 
         Assert.HasCount(2, links);
         var forward = links.Single(l => l.From == 0);
@@ -174,7 +174,7 @@ public sealed class AudioAlignerTests
             Audio(Clicks(times.Select(t => t - 0.9), 60, seed: 26)),
         ];
 
-        var links = AudioAligner.Links(songs);
+        var links = AudioAligner.Links(songs, TestContext.CancellationToken);
 
         foreach (var link in links.Where(l => l.From < l.To))
         {
@@ -201,7 +201,7 @@ public sealed class AudioAlignerTests
             string[] names = ["guitar.wav", "drums.wav", "preview.wav", "crowd.wav"];
             var cache = new StemPeaksCache(64L * 1024 * 1024);
 
-            var read = AudioAligner.Read(entry, names, WaveformResolution.Low, cache);
+            var read = AudioAligner.Read(entry, names, WaveformResolution.Low, cache, TestContext.CancellationToken);
 
             Assert.IsNotNull(read);
             Assert.AreEqual(30, read.Seconds, 0.1);
@@ -212,7 +212,7 @@ public sealed class AudioAlignerTests
             }
 
             // Read again, from the cache, it's the same.
-            var again = AudioAligner.Read(entry, names, WaveformResolution.Medium, cache);
+            var again = AudioAligner.Read(entry, names, WaveformResolution.Medium, cache, TestContext.CancellationToken);
             Assert.AreEqual(0, AudioAligner.Align(read, again!).OffsetMs);
         }
         finally
@@ -235,12 +235,12 @@ public sealed class AudioAlignerTests
             File.WriteAllBytes(Path.Combine(b.FullName, "guitar.wav"), TestAudio.Wav(Clicks(times.Select(t => t - 0.5), 40, seed: 35, gain: 0.3), Rate, 1));
             File.WriteAllBytes(Path.Combine(b.FullName, "crowd.wav"), TestAudio.Wav(Clicks(Times(60, seed: 36), 40, seed: 37), Rate, 1));
 
-            var first = AudioAligner.Read(new SongEntry(SongEntryKind.SongFolder, a.FullName, a.Name, a.Name), ["song.wav"], WaveformResolution.Low)!;
-            var second = AudioAligner.Read(new SongEntry(SongEntryKind.SongFolder, b.FullName, b.Name, b.Name), ["guitar.wav", "crowd.wav"], WaveformResolution.Low)!;
-            var estimate = AudioAligner.Links([first, second]).Single(l => l.From == 0).Estimate(AlignmentMethod.Audio);
+            var first = AudioAligner.Read(new SongEntry(SongEntryKind.SongFolder, a.FullName, a.Name, a.Name), ["song.wav"], WaveformResolution.Low, cancellationToken: TestContext.CancellationToken)!;
+            var second = AudioAligner.Read(new SongEntry(SongEntryKind.SongFolder, b.FullName, b.Name, b.Name), ["guitar.wav", "crowd.wav"], WaveformResolution.Low, cancellationToken: TestContext.CancellationToken)!;
+            var estimate = AudioAligner.Links([first, second], TestContext.CancellationToken).Single(l => l.From == 0).Estimate(AlignmentMethod.Audio);
 
             Assert.AreEqual(500, estimate.OffsetMs, 3);
-            Assert.IsTrue(estimate.Match > 0.8, $"Match was {estimate.Match}.");
+            Assert.IsGreaterThan(0.8, estimate.Match, $"Match was {estimate.Match}.");
         }
         finally
         {
@@ -257,11 +257,11 @@ public sealed class AudioAlignerTests
             File.WriteAllBytes(Path.Combine(folder.FullName, "song.wav"), TestAudio.Wav(Clicks(Times(10, seed: 26), 8, seed: 27), Rate, 1));
             var entry = new SongEntry(SongEntryKind.SongFolder, folder.FullName, folder.Name, folder.Name);
             var cache = new StemPeaksCache(64L * 1024 * 1024);
-            AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.Low, cache, anyResolution: false);
+            AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.Low, cache, anyResolution: false, TestContext.CancellationToken);
 
             // Any resolution will do for lining up, but drawing mixes tracks of one.
-            Assert.AreEqual(WaveformResolution.Low, AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.High, cache, anyResolution: true).Single().Resolution);
-            Assert.AreEqual(WaveformResolution.High, AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.High, cache, anyResolution: false).Single().Resolution);
+            Assert.AreEqual(WaveformResolution.Low, AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.High, cache, anyResolution: true, TestContext.CancellationToken).Single().Resolution);
+            Assert.AreEqual(WaveformResolution.High, AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.High, cache, anyResolution: false, TestContext.CancellationToken).Single().Resolution);
         }
         finally
         {
@@ -330,4 +330,6 @@ public sealed class AudioAlignerTests
         WaveformPeaks.Compute("song.wav", new WavSource(new MemoryStream(TestAudio.Wav(samples, Rate, 1))), WaveformResolution.Low);
 
     private static AlignmentAudio Audio(float[] samples) => AlignmentAudio.Of([Peaks(samples)])!;
+
+    public TestContext TestContext { get; set; }
 }

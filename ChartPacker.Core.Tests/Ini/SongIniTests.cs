@@ -41,7 +41,7 @@ public sealed class SongIniTests
         SongIni.Write(writer, pairs);
 
         Assert.AreEqual("[song]\nname = Title\nloading_phrase = a = b\ndelay = 0\n", writer.ToString());
-        CollectionAssert.AreEqual(pairs, Parse(writer.ToString())!.ToArray());
+        Assert.AreSequenceEqual(pairs, [.. Parse(writer.ToString())!]);
     }
 
     [TestMethod]
@@ -49,10 +49,10 @@ public sealed class SongIniTests
     {
         string path = Path.Combine(_root.FullName, "song.ini");
 
-        await SongIni.WriteAsync(path, [P("name", "Title")]);
+        await SongIni.WriteAsync(path, [P("name", "Title")], TestContext.CancellationToken);
 
         Assert.AreEqual((byte)'[', File.ReadAllBytes(path)[0]);
-        Assert.AreEqual("Title", (await SongIni.ReadAsync(path)).Pairs.Single().Value);
+        Assert.AreEqual("Title", (await SongIni.ReadAsync(path, TestContext.CancellationToken)).Pairs.Single().Value);
     }
 
     [TestMethod]
@@ -65,7 +65,7 @@ public sealed class SongIniTests
             diff_guitar = 3
             """);
 
-        CollectionAssert.AreEqual(new[] { P("name", "Title"), P("artist", "Band"), P("diff_guitar", "3") }, pairs!.ToArray());
+        Assert.AreSequenceEqual([P("name", "Title"), P("artist", "Band"), P("diff_guitar", "3")], [.. pairs!]);
     }
 
     [TestMethod]
@@ -88,7 +88,7 @@ public sealed class SongIniTests
             artist = Wrong
             """);
 
-        CollectionAssert.AreEqual(new[] { P("name", "Right") }, pairs!.ToArray());
+        Assert.AreSequenceEqual([P("name", "Right")], [.. pairs!]);
     }
 
     [TestMethod]
@@ -104,7 +104,7 @@ public sealed class SongIniTests
             name = Title
             """);
 
-        CollectionAssert.AreEqual(new[] { P("name", "Title") }, pairs!.ToArray());
+        Assert.AreSequenceEqual([P("name", "Title")], [.. pairs!]);
     }
 
     [TestMethod]
@@ -112,7 +112,7 @@ public sealed class SongIniTests
     {
         var pairs = Parse("[song]\n   loading_phrase   =   <color=#00FF00>Hi</color>  \nempty =\n");
 
-        CollectionAssert.AreEqual(new[] { P("loading_phrase", "<color=#00FF00>Hi</color>"), P("empty", "") }, pairs!.ToArray());
+        Assert.AreSequenceEqual([P("loading_phrase", "<color=#00FF00>Hi</color>"), P("empty", "")], [.. pairs!]);
     }
 
     [TestMethod]
@@ -125,7 +125,7 @@ public sealed class SongIniTests
             NAME = Second
             """);
 
-        CollectionAssert.AreEqual(new[] { P("name", "Second"), P("artist", "Band") }, pairs!.ToArray());
+        Assert.AreSequenceEqual([P("name", "Second"), P("artist", "Band")], [.. pairs!]);
     }
 
     [TestMethod]
@@ -140,7 +140,7 @@ public sealed class SongIniTests
             artist = Band
             """);
 
-        CollectionAssert.AreEqual(new[] { P("name", "Title"), P("artist", "Band") }, pairs!.ToArray());
+        Assert.AreSequenceEqual([P("name", "Title"), P("artist", "Band")], [.. pairs!]);
     }
 
     [TestMethod]
@@ -154,21 +154,21 @@ public sealed class SongIniTests
     public async Task ReadAsyncHandlesBomAndCrLf()
     {
         string path = Path.Combine(_root.FullName, "song.ini");
-        await File.WriteAllTextAsync(path, "[song]\r\nname = Café\r\n", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        await File.WriteAllTextAsync(path, "[song]\r\nname = Café\r\n", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true), TestContext.CancellationToken);
 
-        var result = await SongIni.ReadAsync(path);
+        var result = await SongIni.ReadAsync(path, TestContext.CancellationToken);
 
         Assert.AreEqual(SongIniStatus.Ok, result.Status);
-        CollectionAssert.AreEqual(new[] { P("name", "Café") }, result.Pairs.ToArray());
+        Assert.AreSequenceEqual([P("name", "Café")], [.. result.Pairs]);
     }
 
     [TestMethod]
     public async Task ReadAsyncReportsMissingSection()
     {
         string path = Path.Combine(_root.FullName, "song.ini");
-        await File.WriteAllTextAsync(path, "[notsong]\nname = A\n");
+        await File.WriteAllTextAsync(path, "[notsong]\nname = A\n", TestContext.CancellationToken);
 
-        var result = await SongIni.ReadAsync(path);
+        var result = await SongIni.ReadAsync(path, TestContext.CancellationToken);
 
         Assert.AreEqual(SongIniStatus.NoSongSection, result.Status);
         Assert.IsEmpty(result.Pairs);
@@ -178,30 +178,30 @@ public sealed class SongIniTests
     public async Task ReadAsyncReportsRepeatedKeysOnceAsFirstSpelled()
     {
         string path = Path.Combine(_root.FullName, "song.ini");
-        await File.WriteAllTextAsync(path, "[song]\nName = A\nname = B\nNAME = C\ndelay = 0\n");
+        await File.WriteAllTextAsync(path, "[song]\nName = A\nname = B\nNAME = C\ndelay = 0\n", TestContext.CancellationToken);
 
-        var result = await SongIni.ReadAsync(path);
+        var result = await SongIni.ReadAsync(path, TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { P("Name", "C"), P("delay", "0") }, result.Pairs.ToArray());
-        CollectionAssert.AreEqual(new[] { "Name" }, result.DuplicateKeys.ToArray());
+        Assert.AreSequenceEqual([P("Name", "C"), P("delay", "0")], [.. result.Pairs]);
+        Assert.AreSequenceEqual(["Name"], [.. result.DuplicateKeys]);
     }
 
     [TestMethod]
     public async Task ReadAsyncReportsNoDuplicatesForDistinctKeys()
     {
         string path = Path.Combine(_root.FullName, "song.ini");
-        await File.WriteAllTextAsync(path, "[song]\nname = A\nartist = B\n");
+        await File.WriteAllTextAsync(path, "[song]\nname = A\nartist = B\n", TestContext.CancellationToken);
 
-        Assert.IsEmpty((await SongIni.ReadAsync(path)).DuplicateKeys);
+        Assert.IsEmpty((await SongIni.ReadAsync(path, TestContext.CancellationToken)).DuplicateKeys);
     }
 
     [TestMethod]
     public async Task ReadAsyncRefusesOversizedFile()
     {
         string path = Path.Combine(_root.FullName, "song.ini");
-        await File.WriteAllBytesAsync(path, new byte[SongIni.MaxFileSize + 1]);
+        await File.WriteAllBytesAsync(path, new byte[SongIni.MaxFileSize + 1], TestContext.CancellationToken);
 
-        var result = await SongIni.ReadAsync(path);
+        var result = await SongIni.ReadAsync(path, TestContext.CancellationToken);
 
         Assert.AreEqual(SongIniStatus.TooLarge, result.Status);
     }
@@ -209,4 +209,6 @@ public sealed class SongIniTests
     private static IReadOnlyList<KeyValuePair<string, string>>? Parse(string text) => SongIni.Parse(new StringReader(text));
 
     private static KeyValuePair<string, string> P(string key, string value) => new(key, value);
+
+    public TestContext TestContext { get; set; }
 }

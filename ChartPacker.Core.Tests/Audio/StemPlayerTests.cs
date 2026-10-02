@@ -23,7 +23,7 @@ public sealed class StemPlayerTests
 
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
         Thread.Sleep(50);
-        Assert.IsTrue(output.QueuedFrames < QueueTarget + (Rate / 20), $"{output.QueuedFrames} frames were queued.");
+        Assert.IsLessThan(QueueTarget + (Rate / 20), output.QueuedFrames, $"{output.QueuedFrames} frames were queued.");
         Assert.IsTrue(output.IsPlaying);
     }
 
@@ -204,7 +204,7 @@ public sealed class StemPlayerTests
         // The device plays the queue four times as fast, so four times the frames last QueueMilliseconds.
         WaitUntil(() => output.QueuedFrames >= QueueTarget * 4);
         Thread.Sleep(50);
-        Assert.IsTrue(output.QueuedFrames < (QueueTarget * 4) + (Rate / 20), $"{output.QueuedFrames} frames were queued.");
+        Assert.IsLessThan((QueueTarget * 4) + (Rate / 20), output.QueuedFrames, $"{output.QueuedFrames} frames were queued.");
     }
 
     [TestMethod]
@@ -219,8 +219,8 @@ public sealed class StemPlayerTests
         // Less than one ordinary 20 ms chunk, which would take two seconds to play at this speed.
         WaitUntil(() => output.QueuedFrames > 0);
         Thread.Sleep(50);
-        Assert.IsTrue(output.QueuedFrames <= target, $"{output.QueuedFrames} frames were queued.");
-        Assert.IsTrue(output.LargestWrite <= target, $"{output.LargestWrite} frames were written at once.");
+        Assert.IsLessThanOrEqualTo(target, output.QueuedFrames, $"{output.QueuedFrames} frames were queued.");
+        Assert.IsLessThanOrEqualTo(target, output.LargestWrite, $"{output.LargestWrite} frames were written at once.");
     }
 
     [TestMethod]

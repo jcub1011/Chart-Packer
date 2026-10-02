@@ -26,17 +26,15 @@ public sealed class SongFolderListingTests
         Write("stems/Guitar.ogg", 7);
         Write("stems/deep/extra.txt", 0);
 
-        var files = SongFolderListing.List(_root.FullName);
+        var files = SongFolderListing.List(_root.FullName, TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Assert.AreSequenceEqual(
+            [
                 new FolderFileEntry("notes.chart", 42),
                 new FolderFileEntry("song.ini", 10),
                 new FolderFileEntry("stems/deep/extra.txt", 0),
                 new FolderFileEntry("stems/Guitar.ogg", 7),
-            },
-            files.ToArray());
+            ], [.. files]);
     }
 
     [TestMethod]
@@ -46,7 +44,7 @@ public sealed class SongFolderListingTests
         Write("A.txt", 1);
         Write("C.txt", 1);
 
-        CollectionAssert.AreEqual(new[] { "A.txt", "b.txt", "C.txt" }, SongFolderListing.List(_root.FullName).Select(f => f.RelativePath).ToArray());
+        Assert.AreSequenceEqual(["A.txt", "b.txt", "C.txt"], [.. SongFolderListing.List(_root.FullName, TestContext.CancellationToken).Select(f => f.RelativePath)]);
     }
 
     [TestMethod]
@@ -55,7 +53,7 @@ public sealed class SongFolderListingTests
         string path = Write("desktop.ini", 3);
         File.SetAttributes(path, FileAttributes.Hidden | FileAttributes.System);
 
-        Assert.AreEqual("desktop.ini", SongFolderListing.List(_root.FullName).Single().RelativePath);
+        Assert.AreEqual("desktop.ini", SongFolderListing.List(_root.FullName, TestContext.CancellationToken).Single().RelativePath);
     }
 
     [TestMethod]
@@ -66,20 +64,19 @@ public sealed class SongFolderListingTests
         var written = new DateTime(2024, 5, 6, 7, 8, 9, DateTimeKind.Utc);
         File.SetLastWriteTimeUtc(chart, written);
 
-        var stamped = SongFolderListing.ListStamped(_root.FullName);
+        var stamped = SongFolderListing.ListStamped(_root.FullName, TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(
-            SongFolderListing.List(_root.FullName).ToArray(),
-            stamped.Select(f => new FolderFileEntry(f.RelativePath, f.Length)).ToArray());
+        Assert.AreSequenceEqual(
+            [.. SongFolderListing.List(_root.FullName, TestContext.CancellationToken)], [.. stamped.Select(f => new FolderFileEntry(f.RelativePath, f.Length))]);
         Assert.AreEqual(written, stamped.Single(f => f.RelativePath == "notes.chart").LastWriteTimeUtc);
     }
 
     [TestMethod]
-    public void EmptyFolderListsNothing() => Assert.IsEmpty(SongFolderListing.List(_root.FullName));
+    public void EmptyFolderListsNothing() => Assert.IsEmpty(SongFolderListing.List(_root.FullName, TestContext.CancellationToken));
 
     [TestMethod]
     public void MissingFolderThrows() =>
-        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongFolderListing.List(Path.Combine(_root.FullName, "nope")));
+        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SongFolderListing.List(Path.Combine(_root.FullName, "nope"), TestContext.CancellationToken));
 
     [TestMethod]
     public async Task CancelledListAsyncThrows()
@@ -98,4 +95,6 @@ public sealed class SongFolderListingTests
         File.WriteAllBytes(path, new byte[size]);
         return path;
     }
+
+    public TestContext TestContext { get; set; }
 }

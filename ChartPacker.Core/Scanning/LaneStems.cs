@@ -28,9 +28,9 @@ public static class LaneStems
     /// </summary>
     public static IReadOnlyList<IReadOnlyList<string>> For(ChartInstrument instrument) => instrument switch
     {
-        ChartInstrument.Guitar or ChartInstrument.GuitarCoop or ChartInstrument.GhlGuitar => GuitarStems,
+        ChartInstrument.Guitar or ChartInstrument.GuitarCoop or ChartInstrument.GhlGuitar or ChartInstrument.GhlCoop => GuitarStems,
         ChartInstrument.Bass or ChartInstrument.GhlBass => BassStems,
-        ChartInstrument.Rhythm => RhythmStems,
+        ChartInstrument.Rhythm or ChartInstrument.GhlRhythm => RhythmStems,
         ChartInstrument.Keys => KeysStems,
         ChartInstrument.Drums => DrumsStems,
         _ => [],

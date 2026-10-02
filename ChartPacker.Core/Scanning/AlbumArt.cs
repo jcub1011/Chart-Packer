@@ -97,7 +97,7 @@ public static class AlbumArt
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(name);
 
-        var list = items as IReadOnlyList<T> ?? items.ToList();
+        var list = items as IReadOnlyList<T> ?? [.. items];
         foreach (string candidate in Names)
         {
             foreach (T item in list)

@@ -625,7 +625,7 @@ namespace ChartPacker.ViewModels
                         try
                         {
                             var backgrounds = await BackgroundViewModel.LoadAsync(
-                                selection.Songs.Select(s => s.Pairs is null ? null : s.Entry).ToList(), stagedBackgrounds, cts.Token);
+                                [.. selection.Songs.Select(s => s.Pairs is null ? null : s.Entry)], stagedBackgrounds, cts.Token);
                             return selection with { Art = art, Backgrounds = backgrounds };
                         }
                         catch
@@ -1643,7 +1643,7 @@ namespace ChartPacker.ViewModels
         /// <summary>The background, the highway and the lyrics, which play the selected songs as they're drafted, follow the drafts.</summary>
         private void RefreshPlayback()
         {
-            Background.Refresh(_songs.Select(BackgroundSongOf).ToList());
+            Background.Refresh([.. _songs.Select(BackgroundSongOf)]);
             Highway.Refresh(HighwaySongOf());
             Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
         }
@@ -1684,12 +1684,11 @@ namespace ChartPacker.ViewModels
 
         private void Apply(LoadedSelection loaded)
         {
-            _songs = loaded.Songs
+            _songs = [.. loaded.Songs
                 .Select((s, i) => (Song: s, ArtHash: loaded.Art.DiskHashes[i], Backgrounds: loaded.Backgrounds.Stored.ElementAtOrDefault(i) ?? StoredBackgrounds.None))
                 .Where(x => x.Song.Pairs is not null)
                 .Select(x => new EditableSong(
-                    x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath), x.Song.DuplicateKeys), x.Song.SongIniPath, x.ArtHash, x.Backgrounds))
-                .ToList();
+                    x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath), x.Song.DuplicateKeys), x.Song.SongIniPath, x.ArtHash, x.Backgrounds))];
             _artImages = loaded.Art.Images;
             _stagedArt = loaded.Art.Staged;
             _diskFiles = loaded.Files;
@@ -1897,8 +1896,8 @@ namespace ChartPacker.ViewModels
                 return new LoadedSelection(
                     [LoadedSongOf(SongMetadataCheck.FromSng(entry, result)).Song],
                     size,
-                    result.Files.Select(f => new DiskFile(f.Name, f.Length)).ToList(),
-                    result.Findings.Select(f => new FindingRow(f.RuleId, f.Message, f.Severity == Severity.Error)).ToList(),
+                    [.. result.Files.Select(f => new DiskFile(f.Name, f.Length))],
+                    [.. result.Findings.Select(f => new FindingRow(f.RuleId, f.Message, f.Severity == Severity.Error))],
                     MetadataNote: null);
             }
 
@@ -1912,7 +1911,7 @@ namespace ChartPacker.ViewModels
             return new LoadedSelection(
                 [song],
                 (ulong)files.Sum(f => f.Length),
-                files.Select(f => new DiskFile(f.RelativePath, (ulong)f.Length)).ToList(),
+                [.. files.Select(f => new DiskFile(f.RelativePath, (ulong)f.Length))],
                 [],
                 note);
         }
@@ -2173,12 +2172,11 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasRemovedTracks));
 
             var stems = tracks.Select(t => t.Stem).ToHashSet(StringComparer.Ordinal);
-            AddTrackOptions = AudioStems.Stems
+            AddTrackOptions = [.. AudioStems.Stems
                 .Select(stem => new StemOption(
                     stem,
                     stems.Contains(stem) ? string.Format(CultureInfo.CurrentCulture, Strings.ReplaceTrackFormat, stem) : stem,
-                    _addTrackCommands[stem]))
-                .ToList();
+                    _addTrackCommands[stem]))];
         }
 
         /// <summary><paramref name="track"/>'s file size, formatted: the file to be added, or the one stored.</summary>

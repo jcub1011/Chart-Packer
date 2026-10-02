@@ -14,10 +14,10 @@ internal static class SustainCutoff
     public const long ShortestSustain = 3;
 
     /// <summary>
-    /// The cutoff a MIDI chart of <paramref name="resolution"/> is read with: song.ini's
-    /// <paramref name="setting"/>, where 0 is taken as 1, or a third of a beat.
+    /// The cutoff a MIDI chart of <paramref name="resolution"/> is read with, as YARG takes song.ini's
+    /// <paramref name="setting"/>: 0 is taken as 1, and none or a negative one as a third of a beat.
     /// </summary>
-    public static long Of(int resolution, long? setting) => setting is { } ticks ? Math.Max(1, ticks) : resolution / 3;
+    public static long Of(int resolution, long? setting) => setting is { } ticks && ticks >= 0 ? Math.Max(1, ticks) : resolution / 3;
 
     /// <summary>
     /// The cutoff to write for a chart of <paramref name="resolution"/> whose shortest sustain is

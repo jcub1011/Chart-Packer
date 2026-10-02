@@ -16,7 +16,8 @@ internal static class MidiLayout
     public const int SysexTap = 4;
     public const int SysexAllDifficulties = 0xFF;
 
-    public static IReadOnlyDictionary<string, ChartInstrument> TrackNames { get; } = new Dictionary<string, ChartInstrument>(StringComparer.OrdinalIgnoreCase)
+    /// <summary>The instrument of each track YARG reads, by its exact name.</summary>
+    public static IReadOnlyDictionary<string, ChartInstrument> TrackNames { get; } = new Dictionary<string, ChartInstrument>(StringComparer.Ordinal)
     {
         ["PART GUITAR"] = ChartInstrument.Guitar,
         ["T1 GEMS"] = ChartInstrument.Guitar,
@@ -24,10 +25,16 @@ internal static class MidiLayout
         ["PART RHYTHM"] = ChartInstrument.Rhythm,
         ["PART KEYS"] = ChartInstrument.Keys,
         ["PART DRUMS"] = ChartInstrument.Drums,
+        ["PART REAL_DRUMS_PS"] = ChartInstrument.Drums,
         ["PART GUITAR COOP"] = ChartInstrument.GuitarCoop,
         ["PART GUITAR GHL"] = ChartInstrument.GhlGuitar,
         ["PART BASS GHL"] = ChartInstrument.GhlBass,
+        ["PART RHYTHM GHL"] = ChartInstrument.GhlRhythm,
+        ["PART GUITAR COOP GHL"] = ChartInstrument.GhlCoop,
     };
+
+    /// <summary>The track names that replace an earlier track of their instrument, where any other is skipped.</summary>
+    public static IReadOnlySet<string> OverridingTrackNames { get; } = new HashSet<string>(StringComparer.Ordinal) { "PART GUITAR", "PART DRUMS" };
 
     /// <summary>
     /// The first pitch of a difficulty: five-fret green and the drum kick are 60, 72, 84 and 96;
@@ -64,247 +71,313 @@ internal static class MidiLayout
 }
 
 /// <summary>
-/// Reads a <c>notes.mid</c>: the tempo map, and the tracks named in <see cref="MidiLayout.TrackNames"/>.
-/// Everything else (vocals, venue, events, pro keys) is skipped.
+/// Reads a <c>notes.mid</c> as YARG does (<c>MidReader</c> in YARG.Core): the tempo map, and the tracks named in
+/// <see cref="MidiLayout.TrackNames"/>. Everything else (vocals, venue, events, pro keys) is skipped.
 /// </summary>
+/// <remarks>
+/// <list type="bullet">
+/// <item>The tempo map is the first track's. As YARG counts it, every tempo and time signature there is the
+/// first event's delta later than it's written.</item>
+/// <item>A track is named by a track-name event at tick 0, and its first event is never read. Of two tracks of an
+/// instrument the first is kept, except that a later <c>PART GUITAR</c> or <c>PART DRUMS</c> replaces it.</item>
+/// <item>A note-on pairs with the next note-off of its pitch and channel; a second note-on while one is held is
+/// ignored, and a note never let go is lost. Notes are taken as they're let go, and the first of two on a tick
+/// and fret or pad is kept.</item>
+/// </list>
+/// </remarks>
 internal static class MidiChartReader
 {
-    // Rock Band's default: a note is a natural HOPO within 170/480 of a beat of the one before.
-    private const double HopoBeats = 170.0 / 480;
-
-    /// <summary>
-    /// The natural-HOPO thresholds a MIDI chart of <paramref name="resolution"/> can be played with, the one
-    /// it's read with first: Rock Band's default and YARG's, a third of a beat and a tick; or song.ini's
-    /// <c>hopo_frequency</c> with YARG's extra tick, and without it.
-    /// </summary>
-    internal static long[] HopoThresholdsOf(ChartReadOptions options, int resolution) =>
-        options.HopoThreshold is { } ticks
-            ? [ticks + 1, ticks]
-            : [(long)(resolution * HopoBeats), (resolution / 3) + 1];
-
-    /// <exception cref="ChartFormatException">The file isn't a MIDI file, or is malformed.</exception>
+    /// <exception cref="ChartFormatException">The file isn't a MIDI file YARG can read, or is malformed.</exception>
     public static ChartDocument Read(byte[] bytes, ChartReadOptions options)
     {
-        var (_, resolution, chunks) = MidiFile.ReadChunks(bytes);
-        var tracks = chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.ReadEvents(bytes, c)).ToList();
-        var tempo = TempoOf(bytes, resolution, tracks);
+        var (_, resolution, all) = MidiFile.ReadChunks(bytes);
+        var chunks = all.Skip(1).ToList();
+        if (chunks.Count == 0 || chunks[0].Id != "MTrk")
+            throw new ChartFormatException("The MIDI file doesn't start with a track.");
 
-        var parts = new Dictionary<ChartInstrument, TrackSpans>();
-        foreach (var events in tracks)
+        var tracks = chunks.Select(c => c.Id == "MTrk" ? MidiFile.ReadEvents(bytes, c) : null).ToList();
+        var tempo = TempoOf(bytes, resolution, [tracks[0]!]);
+
+        var parts = new Dictionary<ChartInstrument, List<MidiEvent>>();
+        foreach (var events in tracks.Skip(1))
         {
-            if (MidiFile.NameOf(bytes, events) is { } name && MidiLayout.TrackNames.TryGetValue(name, out var instrument) && !parts.ContainsKey(instrument))
-                parts[instrument] = TrackSpans.Of(bytes, events);
+            if (events is not { Count: > 0 } || NameOf(bytes, events) is not { } name || !MidiLayout.TrackNames.TryGetValue(name, out var instrument))
+                continue;
+            if (!parts.ContainsKey(instrument) || MidiLayout.OverridingTrackNames.Contains(name))
+                parts[instrument] = events;
         }
 
-        bool fiveLane = parts.TryGetValue(ChartInstrument.Drums, out var drums)
-            && Enum.GetValues<ChartDifficulty>().Any(d => drums.Notes.ContainsKey(MidiLayout.BaseOf(ChartInstrumentKind.Drums, d) + 5));
-
         var result = new Dictionary<ChartTrackKey, NoteTrack>();
-        foreach (var (instrument, spans) in parts)
+        bool fiveLane = false, pro = false;
+        foreach (var (instrument, events) in parts)
         {
+            var track = TrackData.Of(bytes, events, ChartInstruments.KindOf(instrument) == ChartInstrumentKind.FiveFret);
+            var kind = ChartInstruments.KindOf(instrument);
+            var starPower = track.Phrases(options.MidiStarPowerPitch);
+            if (kind == ChartInstrumentKind.Drums)
+            {
+                var layout = DrumsLayoutOf(bytes, events, options);
+                fiveLane = layout == DrumsLayout.FiveLane;
+                pro = layout == DrumsLayout.Pro;
+                foreach (var (difficulty, notes) in Drums(track, layout, starPower))
+                {
+                    if (notes.Count > 0)
+                        result[new ChartTrackKey(instrument, difficulty)] = new NoteTrack(notes, starPower);
+                }
+
+                continue;
+            }
+
             foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
             {
-                var track = Build(instrument, difficulty, spans, resolution, fiveLane, options);
-                if (track.Notes.Count > 0)
-                    result[new ChartTrackKey(instrument, difficulty)] = track;
+                var notes = Frets(track, kind, difficulty, resolution, options, starPower);
+                if (notes.Count > 0)
+                    result[new ChartTrackKey(instrument, difficulty)] = new NoteTrack(notes, starPower);
             }
         }
 
-        return new ChartDocument(tempo, result, null, fiveLane);
+        return new ChartDocument(tempo, result, null, fiveLane) { IsProDrums = pro };
     }
 
-    /// <summary>The tempo map, from the tempo and time-signature events of every track.</summary>
+    /// <summary>
+    /// The tempo map, from the tempo and time-signature events of the first of <paramref name="tracks"/>, YARG's
+    /// sync track, each the first event's delta later than written, as YARG counts them.
+    /// </summary>
     internal static TempoMap TempoOf(byte[] bytes, int resolution, List<List<MidiEvent>> tracks)
     {
         var tempos = new List<TempoChange>();
         var signatures = new List<TimeSignature>();
-        foreach (var e in tracks.SelectMany(t => t).Where(e => e.IsMeta))
+        var sync = tracks.Count > 0 ? tracks[0] : [];
+        long shift = sync.Count > 0 ? sync[0].Tick : 0;
+        foreach (var e in sync.Where(e => e.IsMeta))
         {
             var (type, start, length) = MidiFile.MetaOf(bytes, e);
             if (type == 0x51 && length == 3)
-                tempos.Add(new TempoChange(e.Tick, (bytes[start] << 16) | (bytes[start + 1] << 8) | bytes[start + 2]));
+                tempos.Add(new TempoChange(e.Tick + shift, (bytes[start] << 16) | (bytes[start + 1] << 8) | bytes[start + 2]));
             else if (type == 0x58 && length >= 2 && bytes[start + 1] < 7)
-                signatures.Add(new TimeSignature(e.Tick, bytes[start], 1 << bytes[start + 1]));
+                signatures.Add(new TimeSignature(e.Tick + shift, bytes[start], 1 << bytes[start + 1]));
         }
 
         return new TempoMap(resolution, tempos.OrderBy(t => t.Tick), signatures.OrderBy(s => s.Tick));
     }
 
-    private static NoteTrack Build(ChartInstrument instrument, ChartDifficulty difficulty, TrackSpans spans, int resolution, bool fiveLane, ChartReadOptions options)
+    /// <summary>
+    /// A track's name as YARG takes it: of its track-name events at tick 0, the first YARG recognizes, or the first.
+    /// </summary>
+    internal static string? NameOf(byte[] bytes, List<MidiEvent> events)
     {
-        var kind = ChartInstruments.KindOf(instrument);
+        string? first = null;
+        foreach (var e in events)
+        {
+            if (e.Tick != 0)
+                break;
+            if (MidiFile.TextOf(bytes, e, 0x03) is not { } name)
+                continue;
+            if (IsRecognized(name))
+                return name;
+            first ??= name;
+        }
+
+        return first;
+    }
+
+    private static bool IsRecognized(string name) =>
+        name is "BEAT" or "EVENTS" or "VENUE" or "PART REAL_KEYS_X" or "PART REAL_KEYS_H" or "PART REAL_KEYS_M" or "PART REAL_KEYS_E" or "PART VOCALS"
+            or "PART REAL_GUITAR" or "PART REAL_GUITAR_22" or "PART REAL_BASS" or "PART REAL_BASS_22" or "PART ELITE_DRUMS"
+            or "HARM1" or "HARM2" or "HARM3" or "PART HARM1" or "PART HARM2" or "PART HARM3"
+        || MidiLayout.TrackNames.ContainsKey(name);
+
+    /// <summary>
+    /// The drums' layout (see <see cref="DrumsLayouts"/>), from song.ini and the track's events in order: a
+    /// fifth-pad note-on (65, 77, 89 or 101), or any tom marker event.
+    /// </summary>
+    private static DrumsLayout DrumsLayoutOf(byte[] bytes, List<MidiEvent> events, ChartReadOptions options)
+    {
+        var layouts = new DrumsLayouts(options, midi: true);
+        foreach (var e in events)
+        {
+            if (e.Kind is not (0x80 or 0x90))
+                continue;
+            int pitch = bytes[e.DataStart];
+            bool on = e.Kind == 0x90 && bytes[e.DataStart + 1] > 0;
+            if (pitch is 65 or 77 or 89 or 101 && on)
+                layouts.FifthPad();
+            else if (pitch is >= MidiLayout.FirstTomPitch and <= MidiLayout.FirstTomPitch + 2)
+                layouts.ProMarker();
+        }
+
+        return layouts.Layout;
+    }
+
+    private static List<ChartNote> Frets(TrackData track, ChartInstrumentKind kind, ChartDifficulty difficulty, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower)
+    {
         int b = MidiLayout.BaseOf(kind, difficulty);
-        // As YARG reads it, a note held for less than the cutoff is a note, not a sustain.
         long cutoff = SustainCutoff.Of(resolution, options.SustainCutoff);
-        long LengthOf(Span span) => span.Length >= cutoff ? span.Length : 0;
+        long LengthOf(Held note) => note.End - note.Start >= cutoff ? note.End - note.Start : 0;
 
-        var starPower = spans.Of(MidiLayout.StarPowerPitch).Select(s => new StarPowerPhrase(s.Start, s.Length)).ToList();
-        var sysexOpen = spans.SysexFor(difficulty, MidiLayout.SysexOpen);
-        var sysexTap = spans.SysexFor(difficulty, MidiLayout.SysexTap);
-
-        FretMarks MarksAt(long tick, int hopoPitch) => new(
-            Toggle: false,
-            ForceHopo: Span.Covers(spans.Of(hopoPitch), tick),
-            ForceStrum: Span.Covers(spans.Of(hopoPitch + 1), tick),
-            Tap: Span.Covers(spans.Of(MidiLayout.TapPitch), tick) || Span.Covers(sysexTap, tick));
-
-        long hopoThreshold = options.MidiHopoTicks ?? HopoThresholdsOf(options, resolution)[0];
-        switch (kind)
+        // The frets, each tick's first of a fret kept. Six-fret: open, white 1-3, black 1-3.
+        var gems = new List<Gem>();
+        var taken = new HashSet<(long, int)>();
+        foreach (var note in track.Notes)
         {
-            case ChartInstrumentKind.Drums:
-            {
-                bool pro = options.ProDrums || Enumerable.Range(MidiLayout.FirstTomPitch, 3).Any(p => spans.Notes.ContainsKey(p));
-                var gems = new List<(Gem, NoteFlags)>();
-                foreach (var s in spans.Of(b))
-                    gems.Add((new Gem(s.Start, 0, ChartNote.OpenLane), NoteFlags.None));
-                if (difficulty == ChartDifficulty.Expert)
-                {
-                    foreach (var s in spans.Of(MidiLayout.DoubleKickPitch))
-                        gems.Add((new Gem(s.Start, 0, ChartNote.OpenLane), NoteFlags.DoubleKick));
-                }
-
-                for (int lane = 0; lane < (fiveLane ? 5 : 4); lane++)
-                {
-                    foreach (var s in spans.Of(b + 1 + lane))
-                    {
-                        // Yellow, blue and green are cymbals unless a tom marker covers them.
-                        bool cymbal = pro && !fiveLane && lane >= 1 && !Span.Covers(spans.Of(MidiLayout.FirstTomPitch + lane - 1), s.Start);
-                        gems.Add((new Gem(s.Start, 0, lane), cymbal ? NoteFlags.Cymbal : NoteFlags.None));
-                    }
-                }
-
-                return new NoteTrack(NoteBuilder.Drums(gems, starPower), starPower);
-            }
-
-            case ChartInstrumentKind.SixFret:
-            {
-                var gems = spans.Of(b).Select(s => new Gem(s.Start, LengthOf(s), ChartNote.OpenLane)).ToList();
-                for (int lane = 0; lane < 6; lane++)
-                    gems.AddRange(spans.Of(b + 1 + lane).Select(s => new Gem(s.Start, LengthOf(s), lane)));
-                return new NoteTrack(NoteBuilder.Frets(gems, hopoThreshold, t => MarksAt(t, b + 7), starPower), starPower);
-            }
-
-            default:
-            {
-                var gems = new List<Gem>();
-                for (int lane = 0; lane < 5; lane++)
-                {
-                    // Phase Shift marks an open note as a green note inside an open sysex.
-                    gems.AddRange(spans.Of(b + lane).Select(s => new Gem(
-                        s.Start, LengthOf(s), lane == 0 && Span.Covers(sysexOpen, s.Start) ? ChartNote.OpenLane : lane)));
-                }
-
-                if (spans.HasEnhancedOpens)
-                    gems.AddRange(spans.Of(b - 1).Select(s => new Gem(s.Start, LengthOf(s), ChartNote.OpenLane)));
-                return new NoteTrack(NoteBuilder.Frets(gems, hopoThreshold, t => MarksAt(t, b + 5), starPower), starPower);
-            }
+            int offset = note.Pitch - b;
+            int? lane = kind == ChartInstrumentKind.SixFret
+                ? offset switch { 0 => ChartNote.OpenLane, >= 1 and <= 6 => offset - 1, _ => null }
+                : offset switch { >= 0 and <= 4 => offset, -1 when note.EnhancedOpens => ChartNote.OpenLane, _ => null };
+            if (lane is { } fret && taken.Add((note.Start, fret)))
+                gems.Add(new Gem(note.Start, LengthOf(note), fret));
         }
+
+        // Phase Shift open phrases make every note in them open.
+        var opens = track.SysexFor(difficulty, MidiLayout.SysexOpen);
+        if (opens.Count > 0)
+            gems = [.. gems.Select(g => Covered(opens, g.Tick) ? g with { Lane = ChartNote.OpenLane } : g)];
+
+        int forceHopo = kind == ChartInstrumentKind.SixFret ? b + 7 : b + 5;
+        var hopo = track.Spans(forceHopo);
+        var strum = track.Spans(forceHopo + 1);
+        var taps = track.Spans(MidiLayout.TapPitch).Concat(track.SysexFor(difficulty, MidiLayout.SysexTap)).ToList();
+        var marks = new Func<long, FretMarks>(tick => new FretMarks(false, Covered(hopo, tick), Covered(strum, tick), Covered(taps, tick)));
+
+        long threshold = options.MidiHopoTicks ?? options.MidiHopoThresholds(resolution)[0];
+        return NoteBuilder.Frets(gems.OrderBy(g => g.Tick), threshold, marks, starPower, midiChordRule: true);
     }
 
-    /// <summary>A note held from <see cref="Start"/> to <see cref="End"/>.</summary>
-    private readonly record struct Span(long Start, long End)
+    private static Dictionary<ChartDifficulty, List<ChartNote>> Drums(TrackData track, DrumsLayout layout, IReadOnlyList<StarPowerPhrase> starPower)
     {
-        public long Length => End - Start;
-
-        public static bool Covers(List<Span> spans, long tick)
+        var gems = new Dictionary<ChartDifficulty, List<DrumGem>>();
+        var mixes = new Dictionary<ChartDifficulty, List<(long, bool)>>();
+        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
         {
-            foreach (var span in spans)
+            int b = MidiLayout.BaseOf(ChartInstrumentKind.Drums, difficulty);
+            var taken = new HashSet<(long, int)>();
+            var list = new List<DrumGem>();
+            foreach (var note in track.Notes)
             {
-                if (span.Start > tick)
-                    return false;
-                if (tick < span.End || tick == span.Start)
-                    return true;
+                // The pad below the kick is its Expert+ double kick.
+                int pad = note.Pitch - b;
+                if (pad is < -1 or > 5 || !taken.Add((note.Start, Math.Max(0, pad))))
+                    continue;
+
+                // Yellow, blue and the fourth pad are cymbals, each tom marker over one toggling it.
+                bool cymbal = pad is >= 2 and <= 4 && track.Spans(MidiLayout.FirstTomPitch + pad - 2).Count(s => Covers(s, note.Start)) % 2 == 0;
+                list.Add(new DrumGem(note.Start, Math.Max(0, pad), cymbal, DoubleKick: pad == -1));
             }
 
-            return false;
+            gems[difficulty] = list;
+            mixes[difficulty] =
+            [
+                .. track.Texts
+                    .Select(t => ChartTextEvents.TryParseMix(t.Text, out var d, out bool flip) && d == difficulty ? (t.Tick, (bool?)flip) : (t.Tick, null))
+                    .Where(m => m.Item2 is not null)
+                    .Select(m => (m.Tick, m.Item2!.Value)),
+            ];
         }
+
+        var starPowerOf = Enum.GetValues<ChartDifficulty>().ToDictionary(d => d, _ => starPower);
+        return DrumNotes.Build(gems, mixes, starPowerOf, layout);
     }
 
-    /// <summary>A track's notes as spans by pitch, and its Phase Shift sysex spans, all in order.</summary>
-    private sealed class TrackSpans
+    private static bool Covered(IEnumerable<Held> spans, long tick) => spans.Any(s => Covers(s, tick));
+
+    /// <summary>Whether a marker covers <paramref name="tick"/>: from its start to the tick before its end, or its start if it has no length.</summary>
+    private static bool Covers(Held span, long tick) => tick == span.Start || (tick > span.Start && tick < span.End);
+
+    /// <summary>A note, or a Phase Shift sysex phrase, from its start to its end.</summary>
+    /// <param name="EnhancedOpens">Whether <c>ENHANCED_OPENS</c> had been read when it was let go.</param>
+    private readonly record struct Held(int Pitch, long Start, long End, bool EnhancedOpens = false);
+
+    /// <summary>A track's notes in the order they're let go, its Phase Shift sysex phrases, and its text events.</summary>
+    private sealed class TrackData
     {
-        private static readonly List<Span> None = [];
+        public List<Held> Notes { get; } = [];
 
-        public Dictionary<int, List<Span>> Notes { get; } = [];
+        public Dictionary<(int Difficulty, int Code), List<Held>> Sysex { get; } = [];
 
-        public Dictionary<(int Difficulty, int Type), List<Span>> Sysex { get; } = [];
+        public List<(long Tick, string Text)> Texts { get; } = [];
 
-        public bool HasEnhancedOpens { get; private set; }
+        public List<Held> Spans(int pitch) => [.. Notes.Where(n => n.Pitch == pitch)];
 
-        public List<Span> Of(int pitch) => Notes.GetValueOrDefault(pitch) ?? None;
-
-        public List<Span> SysexFor(ChartDifficulty difficulty, int type) =>
+        public List<Held> SysexFor(ChartDifficulty difficulty, int code) =>
         [
-            .. (Sysex.GetValueOrDefault(((int)difficulty, type)) ?? None)
-                .Concat(Sysex.GetValueOrDefault((MidiLayout.SysexAllDifficulties, type)) ?? None)
-                .OrderBy(s => s.Start),
+            .. Sysex.GetValueOrDefault(((int)difficulty, code)) ?? [],
+            .. Sysex.GetValueOrDefault((MidiLayout.SysexAllDifficulties, code)) ?? [],
         ];
 
-        public static TrackSpans Of(byte[] bytes, List<MidiEvent> events)
-        {
-            var spans = new TrackSpans();
-            var held = new Dictionary<int, Queue<long>>();
-            var heldSysex = new Dictionary<(int, int), long>();
+        /// <summary>The phrases on <paramref name="pitch"/> in order, the first of two that start together kept.</summary>
+        public List<StarPowerPhrase> Phrases(int pitch) =>
+        [
+            .. Spans(pitch).OrderBy(s => s.Start).DistinctBy(s => s.Start).Select(s => new StarPowerPhrase(s.Start, s.End - s.Start)),
+        ];
 
-            foreach (var e in events)
+        /// <param name="enhancedOpens">Whether an <c>ENHANCED_OPENS</c> event can turn on open notes: five-fret only.</param>
+        public static TrackData Of(byte[] bytes, List<MidiEvent> events, bool enhancedOpens)
+        {
+            var track = new TrackData();
+            var held = new List<(int Pitch, int Channel, long Start)>();
+            var heldSysex = new List<(int Difficulty, int Code, long Start)>();
+            bool opensOn = false;
+
+            // YARG skips a track's first event, which is meant to be its name.
+            foreach (var e in events.Skip(1))
             {
                 if (e.Kind is 0x80 or 0x90)
                 {
                     int pitch = bytes[e.DataStart];
-                    bool on = e.Kind == 0x90 && bytes[e.DataStart + 1] > 0;
-                    if (!held.TryGetValue(pitch, out var starts))
-                        held[pitch] = starts = new Queue<long>();
-
-                    if (on)
+                    int channel = e.Status & 0x0F;
+                    int at = held.FindIndex(h => h.Pitch == pitch && h.Channel == channel);
+                    if (e.Kind == 0x90 && bytes[e.DataStart + 1] > 0)
                     {
-                        starts.Enqueue(e.Tick);
+                        if (at < 0)
+                            held.Add((pitch, channel, e.Tick));
                     }
-                    else if (starts.TryDequeue(out long start))
+                    else if (at >= 0)
                     {
-                        if (!spans.Notes.TryGetValue(pitch, out var list))
-                            spans.Notes[pitch] = list = [];
-                        list.Add(new Span(start, e.Tick));
+                        track.Notes.Add(new Held(pitch, held[at].Start, e.Tick, opensOn));
+                        held.RemoveAt(at);
                     }
                 }
                 else if (e.IsSysex)
                 {
                     var data = MidiFile.SysexOf(bytes, e);
-                    if (data.Length < 7 || data[0] != 0x50 || data[1] != 0x53 || data[2] != 0 || data[3] != 0)
+                    if (data.Length != 8 || data[0] != 0x50 || data[1] != 0x53 || data[2] != 0 || data[3] != 0 || data[6] > 1)
                         continue;
 
                     var key = ((int)data[4], (int)data[5]);
-                    if (data[6] != 0)
+                    int at = heldSysex.FindIndex(h => (h.Difficulty, h.Code) == key);
+                    if (data[6] == 1)
                     {
-                        heldSysex.TryAdd(key, e.Tick);
+                        if (at < 0)
+                            heldSysex.Add((key.Item1, key.Item2, e.Tick));
                     }
-                    else if (heldSysex.Remove(key, out long start))
+                    else if (at >= 0)
                     {
-                        if (!spans.Sysex.TryGetValue(key, out var list))
-                            spans.Sysex[key] = list = [];
-                        list.Add(new Span(start, e.Tick));
+                        if (!track.Sysex.TryGetValue(key, out var list))
+                            track.Sysex[key] = list = [];
+                        list.Add(new Held(0, heldSysex[at].Start, e.Tick));
+                        heldSysex.RemoveAt(at);
                     }
                 }
-                else if (MidiFile.TextOf(bytes, e, 0x01) is { } text && text.Contains("ENHANCED_OPENS", StringComparison.OrdinalIgnoreCase))
+                else if (TextOf(bytes, e) is { } text)
                 {
-                    spans.HasEnhancedOpens = true;
+                    string normalized = ChartTextEvents.Normalize(text);
+                    if (normalized == "ENHANCED_OPENS" && enhancedOpens)
+                        opensOn = true;
+                    else
+                        track.Texts.Add((e.Tick, normalized));
                 }
             }
 
-            // A note never let go is a note without a sustain.
-            foreach (var (pitch, starts) in held)
-            {
-                if (starts.Count == 0)
-                    continue;
-                if (!spans.Notes.TryGetValue(pitch, out var list))
-                    spans.Notes[pitch] = list = [];
-                list.AddRange(starts.Select(s => new Span(s, s)));
-            }
+            return track;
+        }
 
-            foreach (var list in spans.Notes.Values)
-                list.Sort((x, y) => x.Start.CompareTo(y.Start));
-            foreach (var list in spans.Sysex.Values)
-                list.Sort((x, y) => x.Start.CompareTo(y.Start));
-            return spans;
+        /// <summary>A text event's text: any text type but the copyright and the track name.</summary>
+        private static string? TextOf(byte[] bytes, MidiEvent e)
+        {
+            if (!e.IsMeta)
+                return null;
+            var (type, start, length) = MidiFile.MetaOf(bytes, e);
+            return type is 0x01 or (>= 0x04 and <= 0x09) ? MidiFile.DecodeText(bytes.AsSpan(start, length)) : null;
         }
     }
 }

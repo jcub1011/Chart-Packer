@@ -20,6 +20,8 @@ namespace ChartPacker.ViewModels
             ChartInstrument.Rhythm => Strings.InstrumentRhythm,
             ChartInstrument.GuitarCoop => Strings.InstrumentGuitarCoop,
             ChartInstrument.GhlGuitar => Strings.InstrumentGhlGuitar,
+            ChartInstrument.GhlRhythm => Strings.InstrumentGhlRhythm,
+            ChartInstrument.GhlCoop => Strings.InstrumentGhlCoop,
             _ => Strings.InstrumentGhlBass,
         };
 

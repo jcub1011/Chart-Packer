@@ -99,7 +99,7 @@ public static class SongBackgrounds
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(name);
 
-        var list = items as IReadOnlyList<T> ?? items.ToList();
+        var list = items as IReadOnlyList<T> ?? [.. items];
         string stem = StemOf(kind);
         foreach (string extension in ExtensionsOf(kind))
         {

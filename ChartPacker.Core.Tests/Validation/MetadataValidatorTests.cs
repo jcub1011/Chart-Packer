@@ -119,9 +119,8 @@ public sealed class MetadataValidatorTests
     {
         var findings = MetadataValidator.Validate([P("name", "Song"), P("diff_guitar", "hard"), P("pro_drums", "1"), P("frets", "X")]);
 
-        CollectionAssert.AreEqual(
-            new[] { ("diff_guitar", SngRules.Sng024), ("pro_drums", SngRules.Sng060), ("frets", SngRules.Sng025) },
-            findings.Select(f => (f.Key, f.RuleId)).ToArray());
+        Assert.AreSequenceEqual(
+            new[] { ("diff_guitar", SngRules.Sng024), ("pro_drums", SngRules.Sng060), ("frets", SngRules.Sng025) }, findings.Select(f => (f.Key, f.RuleId)).ToArray());
     }
 
     [TestMethod]

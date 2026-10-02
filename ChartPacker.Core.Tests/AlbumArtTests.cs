@@ -24,7 +24,7 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("album.jpg", Jpg), ("notes.chart", [1]));
 
-        CollectionAssert.AreEqual(Jpg, await AlbumArt.ReadAsync(Folder(folder)));
+        Assert.AreSequenceEqual(Jpg, await AlbumArt.ReadAsync(Folder(folder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -32,7 +32,7 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("album.jpg", Jpg), ("album.png", Png));
 
-        CollectionAssert.AreEqual(Png, await AlbumArt.ReadAsync(Folder(folder)));
+        Assert.AreSequenceEqual(Png, await AlbumArt.ReadAsync(Folder(folder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -40,7 +40,7 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("Album.PNG", Png));
 
-        CollectionAssert.AreEqual(Png, await AlbumArt.ReadAsync(Folder(folder)));
+        Assert.AreSequenceEqual(Png, await AlbumArt.ReadAsync(Folder(folder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -48,7 +48,7 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("art/album.png", Png));
 
-        Assert.IsNull(await AlbumArt.ReadAsync(Folder(folder)));
+        Assert.IsNull(await AlbumArt.ReadAsync(Folder(folder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -56,7 +56,7 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("background.png", Png));
 
-        Assert.IsNull(await AlbumArt.ReadAsync(Folder(folder)));
+        Assert.IsNull(await AlbumArt.ReadAsync(Folder(folder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -64,8 +64,8 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("album.png", Png));
 
-        Assert.IsNull(await AlbumArt.ReadAsync(Folder(folder), maxBytes: Png.Length - 1));
-        CollectionAssert.AreEqual(Png, await AlbumArt.ReadAsync(Folder(folder), maxBytes: Png.Length));
+        Assert.IsNull(await AlbumArt.ReadAsync(Folder(folder), maxBytes: Png.Length - 1, TestContext.CancellationToken));
+        Assert.AreSequenceEqual(Png, await AlbumArt.ReadAsync(Folder(folder), maxBytes: Png.Length, TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -74,7 +74,7 @@ public sealed class AlbumArtTests
         var builder = new SngBuilder();
         builder.AddFile("notes.chart", Masked(builder, [5, 5, 5])).AddFile("album.jpg", Masked(builder, Jpg));
 
-        CollectionAssert.AreEqual(Jpg, await AlbumArt.ReadAsync(WriteSng(builder)));
+        Assert.AreSequenceEqual(Jpg, await AlbumArt.ReadAsync(WriteSng(builder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -83,7 +83,7 @@ public sealed class AlbumArtTests
         var builder = new SngBuilder();
         builder.AddFile("album.jpeg", Masked(builder, Jpg)).AddFile("ALBUM.png", Masked(builder, Png));
 
-        CollectionAssert.AreEqual(Png, await AlbumArt.ReadAsync(WriteSng(builder)));
+        Assert.AreSequenceEqual(Png, await AlbumArt.ReadAsync(WriteSng(builder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -92,7 +92,7 @@ public sealed class AlbumArtTests
         var builder = new SngBuilder();
         builder.AddFile("notes.chart", Masked(builder, [5]));
 
-        Assert.IsNull(await AlbumArt.ReadAsync(WriteSng(builder)));
+        Assert.IsNull(await AlbumArt.ReadAsync(WriteSng(builder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -101,7 +101,7 @@ public sealed class AlbumArtTests
         var builder = new SngBuilder();
         builder.AddFile("album.png", Masked(builder, Png));
 
-        Assert.IsNull(await AlbumArt.ReadAsync(WriteSng(builder), maxBytes: Png.Length - 1));
+        Assert.IsNull(await AlbumArt.ReadAsync(WriteSng(builder), maxBytes: Png.Length - 1, TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -111,7 +111,7 @@ public sealed class AlbumArtTests
         builder.AddFile("album.png", Masked(builder, Png));
         builder.LengthOverrides[0] = (ulong)Png.Length + 100;
 
-        await Assert.ThrowsAsync<IOException>(() => AlbumArt.ReadAsync(WriteSng(builder)));
+        await Assert.ThrowsAsync<IOException>(() => AlbumArt.ReadAsync(WriteSng(builder), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -120,7 +120,7 @@ public sealed class AlbumArtTests
         string path = Path.Combine(_root.FullName, "junk.sng");
         File.WriteAllBytes(path, [1, 2, 3]);
 
-        Assert.IsNull(await AlbumArt.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "junk.sng", "junk")));
+        Assert.IsNull(await AlbumArt.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "junk.sng", "junk"), cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -166,11 +166,11 @@ public sealed class AlbumArtTests
         string folder = CreateFolder(("Album.JPG", Jpg), ("album.jpeg", Jpg), ("notes.chart", [1]));
         string source = WriteLoose("cover.PNG", Png);
 
-        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(source));
+        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(source), TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "album.png", "notes.chart" }, FileNames(folder));
-        CollectionAssert.AreEqual(Png, File.ReadAllBytes(Path.Combine(folder, "album.png")));
-        CollectionAssert.AreEqual(Png, File.ReadAllBytes(source));
+        Assert.AreSequenceEqual(["album.png", "notes.chart"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(Png, File.ReadAllBytes(Path.Combine(folder, "album.png")));
+        Assert.AreSequenceEqual(Png, File.ReadAllBytes(source));
     }
 
     [TestMethod]
@@ -178,9 +178,9 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("album.png", Png), ("album.jpg", Jpg), ("art/album.png", Png), ("notes.chart", [1]));
 
-        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(null));
+        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(null), TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.chart" }, FileNames(folder));
+        Assert.AreSequenceEqual(["notes.chart"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.IsTrue(File.Exists(Path.Combine(folder, "art", "album.png")));
     }
 
@@ -189,10 +189,10 @@ public sealed class AlbumArtTests
     {
         string folder = CreateFolder(("album.jpg", Jpg), ("album.png", Png));
 
-        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(Path.Combine(folder, "album.jpg")));
+        await AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(Path.Combine(folder, "album.jpg")), TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "album.jpg" }, FileNames(folder));
-        CollectionAssert.AreEqual(Jpg, File.ReadAllBytes(Path.Combine(folder, "album.jpg")));
+        Assert.AreSequenceEqual(["album.jpg"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(Jpg, File.ReadAllBytes(Path.Combine(folder, "album.jpg")));
     }
 
     [TestMethod]
@@ -201,9 +201,9 @@ public sealed class AlbumArtTests
         string folder = CreateFolder(("album.jpg", Jpg));
 
         await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(Path.Combine(_root.FullName, "missing.png"))));
+            AlbumArt.ApplyToFolderAsync(folder, new AlbumArtChange(Path.Combine(_root.FullName, "missing.png")), TestContext.CancellationToken));
 
-        CollectionAssert.AreEquivalent(new[] { "album.jpg" }, FileNames(folder));
+        Assert.AreSequenceEqual(["album.jpg"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     private string WriteLoose(string name, byte[] data)
@@ -245,4 +245,6 @@ public sealed class AlbumArtTests
 
     private SongEntry Folder(string path) =>
         new(SongEntryKind.SongFolder, path, Path.GetRelativePath(_root.FullName, path), Path.GetFileName(path));
+
+    public TestContext TestContext { get; set; }
 }

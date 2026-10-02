@@ -36,7 +36,7 @@ public static class DraftWriter
         if (read.HasErrors)
             return read.Findings;
 
-        var pairs = draft.ApplyTo(read.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList());
+        var pairs = draft.ApplyTo([.. read.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value))]);
         var remove = new HashSet<string>(draft.RemovedFiles, StringComparer.OrdinalIgnoreCase);
         List<SngSourceFile> add = [];
 

@@ -29,16 +29,16 @@ public sealed class DraftWriterTests
         draft.AddFile(new AddedFile("guitar.ogg", WriteSource([7, 7]), 2));
         draft.AddFile(new AddedFile("song.ogg", WriteSource([9, 9, 9]), 3));
 
-        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+        var findings = await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
         Assert.IsEmpty(after.Findings);
-        CollectionAssert.AreEqual(new[] { "notes.chart", "guitar.ogg", "song.ogg" }, after.Files.Select(f => f.Name).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
-        CollectionAssert.AreEqual(new byte[] { 7, 7 }, Extract(sng, after, "guitar.ogg"));
-        CollectionAssert.AreEqual(new byte[] { 9, 9, 9 }, Extract(sng, after, "song.ogg"));
-        CollectionAssert.AreEqual(new[] { ("name", "A") }, after.Metadata.Select(p => (p.Key, p.Value)).ToArray());
+        Assert.AreSequenceEqual(["notes.chart", "guitar.ogg", "song.ogg"], [.. after.Files.Select(f => f.Name)]);
+        Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
+        Assert.AreSequenceEqual(new byte[] { 7, 7 }, Extract(sng, after, "guitar.ogg"));
+        Assert.AreSequenceEqual(new byte[] { 9, 9, 9 }, Extract(sng, after, "song.ogg"));
+        Assert.AreSequenceEqual([("name", "A")], [.. after.Metadata.Select(p => (p.Key, p.Value))]);
     }
 
     [TestMethod]
@@ -53,13 +53,13 @@ public sealed class DraftWriterTests
         draft.RemoveFile("notes.chart");
         draft.AddFile(new AddedFile("notes.mid", WriteSource([6]), 1));
 
-        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+        var findings = await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
-        CollectionAssert.AreEquivalent(new[] { "album.png", "notes.mid" }, after.Files.Select(f => f.Name).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 8, 8 }, Extract(sng, after, "album.png"));
-        CollectionAssert.AreEqual(new[] { ("name", "A"), ("artist", "Band") }, after.Metadata.Select(p => (p.Key, p.Value)).ToArray());
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
+        Assert.AreSequenceEqual(["album.png", "notes.mid"], [.. after.Files.Select(f => f.Name)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 8, 8 }, Extract(sng, after, "album.png"));
+        Assert.AreSequenceEqual([("name", "A"), ("artist", "Band")], [.. after.Metadata.Select(p => (p.Key, p.Value))]);
     }
 
     [TestMethod]
@@ -69,10 +69,10 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.Set("name", "B");
 
-        await DraftWriter.SaveSngAsync(sng, draft);
+        await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        var after = SngReader.Read(sng);
-        CollectionAssert.AreEqual(new[] { "album.jpg", "notes.chart" }, after.Files.Select(f => f.Name).ToArray());
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
+        Assert.AreSequenceEqual(["album.jpg", "notes.chart"], [.. after.Files.Select(f => f.Name)]);
         Assert.AreEqual("B", after.Metadata.Single().Value);
     }
 
@@ -85,13 +85,13 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.SetBackground(BackgroundKind.Image, image);
 
-        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+        var findings = await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
-        CollectionAssert.AreEquivalent(new[] { "background.jpeg", "video.mp4", "notes.chart" }, after.Files.Select(f => f.Name).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 8, 8 }, Extract(sng, after, "background.jpeg"));
-        CollectionAssert.AreEqual(new byte[] { 3 }, Extract(sng, after, "video.mp4"));
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
+        Assert.AreSequenceEqual(["background.jpeg", "video.mp4", "notes.chart"], [.. after.Files.Select(f => f.Name)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 8, 8 }, Extract(sng, after, "background.jpeg"));
+        Assert.AreSequenceEqual(new byte[] { 3 }, Extract(sng, after, "video.mp4"));
     }
 
     [TestMethod]
@@ -106,12 +106,12 @@ public sealed class DraftWriterTests
         draft.RemoveBackground(BackgroundKind.Image);
         draft.AddFile(new AddedFile("guitar.ogg", WriteSource([7]), 1));
 
-        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+        var findings = await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
-        CollectionAssert.AreEquivalent(new[] { "album.png", "video.mp4", "notes.chart", "guitar.ogg" }, after.Files.Select(f => f.Name).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 6, 6 }, Extract(sng, after, "video.mp4"));
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
+        Assert.AreSequenceEqual(["album.png", "video.mp4", "notes.chart", "guitar.ogg"], [.. after.Files.Select(f => f.Name)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 6, 6 }, Extract(sng, after, "video.mp4"));
     }
 
     [TestMethod]
@@ -121,9 +121,9 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.Set("name", "B");
 
-        await DraftWriter.SaveSngAsync(sng, draft);
+        await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { "background.png", "video.mp4" }, SngReader.Read(sng).Files.Select(f => f.Name).ToArray());
+        Assert.AreSequenceEqual(["background.png", "video.mp4"], [.. SngReader.Read(sng, TestContext.CancellationToken).Files.Select(f => f.Name)]);
     }
 
     [TestMethod]
@@ -141,10 +141,10 @@ public sealed class DraftWriterTests
         draft.SetBackground(BackgroundKind.Image, image);
         draft.RemoveBackground(BackgroundKind.Video);
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "background.png", "notes.chart" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "background.png")));
+        Assert.AreSequenceEqual(["background.png", "notes.chart"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "background.png")));
         Assert.IsTrue(File.Exists(Path.Combine(sub, "video.mp4")));
     }
 
@@ -158,10 +158,10 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.SetBackground(BackgroundKind.Video, own);
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "video.webm" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 1, 2 }, File.ReadAllBytes(own));
+        Assert.AreSequenceEqual(["video.webm"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 1, 2 }, File.ReadAllBytes(own));
     }
 
     [TestMethod]
@@ -177,11 +177,10 @@ public sealed class DraftWriterTests
         draft.RemoveFile("video.mp4");
         draft.AddFile(new AddedFile("guitar.ogg", WriteSource([7]), 1));
 
-        await DraftWriter.SaveFolderAsync(folder, songIni, draft);
+        await DraftWriter.SaveFolderAsync(folder, songIni, draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(
-            new[] { "guitar.ogg", "notes.chart", "song.ini" },
-            Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(
+            ["guitar.ogg", "notes.chart", "song.ini"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         StringAssert.Contains(File.ReadAllText(songIni), "name = B");
     }
 
@@ -194,10 +193,10 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.AddFile(new AddedFile("notes.mid", WriteSource([6, 6]), 2), ["Notes.Chart"]);
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.mid", "song.ogg" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 6, 6 }, File.ReadAllBytes(Path.Combine(folder, "notes.mid")));
+        Assert.AreSequenceEqual(["notes.mid", "song.ogg"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 6, 6 }, File.ReadAllBytes(Path.Combine(folder, "notes.mid")));
     }
 
     [TestMethod]
@@ -208,9 +207,9 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.AddFile(new AddedFile("guitar.ogg", WriteSource([7]), 1));
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "guitar.ogg", "notes.chart" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(["guitar.ogg", "notes.chart"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -222,9 +221,9 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.SetChartOffset(ExpertGuitar, 500);
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.chart" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(["notes.chart"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.AreEqual(192, ChartReaderTests.Notes(ChartReader.Read(File.ReadAllBytes(chart), "notes.chart"), ChartInstrument.Guitar)[0].Tick);
         Assert.IsEmpty(Directory.GetFiles(Path.GetTempPath(), "chartpacker-*.chart").Where(f => File.GetCreationTimeUtc(f) > DateTime.UtcNow.AddMinutes(-1)));
     }
@@ -239,11 +238,11 @@ public sealed class DraftWriterTests
         draft.AddFile(new AddedFile("notes.mid", source, 1), ["notes.chart"]);
         draft.SetChartOffset(ExpertGuitar, 250);
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.mid" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(["notes.mid"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.AreEqual(240, ChartReaderTests.Notes(ChartReader.Read(File.ReadAllBytes(Path.Combine(folder, "notes.mid")), "notes.mid"), ChartInstrument.Guitar)[0].Tick);
-        CollectionAssert.AreEqual(ChartReaderTests.SampleMidi(), File.ReadAllBytes(source));
+        Assert.AreSequenceEqual(ChartReaderTests.SampleMidi(), File.ReadAllBytes(source));
     }
 
     [TestMethod]
@@ -257,7 +256,7 @@ public sealed class DraftWriterTests
         draft.Set("name", "B");
         draft.SetChartOffset(ExpertGuitar, -500);
 
-        await Assert.ThrowsExactlyAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft));
+        await Assert.ThrowsExactlyAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft, TestContext.CancellationToken));
 
         Assert.AreEqual("[song]\nname = A\n", File.ReadAllText(songIni));
         Assert.AreEqual(ChartReaderTests.Chart, File.ReadAllText(Path.Combine(folder, "notes.chart")));
@@ -274,7 +273,7 @@ public sealed class DraftWriterTests
         draft.AddFile(new AddedFile("notes.mid", source, ChartReader.MaxBytes + 1));
         draft.SetChartOffset(ExpertGuitar, 250);
 
-        await Assert.ThrowsExactlyAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft));
+        await Assert.ThrowsExactlyAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken));
 
         Assert.IsEmpty(Directory.GetFiles(folder));
     }
@@ -287,14 +286,14 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.SetChartOffset(ExpertGuitar, 250);
 
-        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+        var findings = await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
-        CollectionAssert.AreEquivalent(new[] { "notes.mid", "song.ogg" }, after.Files.Select(f => f.Name).ToArray());
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
+        Assert.AreSequenceEqual(["notes.mid", "song.ogg"], [.. after.Files.Select(f => f.Name)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         var chart = ChartReader.Read(Extract(sng, after, "notes.mid"), "notes.mid");
         Assert.AreEqual(240, ChartReaderTests.Notes(chart, ChartInstrument.Guitar)[0].Tick);
-        CollectionAssert.AreEqual(new byte[] { 4 }, Extract(sng, after, "song.ogg"));
+        Assert.AreSequenceEqual(new byte[] { 4 }, Extract(sng, after, "song.ogg"));
     }
 
     [TestMethod]
@@ -305,16 +304,15 @@ public sealed class DraftWriterTests
         File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
         string source = WriteNamedSource("notes.mid", VocalsMidi("hey"));
         var draft = new MetadataDraft();
-        draft.SetVocals(await VocalsSource.LoadAsync(source));
+        draft.SetVocals(await VocalsSource.LoadAsync(source, TestContext.CancellationToken));
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
         byte[] saved = File.ReadAllBytes(chart);
-        CollectionAssert.AreEqual(new[] { "notes.mid" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(["notes.mid"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
         Assert.AreEqual("hey", VocalReader.Read(saved, "notes.mid").Main!.Lyrics.Single().Text);
-        CollectionAssert.AreEqual(
-            ChartReaderTests.Notes(ChartReader.Read(ChartReaderTests.SampleMidi(), "notes.mid"), ChartInstrument.Guitar),
-            ChartReaderTests.Notes(ChartReader.Read(saved, "notes.mid"), ChartInstrument.Guitar));
+        Assert.AreSequenceEqual(
+            ChartReaderTests.Notes(ChartReader.Read(ChartReaderTests.SampleMidi(), "notes.mid"), ChartInstrument.Guitar), ChartReaderTests.Notes(ChartReader.Read(saved, "notes.mid"), ChartInstrument.Guitar));
     }
 
     [TestMethod]
@@ -326,9 +324,9 @@ public sealed class DraftWriterTests
         string source = WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960));
         File.WriteAllText(Path.Combine(Path.GetDirectoryName(source)!, "song.ini"), "[song]\ndelay = 500\n");
         var draft = new MetadataDraft();
-        draft.SetVocals(await VocalsSource.LoadAsync(source));
+        draft.SetVocals(await VocalsSource.LoadAsync(source, TestContext.CancellationToken));
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
         // Half a second later, at 120 BPM and 480 ticks a beat.
         Assert.AreEqual(1440, VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Tick);
@@ -343,7 +341,7 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.SetVocalsOffset(-500);
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
         Assert.AreEqual(480, VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Tick);
     }
@@ -355,10 +353,10 @@ public sealed class DraftWriterTests
         string chart = Path.Combine(folder, "notes.mid");
         File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
         var draft = new MetadataDraft();
-        draft.SetVocals(await VocalsSource.LoadAsync(WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960))));
+        draft.SetVocals(await VocalsSource.LoadAsync(WriteNamedSource("notes.mid", VocalsMidi("hey", tick: 960)), TestContext.CancellationToken));
         draft.SetVocalsOffset(250);
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
         Assert.AreEqual(1200, VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Tick);
     }
@@ -376,10 +374,10 @@ public sealed class DraftWriterTests
         draft.RemoveVocals();
         draft.SetChartOffset(ExpertGuitar, 250);
 
-        var findings = await DraftWriter.SaveSngAsync(sng, draft);
+        var findings = await DraftWriter.SaveSngAsync(sng, draft, TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
         byte[] saved = Extract(sng, after, "notes.mid");
         Assert.IsEmpty(VocalReader.Read(saved, "notes.mid").Parts);
         Assert.AreEqual(240, ChartReaderTests.Notes(ChartReader.Read(saved, "notes.mid"), ChartInstrument.Guitar)[0].Tick);
@@ -393,10 +391,10 @@ public sealed class DraftWriterTests
         File.WriteAllBytes(chart, ChartReaderTests.SampleMidi());
         string source = WriteNamedSource("notes.mid", VocalsMidi("hey"));
         var draft = new MetadataDraft();
-        draft.SetVocals(await VocalsSource.LoadAsync(source));
+        draft.SetVocals(await VocalsSource.LoadAsync(source, TestContext.CancellationToken));
         File.WriteAllBytes(source, VocalsMidi("changed"));
 
-        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft);
+        await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
         Assert.AreEqual("hey", VocalReader.Read(File.ReadAllBytes(chart), "notes.mid").Main!.Lyrics.Single().Text);
     }
@@ -412,18 +410,18 @@ public sealed class DraftWriterTests
         var draft = new MetadataDraft();
         draft.Set("name", "B");
         // Sung at the very start of a song without a delay, which is before this one's chart starts.
-        draft.SetVocals(await VocalsSource.LoadAsync(WriteNamedSource("notes.mid", VocalsMidi("hey"))));
+        draft.SetVocals(await VocalsSource.LoadAsync(WriteNamedSource("notes.mid", VocalsMidi("hey")), TestContext.CancellationToken));
 
-        await Assert.ThrowsAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft));
+        await Assert.ThrowsAsync<ChartFormatException>(() => DraftWriter.SaveFolderAsync(folder, songIni, draft, TestContext.CancellationToken));
 
         Assert.AreEqual("[song]\nname = A\ndelay = 500\n", File.ReadAllText(songIni));
-        CollectionAssert.AreEqual(ChartReaderTests.SampleMidi(), File.ReadAllBytes(chart));
+        Assert.AreSequenceEqual(ChartReaderTests.SampleMidi(), File.ReadAllBytes(chart));
     }
 
     [TestMethod]
     public async Task AMissingVocalsSourceCantBeRead()
     {
-        await Assert.ThrowsAsync<IOException>(() => VocalsSource.LoadAsync(Path.Combine(_root.FullName, "gone", "notes.mid")));
+        await Assert.ThrowsAsync<IOException>(() => VocalsSource.LoadAsync(Path.Combine(_root.FullName, "gone", "notes.mid"), TestContext.CancellationToken));
     }
 
     private static byte[] VocalsMidi(string lyric, long tick = 0) => new MidiBuilder()
@@ -453,7 +451,7 @@ public sealed class DraftWriterTests
     {
         var sources = files.Select(f => new SngSourceFile(f.Name, WriteSource(f.Data), f.Data.Length)).ToList();
         string sng = Path.Combine(_root.FullName, "song.sng");
-        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata, sources, overwrite: false);
+        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata, sources, overwrite: false, cancellationToken: TestContext.CancellationToken);
         return sng;
     }
 
@@ -464,4 +462,6 @@ public sealed class DraftWriterTests
         SngFileData.CopyUnmasked(handle, read.Files.Single(f => f.Name == name), read.Header!.Mask.Span, output);
         return output.ToArray();
     }
+
+    public TestContext TestContext { get; set; }
 }

@@ -17,7 +17,7 @@ public sealed class MetadataDraftTests
 
         var result = draft.ApplyTo([P("artist", "A"), P("Name", "Old"), P("album", "B")]);
 
-        CollectionAssert.AreEqual(new[] { P("artist", "A"), P("Name", "New"), P("album", "B") }, result);
+        Assert.AreSequenceEqual([P("artist", "A"), P("Name", "New"), P("album", "B")], result);
     }
 
     [TestMethod]
@@ -28,7 +28,7 @@ public sealed class MetadataDraftTests
 
         var result = draft.ApplyTo([P("name", "One"), P("artist", "A"), P("name", "Two")]);
 
-        CollectionAssert.AreEqual(new[] { P("name", "New"), P("artist", "A") }, result);
+        Assert.AreSequenceEqual([P("name", "New"), P("artist", "A")], result);
     }
 
     [TestMethod]
@@ -39,7 +39,7 @@ public sealed class MetadataDraftTests
 
         var result = draft.ApplyTo([P("name", "One"), P("artist", "A"), P("NAME", "Two")]);
 
-        CollectionAssert.AreEqual(new[] { P("artist", "A") }, result);
+        Assert.AreSequenceEqual([P("artist", "A")], result);
     }
 
     [TestMethod]
@@ -51,7 +51,7 @@ public sealed class MetadataDraftTests
 
         var result = draft.ApplyTo([P("name", "Title")]);
 
-        CollectionAssert.AreEqual(new[] { P("name", "Title"), P("year", "2001"), P("genre", "Rock") }, result);
+        Assert.AreSequenceEqual([P("name", "Title"), P("year", "2001"), P("genre", "Rock")], result);
     }
 
     [TestMethod]
@@ -63,7 +63,7 @@ public sealed class MetadataDraftTests
 
         var result = draft.ApplyTo(pairs);
 
-        CollectionAssert.AreEqual(new[] { P("artist", "A"), P("artist", "B"), P("name", "New"), P("icon", "x") }, result);
+        Assert.AreSequenceEqual([P("artist", "A"), P("artist", "B"), P("name", "New"), P("icon", "x")], result);
     }
 
     [TestMethod]
@@ -73,7 +73,7 @@ public sealed class MetadataDraftTests
         draft.Remove("year");
         var pairs = new[] { P("name", "Title") };
 
-        CollectionAssert.AreEqual(pairs, draft.ApplyTo(pairs));
+        Assert.AreSequenceEqual(pairs, draft.ApplyTo(pairs));
     }
 
     [TestMethod]
@@ -98,8 +98,8 @@ public sealed class MetadataDraftTests
         draft.Revert("NAME");
 
         Assert.IsFalse(draft.TryGetChange("name", out _));
-        CollectionAssert.AreEqual(new[] { "artist" }, draft.Keys.ToArray());
-        CollectionAssert.AreEqual(new[] { P("name", "Old"), P("artist", "B") }, draft.ApplyTo([P("name", "Old"), P("artist", "A")]));
+        Assert.AreSequenceEqual(["artist"], [.. draft.Keys]);
+        Assert.AreSequenceEqual([P("name", "Old"), P("artist", "B")], draft.ApplyTo([P("name", "Old"), P("artist", "A")]));
     }
 
     [TestMethod]
@@ -124,7 +124,7 @@ public sealed class MetadataDraftTests
         Assert.IsFalse(draft.HasMetadataChanges);
         Assert.AreEqual(new AlbumArtChange(@"C:\art\cover.png"), draft.AlbumArt);
         Assert.IsEmpty(draft.Keys);
-        CollectionAssert.AreEqual(new[] { P("name", "A") }, draft.ApplyTo([P("name", "A")]));
+        Assert.AreSequenceEqual([P("name", "A")], draft.ApplyTo([P("name", "A")]));
     }
 
     [TestMethod]
@@ -220,7 +220,7 @@ public sealed class MetadataDraftTests
         Assert.IsFalse(draft.IsEmpty);
         Assert.IsTrue(draft.HasChartOffsets);
         Assert.IsFalse(draft.HasFileChanges);
-        CollectionAssert.AreEqual(new[] { KeyValuePair.Create(hard, -5) }, draft.ChartOffsets.ToArray());
+        Assert.AreSequenceEqual([KeyValuePair.Create(hard, -5)], [.. draft.ChartOffsets]);
 
         draft.Clear();
 
@@ -306,17 +306,17 @@ public sealed class MetadataDraftTests
         draft.SetChartOffset(track, 0);
         clone.RevertFile("guitar.opus");
 
-        CollectionAssert.AreEqual(new[] { "name", "artist" }, clone.Keys.ToArray());
+        Assert.AreSequenceEqual(["name", "artist"], [.. clone.Keys]);
         Assert.AreEqual(new AlbumArtChange("cover.png"), clone.AlbumArt);
         Assert.AreEqual(new BackgroundChange("clip.webm"), clone.BackgroundVideo);
-        CollectionAssert.AreEqual(new[] { "video.mp4" }, clone.RemovedFiles.ToArray());
+        Assert.AreSequenceEqual(["video.mp4"], [.. clone.RemovedFiles]);
         Assert.IsEmpty(clone.AddedFiles);
-        CollectionAssert.AreEqual(new[] { KeyValuePair.Create(track, 40) }, clone.ChartOffsets.ToArray());
+        Assert.AreSequenceEqual([KeyValuePair.Create(track, 40)], [.. clone.ChartOffsets]);
         Assert.AreEqual(new VocalsChange(source), clone.Vocals);
 
         // Reverting the clone's add brought back only its own copy of the file it replaced.
-        CollectionAssert.AreEquivalent(new[] { "video.mp4", "guitar.ogg" }, draft.RemovedFiles.ToArray());
-        CollectionAssert.AreEqual(new[] { "name", "artist", "album" }, draft.Keys.ToArray());
+        Assert.AreSequenceEqual(["video.mp4", "guitar.ogg"], [.. draft.RemovedFiles], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(["name", "artist", "album"], [.. draft.Keys]);
         Assert.IsNull(draft.BackgroundVideo);
         Assert.IsFalse(draft.HasChartOffsets);
     }
@@ -358,9 +358,8 @@ public sealed class MetadataDraftTests
 
         draft.AddFile(new AddedFile("GUITAR.ogg", "b.ogg", 2));
 
-        CollectionAssert.AreEqual(
-            new[] { new AddedFile("GUITAR.ogg", "b.ogg", 2), new AddedFile("drums.ogg", "d.ogg", 3) },
-            draft.AddedFiles.ToArray());
+        Assert.AreSequenceEqual(
+            [new AddedFile("GUITAR.ogg", "b.ogg", 2), new AddedFile("drums.ogg", "d.ogg", 3)], [.. draft.AddedFiles]);
     }
 
     [TestMethod]
@@ -375,7 +374,7 @@ public sealed class MetadataDraftTests
 
         Assert.IsFalse(draft.IsFileRemoved("song.ogg"));
         Assert.IsFalse(draft.IsFileAdded("song.ogg"));
-        CollectionAssert.AreEqual(new[] { "notes.chart" }, draft.RemovedFiles.ToArray());
+        Assert.AreSequenceEqual(["notes.chart"], [.. draft.RemovedFiles]);
         Assert.IsEmpty(draft.AddedFiles);
     }
 
@@ -429,7 +428,7 @@ public sealed class MetadataDraftTests
 
         draft.RevertFile("guitar.ogg");
 
-        CollectionAssert.AreEqual(new[] { "guitar.mp3" }, draft.RemovedFiles.ToArray());
+        Assert.AreSequenceEqual(["guitar.mp3"], [.. draft.RemovedFiles]);
         Assert.IsEmpty(draft.AddedFiles);
     }
 
@@ -443,7 +442,7 @@ public sealed class MetadataDraftTests
 
         draft.RevertFile("guitar.ogg");
 
-        CollectionAssert.AreEqual(new[] { "guitar.mp3" }, draft.RemovedFiles.ToArray());
+        Assert.AreSequenceEqual(["guitar.mp3"], [.. draft.RemovedFiles]);
     }
 
     [TestMethod]
@@ -456,8 +455,8 @@ public sealed class MetadataDraftTests
         draft.RevertFile("guitar.ogg");
         draft.AddFile(new AddedFile("guitar.opus", "y.opus", 2), ["guitar.mp3"]);
 
-        CollectionAssert.AreEqual(new[] { "guitar.mp3" }, draft.RemovedFiles.ToArray());
-        CollectionAssert.AreEqual(new[] { new AddedFile("guitar.opus", "y.opus", 2) }, draft.AddedFiles.ToArray());
+        Assert.AreSequenceEqual(["guitar.mp3"], [.. draft.RemovedFiles]);
+        Assert.AreSequenceEqual([new AddedFile("guitar.opus", "y.opus", 2)], [.. draft.AddedFiles]);
 
         draft.RevertFile("guitar.opus");
 

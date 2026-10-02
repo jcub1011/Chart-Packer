@@ -80,7 +80,7 @@ internal static class NoteCheck
 
     /// <summary>
     /// The MIDI chart <paramref name="midi"/> read with <paramref name="options"/> under each natural-HOPO
-    /// threshold a game might play it with (see <see cref="MidiChartReader.HopoThresholdsOf"/>), the one it's
+    /// threshold a game might play it with (see <see cref="ChartReadOptions.MidiHopoThresholds"/>), the one it's
     /// read with first.
     /// </summary>
     public static IReadOnlyList<ChartDocument> ReadEveryWay(byte[] midi, ChartReadOptions options)
@@ -89,7 +89,7 @@ internal static class NoteCheck
         return
         [
             ChartReader.Read(midi, ChartFiles.MidiName, options),
-            .. MidiChartReader.HopoThresholdsOf(options, resolution).Skip(1).Select(t => ChartReader.Read(midi, ChartFiles.MidiName, options with { MidiHopoTicks = t })),
+            .. options.MidiHopoThresholds(resolution).Skip(1).Select(t => ChartReader.Read(midi, ChartFiles.MidiName, options with { MidiHopoTicks = t })),
         ];
     }
 

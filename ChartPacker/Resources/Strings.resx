@@ -1357,6 +1357,12 @@
   <data name="InstrumentGhlBass" xml:space="preserve">
     <value>GHL Bass</value>
   </data>
+  <data name="InstrumentGhlRhythm" xml:space="preserve">
+    <value>GHL Rhythm</value>
+  </data>
+  <data name="InstrumentGhlCoop" xml:space="preserve">
+    <value>GHL Guitar Co-op</value>
+  </data>
   <data name="InstrumentProDrums" xml:space="preserve">
     <value>Pro Drums</value>
   </data>

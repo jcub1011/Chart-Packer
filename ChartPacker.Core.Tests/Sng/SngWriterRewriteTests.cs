@@ -23,21 +23,20 @@ public sealed class SngWriterRewriteTests
         string sng = await CreateSngAsync(
             [KeyValuePair.Create("name", "Old"), KeyValuePair.Create("artist", "Band")],
             ("notes.chart", chart), ("song.ogg", audio), ("empty.txt", []));
-        var before = SngReader.Read(sng);
+        var before = SngReader.Read(sng, TestContext.CancellationToken);
 
         var findings = await SngWriter.RewriteMetadataAsync(
-            sng, [KeyValuePair.Create("name", "New Title"), KeyValuePair.Create("artist", "Band")]);
+            sng, [KeyValuePair.Create("name", "New Title"), KeyValuePair.Create("artist", "Band")], TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
         Assert.IsEmpty(after.Findings);
-        CollectionAssert.AreEqual(before.Header!.Mask.ToArray(), after.Header!.Mask.ToArray());
-        CollectionAssert.AreEqual(
-            new[] { ("name", "New Title"), ("artist", "Band") },
-            after.Metadata.Select(p => (p.Key, p.Value)).ToArray());
-        CollectionAssert.AreEqual(before.Files.Select(f => (f.Name, f.Length)).ToArray(), after.Files.Select(f => (f.Name, f.Length)).ToArray());
-        CollectionAssert.AreEqual(chart, Extract(sng, after, "notes.chart"));
-        CollectionAssert.AreEqual(audio, Extract(sng, after, "song.ogg"));
+        Assert.AreSequenceEqual(before.Header!.Mask.ToArray(), after.Header!.Mask.ToArray());
+        Assert.AreSequenceEqual(
+            [("name", "New Title"), ("artist", "Band")], [.. after.Metadata.Select(p => (p.Key, p.Value))]);
+        Assert.AreSequenceEqual([.. before.Files.Select(f => (f.Name, f.Length))], [.. after.Files.Select(f => (f.Name, f.Length))]);
+        Assert.AreSequenceEqual(chart, Extract(sng, after, "notes.chart"));
+        Assert.AreSequenceEqual(audio, Extract(sng, after, "song.ogg"));
         Assert.IsEmpty(Extract(sng, after, "empty.txt"));
         Assert.IsFalse(File.Exists(sng + SngWriter.TempSuffix));
     }
@@ -51,10 +50,10 @@ public sealed class SngWriterRewriteTests
         byte[] bytes = builder.Build();
         File.WriteAllBytes(sng, bytes);
 
-        var findings = await SngWriter.RewriteMetadataAsync(sng, [KeyValuePair.Create("name", "B")]);
+        var findings = await SngWriter.RewriteMetadataAsync(sng, [KeyValuePair.Create("name", "B")], TestContext.CancellationToken);
 
-        Assert.IsTrue(findings.Any(f => f.Severity == Severity.Error));
-        CollectionAssert.AreEqual(bytes, File.ReadAllBytes(sng));
+        Assert.Contains(f => f.Severity == Severity.Error, findings);
+        Assert.AreSequenceEqual(bytes, File.ReadAllBytes(sng));
         Assert.IsFalse(File.Exists(sng + SngWriter.TempSuffix));
     }
 
@@ -66,11 +65,11 @@ public sealed class SngWriterRewriteTests
         string sng = Path.Combine(_root.FullName, "trailing.sng");
         File.WriteAllBytes(sng, builder.Build());
 
-        await SngWriter.RewriteMetadataAsync(sng, [KeyValuePair.Create("name", "B")]);
+        await SngWriter.RewriteMetadataAsync(sng, [KeyValuePair.Create("name", "B")], TestContext.CancellationToken);
 
-        var after = SngReader.Read(sng);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
         Assert.IsEmpty(after.Findings);
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, Raw(sng, after.Files.Single()));
+        Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, Raw(sng, after.Files.Single()));
     }
 
     [TestMethod]
@@ -84,7 +83,7 @@ public sealed class SngWriterRewriteTests
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             SngWriter.RewriteMetadataAsync(sng, [KeyValuePair.Create("name", "New")], cts.Token));
 
-        CollectionAssert.AreEqual(bytes, File.ReadAllBytes(sng));
+        Assert.AreSequenceEqual(bytes, File.ReadAllBytes(sng));
         Assert.IsFalse(File.Exists(sng + SngWriter.TempSuffix));
     }
 
@@ -99,20 +98,20 @@ public sealed class SngWriterRewriteTests
         string sng = await CreateSngAsync(
             [KeyValuePair.Create("name", "A")],
             ("album.jpg", oldArt), ("song.ogg", audio), ("notes.chart", [1, 2, 3]));
-        var before = SngReader.Read(sng);
+        var before = SngReader.Read(sng, TestContext.CancellationToken);
         string source = WriteSource(newArt);
 
         var findings = await SngWriter.RewriteAsync(
-            sng, [KeyValuePair.Create("name", "A")], ["ALBUM.JPG"], [new SngSourceFile("album.png", source, newArt.Length)]);
+            sng, [KeyValuePair.Create("name", "A")], ["ALBUM.JPG"], [new SngSourceFile("album.png", source, newArt.Length)], TestContext.CancellationToken);
 
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        var after = SngReader.Read(sng);
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
         Assert.IsEmpty(after.Findings);
-        CollectionAssert.AreEqual(before.Header!.Mask.ToArray(), after.Header!.Mask.ToArray());
-        CollectionAssert.AreEqual(new[] { "song.ogg", "notes.chart", "album.png" }, after.Files.Select(f => f.Name).ToArray());
-        CollectionAssert.AreEqual(audio, Extract(sng, after, "song.ogg"));
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
-        CollectionAssert.AreEqual(newArt, Extract(sng, after, "album.png"));
+        Assert.AreSequenceEqual(before.Header!.Mask.ToArray(), after.Header!.Mask.ToArray());
+        Assert.AreSequenceEqual(["song.ogg", "notes.chart", "album.png"], [.. after.Files.Select(f => f.Name)]);
+        Assert.AreSequenceEqual(audio, Extract(sng, after, "song.ogg"));
+        Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
+        Assert.AreSequenceEqual(newArt, Extract(sng, after, "album.png"));
         Assert.IsFalse(File.Exists(sng + SngWriter.TempSuffix));
     }
 
@@ -121,12 +120,12 @@ public sealed class SngWriterRewriteTests
     {
         string sng = await CreateSngAsync([KeyValuePair.Create("name", "A")], ("album.png", [9, 9]), ("notes.chart", [1, 2, 3]));
 
-        await SngWriter.RewriteAsync(sng, [KeyValuePair.Create("name", "A")], ["album.png", "not-there.txt"], []);
+        await SngWriter.RewriteAsync(sng, [KeyValuePair.Create("name", "A")], ["album.png", "not-there.txt"], [], TestContext.CancellationToken);
 
-        var after = SngReader.Read(sng);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
         Assert.IsEmpty(after.Findings);
         Assert.AreEqual("notes.chart", after.Files.Single().Name);
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
+        Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
     }
 
     [TestMethod]
@@ -135,12 +134,12 @@ public sealed class SngWriterRewriteTests
         string sng = await CreateSngAsync([KeyValuePair.Create("name", "A")], ("notes.chart", [1, 2, 3]));
         string source = WriteSource([7, 7, 7, 7]);
 
-        await SngWriter.RewriteAsync(sng, [KeyValuePair.Create("name", "A")], [], [new SngSourceFile("album.jpg", source, 4)]);
+        await SngWriter.RewriteAsync(sng, [KeyValuePair.Create("name", "A")], [], [new SngSourceFile("album.jpg", source, 4)], TestContext.CancellationToken);
 
-        var after = SngReader.Read(sng);
+        var after = SngReader.Read(sng, TestContext.CancellationToken);
         Assert.IsEmpty(after.Findings);
-        CollectionAssert.AreEqual(new[] { "notes.chart", "album.jpg" }, after.Files.Select(f => f.Name).ToArray());
-        CollectionAssert.AreEqual(new byte[] { 7, 7, 7, 7 }, Extract(sng, after, "album.jpg"));
+        Assert.AreSequenceEqual(["notes.chart", "album.jpg"], [.. after.Files.Select(f => f.Name)]);
+        Assert.AreSequenceEqual(new byte[] { 7, 7, 7, 7 }, Extract(sng, after, "album.jpg"));
     }
 
     [TestMethod]
@@ -151,9 +150,9 @@ public sealed class SngWriterRewriteTests
         string source = WriteSource([1]);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            SngWriter.RewriteAsync(sng, [KeyValuePair.Create("name", "A")], [], [new SngSourceFile("ALBUM.png", source, 1)]));
+            SngWriter.RewriteAsync(sng, [KeyValuePair.Create("name", "A")], [], [new SngSourceFile("ALBUM.png", source, 1)], TestContext.CancellationToken));
 
-        CollectionAssert.AreEqual(bytes, File.ReadAllBytes(sng));
+        Assert.AreSequenceEqual(bytes, File.ReadAllBytes(sng));
         Assert.IsFalse(File.Exists(sng + SngWriter.TempSuffix));
     }
 
@@ -174,7 +173,7 @@ public sealed class SngWriterRewriteTests
         }).ToList();
 
         string sng = Path.Combine(_root.FullName, "song.sng");
-        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata, sources, overwrite: false);
+        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata, sources, overwrite: false, cancellationToken: TestContext.CancellationToken);
         return sng;
     }
 
@@ -193,4 +192,6 @@ public sealed class SngWriterRewriteTests
         SngFileData.CopyRaw(handle, entry, output);
         return output.ToArray();
     }
+
+    public TestContext TestContext { get; set; }
 }

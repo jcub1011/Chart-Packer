@@ -37,10 +37,9 @@ public sealed class ChartShifterTests
         StringAssert.Contains(shifted, "192 = S 2 300");
 
         var moved = ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar);
-        CollectionAssert.AreEqual(
-            ChartReaderTests.Notes(before, ChartInstrument.Guitar).Select(n => before.Tempo.Shift(n.Tick, TimeSpan.FromMilliseconds(500))).ToArray(),
-            moved.Select(n => n.Tick).ToArray());
-        CollectionAssert.AreEqual(ChartReaderTests.Notes(before, ChartInstrument.Drums), ChartReaderTests.Notes(result.Document, ChartInstrument.Drums));
+        Assert.AreSequenceEqual(
+            [.. ChartReaderTests.Notes(before, ChartInstrument.Guitar).Select(n => before.Tempo.Shift(n.Tick, TimeSpan.FromMilliseconds(500)))], [.. moved.Select(n => n.Tick)]);
+        Assert.AreSequenceEqual(ChartReaderTests.Notes(before, ChartInstrument.Drums), ChartReaderTests.Notes(result.Document, ChartInstrument.Drums));
         Assert.IsEmpty(result.ChangedMarkings);
     }
 
@@ -88,16 +87,14 @@ public sealed class ChartShifterTests
 
         var result = ChartShifter.Shift(bytes, "notes.mid", new Dictionary<ChartTrackKey, int> { [ExpertGuitar] = 250 });
 
-        CollectionAssert.AreEqual(
-            ChartReaderTests.Notes(before, ChartInstrument.Guitar).Select(n => before.Tempo.Shift(n.Tick, TimeSpan.FromMilliseconds(250))).ToArray(),
-            ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar).Select(n => n.Tick).ToArray());
-        CollectionAssert.AreEqual(
-            ChartReaderTests.Notes(before, ChartInstrument.Guitar, ChartDifficulty.Hard),
-            ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar, ChartDifficulty.Hard));
+        Assert.AreSequenceEqual(
+            [.. ChartReaderTests.Notes(before, ChartInstrument.Guitar).Select(n => before.Tempo.Shift(n.Tick, TimeSpan.FromMilliseconds(250)))], [.. ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar).Select(n => n.Tick)]);
+        Assert.AreSequenceEqual(
+            ChartReaderTests.Notes(before, ChartInstrument.Guitar, ChartDifficulty.Hard), ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar, ChartDifficulty.Hard));
 
         // The drum and vocal tracks follow the guitar, byte for byte.
         int drums = IndexOf(bytes, "PART DRUMS"u8) - 12;
-        CollectionAssert.AreEqual(bytes[drums..], result.Bytes[^(bytes.Length - drums)..]);
+        Assert.AreSequenceEqual(bytes[drums..], result.Bytes[^(bytes.Length - drums)..]);
     }
 
     [TestMethod]
@@ -108,7 +105,7 @@ public sealed class ChartShifterTests
         var result = ChartShifter.Shift(bytes, "notes.mid", new Dictionary<ChartTrackKey, int> { [ExpertGuitar] = 250 });
 
         // The first note moves out of the star power phrase every difficulty shares.
-        CollectionAssert.AreEqual(new[] { ExpertGuitar }, result.ChangedMarkings.ToArray());
+        Assert.AreSequenceEqual([ExpertGuitar], [.. result.ChangedMarkings]);
         Assert.AreEqual(NoteFlags.None, ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar)[0].Flags);
     }
 
@@ -121,10 +118,9 @@ public sealed class ChartShifterTests
         var result = ChartShifter.Shift(bytes, "notes.mid", new Dictionary<ChartTrackKey, int> { [ExpertGuitar] = 250, [HardGuitar] = 250 });
 
         Assert.IsEmpty(result.ChangedMarkings);
-        CollectionAssert.AreEqual(
-            ChartReaderTests.Notes(before, ChartInstrument.Guitar).Select(n => n.Flags).ToArray(),
-            ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar).Select(n => n.Flags).ToArray());
-        CollectionAssert.AreEqual(ChartReaderTests.Notes(before, ChartInstrument.Drums), ChartReaderTests.Notes(result.Document, ChartInstrument.Drums));
+        Assert.AreSequenceEqual(
+            [.. ChartReaderTests.Notes(before, ChartInstrument.Guitar).Select(n => n.Flags)], [.. ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar).Select(n => n.Flags)]);
+        Assert.AreSequenceEqual(ChartReaderTests.Notes(before, ChartInstrument.Drums), ChartReaderTests.Notes(result.Document, ChartInstrument.Drums));
     }
 
     [TestMethod]

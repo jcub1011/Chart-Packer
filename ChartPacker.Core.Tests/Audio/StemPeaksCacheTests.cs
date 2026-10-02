@@ -134,7 +134,7 @@ public sealed class StemPeaksCacheTests
     public void PeaksTakeRoughlyTheirSamplesSize()
     {
         // One second: 50 buckets of three floats (low, high and loudness), and 2000 samples of two bytes.
-        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(48000, 2, 48000, (_, _) => 0.5f));
+        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(48000, 2, 48000, (_, _) => 0.5f), TestContext.CancellationToken);
 
         Assert.AreEqual((50 * 3 * sizeof(float)) + (2000 * 2), peaks.SizeBytes);
     }
@@ -150,4 +150,6 @@ public sealed class StemPeaksCacheTests
 
     private static StemPeaks Peaks(int frames) =>
         WaveformPeaks.Compute("stem", new TestAudio.FakeSource(1000, 1, frames, (_, _) => 0.5f));
+
+    public TestContext TestContext { get; set; }
 }

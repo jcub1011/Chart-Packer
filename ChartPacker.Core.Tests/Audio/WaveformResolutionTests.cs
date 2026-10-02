@@ -36,8 +36,8 @@ public sealed class WaveformResolutionTests
     {
         var resolution = new WaveformResolution(bucketsPerSecond);
 
-        Assert.AreEqual(bucketsPerSecond, WaveformPeaks.Compute("x", new TestAudio.FakeSource(44100, 1, 44100, (_, _) => 0.1f), resolution).Count);
-        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(48000, 1, 48000, (_, _) => 0.1f), resolution);
+        Assert.AreEqual(bucketsPerSecond, WaveformPeaks.Compute("x", new TestAudio.FakeSource(44100, 1, 44100, (_, _) => 0.1f), resolution, TestContext.CancellationToken).Count);
+        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(48000, 1, 48000, (_, _) => 0.1f), resolution, TestContext.CancellationToken);
         Assert.AreEqual(bucketsPerSecond, peaks.Count);
         Assert.AreEqual(resolution, peaks.Resolution);
         Assert.AreEqual(1.0, WaveformPeaks.Of(peaks).Seconds, 1e-9);
@@ -49,12 +49,12 @@ public sealed class WaveformResolutionTests
         // A click 2 ms long, 10 ms in: 20 ms buckets hold it whole; 2.5 ms ones place it.
         static TestAudio.FakeSource Click() => new(48000, 1, 4800, (n, _) => n is >= 480 and < 576 ? 0.8f : 0f);
 
-        var low = WaveformPeaks.Compute("x", Click(), WaveformResolution.Low);
-        var ultra = WaveformPeaks.Compute("x", Click(), WaveformResolution.Ultra);
+        var low = WaveformPeaks.Compute("x", Click(), WaveformResolution.Low, TestContext.CancellationToken);
+        var ultra = WaveformPeaks.Compute("x", Click(), WaveformResolution.Ultra, TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { 0.8f, 0f, 0f, 0f, 0f }, low.Max.ToArray());
+        Assert.AreSequenceEqual([0.8f, 0f, 0f, 0f, 0f], [.. low.Max]);
         Assert.AreEqual(4, ultra.Max.ToList().FindIndex(v => v > 0), "The click starts in the fifth 2.5 ms bucket.");
-        Assert.AreEqual(1, ultra.Max.Count(v => v > 0));
+        Assert.ContainsSingle(v => v > 0, ultra.Max);
     }
 
     [TestMethod]
@@ -63,19 +63,19 @@ public sealed class WaveformResolutionTests
     public void ChunksAtAFinerResolutionGiveThePeaksOfOneRead(int rate, int frames, int chunkBuckets)
     {
         var resolution = WaveformResolution.Ultra;
-        var expected = WaveformPeaks.Compute("x", Wavy(rate, frames), resolution);
+        var expected = WaveformPeaks.Compute("x", Wavy(rate, frames), resolution, TestContext.CancellationToken);
 
         var reader = new StemPeaksReader("x", Wavy(rate, frames), chunkBuckets: chunkBuckets, resolution: resolution);
         for (int i = reader.ChunkCount - 1; i >= 0; i--)
-            reader.ReadChunk(i, Wavy(rate, frames));
+            reader.ReadChunk(i, Wavy(rate, frames), TestContext.CancellationToken);
         var actual = reader.Finish();
 
         Assert.AreEqual(resolution, actual.Resolution);
-        CollectionAssert.AreEqual(expected.Max.ToArray(), actual.Max.ToArray());
-        CollectionAssert.AreEqual(expected.Rms.ToArray(), actual.Rms.ToArray());
+        Assert.AreSequenceEqual([.. expected.Max], [.. actual.Max]);
+        Assert.AreSequenceEqual([.. expected.Rms], [.. actual.Rms]);
         var expectedMix = WaveformPeaks.Mix([new AudibleStem(expected, false, false, 0.5f), new AudibleStem(expected, false, false, 0.5f)]);
         var actualMix = WaveformPeaks.Mix([new AudibleStem(actual, false, false, 0.5f), new AudibleStem(actual, false, false, 0.5f)]);
-        CollectionAssert.AreEqual(expectedMix.Max.ToArray(), actualMix.Max.ToArray());
+        Assert.AreSequenceEqual([.. expectedMix.Max], [.. actualMix.Max]);
     }
 
     [TestMethod]
@@ -105,7 +105,7 @@ public sealed class WaveformResolutionTests
     [TestMethod]
     public void LevelsAreThoseOfTheBucketsAcrossTheStretch()
     {
-        var waveform = WaveformPeaks.Of(WaveformPeaks.Compute("x", Wavy(48000, 48000), WaveformResolution.High));
+        var waveform = WaveformPeaks.Of(WaveformPeaks.Compute("x", Wavy(48000, 48000), WaveformResolution.High, TestContext.CancellationToken));
 
         foreach (var (first, last) in new[] { (0, 1), (3, 17), (190, 200), (0, 200), (150, 400), (-5, 3) })
         {
@@ -126,10 +126,10 @@ public sealed class WaveformResolutionTests
     public void LevelsAreOnlyOfWhatHasBeenRead()
     {
         var snapshots = new List<StemPeaks>();
-        WaveformPeaks.Compute("x", new TestAudio.FakeSource(1000, 1, 10000, (_, _) => 0.5f), snapshots.Add, TimeSpan.Zero, resolution: WaveformResolution.Medium);
+        WaveformPeaks.Compute("x", new TestAudio.FakeSource(1000, 1, 10000, (_, _) => 0.5f), snapshots.Add, TimeSpan.Zero, resolution: WaveformResolution.Medium, cancellationToken: TestContext.CancellationToken);
         var partial = WaveformPeaks.Of(snapshots[0]);
 
-        Assert.IsTrue(partial.ReadCount < partial.Count);
+        Assert.IsLessThan(partial.Count, partial.ReadCount);
         Assert.AreEqual((0.0, 0.0, 0.0), partial.LevelsOf(partial.ReadCount, partial.Count));
         Assert.AreEqual(0.5, partial.LevelsOf(0, partial.Count).High);
     }
@@ -139,7 +139,7 @@ public sealed class WaveformResolutionTests
     {
         var cache = new StemPeaksCache(1024 * 1024);
         var key = new StemPeaksKey("C:\\songs\\guitar.wav", "guitar.wav", 100, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
-        var peaks = WaveformPeaks.Compute("guitar", new TestAudio.FakeSource(1000, 1, 1000, (_, _) => 0.5f), WaveformResolution.High);
+        var peaks = WaveformPeaks.Compute("guitar", new TestAudio.FakeSource(1000, 1, 1000, (_, _) => 0.5f), WaveformResolution.High, TestContext.CancellationToken);
 
         cache.Add(key, peaks);
 
@@ -155,4 +155,6 @@ public sealed class WaveformResolutionTests
     // A second holding a level of `level` and -level throughout, each sample of it sampled twice for mixing.
     private static AudibleStem Stem(float level, WaveformResolution resolution) =>
         new(WaveformPeaks.Compute("stem", new TestAudio.FakeSource(1000, 1, 1000, (n, _) => n % 2 == 0 ? level : -level), resolution), false, false);
+
+    public TestContext TestContext { get; set; }
 }

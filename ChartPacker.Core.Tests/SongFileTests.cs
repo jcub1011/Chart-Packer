@@ -23,11 +23,11 @@ public sealed class SongFileTests
     {
         var entry = Folder(CreateFolder(("Video.MP4", Data), ("notes.chart", [1])));
 
-        CollectionAssert.AreEqual(Data, await SongFile.ReadAsync(entry, "video.mp4", long.MaxValue));
-        Assert.AreEqual(Hash(Data), await SongFile.HashAsync(entry, "video.mp4"));
-        Assert.IsNull(await SongFile.ReadAsync(entry, "video.mp4", Data.Length - 1));
-        Assert.IsNull(await SongFile.ReadAsync(entry, "background.png", long.MaxValue));
-        Assert.IsNull(await SongFile.HashAsync(entry, "background.png"));
+        Assert.AreSequenceEqual(Data, await SongFile.ReadAsync(entry, "video.mp4", long.MaxValue, TestContext.CancellationToken));
+        Assert.AreEqual(Hash(Data), await SongFile.HashAsync(entry, "video.mp4", TestContext.CancellationToken));
+        Assert.IsNull(await SongFile.ReadAsync(entry, "video.mp4", Data.Length - 1, TestContext.CancellationToken));
+        Assert.IsNull(await SongFile.ReadAsync(entry, "background.png", long.MaxValue, TestContext.CancellationToken));
+        Assert.IsNull(await SongFile.HashAsync(entry, "background.png", TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -37,10 +37,10 @@ public sealed class SongFileTests
         builder.AddFile("notes.chart", Masked(builder, [5])).AddFile("video.webm", Masked(builder, Data));
         var entry = WriteSng(builder);
 
-        CollectionAssert.AreEqual(Data, await SongFile.ReadAsync(entry, "VIDEO.webm", long.MaxValue));
-        Assert.AreEqual(Hash(Data), await SongFile.HashAsync(entry, "video.webm"));
-        Assert.IsNull(await SongFile.ReadAsync(entry, "video.webm", Data.Length - 1));
-        Assert.IsNull(await SongFile.HashAsync(entry, "video.mp4"));
+        Assert.AreSequenceEqual(Data, await SongFile.ReadAsync(entry, "VIDEO.webm", long.MaxValue, TestContext.CancellationToken));
+        Assert.AreEqual(Hash(Data), await SongFile.HashAsync(entry, "video.webm", TestContext.CancellationToken));
+        Assert.IsNull(await SongFile.ReadAsync(entry, "video.webm", Data.Length - 1, TestContext.CancellationToken));
+        Assert.IsNull(await SongFile.HashAsync(entry, "video.mp4", TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -48,11 +48,11 @@ public sealed class SongFileTests
     {
         var entry = Folder(CreateFolder(("Extras/Readme.TXT", Data), ("notes.chart", [1])));
 
-        CollectionAssert.AreEqual(Data, await SongFile.ReadAsync(entry, "extras/readme.txt", long.MaxValue));
-        await using (var stream = SongFile.OpenRead(entry, "EXTRAS/readme.txt"))
+        Assert.AreSequenceEqual(Data, await SongFile.ReadAsync(entry, "extras/readme.txt", long.MaxValue, TestContext.CancellationToken));
+        await using (var stream = SongFile.OpenRead(entry, "EXTRAS/readme.txt", TestContext.CancellationToken))
             Assert.AreEqual(Data.Length, stream!.Length);
-        Assert.IsNull(SongFile.OpenRead(entry, "extras/missing.txt"));
-        Assert.IsNull(SongFile.OpenRead(entry, "missing/readme.txt"));
+        Assert.IsNull(SongFile.OpenRead(entry, "extras/missing.txt", TestContext.CancellationToken));
+        Assert.IsNull(SongFile.OpenRead(entry, "missing/readme.txt", TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -66,8 +66,8 @@ public sealed class SongFileTests
         File.WriteAllBytes(Path.Combine(_root.FullName, "outside.txt"), Data);
         var entry = Folder(CreateFolder(("extras/readme.txt", Data), ("notes.chart", [1])));
 
-        Assert.IsNull(SongFile.OpenRead(entry, name));
-        Assert.IsNull(await SongFile.ReadAsync(entry, name, long.MaxValue));
+        Assert.IsNull(SongFile.OpenRead(entry, name, TestContext.CancellationToken));
+        Assert.IsNull(await SongFile.ReadAsync(entry, name, long.MaxValue, TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -78,8 +78,8 @@ public sealed class SongFileTests
         builder.AddFile("extras/video.mp4", Masked(builder, [1])).AddFile("video.mp4", Masked(builder, Data));
         var sng = WriteSng(builder);
 
-        CollectionAssert.AreEqual(new[] { new StoredFile("background.png", Data.Length) }, SongFile.ListTopLevel(folder).ToArray());
-        CollectionAssert.AreEqual(new[] { new StoredFile("video.mp4", Data.Length) }, SongFile.ListTopLevel(sng).ToArray());
+        Assert.AreSequenceEqual([new StoredFile("background.png", Data.Length)], [.. SongFile.ListTopLevel(folder, TestContext.CancellationToken)]);
+        Assert.AreSequenceEqual([new StoredFile("video.mp4", Data.Length)], [.. SongFile.ListTopLevel(sng, TestContext.CancellationToken)]);
     }
 
     private static string Hash(byte[] data) => Convert.ToHexString(SHA256.HashData(data));
@@ -113,4 +113,6 @@ public sealed class SongFileTests
 
     private SongEntry Folder(string path) =>
         new(SongEntryKind.SongFolder, path, Path.GetRelativePath(_root.FullName, path), Path.GetFileName(path));
+
+    public TestContext TestContext { get; set; }
 }

@@ -22,7 +22,7 @@ public sealed class DedupAnalyzerTests
         var folder = Song(_root, "Song");
         var sng = await PackAsync(folder, Path.Combine(_root.FullName, "Song.sng"));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng], cancellationToken: TestContext.CancellationToken);
 
         AssertExact(analysis, folder, sng);
     }
@@ -38,10 +38,10 @@ public sealed class DedupAnalyzerTests
 
         string first = Path.Combine(_root.FullName, "Song.sng");
         string second = Path.Combine(_root.FullName, "Song (1).sng");
-        await SngWriter.WriteAsync(first, SngMask.Generate(), metadata, files, overwrite: false);
-        await SngWriter.WriteAsync(second, SngMask.Generate(), [.. metadata.Reverse()], [.. files.Reverse()], overwrite: false);
+        await SngWriter.WriteAsync(first, SngMask.Generate(), metadata, files, overwrite: false, cancellationToken: TestContext.CancellationToken);
+        await SngWriter.WriteAsync(second, SngMask.Generate(), [.. metadata.Reverse()], [.. files.Reverse()], overwrite: false, cancellationToken: TestContext.CancellationToken);
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([SngEntry(first), SngEntry(second), folder]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([SngEntry(first), SngEntry(second), folder], cancellationToken: TestContext.CancellationToken);
 
         AssertExact(analysis, SngEntry(first), SngEntry(second), folder);
     }
@@ -61,7 +61,7 @@ public sealed class DedupAnalyzerTests
             (".DS_Store", Utf8("junk")),
             ("__MACOSX/._guitar.ogg", Utf8("junk")));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([sng, messy]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([sng, messy], cancellationToken: TestContext.CancellationToken);
 
         AssertExact(analysis, sng, messy);
     }
@@ -73,12 +73,12 @@ public sealed class DedupAnalyzerTests
         var sng = await PackAsync(folder, Path.Combine(_root.FullName, "Song.sng"));
         File.WriteAllBytes(Path.Combine(folder.FullPath, "old.sng"), [1, 2, 3]);
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng], cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(analysis.Exact);
         var chart = analysis.SameChart.Single();
         var withExtras = chart.Entries.Single(e => e.Entry.Kind == SongEntryKind.SongFolder);
-        CollectionAssert.AreEqual(new[] { "old.sng" }, withExtras.Extras.ToArray());
+        Assert.AreSequenceEqual(["old.sng"], [.. withExtras.Extras]);
     }
 
     [TestMethod]
@@ -87,7 +87,7 @@ public sealed class DedupAnalyzerTests
         var folder = Folder(_root, "Song", IniFor("Artist", "Title"), ("notes.chart", Utf8(Chart)), ("stems/extra.ogg", Bytes(100, 2)));
         var sng = await PackAsync(folder, Path.Combine(_root.FullName, "Song.sng"));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([folder, sng], cancellationToken: TestContext.CancellationToken);
 
         AssertExact(analysis, folder, sng);
     }
@@ -99,7 +99,7 @@ public sealed class DedupAnalyzerTests
         var upper = Folder(_root, "Upper", "[song]\nName = Title\nARTIST = Artist\n", ("notes.chart", Utf8(Chart)));
         var retitled = Folder(_root, "Retitled", "[song]\nname = Title!\nartist = Artist\n", ("notes.chart", Utf8(Chart)));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([lower, upper, retitled]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([lower, upper, retitled], cancellationToken: TestContext.CancellationToken);
 
         AssertExact(analysis, lower, upper);
         Assert.HasCount(2, analysis.SameChart.Single().Variants);
@@ -111,7 +111,7 @@ public sealed class DedupAnalyzerTests
         var both = Folder(_root, "Both", IniFor("Artist", "Title", "frets = Old\ncharter = New\n"), ("notes.chart", Utf8(Chart)));
         var one = Folder(_root, "One", IniFor("Artist", "Title", "charter = New\n"), ("notes.chart", Utf8(Chart)));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([both, one]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([both, one], cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(analysis.Exact);
         Assert.HasCount(2, analysis.SameChart.Single().Variants);
@@ -124,11 +124,11 @@ public sealed class DedupAnalyzerTests
         var a = Folder(_root, "A", IniFor("Artist", "Title"), ("notes.chart", Utf8(Chart)), ("guitar.ogg", audio), ("album.png", Bytes(64, 1)));
         var b = Folder(_root, "B", IniFor("Artist", "Title"), ("notes.chart", Utf8(Chart)), ("guitar.ogg", audio), ("album.png", Bytes(64, 2)));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b], cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(analysis.Exact);
         var variants = analysis.SameChart.Single().Variants;
-        var differences = await DedupDifferences.CompareAsync(variants[0].Entries[0], variants[1].Entries[0], analysis.Hasher);
+        var differences = await DedupDifferences.CompareAsync(variants[0].Entries[0], variants[1].Entries[0], analysis.Hasher, TestContext.CancellationToken);
         Assert.AreEqual(new FileDifference("album.png", FileDifferenceKind.Differs), differences.Files.Single());
         Assert.AreEqual(2, differences.IdenticalFiles);
         Assert.IsEmpty(differences.Metadata);
@@ -141,12 +141,12 @@ public sealed class DedupAnalyzerTests
         var b = Song(_root, "B", "the band", "Song", chart: Chart.Replace("0 = N 0 0", "0 = N 1 0"));
         var other = Song(_root, "C", "The Band", "Other Song", chart: Chart.Replace("0 = N 0 0", "0 = N 2 0"));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b, other]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b, other], cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(analysis.Exact);
         Assert.IsEmpty(analysis.SameChart);
         var song = analysis.MergeCandidates.Single();
-        CollectionAssert.AreEquivalent(new[] { a.FullPath, b.FullPath }, song.Charts.SelectMany(c => c.Entries).Select(e => e.Entry.FullPath).ToArray());
+        Assert.AreSequenceEqual([a.FullPath, b.FullPath], [.. song.Charts.SelectMany(c => c.Entries).Select(e => e.Entry.FullPath)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -155,7 +155,7 @@ public sealed class DedupAnalyzerTests
         var a = Folder(_root, "A", IniFor("Artist", "Title"), ("guitar.ogg", Bytes(100, 1)));
         var b = Folder(_root, "B", IniFor("Artist", "Title"), ("guitar.ogg", Bytes(100, 1)));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b], cancellationToken: TestContext.CancellationToken);
 
         AssertExact(analysis, a, b);
         Assert.IsEmpty(analysis.SameChart);
@@ -168,7 +168,7 @@ public sealed class DedupAnalyzerTests
         string path = Path.Combine(_root.FullName, "Broken.sng");
         File.WriteAllBytes(path, Utf8("not an sng at all, but long enough to have a header"));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([SngEntry(path)]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([SngEntry(path)], cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(DedupSkipReason.SngHasErrors, analysis.Skipped.Single().Reason);
     }
@@ -179,7 +179,7 @@ public sealed class DedupAnalyzerTests
         var a = Song(_root, "A", audio: Bytes(1 << 20, 1));
         var b = Song(_root, "B", chart: Chart.Replace("0 = N 0 0", "0 = N 1 0"), audio: Bytes(1 << 20, 1));
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b], cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(analysis.Exact);
         Assert.AreEqual(2, analysis.Hasher.FilesHashed);
@@ -201,7 +201,7 @@ public sealed class DedupAnalyzerTests
             }
         });
 
-        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b], progress: progress);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([a, b], progress: progress, cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(analysis.Exact);
         var skipped = analysis.Skipped.Single();
@@ -219,7 +219,7 @@ public sealed class DedupAnalyzerTests
         {
             if (p.Phase == DedupPhase.Reading)
                 last = p;
-        }));
+        }), cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(30, last!.ItemsDone);
         Assert.AreEqual(30, last.ItemsTotal);
@@ -238,7 +238,7 @@ public sealed class DedupAnalyzerTests
         ];
         var reports = new List<DedupProgress>();
 
-        await DedupAnalyzer.AnalyzeAsync(entries, progress: new Inline<DedupProgress>(reports.Add));
+        await DedupAnalyzer.AnalyzeAsync(entries, progress: new Inline<DedupProgress>(reports.Add), cancellationToken: TestContext.CancellationToken);
 
         foreach (var phase in new[] { DedupPhase.Comparing, DedupPhase.MatchingCharts })
         {
@@ -260,7 +260,7 @@ public sealed class DedupAnalyzerTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => hasher.HashAsync(song, "guitar.ogg", cts.Token));
 
-        Assert.AreEqual(Hash(Bytes(4096, 1)), await hasher.HashAsync(song, "guitar.ogg"));
+        Assert.AreEqual(Hash(Bytes(4096, 1)), await hasher.HashAsync(song, "guitar.ogg", TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -272,11 +272,11 @@ public sealed class DedupAnalyzerTests
         DateTime written = File.GetLastWriteTimeUtc(audio);
         File.Move(audio, audio + ".away");
 
-        await Assert.ThrowsAsync<SongChangedException>(() => hasher.HashAsync(song, "guitar.ogg"));
+        await Assert.ThrowsAsync<SongChangedException>(() => hasher.HashAsync(song, "guitar.ogg", TestContext.CancellationToken));
 
         File.Move(audio + ".away", audio);
         File.SetLastWriteTimeUtc(audio, written);
-        Assert.AreEqual(Hash(Bytes(4096, 1)), await hasher.HashAsync(song, "guitar.ogg"));
+        Assert.AreEqual(Hash(Bytes(4096, 1)), await hasher.HashAsync(song, "guitar.ogg", TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -294,7 +294,7 @@ public sealed class DedupAnalyzerTests
     {
         var a = Song(_root, "A");
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DedupAnalyzer.AnalyzeAsync([a], parallelism: 0));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DedupAnalyzer.AnalyzeAsync([a], parallelism: 0, TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -314,15 +314,15 @@ public sealed class DedupAnalyzerTests
         entries.Add(Song(_root, "MergeB", "Band", "Merge", chart: Chart.Replace("0 = N 0 0", "0 = N 4 0")));
         entries.Add(Song(_root, "Alone", title: "Alone", chart: Chart.Replace("0 = N 0 0", "0 = N 5 0")));
 
-        var one = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 1));
-        var many = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 8));
+        var one = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 1, TestContext.CancellationToken));
+        var many = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 8, TestContext.CancellationToken));
 
         Assert.HasCount(3, one.Exact);
         Assert.HasCount(1, one.SameChart);
         Assert.HasCount(1, one.Merge);
-        CollectionAssert.AreEqual(one.Exact, many.Exact);
-        CollectionAssert.AreEqual(one.SameChart, many.SameChart);
-        CollectionAssert.AreEqual(one.Merge, many.Merge);
+        Assert.AreSequenceEqual(one.Exact, many.Exact);
+        Assert.AreSequenceEqual(one.SameChart, many.SameChart);
+        Assert.AreSequenceEqual(one.Merge, many.Merge);
 
         static (string[] Exact, string[] SameChart, string[] Merge) Describe(DedupAnalysis analysis) =>
         (
@@ -337,7 +337,7 @@ public sealed class DedupAnalyzerTests
     /// <summary>A fingerprinted song folder, from two exact copies so both are fingerprinted.</summary>
     private async Task<SongFingerprint> FingerprintAsync()
     {
-        var analysis = await DedupAnalyzer.AnalyzeAsync([Song(_root, "A"), Song(_root, "B")]);
+        var analysis = await DedupAnalyzer.AnalyzeAsync([Song(_root, "A"), Song(_root, "B")], cancellationToken: TestContext.CancellationToken);
         return analysis.Exact.Single().Entries[0];
     }
 
@@ -346,6 +346,8 @@ public sealed class DedupAnalyzerTests
     private static void AssertExact(DedupAnalysis analysis, params SongEntry[] expected)
     {
         var variant = analysis.Exact.Single();
-        CollectionAssert.AreEquivalent(expected.Select(e => e.FullPath).ToArray(), variant.Entries.Select(e => e.Entry.FullPath).ToArray());
+        Assert.AreSequenceEqual([.. expected.Select(e => e.FullPath)], [.. variant.Entries.Select(e => e.Entry.FullPath)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
+
+    public TestContext TestContext { get; set; }
 }
