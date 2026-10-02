@@ -45,9 +45,17 @@ internal static class ChartTextReader
         return null;
     }
 
+    /// <summary>
+    /// How long a note of <paramref name="length"/> ticks is held, as <paramref name="options"/> read it: a
+    /// <c>.chart</c> has no sustain cutoff unless song.ini sets one, and then one held for less isn't a sustain.
+    /// </summary>
+    internal static long SustainOf(long length, ChartReadOptions options) =>
+        length <= 0 || (options.SustainCutoff is { } cutoff && length < cutoff) ? 0 : length;
+
     /// <exception cref="ChartFormatException">The file isn't a <c>.chart</c>.</exception>
-    public static ChartDocument Read(byte[] bytes)
+    public static ChartDocument Read(byte[] bytes, ChartReadOptions? options = null)
     {
+        options ??= ChartReadOptions.Default;
         var sections = Sections(Decode(bytes));
         if (sections.Count == 0)
             throw new ChartFormatException("The chart has no sections.");
@@ -89,11 +97,11 @@ internal static class ChartTextReader
             .Where(p => p.Key.Instrument == ChartInstrument.Drums)
             .Any(p => p.Value.Any(e => e.Type == "N" && e.Args.Length >= 1 && e.Args[0] == 5));
 
-        long hopoThreshold = (long)(resolution * HopoBeats);
+        long hopoThreshold = options.HopoThreshold ?? (long)(resolution * HopoBeats);
         var tracks = new Dictionary<ChartTrackKey, NoteTrack>();
         foreach (var (key, events) in trackEvents)
         {
-            var track = BuildTrack(key, events, hopoThreshold, fiveLane);
+            var track = BuildTrack(key, events, hopoThreshold, fiveLane, options);
             if (track.Notes.Count > 0)
                 tracks[key] = track;
         }
@@ -101,7 +109,7 @@ internal static class ChartTextReader
         return new ChartDocument(tempo, tracks, offset, fiveLane);
     }
 
-    private static NoteTrack BuildTrack(ChartTrackKey key, List<ChartEvent> events, long hopoThreshold, bool fiveLane)
+    private static NoteTrack BuildTrack(ChartTrackKey key, List<ChartEvent> events, long hopoThreshold, bool fiveLane, ChartReadOptions options)
     {
         var starPower = events
             .Where(e => e.Type == "S" && e.Args.Length >= 1 && e.Args[0] == 2)
@@ -111,7 +119,7 @@ internal static class ChartTextReader
 
         var notes = events.Where(e => e.Type == "N" && e.Args.Length >= 1).ToList();
         var markers = notes.GroupBy(e => e.Tick).ToDictionary(g => g.Key, g => g.Select(e => e.Args[0]).ToHashSet());
-        long LengthOf(ChartEvent e) => e.Args.Length >= 2 ? Math.Max(0, e.Args[1]) : 0;
+        long LengthOf(ChartEvent e) => e.Args.Length >= 2 ? SustainOf(e.Args[1], options) : 0;
 
         switch (ChartInstruments.KindOf(key.Instrument))
         {

@@ -55,6 +55,65 @@ public sealed class MidiMergerTests
     }
 
     [TestMethod]
+    public void ChartPartWithShortSustainsSetsTheCutoffAndOtherPartsKeepReadingTheSame()
+    {
+        // The base's bass note is held just under its default cutoff of 160: a note, not a sustain.
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART BASS").Note(0, 96, 159).Note(480, 97, 480).Build());
+        // A third of a beat at 192 is 160 ticks at 480: a sustain of exactly the default cutoff.
+        var (guitar, _) = MidiChart.Load(Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
+            }
+            [ExpertSingle]
+            {
+              0 = N 0 64
+              192 = N 1 0
+            }
+            """), "notes.chart", []);
+
+        var result = MidiMerger.Merge(baseChart, [(baseChart, Bass), (guitar, Guitar)]);
+        var merged = ChartReader.Read(result.Midi, "notes.mid", new ChartReadOptions(SustainCutoff: result.SustainCutoff));
+
+        Assert.AreEqual(159L, result.SustainCutoff);
+        CollectionAssert.AreEqual(new long[] { 160, 0 }, ChartReaderTests.Notes(merged, ChartInstrument.Guitar).Select(n => n.Length).ToArray());
+        CollectionAssert.AreEqual(new long[] { 0, 480 }, ChartReaderTests.Notes(merged, ChartInstrument.Bass).Select(n => n.Length).ToArray());
+        Assert.IsEmpty(result.Warnings);
+    }
+
+    [TestMethod]
+    public void PartsWithLongSustainsNeedNoCutoff()
+    {
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 480).Build());
+
+        var result = MidiMerger.Merge(baseChart, [(baseChart, Guitar)]);
+
+        Assert.IsNull(result.SustainCutoff);
+    }
+
+    [TestMethod]
+    public void WarningsSayWhereInTheSourceChart()
+    {
+        // The source plays half a second later, so its notes are placed a beat on; at 1920 ticks a beat,
+        // its notes at 0 and 1 land on the same tick at 480 and become one.
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());
+        var other = new MidiChart(
+            new MidiBuilder(1920).Track("tempo").Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 1).Note(1, 96).Build(),
+            TimeSpan.FromMilliseconds(500),
+            ChartReadOptions.Default);
+
+        var result = MidiMerger.Merge(baseChart, [(other, Guitar)]);
+
+        var warning = result.Warnings.Single();
+        Assert.AreEqual(ChartMergeIssue.NotesLost, warning.Issue);
+        Assert.AreEqual(0, warning.Times.Single().TotalSeconds, 0.002);
+    }
+
+    [TestMethod]
     public void DelayDifferenceMovesTheNotes()
     {
         var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());

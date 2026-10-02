@@ -153,6 +153,7 @@ public static class SongMerger
                 case MergeKeyRule.Video:
                     return From(plan.VideoSource, key);
                 case MergeKeyRule.SongLength:
+                case MergeKeyRule.SustainCutoff:
                     return null;
                 default:
                     if (!conflicts.ContainsKey(key))
@@ -350,6 +351,8 @@ public static class SongMerger
             .Concat(merged.Warnings)
             .ToList();
         var pairs = BuildMetadata(plan).ToList();
+        if (merged.SustainCutoff is { } cutoff)
+            pairs.Add(KeyValuePair.Create(SongMergeAnalysis.SustainCutoffKey, cutoff.ToString(CultureInfo.InvariantCulture)));
         if (applyOffsets)
             pairs = WithTimingOffsets(pairs, plan);
 

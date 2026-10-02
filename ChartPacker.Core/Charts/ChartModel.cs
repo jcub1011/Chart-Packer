@@ -109,17 +109,37 @@ public sealed class ChartDocument(TempoMap tempo, IReadOnlyDictionary<ChartTrack
 
 /// <summary>Settings a chart doesn't carry itself.</summary>
 /// <param name="ProDrums">song.ini's <c>pro_drums</c>: the MIDI drums' yellow, blue and green are cymbals unless marked as toms.</param>
-public sealed record ChartReadOptions(bool ProDrums = false)
+/// <param name="SustainCutoff">
+/// song.ini's <c>sustain_cutoff_threshold</c>, in ticks: a note held for less is a note, not a sustain. Without it a
+/// MIDI chart's is a third of a beat, and a <c>.chart</c> has none.
+/// </param>
+/// <param name="HopoThreshold">song.ini's <c>hopo_frequency</c>, in ticks: how close a note must follow the one before to be a natural HOPO.</param>
+public sealed record ChartReadOptions(bool ProDrums = false, long? SustainCutoff = null, long? HopoThreshold = null)
 {
     public static ChartReadOptions Default { get; } = new();
 
-    /// <summary>The options a song's metadata sets: <c>pro_drums</c>, or its legacy <c>pro_drum</c>.</summary>
+    /// <summary>
+    /// The exact natural-HOPO threshold a MIDI chart is read with, in place of the one <see cref="HopoThreshold"/> or
+    /// the default gives: for checking a chart reads the same under each game's threshold.
+    /// </summary>
+    internal long? MidiHopoTicks { get; init; }
+
+    /// <summary>
+    /// The options a song's metadata sets: <c>pro_drums</c>, or its legacy <c>pro_drum</c>;
+    /// <c>sustain_cutoff_threshold</c>; and <c>hopo_frequency</c>.
+    /// </summary>
     public static ChartReadOptions From(IReadOnlyList<KeyValuePair<string, string>> pairs)
     {
         ArgumentNullException.ThrowIfNull(pairs);
         string? value = SongChartSettings.First(pairs, "pro_drums") ?? SongChartSettings.First(pairs, "pro_drum");
-        return new ChartReadOptions(value is not null && (value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase) || value.Trim() == "1"));
+        return new ChartReadOptions(
+            value is not null && (value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase) || value.Trim() == "1"),
+            Ticks(SongChartSettings.First(pairs, "sustain_cutoff_threshold")),
+            Ticks(SongChartSettings.First(pairs, "hopo_frequency")));
     }
+
+    private static long? Ticks(string? value) =>
+        long.TryParse(value?.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long ticks) ? ticks : null;
 }
 
 /// <summary>What a song's metadata says about how its chart plays.</summary>

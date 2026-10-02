@@ -52,6 +52,9 @@ public enum MergeKeyRule
 
     /// <summary>Worked out from the merged song.</summary>
     SongLength,
+
+    /// <summary>Worked out from the merged chart: the <c>sustain_cutoff_threshold</c> its sustains need.</summary>
+    SustainCutoff,
 }
 
 /// <summary>A part one source has.</summary>
@@ -132,7 +135,7 @@ public sealed class SongMergeAnalysis
 {
     private static readonly HashSet<string> BaseKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        "hopo_frequency", "hopofreq", "eighthnote_hopo", "sustain_cutoff_threshold", "multiplier_note", "end_events", "sysex_slider", "sysex_pro_slide",
+        "hopo_frequency", "hopofreq", "eighthnote_hopo", "multiplier_note", "end_events", "sysex_slider", "sysex_pro_slide",
     };
 
     private static readonly HashSet<string> AudioKeys = new(StringComparer.OrdinalIgnoreCase) { "preview_start_time", "preview_end_time", "preview", "tuning_offset_cents" };
@@ -170,6 +173,9 @@ public sealed class SongMergeAnalysis
     public IReadOnlyList<int> SourcesWith(string partId) =>
         Enumerable.Range(0, Sources.Count).Where(i => Sources[i].HasPart(partId)).ToList();
 
+    /// <summary>The song.ini key for how long a MIDI note must be held to be a sustain.</summary>
+    internal const string SustainCutoffKey = "sustain_cutoff_threshold";
+
     /// <summary>Where the merged song's value for <paramref name="key"/> comes from.</summary>
     public static MergeKeyRule RuleOf(string key)
     {
@@ -178,6 +184,7 @@ public sealed class SongMergeAnalysis
         {
             "charter" => MergeKeyRule.Charter,
             "song_length" => MergeKeyRule.SongLength,
+            SustainCutoffKey => MergeKeyRule.SustainCutoff,
             "delay" => MergeKeyRule.Delay,
             "cover" => MergeKeyRule.AlbumArt,
             "background" => MergeKeyRule.Background,

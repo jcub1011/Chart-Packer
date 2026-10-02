@@ -208,6 +208,80 @@ public sealed class ChartReaderTests
     }
 
     [TestMethod]
+    public void MidiNoteHeldForAThirdOfABeatIsASustainAsYargReadsIt()
+    {
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 160).Note(480, 97, 159).Build();
+
+        CollectionAssert.AreEqual(new long[] { 160, 0 }, Notes(ChartReader.Read(midi, "notes.mid"), ChartInstrument.Guitar).Select(n => n.Length).ToArray());
+    }
+
+    [TestMethod]
+    public void MidiSustainCutoffComesFromSongIniWhereZeroIsATick()
+    {
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 1).Note(480, 97, 100).Build();
+        long[] Lengths(string cutoff) =>
+            [.. Notes(ChartReader.Read(midi, "notes.mid", ChartReadOptions.From([new("sustain_cutoff_threshold", cutoff)])), ChartInstrument.Guitar).Select(n => n.Length)];
+
+        CollectionAssert.AreEqual(new long[] { 0, 100 }, Lengths("100"));
+        CollectionAssert.AreEqual(new long[] { 0, 0 }, Lengths("101"));
+        CollectionAssert.AreEqual(new long[] { 1, 100 }, Lengths("0"));
+        CollectionAssert.AreEqual(new long[] { 0, 0 }, Lengths("soon"));
+    }
+
+    [TestMethod]
+    public void ChartSustainsHaveACutoffOnlyWhenSongIniSetsOne()
+    {
+        byte[] chart = Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
+            }
+            [ExpertSingle]
+            {
+              0 = N 0 10
+              192 = N 1 64
+            }
+            """);
+        long[] Lengths(ChartReadOptions options) => [.. Notes(ChartReader.Read(chart, "notes.chart", options), ChartInstrument.Guitar).Select(n => n.Length)];
+
+        CollectionAssert.AreEqual(new long[] { 10, 64 }, Lengths(ChartReadOptions.Default));
+        CollectionAssert.AreEqual(new long[] { 0, 64 }, Lengths(ChartReadOptions.From([new("sustain_cutoff_threshold", "64")])));
+    }
+
+    [TestMethod]
+    public void HopoFrequencySetsTheNaturalHopoThreshold()
+    {
+        // Past the default threshold of each: 100 ticks apart in a .chart at 192, 200 in MIDI at 480.
+        byte[] chart = Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
+            }
+            [ExpertSingle]
+            {
+              0 = N 0 0
+              100 = N 1 0
+            }
+            """);
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR").Note(0, 96).Note(200, 97).Build();
+        NoteFlags Second(byte[] bytes, string name, ChartReadOptions options) => Notes(ChartReader.Read(bytes, name, options), ChartInstrument.Guitar)[1].Flags;
+
+        Assert.AreEqual(NoteFlags.None, Second(chart, "notes.chart", ChartReadOptions.Default));
+        Assert.AreEqual(NoteFlags.Hopo, Second(chart, "notes.chart", ChartReadOptions.From([new("hopo_frequency", "100")])));
+        Assert.AreEqual(NoteFlags.None, Second(midi, "notes.mid", ChartReadOptions.Default));
+        // As YARG reads it, a MIDI chart's hopo_frequency has a tick of leniency.
+        Assert.AreEqual(NoteFlags.Hopo, Second(midi, "notes.mid", ChartReadOptions.From([new("hopo_frequency", "199")])));
+    }
+
+    [TestMethod]
     public void MalformedChartsThrow()
     {
         Assert.ThrowsExactly<ChartFormatException>(() => ChartReader.Read([1, 2, 3], "notes.mid"));

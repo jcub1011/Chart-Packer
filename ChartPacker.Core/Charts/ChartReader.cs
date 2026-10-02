@@ -14,7 +14,7 @@ public static class ChartReader
     public static ChartDocument Read(byte[] bytes, string storedName, ChartReadOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(bytes);
-        return IsMidi(storedName) ? MidiChartReader.Read(bytes, options ?? ChartReadOptions.Default) : ChartTextReader.Read(bytes);
+        return IsMidi(storedName) ? MidiChartReader.Read(bytes, options ?? ChartReadOptions.Default) : ChartTextReader.Read(bytes, options);
     }
 
     /// <summary>

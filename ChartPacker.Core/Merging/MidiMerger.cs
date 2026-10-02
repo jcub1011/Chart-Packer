@@ -6,7 +6,7 @@ namespace ChartPacker.Core.Merging;
 /// <summary>A chart's MIDI file, and what places its notes against its audio.</summary>
 /// <param name="Midi">The MIDI file.</param>
 /// <param name="Delay">How much later than its ticks say the chart plays: song.ini's <c>delay</c>, or a <c>.chart</c>'s <c>Offset</c>.</param>
-/// <param name="Options">How its notes are read: <c>pro_drums</c>.</param>
+/// <param name="Options">How its notes are read: <c>pro_drums</c>, its sustain cutoff and HOPO threshold.</param>
 public sealed record MidiChart(byte[] Midi, TimeSpan Delay, ChartReadOptions Options)
 {
     /// <summary>
@@ -25,14 +25,18 @@ public sealed record MidiChart(byte[] Midi, TimeSpan Delay, ChartReadOptions Opt
             return (new MidiChart(bytes, delay, options), null);
 
         var conversion = ChartToMidi.Convert(bytes, options);
-        return (new MidiChart(conversion.Midi, delay, new ChartReadOptions(conversion.ProDrums)), conversion);
+        return (new MidiChart(conversion.Midi, delay, new ChartReadOptions(conversion.ProDrums, conversion.SustainCutoff, options.HopoThreshold)), conversion);
     }
 }
 
 /// <summary>A merged MIDI file.</summary>
 /// <param name="Midi">The MIDI file.</param>
 /// <param name="Warnings">Tracks whose notes didn't come out exactly as their source has them.</param>
-public sealed record MidiMergeResult(byte[] Midi, IReadOnlyList<ChartMergeWarning> Warnings);
+/// <param name="SustainCutoff">
+/// The <c>sustain_cutoff_threshold</c> the merged song.ini needs, when the default, a third of a beat,
+/// would make some of its sustains notes.
+/// </param>
+public sealed record MidiMergeResult(byte[] Midi, IReadOnlyList<ChartMergeWarning> Warnings, long? SustainCutoff = null);
 
 /// <summary>Combines the parts of several charts' MIDI files into one.</summary>
 /// <remarks>
@@ -42,9 +46,12 @@ public sealed record MidiMergeResult(byte[] Midi, IReadOnlyList<ChartMergeWarnin
 /// to the tick of the base chart that plays at the same moment against the audio, to the nearest
 /// tick, so a sustain keeps its length in time. A part from a chart with the same tempo map and
 /// delay is copied tick for tick.</para>
+/// <para>A song has one sustain cutoff, so the merged chart takes the one its shortest sustain
+/// needs, and any note its source reads differently from how it would read under that cutoff is
+/// held for more or less time to read the same.</para>
 /// <para>The result is read back and each modelled part compared with its source. Where moving to
-/// another tempo map or division changes which notes are natural HOPOs, force markers keep them as
-/// they were; anything else that changed is a warning.</para>
+/// another tempo map or division changes which notes are natural HOPOs, under any game's threshold,
+/// force markers keep them as they were; anything else that changed is a warning.</para>
 /// </remarks>
 public static class MidiMerger
 {
@@ -74,11 +81,16 @@ public static class MidiMerger
             {
                 if (track.Name is not { } name || !part.Has(name) || !seen.Add(name))
                     continue;
-                placed.Add(new PlacedTrack(name, Place(source.Midi, track.Events, map), source, map));
+                placed.Add(new PlacedTrack(name, Place(source.Midi, track.Events, map), source, map, GemsOf(name, source, file, track.Events)));
             }
         }
 
-        var readOptions = parts.FirstOrDefault(p => p.Part.Id == "drums").Source?.Options ?? baseChart.Options;
+        long? cutoff = SustainCutoff.For(baseFile.Division, placed.SelectMany(t => t.Gems.Sustains.Select(n => t.Messages[n.Off].Tick - t.Messages[n.On].Tick)).Cast<long?>().Min());
+        foreach (var track in placed)
+            SustainCutoff.Normalize(track.Messages, track.Gems.Notes, track.Gems.Sustains.Contains, SustainCutoff.Of(baseFile.Division, cutoff));
+
+        var drums = parts.FirstOrDefault(p => p.Part.Id == "drums").Source?.Options ?? baseChart.Options;
+        var readOptions = new ChartReadOptions(drums.ProDrums, cutoff, baseChart.Options.HopoThreshold);
         byte[] midi = Build(baseFile.Division, structural, placed);
         var docs = new Dictionary<MidiChart, ChartDocument>(ReferenceEqualityComparer.Instance);
         var warnings = new List<ChartMergeWarning>();
@@ -90,7 +102,7 @@ public static class MidiMerger
             if (!tempo.SameAs(baseFile.Tempo))
                 throw new ChartFormatException("The base chart keeps tempo changes in a part that isn't being kept, so its tempo map can't be.");
 
-            var merged = ChartReader.Read(midi, ChartFiles.MidiName, readOptions);
+            var reads = NoteCheck.ReadEveryWay(midi, readOptions);
             var done = new HashSet<ChartInstrument>();
             bool fixedAny = false;
             warnings.Clear();
@@ -104,31 +116,52 @@ public static class MidiMerger
                 if (!docs.TryGetValue(track.Source, out var sourceDoc))
                     docs[track.Source] = sourceDoc = ChartReader.Read(track.Source.Midi, ChartFiles.MidiName, track.Source.Options);
 
+                // Where a note is, as song time in its source chart: the merged chart's time, less the delay difference.
+                TimeSpan TimeOf(long tick) =>
+                    TimeSpan.FromSeconds(Math.Max(0, baseFile.Tempo.SecondsAt(tick) + (baseChart.Delay - track.Source.Delay).TotalSeconds));
+
                 foreach (var difficulty in sourceDoc.DifficultiesOf(instrument))
                 {
                     var key = new ChartTrackKey(instrument, difficulty);
                     var expected = sourceDoc.Tracks[key].Notes
                         .Select(n => n with { Tick = track.Map(n.Tick), Length = n.Length > 0 ? track.Map(n.Tick + n.Length) - track.Map(n.Tick) : 0 })
                         .ToList();
-                    var result = NoteCheck.Compare(expected, merged.Tracks.GetValueOrDefault(key)?.Notes);
+                    var result = NoteCheck.Compare(expected, reads, key);
                     if (result.HopoFixes.Count > 0 && pass == 0)
                     {
                         track.Messages.AddRange(NoteCheck.ForceMarkers(ChartInstruments.KindOf(instrument), difficulty, result.HopoFixes));
                         fixedAny = true;
                     }
 
-                    var issue = result.Issue;
-                    if (result.HopoFixes.Count > 0 && pass > 0 && !(issue >= ChartMergeIssue.MarkingsChanged))
-                        issue = ChartMergeIssue.MarkingsChanged;
-                    if (issue is { } found)
-                        warnings.Add(new ChartMergeWarning(found, track.Name.ToUpperInvariant(), difficulty));
+                    if (NoteCheck.WarningOf(result, pass, track.Name.ToUpperInvariant(), difficulty, TimeOf) is { } warning)
+                        warnings.Add(warning);
                 }
             }
 
             if (!fixedAny)
-                return new MidiMergeResult(midi, [.. warnings]);
+                return new MidiMergeResult(midi, [.. warnings], cutoff);
             midi = Build(baseFile.Division, structural, placed);
         }
+    }
+
+    /// <summary>
+    /// The gems of the track <paramref name="name"/> of <paramref name="source"/>, if it's a fret
+    /// track, as its messages placed by <see cref="Place"/> have them, and the ones its source reads as sustains.
+    /// </summary>
+    private static TrackGems GemsOf(string name, MidiChart source, ParsedFile file, List<MidiEvent> events)
+    {
+        if (!MidiLayout.TrackNames.TryGetValue(name, out var instrument))
+            return TrackGems.None;
+        var kind = ChartInstruments.KindOf(instrument);
+        if (kind == ChartInstrumentKind.Drums)
+            return TrackGems.None;
+
+        // Placed where they are, the messages are those Place gives in the same order, with their own ticks.
+        var original = Place(source.Midi, events, tick => tick);
+        bool opens = original.Any(m => m.Bytes is [0xFF, 0x01, ..] && System.Text.Encoding.Latin1.GetString(m.Bytes).Contains("ENHANCED_OPENS", StringComparison.OrdinalIgnoreCase));
+        var notes = SustainCutoff.NotesOf(original, SustainCutoff.GemPitches(kind, opens));
+        long cutoff = SustainCutoff.Of(file.Division, source.Options.SustainCutoff);
+        return new TrackGems(notes, notes.Where(n => original[n.Off].Tick - original[n.On].Tick >= cutoff).ToHashSet());
     }
 
     /// <summary>
@@ -188,5 +221,11 @@ public static class MidiMerger
 
     private sealed record ParsedFile(int Division, List<ParsedTrack> Tracks, TempoMap Tempo);
 
-    private sealed record PlacedTrack(string Name, List<MidiMessage> Messages, MidiChart Source, Func<long, long> Map);
+    private sealed record PlacedTrack(string Name, List<MidiMessage> Messages, MidiChart Source, Func<long, long> Map, TrackGems Gems);
+
+    /// <summary>A placed track's gems, and the ones that are sustains.</summary>
+    private sealed record TrackGems(IReadOnlyList<SustainCutoff.Held> Notes, IReadOnlySet<SustainCutoff.Held> Sustains)
+    {
+        public static TrackGems None { get; } = new([], new HashSet<SustainCutoff.Held>());
+    }
 }

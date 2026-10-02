@@ -87,6 +87,7 @@ public sealed class SongMergerTests
         Assert.AreEqual(MergeKeyRule.Audio, SongMergeAnalysis.RuleOf("preview_start_time"));
         Assert.AreEqual(MergeKeyRule.Video, SongMergeAnalysis.RuleOf("video_start_time"));
         Assert.AreEqual(MergeKeyRule.Base, SongMergeAnalysis.RuleOf("hopo_frequency"));
+        Assert.AreEqual(MergeKeyRule.SustainCutoff, SongMergeAnalysis.RuleOf("Sustain_Cutoff_Threshold"));
         Assert.AreEqual(MergeKeyRule.Chosen, SongMergeAnalysis.RuleOf("genre"));
     }
 
@@ -393,6 +394,27 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task SustainCutoffComesFromTheMergedChart()
+    {
+        // The .chart's guitar has a sustain of a third of a beat; the base's song.ini has a cutoff of its own.
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(sustainCutoff: 240), await DrumsAndGuitarSngAsync(guitarSustain: 64)]);
+        string folder = _root.CreateSubdirectory("preview").FullName;
+
+        var warnings = await SongMerger.StageAsync(Plan(analysis, new Dictionary<string, int> { ["guitar"] = 1, ["bass"] = 0 }), folder, new NoVideo(), new Dictionary<string, string>());
+        string ini = File.ReadAllText(Path.Combine(folder, "song.ini"));
+
+        Assert.IsEmpty(warnings);
+        // 64 ticks at 192 is 160 at the base's 480.
+        StringAssert.Contains(ini, "sustain_cutoff_threshold = 159");
+        Assert.DoesNotContain("sustain_cutoff_threshold = 240", ini);
+
+        // Without a sustain that short, the default is left to the game.
+        var plain = await SongMergeAnalysis.LoadAsync([DrumsAndBass(sustainCutoff: 240), await DrumsAndGuitarSngAsync()]);
+        await SongMerger.StageAsync(Plan(plain, new Dictionary<string, int> { ["guitar"] = 1, ["bass"] = 0 }), folder, new NoVideo(), new Dictionary<string, string>());
+        Assert.DoesNotContain("sustain_cutoff_threshold", File.ReadAllText(Path.Combine(folder, "song.ini")));
+    }
+
+    [TestMethod]
     public async Task PlanThatNamesAPartTheSourceLacksIsRejected()
     {
         var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);
@@ -417,7 +439,7 @@ public sealed class SongMergerTests
         [.. Directory.EnumerateDirectories(Path.GetTempPath(), "chartpacker-merge-*")];
 
     /// <summary>A folder song: pro-less drums and bass in MIDI at 480 ticks a beat, the full mix, and album art.</summary>
-    private SongEntry DrumsAndBass(string genre = "Rock")
+    private SongEntry DrumsAndBass(string genre = "Rock", int? sustainCutoff = null)
     {
         var folder = _root.CreateSubdirectory("A " + Guid.NewGuid().ToString("N")[..6]);
         File.WriteAllText(Path.Combine(folder.FullName, "song.ini"), $"""
@@ -430,6 +452,7 @@ public sealed class SongMergerTests
             diff_drums = 3
             diff_bass = 2
             preview_start_time = 1000
+            {(sustainCutoff is { } cutoff ? $"sustain_cutoff_threshold = {cutoff}" : "")}
             """);
         File.WriteAllBytes(Path.Combine(folder.FullName, "notes.mid"), new MidiBuilder()
             .Track("tempo").Tempo(0, 120)
@@ -443,7 +466,7 @@ public sealed class SongMergerTests
     }
 
     /// <summary>A <c>.sng</c>: pro drums and guitar in a <c>.chart</c> at 192 ticks a beat, and guitar and drum stems.</summary>
-    private async Task<SongEntry> DrumsAndGuitarSngAsync(string name = "B")
+    private async Task<SongEntry> DrumsAndGuitarSngAsync(string name = "B", int guitarSustain = 0)
     {
         var folder = _root.CreateSubdirectory("B-source " + Guid.NewGuid().ToString("N")[..6]);
         File.WriteAllText(Path.Combine(folder.FullName, "song.ini"), """
@@ -456,7 +479,7 @@ public sealed class SongMergerTests
             diff_drums = 5
             diff_guitar = 4
             """);
-        File.WriteAllText(Path.Combine(folder.FullName, "notes.chart"), """
+        File.WriteAllText(Path.Combine(folder.FullName, "notes.chart"), $$"""
             [Song]
             {
               Resolution = 192
@@ -467,7 +490,7 @@ public sealed class SongMergerTests
             }
             [ExpertSingle]
             {
-              0 = N 0 0
+              0 = N 0 {{guitarSustain}}
               192 = N 1 0
             }
             [ExpertDrums]

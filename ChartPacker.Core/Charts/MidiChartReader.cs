@@ -72,8 +72,15 @@ internal static class MidiChartReader
     // Rock Band's default: a note is a natural HOPO within 170/480 of a beat of the one before.
     private const double HopoBeats = 170.0 / 480;
 
-    // A MIDI note held no longer than a third of a beat is a note, not a sustain.
-    private const double SustainCutoffBeats = 1.0 / 3;
+    /// <summary>
+    /// The natural-HOPO thresholds a MIDI chart of <paramref name="resolution"/> can be played with, the one
+    /// it's read with first: Rock Band's default and YARG's, a third of a beat and a tick; or song.ini's
+    /// <c>hopo_frequency</c> with YARG's extra tick, and without it.
+    /// </summary>
+    internal static long[] HopoThresholdsOf(ChartReadOptions options, int resolution) =>
+        options.HopoThreshold is { } ticks
+            ? [ticks + 1, ticks]
+            : [(long)(resolution * HopoBeats), (resolution / 3) + 1];
 
     /// <exception cref="ChartFormatException">The file isn't a MIDI file, or is malformed.</exception>
     public static ChartDocument Read(byte[] bytes, ChartReadOptions options)
@@ -127,8 +134,9 @@ internal static class MidiChartReader
     {
         var kind = ChartInstruments.KindOf(instrument);
         int b = MidiLayout.BaseOf(kind, difficulty);
-        long cutoff = (long)(resolution * SustainCutoffBeats);
-        long LengthOf(Span span) => span.Length > cutoff ? span.Length : 0;
+        // As YARG reads it, a note held for less than the cutoff is a note, not a sustain.
+        long cutoff = SustainCutoff.Of(resolution, options.SustainCutoff);
+        long LengthOf(Span span) => span.Length >= cutoff ? span.Length : 0;
 
         var starPower = spans.Of(MidiLayout.StarPowerPitch).Select(s => new StarPowerPhrase(s.Start, s.Length)).ToList();
         var sysexOpen = spans.SysexFor(difficulty, MidiLayout.SysexOpen);
@@ -140,7 +148,7 @@ internal static class MidiChartReader
             ForceStrum: Span.Covers(spans.Of(hopoPitch + 1), tick),
             Tap: Span.Covers(spans.Of(MidiLayout.TapPitch), tick) || Span.Covers(sysexTap, tick));
 
-        long hopoThreshold = (long)(resolution * HopoBeats);
+        long hopoThreshold = options.MidiHopoTicks ?? HopoThresholdsOf(options, resolution)[0];
         switch (kind)
         {
             case ChartInstrumentKind.Drums:

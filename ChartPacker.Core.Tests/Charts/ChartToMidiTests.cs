@@ -148,6 +148,229 @@ public sealed class ChartToMidiTests
     }
 
     [TestMethod]
+    public void SustainsOfAThirdOfABeatStaySustainsOnEveryDifficulty()
+    {
+        // A third of a beat at 192 is the default MIDI cutoff, so the converted chart needs one just under it.
+        string Difficulty(string name) => $$"""
+            [{{name}}Single]
+            {
+              0 = N 0 64
+              192 = N 1 64
+              384 = N 2 0
+            }
+            """;
+        byte[] chart = Chart(string.Join("\n", new[] { "Easy", "Medium", "Hard", "Expert" }.Select(Difficulty)));
+
+        var conversion = ChartToMidi.Convert(chart);
+        var midi = ChartReader.Read(conversion.Midi, "notes.mid", new ChartReadOptions(conversion.ProDrums, conversion.SustainCutoff));
+
+        Assert.IsEmpty(conversion.Warnings);
+        Assert.AreEqual(63L, conversion.SustainCutoff);
+        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+            CollectionAssert.AreEqual(new long[] { 64, 64, 0 }, ChartReaderTests.Notes(midi, ChartInstrument.Guitar, difficulty).Select(n => n.Length).ToArray(), difficulty.ToString());
+    }
+
+    [TestMethod]
+    public void ShortSustainsGetTheCutoffTheyNeedAndNotesStayNotes()
+    {
+        byte[] chart = Chart("""
+            [ExpertSingle]
+            {
+              0 = N 0 10
+              192 = N 1 0
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart);
+        var notes = ChartReaderTests.Notes(ChartReader.Read(conversion.Midi, "notes.mid", new ChartReadOptions(SustainCutoff: conversion.SustainCutoff)), ChartInstrument.Guitar);
+
+        Assert.AreEqual(9L, conversion.SustainCutoff);
+        CollectionAssert.AreEqual(new long[] { 10, 0 }, notes.Select(n => n.Length).ToArray());
+        Assert.IsEmpty(conversion.Warnings);
+    }
+
+    [TestMethod]
+    public void SustainsLongerThanAThirdOfABeatNeedNoCutoff()
+    {
+        var conversion = ChartToMidi.Convert(Chart("""
+            [ExpertSingle]
+            {
+              0 = N 0 65
+            }
+            """));
+
+        Assert.IsNull(conversion.SustainCutoff);
+        Assert.IsEmpty(conversion.Warnings);
+    }
+
+    [TestMethod]
+    public void OneTickSustainIsHeldLongEnoughToStayASustain()
+    {
+        byte[] chart = Chart("""
+            [ExpertSingle]
+            {
+              0 = N 0 1
+              192 = N 1 0
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart);
+        var notes = ChartReaderTests.Notes(ChartReader.Read(conversion.Midi, "notes.mid", new ChartReadOptions(SustainCutoff: conversion.SustainCutoff)), ChartInstrument.Guitar);
+
+        // Clear of the lowest cutoff, 2, that a one-tick note is under.
+        Assert.AreEqual(2L, conversion.SustainCutoff);
+        CollectionAssert.AreEqual(new long[] { 3, 0 }, notes.Select(n => n.Length).ToArray());
+        Assert.IsEmpty(conversion.Warnings);
+    }
+
+    [TestMethod]
+    public void SongIniSustainCutoffMakesShortChartSustainsNotes()
+    {
+        byte[] chart = Chart("""
+            [ExpertSingle]
+            {
+              0 = N 0 50
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart, ChartReadOptions.From([new("sustain_cutoff_threshold", "64")]));
+        var notes = ChartReaderTests.Notes(ChartReader.Read(conversion.Midi, "notes.mid"), ChartInstrument.Guitar);
+
+        Assert.AreEqual(0, notes.Single().Length);
+        Assert.IsEmpty(conversion.Warnings);
+    }
+
+    [TestMethod]
+    public void ExpertCymbalsWinOverTheTomsOfADifficultyWithoutCymbalMarkers()
+    {
+        byte[] chart = Chart("""
+            [ExpertDrums]
+            {
+              0 = N 2 0
+              0 = N 66 0
+              192 = N 3 0
+            }
+            [HardDrums]
+            {
+              0 = N 2 0
+              192 = N 3 0
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart);
+        var midi = ChartReader.Read(conversion.Midi, "notes.mid", new ChartReadOptions(conversion.ProDrums));
+
+        Assert.IsEmpty(conversion.Warnings);
+        foreach (var difficulty in new[] { ChartDifficulty.Expert, ChartDifficulty.Hard })
+        {
+            CollectionAssert.AreEqual(
+                new[] { new ChartNote(0, 0, 1, NoteFlags.Cymbal), new ChartNote(192, 0, 2, NoteFlags.None) },
+                ChartReaderTests.Notes(midi, ChartInstrument.Drums, difficulty),
+                difficulty.ToString());
+        }
+    }
+
+    [TestMethod]
+    public void DifficultyWithCymbalMarkersThatDisagreesIsWarnedWithWhere()
+    {
+        // Hard marks its blue as a cymbal, so its yellow at 384 is meant as a tom; Expert's is a cymbal.
+        byte[] chart = Chart("""
+            [ExpertDrums]
+            {
+              0 = N 3 0
+              0 = N 67 0
+              384 = N 2 0
+              384 = N 66 0
+            }
+            [HardDrums]
+            {
+              0 = N 3 0
+              0 = N 67 0
+              384 = N 2 0
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart);
+
+        var warning = conversion.Warnings.Single();
+        Assert.AreEqual((ChartMergeIssue.MarkingsChanged, "PART DRUMS", ChartDifficulty.Hard), (warning.Issue, warning.TrackName, warning.Difficulty));
+        // Two beats at 120 BPM.
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, warning.Times.ToArray());
+    }
+
+    [TestMethod]
+    public void StarPowerThatDiffersOnAnEasierDifficultyIsWarnedWithWhere()
+    {
+        byte[] chart = Chart("""
+            [ExpertSingle]
+            {
+              0 = N 0 0
+              0 = S 2 96
+              768 = N 0 0
+            }
+            [HardSingle]
+            {
+              0 = N 0 0
+              768 = N 0 0
+              768 = S 2 96
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart);
+
+        var warning = conversion.Warnings.Single();
+        Assert.AreEqual(ChartDifficulty.Hard, warning.Difficulty);
+        Assert.AreEqual(ChartMergeIssue.MarkingsChanged, warning.Issue);
+        CollectionAssert.AreEqual(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(2) }, warning.Times.ToArray());
+    }
+
+    [TestMethod]
+    public void HopoIsForcedThoughStarPowerDiffersToo()
+    {
+        // 66 ticks at 192 is a strum in a .chart, but within Rock Band's 68 in MIDI. Hard's note there also
+        // takes Expert's star power, which Hard doesn't have.
+        byte[] chart = Chart("""
+            [ExpertSingle]
+            {
+              0 = N 0 0
+              66 = N 1 0
+              66 = S 2 10
+            }
+            [HardSingle]
+            {
+              0 = N 0 0
+              66 = N 1 0
+            }
+            """);
+
+        var conversion = ChartToMidi.Convert(chart);
+        var hard = ChartReaderTests.Notes(ChartReader.Read(conversion.Midi, "notes.mid"), ChartInstrument.Guitar, ChartDifficulty.Hard);
+
+        Assert.AreEqual(new ChartNote(66, 0, 1, NoteFlags.StarPower), hard[1]);
+        Assert.AreEqual(ChartDifficulty.Hard, conversion.Warnings.Single().Difficulty);
+    }
+
+    [TestMethod]
+    public void NoteYargWouldReadDifferentlyIsForced()
+    {
+        // At 480, 162 ticks is a .chart HOPO and within Rock Band's 170, but past YARG's third of a beat and a tick.
+        byte[] chart = Chart("""
+            [ExpertSingle]
+            {
+              0 = N 0 0
+              162 = N 1 0
+            }
+            """, resolution: 480);
+
+        var conversion = ChartToMidi.Convert(chart);
+        var yarg = ChartReader.Read(conversion.Midi, "notes.mid", ChartReadOptions.Default with { MidiHopoTicks = 161 });
+
+        Assert.AreEqual(NoteFlags.Hopo, ChartReaderTests.Notes(yarg, ChartInstrument.Guitar)[1].Flags);
+        Assert.AreEqual(NoteFlags.Hopo, ChartReaderTests.Notes(ChartReader.Read(conversion.Midi, "notes.mid"), ChartInstrument.Guitar)[1].Flags);
+        Assert.IsEmpty(conversion.Warnings);
+    }
+
+    [TestMethod]
     public void DoubleKickBelowExpertIsNoNoteEitherSide()
     {
         byte[] chart = Chart("""
@@ -228,10 +451,10 @@ public sealed class ChartToMidiTests
             events.Where(e => e.Tick > 0).Select(Kind).Where(k => k != "other").ToArray());
     }
 
-    private static byte[] Chart(string tracks) => Encoding.UTF8.GetBytes($$"""
+    private static byte[] Chart(string tracks, int resolution = 192) => Encoding.UTF8.GetBytes($$"""
         [Song]
         {
-          Resolution = 192
+          Resolution = {{resolution}}
         }
         [SyncTrack]
         {
