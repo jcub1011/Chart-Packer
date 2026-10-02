@@ -1566,6 +1566,14 @@
   <data name="MergeAlignmentReference" xml:space="preserve">
     <value>Kept audio: the others line up with it</value>
   </data>
+  <data name="MergeReferenceShort" xml:space="preserve">
+    <value>Kept audio</value>
+    <comment>Chip in a merge alignment cell for the song with the kept audio. The full explanation, in its tooltip, is MergeAlignmentReference.</comment>
+  </data>
+  <data name="MergeSourcesCaption" xml:space="preserve">
+    <value>Take from</value>
+    <comment>Caption at the left of the merge window's pinned row of song headers, above the row labels.</comment>
+  </data>
   <data name="MergeAlignmentNoChart" xml:space="preserve">
     <value>No chart to line up by</value>
   </data>
@@ -1729,6 +1737,13 @@
   <data name="MergeLeaveOut" xml:space="preserve">
     <value>Leave out</value>
   </data>
+  <data name="MergeIncludeToolTip" xml:space="preserve">
+    <value>Include this in the merge — uncheck to leave it out</value>
+  </data>
+  <data name="MergeIncludeNameFormat" xml:space="preserve">
+    <value>Include {0}</value>
+    <comment>Accessible name of a merge row's Include checkbox. {0} is the row's label, e.g. "Guitar".</comment>
+  </data>
   <data name="MergeNone" xml:space="preserve">
     <value>None</value>
   </data>
@@ -1747,11 +1762,23 @@
   <data name="MergeFormatChart" xml:space="preserve">
     <value>.chart (converted)</value>
   </data>
+  <data name="MergeFormatChartShort" xml:space="preserve">
+    <value>CHART</value>
+    <comment>Short chip in a merge source header for a .chart chart. The full text is MergeFormatChart.</comment>
+  </data>
   <data name="MergeFormatNone" xml:space="preserve">
     <value>No chart</value>
   </data>
   <data name="MergeStemsNone" xml:space="preserve">
     <value>No audio</value>
+  </data>
+  <data name="MergeStemsOne" xml:space="preserve">
+    <value>1 track</value>
+    <comment>Compact merge audio cell for a song with a single audio file. The file names stay in the tooltip.</comment>
+  </data>
+  <data name="MergeStemsFormat" xml:space="preserve">
+    <value>{0:N0} tracks</value>
+    <comment>Compact merge audio cell. {0} is the number of audio files. The file names stay in the tooltip.</comment>
   </data>
   <data name="MergeDifficultyFormat" xml:space="preserve">
     <value>diff {0}</value>

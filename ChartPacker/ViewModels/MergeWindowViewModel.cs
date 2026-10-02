@@ -21,14 +21,42 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
+    /// <summary>A charted difficulty's letter in a merge cell, colored like the inspector's.</summary>
+    public sealed record MergeDifficultyItem(ChartDifficulty Difficulty, string Letter);
+
+    /// <summary>A part's note count in a merge cell, colored by its difficulty like the inspector's.</summary>
+    public sealed record MergeNoteCountItem(ChartDifficulty? Difficulty, string Text);
+
     /// <summary>One cell of a merge choice: a source, or leaving the thing out.</summary>
-    /// <param name="counts">A part's note counts, easiest first, e.g. <c>312 · 640 · 980</c>.</param>
     /// <param name="toolTip">The tooltip, when there's more to it than <see cref="PlainText"/>.</param>
-    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true, string? counts = null, string? toolTip = null) : ObservableObject
+    /// <param name="summary">Compact text shown instead of <paramref name="text"/>, e.g. <c>3 tracks</c> for audio; the full text stays in the tooltip.</param>
+    /// <param name="difficultyItems">The cell's difficulty letters, colored like the inspector's; empty outside part rows.</param>
+    /// <param name="noteCountItems">The cell's note counts, colored by difficulty like the inspector's; empty outside part rows.</param>
+    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true, string? toolTip = null, string? summary = null,
+        IReadOnlyList<MergeDifficultyItem>? difficultyItems = null, IReadOnlyList<MergeNoteCountItem>? noteCountItems = null) : ObservableObject
     {
 
         /// <summary>The source it takes from; <see langword="null"/> to leave the thing out.</summary>
         public int? Source { get; } = source;
+
+        /// <summary>Compact text shown instead of <see cref="Text"/>, when the full text only fits the tooltip.</summary>
+        public string? Summary { get; } = summary;
+
+        public bool HasSummary => !string.IsNullOrEmpty(Summary);
+
+        public IReadOnlyList<MergeDifficultyItem> DifficultyItems { get; } = difficultyItems ?? [];
+
+        public bool HasDifficulties => DifficultyItems.Count > 0;
+
+        public IReadOnlyList<MergeNoteCountItem> NoteCountItems { get; } = noteCountItems ?? [];
+
+        public bool HasNoteCounts => NoteCountItems.Count > 0;
+
+        /// <summary>Whether the cell shows <see cref="Text"/>: only when it has neither colored letters nor a summary.</summary>
+        public bool ShowText => !HasDifficulties && !HasSummary;
+
+        /// <summary>Whether the cell shows <see cref="Summary"/>: only when it has no colored letters.</summary>
+        public bool ShowSummary => !HasDifficulties && HasSummary;
 
         /// <summary>What the cell shows; a metadata value can carry rich-text tags, which are drawn.</summary>
         public string Text { get; } = text;
@@ -39,10 +67,6 @@ namespace ChartPacker.ViewModels
         public string? Detail { get; } = detail;
 
         public bool HasDetail => !string.IsNullOrEmpty(Detail);
-
-        public string? Counts { get; } = counts;
-
-        public bool HasCounts => !string.IsNullOrEmpty(Counts);
 
         public string ToolTip => toolTip ?? PlainText;
 
@@ -65,25 +89,80 @@ namespace ChartPacker.ViewModels
         }
     }
 
+    /// <summary>A merge row's fixed icon.</summary>
+    public enum MergeRowIcon
+    {
+        None,
+        Instrument,
+        Waveform,
+        AlbumArt,
+        Background,
+        Video,
+        Midi,
+    }
+
     /// <summary>A row of the merge window: one thing to take from one of the sources.</summary>
-    public sealed partial class MergeChoiceViewModel(string label, string? key = null) : ObservableObject
+    /// <remarks>
+    /// Rows that can be left out show an Include checkbox in the gutter instead of a leave-out
+    /// column; unchecking it selects the leave-out option, checking it again restores the source.
+    /// </remarks>
+    public sealed partial class MergeChoiceViewModel(string label, string? key = null, DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None) : ObservableObject
     {
         private static int _nextGroup;
         private bool _selecting;
+        private bool _syncingInclude;
+        private int? _lastSource;
+        private List<MergeOptionViewModel>? _sourceOptions;
 
         public string Label { get; } = label;
 
         /// <summary>The part id or metadata key the row is for.</summary>
         public string? Key { get; } = key;
 
+        /// <summary>The row's instrument icon, drawn like the inspector's; <see langword="null"/> outside part rows.</summary>
+        public DifficultyGlyph? Glyph { get; } = glyph;
+
+        public bool HasGlyph => Glyph is not null;
+
+        /// <summary>The row's fixed icon: the audio waveform, an art placeholder, or MIDI.</summary>
+        public MergeRowIcon IconKind { get; } = icon;
+
+        public bool HasStaticIcon => IconKind is not MergeRowIcon.None and not MergeRowIcon.Instrument;
+
+        /// <summary>Whether the gutter shows an icon for the row.</summary>
+        public bool HasRowIcon => HasGlyph || HasStaticIcon;
+
         public string GroupName { get; } = "merge-choice-" + Interlocked.Increment(ref _nextGroup).ToString(CultureInfo.InvariantCulture);
 
         public List<MergeOptionViewModel> Options { get; } = [];
+
+        /// <summary>The per-source cells, without the leave-out option the Include checkbox stands for.</summary>
+        /// <remarks>Worked out once, when first shown: the options are all added before then, and a fresh list would regenerate the cells.</remarks>
+        public IReadOnlyList<MergeOptionViewModel> SourceOptions => _sourceOptions ??= Options.Where(o => o.Source is not null).ToList();
+
+        /// <summary>The leave-out option the Include checkbox stands for, if the row has one.</summary>
+        public MergeOptionViewModel? LeaveOutOption => Options.FirstOrDefault(o => o.Source is null);
+
+        /// <summary>Whether the row can be left out, and so shows the Include checkbox.</summary>
+        public bool CanExclude => LeaveOutOption is { IsAvailable: true, IsShown: true };
+
+        /// <summary>Whether the thing is taken from one of the sources; false leaves it out. Defaults to included.</summary>
+        [ObservableProperty]
+        public partial bool IsIncluded { get; set; } = true;
+
+        public bool IsExcluded => CanExclude && !IsIncluded;
+
+        public string IncludeToolTip => Strings.MergeIncludeToolTip;
+
+        public string IncludeName => string.Format(CultureInfo.CurrentCulture, Strings.MergeIncludeNameFormat, Label);
 
         public MergeOptionViewModel? Selected => Options.FirstOrDefault(o => o.IsSelected);
 
         /// <summary>Nothing is chosen yet, and something must be.</summary>
         public bool NeedsChoice => Selected is null;
+
+        /// <summary>Nothing is chosen yet, and the row is included, so it still has to be made.</summary>
+        public bool ShowNeedsChoice => IsIncluded && NeedsChoice;
 
         /// <summary>The user chose, so defaults no longer follow other choices.</summary>
         public bool IsTouched { get; private set; }
@@ -109,6 +188,7 @@ namespace ChartPacker.ViewModels
                 _selecting = false;
             }
 
+            SyncInclude(option);
             Raise();
         }
 
@@ -132,19 +212,87 @@ namespace ChartPacker.ViewModels
                 _selecting = false;
             }
 
+            if (option.Source is { } s)
+                _lastSource = s;
+            SyncInclude(option);
             Raise();
+        }
+
+        partial void OnIsIncludedChanged(bool value)
+        {
+            if (_syncingInclude)
+                return;
+
+            // The user's choice, so defaults no longer follow other choices, as for clicking a cell.
+            IsTouched = true;
+            _syncingInclude = true;
+            try
+            {
+                if (!value)
+                {
+                    _lastSource = Selected?.Source;
+                    Select(null, force: true);
+                }
+                else if (_lastSource is { } s)
+                {
+                    Select(s, force: true);
+                }
+                else
+                {
+                    // Included again with nothing to restore: force an explicit choice.
+                    _selecting = true;
+                    try
+                    {
+                        foreach (var other in Options)
+                            other.IsSelected = false;
+                    }
+                    finally
+                    {
+                        _selecting = false;
+                    }
+
+                    Raise();
+                }
+            }
+            finally
+            {
+                _syncingInclude = false;
+            }
+
+            OnPropertyChanged(nameof(IsExcluded));
+            OnPropertyChanged(nameof(ShowNeedsChoice));
+        }
+
+        /// <summary>Keeps the Include checkbox with the selection, without feeding back into it.</summary>
+        private void SyncInclude(MergeOptionViewModel? option)
+        {
+            if (!CanExclude || _syncingInclude)
+                return;
+
+            _syncingInclude = true;
+            try
+            {
+                IsIncluded = option?.Source is not null;
+            }
+            finally
+            {
+                _syncingInclude = false;
+            }
         }
 
         private void Raise()
         {
             OnPropertyChanged(nameof(Selected));
             OnPropertyChanged(nameof(NeedsChoice));
+            OnPropertyChanged(nameof(ShowNeedsChoice));
+            OnPropertyChanged(nameof(IsExcluded));
             Changed?.Invoke(this);
         }
     }
 
     /// <summary>A column header: one of the songs being merged.</summary>
-    /// <param name="Charter">The charter as stored, rich-text tags and all, for the header to draw.</param>
+    /// <param name="Charter">The charter as stored, rich-text tags and all, for the tooltip.</param>
+    /// <param name="Format">The full chart format, for the tooltip; the header shows <see cref="FormatShort"/>.</param>
     public sealed record MergeSourceViewModel(string Title, string? Artist, string? Charter, string Format, string? Problem)
     {
         public bool HasArtist => !string.IsNullOrEmpty(Artist);
@@ -152,6 +300,13 @@ namespace ChartPacker.ViewModels
         public bool HasCharter => !string.IsNullOrEmpty(Charter);
 
         public string? CharterPlainText => Charter is null ? null : RichText.ToPlainText(Charter);
+
+        /// <summary>Compact chart format for the header chip; the full text stays in the tooltip.</summary>
+        public string FormatShort => Format == Strings.MergeFormatChart ? Strings.MergeFormatChartShort : Format;
+
+        /// <summary>The header's tooltip: title, artist and charter, each on its own line.</summary>
+        public string HeaderToolTip => string.Join(Environment.NewLine,
+            new[] { Title, Artist, CharterPlainText }.Where(s => !string.IsNullOrEmpty(s))!);
 
         public bool HasProblem => !string.IsNullOrEmpty(Problem);
     }
@@ -244,8 +399,8 @@ namespace ChartPacker.ViewModels
         /// <summary>Asks the window to close; true when a song was merged.</summary>
         public event Action<bool>? CloseRequested;
 
-        /// <summary>One column per source, plus one for leaving a thing out.</summary>
-        public int ColumnCount => Sources.Count + 1;
+        /// <summary>One column per source; rows that can be left out use an Include checkbox instead of an extra column.</summary>
+        public int ColumnCount => Sources.Count;
 
         public AvaloniaList<MergeSourceViewModel> Sources { get; } = [];
 
@@ -353,22 +508,30 @@ namespace ChartPacker.ViewModels
                 Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, s.Headline.Artist, SongHeadline.CharterMarkup(s.Pairs), FormatOf(s.Format), problem));
             }
 
-            BaseChoice = Choice(Strings.MergeBaseLabel, null, i => sources[i].Chart is not null, i => FormatOf(sources[i].Format), null, leaveOut: null);
+            BaseChoice = Choice(Strings.MergeBaseLabel, null, i => sources[i].Chart is not null, i => FormatOf(sources[i].Format), null, leaveOut: null,
+                icon: MergeRowIcon.Midi);
 
             foreach (var part in analysis.Parts)
             {
                 var row = Choice(ChartLabels.PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), i => RatingOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut,
-                    counts: i => sources[i].Parts.First(p => p.Part.Id == part.Id).NoteCounts);
+                    counts: i => sources[i].Parts.First(p => p.Part.Id == part.Id).NoteCounts,
+                    difficulties: i => sources[i].Parts.First(p => p.Part.Id == part.Id).Difficulties,
+                    glyph: PartGlyphOf(part.Id));
                 var with = analysis.SourcesWith(part.Id);
                 if (with.Count == 1)
                     row.Select(with[0]);
                 Parts.Add(row);
             }
 
-            AudioChoice = Choice(Strings.MergeAudioLabel, null, i => true, i => StemsOf(sources[i]), null, leaveOut: null);
-            Assets.Add(Choice(Strings.MergeAlbumArtLabel, "album", i => sources[i].AlbumArt is not null, i => sources[i].AlbumArt ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone));
-            Assets.Add(Choice(Strings.MergeBackgroundLabel, "background", i => sources[i].BackgroundImage is not null, i => sources[i].BackgroundImage ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone));
-            Assets.Add(Choice(Strings.MergeVideoLabel, "video", i => sources[i].Video is not null, i => sources[i].Video ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone));
+            AudioChoice = Choice(Strings.MergeAudioLabel, null, i => true, i => StemsOf(sources[i]), null, leaveOut: null,
+                summary: i => StemsSummaryOf(sources[i]),
+                icon: MergeRowIcon.Waveform);
+            Assets.Add(Choice(Strings.MergeAlbumArtLabel, "album", i => sources[i].AlbumArt is not null, i => sources[i].AlbumArt ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+                icon: MergeRowIcon.AlbumArt));
+            Assets.Add(Choice(Strings.MergeBackgroundLabel, "background", i => sources[i].BackgroundImage is not null, i => sources[i].BackgroundImage ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+                icon: MergeRowIcon.Background));
+            Assets.Add(Choice(Strings.MergeVideoLabel, "video", i => sources[i].Video is not null, i => sources[i].Video ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+                icon: MergeRowIcon.Video));
 
             foreach (var conflict in analysis.Conflicts)
                 Metadata.Add(Choice(conflict.Key, conflict.Key, i => true, i => conflict.Values[i] ?? Strings.MergeNotSet, null, leaveOut: null));
@@ -389,10 +552,15 @@ namespace ChartPacker.ViewModels
         }
 
         /// <param name="counts">An available cell's note counts, for a part's row.</param>
+        /// <param name="summary">Compact text shown instead of <paramref name="text"/>, e.g. a stem count for audio.</param>
+        /// <param name="difficulties">An available cell's charted difficulties, for a part's colored letters.</param>
+        /// <param name="glyph">The row's instrument icon, drawn like the inspector's.</param>
+        /// <param name="icon">The row's fixed icon: the audio waveform, an art placeholder, or MIDI.</param>
         private MergeChoiceViewModel Choice(string label, string? key, Func<int, bool> available, Func<int, string> text, Func<int, string?>? detail, string? leaveOut,
-            Func<int, IReadOnlyList<NoteCount>>? counts = null)
+            Func<int, IReadOnlyList<NoteCount>>? counts = null, Func<int, string?>? summary = null, Func<int, IReadOnlyList<ChartDifficulty>>? difficulties = null,
+            DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None)
         {
-            var row = new MergeChoiceViewModel(label, key);
+            var row = new MergeChoiceViewModel(label, key, glyph, icon);
             for (int i = 0; i < Sources.Count; i++)
             {
                 bool has = available(i);
@@ -400,8 +568,12 @@ namespace ChartPacker.ViewModels
                 var noteCounts = has && counts is not null ? counts(i) : [];
                 bool counted = noteCounts.Count > 0;
                 row.Options.Add(new MergeOptionViewModel(row, i, shown, detail?.Invoke(i), has,
-                    counts: counted ? string.Join(Strings.MergeNoteCountSeparator, noteCounts.Select(c => c.Count.ToString("N0", CultureInfo.CurrentCulture))) : null,
-                    toolTip: counted ? string.Join(Environment.NewLine, [RichText.ToPlainText(shown), .. noteCounts.Select(NoteCountLine)]) : null));
+                    toolTip: counted ? string.Join(Environment.NewLine, [RichText.ToPlainText(shown), .. noteCounts.Select(NoteCountLine)]) : null,
+                    summary: has ? summary?.Invoke(i) : null,
+                    difficultyItems: has && difficulties is not null
+                        ? difficulties(i).Select(d => new MergeDifficultyItem(d, ChartLabels.DifficultyLetter(d))).ToList()
+                        : [],
+                    noteCountItems: noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture))).ToList()));
             }
 
             row.Options.Add(leaveOut is null
@@ -923,6 +1095,10 @@ namespace ChartPacker.ViewModels
             _ => Strings.MergeFormatNone,
         };
 
+        /// <summary>The part's instrument icon, drawn like the inspector's; <see langword="null"/> for a part that isn't known.</summary>
+        private static DifficultyGlyph? PartGlyphOf(string partId) =>
+            DifficultySlots.All.FirstOrDefault(s => s.PartId == partId)?.Glyph;
+
         /// <summary>The difficulties a source's part has notes for, as letters; for a part that isn't read, just that it's there.</summary>
         private static string DifficultiesOf(MergeSource source, string partId)
         {
@@ -943,5 +1119,13 @@ namespace ChartPacker.ViewModels
 
         private static string StemsOf(MergeSource source) =>
             source.AudioFiles.Count == 0 ? Strings.MergeStemsNone : string.Join(", ", source.AudioFiles);
+
+        /// <summary>Compact audio cell text, e.g. <c>3 tracks</c>; <see langword="null"/> shows the full text instead.</summary>
+        private static string? StemsSummaryOf(MergeSource source) => source.AudioFiles.Count switch
+        {
+            0 => null,
+            1 => Strings.MergeStemsOne,
+            var n => string.Format(CultureInfo.CurrentCulture, Strings.MergeStemsFormat, n),
+        };
     }
 }

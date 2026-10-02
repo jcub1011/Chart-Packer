@@ -35,6 +35,8 @@
     <StreamGeometry x:Key="PreviewIconGeometry">M5,4 L7.5,4 L7.5,20 L5,20 Z M10,4 L21,12 L10,20 Z</StreamGeometry>
     <!-- A speaker cone and one sound wave. -->
     <StreamGeometry x:Key="VolumeIconGeometry">M3,9 L7,9 L12,5 L12,19 L7,15 L3,15 Z M16,8 A5,5 0 0 1 16,16 L15,14 A3,3 0 0 0 15,10 Z</StreamGeometry>
+    <!-- A MIDI plug: a half-disc body with five pins below it. -->
+    <StreamGeometry x:Key="MidiIconGeometry">M4,13 A8,8 0 0 1 20,13 Z M5.7,14 L7.3,14 L7.3,18 L5.7,18 Z M8.45,14 L10.05,14 L10.05,18 L8.45,18 Z M11.2,14 L12.8,14 L12.8,18 L11.2,18 Z M13.95,14 L15.55,14 L15.55,18 L13.95,18 Z M16.7,14 L18.3,14 L18.3,18 L16.7,18 Z</StreamGeometry>
 
     <!-- Instruments, for the difficulty icons: filled on a 512×512 grid, from game-icons.net under CC BY 3.0
          (https://creativecommons.org/licenses/by/3.0/); see THIRD-PARTY-NOTICES.md. -->
