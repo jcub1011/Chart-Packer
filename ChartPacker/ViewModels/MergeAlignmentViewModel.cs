@@ -120,11 +120,18 @@ namespace ChartPacker.ViewModels
         private readonly Dictionary<int, int> _nudges = [];
         private int? _alignedTo;
 
+        // The songs set by hand, which stay where their nudges put them, and which others can be lined up with.
+        private readonly HashSet<int> _byHand = [];
+
         // The songs whose audio couldn't be read when the links were worked out, by title.
         private IReadOnlyList<string> _unreadAudio = [];
 
-        // What AlignmentProblemOf last found, for the plan of that signature.
-        private (string Signature, string? Problem)? _alignmentProblem;
+        // When the parts of the plan of that signature start, its source offsets aside, as AlignmentProblemOf last read them; or why they couldn't be.
+        private (string Signature, SongMerger.PartStarts? Starts, string? Problem)? _partStarts;
+
+        // Each song's parts to compare, by source, read the first time it's compared: its chart doesn't change.
+        private readonly Dictionary<int, Task<IReadOnlyList<ComparePartOption>>> _compareParts = [];
+        private bool _openingCompare;
 
         /// <summary>One cell per source, lined up with the headers.</summary>
         public AvaloniaList<MergeAlignmentCellViewModel> Alignment { get; } = [];
@@ -132,6 +139,7 @@ namespace ChartPacker.ViewModels
         /// <summary>The links between the songs are being worked out.</summary>
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(AutoAlignCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ResetAlignmentCommand))]
         public partial bool IsAligning { get; set; }
 
         /// <summary>What lining up is doing: reading the charts, or the audio, which takes longer.</summary>
@@ -163,6 +171,7 @@ namespace ChartPacker.ViewModels
             _alignedTo = audio;
             _choices.Clear();
             _nudges.Clear();
+            _byHand.Clear();
             AlignmentMessage = null;
             ShowAlignment();
         }
@@ -178,14 +187,15 @@ namespace ChartPacker.ViewModels
             return moved.Count > 0 ? moved : null;
         }
 
-        private int[] AlignmentOffsets(int reference) => SourceAligner.OffsetsOf(Alignment.Count, reference, _choices, _nudges);
+        private int[] AlignmentOffsets(int reference) => SourceAligner.OffsetsOf(Alignment.Count, reference, _choices, _nudges, _byHand);
 
         private bool CanAutoAlign() => !IsAligning;
 
         /// <summary>
         /// Lines every song up it can, by the links between them, replacing what was chosen or typed: by the parts they share,
         /// and by their audio. Both are worked out the first time, the audio read from <see cref="StemPeaksCache.Shared"/> where
-        /// a song's waveform has been, and kept for the window's life.
+        /// a song's waveform has been, and kept for the window's life. Nothing can be chosen or typed meanwhile, as it would be
+        /// replaced; the audio kept can be, and then the links are only offered against it.
         /// </summary>
         [RelayCommand(CanExecute = nameof(CanAutoAlign))]
         private async Task AutoAlignAsync()
@@ -214,20 +224,22 @@ namespace ChartPacker.ViewModels
                     _unreadAudio = unread;
                 }
 
-                if (_alignedTo != reference || _closed)
-                    return;
+                // Against other audio by now, the songs went back to where their charts have them; the links are still offered.
+                if (_alignedTo == reference && !_closed)
+                {
+                    _choices.Clear();
+                    _nudges.Clear();
+                    _byHand.Clear();
+                    foreach (var (source, choice) in SourceAligner.Solve(reference, _links))
+                        _choices[source] = choice;
 
-                _choices.Clear();
-                _nudges.Clear();
-                foreach (var (source, choice) in SourceAligner.Solve(reference, _links))
-                    _choices[source] = choice;
-
-                var messages = new List<string>();
-                if (_unreadAudio.Count > 0)
-                    messages.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentAudioUnreadFormat, string.Join(", ", _unreadAudio)));
-                if (Enumerable.Range(0, Alignment.Count).Any(i => i != reference && !_choices.ContainsKey(i)))
-                    messages.Add(Strings.MergeAlignmentNoLinks);
-                AlignmentMessage = messages.Count > 0 ? string.Join(" ", messages) : null;
+                    var messages = new List<string>();
+                    if (_unreadAudio.Count > 0)
+                        messages.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentAudioUnreadFormat, string.Join(", ", _unreadAudio)));
+                    if (Enumerable.Range(0, Alignment.Count).Any(i => i != reference && !_choices.ContainsKey(i)))
+                        messages.Add(Strings.MergeAlignmentNoLinks);
+                    AlignmentMessage = messages.Count > 0 ? string.Join(" ", messages) : null;
+                }
             }
             catch (OperationCanceledException)
             {
@@ -240,6 +252,9 @@ namespace ChartPacker.ViewModels
             {
                 IsAligning = false;
             }
+
+            if (_closed)
+                return;
 
             ShowAlignment();
             Refresh();
@@ -257,19 +272,22 @@ namespace ChartPacker.ViewModels
             {
                 return AudioAligner.Read(source.Entry, source.AudioFiles, resolution, StemPeaksCache.Shared, cancellationToken);
             }
-            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.IO.InvalidDataException)
+            catch (Exception ex) when (MergeCompareViewModel.IsUnreadableAudio(ex))
             {
                 unread.Add(title);
                 return null;
             }
         }
 
+        private bool CanResetAlignment() => !IsAligning;
+
         /// <summary>Moves every song back to where its own chart has it.</summary>
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanResetAlignment))]
         private void ResetAlignment()
         {
             _choices.Clear();
             _nudges.Clear();
+            _byHand.Clear();
             AlignmentMessage = null;
             ShowAlignment();
             Refresh();
@@ -296,17 +314,20 @@ namespace ChartPacker.ViewModels
             if (_alignedTo is not { } reference)
                 return;
 
-            // Set by hand, it stays where the link had it; linked anew, it goes where the link puts it.
+            // Set by hand, it stays where the link had it, and the songs lined up with it stay with it; linked anew, it goes
+            // where the link puts it.
             int at = AlignmentOffsets(reference)[cell.Source];
             if (choice is null)
             {
                 _choices.Remove(cell.Source);
                 _nudges[cell.Source] = at;
+                _byHand.Add(cell.Source);
             }
             else
             {
                 _choices[cell.Source] = choice;
                 _nudges.Remove(cell.Source);
+                _byHand.Remove(cell.Source);
             }
 
             ShowAlignment();
@@ -318,11 +339,30 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Opens the window that lines <paramref name="cell"/>'s song up by eye with the kept audio's song, starting where it is and
-        /// offering where each of its links would put it. The part it's linked by is shown, or else the first both have.
+        /// offering where each of its links would put it. The part it's linked by is shown, or else the first both have. Each
+        /// song's parts are read the first time, off the interface's thread.
         /// </summary>
-        private void OnCompare(MergeAlignmentCellViewModel cell)
+        private async void OnCompare(MergeAlignmentCellViewModel cell)
         {
-            if (_analysis is not { } analysis || _alignedTo is not { } reference || cell.Source == reference)
+            if (_openingCompare || _analysis is not { } analysis || _alignedTo is not { } reference || cell.Source == reference)
+                return;
+
+            var referenceSource = analysis.Sources[reference];
+            var songSource = analysis.Sources[cell.Source];
+            IReadOnlyList<ComparePartOption> referenceParts, songParts;
+            _openingCompare = true;
+            try
+            {
+                referenceParts = await ComparePartsOf(reference, referenceSource);
+                songParts = await ComparePartsOf(cell.Source, songSource);
+            }
+            finally
+            {
+                _openingCompare = false;
+            }
+
+            // Against other audio by then, or being lined up anew, it would mean something else.
+            if (_alignedTo != reference || IsAligning || IsDone || _closed)
                 return;
 
             var offsets = AlignmentOffsets(reference);
@@ -332,10 +372,6 @@ namespace ChartPacker.ViewModels
                 .Select(o => new CompareEstimate(string.Format(CultureInfo.CurrentCulture, Strings.MergeCompareEstimateFormat, o.Label, o.Offset), o.Offset))
                 .ToList();
 
-            var referenceSource = analysis.Sources[reference];
-            var songSource = analysis.Sources[cell.Source];
-            var referenceParts = MergeCompareViewModel.PartsOf(referenceSource);
-            var songParts = MergeCompareViewModel.PartsOf(songSource);
             string? preferred = _choices.GetValueOrDefault(cell.Source)?.Link.PartId
                 ?? referenceParts.Select(p => p.PartId).OfType<string>().FirstOrDefault(id => songParts.Any(p => p.PartId == id));
 
@@ -358,6 +394,9 @@ namespace ChartPacker.ViewModels
             CompareRequested?.Invoke(compare);
         }
 
+        private Task<IReadOnlyList<ComparePartOption>> ComparePartsOf(int index, MergeSource source) =>
+            _compareParts.TryGetValue(index, out var parts) ? parts : _compareParts[index] = Task.Run(() => MergeCompareViewModel.PartsOf(source));
+
         /// <summary>The user typed how far a song moves: what's more or less than its link puts it is its nudge.</summary>
         private void OnAlignmentTyped(MergeAlignmentCellViewModel cell, int offset)
         {
@@ -371,6 +410,10 @@ namespace ChartPacker.ViewModels
             else
                 _nudges[cell.Source] = nudge;
 
+            // Without a link, it's where it was typed: set by hand.
+            if (!_choices.ContainsKey(cell.Source))
+                _byHand.Add(cell.Source);
+
             ShowAlignment();
             Refresh();
         }
@@ -381,8 +424,9 @@ namespace ChartPacker.ViewModels
             if (_alignedTo is not { } reference)
                 return;
 
-            // A choice that no longer reaches the reference, as one lined up through a song now set by hand, is dropped.
-            foreach (int source in _choices.Keys.Where(s => !SourceAligner.IsLinked(s, reference, _choices, new HashSet<int>())).ToList())
+            // A choice that no longer reaches the reference or a song set by hand, as one lined up through a song now lined up
+            // with nothing, is dropped.
+            foreach (int source in _choices.Keys.Where(s => !SourceAligner.IsLinked(s, reference, _choices, new HashSet<int>(), _byHand)).ToList())
                 _choices.Remove(source);
 
             var offsets = AlignmentOffsets(reference);
@@ -396,7 +440,7 @@ namespace ChartPacker.ViewModels
                 }
 
                 var options = new List<MergeAlignmentOptionViewModel> { new(null, Strings.MergeAlignmentByHand) };
-                foreach (var link in (_links ?? []).Where(l => l.To == cell.Source && SourceAligner.IsLinked(l.From, reference, _choices, new HashSet<int> { cell.Source })))
+                foreach (var link in (_links ?? []).Where(l => l.To == cell.Source && SourceAligner.IsLinked(l.From, reference, _choices, new HashSet<int> { cell.Source }, _byHand)))
                 {
                     // A note pattern nothing lines up by isn't worth offering.
                     foreach (var method in link.Methods.Where(m => m != AlignmentMethod.NotePattern || link.Estimate(m).Matched > 0))
@@ -485,30 +529,34 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Why the plan's alignment can't be merged: the parts it moves before the song starts. <see langword="null"/> when it can.
-        /// Kept for the plan last asked about, as dragging an offset asks again at every step and the charts would be read each time.
+        /// When the parts start is kept for the plan last asked about, its offsets aside, as dragging an offset asks again at
+        /// every step and the charts would be read each time.
         /// </summary>
         private string? AlignmentProblemOf(SongMergePlan plan)
         {
             if (plan.SourceOffsets is null)
                 return null;
 
-            string signature = Signature(plan);
-            if (_alignmentProblem is { } known && known.Signature == signature)
+            string signature = Signature(plan with { SourceOffsets = null });
+            if (_partStarts is not { } known || known.Signature != signature)
+            {
+                try
+                {
+                    known = (signature, SongMerger.PartStartsOf(plan), null);
+                }
+                catch (Exception ex) when (ex is ChartFormatException or ArgumentException)
+                {
+                    known = (signature, null, ex.Message);
+                }
+
+                _partStarts = known;
+            }
+
+            if (known.Starts is not { } starts)
                 return known.Problem;
 
-            string? problem;
-            try
-            {
-                var early = SongMerger.PartsBeforeStart(plan);
-                problem = early.Count == 0 ? null : string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentBeforeStartFormat, string.Join(", ", early.Select(PartNameOf)));
-            }
-            catch (Exception ex) when (ex is ChartFormatException or ArgumentException)
-            {
-                problem = ex.Message;
-            }
-
-            _alignmentProblem = (signature, problem);
-            return problem;
+            var early = starts.BeforeStart(plan.SourceOffsets);
+            return early.Count == 0 ? null : string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentBeforeStartFormat, string.Join(", ", early.Select(PartNameOf)));
         }
     }
 }

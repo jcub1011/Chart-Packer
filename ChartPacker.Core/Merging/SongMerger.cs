@@ -86,7 +86,11 @@ public static class SongMerger
 
     /// <summary>The merged song's metadata, <c>song_length</c> aside, in the base source's order with other keys after.</summary>
     /// <exception cref="ArgumentException">The plan names a source or part that doesn't exist.</exception>
-    public static IReadOnlyList<KeyValuePair<string, string>> BuildMetadata(SongMergePlan plan)
+    public static IReadOnlyList<KeyValuePair<string, string>> BuildMetadata(SongMergePlan plan) => WithSourceOffsets(MetadataOf(plan), plan);
+
+    /// <summary>The merged song's metadata as <see cref="BuildMetadata"/> builds it, without the plan's <see cref="SongMergePlan.SourceOffsets"/>.</summary>
+    /// <inheritdoc cref="BuildMetadata"/>
+    private static List<KeyValuePair<string, string>> MetadataOf(SongMergePlan plan)
     {
         Validate(plan);
         var sources = plan.Analysis.Sources;
@@ -157,12 +161,11 @@ public static class SongMerger
             }
         }
 
-        var pairs = keys
+        return keys
             .Select(k => (Key: k, Value: ValueOf(k)))
             .Where(p => p.Value is not null)
             .Select(p => KeyValuePair.Create(p.Key, p.Value!))
             .ToList();
-        return WithSourceOffsets(pairs, plan);
     }
 
     /// <summary>
@@ -172,7 +175,7 @@ public static class SongMerger
     /// </summary>
     private static List<KeyValuePair<string, string>> WithSourceOffsets(List<KeyValuePair<string, string>> pairs, SongMergePlan plan)
     {
-        int chart = plan.SourceOffsetOf(plan.BaseSource);
+        int chart = BaseOffsetOf(plan.SourceOffsetOf(plan.BaseSource), DelayRangeOf(pairs));
         int video = plan.VideoSource is { } v ? plan.SourceOffsetOf(v) : 0;
         if (chart == 0 && video == 0)
             return pairs;
@@ -182,6 +185,19 @@ public static class SongMerger
         TimingOffsets.Set(draft, TimingOffsets.VideoKey, pairs, TimeSpan.Zero, video);
         return draft.ApplyTo(pairs);
     }
+
+    /// <summary>
+    /// The offsets <see cref="TimingOffsets.Set"/> can make to the <c>delay</c> of <paramref name="pairs"/>, the merged
+    /// metadata without source offsets: moving the base chart later is moving the audio earlier, so it's the other way round.
+    /// </summary>
+    private static (int Min, int Max) DelayRangeOf(IReadOnlyList<KeyValuePair<string, string>> pairs) =>
+        TimingOffsets.RangeOf(TimingOffsets.AudioKey, pairs, TimeSpan.Zero);
+
+    /// <summary>
+    /// How far the base chart moves for <paramref name="offset"/>: as far as the <c>delay</c> can take it, within
+    /// <paramref name="range"/> from <see cref="DelayRangeOf"/>, so its parts are placed against the <c>delay</c> it's written with.
+    /// </summary>
+    private static int BaseOffsetOf(int offset, (int Min, int Max) range) => (int)-Math.Clamp(-(long)offset, range.Min, range.Max);
 
     /// <summary>
     /// The file name, without <c>.sng</c>, for a song with <paramref name="pairs"/>: <c>Artist - Name</c>
@@ -409,17 +425,19 @@ public static class SongMerger
 
     /// <summary>
     /// Each source's chart, by source, as the plan places it: with its delay that much more for a source
-    /// <see cref="SongMergePlan.SourceOffsets"/> moves. A source that doesn't move keeps its own chart.
+    /// <see cref="SongMergePlan.SourceOffsets"/> moves, the base chart's only as far as the <c>delay</c> can take it; see
+    /// <see cref="BaseOffsetOf"/>. A source that doesn't move keeps its own chart.
     /// </summary>
     private static Dictionary<int, MidiChart> AlignedCharts(SongMergePlan plan)
     {
         var sources = plan.Analysis.Sources;
+        int baseOffset = BaseOffsetOf(plan.SourceOffsetOf(plan.BaseSource), DelayRangeOf(MetadataOf(plan)));
         var charts = new Dictionary<int, MidiChart>();
         for (int i = 0; i < sources.Count; i++)
         {
             if (sources[i].Chart is not { } chart)
                 continue;
-            int offset = plan.SourceOffsetOf(i);
+            int offset = i == plan.BaseSource ? baseOffset : plan.SourceOffsetOf(i);
             charts[i] = offset == 0 ? chart : chart with { Delay = chart.Delay + TimeSpan.FromMilliseconds(offset) };
         }
 
@@ -433,30 +451,77 @@ public static class SongMerger
     /// </summary>
     /// <exception cref="ArgumentException">The plan names a source or part that doesn't exist, or its base has no chart.</exception>
     /// <exception cref="ChartFormatException">A chart is malformed.</exception>
-    public static IReadOnlyList<string> PartsBeforeStart(SongMergePlan plan)
+    public static IReadOnlyList<string> PartsBeforeStart(SongMergePlan plan) => PartStartsOf(plan).BeforeStart(plan.SourceOffsets);
+
+    /// <summary>
+    /// When the plan's parts start, read from the charts once, so that <see cref="PartStarts.BeforeStart"/> can tell which
+    /// would start before the merged song for any <see cref="SongMergePlan.SourceOffsets"/>; the plan's own are ignored.
+    /// </summary>
+    /// <inheritdoc cref="PartsBeforeStart"/>
+    public static PartStarts PartStartsOf(SongMergePlan plan)
     {
-        Validate(plan);
-        var charts = AlignedCharts(plan);
-        if (!charts.TryGetValue(plan.BaseSource, out var baseChart))
+        var metadata = MetadataOf(plan);
+        var sources = plan.Analysis.Sources;
+        if (sources[plan.BaseSource].Chart is not { } baseChart)
             throw new ArgumentException("The base song has no chart that can be read.", nameof(plan));
 
         var tempo = new Dictionary<int, TempoMap>();
-        TempoMap TempoOf(int source) =>
-            tempo.TryGetValue(source, out var map) ? map : tempo[source] = ChartReader.Read(charts[source].Midi, ChartFiles.MidiName, charts[source].Options).Tempo;
+        TempoMap TempoOf(int source, MidiChart chart) =>
+            tempo.TryGetValue(source, out var map) ? map : tempo[source] = ChartReader.Read(chart.Midi, ChartFiles.MidiName, chart.Options).Tempo;
 
-        var early = new List<string>();
+        var starts = new List<PartStart>();
         foreach (var (partId, source) in plan.Parts.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
+            var chart = sources[source].Chart ?? throw new ArgumentException($"The song chosen for '{partId}' has no chart that can be read.", nameof(plan));
             var part = plan.Analysis.Parts.First(p => p.Id == partId);
-            if (FirstNoteTick(charts[source].Midi, part) is not { } first)
+            if (FirstNoteTick(chart.Midi, part) is not { } first)
                 continue;
-
-            double seconds = TempoOf(source).SecondsAt(first) + (charts[source].Delay - baseChart.Delay).TotalSeconds;
-            if (Math.Round(TempoOf(plan.BaseSource).TickAt(seconds), MidpointRounding.AwayFromZero) < 0)
-                early.Add(partId);
+            starts.Add(new PartStart(partId, source, TempoOf(source, chart).SecondsAt(first), chart.Delay - baseChart.Delay));
         }
 
-        return early;
+        return new PartStarts(plan.BaseSource, TempoOf(plan.BaseSource, baseChart), DelayRangeOf(metadata), starts);
+    }
+
+    /// <param name="Seconds">When its first note is by its own chart's tempo map, its delay left out.</param>
+    /// <param name="DelayFromBase">How much more its chart's delay is than the base chart's.</param>
+    internal sealed record PartStart(string PartId, int Source, double Seconds, TimeSpan DelayFromBase);
+
+    /// <summary>When a merge plan's parts start, for telling which source offsets would place one before the song does; see <see cref="PartStartsOf"/>.</summary>
+    public sealed class PartStarts
+    {
+        private readonly int _baseSource;
+        private readonly TempoMap _baseTempo;
+        private readonly (int Min, int Max) _delayRange;
+        private readonly IReadOnlyList<PartStart> _starts;
+
+        internal PartStarts(int baseSource, TempoMap baseTempo, (int Min, int Max) delayRange, IReadOnlyList<PartStart> starts)
+        {
+            _baseSource = baseSource;
+            _baseTempo = baseTempo;
+            _delayRange = delayRange;
+            _starts = starts;
+        }
+
+        /// <summary>
+        /// The parts, by <see cref="MidiPart.Id"/>, whose first note <paramref name="sourceOffsets"/> would place before the merged
+        /// song starts, as <see cref="PartsBeforeStart"/> tells for a plan with them.
+        /// </summary>
+        public IReadOnlyList<string> BeforeStart(IReadOnlyDictionary<int, int>? sourceOffsets)
+        {
+            int OffsetOf(int source) => sourceOffsets?.GetValueOrDefault(source) ?? 0;
+            int baseOffset = BaseOffsetOf(OffsetOf(_baseSource), _delayRange);
+
+            var early = new List<string>();
+            foreach (var start in _starts)
+            {
+                long offset = start.Source == _baseSource ? baseOffset : OffsetOf(start.Source);
+                double seconds = start.Seconds + (start.DelayFromBase + TimeSpan.FromMilliseconds(offset - baseOffset)).TotalSeconds;
+                if (Math.Round(_baseTempo.TickAt(seconds), MidpointRounding.AwayFromZero) < 0)
+                    early.Add(start.PartId);
+            }
+
+            return early;
+        }
     }
 
     /// <summary>The tick of the first note of any of <paramref name="part"/>'s tracks in <paramref name="midi"/>; <see langword="null"/> for none.</summary>

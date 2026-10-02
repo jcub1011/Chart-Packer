@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Audio.Spectrum;
 using ChartPacker.Audio.Waveforms;
@@ -83,7 +84,8 @@ public sealed class AlignmentAudio
     private static float[] OnsetsOf(float[] mix)
     {
         int hop = AudioAligner.MixRate / AudioAligner.FramesPerSecond;
-        int frames = Math.Max(0, ((mix.Length - WindowSamples) / hop) + 1);
+        // A mix shorter than a window has no frames: the division would round its negative up to nothing, and count one.
+        int frames = mix.Length < WindowSamples ? 0 : ((mix.Length - WindowSamples) / hop) + 1;
 
         var loudness = new float[frames];
         for (int m = 0; m < frames; m++)
@@ -152,35 +154,34 @@ public static class AudioAligner
     // How far either side of the offset the start and the end of the song are looked for, in frames, for drift.
     private const int DriftSearchFrames = 20;
 
-    private static readonly int ReadParallelism = Math.Max(1, Environment.ProcessorCount - 1);
-
     /// <summary>How far to move <paramref name="to"/>'s song, as its audio puts it, to line it up with <paramref name="from"/>'s.</summary>
     public static AlignmentEstimate Align(AlignmentAudio from, AlignmentAudio to)
     {
         ArgumentNullException.ThrowIfNull(from);
         ArgumentNullException.ThrowIfNull(to);
 
+        var fft = new Fft(Fft.SizeFor(from.Onsets.Length + to.Onsets.Length));
+        return Align(from, OnsetSpectrum.Of(from, fft), to, OnsetSpectrum.Of(to, fft), fft);
+    }
+
+    /// <summary>
+    /// <see cref="Align(AlignmentAudio, AlignmentAudio)"/>, from the spectra of the two songs' onsets, each taken by
+    /// <paramref name="fft"/>, whose size is at least as long as both together, so that no lag wraps round onto another.
+    /// </summary>
+    private static AlignmentEstimate Align(AlignmentAudio from, OnsetSpectrum fromSpectrum, AlignmentAudio to, OnsetSpectrum toSpectrum, Fft fft)
+    {
         int maxShift = SourceAligner.MaxShiftMs * FramesPerSecond / 1000;
         float[] a = from.Onsets, b = to.Onsets;
-        int size = Fft.SizeFor(a.Length + b.Length);
-        var fft = new Fft(size);
-
-        var ar = new float[size];
-        var ai = new float[size];
-        var br = new float[size];
-        var bi = new float[size];
-        a.CopyTo(ar, 0);
-        b.CopyTo(br, 0);
-        fft.Forward(ar, ai);
-        fft.Forward(br, bi);
+        int size = fft.Size;
 
         // A times B's conjugate: at lag k, the sum of a[n + k] b[n], at index k, or size + k when it's negative.
+        var ar = new float[size];
+        var ai = new float[size];
+        float[] fr = fromSpectrum.Re, fi = fromSpectrum.Im, tr = toSpectrum.Re, ti = toSpectrum.Im;
         for (int i = 0; i < size; i++)
         {
-            float re = (ar[i] * br[i]) + (ai[i] * bi[i]);
-            float im = (ai[i] * br[i]) - (ar[i] * bi[i]);
-            ar[i] = re;
-            ai[i] = im;
+            ar[i] = (fr[i] * tr[i]) + (fi[i] * ti[i]);
+            ai[i] = (fi[i] * tr[i]) - (fr[i] * ti[i]);
         }
 
         fft.Inverse(ar, ai);
@@ -234,11 +235,20 @@ public static class AudioAligner
             }
         }
 
+        if (pairs.Count == 0)
+            return [];
+
+        // One size for every pair, at least as long as the two longest together, so each song's spectrum is taken once.
+        var options = new ParallelOptions { CancellationToken = cancellationToken, MaxDegreeOfParallelism = ChunkedPeaksRead.Parallelism };
+        var fft = new Fft(Fft.SizeFor(2 * audio.Max(a => a?.Onsets.Length ?? 0)));
+        var spectra = new OnsetSpectrum?[audio.Count];
+        Parallel.For(0, audio.Count, options, i => spectra[i] = audio[i] is { } song ? OnsetSpectrum.Of(song, fft) : null);
+
         var found = new AlignmentLink[pairs.Count];
-        Parallel.For(0, pairs.Count, new ParallelOptions { CancellationToken = cancellationToken, MaxDegreeOfParallelism = ReadParallelism }, p =>
+        Parallel.For(0, pairs.Count, options, p =>
         {
             var (i, j) = pairs[p];
-            found[p] = AlignmentLink.ByAudio(i, j, Align(audio[i]!, audio[j]!));
+            found[p] = AlignmentLink.ByAudio(i, j, Align(audio[i]!, spectra[i]!, audio[j]!, spectra[j]!, fft));
         });
 
         return [.. found.SelectMany(link => new[] { link, link.Reversed() })];
@@ -293,45 +303,20 @@ public static class AudioAligner
         if (keys.Count > 0)
         {
             using var audio = SongAudio.Open(entry, [.. keys.Keys], cancellationToken);
-            var reads = audio.Tracks
-                .Where(t => t.Source is not null)
-                .Select(t => (Opened: t, Reader: new StemPeaksReader(t.Track.StoredName, t.Source!, resolution: resolution), Failed: new FailedFlag()))
-                .ToList();
-            var chunks = reads.SelectMany(read => Enumerable.Range(0, read.Reader.ChunkCount).Select(index => (Read: read, Index: index))).ToList();
 
-            Parallel.ForEach(chunks, new ParallelOptions { CancellationToken = cancellationToken, MaxDegreeOfParallelism = ReadParallelism }, chunk =>
-            {
-                var (opened, reader, failed) = chunk.Read;
-                if (failed.Value)
-                    return;
-                try
-                {
-                    // The first chunk is read from the source opened for the track; the rest open their own.
-                    if (chunk.Index == 0)
-                    {
-                        reader.ReadChunk(0, opened.Source!, cancellationToken);
-                    }
-                    else
-                    {
-                        using var source = audio.OpenSource(opened.Track);
-                        reader.ReadChunk(chunk.Index, source, cancellationToken);
-                    }
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-                {
-                    // A track that can't be read is left out of the mix; the others carry on.
-                    failed.Value = true;
-                }
-            });
+            // A track that can't be read is left out of the mix; the others carry on.
+            var read = new ConcurrentDictionary<OpenedTrack, StemPeaks>();
+            ChunkedPeaksRead.Read(audio, resolution, completed: (opened, finished) => read[opened] = finished, cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            foreach (var (opened, reader, failed) in reads)
+            // In the tracks' order, whichever finished first, so the mix comes out the same each time.
+            foreach (var opened in audio.Tracks)
             {
-                if (failed.Value)
+                if (!read.TryGetValue(opened, out var finished))
                     continue;
-                var read = reader.Finish();
-                peaks.Add(read);
+                peaks.Add(finished);
                 if (keys[opened.Track] is { } key)
-                    cache?.Add(key, read);
+                    cache?.Add(key, finished);
             }
         }
 
@@ -417,9 +402,26 @@ public static class AudioAligner
 
     private static int Milliseconds(double frames) => (int)Math.Round(frames * 1000 / FramesPerSecond, MidpointRounding.AwayFromZero);
 
-    /// <summary>Whether a track's read has failed, set by whichever thread reads the chunk that fails.</summary>
-    private sealed class FailedFlag
+    /// <summary>The spectrum of a song's onsets, padded with silence to an <see cref="Fft"/>'s size, for lining it up with others.</summary>
+    private sealed class OnsetSpectrum
     {
-        public volatile bool Value;
+        private OnsetSpectrum(float[] re, float[] im)
+        {
+            Re = re;
+            Im = im;
+        }
+
+        public float[] Re { get; }
+
+        public float[] Im { get; }
+
+        public static OnsetSpectrum Of(AlignmentAudio audio, Fft fft)
+        {
+            var re = new float[fft.Size];
+            var im = new float[fft.Size];
+            audio.Onsets.CopyTo(re, 0);
+            fft.Forward(re, im);
+            return new OnsetSpectrum(re, im);
+        }
     }
 }

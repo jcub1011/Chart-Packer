@@ -254,6 +254,41 @@ public sealed class SourceAlignerTests
     }
 
     [TestMethod]
+    public void SongsLinedUpThroughOneSetByHandStayWithIt()
+    {
+        long[] rhythm = Rhythm(60, seed: 8);
+        var a = Of(Midi(guitar: rhythm), delayMs: 250);
+        var b = Of(Midi(guitar: rhythm, drums: rhythm));
+        var c = Of(Midi(drums: rhythm), delayMs: 100);
+        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c])).ToDictionary();
+
+        // B is set by hand where its link had it: C, lined up with B, stays where it was, and follows B when it moves.
+        choices.Remove(1);
+        var byHand = new HashSet<int> { 1 };
+        Assert.IsTrue(SourceAligner.IsLinked(2, 0, choices, new HashSet<int>(), byHand));
+        CollectionAssert.AreEqual(new[] { 0, 250, 150 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 250 }, byHand));
+        CollectionAssert.AreEqual(new[] { 0, 300, 200 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 300 }, byHand));
+
+        // Lined up with nothing, B no longer places C.
+        Assert.IsFalse(SourceAligner.IsLinked(2, 0, choices, new HashSet<int>()));
+        CollectionAssert.AreEqual(new[] { 0, 250, 0 }, SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = 250 }));
+    }
+
+    [TestMethod]
+    public void OffsetsTooFarForAnIntAreKeptWithinOne()
+    {
+        long[] rhythm = Rhythm(60, seed: 8);
+        var a = Of(Midi(guitar: rhythm), delayMs: 250);
+        var b = Of(Midi(guitar: rhythm, drums: rhythm));
+        var c = Of(Midi(drums: rhythm), delayMs: 100);
+        var choices = SourceAligner.Solve(0, SourceAligner.Links([a, b, c]));
+
+        var offsets = SourceAligner.OffsetsOf(3, 0, choices, new Dictionary<int, int> { [1] = int.MaxValue, [2] = int.MaxValue });
+
+        CollectionAssert.AreEqual(new[] { 0, int.MaxValue, int.MaxValue }, offsets);
+    }
+
+    [TestMethod]
     public void TheShortestRouteIsTaken()
     {
         long[] rhythm = Rhythm(60, seed: 9);

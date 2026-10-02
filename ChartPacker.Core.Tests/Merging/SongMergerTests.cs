@@ -336,6 +336,25 @@ public sealed class SongMergerTests
 
         // Moving the base later moves the start with it, so the others' notes come before it.
         CollectionAssert.AreEqual(new[] { "drums", "guitar" }, SongMerger.PartsBeforeStart(plan with { SourceOffsets = new Dictionary<int, int> { [0] = 100 } }).ToArray());
+
+        // Read once, the starts tell the same for any offsets, the plan's own aside.
+        var starts = SongMerger.PartStartsOf(plan with { SourceOffsets = new Dictionary<int, int> { [1] = -1 } });
+        Assert.IsEmpty(starts.BeforeStart(null));
+        CollectionAssert.AreEqual(new[] { "drums", "guitar" }, starts.BeforeStart(new Dictionary<int, int> { [0] = 100 }).ToArray());
+    }
+
+    [TestMethod]
+    public async Task TheBaseChartMovesOnlyAsFarAsTheDelayCanTakeIt()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 1, ["guitar"] = 1 }) with
+        {
+            SourceOffsets = new Dictionary<int, int> { [0] = 100_000_000, [1] = 99_999_999 },
+        };
+
+        // The delay stops at its furthest; the base chart's parts are placed against that, so the other song's are long after it.
+        Assert.AreEqual("86399999", SongMerger.BuildMetadata(plan).Single(p => p.Key == "delay").Value);
+        Assert.IsEmpty(SongMerger.PartsBeforeStart(plan));
     }
 
     [TestMethod]

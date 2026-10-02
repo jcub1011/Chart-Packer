@@ -163,6 +163,30 @@ public sealed class AudioAlignerTests
     }
 
     [TestMethod]
+    public void LinksLineSongsOfDifferentLengthsUpAsEachPairWould()
+    {
+        // Links takes every song's spectrum once, at one size for all of them.
+        double[] times = Times(80, seed: 23);
+        AlignmentAudio[] songs =
+        [
+            Audio(Clicks(times, 50, seed: 24)),
+            Audio(Clicks(times.Select(t => t + 0.4), 30, seed: 25)),
+            Audio(Clicks(times.Select(t => t - 0.9), 60, seed: 26)),
+        ];
+
+        var links = AudioAligner.Links(songs);
+
+        foreach (var link in links.Where(l => l.From < l.To))
+        {
+            var linked = link.Estimate(AlignmentMethod.Audio);
+            var paired = AudioAligner.Align(songs[link.From], songs[link.To]);
+            Assert.AreEqual(paired.OffsetMs, linked.OffsetMs, 1, $"{link.From} to {link.To}");
+            Assert.AreEqual(paired.Match, linked.Match, 1e-3, $"{link.From} to {link.To}");
+            Assert.AreEqual(paired.IsAmbiguous, linked.IsAmbiguous, $"{link.From} to {link.To}");
+        }
+    }
+
+    [TestMethod]
     public void ASongsTracksAreReadWithoutThePreviewOrTheCrowdAndKept()
     {
         double[] times = Times(40, seed: 23);
@@ -250,6 +274,18 @@ public sealed class AudioAlignerTests
     {
         Assert.IsNull(AlignmentAudio.Of([Peaks(new float[Rate * 5])]));
         Assert.IsNull(AlignmentAudio.Of([]));
+    }
+
+    [TestMethod]
+    public void AudioTooShortToRiseIsNothingToLineUpBy()
+    {
+        // Up to 12 ms: shorter than a frame's window, which was read past, and then too few frames to rise over.
+        for (int ms = 1; ms <= 12; ms++)
+        {
+            var random = new Random(ms);
+            float[] noise = [.. Enumerable.Range(0, Rate * ms / 1000).Select(_ => (float)((random.NextDouble() * 2) - 1))];
+            Assert.IsNull(AlignmentAudio.Of([Peaks(noise)]), $"{ms} ms");
+        }
     }
 
     /// <summary>Times of hits with gaps of an eighth to a beat and a half at 120 BPM, the same for a seed, from a second in.</summary>

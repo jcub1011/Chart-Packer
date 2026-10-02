@@ -216,10 +216,18 @@ namespace ChartPacker.ViewModels
                 var peaks = AudioAligner.ReadPeaks(source.Entry, source.AudioFiles, resolution, StemPeaksCache.Shared, anyResolution: false, cancellationToken);
                 return peaks.Count > 0 ? WaveformPeaks.Mix([.. peaks.Select(p => new AudibleStem(p, IsMuted: false, IsSolo: false))]) : null;
             }
-            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.IO.InvalidDataException)
+            catch (Exception ex) when (IsUnreadableAudio(ex))
             {
                 return null;
             }
         }
+
+        /// <summary>
+        /// Whether <paramref name="ex"/> is how reading a song's audio says it can't be read: the audio, or its file, is bad or
+        /// gone. Thrown by a track read on another thread, it comes wrapped, and counts only when all that's wrapped does.
+        /// </summary>
+        internal static bool IsUnreadableAudio(Exception ex) => ex is AggregateException aggregate
+            ? aggregate.InnerExceptions.Count > 0 && aggregate.InnerExceptions.All(IsUnreadableAudio)
+            : ex is System.IO.IOException or UnauthorizedAccessException or System.IO.InvalidDataException or NotSupportedException or ObjectDisposedException;
     }
 }

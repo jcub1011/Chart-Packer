@@ -432,17 +432,22 @@ public static class SourceAligner
     /// <summary>
     /// How far each song moves, in milliseconds, by source: <paramref name="reference"/> not at all; one with a choice as
     /// far as the song it's lined up with does, and the link's offset more; and each by its <paramref name="nudges"/> on
-    /// top. A song lined up through itself, or through one no choice lines up, moves by its nudge alone.
+    /// top. A song lined up through itself, or through one no choice lines up and that isn't set by hand, moves by its
+    /// nudge alone. Each is kept within what an <see cref="int"/> holds.
     /// </summary>
     /// <param name="count">How many songs there are.</param>
     /// <param name="nudges">How far each song is moved by hand on top of its link, by source; the reference's is ignored.</param>
-    public static int[] OffsetsOf(int count, int reference, IReadOnlyDictionary<int, AlignmentChoice> choices, IReadOnlyDictionary<int, int>? nudges = null)
+    /// <param name="byHand">
+    /// The songs set by hand, without a choice, where their nudges put them: a song can be lined up with one of these as
+    /// with the reference, and follows it when it moves.
+    /// </param>
+    public static int[] OffsetsOf(int count, int reference, IReadOnlyDictionary<int, AlignmentChoice> choices, IReadOnlyDictionary<int, int>? nudges = null, IReadOnlySet<int>? byHand = null)
     {
         ArgumentNullException.ThrowIfNull(choices);
         var offsets = new int?[count];
         int Nudge(int source) => source == reference ? 0 : nudges?.GetValueOrDefault(source) ?? 0;
 
-        // A song's choice only counts when it leads to the reference without coming back round, so this ends.
+        // A song's choice only counts when it leads to the reference, or a song set by hand, without coming back round, so this ends.
         int OffsetOf(int source)
         {
             if (offsets[source] is { } known)
@@ -450,10 +455,10 @@ public static class SourceAligner
             if (source == reference)
                 return (offsets[source] = 0).Value;
 
-            int linked = 0;
-            if (choices.TryGetValue(source, out var choice) && choice.Link.To == source && IsLinked(choice.Link.From, reference, choices, new HashSet<int> { source }))
-                linked = OffsetOf(choice.Link.From) + choice.OffsetMs;
-            return (offsets[source] = linked + Nudge(source)).Value;
+            long linked = 0;
+            if (choices.TryGetValue(source, out var choice) && choice.Link.To == source && IsLinked(choice.Link.From, reference, choices, new HashSet<int> { source }, byHand))
+                linked = (long)OffsetOf(choice.Link.From) + choice.OffsetMs;
+            return (offsets[source] = (int)Math.Clamp(linked + Nudge(source), int.MinValue, int.MaxValue)).Value;
         }
 
         for (int i = 0; i < count; i++)
@@ -462,10 +467,12 @@ public static class SourceAligner
     }
 
     /// <summary>
-    /// Whether <paramref name="source"/> is <paramref name="reference"/>, or lined up with it through <paramref name="choices"/>
-    /// without passing through any of <paramref name="avoiding"/>: what a song can be lined up with without going round in a circle.
+    /// Whether <paramref name="source"/> is <paramref name="reference"/> or one of <paramref name="byHand"/>, or lined up with
+    /// one of them through <paramref name="choices"/>, without passing through any of <paramref name="avoiding"/>: what a song
+    /// can be lined up with without going round in a circle.
     /// </summary>
-    public static bool IsLinked(int source, int reference, IReadOnlyDictionary<int, AlignmentChoice> choices, IReadOnlySet<int> avoiding)
+    /// <param name="byHand">The songs set by hand, which stay where they're put; see <see cref="OffsetsOf"/>.</param>
+    public static bool IsLinked(int source, int reference, IReadOnlyDictionary<int, AlignmentChoice> choices, IReadOnlySet<int> avoiding, IReadOnlySet<int>? byHand = null)
     {
         ArgumentNullException.ThrowIfNull(choices);
         ArgumentNullException.ThrowIfNull(avoiding);
@@ -474,7 +481,7 @@ public static class SourceAligner
         {
             if (avoiding.Contains(at) || !seen.Add(at))
                 return false;
-            if (at == reference)
+            if (at == reference || (byHand?.Contains(at) == true && !choices.ContainsKey(at)))
                 return true;
             if (!choices.ContainsKey(at))
                 return false;

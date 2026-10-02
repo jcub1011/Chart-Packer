@@ -135,9 +135,6 @@ namespace ChartPacker.ViewModels
         // How often a track being read shows what has been read of it.
         private static readonly TimeSpan PeaksProgressInterval = TimeSpan.FromMilliseconds(250);
 
-        // Tracks are read side by side, leaving a core for the interface and playback.
-        private static readonly int ReadParallelism = Math.Max(1, Environment.ProcessorCount - 1);
-
         private readonly Func<int, IAudioOutput> _openOutput;
         private readonly DispatcherTimer _timer;
         private SongEntry? _entry;
@@ -794,57 +791,21 @@ namespace ChartPacker.ViewModels
                 // Separate from the player's own sources, which are for the audio thread alone.
                 using var audio = SongAudio.Open(entry, [.. keys.Keys], cancellationToken);
 
-                // Every chunk of every track at once, each from a source of its own. The tracks' first chunks go first, the
-                // longest track's first of all, so each track fills in from its start at the same pace and the mix keeps up.
-                var reads = audio.Tracks
-                    .Where(t => t.Source is not null)
-                    .OrderByDescending(t => t.Source!.LengthFrames)
-                    .Select(opened => new TrackRead(opened, partial => ShowPeaks(opened.Track, partial, isComplete: false, cancellationToken), PeaksProgressInterval, resolution))
-                    .ToList();
-                var chunks = reads
-                    .SelectMany(read => Enumerable.Range(0, read.Reader.ChunkCount).Select(index => (Read: read, Index: index)))
-                    .OrderBy(chunk => chunk.Index)
-                    .ToList();
-
-                var options = new ParallelOptions { CancellationToken = cancellationToken, MaxDegreeOfParallelism = ReadParallelism };
-                Parallel.ForEach(chunks, options, chunk =>
-                {
-                    var read = chunk.Read;
-                    var track = read.Opened.Track;
-                    try
+                // Each track fills in from its start at the same pace, so the mix keeps up. One that can't be read has no
+                // waveform, and what was read of it goes, so the mix isn't left waiting on it.
+                ChunkedPeaksRead.Read(
+                    audio,
+                    resolution,
+                    completed: (opened, peaks) =>
                     {
-                        if (!read.HasFailed)
-                        {
-                            // The first chunk is read from the source opened for the track; the rest open their own.
-                            if (chunk.Index == 0)
-                            {
-                                read.Reader.ReadChunk(0, read.Opened.Source!, cancellationToken);
-                            }
-                            else
-                            {
-                                using var source = audio.OpenSource(track);
-                                read.Reader.ReadChunk(chunk.Index, source, cancellationToken);
-                            }
-                        }
-
-                        read.EndChunk(() =>
-                        {
-                            var peaks = read.Reader.Finish();
-                            ShowPeaks(track, peaks, isComplete: true, cancellationToken);
-                            if (keys[track] is { } key)
-                                StemPeaksCache.Shared.Add(key, peaks);
-                        });
-                    }
-                    catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
-                    {
-                        // The read was stopped; the other tracks carry on.
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-                    {
-                        // This track has no waveform, and what was read of it goes, so the mix isn't left waiting on it; the other tracks carry on.
-                        read.Fail(() => ForgetPeaks(track, cancellationToken));
-                    }
-                });
+                        ShowPeaks(opened.Track, peaks, isComplete: true, cancellationToken);
+                        if (keys[opened.Track] is { } key)
+                            StemPeaksCache.Shared.Add(key, peaks);
+                    },
+                    failed: opened => ForgetPeaks(opened.Track, cancellationToken),
+                    progress: (opened, partial) => ShowPeaks(opened.Track, partial, isComplete: false, cancellationToken),
+                    PeaksProgressInterval,
+                    cancellationToken);
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException)
             {
@@ -1321,73 +1282,5 @@ namespace ChartPacker.ViewModels
                 _isUpdatingPosition = false;
             }
         }
-
-        /// <summary>
-        /// One track's waveform, read in chunks on several threads: whether a chunk's read failed, which takes the
-        /// whole track's waveform with it, and how many chunks are left before it's done.
-        /// </summary>
-        private sealed class TrackRead
-        {
-            // Held while the track's peaks are shown or forgotten, so that none are shown once they've been forgotten.
-            private readonly Lock _lock = new();
-            private bool _hasFailed;
-            private int _remaining;
-
-            /// <param name="show">Shows the peaks read so far, unless the read has failed.</param>
-            public TrackRead(OpenedTrack opened, Action<StemPeaks> show, TimeSpan progressInterval, WaveformResolution resolution)
-            {
-                Opened = opened;
-                Reader = new StemPeaksReader(opened.Track.StoredName, opened.Source!, Show, progressInterval, resolution: resolution);
-                _remaining = Reader.ChunkCount;
-
-                void Show(StemPeaks partial)
-                {
-                    lock (_lock)
-                    {
-                        if (!_hasFailed)
-                            show(partial);
-                    }
-                }
-            }
-
-            public OpenedTrack Opened { get; }
-
-            public StemPeaksReader Reader { get; }
-
-            public bool HasFailed
-            {
-                get
-                {
-                    lock (_lock)
-                        return _hasFailed;
-                }
-            }
-
-            /// <summary>Marks the read failed, calling <paramref name="forget"/> the first time.</summary>
-            public void Fail(Action forget)
-            {
-                lock (_lock)
-                {
-                    if (_hasFailed)
-                        return;
-                    _hasFailed = true;
-                    forget();
-                }
-            }
-
-            /// <summary>Counts a chunk as done with, calling <paramref name="finish"/> once they all are, unless the read has failed.</summary>
-            public void EndChunk(Action finish)
-            {
-                if (Interlocked.Decrement(ref _remaining) != 0)
-                    return;
-
-                lock (_lock)
-                {
-                    if (!_hasFailed)
-                        finish();
-                }
-            }
-        }
-
     }
 }

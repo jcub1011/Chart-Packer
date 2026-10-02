@@ -186,7 +186,7 @@
                         <Border Classes="choice-row">
                             <Grid ColumnDefinitions="180,*" ColumnSpacing="8">
                                 <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{x:Static res:Strings.MergeAlignmentLabel}" />
-                                <ItemsControl Grid.Column="1" ItemsSource="{Binding Alignment}">
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding Alignment}" IsEnabled="{Binding !IsAligning}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <UniformGrid Rows="1" Columns="{Binding ColumnCount}" />
