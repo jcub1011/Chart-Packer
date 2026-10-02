@@ -162,6 +162,91 @@
                         <ContentControl Content="{Binding AudioChoice}" />
                     </StackPanel>
 
+                    <!-- How far each song moves to line up with the kept audio: one cell per song, under its header. -->
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0" Classes="merge-heading" VerticalAlignment="Center" Text="{x:Static res:Strings.MergeSectionAlignment}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsAligning}">
+                                    <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" />
+                                    <TextBlock Classes="muted" VerticalAlignment="Center" Text="{Binding AligningText}" />
+                                </StackPanel>
+                                <Button Content="{x:Static res:Strings.MergeAutoAlignButton}"
+                                        Command="{Binding AutoAlignCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.MergeAutoAlignToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.MergeAutoAlignButton}" />
+                                <Button Content="{x:Static res:Strings.MergeAlignmentResetButton}"
+                                        Command="{Binding ResetAlignmentCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.MergeAlignmentResetToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentResetButton}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Classes="merge-description" Text="{x:Static res:Strings.MergeAlignmentDescription}" />
+                        <TextBlock Classes="warning" Text="{Binding AlignmentMessage}" IsVisible="{Binding HasAlignmentMessage}" />
+                        <Border Classes="choice-row">
+                            <Grid ColumnDefinitions="180,*" ColumnSpacing="8">
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{x:Static res:Strings.MergeAlignmentLabel}" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding Alignment}" IsEnabled="{Binding !IsAligning}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" Columns="{Binding ColumnCount}" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:MergeAlignmentCellViewModel">
+                                            <StackPanel Margin="3,0" Spacing="4" VerticalAlignment="Top">
+                                                <TextBlock Classes="muted"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap"
+                                                           IsVisible="{Binding IsReference}"
+                                                           Text="{x:Static res:Strings.MergeAlignmentReference}" />
+                                                <StackPanel Spacing="4" IsVisible="{Binding CanMove}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                                                       Width="72"
+                                                                       ShowButtonSpinner="False"
+                                                                       VerticalAlignment="Center"
+                                                                       Value="{Binding Offset}"
+                                                                       Increment="1"
+                                                                       Minimum="-2147483648"
+                                                                       Maximum="2147483647"
+                                                                       FormatString="+0;-0;0"
+                                                                       AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentOffsetName}">
+                                                            <ToolTip.Tip>
+                                                                <StackPanel Spacing="6">
+                                                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
+                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                                                </StackPanel>
+                                                            </ToolTip.Tip>
+                                                        </NumericUpDown>
+                                                        <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                                                        <Button Content="{x:Static res:Strings.MergeCompareButton}"
+                                                                Command="{Binding CompareCommand}"
+                                                                ToolTip.Tip="{x:Static res:Strings.MergeCompareToolTip}"
+                                                                AutomationProperties.Name="{x:Static res:Strings.MergeCompareToolTip}" />
+                                                    </StackPanel>
+                                                    <ComboBox HorizontalAlignment="Stretch"
+                                                              ItemsSource="{Binding Options}"
+                                                              SelectedItem="{Binding SelectedOption}"
+                                                              IsVisible="{Binding CanLink}"
+                                                              AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentLinkName}">
+                                                        <ComboBox.ItemTemplate>
+                                                            <DataTemplate DataType="vm:MergeAlignmentOptionViewModel">
+                                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}" />
+                                                            </DataTemplate>
+                                                        </ComboBox.ItemTemplate>
+                                                    </ComboBox>
+                                                    <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap" Text="{Binding Note}" IsVisible="{Binding HasNote}" />
+                                                    <TextBlock Classes="warning" FontSize="11" Text="{Binding Warning}" IsVisible="{Binding HasWarning}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
                     <StackPanel Spacing="6">
                         <TextBlock Classes="merge-heading" Text="{x:Static res:Strings.MergeSectionAssets}" />
                         <ItemsControl ItemsSource="{Binding Assets}">

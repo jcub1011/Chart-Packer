@@ -6,7 +6,7 @@ namespace ChartPacker.Audio.Spectrum;
 /// quieter) to 1 (a full-scale sine).
 /// </summary>
 /// <remarks>
-/// A Hann-windowed radix-2 FFT (Cooley–Tukey, decimation in time). Each band takes its loudest bin, tilted up
+/// A Hann-windowed radix-2 FFT; see <see cref="Fft"/>. Each band takes its loudest bin, tilted up
 /// 3 dB an octave about 1 kHz, as music has less energy the higher it goes. Nothing is allocated per window.
 /// Not thread-safe.
 /// </remarks>
@@ -23,11 +23,9 @@ public sealed class SpectrumAnalyzer
     private const double TiltDbPerOctave = 3;
     private const double TiltCentreHz = 1000;
 
+    private readonly Fft _fft = new(FftSize);
     private readonly float[] _window = new float[FftSize];
     private readonly float _windowSum;
-    private readonly int[] _reversed = new int[FftSize];
-    private readonly float[] _cos = new float[FftSize / 2];
-    private readonly float[] _sin = new float[FftSize / 2];
     private readonly float[] _re = new float[FftSize];
     private readonly float[] _im = new float[FftSize];
 
@@ -37,23 +35,11 @@ public sealed class SpectrumAnalyzer
 
     public SpectrumAnalyzer()
     {
-        int bits = (int)Math.Log2(FftSize);
         for (int i = 0; i < FftSize; i++)
         {
             // The periodic Hann window.
             _window[i] = (float)(0.5 * (1 - Math.Cos(2 * Math.PI * i / FftSize)));
             _windowSum += _window[i];
-
-            int reversed = 0;
-            for (int b = 0; b < bits; b++)
-                reversed |= ((i >> b) & 1) << (bits - 1 - b);
-            _reversed[i] = reversed;
-        }
-
-        for (int i = 0; i < FftSize / 2; i++)
-        {
-            _cos[i] = (float)Math.Cos(2 * Math.PI * i / FftSize);
-            _sin[i] = (float)Math.Sin(2 * Math.PI * i / FftSize);
         }
     }
 
@@ -92,32 +78,11 @@ public sealed class SpectrumAnalyzer
     {
         for (int i = 0; i < FftSize; i++)
         {
-            _re[_reversed[i]] = samples[i] * _window[i];
-            _im[_reversed[i]] = 0;
+            _re[i] = samples[i] * _window[i];
+            _im[i] = 0;
         }
 
-        for (int size = 2; size <= FftSize; size *= 2)
-        {
-            int half = size / 2;
-            int step = FftSize / size;
-            for (int start = 0; start < FftSize; start += size)
-            {
-                for (int k = 0; k < half; k++)
-                {
-                    // The twiddle factor e^(-2πik/size).
-                    float wr = _cos[k * step];
-                    float wi = -_sin[k * step];
-                    int a = start + k;
-                    int b = a + half;
-                    float xr = (_re[b] * wr) - (_im[b] * wi);
-                    float xi = (_re[b] * wi) + (_im[b] * wr);
-                    _re[b] = _re[a] - xr;
-                    _im[b] = _im[a] - xi;
-                    _re[a] += xr;
-                    _im[a] += xi;
-                }
-            }
-        }
+        _fft.Forward(_re, _im);
     }
 
     /// <summary>Works out which bins each band covers at <paramref name="sampleRate"/>.</summary>

@@ -355,6 +355,8 @@ namespace ChartPacker.ViewModels
             foreach (var conflict in analysis.Conflicts)
                 Metadata.Add(Choice(conflict.Key, conflict.Key, i => true, i => conflict.Values[i] ?? Strings.MergeNotSet, null, leaveOut: null));
 
+            BuildAlignment(analysis);
+
             // The audio with the most tracks; the rest follow it until chosen.
             int audio = Enumerable.Range(0, sources.Count)
                 .OrderByDescending(i => sources[i].AudioFiles.Count(f => !AudioStems.StemOf(f)!.Equals(AudioStems.Preview, StringComparison.OrdinalIgnoreCase)))
@@ -405,6 +407,7 @@ namespace ChartPacker.ViewModels
                 Assets[0].Select(Pick(audio, i => sources[i].AlbumArt is not null));
                 Assets[1].Select(Pick(audio, i => sources[i].BackgroundImage is not null));
                 Assets[2].Select(Pick(audio, i => sources[i].Video is not null));
+                AlignTo(audio);
             }
 
             if (ReferenceEquals(row, BaseChoice) && row.Selected?.Source is { } chosenBase)
@@ -436,7 +439,8 @@ namespace ChartPacker.ViewModels
                 audio,
                 Assets[0].Selected?.Source,
                 Assets[1].Selected?.Source,
-                Assets[2].Selected?.Source);
+                Assets[2].Selected?.Source,
+                SourceOffsets: SourceOffsets());
 
             // Checked here, not only when the preview is next staged, so a merge straight after a change can't take them.
             var timing = TimingOf(plan);
@@ -457,15 +461,16 @@ namespace ChartPacker.ViewModels
         /// <summary>
         /// Whether <paramref name="plan"/> stages the <c>delay</c> and the <c>video_start_time</c> as <see cref="_previewed"/>
         /// did: an offset set against one that has since changed, as by choosing another source's value for it, no
-        /// longer means what it did.
+        /// longer means what it did. Lining the songs up moves them both, but an offset set on the preview moves things
+        /// from where the songs are lined up to, so it still means what it did.
         /// </summary>
         private (bool SameDelay, bool SameVideoStart) TimingOf(SongMergePlan plan)
         {
             if (_previewed is not { } previewed)
                 return (false, false);
 
-            var before = SongMerger.BuildMetadata(previewed);
-            var after = SongMerger.BuildMetadata(plan);
+            var before = SongMerger.BuildMetadata(previewed with { SourceOffsets = null });
+            var after = SongMerger.BuildMetadata(plan with { SourceOffsets = null });
             return (TimingOffsets.OffsetOf(TimingOffsets.AudioKey, before, after, TimeSpan.Zero) == 0,
                 TimingOffsets.OffsetOf(TimingOffsets.VideoKey, before, after, TimeSpan.Zero) == 0);
         }
@@ -584,6 +589,8 @@ namespace ChartPacker.ViewModels
                 // The lyrics say so only of an offset set on vocals the plan still takes; merging would fail on it.
                 else if (plan.VocalsOffset != 0 && Preview.Lyrics.HasProblem)
                     TargetProblem = Strings.MergeLyricsOffsetBeforeStart;
+                else
+                    TargetProblem = AlignmentProblemOf(plan);
             }
             else
             {
@@ -807,7 +814,10 @@ namespace ChartPacker.ViewModels
                 previewDrafts.NotifyChanged(folder);
         }
 
-        /// <summary>What a plan takes from where, to tell whether the preview already shows it; the offsets aren't part of it, as the preview shows them itself.</summary>
+        /// <summary>
+        /// What a plan takes from where, and how far it lines each song up, to tell whether the preview already shows it; the
+        /// preview's own offsets aren't part of it, as the preview shows them itself.
+        /// </summary>
         private static string Signature(SongMergePlan plan) => string.Join(
             ";",
             [
@@ -816,6 +826,7 @@ namespace ChartPacker.ViewModels
                 $"{plan.AlbumArtSource}/{plan.BackgroundSource}/{plan.VideoSource}",
                 .. plan.Parts.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}"),
                 .. plan.Metadata.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}"),
+                .. (plan.SourceOffsets ?? new Dictionary<int, int>()).OrderBy(p => p.Key).Select(p => $"@{p.Key}={p.Value}"),
             ]);
 
         private static string Describe(ChartMergeWarning warning)

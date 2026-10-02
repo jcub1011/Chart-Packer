@@ -976,7 +976,7 @@ namespace ChartPacker.Controls
         }
 
         /// <summary>The column a lane is drawn in: six-fret's black and white frets share three.</summary>
-        private static int Column(HighwayLane lane, int noteLane) =>
+        internal static int Column(HighwayLane lane, int noteLane) =>
             lane.Kind == ChartInstrumentKind.SixFret ? noteLane % 3 : Math.Min(noteLane, lane.LaneCount - 1);
 
         private static bool IsBlackFret(HighwayLane lane, ChartNote note) => lane.Kind == ChartInstrumentKind.SixFret && note.Lane >= 3;
@@ -991,7 +991,7 @@ namespace ChartPacker.Controls
         private static Color HitColor(HighwayLane lane, int column) =>
             lane.Kind == ChartInstrumentKind.SixFret ? WhiteFretColor : TargetColor(lane, column);
 
-        private static Color NoteColor(HighwayLane lane, ChartNote note)
+        internal static Color NoteColor(HighwayLane lane, ChartNote note)
         {
             if ((note.Flags & NoteFlags.StarPower) != 0)
                 return StarPowerColor;

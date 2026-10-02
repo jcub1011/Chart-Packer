@@ -1530,6 +1530,181 @@
   <data name="MergeVideoLabel" xml:space="preserve">
     <value>Background video</value>
   </data>
+  <data name="MergeSectionAlignment" xml:space="preserve">
+    <value>Alignment</value>
+  </data>
+  <data name="MergeAlignmentDescription" xml:space="preserve">
+    <value>How far each song's chart moves to line up with the kept audio; its parts, lyrics and video move with it. Auto-align lines each song up with one already lined up: by a part they share, the pattern of its notes all through the song or its first notes, or else by their audio, each mixed down. Fine-tune each part afterwards with the note highway's offsets.</value>
+  </data>
+  <data name="MergeAlignmentLabel" xml:space="preserve">
+    <value>Offset</value>
+  </data>
+  <data name="MergeAutoAlignButton" xml:space="preserve">
+    <value>Auto-align</value>
+  </data>
+  <data name="MergeAutoAlignToolTip" xml:space="preserve">
+    <value>Works out how far each song is from the kept audio, by the parts the songs share or else by their audio, and lines them all up. Offsets typed by hand are replaced. The first time, each song's audio is read, which can take a few seconds.</value>
+  </data>
+  <data name="MergeAlignmentResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="MergeAlignmentResetToolTip" xml:space="preserve">
+    <value>Moves every song back to where its own chart has it.</value>
+  </data>
+  <data name="MergeAligning" xml:space="preserve">
+    <value>Lining up…</value>
+  </data>
+  <data name="MergeAligningAudio" xml:space="preserve">
+    <value>Reading the audio…</value>
+  </data>
+  <data name="MergeAlignmentReference" xml:space="preserve">
+    <value>Kept audio: the others line up with it</value>
+  </data>
+  <data name="MergeAlignmentNoChart" xml:space="preserve">
+    <value>No chart to line up by</value>
+  </data>
+  <data name="MergeAlignmentByHand" xml:space="preserve">
+    <value>Set by hand</value>
+    <comment>The link choice for a song moved only by the offset typed for it.</comment>
+  </data>
+  <data name="MergeAlignmentOptionFormat" xml:space="preserve">
+    <value>{0} · {1} · {2}</value>
+    <comment>A link choice: {0} is the song lined up with, {1} the part they share, {2} how (MergeAlignmentPatternFormat or MergeAlignmentFirstNotes).</comment>
+  </data>
+  <data name="MergeAlignmentPatternFormat" xml:space="preserve">
+    <value>note pattern, {0:P0} line up</value>
+    <comment>{0} is the share of the part's notes that line up, from 0 to 1.</comment>
+  </data>
+  <data name="MergeAlignmentFirstNotes" xml:space="preserve">
+    <value>first notes</value>
+  </data>
+  <data name="MergeAlignmentAudioPart" xml:space="preserve">
+    <value>Audio</value>
+    <comment>In a link choice, in place of the part shared: the songs are lined up by their audio.</comment>
+  </data>
+  <data name="MergeAlignmentAudioFormat" xml:space="preserve">
+    <value>{0:P0} alike</value>
+    <comment>{0} is how alike the two songs' audio is at the offset, from 0 to 1.</comment>
+  </data>
+  <data name="MergeAlignmentAudioWeakFormat" xml:space="preserve">
+    <value>The audio is only {0:P0} alike: the songs may be different recordings, or the offset may be wrong.</value>
+  </data>
+  <data name="MergeAlignmentAudioUnreadFormat" xml:space="preserve">
+    <value>The audio of {0} couldn't be read, so it's lined up by its chart alone.</value>
+    <comment>{0} lists the songs, e.g. "Song A, Song B".</comment>
+  </data>
+  <data name="MergeAlignmentLinkFormat" xml:space="preserve">
+    <value>{0:+0;-0;0} ms from {1}</value>
+    <comment>Under a linked song's offset: {0} is how far the link moves it from the song it's lined up with, {1} that song.</comment>
+  </data>
+  <data name="MergeAlignmentFirstNotesHint" xml:space="preserve">
+    <value>Only the first notes line it up: check both charts start at the same place in the song.</value>
+  </data>
+  <data name="MergeAlignmentAmbiguous" xml:space="preserve">
+    <value>Another offset, about a beat out, lines up nearly as well.</value>
+  </data>
+  <data name="MergeAlignmentNarrowed" xml:space="preserve">
+    <value>The notes repeat, so it was looked for near the first notes.</value>
+  </data>
+  <data name="MergeAlignmentNarrowedByAudio" xml:space="preserve">
+    <value>The notes repeat, so it was looked for near where the audio puts it.</value>
+  </data>
+  <data name="MergeAlignmentAudioDisagreesFormat" xml:space="preserve">
+    <value>Its audio puts it at {0:+0;-0;0} ms, {1:+0;-0;0} ms from here: check which is right.</value>
+    <comment>{0} is where the song's audio puts it against the kept audio; {1} how far that is from where it is now.</comment>
+  </data>
+  <data name="MergeAlignmentPatternDisagreesFormat" xml:space="preserve">
+    <value>Its note pattern ({1:P0} line up) puts it {0:+0;-0;0} ms from here instead.</value>
+    <comment>{0} is how far the part's note pattern puts the song from where its first notes do; {1} the share of notes that line up there.</comment>
+  </data>
+  <data name="MergeAlignmentDriftFormat" xml:space="preserve">
+    <value>The end of the song lines up {0:+0;-0} ms from its start: the songs may differ in length or speed.</value>
+  </data>
+  <data name="MergeAlignmentUnreached" xml:space="preserve">
+    <value>No part or audio in common with a song that's lined up.</value>
+  </data>
+  <data name="MergeAlignmentNoLinks" xml:space="preserve">
+    <value>Some songs share no part or audio with the kept audio's song, or with one lined up with it; set those by hand.</value>
+  </data>
+  <data name="MergeAlignmentFailedFormat" xml:space="preserve">
+    <value>The songs couldn't be lined up: {0}</value>
+  </data>
+  <data name="MergeAlignmentOffsetName" xml:space="preserve">
+    <value>Alignment offset</value>
+  </data>
+  <data name="MergeAlignmentOffsetToolTip" xml:space="preserve">
+    <value>How far everything from this song moves, in milliseconds, later when positive. A value typed for a linked song is added to its link, and the songs lined up with it follow.</value>
+  </data>
+  <data name="MergeAlignmentLinkName" xml:space="preserve">
+    <value>Lined up by</value>
+  </data>
+  <data name="MergeCompareButton" xml:space="preserve">
+    <value>Compare…</value>
+  </data>
+  <data name="MergeCompareToolTip" xml:space="preserve">
+    <value>Line this song up by eye: its waveform and notes against the kept audio's song's.</value>
+  </data>
+  <data name="MergeCompareTitleFormat" xml:space="preserve">
+    <value>Line up {0}</value>
+    <comment>The window's title. {0} is the song being lined up.</comment>
+  </data>
+  <data name="MergeCompareHeadingFormat" xml:space="preserve">
+    <value>Line up {0} with {1}</value>
+    <comment>{0} is the song being lined up, {1} the kept audio's song.</comment>
+  </data>
+  <data name="MergeCompareDescriptionFormat" xml:space="preserve">
+    <value>Drag {0}'s lanes sideways until its waveform and notes line up with those above them; drag anywhere else to move along the song. Scroll to zoom, or with Shift held to move along it. Hold Ctrl for a finer drag.</value>
+    <comment>{0} is the song being lined up.</comment>
+  </data>
+  <data name="MergeCompareNoAudioFormat" xml:space="preserve">
+    <value>{0} has no audio that can be read, so only its notes are shown.</value>
+  </data>
+  <data name="MergeCompareVocals" xml:space="preserve">
+    <value>Vocals</value>
+  </data>
+  <data name="MergeCompareReferencePartName" xml:space="preserve">
+    <value>The kept audio's song's part</value>
+  </data>
+  <data name="MergeCompareSongPartName" xml:space="preserve">
+    <value>This song's part</value>
+  </data>
+  <data name="MergeCompareRevertButton" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="MergeCompareRevertToolTip" xml:space="preserve">
+    <value>Back to the offset the song had when this opened.</value>
+  </data>
+  <data name="MergeCompareZoomIn" xml:space="preserve">
+    <value>Zoom in</value>
+  </data>
+  <data name="MergeCompareZoomOut" xml:space="preserve">
+    <value>Zoom out</value>
+  </data>
+  <data name="MergeCompareShowStart" xml:space="preserve">
+    <value>First notes</value>
+    <comment>Moves the view to just before the first notes.</comment>
+  </data>
+  <data name="MergeCompareShowAll" xml:space="preserve">
+    <value>Whole song</value>
+    <comment>Zooms the view out to show both songs from end to end.</comment>
+  </data>
+  <data name="MergeCompareTimelineName" xml:space="preserve">
+    <value>Both songs on one timeline</value>
+  </data>
+  <data name="MergeCompareJumpTo" xml:space="preserve">
+    <value>Jump to where a link puts it</value>
+  </data>
+  <data name="MergeCompareEstimateFormat" xml:space="preserve">
+    <value>{0}: {1:+0;-0;0} ms</value>
+    <comment>{0} is a link choice, as the alignment cell lists it; {1} where it puts the song.</comment>
+  </data>
+  <data name="MergeCompareApplyButton" xml:space="preserve">
+    <value>Use this offset</value>
+  </data>
+  <data name="MergeAlignmentBeforeStartFormat" xml:space="preserve">
+    <value>Lining up moves {0} before the song starts. Move its song later, or choose another base chart.</value>
+    <comment>{0} lists the parts, e.g. "Guitar, Drums".</comment>
+  </data>
   <data name="MergeSectionMetadata" xml:space="preserve">
     <value>Metadata</value>
   </data>

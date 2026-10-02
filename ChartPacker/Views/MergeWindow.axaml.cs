@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartPacker.ViewModels;
 
@@ -20,7 +21,16 @@ namespace ChartPacker.Views
         {
             base.OnDataContextChanged(e);
             if (DataContext is MergeWindowViewModel viewModel)
+            {
                 viewModel.CloseRequested += _ => Close();
+                viewModel.CompareRequested += compare => _ = ShowCompareAsync(compare);
+            }
+        }
+
+        private async Task ShowCompareAsync(MergeCompareViewModel compare)
+        {
+            var dialog = new MergeCompareWindow { DataContext = compare };
+            await dialog.ShowDialog(this);
         }
 
         protected override void OnClosing(WindowClosingEventArgs e)

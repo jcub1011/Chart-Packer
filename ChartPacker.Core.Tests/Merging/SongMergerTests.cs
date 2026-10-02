@@ -271,6 +271,93 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task SourceOffsetsMoveThePartsFromTheirSourceInTheMergeAndThePreview()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 1, ["guitar"] = 1 }) with
+        {
+            SourceOffsets = new Dictionary<int, int> { [1] = 500 },
+        };
+        string output = _root.CreateSubdirectory("out").FullName;
+
+        var result = await SongMerger.MergeAsync(plan, output, OverwritePolicy.Skip, new NoVideo());
+        var entry = new SongEntry(SongEntryKind.SngFile, result.OutputPath, "merged.sng", "merged");
+        var chart = ChartReader.Read((await SongFile.ReadAsync(entry, "notes.mid", ChartReader.MaxBytes))!, "notes.mid");
+
+        // Half a second at 120 BPM is a beat, 480 ticks; the base's bass and delay didn't move.
+        CollectionAssert.AreEqual(new long[] { 480, 720 }, ChartReaderTests.Notes(chart, ChartInstrument.Drums).Select(n => n.Tick).ToArray());
+        CollectionAssert.AreEqual(new long[] { 480, 960 }, ChartReaderTests.Notes(chart, ChartInstrument.Guitar).Select(n => n.Tick).ToArray());
+        CollectionAssert.AreEqual(new long[] { 0, 480 }, ChartReaderTests.Notes(chart, ChartInstrument.Bass).Select(n => n.Tick).ToArray());
+        Assert.IsFalse(SngReader.Read(result.OutputPath).Metadata.Any(p => p.Key == "delay"));
+
+        string folder = _root.CreateSubdirectory("preview").FullName;
+        await SongMerger.StageAsync(plan, folder, new NoVideo(), new Dictionary<string, string>());
+        var preview = ChartReader.Read(File.ReadAllBytes(Path.Combine(folder, "notes.mid")), "notes.mid");
+        CollectionAssert.AreEqual(new long[] { 480, 720 }, ChartReaderTests.Notes(preview, ChartInstrument.Drums).Select(n => n.Tick).ToArray());
+    }
+
+    [TestMethod]
+    public async Task TheBaseSourcesOffsetMovesTheDelayAndTheVideosSourcesTheVideoStart()
+    {
+        var withVideo = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(withVideo.FullPath, "video.mp4"), [0, 0, 0, 0]);
+        var analysis = await SongMergeAnalysis.LoadAsync([withVideo, await DrumsAndGuitarSngAsync()]);
+
+        // The audio is the second song's; the first's chart and video are 200 ms early against it.
+        var plan = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0, ["guitar"] = 1 }) with
+        {
+            AudioSource = 1,
+            VideoSource = 0,
+            SourceOffsets = new Dictionary<int, int> { [0] = 200 },
+        };
+
+        var metadata = SongMerger.BuildMetadata(plan).ToDictionary(p => p.Key, p => p.Value);
+        Assert.AreEqual("200", metadata["delay"]);
+        Assert.AreEqual("-200", metadata["video_start_time"]);
+
+        // The guitar's song isn't moved, so it's placed 200 ms earlier against the base's delay than the drums are.
+        string folder = _root.CreateSubdirectory("preview").FullName;
+        await SongMerger.StageAsync(plan, folder, new NoVideo(), new Dictionary<string, string>());
+        var preview = ChartReader.Read(File.ReadAllBytes(Path.Combine(folder, "notes.mid")), "notes.mid");
+        CollectionAssert.AreEqual(new long[] { 0, 480 }, ChartReaderTests.Notes(preview, ChartInstrument.Drums).Select(n => n.Tick).ToArray());
+        CollectionAssert.AreEqual(new long[] { 0, 288 }, ChartReaderTests.Notes(preview, ChartInstrument.Guitar).Select(n => n.Tick).ToArray());
+        StringAssert.Contains(File.ReadAllText(Path.Combine(folder, "song.ini")), "delay = 200");
+    }
+
+    [TestMethod]
+    public async Task PartsAnOffsetWouldMoveBeforeTheStartAreFound()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 1, ["guitar"] = 1 });
+
+        Assert.IsEmpty(SongMerger.PartsBeforeStart(plan));
+        Assert.IsEmpty(SongMerger.PartsBeforeStart(plan with { SourceOffsets = new Dictionary<int, int> { [1] = 300 } }));
+        CollectionAssert.AreEqual(new[] { "drums", "guitar" }, SongMerger.PartsBeforeStart(plan with { SourceOffsets = new Dictionary<int, int> { [1] = -1 } }).ToArray());
+
+        // Moving the base later moves the start with it, so the others' notes come before it.
+        CollectionAssert.AreEqual(new[] { "drums", "guitar" }, SongMerger.PartsBeforeStart(plan with { SourceOffsets = new Dictionary<int, int> { [0] = 100 } }).ToArray());
+
+        // Read once, the starts tell the same for any offsets, the plan's own aside.
+        var starts = SongMerger.PartStartsOf(plan with { SourceOffsets = new Dictionary<int, int> { [1] = -1 } });
+        Assert.IsEmpty(starts.BeforeStart(null));
+        CollectionAssert.AreEqual(new[] { "drums", "guitar" }, starts.BeforeStart(new Dictionary<int, int> { [0] = 100 }).ToArray());
+    }
+
+    [TestMethod]
+    public async Task TheBaseChartMovesOnlyAsFarAsTheDelayCanTakeIt()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 1, ["guitar"] = 1 }) with
+        {
+            SourceOffsets = new Dictionary<int, int> { [0] = 100_000_000, [1] = 99_999_999 },
+        };
+
+        // The delay stops at its furthest; the base chart's parts are placed against that, so the other song's are long after it.
+        Assert.AreEqual("86399999", SongMerger.BuildMetadata(plan).Single(p => p.Key == "delay").Value);
+        Assert.IsEmpty(SongMerger.PartsBeforeStart(plan));
+    }
+
+    [TestMethod]
     public async Task AVideoOffsetWithoutAVideoIsLeftOut()
     {
         var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()]);
