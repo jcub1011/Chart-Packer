@@ -720,6 +720,43 @@ namespace ChartPacker.ViewModels
             SetPosition(0);
         }
 
+        /// <summary>
+        /// Puts playback back at <paramref name="position"/> after the shown song was reloaded, e.g. the merge
+        /// preview was staged again: the seek bar moves there in any case, and playing resumes when
+        /// <paramref name="resume"/> is set. Nothing happens when there's nothing playable to go back to.
+        /// </summary>
+        public async Task RestorePlaybackAsync(TimeSpan position, bool resume)
+        {
+            double seconds = Math.Max(0, position.TotalSeconds);
+            double timeline = TimelineSeconds;
+            if (timeline > 0)
+                seconds = Math.Min(seconds, timeline);
+
+            // While scrubbing the slider owns the position; a reload must not fight it.
+            if (IsScrubbing)
+                return;
+
+            SetPosition(seconds);
+
+            if (!resume || IsScrubbing)
+                return;
+
+            if (await EnsureOpenAsync() is not { } player)
+                return;
+
+            // The length may only be known now that the audio is open.
+            double playable = Math.Max(TimelineSeconds, player.Length.TotalSeconds);
+            if (playable > 0 && seconds > playable)
+            {
+                seconds = playable;
+                SetPosition(seconds);
+            }
+
+            player.Seek(TimeSpan.FromSeconds(seconds));
+            player.Play();
+            SetPlaying(player.IsPlaying);
+        }
+
         private bool CanJumpToPreview() => PreviewStart is not null && CanPlay();
 
         /// <summary>Plays from the song's preview start.</summary>

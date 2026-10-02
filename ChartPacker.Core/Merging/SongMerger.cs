@@ -350,13 +350,8 @@ public static class SongMerger
         if (sources[plan.BaseSource].Chart is null)
             throw new ArgumentException("The base song has no chart that can be read.", nameof(plan));
 
-        var charts = AlignedCharts(plan);
-        var baseChart = charts[plan.BaseSource];
-        var parts = plan.Parts
-            .Select(p => (Source: charts[p.Value], Part: plan.Analysis.Parts.First(part => part.Id == p.Key)))
-            .ToList();
-        var merged = MidiMerger.Merge(baseChart, parts);
-        var warnings = plan.Parts.Values.Distinct().SelectMany(i => sources[i].ConversionWarnings.Where(w => parts.Any(p => ReferenceEquals(p.Source, charts[i]) && p.Part.Has(w.TrackName))))
+        var merged = MergedChart(plan);
+        var warnings = plan.Parts.Values.Distinct().SelectMany(i => sources[i].ConversionWarnings.Where(w => plan.Parts.Any(p => p.Value == i && plan.Analysis.Parts.First(part => part.Id == p.Key).Has(w.TrackName))))
             .Concat(merged.Warnings)
             .ToList();
         var pairs = BuildMetadata(plan).ToList();
@@ -433,6 +428,80 @@ public static class SongMerger
         if (plan.VideoSource is not null)
             TimingOffsets.Set(draft, TimingOffsets.VideoKey, pairs, TimeSpan.Zero, plan.VideoOffset);
         return draft.ApplyTo(pairs);
+    }
+
+    /// <summary>
+    /// The plan's charts merged in memory, exactly as <see cref="StageAsync"/> stages them: each source's chart
+    /// with its delay moved by the plan's <see cref="SongMergePlan.SourceOffsets"/>, merged into the base chart's.
+    /// </summary>
+    internal static MidiMergeResult MergedChart(SongMergePlan plan)
+    {
+        var charts = AlignedCharts(plan);
+        var baseChart = charts[plan.BaseSource];
+        var parts = plan.Parts
+            .Select(p => (Source: charts[p.Value], Part: plan.Analysis.Parts.First(part => part.Id == p.Key)))
+            .ToList();
+        return MidiMerger.Merge(baseChart, parts);
+    }
+
+    /// <summary>
+    /// How far the taken parts move on song time from staging <paramref name="staged"/> to choosing
+    /// <paramref name="pending"/>, for showing a lining-up live.
+    /// </summary>
+    /// <param name="Tracks">
+    /// Each taken instrument's move in milliseconds, later when positive, for every difficulty it has or
+    /// not; moving what's staged by these shows what staging the choice stages. Parts that don't move are left out.
+    /// </param>
+    /// <param name="VocalsMs">How far the vocals move in milliseconds, for the lyrics lane.</param>
+    public sealed record AlignmentPreviewShifts(IReadOnlyDictionary<ChartTrackKey, int> Tracks, int VocalsMs);
+
+    /// <summary>
+    /// How the taken parts move on song time from staging <paramref name="staged"/> to choosing
+    /// <paramref name="pending"/>: each part its source's offset against the base chart's, the base chart's only as
+    /// far as the <c>delay</c> can take it, as <see cref="AlignedCharts"/> and <see cref="WithSourceOffsets"/>
+    /// place it. <see langword="null"/> when the base chart can't be read, or when two taken parts share an
+    /// instrument but move apart, which one lane can't show.
+    /// </summary>
+    /// <remarks>Both plans must take everything from the same places, the lining-up aside.</remarks>
+    public static AlignmentPreviewShifts? PreviewShifts(SongMergePlan staged, SongMergePlan pending)
+    {
+        if (pending.Analysis.Sources[pending.BaseSource].Chart is null)
+            return null;
+
+        int base0 = BaseOffsetOf(staged.SourceOffsetOf(staged.BaseSource), DelayRangeOf(MetadataOf(staged)));
+        int base1 = BaseOffsetOf(pending.SourceOffsetOf(pending.BaseSource), DelayRangeOf(MetadataOf(pending)));
+
+        int ShiftOf(SongMergePlan plan, int baseShift, int source) =>
+            source == plan.BaseSource ? baseShift : plan.SourceOffsetOf(source);
+
+        var moves = new Dictionary<ChartInstrument, int>();
+        foreach (var (partId, source) in pending.Parts)
+        {
+            int delta = (ShiftOf(pending, base1, source) - ShiftOf(staged, base0, source)) - (base1 - base0);
+            if (delta == 0)
+                continue;
+            // A part no source has is rejected when staged; the staging reports it.
+            if (pending.Analysis.Parts.FirstOrDefault(p => p.Id == partId) is not { } part)
+                continue;
+            foreach (var instrument in MidiPartCatalog.InstrumentsOf(part))
+            {
+                if (moves.TryGetValue(instrument, out int moved) && moved != delta)
+                    return null;
+                moves[instrument] = delta;
+            }
+        }
+
+        var tracks = new Dictionary<ChartTrackKey, int>();
+        foreach (var (instrument, delta) in moves)
+            foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+                tracks[new ChartTrackKey(instrument, difficulty)] = delta;
+
+        int vocalsSource = pending.Parts.TryGetValue("vocals", out int vocals) ? vocals
+            : pending.Parts.TryGetValue("harmonies", out int harmonies) ? harmonies : -1;
+        int vocalsMs = vocalsSource < 0 ? 0
+            : (ShiftOf(pending, base1, vocalsSource) - ShiftOf(staged, base0, vocalsSource)) - (base1 - base0);
+
+        return new AlignmentPreviewShifts(tracks, vocalsMs);
     }
 
     /// <summary>

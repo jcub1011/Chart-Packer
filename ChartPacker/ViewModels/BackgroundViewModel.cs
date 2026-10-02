@@ -222,9 +222,16 @@ namespace ChartPacker.ViewModels
         };
 
         /// <summary>Takes the selection's loaded backgrounds, letting go of what was shown before.</summary>
-        public void Apply(LoadedBackgrounds loaded)
+        /// <param name="keepShown">
+        /// Leaves what's shown, the video playing, until the next <see cref="Refresh"/>, for the same song read again in place:
+        /// that goes on with the video when it's the same one, so it doesn't start over.
+        /// </param>
+        public void Apply(LoadedBackgrounds loaded, bool keepShown = false)
         {
-            Unload();
+            if (keepShown)
+                DisposeLater(_images.Values);
+            else
+                Unload();
             _images = loaded.Images;
             _staged = loaded.Staged;
         }

@@ -325,6 +325,98 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task PreviewShiftsShowChoosingAnOffsetLikeStagingIt()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var staged = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 1, ["guitar"] = 1 });
+        var pending = staged with { SourceOffsets = new Dictionary<int, int> { [1] = 500 } };
+
+        var shifts = SongMerger.PreviewShifts(staged, pending);
+        Assert.IsNotNull(shifts);
+
+        // The second song's drums and guitar move half a second later; the base's bass doesn't move at all.
+        Assert.AreEqual(500, shifts.Tracks[new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert)]);
+        Assert.AreEqual(500, shifts.Tracks[new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Easy)]);
+        Assert.IsFalse(shifts.Tracks.Keys.Any(k => k.Instrument == ChartInstrument.Bass));
+        Assert.AreEqual(0, shifts.VocalsMs);
+
+        // Moving what's staged by the shifts shows what staging the choice stages, to a few milliseconds a note.
+        var options = ChartReadOptions.From(SongMerger.BuildMetadata(pending));
+        var live = ChartReader.Read(ChartShifter.Shift(SongMerger.MergedChart(staged).Midi, "notes.mid", shifts.Tracks, options).Bytes, "notes.mid", options);
+        var fresh = ChartReader.Read(SongMerger.MergedChart(pending).Midi, "notes.mid", options);
+        Assert.AreSequenceEqual(
+            [.. fresh.Tracks.Keys.OrderBy(k => k.Instrument).ThenBy(k => k.Difficulty)],
+            [.. live.Tracks.Keys.OrderBy(k => k.Instrument).ThenBy(k => k.Difficulty)]);
+        foreach (var key in fresh.Tracks.Keys)
+        {
+            var want = fresh.Tracks[key].Notes;
+            var got = live.Tracks[key].Notes;
+            Assert.AreEqual(want.Count, got.Count, key.ToString());
+            for (int i = 0; i < want.Count; i++)
+            {
+                double off = Math.Abs(fresh.Tempo.SecondsAt(want[i].Tick) - live.Tempo.SecondsAt(got[i].Tick));
+                Assert.IsTrue(off < 0.005, $"{key} note {i} is {off:0.000} s apart");
+            }
+        }
+    }
+
+    [TestMethod]
+    public async Task PreviewShiftsShowChoosingTheBaseSourcesOffsetLikeStagingIt()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var staged = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0, ["guitar"] = 1 });
+        var pending = staged with { SourceOffsets = new Dictionary<int, int> { [0] = 200 } };
+
+        var shifts = SongMerger.PreviewShifts(staged, pending);
+        Assert.IsNotNull(shifts);
+
+        // Moving the base later moves the start with it: the guitar is placed 200 ms earlier against the
+        // delay, while the base's own drums stay where they are. (Shifting the staged chart itself that far
+        // would move the guitar's first note before the start, which the highway reports instead of showing.)
+        Assert.AreEqual(-200, shifts.Tracks[new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Expert)]);
+        Assert.IsFalse(shifts.Tracks.Keys.Any(k => k.Instrument == ChartInstrument.Drums));
+        Assert.AreEqual("200", SongMerger.BuildMetadata(pending).First(p => p.Key == "delay").Value);
+    }
+
+    [TestMethod]
+    public async Task PreviewShiftsAreFromWhereTheStagingAlreadyLinedTheSongsUp()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 1, ["guitar"] = 1 });
+        var staged = plan with { SourceOffsets = new Dictionary<int, int> { [1] = 300 } };
+        var pending = plan with { SourceOffsets = new Dictionary<int, int> { [1] = 500 } };
+
+        var shifts = SongMerger.PreviewShifts(staged, pending);
+        Assert.IsNotNull(shifts);
+
+        // Only what's moved since the staging: the 300 ms it already has isn't moved again.
+        Assert.AreEqual(200, shifts.Tracks[new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert)]);
+        Assert.AreEqual(200, shifts.Tracks[new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Expert)]);
+        Assert.IsEmpty(SongMerger.PreviewShifts(pending, pending)!.Tracks);
+    }
+
+    [TestMethod]
+    public async Task PreviewShiftsMoveTheVocalsWithTheSongTheyComeFrom()
+    {
+        var withVocals = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(withVocals.FullPath, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART DRUMS").Note(0, 96).Note(480, 97)
+            .Track("PART VOCALS").Note(0, 60).Meta(0, 0x05, Encoding.Latin1.GetBytes("hey"))
+            .Build());
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), withVocals], TestContext.CancellationToken);
+        var staged = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0, ["vocals"] = 1 });
+        var pending = staged with { SourceOffsets = new Dictionary<int, int> { [1] = 250 } };
+
+        var shifts = SongMerger.PreviewShifts(staged, pending);
+        Assert.IsNotNull(shifts);
+
+        // The base's drums stay; the vocals move with the second song.
+        Assert.AreEqual(250, shifts.VocalsMs);
+        Assert.IsEmpty(shifts.Tracks);
+    }
+
+    [TestMethod]
     public async Task PartsAnOffsetWouldMoveBeforeTheStartAreFound()
     {
         var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);

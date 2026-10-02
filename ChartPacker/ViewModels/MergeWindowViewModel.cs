@@ -185,7 +185,8 @@ namespace ChartPacker.ViewModels
         MetadataDraftStore previewDrafts) : ViewModelBase
     {
 
-        // The plan the preview was staged with, which its highway's, audio's and video's offsets were set against.
+        // The plan the preview shows, which its highway's, audio's and video's offsets are set against: the one it was staged
+        // with, or the one it shows lined up live, ahead of staging.
         private SongMergePlan? _previewed;
         private SongMergeAnalysis? _analysis;
         private CancellationTokenSource? _cts;
@@ -568,6 +569,9 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
+            // Lining the songs up moves the preview right away, the way dragging a highway offset does; the staging that
+            // follows changes nothing shown.
+            PreviewLiveAlignment();
             SchedulePreview();
             RefreshTarget();
         }
@@ -753,9 +757,28 @@ namespace ChartPacker.ViewModels
             IsPreviewUpdating = true;
             try
             {
-                // Playback and the background video hold the song's files open; they're let go first.
-                await Preview.ShowAsync([]);
-                await Preview.Player.WhenFilesClosedAsync();
+                // Where playback is, to put it back should reading the song again stop it: the audio, the parts or the
+                // names may change what's staged, but that shouldn't move the playhead.
+                TimeSpan resumeAt = Preview.Player.CurrentPosition;
+                bool wasPlaying = Preview.Player.IsPlaying;
+                bool wasScrubbing = Preview.Player.IsScrubbing;
+
+                // Only the songs' lining-up changed since the chart was read, which the preview already shows: staging
+                // writes the same, and nothing shown is read again. Otherwise it's read again in place; only what holds
+                // a file staging replaces is let go first: playback for other audio, the video for another video.
+                bool live = LiveShiftsOf(plan) is not null;
+                if (!live)
+                {
+                    if (_previewed?.AudioSource != plan.AudioSource)
+                    {
+                        await Preview.ReleaseFilesAsync();
+                    }
+                    else if (_previewed?.VideoSource != plan.VideoSource)
+                    {
+                        Preview.Background.Unload();
+                        await Preview.Background.WhenClosedAsync();
+                    }
+                }
 
                 _previewFolder ??= Directory.CreateTempSubdirectory("chartpacker-merge-preview-").FullName;
                 var warnings = await SongMerger.StageAsync(plan, _previewFolder, video, _staged, cts.Token);
@@ -768,7 +791,29 @@ namespace ChartPacker.ViewModels
                 _previewedPlan = signature;
                 RebaseTimingOffsets(plan);
                 _previewed = plan;
-                await Preview.ShowAsync([new SongEntry(SongEntryKind.SongFolder, _previewFolder, ".", name)]);
+
+                if (live)
+                {
+                    // The rows, files and length catch up with what's staged; the rest already shows it.
+                    await Preview.SyncPreviewStagingAsync(cts.Token);
+                    return;
+                }
+
+                await Preview.ShowAsync([new SongEntry(SongEntryKind.SongFolder, _previewFolder, ".", name)], inPlace: true);
+                if (_closed)
+                    return;
+
+                // What the preview read is what was just staged: the next staging can't start until this one is done.
+                _loadedPlan = plan;
+                _loadedGeneration = Preview.LoadGeneration;
+
+                // Playback that went on through the reload needs nothing. Otherwise it went with it, for other tracks;
+                // it goes back to where it was, playing again if it was, even with another change on its way, which
+                // lets go of it again only if it has to.
+                if (wasPlaying && !wasScrubbing && !Preview.Player.IsPlaying)
+                    await Preview.Player.RestorePlaybackAsync(resumeAt, resume: true);
+                else if (!wasPlaying && !wasScrubbing && Preview.Player.PositionSeconds != resumeAt.TotalSeconds)
+                    await Preview.Player.RestorePlaybackAsync(resumeAt, resume: false);
             }
             catch (OperationCanceledException)
             {

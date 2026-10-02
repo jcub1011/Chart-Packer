@@ -21,7 +21,18 @@ namespace ChartPacker.ViewModels
     /// <summary>The one selected song, as the note highway needs it.</summary>
     /// <param name="Metadata">Its metadata with the draft applied, for <c>delay</c> and <c>pro_drums</c>.</param>
     /// <param name="StoredFiles">The names of its files as stored.</param>
-    public sealed record HighwaySong(SongEntry Entry, MetadataDraft Draft, IReadOnlyList<KeyValuePair<string, string>> Metadata, IReadOnlyList<string> StoredFiles);
+    /// <param name="ChartShifts">
+    /// How far to draw each instrument difficulty moved on song time, in milliseconds, later when positive, on top of the draft's
+    /// offsets, without that being an offset of the song's: the merge preview lining its songs up live, from the chart it last read.
+    /// </param>
+    /// <param name="VocalsShift">How far to draw the vocals moved, as <paramref name="ChartShifts"/> moves the instruments.</param>
+    public sealed record HighwaySong(
+        SongEntry Entry,
+        MetadataDraft Draft,
+        IReadOnlyList<KeyValuePair<string, string>> Metadata,
+        IReadOnlyList<string> StoredFiles,
+        IReadOnlyDictionary<ChartTrackKey, int>? ChartShifts = null,
+        int VocalsShift = 0);
 
     /// <summary>A difficulty in an instrument's picker, labelled with its pending offset if it has one.</summary>
     public sealed record DifficultyOption(ChartDifficulty Difficulty, string Label);
@@ -57,6 +68,9 @@ namespace ChartPacker.ViewModels
         private string? _sourceKey;
         private string? _chartName;
         private byte[]? _bytes;
+
+        // Set by ReloadChart: the next chart read keeps what's drawn until it's rebuilt from what's read.
+        private bool _keepScene;
 
         // The chart as stored, which the rows are built from, and as the draft moves it, which is drawn.
         private ChartDocument? _original;
@@ -237,9 +251,23 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
+        /// Has the next <see cref="Refresh"/> read the chart afresh, as after it was written again in place, while what's
+        /// drawn stays until the chart read is rebuilt: the merge preview staged again, so it doesn't blink.
+        /// </summary>
+        public void ReloadChart()
+        {
+            _version++;
+            _sourceKey = null;
+            _chartName = null;
+            _bytes = null;
+            _builtOffsets = null;
+            _keepScene = _original is not null;
+        }
+
+        /// <summary>
         /// Shows <paramref name="song"/>'s chart, with its draft's offsets; <see langword="null"/> shows
         /// nothing, as for no selection or several songs. The chart is read again only when it's a
-        /// different file: the draft adding one, or a different song.
+        /// different file: the draft adding one, or a different song, or after <see cref="ReloadChart"/>.
         /// </summary>
         public void Refresh(HighwaySong? song)
         {
@@ -260,7 +288,12 @@ namespace ChartPacker.ViewModels
             string key = chart.StagedPath ?? $"{song.Entry.FullPath}|{chart.Name}";
             if (key != _sourceKey)
             {
-                Clear(null);
+                // Read again in place, what's drawn stays until it's rebuilt; anything else starts afresh.
+                if (_keepScene)
+                    _version++;
+                else
+                    Clear(null);
+                _keepScene = false;
                 _sourceKey = key;
                 _ = LoadAsync(song.Entry, chart, key);
             }
@@ -308,6 +341,7 @@ namespace ChartPacker.ViewModels
             _sourceKey = null;
             _chartName = null;
             _bytes = null;
+            _keepScene = false;
             _original = null;
             _originalOf = null;
             _shown = null;
@@ -335,7 +369,7 @@ namespace ChartPacker.ViewModels
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 if (version == _version)
-                    Note = string.Format(CultureInfo.CurrentCulture, Strings.HighwayUnreadableFormat, ex.Message);
+                    ShowUnread(key, string.Format(CultureInfo.CurrentCulture, Strings.HighwayUnreadableFormat, ex.Message));
                 return;
             }
 
@@ -343,7 +377,7 @@ namespace ChartPacker.ViewModels
                 return;
             if (bytes is null)
             {
-                Note = Strings.HighwayNoChart;
+                ShowUnread(key, Strings.HighwayNoChart);
                 ChartParts = NoParts;
                 return;
             }
@@ -360,16 +394,39 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
+        /// Shows <paramref name="note"/> for the chart at <paramref name="key"/>, which wasn't read: nothing drawn before it was
+        /// read again stays. It stays known as read, so it isn't read again until it's a different one.
+        /// </summary>
+        private void ShowUnread(string key, string note)
+        {
+            Clear(note);
+            _sourceKey = key;
+        }
+
+        /// <summary>
         /// Whether what's shown, or the rebuild under way, is of <paramref name="song"/>'s offsets and the
         /// settings it's read with: <c>pro_drums</c>, <c>sustain_cutoff_threshold</c> and <c>hopo_frequency</c>.
         /// </summary>
         private bool IsBuiltFor(HighwaySong song)
         {
-            var offsets = song.Draft.ChartOffsets;
+            var offsets = DisplayOffsets(song);
             return _builtOffsets is { } built
                 && _builtOptions == ChartReadOptions.From(song.Metadata)
                 && built.Count == offsets.Count
                 && built.All(p => offsets.TryGetValue(p.Key, out int ms) && ms == p.Value);
+        }
+
+        /// <summary>The draft's offsets with the song's <see cref="HighwaySong.ChartShifts"/> on top: how far each track is drawn moved.</summary>
+        private static Dictionary<ChartTrackKey, int> DisplayOffsets(HighwaySong song)
+        {
+            var offsets = new Dictionary<ChartTrackKey, int>(song.Draft.ChartOffsets);
+            if (song.ChartShifts is { } shifts)
+            {
+                foreach (var (key, ms) in shifts)
+                    offsets[key] = offsets.GetValueOrDefault(key) + ms;
+            }
+
+            return offsets;
         }
 
         /// <summary>Draws the chart shown against the song's <c>delay</c> as drafted now.</summary>
@@ -417,11 +474,14 @@ namespace ChartPacker.ViewModels
                 return;
 
             int version = ++_version;
-            var offsets = new Dictionary<ChartTrackKey, int>(song.Draft.ChartOffsets);
+            var offsets = DisplayOffsets(song);
             var options = ChartReadOptions.From(song.Metadata);
             _builtOffsets = offsets;
             _builtOptions = options;
             var cached = _originalOf is { } of && ReferenceEquals(of.Bytes, bytes) && of.Options == options ? _original : null;
+
+            // Markings a shift changes are a problem only where the song has an offset of its own: a shift is just how it's drawn.
+            var ownOffsets = song.ChartShifts is { Count: > 0 } ? song.Draft.ChartOffsets.Keys.ToHashSet() : null;
 
             (ChartDocument Original, ChartDocument Shown, string? Problem) result;
             try
@@ -432,8 +492,9 @@ namespace ChartPacker.ViewModels
                     try
                     {
                         var shifted = ChartShifter.Shift(bytes, name, offsets, options);
-                        string? problem = shifted.ChangedMarkings.Count == 0 ? null : string.Format(
-                            CultureInfo.CurrentCulture, Strings.HighwayMarkingsChangedFormat, string.Join(", ", shifted.ChangedMarkings.Select(TrackName)));
+                        var changed = shifted.ChangedMarkings.Where(k => ownOffsets?.Contains(k) != false).ToList();
+                        string? problem = changed.Count == 0 ? null : string.Format(
+                            CultureInfo.CurrentCulture, Strings.HighwayMarkingsChangedFormat, string.Join(", ", changed.Select(TrackName)));
                         return (original, shifted.Document, problem);
                     }
                     catch (ChartFormatException ex)
@@ -465,9 +526,11 @@ namespace ChartPacker.ViewModels
             Note = null;
             if (!ReferenceEquals(result.Original, _original))
             {
+                // Read again with the same instruments, as when the merge preview is staged again, the rows stay as they are.
+                if (!HasRowsFor(result.Original))
+                    BuildRows(result.Original);
                 _original = result.Original;
                 _originalOf = (bytes, options);
-                BuildRows(result.Original);
             }
 
             ChartOffset = result.Original.Offset ?? TimeSpan.Zero;
@@ -498,6 +561,11 @@ namespace ChartPacker.ViewModels
 
             _isSyncing = false;
         }
+
+        /// <summary>Whether there's a row for each of <paramref name="chart"/>'s instruments, in order, with the difficulties it has.</summary>
+        private bool HasRowsFor(ChartDocument chart) =>
+            Rows.Count == chart.Instruments.Count
+            && Rows.Zip(chart.Instruments).All(p => p.First.Instrument == p.Second && p.First.HasDifficulties(chart.DifficultiesOf(p.Second)));
 
         /// <summary>Brings each row's offset and difficulty labels up to date with the draft.</summary>
         private void SyncRows()
@@ -717,6 +785,9 @@ namespace ChartPacker.ViewModels
 
             Offset = offsets.GetValueOrDefault(Key);
         }
+
+        /// <summary>Whether the row offers exactly <paramref name="difficulties"/>.</summary>
+        internal bool HasDifficulties(IEnumerable<ChartDifficulty> difficulties) => _difficulties.SequenceEqual(difficulties);
 
         private int IndexOf(ChartDifficulty difficulty)
         {

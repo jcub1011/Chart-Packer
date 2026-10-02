@@ -22,6 +22,12 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
         </Style>
+        <Style Selector="StackPanel.preview-status">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="StackPanel.preview-status.updating">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
         <Style Selector="TextBlock.merge-description">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Opacity" Value="0.6" />
@@ -294,8 +300,10 @@
                 <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <TextBlock Grid.Column="0" Classes="merge-heading" VerticalAlignment="Center" Text="{x:Static res:Strings.MergePreviewHeading}" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsPreviewUpdating}">
-                            <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" />
+                        <!-- Always laid out, only faded in, so the heading's row keeps its height and the preview doesn't jump as it appears. -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsHitTestVisible="False"
+                                    Classes="preview-status" Classes.updating="{Binding IsPreviewUpdating}">
+                            <Arc Classes="spinner" Classes.active="{Binding IsPreviewUpdating}" Width="14" Height="14" StrokeThickness="2" />
                             <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.MergePreviewUpdating}" />
                         </StackPanel>
                     </Grid>

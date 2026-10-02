@@ -133,6 +133,11 @@ namespace ChartPacker.ViewModels
         private readonly Dictionary<int, Task<IReadOnlyList<ComparePartOption>>> _compareParts = [];
         private bool _openingCompare;
 
+        // The plan whose chart the preview last read, and the preview's LoadGeneration then: what lining the songs up is
+        // shown moved from, before it's staged.
+        private SongMergePlan? _loadedPlan;
+        private int _loadedGeneration;
+
         /// <summary>One cell per source, lined up with the headers.</summary>
         public AvaloniaList<MergeAlignmentCellViewModel> Alignment { get; } = [];
 
@@ -185,6 +190,47 @@ namespace ChartPacker.ViewModels
             var offsets = AlignmentOffsets(reference);
             var moved = Enumerable.Range(0, offsets.Length).Where(i => offsets[i] != 0).ToDictionary(i => i, i => offsets[i]);
             return moved.Count > 0 ? moved : null;
+        }
+
+        /// <summary>
+        /// Whether <paramref name="plan"/> takes everything from where <paramref name="staged"/> does, the lining-up
+        /// aside: then only the source offsets changed, which the preview can show by moving what it read.
+        /// </summary>
+        private static bool SameSelection(SongMergePlan plan, SongMergePlan staged) =>
+            plan.BaseSource == staged.BaseSource
+            && plan.AudioSource == staged.AudioSource
+            && plan.AlbumArtSource == staged.AlbumArtSource
+            && plan.BackgroundSource == staged.BackgroundSource
+            && plan.VideoSource == staged.VideoSource
+            && plan.Parts.Count == staged.Parts.Count && plan.Parts.All(p => staged.Parts.TryGetValue(p.Key, out int source) && source == p.Value)
+            && plan.Metadata.Count == staged.Metadata.Count && plan.Metadata.All(p => staged.Metadata.TryGetValue(p.Key, out int? source) && source == p.Value);
+
+        /// <summary>
+        /// How far <paramref name="plan"/> moves each part from the chart the preview last read, when lining the songs up is all
+        /// that's changed since and the preview can draw it so; <see langword="null"/> when it has to be staged and read again.
+        /// </summary>
+        private SongMerger.AlignmentPreviewShifts? LiveShiftsOf(SongMergePlan plan) =>
+            _loadedPlan is { } loaded && Preview.LoadGeneration == _loadedGeneration && PreviewMessage is null && SameSelection(plan, loaded)
+                ? SongMerger.PreviewShifts(loaded, plan)
+                : null;
+
+        /// <summary>
+        /// Shows the songs lined up as chosen right away, while the staging is still on its way: the chart and lyrics the
+        /// preview read drawn moved, against the <c>delay</c> and <c>video_start_time</c> staging writes, so the notes, the
+        /// vocals and the video follow an offset as it's dragged. Nothing is read and playback carries on; the staging that
+        /// follows changes nothing shown. Only when lining up is all that's changed since the chart was read; anything else
+        /// is staged and read again in place.
+        /// </summary>
+        private void PreviewLiveAlignment()
+        {
+            if (Plan() is not { } plan || LiveShiftsOf(plan) is not { } shifts)
+                return;
+
+            // The preview's audio and video offsets are its keys' values against what it shows, which this now is.
+            RebaseTimingOffsets(plan);
+            _previewed = plan;
+            if (!Preview.ShowPreviewAlignment(shifts.Tracks, shifts.VocalsMs, SongMerger.BuildMetadata(plan)))
+                _loadedPlan = null;
         }
 
         private int[] AlignmentOffsets(int reference) => SourceAligner.OffsetsOf(Alignment.Count, reference, _choices, _nudges, _byHand);
