@@ -181,7 +181,7 @@ public sealed class DraftWriterTests
 
         Assert.AreSequenceEqual(
             ["guitar.ogg", "notes.chart", "song.ini"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
-        StringAssert.Contains(File.ReadAllText(songIni), "name = B");
+        Assert.Contains("name = B", File.ReadAllText(songIni));
     }
 
     [TestMethod]

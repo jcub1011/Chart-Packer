@@ -120,11 +120,11 @@ public sealed class ChartToMidiTests
 
         string midi = Encoding.Latin1.GetString(ChartToMidi.Convert(chart).Midi);
 
-        StringAssert.Contains(midi, "EVENTS");
-        StringAssert.Contains(midi, "[section Intro]");
-        StringAssert.Contains(midi, "[end]");
-        StringAssert.Contains(midi, "PART VOCALS");
-        StringAssert.Contains(midi, "Hel-");
+        Assert.Contains("EVENTS", midi);
+        Assert.Contains("[section Intro]", midi);
+        Assert.Contains("[end]", midi);
+        Assert.Contains("PART VOCALS", midi);
+        Assert.Contains("Hel-", midi);
         Assert.DoesNotContain("[lyric", midi);
     }
 
@@ -450,7 +450,7 @@ public sealed class ChartToMidiTests
 
         var conversion = ChartToMidi.Convert(chart);
 
-        StringAssert.Contains(Encoding.Latin1.GetString(conversion.Midi), "[mix 3 drums0d]");
+        Assert.Contains("[mix 3 drums0d]", Encoding.Latin1.GetString(conversion.Midi));
         Assert.IsEmpty(conversion.Warnings);
     }
 

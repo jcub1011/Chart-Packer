@@ -34,7 +34,7 @@ public sealed class ChartShifterTests
         int end = text.IndexOf('}', start);
         Assert.AreEqual(text[..start], shifted[..start]);
         Assert.AreEqual(text[end..], shifted[(shifted.IndexOf('}', start))..]);
-        StringAssert.Contains(shifted, "192 = S 2 300");
+        Assert.Contains("192 = S 2 300", shifted);
 
         var moved = ChartReaderTests.Notes(result.Document, ChartInstrument.Guitar);
         Assert.AreSequenceEqual(

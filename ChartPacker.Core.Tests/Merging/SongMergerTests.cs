@@ -132,7 +132,7 @@ public sealed class SongMergerTests
         // The .chart's drums were at 192 ticks a beat; the base's at 480, both at 120 BPM.
         Assert.AreSequenceEqual(
             [new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.None), new ChartNote(240, 0, 1, NoteFlags.Cymbal)], ChartReaderTests.Notes(chart, ChartInstrument.Drums));
-        StringAssert.Contains(Encoding.Latin1.GetString((await SongFile.ReadAsync(entry, "notes.mid", ChartReader.MaxBytes, TestContext.CancellationToken))!), "[section Intro]");
+        Assert.Contains("[section Intro]", Encoding.Latin1.GetString((await SongFile.ReadAsync(entry, "notes.mid", ChartReader.MaxBytes, TestContext.CancellationToken))!));
     }
 
     [TestMethod]
@@ -321,7 +321,7 @@ public sealed class SongMergerTests
         var preview = ChartReader.Read(File.ReadAllBytes(Path.Combine(folder, "notes.mid")), "notes.mid");
         Assert.AreSequenceEqual([0, 480], [.. ChartReaderTests.Notes(preview, ChartInstrument.Drums).Select(n => n.Tick)]);
         Assert.AreSequenceEqual([0, 288], [.. ChartReaderTests.Notes(preview, ChartInstrument.Guitar).Select(n => n.Tick)]);
-        StringAssert.Contains(File.ReadAllText(Path.Combine(folder, "song.ini")), "delay = 200");
+        Assert.Contains("delay = 200", File.ReadAllText(Path.Combine(folder, "song.ini")));
     }
 
     [TestMethod]
@@ -386,7 +386,7 @@ public sealed class SongMergerTests
 
         Assert.AreSequenceEqual(["notes.mid", "song.ini", "guitar.ogg", "drums.ogg", "album.png"], Names(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(folder, "album.png")));
-        StringAssert.Contains(File.ReadAllText(Path.Combine(folder, "song.ini")), "song_length = ");
+        Assert.Contains("song_length = ", File.ReadAllText(Path.Combine(folder, "song.ini")));
 
         await SongMerger.StageAsync(plan with { AlbumArtSource = null }, folder, new NoVideo(), staged, TestContext.CancellationToken);
         Assert.IsFalse(File.Exists(Path.Combine(folder, "album.png")));
@@ -404,7 +404,7 @@ public sealed class SongMergerTests
 
         Assert.IsEmpty(warnings);
         // 64 ticks at 192 is 160 at the base's 480.
-        StringAssert.Contains(ini, "sustain_cutoff_threshold = 159");
+        Assert.Contains("sustain_cutoff_threshold = 159", ini);
         Assert.DoesNotContain("sustain_cutoff_threshold = 240", ini);
 
         // Without a sustain that short, the default is left to the game.

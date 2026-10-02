@@ -294,7 +294,7 @@ public sealed class DedupAnalyzerTests
     {
         var a = Song(_root, "A");
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DedupAnalyzer.AnalyzeAsync([a], parallelism: 0, TestContext.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DedupAnalyzer.AnalyzeAsync([a], parallelism: 0, cancellationToken: TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -314,15 +314,15 @@ public sealed class DedupAnalyzerTests
         entries.Add(Song(_root, "MergeB", "Band", "Merge", chart: Chart.Replace("0 = N 0 0", "0 = N 4 0")));
         entries.Add(Song(_root, "Alone", title: "Alone", chart: Chart.Replace("0 = N 0 0", "0 = N 5 0")));
 
-        var one = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 1, TestContext.CancellationToken));
-        var many = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 8, TestContext.CancellationToken));
+        var (Exact, SameChart, Merge) = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 1, cancellationToken: TestContext.CancellationToken));
+        var many = Describe(await DedupAnalyzer.AnalyzeAsync(entries, parallelism: 8, cancellationToken: TestContext.CancellationToken));
 
-        Assert.HasCount(3, one.Exact);
-        Assert.HasCount(1, one.SameChart);
-        Assert.HasCount(1, one.Merge);
-        Assert.AreSequenceEqual(one.Exact, many.Exact);
-        Assert.AreSequenceEqual(one.SameChart, many.SameChart);
-        Assert.AreSequenceEqual(one.Merge, many.Merge);
+        Assert.HasCount(3, Exact);
+        Assert.HasCount(1, SameChart);
+        Assert.HasCount(1, Merge);
+        Assert.AreSequenceEqual(Exact, many.Exact);
+        Assert.AreSequenceEqual(SameChart, many.SameChart);
+        Assert.AreSequenceEqual(Merge, many.Merge);
 
         static (string[] Exact, string[] SameChart, string[] Merge) Describe(DedupAnalysis analysis) =>
         (

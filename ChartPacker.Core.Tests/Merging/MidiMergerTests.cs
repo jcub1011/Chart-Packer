@@ -35,7 +35,7 @@ public sealed class MidiMergerTests
         Assert.AreSequenceEqual([ChartInstrument.Guitar, ChartInstrument.Drums], [.. merged.Instruments]);
 
         string text = Encoding.Latin1.GetString(result.Midi);
-        StringAssert.Contains(text, "[section Base]");
+        Assert.Contains("[section Base]", text);
         Assert.DoesNotContain("[section Other]", text);
         Assert.IsEmpty(result.Warnings);
     }
@@ -197,9 +197,9 @@ public sealed class MidiMergerTests
         var result = MidiMerger.Merge(baseChart, [(other, MidiPartCatalog.PartOf("HARM1")!)]);
         string text = Encoding.Latin1.GetString(result.Midi);
 
-        StringAssert.Contains(text, "HARM1");
-        StringAssert.Contains(text, "HARM2");
-        StringAssert.Contains(text, "HARM3");
+        Assert.Contains("HARM1", text);
+        Assert.Contains("HARM2", text);
+        Assert.Contains("HARM3", text);
         Assert.IsTrue(ChartReader.Read(result.Midi, "notes.mid").Tempo.SameAs(Read(baseChart).Tempo));
     }
 

@@ -28,7 +28,7 @@ public sealed class UnpackerTests
         Assert.IsTrue(result.Extracted);
         Assert.IsEmpty(result.Findings);
         Assert.AreEqual("ABC", File.ReadAllText(Path.Combine(target, "notes.chart")));
-        StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "name = Test");
+        Assert.Contains("name = Test", File.ReadAllText(Path.Combine(target, "song.ini")));
         AssertNoTempFolders();
     }
 
@@ -67,7 +67,7 @@ public sealed class UnpackerTests
         var result = await Unpacker.UnpackAsync(sng, target, overwrite: false, TestContext.CancellationToken);
 
         Assert.AreEqual(SngRules.Sng053, result.Findings.Single().RuleId);
-        StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "name = Generated");
+        Assert.Contains("name = Generated", File.ReadAllText(Path.Combine(target, "song.ini")));
     }
 
     [TestMethod]

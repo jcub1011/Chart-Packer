@@ -147,13 +147,13 @@ public sealed class VocalsEditorTests
         Assert.IsTrue(result.LyricsOnly);
         Assert.DoesNotContain("lyric old", text);
         Assert.DoesNotContain("96 = E", text);
-        StringAssert.Contains(text, """
+        Assert.Contains("""
               0 = E "section Intro"
               192 = E "phrase_start"
               192 = E "lyric newer"
               384 = E "phrase_end"
               768 = E "end"
-            """.ReplaceLineEndings("\n"));
+            """.ReplaceLineEndings("\n"), text);
         Assert.AreSequenceEqual([new VocalLyric(192, "newer")], [.. VocalReader.Read(result.Bytes, "notes.chart").Main!.Lyrics]);
     }
 
@@ -235,7 +235,7 @@ public sealed class VocalsEditorTests
 
         Assert.AreSequenceEqual([new VocalLyric(96, "hi")], [.. part.Lyrics]);
         Assert.AreSequenceEqual([new VocalPhrase(96, 192)], [.. part.Phrases]);
-        StringAssert.Contains(Encoding.UTF8.GetString(result), "0 = E \"section Intro\"");
+        Assert.Contains("0 = E \"section Intro\"", Encoding.UTF8.GetString(result));
     }
 
     [TestMethod]

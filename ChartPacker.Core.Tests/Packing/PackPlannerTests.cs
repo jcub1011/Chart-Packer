@@ -31,7 +31,7 @@ public sealed class PackPlannerTests
         CollectionAssert.Contains(plan.Excluded.ToArray(), "song.ini");
         var junk = plan.Findings.Single(f => f.RuleId == SngRules.Sng072);
         Assert.AreEqual(Severity.Info, junk.Severity);
-        StringAssert.Contains(junk.Message, "desktop.ini");
+        Assert.Contains("desktop.ini", junk.Message);
         Assert.AreSequenceEqual([KeyValuePair.Create("name", "Test")], [.. plan.Metadata]);
     }
 

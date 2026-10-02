@@ -31,7 +31,7 @@ public sealed class SongExportTests
         Assert.IsTrue(result.Extracted);
         Assert.AreSequenceEqual(new byte[] { 1, 2 }, File.ReadAllBytes(Path.Combine(target, "notes.chart")));
         Assert.AreSequenceEqual(new byte[] { 3 }, File.ReadAllBytes(Path.Combine(target, "extras", "readme.txt")));
-        StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "name = Song");
+        Assert.Contains("name = Song", File.ReadAllText(Path.Combine(target, "song.ini")));
         Assert.AreSequenceEqual(before, File.ReadAllBytes(sng));
         AssertOnlyTarget(target);
     }
@@ -67,7 +67,7 @@ public sealed class SongExportTests
         await SongExport.ExportFolderAsync(FolderEntry(folder), draft, target, TestContext.CancellationToken);
 
         Assert.AreSequenceEqual(["notes.mid", "song.ini", "guitar.ogg"], Directory.GetFiles(target).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
-        StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "artist = Band");
+        Assert.Contains("artist = Band", File.ReadAllText(Path.Combine(target, "song.ini")));
         // The song and the staged file are as they were, so the draft can still be saved.
         Assert.IsTrue(File.Exists(Path.Combine(folder, "video.mp4")));
         Assert.DoesNotContain("Band", File.ReadAllText(Path.Combine(folder, "song.ini")));
