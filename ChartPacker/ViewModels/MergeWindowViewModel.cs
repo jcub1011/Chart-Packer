@@ -175,6 +175,7 @@ namespace ChartPacker.ViewModels
     /// audio's and the video's), with a player of its own; it shows the merged song as chosen.
     /// </param>
     /// <param name="previewDrafts">The preview's drafts: the offsets set on it, which the merge applies.</param>
+    /// <param name="settings">Persisted window state: whether the window was maximized and the split ratio.</param>
     public sealed partial class MergeWindowViewModel(
         IReadOnlyList<SongEntry> entries,
         IReadOnlyList<bool> hasDrafts,
@@ -182,8 +183,10 @@ namespace ChartPacker.ViewModels
         OverwritePolicy policy,
         IVideoDurationProbe video,
         SongDetailViewModel preview,
-        MetadataDraftStore previewDrafts) : ViewModelBase
+        MetadataDraftStore previewDrafts,
+        SettingsService settings) : ViewModelBase
     {
+        private readonly SettingsService _settings = settings;
 
         // The plan the preview shows, which its highway's, audio's and video's offsets are set against: the one it was staged
         // with, or the one it shows lined up live, ahead of staging.
@@ -202,6 +205,20 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The merged song as chosen so far, as the inspector shows a song.</summary>
         public SongDetailViewModel Preview { get; } = preview;
+
+        /// <summary>Whether the window was maximized when last closed. The view applies it on open and writes it back on close.</summary>
+        public bool MergeWindowMaximized
+        {
+            get => _settings.Settings.MergeWindowMaximized;
+            set => _settings.Settings.MergeWindowMaximized = value;
+        }
+
+        /// <summary>Share of the window's width given to the preview panel. The view applies it on open and writes it back on close.</summary>
+        public double MergePreviewFraction
+        {
+            get => _settings.Settings.MergePreviewFraction;
+            set => _settings.Settings.MergePreviewFraction = value;
+        }
 
         /// <summary>The preview is being put together.</summary>
         [ObservableProperty]

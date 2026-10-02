@@ -31,9 +31,18 @@ namespace ChartPacker.Services
         public const double DefaultLaneFineScrubFactor = 5;
         public const double MinLaneFineScrubFactor = 2;
         public const double MaxLaneFineScrubFactor = 20;
+        public const double DefaultMergePreviewFraction = 0.4;
+        public const double MinMergePreviewFraction = 0.2;
+        public const double MaxMergePreviewFraction = 0.8;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
+
+        /// <summary>Whether the merge songs editor was maximized when it was last closed.</summary>
+        public bool MergeWindowMaximized { get; set; }
+
+        /// <summary>Share of the merge songs editor's width given to the preview (right) panel, from 0 to 1.</summary>
+        public double MergePreviewFraction { get; set; } = DefaultMergePreviewFraction;
 
         /// <summary>How many folder levels below the picked folder the library scan searches.</summary>
         public int ScanMaxDepth { get; set; } = DefaultScanMaxDepth;

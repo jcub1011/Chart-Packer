@@ -108,7 +108,8 @@
         </DataTemplate>
     </Window.DataTemplates>
 
-    <Grid RowDefinitions="*,Auto" ColumnDefinitions="3*,Auto,2*">
+    <Grid x:Name="MergeRoot" RowDefinitions="*,Auto" ColumnDefinitions="3*,Auto,2*">
+        <!-- Columns (0) choices, (1) splitter, (2) preview. MergeWindow.axaml.cs indexes these. -->
         <Panel Grid.Row="0" Grid.Column="0">
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
