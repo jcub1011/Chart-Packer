@@ -458,7 +458,7 @@ public static class ChartToMidi
                     if (sustain)
                     {
                         end = Math.Min(Math.Max(end, start + SustainCutoff.ShortestSustain), next);
-                        if (!(shortest <= end - start))
+                        if (end - start >= SustainCutoff.ShortestSustain && !(shortest <= end - start))
                             shortest = end - start;
                     }
 

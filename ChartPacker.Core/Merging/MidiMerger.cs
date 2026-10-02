@@ -179,6 +179,11 @@ public static class MidiMerger
     /// The gems of the track <paramref name="name"/> of <paramref name="source"/>, if it's a fret
     /// track, as its messages placed by <see cref="Place"/> have them, and the ones its source reads as sustains.
     /// </summary>
+    /// <remarks>
+    /// The returned <see cref="SustainCutoff.Held"/> indexes are into the <see cref="Place"/>d message list.
+    /// They are computed on an identity-placed list but applied to the map-placed <see cref="PlacedTrack.Messages"/>;
+    /// that is only valid because <see cref="Place"/> preserves event order and count for any map.
+    /// </remarks>
     private static TrackGems GemsOf(string name, MidiChart source, ParsedFile file, List<MidiEvent> events)
     {
         if (!MidiLayout.TrackNames.TryGetValue(name, out var instrument))
@@ -188,6 +193,7 @@ public static class MidiMerger
             return TrackGems.None;
 
         // Placed where they are, the messages are those Place gives in the same order, with their own ticks.
+        // Do not filter or reorder here: the Held indexes below must stay aligned with Place(..., map) in Merge.
         var original = Place(source.Midi, events, tick => tick);
         bool opens = original.Any(m => m.Bytes is [0xFF, 0x01 or (>= 0x04 and <= 0x09), ..] && ChartTextEvents.Normalize(System.Text.Encoding.Latin1.GetString(m.Bytes.AsSpan(3))) == "ENHANCED_OPENS");
         var notes = SustainCutoff.NotesOf(original, SustainCutoff.GemPitches(kind, opens));

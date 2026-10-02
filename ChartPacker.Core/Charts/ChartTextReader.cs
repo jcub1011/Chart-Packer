@@ -233,6 +233,8 @@ internal static class ChartTextReader
         foreach (string line in lines)
         {
             string tickText = SplitOnce(line, '=', out string rest);
+            if (tickText.Length == 0 || !tickText.All(char.IsAsciiDigit))
+                continue;
             long tick = (uint)FastInt(tickText);
             if (tick < previous)
                 continue;
