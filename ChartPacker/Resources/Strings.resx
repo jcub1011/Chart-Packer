@@ -1605,6 +1605,9 @@
   <data name="MergeTargetIsSourceFormat" xml:space="preserve">
     <value>{0} is one of the songs being merged, so it can't be written over.</value>
   </data>
+  <data name="MergeLyricsOffsetBeforeStart" xml:space="preserve">
+    <value>The lyrics offset set on the preview would start the vocals before the song does. Move them later to merge.</value>
+  </data>
   <data name="MergeMerging" xml:space="preserve">
     <value>Merging…</value>
   </data>

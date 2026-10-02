@@ -222,6 +222,32 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task VocalsOffsetIsAppliedToTheMergedChartButNotToAPreview()
+    {
+        var withVocals = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(withVocals.FullPath, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART DRUMS").Note(0, 96).Note(480, 97)
+            .Track("PART VOCALS").Note(0, 60).Meta(0, 0x05, Encoding.Latin1.GetBytes("hey"))
+            .Build());
+        var analysis = await SongMergeAnalysis.LoadAsync([withVocals, await DrumsAndGuitarSngAsync()]);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0, ["vocals"] = 0 }) with { VocalsOffset = 500 };
+        string output = _root.CreateSubdirectory("out").FullName;
+
+        var result = await SongMerger.MergeAsync(plan, output, OverwritePolicy.Skip, new NoVideo());
+        var entry = new SongEntry(SongEntryKind.SngFile, result.OutputPath, "merged.sng", "merged");
+        byte[] merged = (await SongFile.ReadAsync(entry, "notes.mid", ChartReader.MaxBytes))!;
+
+        // Half a second at 120 BPM is a beat, 480 ticks; the drums didn't move.
+        Assert.AreEqual(480L, VocalReader.Read(merged, "notes.mid").FirstTick);
+        CollectionAssert.AreEqual(new long[] { 0, 480 }, ChartReaderTests.Notes(ChartReader.Read(merged, "notes.mid"), ChartInstrument.Drums).Select(n => n.Tick).ToArray());
+
+        string folder = _root.CreateSubdirectory("preview").FullName;
+        await SongMerger.StageAsync(plan, folder, new NoVideo(), new Dictionary<string, string>());
+        Assert.AreEqual(0L, VocalReader.Read(File.ReadAllBytes(Path.Combine(folder, "notes.mid")), "notes.mid").FirstTick);
+    }
+
+    [TestMethod]
     public async Task AudioAndVideoOffsetsGoIntoTheMergedSongIniButNotIntoAPreview()
     {
         var withVideo = DrumsAndBass();

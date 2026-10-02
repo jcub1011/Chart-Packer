@@ -234,7 +234,7 @@ namespace ChartPacker.Controls
                 return;
 
             var start = e.GetPosition(box);
-            Drags.AddOrUpdate(box, new Drag(e.Pointer, start, box.PointToScreen(start), box.Value ?? 0));
+            Drags.AddOrUpdate(box, new Drag(e.Pointer, start, box.Value ?? 0, new FineDrag(box)));
             e.Pointer.Capture(box);
             e.Handled = true;
         }
@@ -252,22 +252,13 @@ namespace ChartPacker.Controls
                     return;
 
                 drag.IsDragging = true;
-                drag.Last = drag.Start;
+
+                // From where it was pressed, so the first step counts the way past the threshold too.
+                drag.Fine.Start(drag.Start);
                 SetCursor(box, HeldPointer.CanHold ? HeldPointer.Hidden : Sideways);
             }
 
-            double dx = at.X - drag.Last.X;
-            if (HeldPointer.CanHold)
-            {
-                // Put the pointer back where the drag began; the move that makes comes back with no distance.
-                HeldPointer.Return(drag.ScreenStart);
-                drag.Last = drag.Start;
-            }
-            else
-            {
-                drag.Last = at;
-            }
-
+            double dx = drag.Fine.Move(at).X;
             if (dx == 0)
                 return;
 
@@ -310,10 +301,11 @@ namespace ChartPacker.Controls
 
         private static void End(NumericUpDown box)
         {
-            if (!Drags.TryGetValue(box, out _))
+            if (!Drags.TryGetValue(box, out var drag))
                 return;
 
             Drags.Remove(box);
+            drag.Fine.Stop();
             UpdateHoverCursor(box);
         }
 
@@ -321,14 +313,12 @@ namespace ChartPacker.Controls
             TextBoxes.TryGetValue(box, out var text) ? text : box.FindDescendantOfType<TextBox>();
 
         /// <summary>A press on the box, and the drag it becomes.</summary>
-        /// <param name="Start">Where it was pressed, in the box.</param>
-        /// <param name="ScreenStart">The same place on the screen, in pixels, where the pointer is held while dragging.</param>
+        /// <param name="Start">Where it was pressed, in the box, where the pointer is held while dragging.</param>
         /// <param name="StartValue">The value when it was pressed.</param>
-        private sealed record Drag(IPointer Pointer, Point Start, PixelPoint ScreenStart, decimal StartValue)
+        /// <param name="Fine">How far the pointer moves as it's dragged, holding it while it can be.</param>
+        private sealed record Drag(IPointer Pointer, Point Start, decimal StartValue, FineDrag Fine)
         {
             public bool IsDragging { get; set; }
-
-            public Point Last { get; set; }
 
             /// <summary>How far the value has been dragged from <see cref="StartValue"/>, unrounded.</summary>
             public double Moved { get; set; }

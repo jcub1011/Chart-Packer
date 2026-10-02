@@ -37,6 +37,10 @@ namespace ChartPacker.Core.Merging;
 /// How far to move the background video against the audio, in milliseconds, later when positive: worked
 /// into the <c>video_start_time</c>. Applied as <paramref name="AudioOffset"/> is, and only with a video.
 /// </param>
+/// <param name="VocalsOffset">
+/// How far to move the merged chart's vocals, in milliseconds of song time, later when positive, as the
+/// preview's lyrics offset sets it; see <see cref="VocalsEditor.Shift"/>. Applied as <paramref name="ChartOffsets"/> are.
+/// </param>
 public sealed record SongMergePlan(
     SongMergeAnalysis Analysis,
     int BaseSource,
@@ -48,7 +52,8 @@ public sealed record SongMergePlan(
     int? VideoSource,
     IReadOnlyDictionary<ChartTrackKey, int>? ChartOffsets = null,
     int AudioOffset = 0,
-    int VideoOffset = 0);
+    int VideoOffset = 0,
+    int VocalsOffset = 0);
 
 /// <summary>A merged song.</summary>
 /// <param name="OutputPath">The <c>.sng</c> written.</param>
@@ -300,6 +305,11 @@ public static class SongMerger
             pairs = WithTimingOffsets(pairs, plan);
 
         byte[] midi = merged.Midi;
+
+        // The vocals first, as saving a draft does: they're placed by song time, and moving notes leaves the vocal tracks alone.
+        if (applyOffsets && plan.VocalsOffset != 0)
+            midi = VocalsEditor.Shift(midi, ChartFiles.MidiName, pairs, TimeSpan.FromMilliseconds(plan.VocalsOffset)).Bytes;
+
         if (applyOffsets && plan.ChartOffsets is { Count: > 0 } offsets)
         {
             // Read as the merged song.ini says, pro_drums included, as the highway that set them read it.
