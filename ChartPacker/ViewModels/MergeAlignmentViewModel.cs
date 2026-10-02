@@ -19,7 +19,13 @@ namespace ChartPacker.ViewModels
     public sealed record MergeAlignmentOptionViewModel(AlignmentChoice? Choice, string Label);
 
     /// <summary>One song's cell of the alignment row: how far it moves, and what it's lined up by.</summary>
-    public sealed partial class MergeAlignmentCellViewModel(int source, bool hasChart, Action<MergeAlignmentCellViewModel, AlignmentChoice?> chosen, Action<MergeAlignmentCellViewModel, int> typed) : ObservableObject
+    /// <param name="compare">Opens the window that lines the song up by eye.</param>
+    public sealed partial class MergeAlignmentCellViewModel(
+        int source,
+        bool hasChart,
+        Action<MergeAlignmentCellViewModel, AlignmentChoice?> chosen,
+        Action<MergeAlignmentCellViewModel, int> typed,
+        Action<MergeAlignmentCellViewModel> compare) : ObservableObject
     {
         // Set while the window shows what it worked out, so that isn't taken for the user's choice.
         private bool _updating;
@@ -87,6 +93,10 @@ namespace ChartPacker.ViewModels
             }
         }
 
+        /// <summary>Lines the song up by eye, against the kept audio's song.</summary>
+        [RelayCommand]
+        private void Compare() => compare(this);
+
         partial void OnSelectedOptionChanged(MergeAlignmentOptionViewModel? value)
         {
             if (!_updating && value is not null)
@@ -138,7 +148,7 @@ namespace ChartPacker.ViewModels
         private void BuildAlignment(SongMergeAnalysis analysis)
         {
             for (int i = 0; i < analysis.Sources.Count; i++)
-                Alignment.Add(new MergeAlignmentCellViewModel(i, analysis.Sources[i].Chart is not null, OnAlignmentChosen, OnAlignmentTyped));
+                Alignment.Add(new MergeAlignmentCellViewModel(i, analysis.Sources[i].Chart is not null, OnAlignmentChosen, OnAlignmentTyped, OnCompare));
         }
 
         /// <summary>
@@ -190,15 +200,16 @@ namespace ChartPacker.ViewModels
                 var token = _cts?.Token ?? default;
                 if (_links is null)
                 {
-                    AligningText = Strings.MergeAligning;
-                    var chartLinks = await Task.Run(() => SourceAligner.Links([.. analysis.Sources.Select(s => ChartOf(s.Chart))], token), token);
-
+                    // The audio first: where a part's note pattern repeats, it's looked for near where the audio puts the songs.
                     AligningText = Strings.MergeAligningAudio;
                     var resolution = WaveformResolution.Of(Preview.Player.WaveformFidelity);
                     var unread = new List<string>();
                     var titles = Sources.Select(s => s.Title).ToList();
                     var audio = await Task.Run(() => analysis.Sources.Select((s, i) => AudioOf(s, resolution, unread, titles[i], token)).ToList(), token);
                     var audioLinks = await Task.Run(() => AudioAligner.Links(audio, token), token);
+
+                    AligningText = Strings.MergeAligning;
+                    var chartLinks = await Task.Run(() => SourceAligner.Links([.. analysis.Sources.Select(s => ChartOf(s.Chart))], audioLinks, token), token);
                     _links = [.. chartLinks, .. audioLinks];
                     _unreadAudio = unread;
                 }
@@ -302,6 +313,51 @@ namespace ChartPacker.ViewModels
             Refresh();
         }
 
+        /// <summary>Asks the window to open the window that lines a song up by eye.</summary>
+        public event Action<MergeCompareViewModel>? CompareRequested;
+
+        /// <summary>
+        /// Opens the window that lines <paramref name="cell"/>'s song up by eye with the kept audio's song, starting where it is and
+        /// offering where each of its links would put it. The part it's linked by is shown, or else the first both have.
+        /// </summary>
+        private void OnCompare(MergeAlignmentCellViewModel cell)
+        {
+            if (_analysis is not { } analysis || _alignedTo is not { } reference || cell.Source == reference)
+                return;
+
+            var offsets = AlignmentOffsets(reference);
+            var estimates = cell.Options
+                .Where(o => o.Choice is not null)
+                .Select(o => (o.Label, Offset: offsets[o.Choice!.Link.From] + o.Choice.OffsetMs))
+                .Select(o => new CompareEstimate(string.Format(CultureInfo.CurrentCulture, Strings.MergeCompareEstimateFormat, o.Label, o.Offset), o.Offset))
+                .ToList();
+
+            var referenceSource = analysis.Sources[reference];
+            var songSource = analysis.Sources[cell.Source];
+            var referenceParts = MergeCompareViewModel.PartsOf(referenceSource);
+            var songParts = MergeCompareViewModel.PartsOf(songSource);
+            string? preferred = _choices.GetValueOrDefault(cell.Source)?.Link.PartId
+                ?? referenceParts.Select(p => p.PartId).OfType<string>().FirstOrDefault(id => songParts.Any(p => p.PartId == id));
+
+            var resolution = WaveformResolution.Of(Preview.Player.WaveformFidelity);
+            var compare = new MergeCompareViewModel(
+                Sources[reference].Title,
+                Sources[cell.Source].Title,
+                offsets[cell.Source],
+                referenceParts,
+                songParts,
+                preferred,
+                estimates,
+                token => (MergeCompareViewModel.WaveformOf(referenceSource, resolution, token), MergeCompareViewModel.WaveformOf(songSource, resolution, token)),
+                offset =>
+                {
+                    // Against other audio, by then, it would mean something else.
+                    if (_alignedTo == reference && !IsDone && !_closed)
+                        OnAlignmentTyped(cell, offset);
+                });
+            CompareRequested?.Invoke(compare);
+        }
+
         /// <summary>The user typed how far a song moves: what's more or less than its link puts it is its nudge.</summary>
         private void OnAlignmentTyped(MergeAlignmentCellViewModel cell, int offset)
         {
@@ -348,7 +404,8 @@ namespace ChartPacker.ViewModels
                 }
 
                 var choice = _choices.GetValueOrDefault(cell.Source);
-                cell.Show(options, choice, offsets[cell.Source], NoteOf(cell, choice, options.Count), WarningOf(choice));
+                var warnings = new[] { WarningOf(choice), DisagreementOf(cell.Source, reference, offsets[cell.Source], choice) }.OfType<string>().ToList();
+                cell.Show(options, choice, offsets[cell.Source], NoteOf(cell, choice, options.Count), warnings.Count > 0 ? string.Join(" ", warnings) : null);
             }
         }
 
@@ -388,12 +445,40 @@ namespace ChartPacker.ViewModels
                 warnings.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentAudioWeakFormat, estimate.Match));
             if (estimate.IsAmbiguous)
                 warnings.Add(Strings.MergeAlignmentAmbiguous);
+            else if (estimate.NarrowedBy == AlignmentMethod.Audio)
+                warnings.Add(Strings.MergeAlignmentNarrowedByAudio);
             else if (estimate.IsNarrowed)
                 warnings.Add(Strings.MergeAlignmentNarrowed);
             if (estimate.HasDrift)
                 warnings.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentDriftFormat, estimate.DriftMs));
             return warnings.Count > 0 ? string.Join(" ", warnings) : null;
         }
+
+        /// <summary>
+        /// Where something else that can be told puts <paramref name="source"/> more than <see cref="DisagreementMs"/> from
+        /// <paramref name="offset"/>, where it is: its audio against the kept audio, when that's reliable; or, lined up by
+        /// first notes, the same part's note pattern. Neither is always right, but one of them is wrong.
+        /// </summary>
+        private string? DisagreementOf(int source, int reference, int offset, AlignmentChoice? choice)
+        {
+            if (_links is null)
+                return null;
+
+            var messages = new List<string>();
+            if (choice?.Method != AlignmentMethod.Audio
+                && _links.FirstOrDefault(l => l.From == reference && l.To == source && l.Audio is { IsReliable: true })?.Audio is { } audio
+                && Math.Abs(audio.OffsetMs - offset) > DisagreementMs)
+                messages.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentAudioDisagreesFormat, audio.OffsetMs, audio.OffsetMs - offset));
+
+            if (choice is { Method: AlignmentMethod.FirstNote, Link.Pattern: { Matched: > 0 } pattern }
+                && Math.Abs(pattern.OffsetMs - choice.OffsetMs) > DisagreementMs)
+                messages.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentPatternDisagreesFormat, pattern.OffsetMs - choice.OffsetMs, pattern.Match));
+
+            return messages.Count > 0 ? string.Join(" ", messages) : null;
+        }
+
+        // Estimates further apart than this, in milliseconds, disagree; nearer, they're as good as the same.
+        private const int DisagreementMs = 100;
 
         private static string PartNameOf(string partId) =>
             MidiPartCatalog.Known.FirstOrDefault(p => p.Id == partId) is { } part ? ChartLabels.PartName(part) : partId;

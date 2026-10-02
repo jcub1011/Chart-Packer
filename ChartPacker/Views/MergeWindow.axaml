@@ -220,6 +220,10 @@
                                                             </ToolTip.Tip>
                                                         </NumericUpDown>
                                                         <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                                                        <Button Content="{x:Static res:Strings.MergeCompareButton}"
+                                                                Command="{Binding CompareCommand}"
+                                                                ToolTip.Tip="{x:Static res:Strings.MergeCompareToolTip}"
+                                                                AutomationProperties.Name="{x:Static res:Strings.MergeCompareToolTip}" />
                                                     </StackPanel>
                                                     <ComboBox HorizontalAlignment="Stretch"
                                                               ItemsSource="{Binding Options}"

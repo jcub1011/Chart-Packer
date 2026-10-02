@@ -163,7 +163,7 @@ public sealed class AudioAlignerTests
     }
 
     [TestMethod]
-    public void ASongsTracksAreReadWithoutThePreviewAndKept()
+    public void ASongsTracksAreReadWithoutThePreviewOrTheCrowdAndKept()
     {
         double[] times = Times(40, seed: 23);
         var folder = Directory.CreateTempSubdirectory("chartpacker-align-");
@@ -172,8 +172,9 @@ public sealed class AudioAlignerTests
             File.WriteAllBytes(Path.Combine(folder.FullName, "guitar.wav"), TestAudio.Wav(Clicks(times, 30, seed: 24), Rate, 1));
             File.WriteAllBytes(Path.Combine(folder.FullName, "drums.wav"), TestAudio.Wav(Clicks(times, 30, seed: 25), Rate, 1));
             File.WriteAllBytes(Path.Combine(folder.FullName, "preview.wav"), TestAudio.Wav(new float[Rate], Rate, 1));
+            File.WriteAllBytes(Path.Combine(folder.FullName, "crowd.wav"), TestAudio.Wav(Clicks(Times(40, seed: 28), 30, seed: 29), Rate, 1));
             var entry = new SongEntry(SongEntryKind.SongFolder, folder.FullName, folder.Name, folder.Name);
-            string[] names = ["guitar.wav", "drums.wav", "preview.wav"];
+            string[] names = ["guitar.wav", "drums.wav", "preview.wav", "crowd.wav"];
             var cache = new StemPeaksCache(64L * 1024 * 1024);
 
             var read = AudioAligner.Read(entry, names, WaveformResolution.Low, cache);
@@ -183,12 +184,60 @@ public sealed class AudioAlignerTests
             foreach (string name in names)
             {
                 var key = StemPeaksCache.KeyOf(entry, new SongTrack(name, Path.GetFileNameWithoutExtension(name), null))!.Value;
-                Assert.AreEqual(name != "preview.wav", cache.TryGet(key, out _), name);
+                Assert.AreEqual(name is not ("preview.wav" or "crowd.wav"), cache.TryGet(key, out _), name);
             }
 
             // Read again, from the cache, it's the same.
             var again = AudioAligner.Read(entry, names, WaveformResolution.Medium, cache);
             Assert.AreEqual(0, AudioAligner.Align(read, again!).OffsetMs);
+        }
+        finally
+        {
+            folder.Delete(recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void TheCrowdDoesntThrowOffAutoAlignment()
+    {
+        // The second song's guitar is half a second early; its crowd, louder, cheers on a beat of its own.
+        double[] times = Times(60, seed: 33);
+        var root = Directory.CreateTempSubdirectory("chartpacker-align-");
+        try
+        {
+            var a = root.CreateSubdirectory("a");
+            var b = root.CreateSubdirectory("b");
+            File.WriteAllBytes(Path.Combine(a.FullName, "song.wav"), TestAudio.Wav(Clicks(times, 40, seed: 34), Rate, 1));
+            File.WriteAllBytes(Path.Combine(b.FullName, "guitar.wav"), TestAudio.Wav(Clicks(times.Select(t => t - 0.5), 40, seed: 35, gain: 0.3), Rate, 1));
+            File.WriteAllBytes(Path.Combine(b.FullName, "crowd.wav"), TestAudio.Wav(Clicks(Times(60, seed: 36), 40, seed: 37), Rate, 1));
+
+            var first = AudioAligner.Read(new SongEntry(SongEntryKind.SongFolder, a.FullName, a.Name, a.Name), ["song.wav"], WaveformResolution.Low)!;
+            var second = AudioAligner.Read(new SongEntry(SongEntryKind.SongFolder, b.FullName, b.Name, b.Name), ["guitar.wav", "crowd.wav"], WaveformResolution.Low)!;
+            var estimate = AudioAligner.Links([first, second]).Single(l => l.From == 0).Estimate(AlignmentMethod.Audio);
+
+            Assert.AreEqual(500, estimate.OffsetMs, 3);
+            Assert.IsTrue(estimate.Match > 0.8, $"Match was {estimate.Match}.");
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void PeaksForDrawingAreReadAtTheResolutionAskedFor()
+    {
+        var folder = Directory.CreateTempSubdirectory("chartpacker-align-");
+        try
+        {
+            File.WriteAllBytes(Path.Combine(folder.FullName, "song.wav"), TestAudio.Wav(Clicks(Times(10, seed: 26), 8, seed: 27), Rate, 1));
+            var entry = new SongEntry(SongEntryKind.SongFolder, folder.FullName, folder.Name, folder.Name);
+            var cache = new StemPeaksCache(64L * 1024 * 1024);
+            AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.Low, cache, anyResolution: false);
+
+            // Any resolution will do for lining up, but drawing mixes tracks of one.
+            Assert.AreEqual(WaveformResolution.Low, AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.High, cache, anyResolution: true).Single().Resolution);
+            Assert.AreEqual(WaveformResolution.High, AudioAligner.ReadPeaks(entry, ["song.wav"], WaveformResolution.High, cache, anyResolution: false).Single().Resolution);
         }
         finally
         {

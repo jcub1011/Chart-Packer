@@ -44,7 +44,7 @@ public sealed class SourceAlignerTests
         var estimate = SourceAligner.NotePattern(a, b, "guitar", ChartDifficulty.Expert);
 
         Assert.AreEqual(730, estimate.OffsetMs);
-        Assert.IsTrue(estimate.IsReliable);
+        Assert.IsTrue(estimate.IsReliable, estimate.ToString());
         Assert.IsFalse(estimate.IsNarrowed);
         Assert.AreEqual(1.0, estimate.Match, 0.01);
         Assert.AreEqual(0, estimate.DriftMs);
@@ -62,7 +62,7 @@ public sealed class SourceAlignerTests
         Assert.AreEqual(0, SourceAligner.FirstNote(a, b, "guitar", ChartDifficulty.Expert).OffsetMs);
         var estimate = SourceAligner.NotePattern(a, b, "guitar", ChartDifficulty.Expert);
         Assert.AreEqual(4000, estimate.OffsetMs);
-        Assert.IsTrue(estimate.IsReliable);
+        Assert.IsTrue(estimate.IsReliable, estimate.ToString());
     }
 
     [TestMethod]
@@ -78,7 +78,7 @@ public sealed class SourceAlignerTests
         var estimate = SourceAligner.NotePattern(a, b, "guitar", ChartDifficulty.Expert);
 
         Assert.AreEqual(-1234, estimate.OffsetMs);
-        Assert.IsTrue(estimate.IsReliable);
+        Assert.IsTrue(estimate.IsReliable, estimate.ToString());
     }
 
     [TestMethod]
@@ -92,7 +92,7 @@ public sealed class SourceAlignerTests
         var estimate = SourceAligner.NotePattern(a, b, "guitar", ChartDifficulty.Expert);
 
         Assert.IsTrue(estimate.IsNarrowed);
-        Assert.IsTrue(estimate.IsReliable);
+        Assert.IsTrue(estimate.IsReliable, estimate.ToString());
         Assert.AreEqual(40, estimate.OffsetMs);
     }
 
@@ -107,6 +107,52 @@ public sealed class SourceAlignerTests
 
         Assert.IsTrue(estimate.IsAmbiguous);
         Assert.IsFalse(estimate.IsReliable);
+    }
+
+    [TestMethod]
+    public void ARepeatingPartIsntLinedUpByItsFirstNotesWhenOnlyOneChartHasAnIntro()
+    {
+        // The riff repeats, so lining it up a riff out is nearly as good as lining it up; and the first chart's intro puts the
+        // first notes five beats from where the riff lines up, where only some of its notes happen to.
+        var (a, b) = IntroAndRiff();
+
+        var estimate = SourceAligner.NotePattern(a, b, "guitar", ChartDifficulty.Expert);
+
+        Assert.IsTrue(estimate.IsAmbiguous);
+        Assert.IsFalse(estimate.IsReliable);
+        Assert.AreEqual(2500, estimate.OffsetMs);
+        Assert.AreEqual(0, SourceAligner.FirstNote(a, b, "guitar", ChartDifficulty.Expert).OffsetMs);
+    }
+
+    [TestMethod]
+    public void ARepeatingPartIsLookedForNearWhereTheAudioPutsIt()
+    {
+        var (a, b) = IntroAndRiff();
+
+        var estimate = SourceAligner.NotePattern(a, b, "guitar", ChartDifficulty.Expert, audioMs: 2490);
+
+        Assert.IsTrue(estimate.IsReliable, estimate.ToString());
+        Assert.AreEqual(AlignmentMethod.Audio, estimate.NarrowedBy);
+        Assert.AreEqual(2500, estimate.OffsetMs);
+    }
+
+    [TestMethod]
+    public void LinksLookForRepeatingPartsNearReliableAudio()
+    {
+        var (a, b) = IntroAndRiff();
+        var audio = Audio(0, 1, 2490, match: 0.8);
+
+        var withAudio = SourceAligner.Links([a, b], audio).Single(l => l.From == 0).Estimate(AlignmentMethod.NotePattern);
+        var weakAudio = SourceAligner.Links([a, b], Audio(0, 1, 2490, match: 0.1)).Single(l => l.From == 0).Estimate(AlignmentMethod.NotePattern);
+
+        Assert.IsTrue(withAudio.IsReliable);
+        Assert.AreEqual(2500, withAudio.OffsetMs);
+        Assert.IsFalse(weakAudio.IsReliable);
+
+        // The audio isn't taken over the chart's own pattern: its link still lines the charts up, and Solve picks it.
+        var choice = SourceAligner.Solve(0, [.. SourceAligner.Links([a, b], audio), .. audio])[1];
+        Assert.AreEqual(AlignmentMethod.NotePattern, choice.Method);
+        Assert.AreEqual(2500, choice.OffsetMs);
     }
 
     [TestMethod]
@@ -132,7 +178,7 @@ public sealed class SourceAlignerTests
         var estimate = SourceAligner.NotePattern(a, b, "drums", ChartDifficulty.Expert);
 
         Assert.AreEqual(1000, estimate.OffsetMs);
-        Assert.IsTrue(estimate.IsReliable);
+        Assert.IsTrue(estimate.IsReliable, estimate.ToString());
     }
 
     [TestMethod]
@@ -332,6 +378,26 @@ public sealed class SourceAlignerTests
         }
 
         return ticks;
+    }
+
+    /// <summary>
+    /// Two charts of a two-bar riff played twelve times, each missing a few of its notes, the first with five beats of intro
+    /// before it: the second is 2.5 s early against the first, though their first notes are together.
+    /// </summary>
+    private static (AlignmentChart A, AlignmentChart B) IntroAndRiff()
+    {
+        var random = new Random(30);
+        long[] riff = [.. Enumerable.Range(0, 16).Where(i => i == 0 || random.Next(2) != 0).Select(i => (long)i * Beat / 2)];
+        long[] played = [.. Enumerable.Range(0, 12).SelectMany(bar => riff.Select(t => t + (bar * 8L * Beat)))];
+
+        long[] Charted(int seed, long from)
+        {
+            var missing = new Random(seed);
+            return [.. played.Where((t, i) => i == 0 || missing.Next(20) != 0).Select(t => t + from)];
+        }
+
+        long[] intro = [.. Enumerable.Range(0, 5).Select(i => (long)i * Beat)];
+        return (Guitar([.. intro, .. Charted(31, 5 * Beat)]), Guitar(Charted(32, 0)));
     }
 
     private static byte[] Midi(long[]? guitar = null, long[]? drums = null, long[]? bass = null)

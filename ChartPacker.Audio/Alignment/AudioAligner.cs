@@ -245,27 +245,46 @@ public static class AudioAligner
     }
 
     /// <summary>
-    /// Reads <paramref name="storedNames"/>' audio tracks of <paramref name="entry"/> for lining up, the preview left out: from
+    /// Reads <paramref name="storedNames"/>' audio tracks of <paramref name="entry"/> for lining up, the preview and the crowd left out: from
     /// <paramref name="cache"/> where it has a track's peaks, read at any resolution, and otherwise from its audio, at
     /// <paramref name="resolution"/>, kept in the cache afterwards. Each track is read in chunks on several threads at once.
     /// </summary>
     /// <returns>The song's audio; <see langword="null"/> when it has no track that could be read, or it's all silence.</returns>
+    /// <param name="entry">The song.</param>
+    /// <param name="storedNames">Its files, of which the audio tracks are read.</param>
+    /// <param name="resolution">How finely to read a track the cache doesn't have.</param>
+    /// <param name="cache">Where tracks' peaks are kept between reads; <see langword="null"/> for none.</param>
+    /// <param name="cancellationToken">Stops the read.</param>
     /// <exception cref="IOException">A <c>.sng</c> can't be read.</exception>
     /// <exception cref="UnauthorizedAccessException">A <c>.sng</c> can't be read.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
-    public static AlignmentAudio? Read(SongEntry entry, IReadOnlyList<string> storedNames, WaveformResolution resolution, StemPeaksCache? cache = null, CancellationToken cancellationToken = default)
+    public static AlignmentAudio? Read(SongEntry entry, IReadOnlyList<string> storedNames, WaveformResolution resolution, StemPeaksCache? cache = null, CancellationToken cancellationToken = default) =>
+        AlignmentAudio.Of(ReadPeaks(entry, storedNames, resolution, cache, anyResolution: true, cancellationToken));
+
+    /// <summary>
+    /// The peaks of <paramref name="storedNames"/>' audio tracks of <paramref name="entry"/>, the preview and the crowd left out, as
+    /// <see cref="Read"/> reads them: each from <paramref name="cache"/> where it has them, and otherwise from its audio, at
+    /// <paramref name="resolution"/>, kept in the cache afterwards. A track that can't be read is left out.
+    /// </summary>
+    /// <param name="anyResolution">
+    /// Whether peaks the cache has at another resolution will do. They won't for drawing the tracks mixed, which
+    /// <see cref="WaveformPeaks.Mix"/> only does for tracks read at one resolution.
+    /// </param>
+    /// <inheritdoc cref="Read"/>
+    public static IReadOnlyList<StemPeaks> ReadPeaks(SongEntry entry, IReadOnlyList<string> storedNames, WaveformResolution resolution, StemPeaksCache? cache, bool anyResolution, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(storedNames);
 
-        var tracks = SongTracks.Resolve(storedNames, null).Where(t => !t.Stem.Equals(AudioStems.Preview, StringComparison.OrdinalIgnoreCase)).ToList();
+        var tracks = SongTracks.Resolve(storedNames, null).Where(t => !IsLeftOut(t.Stem)).ToList();
         var peaks = new List<StemPeaks>();
         var keys = new Dictionary<SongTrack, StemPeaksKey?>();
         foreach (var track in tracks)
         {
             // Each key is taken before its file is read, so what's kept under it is never older than the file it names.
             var key = StemPeaksCache.KeyOf(entry, track);
-            if (key is { } found && cache?.TryGet(found, out var cached) == true)
+            StemPeaks? cached = null;
+            if (key is { } found && cache is not null && (anyResolution ? cache.TryGet(found, out cached) : cache.TryGet(found, resolution, out cached)))
                 peaks.Add(cached);
             else
                 keys[track] = key;
@@ -316,8 +335,15 @@ public static class AudioAligner
             }
         }
 
-        return AlignmentAudio.Of(peaks);
+        return peaks;
     }
+
+    /// <summary>
+    /// Whether <paramref name="stem"/> is left out of a song's mix for lining up: the preview, a clip of its own, and the crowd,
+    /// whose cheering is loud where the song isn't, and doesn't follow its beat, so it lines songs up by the crowd rather than the music.
+    /// </summary>
+    internal static bool IsLeftOut(string stem) =>
+        stem.Equals(AudioStems.Preview, StringComparison.OrdinalIgnoreCase) || stem.Equals(AudioStems.Crowd, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// How far <paramref name="b"/>'s last third lines up from its first, in milliseconds, each looked for near

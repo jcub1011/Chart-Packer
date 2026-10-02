@@ -1606,6 +1606,17 @@
   <data name="MergeAlignmentNarrowed" xml:space="preserve">
     <value>The notes repeat, so it was looked for near the first notes.</value>
   </data>
+  <data name="MergeAlignmentNarrowedByAudio" xml:space="preserve">
+    <value>The notes repeat, so it was looked for near where the audio puts it.</value>
+  </data>
+  <data name="MergeAlignmentAudioDisagreesFormat" xml:space="preserve">
+    <value>Its audio puts it at {0:+0;-0;0} ms, {1:+0;-0;0} ms from here: check which is right.</value>
+    <comment>{0} is where the song's audio puts it against the kept audio; {1} how far that is from where it is now.</comment>
+  </data>
+  <data name="MergeAlignmentPatternDisagreesFormat" xml:space="preserve">
+    <value>Its note pattern ({1:P0} line up) puts it {0:+0;-0;0} ms from here instead.</value>
+    <comment>{0} is how far the part's note pattern puts the song from where its first notes do; {1} the share of notes that line up there.</comment>
+  </data>
   <data name="MergeAlignmentDriftFormat" xml:space="preserve">
     <value>The end of the song lines up {0:+0;-0} ms from its start: the songs may differ in length or speed.</value>
   </data>
@@ -1626,6 +1637,69 @@
   </data>
   <data name="MergeAlignmentLinkName" xml:space="preserve">
     <value>Lined up by</value>
+  </data>
+  <data name="MergeCompareButton" xml:space="preserve">
+    <value>Compare…</value>
+  </data>
+  <data name="MergeCompareToolTip" xml:space="preserve">
+    <value>Line this song up by eye: its waveform and notes against the kept audio's song's.</value>
+  </data>
+  <data name="MergeCompareTitleFormat" xml:space="preserve">
+    <value>Line up {0}</value>
+    <comment>The window's title. {0} is the song being lined up.</comment>
+  </data>
+  <data name="MergeCompareHeadingFormat" xml:space="preserve">
+    <value>Line up {0} with {1}</value>
+    <comment>{0} is the song being lined up, {1} the kept audio's song.</comment>
+  </data>
+  <data name="MergeCompareDescriptionFormat" xml:space="preserve">
+    <value>Drag {0}'s lanes sideways until its waveform and notes line up with those above them; drag anywhere else to move along the song. Scroll to zoom, or with Shift held to move along it. Hold Ctrl for a finer drag.</value>
+    <comment>{0} is the song being lined up.</comment>
+  </data>
+  <data name="MergeCompareNoAudioFormat" xml:space="preserve">
+    <value>{0} has no audio that can be read, so only its notes are shown.</value>
+  </data>
+  <data name="MergeCompareVocals" xml:space="preserve">
+    <value>Vocals</value>
+  </data>
+  <data name="MergeCompareReferencePartName" xml:space="preserve">
+    <value>The kept audio's song's part</value>
+  </data>
+  <data name="MergeCompareSongPartName" xml:space="preserve">
+    <value>This song's part</value>
+  </data>
+  <data name="MergeCompareRevertButton" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="MergeCompareRevertToolTip" xml:space="preserve">
+    <value>Back to the offset the song had when this opened.</value>
+  </data>
+  <data name="MergeCompareZoomIn" xml:space="preserve">
+    <value>Zoom in</value>
+  </data>
+  <data name="MergeCompareZoomOut" xml:space="preserve">
+    <value>Zoom out</value>
+  </data>
+  <data name="MergeCompareShowStart" xml:space="preserve">
+    <value>First notes</value>
+    <comment>Moves the view to just before the first notes.</comment>
+  </data>
+  <data name="MergeCompareShowAll" xml:space="preserve">
+    <value>Whole song</value>
+    <comment>Zooms the view out to show both songs from end to end.</comment>
+  </data>
+  <data name="MergeCompareTimelineName" xml:space="preserve">
+    <value>Both songs on one timeline</value>
+  </data>
+  <data name="MergeCompareJumpTo" xml:space="preserve">
+    <value>Jump to where a link puts it</value>
+  </data>
+  <data name="MergeCompareEstimateFormat" xml:space="preserve">
+    <value>{0}: {1:+0;-0;0} ms</value>
+    <comment>{0} is a link choice, as the alignment cell lists it; {1} where it puts the song.</comment>
+  </data>
+  <data name="MergeCompareApplyButton" xml:space="preserve">
+    <value>Use this offset</value>
   </data>
   <data name="MergeAlignmentBeforeStartFormat" xml:space="preserve">
     <value>Lining up moves {0} before the song starts. Move its song later, or choose another base chart.</value>

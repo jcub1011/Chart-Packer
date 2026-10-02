@@ -166,17 +166,20 @@ internal sealed class AlignmentNotes
 /// beats and hits are at the offset, from 0 to 1. 0 for a first note.
 /// </param>
 /// <param name="IsAmbiguous">For a note pattern or audio, another offset, as a beat away, lines up nearly as well.</param>
-/// <param name="IsNarrowed">
-/// For a note pattern, it was only looked for within half a beat of the first notes' offset, as looking all through the song
-/// was <paramref name="IsAmbiguous"/>.
+/// <param name="NarrowedBy">
+/// For a note pattern, what it was looked for near, within half a beat, as looking all through the song was ambiguous: the
+/// audio's offset, or the first notes'. <see langword="null"/> when it wasn't.
 /// </param>
 /// <param name="DriftMs">
 /// For a note pattern or audio, how much further the end of the song lines up than its start, in milliseconds: a song a
 /// different length, or played at a different speed, which no one offset lines up all through. <see langword="null"/> when
 /// there isn't enough at both ends to tell, or for a first note.
 /// </param>
-public sealed record AlignmentEstimate(AlignmentMethod Method, int OffsetMs, int Matched = 0, double Match = 0, bool IsAmbiguous = false, bool IsNarrowed = false, int? DriftMs = null)
+public sealed record AlignmentEstimate(AlignmentMethod Method, int OffsetMs, int Matched = 0, double Match = 0, bool IsAmbiguous = false, AlignmentMethod? NarrowedBy = null, int? DriftMs = null)
 {
+    /// <summary>For a note pattern, it was only looked for near another estimate; see <see cref="NarrowedBy"/>.</summary>
+    public bool IsNarrowed => NarrowedBy is not null;
+
     /// <summary>
     /// Whether it can be taken without looking. A note pattern: enough notes line up, half of them or more, and no other
     /// offset lines up nearly as many. Audio: the mixes are at least <see cref="SourceAligner.MinAudioMatch"/> alike, and no
@@ -305,21 +308,35 @@ public static class SourceAligner
 
     /// <summary>
     /// How far apart <paramref name="partId"/>'s note pattern puts the songs: how far to move <paramref name="to"/> to line it
-    /// up with <paramref name="from"/>, looked for within <see cref="MaxShiftMs"/>, then, if that's ambiguous, within half a
-    /// beat of the first notes' offset.
+    /// up with <paramref name="from"/>, looked for within <see cref="MaxShiftMs"/>. If that's ambiguous, it's looked for again
+    /// within half a beat of <paramref name="audioMs"/>, the songs' audio's offset, then of the first notes' offset: where it
+    /// lines up there nearly as well as it can anywhere, that's the one of the peaks it is.
     /// </summary>
+    /// <param name="audioMs">How far apart the songs' audio puts them, when that's reliable; it doesn't hang on how either is charted.</param>
     /// <inheritdoc cref="FirstNote"/>
-    public static AlignmentEstimate NotePattern(AlignmentChart from, AlignmentChart to, string partId, ChartDifficulty? difficulty)
+    public static AlignmentEstimate NotePattern(AlignmentChart from, AlignmentChart to, string partId, ChartDifficulty? difficulty, int? audioMs = null)
     {
         var (a, b) = NotesOf(from, to, partId, difficulty);
         var estimate = Pattern(a, b, -MaxShiftMs, MaxShiftMs);
         if (estimate.IsAmbiguous)
         {
-            int center = Milliseconds(a.First - b.First);
+            var centers = new List<(int Center, AlignmentMethod By)>();
+            if (audioMs is { } audio)
+                centers.Add((audio, AlignmentMethod.Audio));
+            centers.Add((Milliseconds(a.First - b.First), AlignmentMethod.FirstNote));
+
             int radius = Math.Max(SecondPeakMs + SmoothingRadius, (int)Math.Round(a.BeatSeconds * 500));
-            var narrowed = Pattern(a, b, center - radius, center + radius) with { IsNarrowed = true };
-            if (narrowed.IsReliable)
-                estimate = narrowed;
+            foreach (var (center, by) in centers)
+            {
+                // Only a peak that was in the running: a worse one nearby is no answer, as where one chart has an intro the other
+                // hasn't, the first notes are far from where the rest lines up.
+                var narrowed = Pattern(a, b, center - radius, center + radius) with { NarrowedBy = by };
+                if (narrowed.IsReliable && narrowed.Match >= estimate.Match * AmbiguousShare)
+                {
+                    estimate = narrowed;
+                    break;
+                }
+            }
         }
 
         return estimate with { DriftMs = DriftOf(a, b, estimate.OffsetMs) };
@@ -329,9 +346,13 @@ public static class SourceAligner
     /// Every link between two of <paramref name="charts"/> (by source; <see langword="null"/> for a song without one): one for
     /// each part two songs share, read at the hardest difficulty both have, each way round.
     /// </summary>
+    /// <param name="audioLinks">
+    /// The links between the songs' audio, if they've been worked out: where one is reliable, a note pattern that's ambiguous
+    /// is looked for near it; see <see cref="NotePattern"/>.
+    /// </param>
     /// <param name="cancellationToken">Stops working them out.</param>
     /// <exception cref="OperationCanceledException">It was stopped.</exception>
-    public static IReadOnlyList<AlignmentLink> Links(IReadOnlyList<AlignmentChart?> charts, CancellationToken cancellationToken = default)
+    public static IReadOnlyList<AlignmentLink> Links(IReadOnlyList<AlignmentChart?> charts, IReadOnlyList<AlignmentLink>? audioLinks = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(charts);
         var links = new List<AlignmentLink>();
@@ -354,7 +375,8 @@ public static class SourceAligner
                         difficulty = both.Max();
                     }
 
-                    var link = new AlignmentLink(i, j, partId, difficulty, FirstNote(a, b, partId, difficulty), NotePattern(a, b, partId, difficulty));
+                    int? audioMs = audioLinks?.FirstOrDefault(l => l.From == i && l.To == j && l.Audio is { IsReliable: true })?.Audio!.OffsetMs;
+                    var link = new AlignmentLink(i, j, partId, difficulty, FirstNote(a, b, partId, difficulty), NotePattern(a, b, partId, difficulty, audioMs));
                     links.Add(link);
                     links.Add(link.Reversed());
                 }

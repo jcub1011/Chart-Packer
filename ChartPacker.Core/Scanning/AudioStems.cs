@@ -19,6 +19,9 @@ public static class AudioStems
     /// <summary>The stem that isn't part of the song: a separate clip played in the song list.</summary>
     public const string Preview = "preview";
 
+    /// <summary>The crowd's cheering and singing along, which the game plays under the song.</summary>
+    public const string Crowd = "crowd";
+
     private static readonly Dictionary<string, int> StemOrder = Stems
         .Select((stem, index) => KeyValuePair.Create(stem, index))
         .ToDictionary(StringComparer.OrdinalIgnoreCase);
