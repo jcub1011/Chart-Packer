@@ -2465,8 +2465,8 @@ namespace ChartPacker.ViewModels
 
             Highway.CanEditOffsets = CanEditOffsets();
 
-            // Not in a preview: the merge doesn't take the lyrics' offset.
-            Lyrics.CanEditOffset = CanChangeFiles();
+            // In a preview too, as the highway's: the merge takes the lyrics' offset.
+            Lyrics.CanEditOffset = CanEditOffsets();
             RefreshTimingOffsetsEditable();
             RefreshCommands();
         }

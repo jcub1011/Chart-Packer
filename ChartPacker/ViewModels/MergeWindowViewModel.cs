@@ -170,10 +170,10 @@ namespace ChartPacker.ViewModels
     /// <param name="policy">What to do when it already exists.</param>
     /// <param name="video">Reads the background video's length, for <c>song_length</c>.</param>
     /// <param name="preview">
-    /// The side panel's inspector, read-only but for its note highway's offsets, with a player of its
-    /// own; it shows the merged song as chosen.
+    /// The side panel's inspector, read-only but for its offsets (the note highway's, the lyrics', the
+    /// audio's and the video's), with a player of its own; it shows the merged song as chosen.
     /// </param>
-    /// <param name="previewDrafts">The preview's drafts: the offsets set on its highway, which the merge applies.</param>
+    /// <param name="previewDrafts">The preview's drafts: the offsets set on it, which the merge applies.</param>
     public sealed partial class MergeWindowViewModel(
         IReadOnlyList<SongEntry> entries,
         IReadOnlyList<bool> hasDrafts,
@@ -445,6 +445,7 @@ namespace ChartPacker.ViewModels
                 ChartOffsets = offsets.Count > 0 ? offsets : null,
                 AudioOffset = AudioOffsetApplies(plan, timing) ? audioOffset : 0,
                 VideoOffset = VideoOffsetApplies(plan, timing) ? videoOffset : 0,
+                VocalsOffset = VocalsOffsetApplies(plan, timing) ? PreviewVocalsOffset() : 0,
             };
         }
 
@@ -467,6 +468,10 @@ namespace ChartPacker.ViewModels
         /// <summary>The offsets set on the preview's highway, against <see cref="_previewed"/>.</summary>
         private IReadOnlyDictionary<ChartTrackKey, int> PreviewOffsets() =>
             _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? previewDrafts.Get(folder).ChartOffsets : new Dictionary<ChartTrackKey, int>();
+
+        /// <summary>The offset set on the preview's lyrics, against <see cref="_previewed"/>.</summary>
+        private int PreviewVocalsOffset() =>
+            _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? previewDrafts.Get(folder).VocalsOffset : 0;
 
         /// <summary>
         /// The audio and video offsets set on the preview, against <see cref="_previewed"/>: how far its draft moves the
@@ -524,15 +529,23 @@ namespace ChartPacker.ViewModels
             if (_previewed is not { } previewed || previewed.BaseSource != plan.BaseSource || previewed.AudioSource != plan.AudioSource || !timing.SameDelay)
                 return false;
 
-            foreach (var part in plan.Analysis.Parts.Where(p => MidiPartCatalog.InstrumentsOf(p).Contains(key.Instrument)))
-            {
-                bool was = previewed.Parts.TryGetValue(part.Id, out int before);
-                bool now = plan.Parts.TryGetValue(part.Id, out int after);
-                if (was != now || before != after)
-                    return false;
-            }
+            return plan.Analysis.Parts.Where(p => MidiPartCatalog.InstrumentsOf(p).Contains(key.Instrument)).All(p => SamePart(p.Id, previewed, plan));
+        }
 
-            return true;
+        /// <summary>
+        /// Whether the offset set on the preview's lyrics still lines the vocals up in <paramref name="plan"/>: the vocals
+        /// and harmonies come from the same songs as when it was set, against the same audio, base chart and <c>delay</c>.
+        /// </summary>
+        private bool VocalsOffsetApplies(SongMergePlan plan, (bool SameDelay, bool SameVideoStart) timing) =>
+            _previewed is { } previewed && previewed.BaseSource == plan.BaseSource && previewed.AudioSource == plan.AudioSource && timing.SameDelay
+            && SamePart("vocals", previewed, plan) && SamePart("harmonies", previewed, plan);
+
+        /// <summary>Whether <paramref name="partId"/> is taken from the same song in both plans, or left out of both.</summary>
+        private static bool SamePart(string partId, SongMergePlan before, SongMergePlan after)
+        {
+            bool was = before.Parts.TryGetValue(partId, out int from);
+            bool now = after.Parts.TryGetValue(partId, out int to);
+            return was == now && from == to;
         }
 
         private void Refresh()
@@ -754,6 +767,7 @@ namespace ChartPacker.ViewModels
         /// Drops the highway offsets that no longer apply to <paramref name="plan"/>: those of a part now
         /// taken from another song, or left out, and all of them when the audio, the base chart or the
         /// <c>delay</c> changed. They were set to line the chart as it was up with the audio as it was.
+        /// The lyrics' offset goes the same way, with the vocals or harmonies taken from another song.
         /// </summary>
         private void ForgetStaleOffsets(SongMergePlan plan)
         {
@@ -764,6 +778,8 @@ namespace ChartPacker.ViewModels
             var timing = TimingOf(plan);
             foreach (var key in draft.ChartOffsets.Keys.Where(k => !OffsetApplies(k, plan, timing)).ToList())
                 draft.SetChartOffset(key, 0);
+            if (draft.HasVocalsOffset && !VocalsOffsetApplies(plan, timing))
+                draft.SetVocalsOffset(0);
         }
 
         /// <summary>What a plan takes from where, to tell whether the preview already shows it; the offsets aren't part of it, as the preview shows them itself.</summary>
