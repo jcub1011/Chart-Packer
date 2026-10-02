@@ -1530,6 +1530,92 @@
   <data name="MergeVideoLabel" xml:space="preserve">
     <value>Background video</value>
   </data>
+  <data name="MergeSectionAlignment" xml:space="preserve">
+    <value>Alignment</value>
+  </data>
+  <data name="MergeAlignmentDescription" xml:space="preserve">
+    <value>How far each song's chart moves to line up with the kept audio; its parts, lyrics and video move with it. Auto-align lines each song up with one already lined up, by a part they share: by the pattern of its notes all through the song, or by its first notes. Fine-tune each part afterwards with the note highway's offsets.</value>
+  </data>
+  <data name="MergeAlignmentLabel" xml:space="preserve">
+    <value>Offset</value>
+  </data>
+  <data name="MergeAutoAlignButton" xml:space="preserve">
+    <value>Auto-align</value>
+  </data>
+  <data name="MergeAutoAlignToolTip" xml:space="preserve">
+    <value>Works out how far each song is from the kept audio by the parts the songs share, and lines them all up. Offsets typed by hand are replaced.</value>
+  </data>
+  <data name="MergeAlignmentResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="MergeAlignmentResetToolTip" xml:space="preserve">
+    <value>Moves every song back to where its own chart has it.</value>
+  </data>
+  <data name="MergeAligning" xml:space="preserve">
+    <value>Lining up…</value>
+  </data>
+  <data name="MergeAlignmentReference" xml:space="preserve">
+    <value>Kept audio: the others line up with it</value>
+  </data>
+  <data name="MergeAlignmentNoChart" xml:space="preserve">
+    <value>No chart to line up by</value>
+  </data>
+  <data name="MergeAlignmentByHand" xml:space="preserve">
+    <value>Set by hand</value>
+    <comment>The link choice for a song moved only by the offset typed for it.</comment>
+  </data>
+  <data name="MergeAlignmentOptionFormat" xml:space="preserve">
+    <value>{0} · {1} · {2}</value>
+    <comment>A link choice: {0} is the song lined up with, {1} the part they share, {2} how (MergeAlignmentPatternFormat or MergeAlignmentFirstNotes).</comment>
+  </data>
+  <data name="MergeAlignmentPatternFormat" xml:space="preserve">
+    <value>note pattern, {0:P0} line up</value>
+    <comment>{0} is the share of the part's notes that line up, from 0 to 1.</comment>
+  </data>
+  <data name="MergeAlignmentFirstNotes" xml:space="preserve">
+    <value>first notes</value>
+  </data>
+  <data name="MergeAlignmentLinkFormat" xml:space="preserve">
+    <value>{0:+0;-0;0} ms from {1}</value>
+    <comment>Under a linked song's offset: {0} is how far the link moves it from the song it's lined up with, {1} that song.</comment>
+  </data>
+  <data name="MergeAlignmentFirstNotesHint" xml:space="preserve">
+    <value>Only the first notes line it up: check both charts start at the same place in the song.</value>
+  </data>
+  <data name="MergeAlignmentAmbiguous" xml:space="preserve">
+    <value>Another offset, about a beat out, lines up nearly as well.</value>
+  </data>
+  <data name="MergeAlignmentNarrowed" xml:space="preserve">
+    <value>The notes repeat, so it was looked for near the first notes.</value>
+  </data>
+  <data name="MergeAlignmentDriftFormat" xml:space="preserve">
+    <value>The end of the song lines up {0:+0;-0} ms from its start: the songs may differ in length or speed.</value>
+  </data>
+  <data name="MergeAlignmentUnreached" xml:space="preserve">
+    <value>No part in common with a song that's lined up.</value>
+  </data>
+  <data name="MergeAlignmentReferenceNoChart" xml:space="preserve">
+    <value>The kept audio's song has no chart, so the others can't be lined up with it automatically.</value>
+  </data>
+  <data name="MergeAlignmentNoLinks" xml:space="preserve">
+    <value>No song shares a part with the kept audio's song, or with one lined up with it.</value>
+  </data>
+  <data name="MergeAlignmentFailedFormat" xml:space="preserve">
+    <value>The songs couldn't be lined up: {0}</value>
+  </data>
+  <data name="MergeAlignmentOffsetName" xml:space="preserve">
+    <value>Alignment offset</value>
+  </data>
+  <data name="MergeAlignmentOffsetToolTip" xml:space="preserve">
+    <value>How far everything from this song moves, in milliseconds, later when positive. A value typed for a linked song is added to its link, and the songs lined up with it follow.</value>
+  </data>
+  <data name="MergeAlignmentLinkName" xml:space="preserve">
+    <value>Lined up by</value>
+  </data>
+  <data name="MergeAlignmentBeforeStartFormat" xml:space="preserve">
+    <value>Lining up moves {0} before the song starts. Move its song later, or choose another base chart.</value>
+    <comment>{0} lists the parts, e.g. "Guitar, Drums".</comment>
+  </data>
   <data name="MergeSectionMetadata" xml:space="preserve">
     <value>Metadata</value>
   </data>
