@@ -22,19 +22,32 @@ namespace ChartPacker.Controls
         public static void Return(PixelPoint screen) => _ = SetCursorPos(screen.X, screen.Y);
 
         /// <summary>
-        /// How far <paramref name="at"/>, in <paramref name="owner"/>, is from <paramref name="screen"/>, where the pointer is held, in the
-        /// owner's units. It's measured in whole screen pixels, so the move that putting the pointer back makes is exactly none, even when
-        /// the held pixel isn't a whole number of the owner's units or the owner has moved on the screen since.
+        /// How far the pointer is from <paramref name="screen"/>, where it's held, in <paramref name="owner"/>'s units. It's read from the
+        /// pointer itself, in whole screen pixels, rather than turned back from where an event says it is in the owner, which can come out
+        /// a pixel short; so the move that putting the pointer back makes is exactly none, and one that arrives late after it reads none too.
         /// </summary>
-        public static Vector From(Visual owner, Point at, PixelPoint screen)
+        public static Vector From(Visual owner, PixelPoint screen)
         {
-            var pixel = owner.PointToScreen(at);
+            if (!GetCursorPos(out var pixel))
+                return default;
+
             double scale = TopLevel.GetTopLevel(owner)?.RenderScaling ?? 1;
             return new Vector((pixel.X - screen.X) / scale, (pixel.Y - screen.Y) / scale);
         }
 
         [DllImport("user32.dll")]
         private static extern int SetCursorPos(int x, int y);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out Win32Point point);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Win32Point
+        {
+            public int X;
+            public int Y;
+        }
     }
 
     /// <summary>
@@ -71,7 +84,7 @@ namespace ChartPacker.Controls
         {
             if (HeldPointer.CanHold)
             {
-                var held = HeldPointer.From(owner, at, _screen);
+                var held = HeldPointer.From(owner, _screen);
                 HeldPointer.Return(_screen);
                 return held;
             }
