@@ -1534,7 +1534,7 @@
     <value>Alignment</value>
   </data>
   <data name="MergeAlignmentDescription" xml:space="preserve">
-    <value>How far each song's chart moves to line up with the kept audio; its parts, lyrics and video move with it. Auto-align lines each song up with one already lined up, by a part they share: by the pattern of its notes all through the song, or by its first notes. Fine-tune each part afterwards with the note highway's offsets.</value>
+    <value>How far each song's chart moves to line up with the kept audio; its parts, lyrics and video move with it. Auto-align lines each song up with one already lined up: by a part they share, the pattern of its notes all through the song or its first notes, or else by their audio, each mixed down. Fine-tune each part afterwards with the note highway's offsets.</value>
   </data>
   <data name="MergeAlignmentLabel" xml:space="preserve">
     <value>Offset</value>
@@ -1543,7 +1543,7 @@
     <value>Auto-align</value>
   </data>
   <data name="MergeAutoAlignToolTip" xml:space="preserve">
-    <value>Works out how far each song is from the kept audio by the parts the songs share, and lines them all up. Offsets typed by hand are replaced.</value>
+    <value>Works out how far each song is from the kept audio, by the parts the songs share or else by their audio, and lines them all up. Offsets typed by hand are replaced. The first time, each song's audio is read, which can take a few seconds.</value>
   </data>
   <data name="MergeAlignmentResetButton" xml:space="preserve">
     <value>Reset</value>
@@ -1553,6 +1553,9 @@
   </data>
   <data name="MergeAligning" xml:space="preserve">
     <value>Lining up…</value>
+  </data>
+  <data name="MergeAligningAudio" xml:space="preserve">
+    <value>Reading the audio…</value>
   </data>
   <data name="MergeAlignmentReference" xml:space="preserve">
     <value>Kept audio: the others line up with it</value>
@@ -1575,6 +1578,21 @@
   <data name="MergeAlignmentFirstNotes" xml:space="preserve">
     <value>first notes</value>
   </data>
+  <data name="MergeAlignmentAudioPart" xml:space="preserve">
+    <value>Audio</value>
+    <comment>In a link choice, in place of the part shared: the songs are lined up by their audio.</comment>
+  </data>
+  <data name="MergeAlignmentAudioFormat" xml:space="preserve">
+    <value>{0:P0} alike</value>
+    <comment>{0} is how alike the two songs' audio is at the offset, from 0 to 1.</comment>
+  </data>
+  <data name="MergeAlignmentAudioWeakFormat" xml:space="preserve">
+    <value>The audio is only {0:P0} alike: the songs may be different recordings, or the offset may be wrong.</value>
+  </data>
+  <data name="MergeAlignmentAudioUnreadFormat" xml:space="preserve">
+    <value>The audio of {0} couldn't be read, so it's lined up by its chart alone.</value>
+    <comment>{0} lists the songs, e.g. "Song A, Song B".</comment>
+  </data>
   <data name="MergeAlignmentLinkFormat" xml:space="preserve">
     <value>{0:+0;-0;0} ms from {1}</value>
     <comment>Under a linked song's offset: {0} is how far the link moves it from the song it's lined up with, {1} that song.</comment>
@@ -1592,13 +1610,10 @@
     <value>The end of the song lines up {0:+0;-0} ms from its start: the songs may differ in length or speed.</value>
   </data>
   <data name="MergeAlignmentUnreached" xml:space="preserve">
-    <value>No part in common with a song that's lined up.</value>
-  </data>
-  <data name="MergeAlignmentReferenceNoChart" xml:space="preserve">
-    <value>The kept audio's song has no chart, so the others can't be lined up with it automatically.</value>
+    <value>No part or audio in common with a song that's lined up.</value>
   </data>
   <data name="MergeAlignmentNoLinks" xml:space="preserve">
-    <value>No song shares a part with the kept audio's song, or with one lined up with it.</value>
+    <value>Some songs share no part or audio with the kept audio's song, or with one lined up with it; set those by hand.</value>
   </data>
   <data name="MergeAlignmentFailedFormat" xml:space="preserve">
     <value>The songs couldn't be lined up: {0}</value>

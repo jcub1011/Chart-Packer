@@ -11,6 +11,9 @@ public enum AlignmentMethod
 
     /// <summary>As many of the part's notes play together as can, all through the song; see <see cref="SourceAligner"/>.</summary>
     NotePattern,
+
+    /// <summary>The songs' audio, each mixed down, sounds together: for songs that share no part, or have no chart.</summary>
+    Audio,
 }
 
 /// <summary>A song's chart, read for lining up: when the notes of each part it can be lined up by start.</summary>
@@ -158,24 +161,33 @@ internal sealed class AlignmentNotes
 /// For <see cref="AlignmentMethod.NotePattern"/>, about how many of the notes line up at the offset; zero for
 /// <see cref="AlignmentMethod.FirstNote"/>, which only lines up one.
 /// </param>
-/// <param name="Match">For a note pattern, the share of the notes that could line up that do, from 0 to 1; 0 for a first note.</param>
-/// <param name="IsAmbiguous">For a note pattern, another offset, as a beat away, lines up nearly as many notes.</param>
+/// <param name="Match">
+/// For a note pattern, the share of the notes that could line up that do, from 0 to 1; for audio, how alike the two mixes'
+/// beats and hits are at the offset, from 0 to 1. 0 for a first note.
+/// </param>
+/// <param name="IsAmbiguous">For a note pattern or audio, another offset, as a beat away, lines up nearly as well.</param>
 /// <param name="IsNarrowed">
 /// For a note pattern, it was only looked for within half a beat of the first notes' offset, as looking all through the song
 /// was <paramref name="IsAmbiguous"/>.
 /// </param>
 /// <param name="DriftMs">
-/// For a note pattern, how much further the end of the song lines up than its start, in milliseconds: a song a different
-/// length, or played at a different speed, which no one offset lines up all through. <see langword="null"/> when there
-/// aren't enough notes at both ends to tell, or for a first note.
+/// For a note pattern or audio, how much further the end of the song lines up than its start, in milliseconds: a song a
+/// different length, or played at a different speed, which no one offset lines up all through. <see langword="null"/> when
+/// there isn't enough at both ends to tell, or for a first note.
 /// </param>
 public sealed record AlignmentEstimate(AlignmentMethod Method, int OffsetMs, int Matched = 0, double Match = 0, bool IsAmbiguous = false, bool IsNarrowed = false, int? DriftMs = null)
 {
     /// <summary>
-    /// For a note pattern, whether it can be taken without looking: enough notes line up, half of them or more, and no
-    /// other offset lines up nearly as many. A first note can't be told either way, so never is.
+    /// Whether it can be taken without looking. A note pattern: enough notes line up, half of them or more, and no other
+    /// offset lines up nearly as many. Audio: the mixes are at least <see cref="SourceAligner.MinAudioMatch"/> alike, and no
+    /// other offset is nearly as alike. A first note can't be told either way, so never is.
     /// </summary>
-    public bool IsReliable => Method == AlignmentMethod.NotePattern && Matched >= SourceAligner.MinMatchedNotes && Match >= SourceAligner.MinMatch && !IsAmbiguous;
+    public bool IsReliable => Method switch
+    {
+        AlignmentMethod.NotePattern => Matched >= SourceAligner.MinMatchedNotes && Match >= SourceAligner.MinMatch && !IsAmbiguous,
+        AlignmentMethod.Audio => Match >= SourceAligner.MinAudioMatch && !IsAmbiguous,
+        _ => false,
+    };
 
     /// <summary>The end of the song lines up more than <see cref="SourceAligner.DriftToleranceMs"/> away from its start.</summary>
     public bool HasDrift => DriftMs is { } drift && Math.Abs(drift) > SourceAligner.DriftToleranceMs;
@@ -184,21 +196,47 @@ public sealed record AlignmentEstimate(AlignmentMethod Method, int OffsetMs, int
     public AlignmentEstimate Reversed() => this with { OffsetMs = -OffsetMs, DriftMs = -DriftMs };
 }
 
-/// <summary>Two songs that share a part, and how far apart that part puts them.</summary>
+/// <summary>
+/// Two songs that can be lined up, and how far apart they are: by a part they share, its first notes and its note pattern;
+/// or by their audio.
+/// </summary>
 /// <param name="From">The song lined up with.</param>
 /// <param name="To">The song to line up: <see cref="AlignmentEstimate.OffsetMs"/> is how far to move it.</param>
-/// <param name="PartId">The part they share, by <see cref="MidiPart.Id"/>.</param>
-/// <param name="Difficulty">The difficulty both are read at: the hardest both have. <see langword="null"/> for the vocals.</param>
-public sealed record AlignmentLink(int From, int To, string PartId, ChartDifficulty? Difficulty, AlignmentEstimate FirstNote, AlignmentEstimate Pattern)
+/// <param name="PartId">The part they share, by <see cref="MidiPart.Id"/>; <see langword="null"/> for their audio.</param>
+/// <param name="Difficulty">The difficulty both are read at: the hardest both have. <see langword="null"/> for the vocals, or audio.</param>
+/// <param name="FirstNote">For a part, how far apart its first notes put the songs.</param>
+/// <param name="Pattern">For a part, how far apart its note pattern puts them.</param>
+/// <param name="Audio">For their audio, how far apart it puts them.</param>
+public sealed record AlignmentLink(int From, int To, string? PartId, ChartDifficulty? Difficulty, AlignmentEstimate? FirstNote, AlignmentEstimate? Pattern, AlignmentEstimate? Audio = null)
 {
-    /// <summary>The estimate <paramref name="method"/> gives.</summary>
-    public AlignmentEstimate Estimate(AlignmentMethod method) => method == AlignmentMethod.NotePattern ? Pattern : FirstNote;
+    /// <summary>A link by the songs' audio.</summary>
+    public static AlignmentLink ByAudio(int from, int to, AlignmentEstimate audio)
+    {
+        ArgumentNullException.ThrowIfNull(audio);
+        return new AlignmentLink(from, to, null, null, null, null, audio);
+    }
 
-    /// <summary>The note pattern when it's <see cref="AlignmentEstimate.IsReliable"/>, otherwise the first note.</summary>
-    public AlignmentMethod PreferredMethod => Pattern.IsReliable ? AlignmentMethod.NotePattern : AlignmentMethod.FirstNote;
+    /// <summary>The link is by the songs' audio rather than a part.</summary>
+    public bool IsAudio => Audio is not null;
+
+    /// <summary>The ways it lines the songs up: a part's note pattern and first notes, or the audio.</summary>
+    public IReadOnlyList<AlignmentMethod> Methods => [.. new[] { Pattern, FirstNote, Audio }.OfType<AlignmentEstimate>().Select(e => e.Method)];
+
+    /// <summary>The estimate <paramref name="method"/> gives.</summary>
+    /// <exception cref="ArgumentException">The link doesn't line the songs up that way.</exception>
+    public AlignmentEstimate Estimate(AlignmentMethod method) => method switch
+    {
+        AlignmentMethod.NotePattern => Pattern,
+        AlignmentMethod.FirstNote => FirstNote,
+        _ => Audio,
+    } ?? throw new ArgumentException($"The link doesn't line the songs up by {method}.", nameof(method));
+
+    /// <summary>For a part, the note pattern when it's <see cref="AlignmentEstimate.IsReliable"/>, otherwise the first notes; for audio, the audio.</summary>
+    public AlignmentMethod PreferredMethod =>
+        IsAudio ? AlignmentMethod.Audio : Pattern?.IsReliable == true ? AlignmentMethod.NotePattern : AlignmentMethod.FirstNote;
 
     /// <summary>The link the other way round: <see cref="From"/> lined up with <see cref="To"/>.</summary>
-    public AlignmentLink Reversed() => new(To, From, PartId, Difficulty, FirstNote.Reversed(), Pattern.Reversed());
+    public AlignmentLink Reversed() => new(To, From, PartId, Difficulty, FirstNote?.Reversed(), Pattern?.Reversed(), Audio?.Reversed());
 }
 
 /// <summary>What one song is lined up by: a link from a song nearer the one whose audio is kept, and the estimate of it used.</summary>
@@ -234,6 +272,10 @@ public static class SourceAligner
 
     /// <summary>The smallest share of the notes that must line up for a note pattern to be <see cref="AlignmentEstimate.IsReliable"/>.</summary>
     public const double MinMatch = 0.5;
+
+    /// <summary>How alike two songs' audio must be at their offset for it to be <see cref="AlignmentEstimate.IsReliable"/>, from 0 to 1.</summary>
+    /// <remarks>The same recording comes out near 1, and another master of it well over half; different songs hardly ever reach a fifth.</remarks>
+    public const double MinAudioMatch = 0.3;
 
     /// <summary>How much further, in milliseconds, the end of a song can line up than its start before it's <see cref="AlignmentEstimate.HasDrift"/>.</summary>
     public const int DriftToleranceMs = 10;
@@ -323,9 +365,11 @@ public static class SourceAligner
     }
 
     /// <summary>
-    /// The link each song is best lined up by, by source, starting from <paramref name="reference"/>: the songs it can be
-    /// reached from by the fewest links, counting one by a first note as two by a reliable note pattern; between links as
-    /// good, the one whose note pattern lines up the most. A song no link reaches isn't listed.
+    /// The link each song is best lined up by, by source, starting from <paramref name="reference"/>: by the route of links
+    /// that costs least, where a reliable note pattern costs least, then reliable audio, then first notes, and audio that
+    /// isn't reliable most; between routes that cost the same, the one whose last link lines up best. The charts are what
+    /// are being lined up, so a link between them comes first; audio lines up charts only as well as each is timed to its
+    /// own audio. A song no link reaches isn't listed.
     /// </summary>
     public static IReadOnlyDictionary<int, AlignmentChoice> Solve(int reference, IReadOnlyList<AlignmentLink> links)
     {
@@ -341,7 +385,8 @@ public static class SourceAligner
             foreach (var link in links.Where(l => l.From == at && !done.Contains(l.To)))
             {
                 var method = link.PreferredMethod;
-                var reached = (Cost: cost[at].Cost + (method == AlignmentMethod.NotePattern ? 1 : 2), link.Pattern.Match);
+                var estimate = link.Estimate(method);
+                var reached = (Cost: cost[at].Cost + CostOf(estimate), estimate.Match);
                 if (!cost.TryGetValue(link.To, out var best) || reached.Cost < best.Cost || (reached.Cost == best.Cost && reached.Match > best.Match))
                 {
                     cost[link.To] = reached;
@@ -352,6 +397,15 @@ public static class SourceAligner
 
         return choices;
     }
+
+    // What a link taken by an estimate adds to a route's cost for Solve.
+    private static int CostOf(AlignmentEstimate estimate) => estimate.Method switch
+    {
+        AlignmentMethod.NotePattern => 2,
+        AlignmentMethod.Audio when estimate.IsReliable => 3,
+        AlignmentMethod.FirstNote => 4,
+        _ => 8,
+    };
 
     /// <summary>
     /// How far each song moves, in milliseconds, by source: <paramref name="reference"/> not at all; one with a choice as

@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
+using ChartPacker.Audio.Alignment;
+using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Merging;
 using ChartPacker.Resources;
@@ -107,6 +110,9 @@ namespace ChartPacker.ViewModels
         private readonly Dictionary<int, int> _nudges = [];
         private int? _alignedTo;
 
+        // The songs whose audio couldn't be read when the links were worked out, by title.
+        private IReadOnlyList<string> _unreadAudio = [];
+
         // What AlignmentProblemOf last found, for the plan of that signature.
         private (string Signature, string? Problem)? _alignmentProblem;
 
@@ -117,6 +123,10 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(AutoAlignCommand))]
         public partial bool IsAligning { get; set; }
+
+        /// <summary>What lining up is doing: reading the charts, or the audio, which takes longer.</summary>
+        [ObservableProperty]
+        public partial string AligningText { get; set; } = Strings.MergeAligning;
 
         /// <summary>Why auto-aligning didn't line every song up, or failed.</summary>
         [ObservableProperty]
@@ -162,7 +172,11 @@ namespace ChartPacker.ViewModels
 
         private bool CanAutoAlign() => !IsAligning;
 
-        /// <summary>Lines every song up it can, by the links between them, replacing what was chosen or typed.</summary>
+        /// <summary>
+        /// Lines every song up it can, by the links between them, replacing what was chosen or typed: by the parts they share,
+        /// and by their audio. Both are worked out the first time, the audio read from <see cref="StemPeaksCache.Shared"/> where
+        /// a song's waveform has been, and kept for the window's life.
+        /// </summary>
         [RelayCommand(CanExecute = nameof(CanAutoAlign))]
         private async Task AutoAlignAsync()
         {
@@ -174,7 +188,21 @@ namespace ChartPacker.ViewModels
             try
             {
                 var token = _cts?.Token ?? default;
-                _links ??= await Task.Run(() => SourceAligner.Links([.. analysis.Sources.Select(s => ChartOf(s.Chart))], token), token);
+                if (_links is null)
+                {
+                    AligningText = Strings.MergeAligning;
+                    var chartLinks = await Task.Run(() => SourceAligner.Links([.. analysis.Sources.Select(s => ChartOf(s.Chart))], token), token);
+
+                    AligningText = Strings.MergeAligningAudio;
+                    var resolution = WaveformResolution.Of(Preview.Player.WaveformFidelity);
+                    var unread = new List<string>();
+                    var titles = Sources.Select(s => s.Title).ToList();
+                    var audio = await Task.Run(() => analysis.Sources.Select((s, i) => AudioOf(s, resolution, unread, titles[i], token)).ToList(), token);
+                    var audioLinks = await Task.Run(() => AudioAligner.Links(audio, token), token);
+                    _links = [.. chartLinks, .. audioLinks];
+                    _unreadAudio = unread;
+                }
+
                 if (_alignedTo != reference || _closed)
                     return;
 
@@ -183,10 +211,12 @@ namespace ChartPacker.ViewModels
                 foreach (var (source, choice) in SourceAligner.Solve(reference, _links))
                     _choices[source] = choice;
 
-                if (analysis.Sources[reference].Chart is null)
-                    AlignmentMessage = Strings.MergeAlignmentReferenceNoChart;
-                else if (Enumerable.Range(0, Alignment.Count).Any(i => i != reference && Alignment[i].HasChart && !_choices.ContainsKey(i)))
-                    AlignmentMessage = Strings.MergeAlignmentNoLinks;
+                var messages = new List<string>();
+                if (_unreadAudio.Count > 0)
+                    messages.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentAudioUnreadFormat, string.Join(", ", _unreadAudio)));
+                if (Enumerable.Range(0, Alignment.Count).Any(i => i != reference && !_choices.ContainsKey(i)))
+                    messages.Add(Strings.MergeAlignmentNoLinks);
+                AlignmentMessage = messages.Count > 0 ? string.Join(" ", messages) : null;
             }
             catch (OperationCanceledException)
             {
@@ -202,6 +232,25 @@ namespace ChartPacker.ViewModels
 
             ShowAlignment();
             Refresh();
+        }
+
+        /// <summary>
+        /// <paramref name="source"/>'s audio, read for lining up; <see langword="null"/> for a song without any, or whose audio
+        /// can't be read, which is added to <paramref name="unread"/> by its <paramref name="title"/>.
+        /// </summary>
+        private static AlignmentAudio? AudioOf(MergeSource source, WaveformResolution resolution, List<string> unread, string title, CancellationToken cancellationToken)
+        {
+            if (source.AudioFiles.Count == 0)
+                return null;
+            try
+            {
+                return AudioAligner.Read(source.Entry, source.AudioFiles, resolution, StemPeaksCache.Shared, cancellationToken);
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.IO.InvalidDataException)
+            {
+                unread.Add(title);
+                return null;
+            }
         }
 
         /// <summary>Moves every song back to where its own chart has it.</summary>
@@ -293,9 +342,9 @@ namespace ChartPacker.ViewModels
                 var options = new List<MergeAlignmentOptionViewModel> { new(null, Strings.MergeAlignmentByHand) };
                 foreach (var link in (_links ?? []).Where(l => l.To == cell.Source && SourceAligner.IsLinked(l.From, reference, _choices, new HashSet<int> { cell.Source })))
                 {
-                    if (link.Pattern.Matched > 0)
-                        options.Add(Option(new AlignmentChoice(link, AlignmentMethod.NotePattern)));
-                    options.Add(Option(new AlignmentChoice(link, AlignmentMethod.FirstNote)));
+                    // A note pattern nothing lines up by isn't worth offering.
+                    foreach (var method in link.Methods.Where(m => m != AlignmentMethod.NotePattern || link.Estimate(m).Matched > 0))
+                        options.Add(Option(new AlignmentChoice(link, method)));
                 }
 
                 var choice = _choices.GetValueOrDefault(cell.Source);
@@ -306,10 +355,14 @@ namespace ChartPacker.ViewModels
         private MergeAlignmentOptionViewModel Option(AlignmentChoice choice)
         {
             var estimate = choice.Link.Estimate(choice.Method);
-            string how = choice.Method == AlignmentMethod.NotePattern
-                ? string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentPatternFormat, estimate.Match)
-                : Strings.MergeAlignmentFirstNotes;
-            return new MergeAlignmentOptionViewModel(choice, string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentOptionFormat, Sources[choice.Link.From].Title, PartNameOf(choice.Link.PartId), how));
+            string how = choice.Method switch
+            {
+                AlignmentMethod.NotePattern => string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentPatternFormat, estimate.Match),
+                AlignmentMethod.Audio => string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentAudioFormat, estimate.Match),
+                _ => Strings.MergeAlignmentFirstNotes,
+            };
+            string by = choice.Link.PartId is { } partId ? PartNameOf(partId) : Strings.MergeAlignmentAudioPart;
+            return new MergeAlignmentOptionViewModel(choice, string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentOptionFormat, Sources[choice.Link.From].Title, by, how));
         }
 
         /// <param name="optionCount">How many options the cell offers, setting it by hand included.</param>
@@ -317,9 +370,9 @@ namespace ChartPacker.ViewModels
         {
             if (choice is not null)
                 return string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentLinkFormat, choice.OffsetMs, Sources[choice.Link.From].Title);
-            if (!cell.HasChart)
-                return Strings.MergeAlignmentNoChart;
-            return _links is not null && optionCount <= 1 ? Strings.MergeAlignmentUnreached : null;
+            if (_links is null)
+                return cell.HasChart ? null : Strings.MergeAlignmentNoChart;
+            return optionCount <= 1 ? Strings.MergeAlignmentUnreached : null;
         }
 
         private static string? WarningOf(AlignmentChoice? choice)
@@ -331,6 +384,8 @@ namespace ChartPacker.ViewModels
             var warnings = new List<string>();
             if (choice.Method == AlignmentMethod.FirstNote)
                 warnings.Add(Strings.MergeAlignmentFirstNotesHint);
+            if (choice.Method == AlignmentMethod.Audio && estimate.Match < SourceAligner.MinAudioMatch)
+                warnings.Add(string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentAudioWeakFormat, estimate.Match));
             if (estimate.IsAmbiguous)
                 warnings.Add(Strings.MergeAlignmentAmbiguous);
             else if (estimate.IsNarrowed)

@@ -251,16 +251,71 @@ public sealed class SourceAlignerTests
     }
 
     [TestMethod]
+    public void AudioLinesUpSongsThatShareNoPart()
+    {
+        long[] rhythm = Rhythm(20, seed: 13);
+        var links = SourceAligner.Links([Of(Midi(guitar: rhythm)), Of(Midi(drums: rhythm))]).Concat(Audio(0, 1, 120, match: 0.9)).ToList();
+
+        var choices = SourceAligner.Solve(0, links);
+
+        Assert.AreEqual(AlignmentMethod.Audio, choices[1].Method);
+        Assert.IsTrue(choices[1].Link.IsAudio);
+        CollectionAssert.AreEqual(new[] { 0, 120 }, SourceAligner.OffsetsOf(2, 0, choices));
+    }
+
+    [TestMethod]
+    public void AReliableNotePatternComesBeforeAudio()
+    {
+        long[] rhythm = Rhythm(60, seed: 14);
+        var links = SourceAligner.Links([Guitar(rhythm), Guitar(rhythm, delayMs: -50)]).Concat(Audio(0, 1, 70, match: 0.95)).ToList();
+
+        var choice = SourceAligner.Solve(0, links)[1];
+
+        Assert.AreEqual(AlignmentMethod.NotePattern, choice.Method);
+        Assert.AreEqual(50, choice.OffsetMs);
+    }
+
+    [TestMethod]
+    public void ReliableAudioComesBeforeFirstNotes()
+    {
+        // Two notes are too few for a note pattern to be reliable.
+        var links = SourceAligner.Links([Guitar([0, 480]), Guitar([0, 480], delayMs: -50)]).Concat(Audio(0, 1, 70, match: 0.6)).ToList();
+
+        Assert.AreEqual(AlignmentMethod.Audio, SourceAligner.Solve(0, links)[1].Method);
+    }
+
+    [TestMethod]
+    public void AudioThatIsntReliableIsTheLastResort()
+    {
+        var links = SourceAligner.Links([Guitar([0, 480]), Guitar([0, 480], delayMs: -50)]).Concat(Audio(0, 1, 70, match: 0.1)).ToList();
+        Assert.AreEqual(AlignmentMethod.FirstNote, SourceAligner.Solve(0, links)[1].Method);
+
+        var audioOnly = SourceAligner.Solve(0, Audio(0, 1, 70, match: 0.1));
+        Assert.AreEqual(AlignmentMethod.Audio, audioOnly[1].Method);
+        Assert.IsFalse(audioOnly[1].Link.Estimate(AlignmentMethod.Audio).IsReliable);
+    }
+
+    [TestMethod]
+    public void AnAudioLinkHasOnlyItsAudio()
+    {
+        var link = Audio(0, 1, 70, match: 0.9)[0];
+
+        CollectionAssert.AreEqual(new[] { AlignmentMethod.Audio }, link.Methods.ToArray());
+        Assert.ThrowsExactly<ArgumentException>(() => link.Estimate(AlignmentMethod.NotePattern));
+        Assert.AreEqual(-70, link.Reversed().Estimate(AlignmentMethod.Audio).OffsetMs);
+    }
+
+    [TestMethod]
     public void EstimatesTurnAroundWithTheirLinks()
     {
         long[] rhythm = Rhythm(60, seed: 12);
         var link = SourceAligner.Links([Guitar(rhythm), Guitar(rhythm, delayMs: 90)]).Single(l => l.From == 0);
         var back = link.Reversed();
 
-        Assert.AreEqual(-90, link.Pattern.OffsetMs);
+        Assert.AreEqual(-90, link.Estimate(AlignmentMethod.NotePattern).OffsetMs);
         Assert.AreEqual((1, 0), (back.From, back.To));
-        Assert.AreEqual(90, back.Pattern.OffsetMs);
-        Assert.AreEqual(90, back.FirstNote.OffsetMs);
+        Assert.AreEqual(90, back.Estimate(AlignmentMethod.NotePattern).OffsetMs);
+        Assert.AreEqual(90, back.Estimate(AlignmentMethod.FirstNote).OffsetMs);
         Assert.AreEqual(AlignmentMethod.NotePattern, back.PreferredMethod);
     }
 
@@ -295,6 +350,13 @@ public sealed class SourceAlignerTests
     }
 
     private static AlignmentChart Guitar(long[] ticks, int delayMs = 0) => Of(Midi(guitar: ticks), delayMs);
+
+    /// <summary>An audio link between two songs, each way round, as <c>AudioAligner</c> would make it.</summary>
+    private static AlignmentLink[] Audio(int from, int to, int offsetMs, double match)
+    {
+        var link = AlignmentLink.ByAudio(from, to, new AlignmentEstimate(AlignmentMethod.Audio, offsetMs, Match: match));
+        return [link, link.Reversed()];
+    }
 
     private static AlignmentChart Vocals(long[] ticks, int delayMs = 0)
     {
