@@ -417,6 +417,52 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task PreviewShiftsFallBackWhenVocalsAndHarmoniesFromDifferentSourcesMoveApart()
+    {
+        // An empty PART VOCALS gives way to a harmony with lyrics in the lyrics lane,
+        // so shifting by the vocals' source would place the shown words wrongly.
+        var lyricLessVocals = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(lyricLessVocals.FullPath, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART VOCALS").Note(0, 60)
+            .Build());
+        var harmoniesWithLyrics = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(harmoniesWithLyrics.FullPath, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("HARM1").Note(0, 60).Meta(0, 0x05, Encoding.Latin1.GetBytes("hey"))
+            .Build());
+        var analysis = await SongMergeAnalysis.LoadAsync([lyricLessVocals, harmoniesWithLyrics], TestContext.CancellationToken);
+        var staged = Plan(analysis, new Dictionary<string, int> { ["vocals"] = 0, ["harmonies"] = 1 });
+        var pending = staged with { SourceOffsets = new Dictionary<int, int> { [1] = 250 } };
+
+        Assert.IsNull(SongMerger.PreviewShifts(staged, pending));
+    }
+
+    [TestMethod]
+    public async Task PreviewShiftsStayLiveWhenVocalsAndHarmoniesMoveTogether()
+    {
+        var lyricLessVocals = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(lyricLessVocals.FullPath, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART DRUMS").Note(0, 96)
+            .Track("PART VOCALS").Note(0, 60)
+            .Build());
+        var harmoniesWithLyrics = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(harmoniesWithLyrics.FullPath, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART DRUMS").Note(0, 96)
+            .Track("HARM1").Note(0, 60).Meta(0, 0x05, Encoding.Latin1.GetBytes("hey"))
+            .Build());
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), lyricLessVocals, harmoniesWithLyrics], TestContext.CancellationToken);
+        var staged = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0, ["vocals"] = 1, ["harmonies"] = 2 });
+        var pending = staged with { SourceOffsets = new Dictionary<int, int> { [1] = 250, [2] = 250 } };
+
+        var shifts = SongMerger.PreviewShifts(staged, pending);
+        Assert.IsNotNull(shifts);
+        Assert.AreEqual(250, shifts.VocalsMs);
+    }
+
+    [TestMethod]
     public async Task PartsAnOffsetWouldMoveBeforeTheStartAreFound()
     {
         var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);

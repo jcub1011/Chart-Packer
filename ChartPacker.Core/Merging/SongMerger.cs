@@ -459,13 +459,15 @@ public static class SongMerger
     /// How the taken parts move on song time from staging <paramref name="staged"/> to choosing
     /// <paramref name="pending"/>: each part its source's offset against the base chart's, the base chart's only as
     /// far as the <c>delay</c> can take it, as <see cref="AlignedCharts"/> and <see cref="WithSourceOffsets"/>
-    /// place it. <see langword="null"/> when the base chart can't be read, or when two taken parts share an
-    /// instrument but move apart, which one lane can't show.
+    /// place it. <see langword="null"/> when the base chart can't be read, when two taken parts share an
+    /// instrument but move apart, which one lane can't show, or when the vocals and harmonies come from
+    /// different sources that move apart, as the lyrics lane can only show one of them.
     /// </summary>
     /// <remarks>Both plans must take everything from the same places, the lining-up aside.</remarks>
     public static AlignmentPreviewShifts? PreviewShifts(SongMergePlan staged, SongMergePlan pending)
     {
-        if (pending.Analysis.Sources[pending.BaseSource].Chart is null)
+        if (pending.Analysis.Sources[pending.BaseSource].Chart is null
+            || staged.Analysis.Sources[staged.BaseSource].Chart is null)
             return null;
 
         int base0 = BaseOffsetOf(staged.SourceOffsetOf(staged.BaseSource), DelayRangeOf(MetadataOf(staged)));
@@ -496,8 +498,20 @@ public static class SongMerger
             foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
                 tracks[new ChartTrackKey(instrument, difficulty)] = delta;
 
-        int vocalsSource = pending.Parts.TryGetValue("vocals", out int vocals) ? vocals
-            : pending.Parts.TryGetValue("harmonies", out int harmonies) ? harmonies : -1;
+        bool hasVocals = pending.Parts.TryGetValue("vocals", out int vocals);
+        bool hasHarmonies = pending.Parts.TryGetValue("harmonies", out int harmonies);
+        if (hasVocals && hasHarmonies && vocals != harmonies)
+        {
+            // The lyrics lane shows one part: an empty PART VOCALS gives way to a harmony with lyrics.
+            // Shifting by the wrong source's delta would place the shown words wrongly, so fall back
+            // to staging and reading again when the two sources move apart.
+            int vocalsDelta = (ShiftOf(pending, base1, vocals) - ShiftOf(staged, base0, vocals)) - (base1 - base0);
+            int harmoniesDelta = (ShiftOf(pending, base1, harmonies) - ShiftOf(staged, base0, harmonies)) - (base1 - base0);
+            if (vocalsDelta != harmoniesDelta)
+                return null;
+        }
+
+        int vocalsSource = hasVocals ? vocals : hasHarmonies ? harmonies : -1;
         int vocalsMs = vocalsSource < 0 ? 0
             : (ShiftOf(pending, base1, vocalsSource) - ShiftOf(staged, base0, vocalsSource)) - (base1 - base0);
 
