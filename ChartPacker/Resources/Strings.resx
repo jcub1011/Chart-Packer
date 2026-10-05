@@ -2417,6 +2417,10 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Analyzed {0} songs, no validation issues found.</value>
     <comment>Shown in a small dialog instead of the Validator window when every song passes. {0} is how many songs were checked.</comment>
   </data>
+  <data name="ValidatorCheckFailedFormat" xml:space="preserve">
+    <value>The songs couldn't be checked: {0}</value>
+    <comment>Shown in a small dialog instead of the Validator window when the check stops on an error before any song fails. {0} is why.</comment>
+  </data>
   <data name="ValidatorFixableCountFormat" xml:space="preserve">
     <value>{0} fixable</value>
     <comment>A chip on a song in the Validator's list. {0} is how many of its failing keys have a quick fix.</comment>

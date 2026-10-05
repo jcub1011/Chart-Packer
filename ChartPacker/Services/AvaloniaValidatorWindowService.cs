@@ -78,7 +78,22 @@ namespace ChartPacker.Services
                 return;
             }
 
-            if (!await viewModel.FirstFailureFound)
+            bool found;
+            try
+            {
+                found = await viewModel.FirstFailureFound;
+            }
+            catch (Exception ex)
+            {
+                await viewModel.ShutdownAsync();
+                string error = string.Format(CultureInfo.CurrentCulture, Strings.ValidatorCheckFailedFormat, ex.Message);
+                var failed = new MessageDialog(Strings.ValidatorWindowTitle, error);
+                WindowChrome.UseOwnerIcon(failed, window);
+                await failed.ShowDialog(window);
+                return;
+            }
+
+            if (!found)
             {
                 await viewModel.ShutdownAsync();
                 string message = string.Format(CultureInfo.CurrentCulture, Strings.ValidatorNoIssuesFormat, entries.Count);
@@ -115,15 +130,18 @@ namespace ChartPacker.Services
             var progress = new ValidatorProgressDialog { DataContext = viewModel };
             WindowChrome.UseOwnerIcon(progress, window);
             var shown = progress.ShowDialog(window);
-            if (await Task.WhenAny(settled, shown) == settled)
+            await Task.WhenAny(settled, shown);
+
+            // Only Cancel closes the dialog before this does, and it wins over a song failing at the same moment.
+            if (shown.IsCompleted)
             {
-                progress.Close();
-                await shown;
-                return true;
+                viewModel.CancelCheck();
+                return false;
             }
 
-            viewModel.CancelCheck();
-            return false;
+            progress.Close();
+            await shown;
+            return true;
         }
     }
 }

@@ -128,7 +128,8 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Completes with <see langword="true"/> once the check lists its first failing song, or with
-        /// <see langword="false"/> when it finishes, or is stopped, with none listed.
+        /// <see langword="false"/> when it finishes, or is stopped, with none listed. Faults when the check breaks off
+        /// on an error with none listed.
         /// </summary>
         public Task<bool> FirstFailureFound => _firstFailure.Task;
 
@@ -260,16 +261,22 @@ namespace ChartPacker.ViewModels
                     // Drafts live on the UI thread, so the check against them is made there.
                     await Dispatcher.UIThread.InvokeAsync(() => Add(i, report));
                 });
+
+                RefreshCounts();
+                IsChecking = false;
             }
             catch (OperationCanceledException)
             {
-                _firstFailure.TrySetResult(Songs.Count > 0);
-                return;
             }
-
-            RefreshCounts();
-            IsChecking = false;
-            _firstFailure.TrySetResult(Songs.Count > 0);
+            catch (Exception ex)
+            {
+                // Once a song is listed the window is open, and keeps what was found.
+                _firstFailure.TrySetException(ex);
+            }
+            finally
+            {
+                _firstFailure.TrySetResult(Songs.Count > 0);
+            }
         }
 
         /// <summary>Stops checking, as the progress shown before the window opens is canceled.</summary>
