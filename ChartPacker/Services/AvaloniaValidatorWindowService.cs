@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Resources;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
 
@@ -31,12 +33,17 @@ namespace ChartPacker.Services
         NoticeViewModel notice,
         SongFileGate songFiles) : IValidatorWindowService
     {
+        // How long the check runs before its progress is shown, so a quick one doesn't flash a dialog.
+        private static readonly TimeSpan ProgressDelay = TimeSpan.FromMilliseconds(300);
+
+        /// <summary>
+        /// Checks <paramref name="entries"/>, and opens the Validator window once one fails, or says that none do. A
+        /// check that takes a while shows its progress, and can be canceled, until then.
+        /// </summary>
         public async Task ShowAsync(IReadOnlyList<SongEntry> entries)
         {
             if (owner() is not { } window)
                 return;
-
-            await mainDetail.SuspendAsync();
 
             // The inspector is the main one in full, with a player and highway of its own. Its pickers and prompts
             // belong to this window, so they come up over it; its drafts and file gate are the main window's.
@@ -61,16 +68,62 @@ namespace ChartPacker.Services
 
             // Songs are read as many at once as a library scan reads.
             int parallelism = Math.Max(settings.Settings.ScanParallelism, AppSettings.MinScanParallelism);
-            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, confirmation);
+            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, settings, confirmation);
             dialog.DataContext = viewModel;
             _ = viewModel.LoadAsync();
+
+            if (!await WaitForFirstFailureAsync(viewModel, window))
+            {
+                await viewModel.ShutdownAsync();
+                return;
+            }
+
+            if (!await viewModel.FirstFailureFound)
+            {
+                await viewModel.ShutdownAsync();
+                string message = string.Format(CultureInfo.CurrentCulture, Strings.ValidatorNoIssuesFormat, entries.Count);
+                var done = new MessageDialog(Strings.ValidatorWindowTitle, message);
+                WindowChrome.UseOwnerIcon(done, window);
+                await done.ShowDialog(window);
+                return;
+            }
+
+            // The rest of the songs go on being checked in the window.
+            await mainDetail.SuspendAsync();
             WindowChrome.UseOwnerIcon(dialog, window);
             await dialog.ShowDialog(window);
+            // OnClosing captured the splitter position into the settings; persist it now rather than waiting for
+            // the main window to close, so it survives a crash.
+            settings.Save();
 
             await viewModel.ShutdownAsync();
             mainDetail.Player.ReloadSettings();
             mainDetail.Highway.ReloadSettings();
             await mainDetail.ResumeAsync();
+        }
+
+        /// <summary>
+        /// Waits until the check finds a song that fails or finishes without one, showing its progress if that takes
+        /// a while. Returns <see langword="false"/> when the progress is canceled, which stops the check.
+        /// </summary>
+        private static async Task<bool> WaitForFirstFailureAsync(ValidatorWindowViewModel viewModel, Window window)
+        {
+            var settled = viewModel.FirstFailureFound;
+            if (await Task.WhenAny(settled, Task.Delay(ProgressDelay)) == settled)
+                return true;
+
+            var progress = new ValidatorProgressDialog { DataContext = viewModel };
+            WindowChrome.UseOwnerIcon(progress, window);
+            var shown = progress.ShowDialog(window);
+            if (await Task.WhenAny(settled, shown) == settled)
+            {
+                progress.Close();
+                await shown;
+                return true;
+            }
+
+            viewModel.CancelCheck();
+            return false;
         }
     }
 }

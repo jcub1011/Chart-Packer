@@ -2413,17 +2413,31 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Every song passes validation ({0} checked).</value>
     <comment>{0} is how many songs were checked.</comment>
   </data>
-  <data name="ValidatorIssueCountFormat" xml:space="preserve">
-    <value>Issues: {0}</value>
-    <comment>{0} is how many keys of the song fail.</comment>
+  <data name="ValidatorNoIssuesFormat" xml:space="preserve">
+    <value>Analyzed {0} songs, no validation issues found.</value>
+    <comment>Shown in a small dialog instead of the Validator window when every song passes. {0} is how many songs were checked.</comment>
+  </data>
+  <data name="ValidatorFixableCountFormat" xml:space="preserve">
+    <value>{0} fixable</value>
+    <comment>A chip on a song in the Validator's list. {0} is how many of its failing keys have a quick fix.</comment>
+  </data>
+  <data name="ValidatorFixableCountToolTip" xml:space="preserve">
+    <value>Issues a quick fix can correct</value>
+  </data>
+  <data name="ValidatorManualCountFormat" xml:space="preserve">
+    <value>{0} manual</value>
+    <comment>A chip on a song in the Validator's list. {0} is how many of its issues have no quick fix.</comment>
+  </data>
+  <data name="ValidatorManualCountToolTip" xml:space="preserve">
+    <value>Issues without a quick fix, to correct by hand in the inspector</value>
+  </data>
+  <data name="ValidatorSelectSongFixesFormat" xml:space="preserve">
+    <value>Select the quick fixes of {0}</value>
+    <comment>Accessible name of a song's check box in the Validator's list, which ticks or clears its fixable issues. {0} is the song's title.</comment>
   </data>
   <data name="ValidatorIssueLineFormat" xml:space="preserve">
     <value>{0}: {1}</value>
-    <comment>A song's failing key in the Validator's list: {0} is the key, {1} the message.</comment>
-  </data>
-  <data name="ValidatorMoreIssuesFormat" xml:space="preserve">
-    <value>…and {0} more</value>
-    <comment>{0} is how many more failing keys the song has than are listed.</comment>
+    <comment>A song's failing key in the Validator's list, as its check box is named: {0} is the key, {1} the message.</comment>
   </data>
   <data name="ValidatorFixed" xml:space="preserve">
     <value>Passes now</value>
