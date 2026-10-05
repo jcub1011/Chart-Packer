@@ -156,6 +156,17 @@ namespace ChartPacker.Services
                     },
                     new ToggleSetting
                     {
+                        Id = "playback.pitchCorrection",
+                        Category = audio,
+                        Label = Strings.PitchCorrectionLabel,
+                        Description = Strings.PitchCorrectionDescription,
+                        Keywords = Words(Strings.PitchCorrectionKeywords),
+                        DefaultValue = true,
+                        Get = () => player.PitchCorrection,
+                        Set = correct => player.PitchCorrection = correct,
+                    },
+                    new ToggleSetting
+                    {
                         Id = "playback.showWaveforms",
                         Category = visualizers,
                         Label = Strings.ShowWaveformsLabel,

@@ -91,6 +91,9 @@ namespace ChartPacker.Services
         /// <summary>The audio player's master volume, from 0 to 1.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
 
+        /// <summary>Whether playing faster or slower keeps the audio's pitch, instead of raising or lowering it with the speed.</summary>
+        public bool PitchCorrection { get; set; } = true;
+
         /// <summary>Whether the player reads and draws waveforms. Off, no track is read ahead of playback.</summary>
         public bool ShowWaveforms { get; set; } = true;
 

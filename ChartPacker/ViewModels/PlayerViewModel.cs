@@ -200,6 +200,7 @@ namespace ChartPacker.ViewModels
             _settings = settings;
             Volume = settings.Settings.MasterVolume;
             PlaybackSpeed = settings.PlaybackSpeed;
+            PitchCorrection = settings.Settings.PitchCorrection;
             ShowWaveforms = settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
@@ -264,12 +265,19 @@ namespace ChartPacker.ViewModels
         public partial double Volume { get; set; }
 
         /// <summary>
-        /// How fast the song plays, as a fraction from 0.01 to 10: 1 is its own speed. The pitch moves with it. Shared by
-        /// every song and player for this run, but not saved.
+        /// How fast the song plays, as a fraction from 0.01 to 10: 1 is its own speed. The pitch moves with it unless
+        /// <see cref="PitchCorrection"/> is on. Shared by every song and player for this run, but not saved.
         /// </summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PlaybackSpeedText))]
         public partial double PlaybackSpeed { get; set; } = 1;
+
+        /// <summary>
+        /// Whether a <see cref="PlaybackSpeed"/> other than 100% keeps the song's pitch, rather than raising or lowering it
+        /// with the speed. Kept in the settings.
+        /// </summary>
+        [ObservableProperty]
+        public partial bool PitchCorrection { get; set; }
 
         /// <summary>The speeds the playback speed box offers, as it shows them; any whole percent in range can be typed too.</summary>
         public static IReadOnlyList<string> PlaybackSpeedPresets { get; } =
@@ -447,12 +455,13 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Takes up the settings again, as after another player sharing them changed them: the master volume, the
-        /// playback speed, and which visualisers are shown.
+        /// playback speed and pitch correction, and which visualisers are shown.
         /// </summary>
         public void ReloadSettings()
         {
             Volume = _settings.Settings.MasterVolume;
             PlaybackSpeed = _settings.PlaybackSpeed;
+            PitchCorrection = _settings.Settings.PitchCorrection;
             ShowWaveforms = _settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
@@ -650,8 +659,8 @@ namespace ChartPacker.ViewModels
                 return false;
 
             _analyzer ??= new SpectrumAnalyzer();
-            // What's heard is played faster or slower than it was mixed, and higher or lower with it.
-            int heardRate = Math.Max(1, (int)Math.Round(player.Mixer.OutputRate * PlaybackSpeed));
+            // Without pitch correction, what's heard is played faster or slower than it was mixed, and higher or lower with it.
+            int heardRate = Math.Max(1, (int)Math.Round(player.HeardSampleRate));
             _analyzer.Analyze(_heard, heardRate, levels);
             return true;
         }
@@ -1053,6 +1062,13 @@ namespace ChartPacker.ViewModels
                 _player.Speed = (float)speed;
         }
 
+        partial void OnPitchCorrectionChanged(bool value)
+        {
+            _settings.Settings.PitchCorrection = value;
+            if (_player is not null)
+                _player.PitchCorrection = value;
+        }
+
         partial void OnShowWaveformsChanged(bool value)
         {
             _settings.Settings.ShowWaveforms = value;
@@ -1167,6 +1183,7 @@ namespace ChartPacker.ViewModels
                 _audio = audio;
                 _player = player;
                 player.Volume = (float)Volume;
+                player.PitchCorrection = PitchCorrection;
                 player.Speed = (float)PlaybackSpeed;
                 player.CapturesHeard = ShowSpectrum;
                 foreach (var row in Tracks)

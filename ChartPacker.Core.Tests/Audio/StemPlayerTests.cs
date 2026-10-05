@@ -293,6 +293,134 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void WithPitchCorrectionTheDevicePlaysAtItsOwnSpeed()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.PitchCorrection = true;
+        player.Speed = 2;
+
+        player.Play();
+
+        // The mix is stretched before it's queued, so the queue plays as written and holds QueueMilliseconds of it.
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        Thread.Sleep(50);
+        Assert.AreEqual(1f, output.Speed);
+        Assert.IsLessThan(QueueTarget + (Rate / 20), output.QueuedFrames, $"{output.QueuedFrames} frames were queued.");
+        Assert.AreEqual(Rate, player.HeardSampleRate);
+    }
+
+    [TestMethod]
+    public void WithPitchCorrectionThePositionMovesAtTheSpeed()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.PitchCorrection = true;
+        player.Speed = 2;
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // Half a second of output is a second of the song at twice the speed.
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        player.Pause();
+        Assert.AreEqual(1, player.Position.TotalSeconds, 0.001);
+    }
+
+    [TestMethod]
+    public void SwitchingPitchCorrectionCarriesOnFromWhatIsHeard()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.Speed = 2;
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        PlayFor(output, Rate / 2);
+        Assert.AreEqual(2f, output.Speed);
+        Assert.AreEqual(2 * Rate, player.HeardSampleRate);
+
+        int clears = output.Clears;
+        player.PitchCorrection = true;
+
+        // What was queued unstretched is dropped, and the song carries on, stretched, from where it was heard.
+        Assert.AreEqual(0.5, player.Position.TotalSeconds, 0.001);
+        WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
+        Assert.AreEqual(1f, output.Speed);
+        Assert.AreEqual(0.5f / 10, output.FirstSampleAfterLastClear ?? float.NaN, 1e-6f);
+        Assert.AreEqual(Rate, player.HeardSampleRate);
+    }
+
+    [TestMethod]
+    public void WithPitchCorrectionASpeedChangeCarriesOnFromWhatIsHeard()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.PitchCorrection = true;
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        PlayFor(output, Rate / 4);
+
+        int clears = output.Clears;
+        player.Speed = 1.5f;
+
+        Assert.AreEqual(0.25, player.Position.TotalSeconds, 0.001);
+        WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
+        Assert.AreEqual(0.25f / 10, output.FirstSampleAfterLastClear ?? float.NaN, 1e-6f);
+    }
+
+    [TestMethod]
+    public void WithoutPitchCorrectionASpeedChangeKeepsTheQueue()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        player.Speed = 1.5f;
+        Thread.Sleep(30);
+
+        Assert.AreEqual(0, output.Clears);
+        Assert.AreEqual(1.5f, output.Speed);
+    }
+
+    [TestMethod]
+    public void AtItsOwnSpeedPitchCorrectionPlaysTheMixAsItIs()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        var heard = new float[2048];
+        player.PitchCorrection = true;
+
+        player.Play();
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        Assert.AreEqual(0, output.Clears);
+        Assert.IsTrue(player.TryReadHeard(heard));
+        for (int n = 0; n < heard.Length; n++)
+            Assert.AreEqual((float)((Rate / 2) - heard.Length + n) / (Rate * 10), heard[n]);
+    }
+
+    [TestMethod]
+    public void TheEndStopsPlaybackWhileStretching()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 0.1);
+        player.PitchCorrection = true;
+        player.Speed = 2;
+
+        player.Play();
+        WaitUntil(() =>
+        {
+            output.Drain(output.QueuedFrames);
+            return player.IsEnded;
+        });
+
+        Assert.IsNull(player.Error);
+        Assert.AreEqual(0.1, player.Position.TotalSeconds, 0.001);
+    }
+
+    [TestMethod]
     public void AnOutputAtAnotherRateIsRefused()
     {
         var mixer = new StemMixer([KeyValuePair.Create("song", (IPcmSource)new FakeSource(44100, 2, 100, (_, _) => 0))]);
