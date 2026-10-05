@@ -30,7 +30,7 @@ public sealed class FolderSnapshotTests
         // Same length, so only the content hash (or timestamp) can catch it.
         Write("settings.json", """{ "LibraryPaneWidth": 480 }""");
 
-        CollectionAssert.AreEqual(new[] { "'settings.json' was modified" }, before.DiffTo(FolderSnapshot.Take(_root.FullName)).ToList());
+        Assert.AreSequenceEqual(["'settings.json' was modified"], before.DiffTo(FolderSnapshot.Take(_root.FullName)).ToList());
     }
 
     [TestMethod]
@@ -42,9 +42,8 @@ public sealed class FolderSnapshotTests
         File.Delete(Path.Combine(_root.FullName, "old.json"));
         Write("new.json", "{}");
 
-        CollectionAssert.AreEquivalent(
-            new[] { "'old.json' was deleted", "'new.json' was created" },
-            before.DiffTo(FolderSnapshot.Take(_root.FullName)).ToList());
+        Assert.AreSequenceEqual(
+            ["'old.json' was deleted", "'new.json' was created"], before.DiffTo(FolderSnapshot.Take(_root.FullName)).ToList(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -56,9 +55,8 @@ public sealed class FolderSnapshotTests
         Directory.CreateDirectory(missing);
         File.WriteAllText(Path.Combine(missing, "settings.json"), "{}");
 
-        CollectionAssert.AreEquivalent(
-            new[] { "folder was created", "'settings.json' was created" },
-            before.DiffTo(FolderSnapshot.Take(missing)).ToList());
+        Assert.AreSequenceEqual(
+            ["folder was created", "'settings.json' was created"], before.DiffTo(FolderSnapshot.Take(missing)).ToList(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     private void Write(string relative, string content)

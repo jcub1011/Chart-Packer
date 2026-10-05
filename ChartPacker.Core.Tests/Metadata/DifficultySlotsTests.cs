@@ -11,7 +11,7 @@ public sealed class DifficultySlotsTests
     {
         var known = KnownKeys.All.Select(k => k.Key).Where(MetadataDifficulty.IsDifficultyKey).Order(StringComparer.Ordinal).ToList();
 
-        CollectionAssert.AreEqual(known, DifficultySlots.All.Select(s => s.Key).Order(StringComparer.Ordinal).ToList());
+        Assert.AreSequenceEqual(known, [.. DifficultySlots.All.Select(s => s.Key).Order(StringComparer.Ordinal)]);
     }
 
     [TestMethod]
@@ -23,7 +23,7 @@ public sealed class DifficultySlotsTests
 
     [TestMethod]
     public void OnlyTheBandRatesNoPart() =>
-        CollectionAssert.AreEqual(new[] { "diff_band" }, DifficultySlots.All.Where(s => s.PartId is null).Select(s => s.Key).ToArray());
+        Assert.AreSequenceEqual(["diff_band"], [.. DifficultySlots.All.Where(s => s.PartId is null).Select(s => s.Key)]);
 
     [TestMethod]
     public void ContainsIgnoresCase()

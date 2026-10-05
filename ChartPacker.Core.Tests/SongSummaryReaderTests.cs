@@ -28,9 +28,9 @@ public sealed class SongSummaryReaderTests
         string path = Path.Combine(_root.FullName, "Song.sng");
         File.WriteAllBytes(path, bytes);
 
-        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"));
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { KeyValuePair.Create("name", "Song"), KeyValuePair.Create("artist", "Band") }, summary.Pairs.ToArray());
+        Assert.AreSequenceEqual([KeyValuePair.Create("name", "Song"), KeyValuePair.Create("artist", "Band")], [.. summary.Pairs]);
         Assert.AreEqual((ulong)bytes.Length, summary.TotalSize);
     }
 
@@ -41,7 +41,7 @@ public sealed class SongSummaryReaderTests
         string path = Path.Combine(_root.FullName, "Broken.sng");
         File.WriteAllBytes(path, bytes);
 
-        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Broken.sng", "Broken"));
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Broken.sng", "Broken"), TestContext.CancellationToken);
 
         Assert.AreEqual("Song", summary.Pairs.Single().Value);
         Assert.AreEqual((ulong)bytes.Length, summary.TotalSize);
@@ -57,9 +57,9 @@ public sealed class SongSummaryReaderTests
         // A song.ini in a subfolder belongs to something else.
         Write(folder, "stems/song.ini", "[song]\nname = Other\n");
 
-        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { KeyValuePair.Create("name", "Song"), KeyValuePair.Create("charter", "Someone") }, summary.Pairs.ToArray());
+        Assert.AreSequenceEqual([KeyValuePair.Create("name", "Song"), KeyValuePair.Create("charter", "Someone")], [.. summary.Pairs]);
         ulong expected = (ulong)Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
         Assert.AreEqual(expected, summary.TotalSize);
     }
@@ -70,7 +70,7 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "stems/song.ini", "[song]\nname = Other\n");
 
-        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken);
 
         Assert.IsEmpty(summary.Pairs);
         Assert.AreEqual((ulong)new FileInfo(Path.Combine(folder, "stems", "song.ini")).Length, summary.TotalSize);
@@ -82,7 +82,7 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "song.ini", "[other]\nname = Song\n");
 
-        Assert.IsEmpty((await SongSummaryReader.ReadAsync(Folder(folder))).Pairs);
+        Assert.IsEmpty((await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).Pairs);
     }
 
     [TestMethod]
@@ -96,9 +96,9 @@ public sealed class SongSummaryReaderTests
         Write(folder, "album.png", "x");
         Write(folder, "stems/bass.ogg", "x");
 
-        var summary = await SongSummaryReader.ReadAsync(Folder(folder));
+        var summary = await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "album.png", "drums_1.ogg", "guitar.ogg", "notes.chart", "video.webm" }, summary.StoredNames.ToArray());
+        Assert.AreSequenceEqual(["album.png", "drums_1.ogg", "guitar.ogg", "notes.chart", "video.webm"], [.. summary.StoredNames], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.AreEqual(LibraryDifficulties.Hard | LibraryDifficulties.Expert, summary.Chart?.Difficulties);
         Assert.IsTrue(summary.Chart!.Instruments.HasFlag(LibraryInstruments.Drums));
     }
@@ -119,10 +119,47 @@ public sealed class SongSummaryReaderTests
         string path = Path.Combine(_root.FullName, "Song.sng");
         File.WriteAllBytes(path, bytes);
 
-        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"));
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.mid", "vocals.ogg" }, summary.StoredNames.ToArray());
+        Assert.AreSequenceEqual(["notes.mid", "vocals.ogg"], [.. summary.StoredNames], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.AreEqual(new ChartContents(LibraryInstruments.Vocals, LibraryDifficulties.None), summary.Chart);
+    }
+
+    [TestMethod]
+    public async Task SngChartLargerThanTheFirstReadIsUnmaskedWhole()
+    {
+        // Enough notes that the chart runs well past the index, with its first byte at an odd place in the mask's cycle.
+        var midiBuilder = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR");
+        for (int i = 0; i < 20_000; i++)
+            midiBuilder.Note(i * 120, 96 + (i % 5));
+        byte[] midi = midiBuilder.Build();
+        Assert.IsGreaterThan(SngReader.PrefixSize, midi.Length);
+
+        var builder = new SngBuilder();
+        byte[] masked = (byte[])midi.Clone();
+        SngMask.Apply(masked, builder.Mask);
+        byte[] bytes = builder.AddMetadata("song_length", "1000").AddFile("a.bin", new byte[37]).AddFile("notes.mid", masked).Build();
+        string path = Path.Combine(_root.FullName, "Song.sng");
+        File.WriteAllBytes(path, bytes);
+
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
+
+        Assert.AreEqual(ChartContents.Read(midi, "notes.mid"), summary.Chart);
+        Assert.AreEqual(new ChartContents(LibraryInstruments.Guitar, LibraryDifficulties.Expert), summary.Chart);
+    }
+
+    [TestMethod]
+    public async Task SngChartRunningPastTheEndIsUnknown()
+    {
+        var builder = new SngBuilder().AddMetadata("song_length", "1000").AddFile("notes.mid", new byte[10]);
+        builder.LengthOverrides[0] = 1_000;
+        string path = Path.Combine(_root.FullName, "Song.sng");
+        File.WriteAllBytes(path, builder.Build());
+
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
+
+        Assert.IsNull(summary.Chart);
+        Assert.AreEqual("1000", summary.Pairs.Single().Value);
     }
 
     [TestMethod]
@@ -131,7 +168,7 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "song.ogg", "x");
 
-        Assert.AreEqual(ChartContents.None, (await SongSummaryReader.ReadAsync(Folder(folder))).Chart);
+        Assert.AreEqual(ChartContents.None, (await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).Chart);
     }
 
     [TestMethod]
@@ -140,12 +177,12 @@ public sealed class SongSummaryReaderTests
         string folder = CreateFolder("Song");
         Write(folder, "notes.mid", "not a midi file");
 
-        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder))).Chart);
+        Assert.IsNull((await SongSummaryReader.ReadAsync(Folder(folder), TestContext.CancellationToken)).Chart);
     }
 
     [TestMethod]
     public async Task MissingFolderThrows() =>
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(() => SongSummaryReader.ReadAsync(Folder(Path.Combine(_root.FullName, "nope"))));
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(() => SongSummaryReader.ReadAsync(Folder(Path.Combine(_root.FullName, "nope")), TestContext.CancellationToken));
 
     [TestMethod]
     public async Task CancelledReadThrows()
@@ -168,4 +205,6 @@ public sealed class SongSummaryReaderTests
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, text);
     }
+
+    public TestContext TestContext { get; set; }
 }

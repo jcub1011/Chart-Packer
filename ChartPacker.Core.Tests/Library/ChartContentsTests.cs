@@ -115,11 +115,11 @@ public sealed class ChartContentsTests
 
         Assert.IsNotNull(parts);
         // Guitar's chord at 0 is one note; the forcing and tap markers at 240 and 600 are none.
-        CollectionAssert.AreEqual(new[] { new NoteCount(ChartDifficulty.Expert, 0, 5) }, Counts(parts, "guitar"));
-        CollectionAssert.AreEqual(new[] { new NoteCount(ChartDifficulty.Hard, 0, 1) }, Counts(parts, "bass"));
+        Assert.AreSequenceEqual([new NoteCount(ChartDifficulty.Expert, 0, 5)], Counts(parts, "guitar"));
+        Assert.AreSequenceEqual([new NoteCount(ChartDifficulty.Hard, 0, 1)], Counts(parts, "bass"));
         // The kick, 2x kick and snare at 0 are one note, as are a gem and its cymbal marker.
-        CollectionAssert.AreEqual(new[] { new NoteCount(ChartDifficulty.Expert, 0, 3) }, Counts(parts, "drums"));
-        CollectionAssert.AreEqual(new[] { new NoteCount(ChartDifficulty.Expert, 0, 3) }, Counts(parts, "guitar_ghl"));
+        Assert.AreSequenceEqual([new NoteCount(ChartDifficulty.Expert, 0, 3)], Counts(parts, "drums"));
+        Assert.AreSequenceEqual([new NoteCount(ChartDifficulty.Expert, 0, 3)], Counts(parts, "guitar_ghl"));
     }
 
     [TestMethod]
@@ -133,9 +133,8 @@ public sealed class ChartContentsTests
         var parts = ChartContents.ReadParts(midi, ChartFiles.MidiName);
 
         Assert.IsNotNull(parts);
-        CollectionAssert.AreEqual(
-            new[] { new NoteCount(ChartDifficulty.Easy, 0, 2), new NoteCount(ChartDifficulty.Expert, 0, 1) },
-            Counts(parts, "guitar"));
+        Assert.AreSequenceEqual(
+            [new NoteCount(ChartDifficulty.Easy, 0, 2), new NoteCount(ChartDifficulty.Expert, 0, 1)], Counts(parts, "guitar"));
     }
 
     [TestMethod]
@@ -149,8 +148,8 @@ public sealed class ChartContentsTests
         var parts = ChartContents.ReadParts(midi, ChartFiles.MidiName);
 
         Assert.IsNotNull(parts);
-        // The lone 2x kick at 0 is Expert+ only; the 2x kick at 480 goes with a kick, which is one note.
-        CollectionAssert.AreEqual(new[] { new NoteCount(ChartDifficulty.Expert, 0, 2) }, Counts(parts, "drums"));
+        // The 2x kicks are Expert+ only. At 480 the 2x kick is let go first, so YARG keeps it over the kick.
+        Assert.AreSequenceEqual([new NoteCount(ChartDifficulty.Expert, 0, 1)], Counts(parts, "drums"));
     }
 
     [TestMethod]
@@ -180,9 +179,8 @@ public sealed class ChartContentsTests
         Assert.IsNotNull(parts);
         // The overdrive marker alone still charts hard, with no notes to count.
         Assert.AreEqual(LibraryDifficulties.Easy | LibraryDifficulties.Hard | LibraryDifficulties.Expert, parts["pro_keys"].Difficulties);
-        CollectionAssert.AreEqual(
-            new[] { new NoteCount(ChartDifficulty.Easy, 0, 1), new NoteCount(ChartDifficulty.Expert, 0, 2) },
-            Counts(parts, "pro_keys"));
+        Assert.AreSequenceEqual(
+            [new NoteCount(ChartDifficulty.Easy, 0, 1), new NoteCount(ChartDifficulty.Expert, 0, 2)], Counts(parts, "pro_keys"));
     }
 
     [TestMethod]
@@ -197,9 +195,8 @@ public sealed class ChartContentsTests
 
         Assert.IsNotNull(parts);
         // 30 is past easy's six strings and 60 is a marker, so neither counts.
-        CollectionAssert.AreEqual(
-            new[] { new NoteCount(ChartDifficulty.Easy, 0, 2), new NoteCount(ChartDifficulty.Expert, 0, 1) },
-            Counts(parts, "pro_guitar"));
+        Assert.AreSequenceEqual(
+            [new NoteCount(ChartDifficulty.Easy, 0, 2), new NoteCount(ChartDifficulty.Expert, 0, 1)], Counts(parts, "pro_guitar"));
     }
 
     [TestMethod]
@@ -217,8 +214,8 @@ public sealed class ChartContentsTests
 
         Assert.IsNotNull(parts);
         // The phrase marker and the percussion note aren't sung.
-        CollectionAssert.AreEqual(new[] { new NoteCount(null, 0, 3) }, Counts(parts, "vocals"));
-        CollectionAssert.AreEqual(new[] { new NoteCount(null, 1, 2), new NoteCount(null, 2, 1) }, Counts(parts, "harmonies"));
+        Assert.AreSequenceEqual([new NoteCount(null, 0, 3)], Counts(parts, "vocals"));
+        Assert.AreSequenceEqual([new NoteCount(null, 1, 2), new NoteCount(null, 2, 1)], Counts(parts, "harmonies"));
         Assert.AreEqual(LibraryDifficulties.None, parts["harmonies"].Difficulties);
     }
 

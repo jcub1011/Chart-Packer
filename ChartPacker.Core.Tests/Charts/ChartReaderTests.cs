@@ -43,7 +43,7 @@ public sealed class ChartReaderTests
         [ExpertDrums]
         {
           0 = N 0 0
-          0 = N 32 0
+          48 = N 32 0
           0 = N 2 0
           0 = N 66 0
           96 = N 3 0
@@ -72,10 +72,9 @@ public sealed class ChartReaderTests
         Assert.AreEqual(192, chart.Tempo.Resolution);
         Assert.AreEqual(2, chart.Tempo.SecondsAt(768), 1e-9);
         Assert.AreEqual(new TimeSignature(768, 6, 8), chart.Tempo.TimeSignatures[^1]);
-        CollectionAssert.AreEqual(
-            new[] { ChartInstrument.Guitar, ChartInstrument.Bass, ChartInstrument.Drums, ChartInstrument.GhlGuitar },
-            chart.Instruments.ToArray());
-        CollectionAssert.AreEqual(new[] { ChartDifficulty.Hard }, chart.DifficultiesOf(ChartInstrument.Bass).ToArray());
+        Assert.AreSequenceEqual(
+            [ChartInstrument.Guitar, ChartInstrument.Bass, ChartInstrument.Drums, ChartInstrument.GhlGuitar], [.. chart.Instruments]);
+        Assert.AreSequenceEqual([ChartDifficulty.Hard], [.. chart.DifficultiesOf(ChartInstrument.Bass)]);
     }
 
     [TestMethod]
@@ -83,9 +82,8 @@ public sealed class ChartReaderTests
     {
         var notes = Notes(ChartReader.Read(Encoding.UTF8.GetBytes(Chart), "notes.chart"), ChartInstrument.Guitar);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Assert.AreSequenceEqual(
+            [
                 // A chord is a strum; star power covers ticks 0-299.
                 new ChartNote(0, 96, 0, NoteFlags.StarPower),
                 new ChartNote(0, 96, 1, NoteFlags.StarPower),
@@ -95,8 +93,7 @@ public sealed class ChartReaderTests
                 new ChartNote(240, 0, 3, NoteFlags.StarPower),
                 new ChartNote(480, 0, ChartNote.OpenLane, NoteFlags.None),
                 new ChartNote(600, 0, 4, NoteFlags.Tap),
-            },
-            notes);
+            ], notes);
     }
 
     [TestMethod]
@@ -104,16 +101,14 @@ public sealed class ChartReaderTests
     {
         var notes = Notes(ChartReader.Read(Encoding.UTF8.GetBytes(Chart), "notes.chart"), ChartInstrument.Drums);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                // A kick and a double kick at a tick are one kick.
+        Assert.AreSequenceEqual(
+            [
                 new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.None),
                 new ChartNote(0, 0, 1, NoteFlags.Cymbal),
+                new ChartNote(48, 0, ChartNote.OpenLane, NoteFlags.DoubleKick),
                 new ChartNote(96, 0, 2, NoteFlags.None),
                 new ChartNote(192, 0, 3, NoteFlags.Cymbal),
-            },
-            notes);
+            ], notes);
     }
 
     [TestMethod]
@@ -123,6 +118,10 @@ public sealed class ChartReaderTests
             [Song]
             {
               Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
             }
             [ExpertDrums]
             {
@@ -137,8 +136,8 @@ public sealed class ChartReaderTests
 
         var read = ChartReader.Read(chart, "notes.chart");
 
-        CollectionAssert.AreEqual(new[] { new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.DoubleKick) }, Notes(read, ChartInstrument.Drums));
-        CollectionAssert.AreEqual(new[] { new ChartNote(96, 0, 0, NoteFlags.None) }, Notes(read, ChartInstrument.Drums, ChartDifficulty.Hard));
+        Assert.AreSequenceEqual([new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.DoubleKick)], Notes(read, ChartInstrument.Drums));
+        Assert.AreSequenceEqual([new ChartNote(96, 0, 0, NoteFlags.None)], Notes(read, ChartInstrument.Drums, ChartDifficulty.Hard));
     }
 
     [TestMethod]
@@ -146,7 +145,7 @@ public sealed class ChartReaderTests
     {
         var notes = Notes(ChartReader.Read(Encoding.UTF8.GetBytes(Chart), "notes.chart"), ChartInstrument.GhlGuitar);
 
-        CollectionAssert.AreEqual(new[] { 0, 3, 5, ChartNote.OpenLane }, notes.Select(n => n.Lane).ToArray());
+        Assert.AreSequenceEqual([0, 3, 5, ChartNote.OpenLane], [.. notes.Select(n => n.Lane)]);
     }
 
     [TestMethod]
@@ -157,8 +156,8 @@ public sealed class ChartReaderTests
         Assert.AreEqual(480, chart.Tempo.Resolution);
         Assert.AreEqual(2, chart.Tempo.SecondsAt(1920), 1e-9);
         Assert.IsNull(chart.Offset);
-        CollectionAssert.AreEqual(new[] { ChartInstrument.Guitar, ChartInstrument.Drums }, chart.Instruments.ToArray());
-        CollectionAssert.AreEqual(new[] { ChartDifficulty.Hard, ChartDifficulty.Expert }, chart.DifficultiesOf(ChartInstrument.Guitar).ToArray());
+        Assert.AreSequenceEqual([ChartInstrument.Guitar, ChartInstrument.Drums], [.. chart.Instruments]);
+        Assert.AreSequenceEqual([ChartDifficulty.Hard, ChartDifficulty.Expert], [.. chart.DifficultiesOf(ChartInstrument.Guitar)]);
     }
 
     [TestMethod]
@@ -166,9 +165,8 @@ public sealed class ChartReaderTests
     {
         var notes = Notes(ChartReader.Read(SampleMidi(), "notes.mid"), ChartInstrument.Guitar);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Assert.AreSequenceEqual(
+            [
                 // Held past a third of a beat, so a sustain; in star power.
                 new ChartNote(0, 200, 0, NoteFlags.StarPower),
                 new ChartNote(120, 0, 1, NoteFlags.Hopo),
@@ -178,8 +176,7 @@ public sealed class ChartReaderTests
                 new ChartNote(1440, 0, ChartNote.OpenLane, NoteFlags.None),
                 // An open marked by Phase Shift sysex.
                 new ChartNote(1920, 0, ChartNote.OpenLane, NoteFlags.None),
-            },
-            notes);
+            ], notes);
     }
 
     [TestMethod]
@@ -187,24 +184,141 @@ public sealed class ChartReaderTests
     {
         var notes = Notes(ChartReader.Read(SampleMidi(), "notes.mid"), ChartInstrument.Drums);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Assert.AreSequenceEqual(
+            [
                 new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.DoubleKick),
                 new ChartNote(0, 0, 1, NoteFlags.Cymbal),
                 new ChartNote(480, 0, 1, NoteFlags.None),
                 new ChartNote(480, 0, 3, NoteFlags.Cymbal),
-            },
-            notes);
+            ], notes);
     }
 
     [TestMethod]
-    public void MidiDrumsWithoutTomMarkersAreCymbalsOnlyForProDrums()
+    public void MidiTomMarkersMarkOnlyTheirOwnPadOnEveryDifficulty()
     {
+        // The blue tom marker, under yellow, blue and green on Expert (98-100) and Hard (86-88).
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART DRUMS")
+            .Note(0, 111, 10).Note(0, 98).Note(0, 99).Note(0, 100).Note(0, 86).Note(0, 87).Note(0, 88)
+            .Build();
+        var chart = ChartReader.Read(midi, "notes.mid");
+
+        foreach (var difficulty in new[] { ChartDifficulty.Expert, ChartDifficulty.Hard })
+        {
+            Assert.AreSequenceEqual(
+                [
+                    new ChartNote(0, 0, 1, NoteFlags.Cymbal),
+                    new ChartNote(0, 0, 2, NoteFlags.None),
+                    new ChartNote(0, 0, 3, NoteFlags.Cymbal),
+                ], Notes(chart, ChartInstrument.Drums, difficulty));
+        }
+    }
+
+    [TestMethod]
+    public void MidiDrumsWithoutTomMarkersAreCymbalsUnlessProDrumsIsFalse()
+    {
+        // YARG takes a MIDI chart's drums as pro drums unless song.ini says they aren't.
         byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART DRUMS").Note(0, 98).Build();
 
-        Assert.AreEqual(NoteFlags.None, Notes(ChartReader.Read(midi, "notes.mid"), ChartInstrument.Drums).Single().Flags);
-        Assert.AreEqual(NoteFlags.Cymbal, Notes(ChartReader.Read(midi, "notes.mid", ChartReadOptions.From([new("pro_drums", "True")])), ChartInstrument.Drums).Single().Flags);
+        Assert.AreEqual(NoteFlags.Cymbal, Notes(ChartReader.Read(midi, "notes.mid"), ChartInstrument.Drums).Single().Flags);
+        Assert.AreEqual(NoteFlags.None, Notes(ChartReader.Read(midi, "notes.mid", ChartReadOptions.From([new("pro_drums", "False")])), ChartInstrument.Drums).Single().Flags);
+    }
+
+    [TestMethod]
+    public void ChartKickAndDoubleKickOnATickAreBothKept()
+    {
+        byte[] chart = Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
+            }
+            [ExpertDrums]
+            {
+              0 = N 0 0
+              0 = N 32 0
+            }
+            """);
+
+        Assert.AreSequenceEqual(
+            [new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.None), new ChartNote(0, 0, ChartNote.OpenLane, NoteFlags.DoubleKick)], Notes(ChartReader.Read(chart, "notes.chart"), ChartInstrument.Drums));
+    }
+
+    [TestMethod]
+    public void MidiNoteHeldForAThirdOfABeatIsASustainAsYargReadsIt()
+    {
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 160).Note(480, 97, 159).Build();
+
+        Assert.AreSequenceEqual([160, 0], [.. Notes(ChartReader.Read(midi, "notes.mid"), ChartInstrument.Guitar).Select(n => n.Length)]);
+    }
+
+    [TestMethod]
+    public void MidiSustainCutoffComesFromSongIniWhereZeroIsATick()
+    {
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR").Note(0, 96, 1).Note(480, 97, 100).Build();
+        long[] Lengths(string cutoff) =>
+            [.. Notes(ChartReader.Read(midi, "notes.mid", ChartReadOptions.From([new("sustain_cutoff_threshold", cutoff)])), ChartInstrument.Guitar).Select(n => n.Length)];
+
+        Assert.AreSequenceEqual([0, 100], Lengths("100"));
+        Assert.AreSequenceEqual([0, 0], Lengths("101"));
+        Assert.AreSequenceEqual([1, 100], Lengths("0"));
+        // A value that isn't a number is 0 to YARG, so a tick.
+        Assert.AreSequenceEqual([1, 100], Lengths("soon"));
+    }
+
+    [TestMethod]
+    public void ChartSustainsHaveACutoffOnlyWhenSongIniSetsOne()
+    {
+        byte[] chart = Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
+            }
+            [ExpertSingle]
+            {
+              0 = N 0 10
+              192 = N 1 64
+            }
+            """);
+        long[] Lengths(ChartReadOptions options) => [.. Notes(ChartReader.Read(chart, "notes.chart", options), ChartInstrument.Guitar).Select(n => n.Length)];
+
+        Assert.AreSequenceEqual([10, 64], Lengths(ChartReadOptions.Default));
+        Assert.AreSequenceEqual([0, 64], Lengths(ChartReadOptions.From([new("sustain_cutoff_threshold", "64")])));
+    }
+
+    [TestMethod]
+    public void HopoFrequencySetsTheNaturalHopoThreshold()
+    {
+        // Past the default threshold of each: 100 ticks apart in a .chart at 192, 200 in MIDI at 480.
+        byte[] chart = Encoding.UTF8.GetBytes("""
+            [Song]
+            {
+              Resolution = 192
+            }
+            [SyncTrack]
+            {
+              0 = B 120000
+            }
+            [ExpertSingle]
+            {
+              0 = N 0 0
+              100 = N 1 0
+            }
+            """);
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR").Note(0, 96).Note(200, 97).Build();
+        NoteFlags Second(byte[] bytes, string name, ChartReadOptions options) => Notes(ChartReader.Read(bytes, name, options), ChartInstrument.Guitar)[1].Flags;
+
+        Assert.AreEqual(NoteFlags.None, Second(chart, "notes.chart", ChartReadOptions.Default));
+        Assert.AreEqual(NoteFlags.Hopo, Second(chart, "notes.chart", ChartReadOptions.From([new("hopo_frequency", "100")])));
+        Assert.AreEqual(NoteFlags.None, Second(midi, "notes.mid", ChartReadOptions.Default));
+        // As YARG reads it, a MIDI chart's hopo_frequency has a tick of leniency.
+        Assert.AreEqual(NoteFlags.Hopo, Second(midi, "notes.mid", ChartReadOptions.From([new("hopo_frequency", "199")])));
     }
 
     [TestMethod]

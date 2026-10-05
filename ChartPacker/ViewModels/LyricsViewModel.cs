@@ -41,6 +41,9 @@ namespace ChartPacker.ViewModels
         private string? _chartName;
         private byte[]? _bytes;
 
+        // Set by ReloadChart: the next chart read keeps what's drawn until it's built from what's read.
+        private bool _keepScene;
+
         // What the latest build was of: the chart, the vocals change and the metadata that places them.
         private string? _builtKey;
 
@@ -217,9 +220,24 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
+        /// Has the next <see cref="Refresh"/> read the chart afresh, as after it was written again in place, while what's
+        /// drawn stays until the chart read is built: the merge preview staged again, so it doesn't blink.
+        /// </summary>
+        public void ReloadChart()
+        {
+            _version++;
+            _chartKey = null;
+            _chartName = null;
+            _bytes = null;
+            _builtKey = null;
+            _keepScene = _shown is not null || Scene is not null;
+        }
+
+        /// <summary>
         /// Shows <paramref name="song"/>'s vocals, with its draft's change and offset; <see langword="null"/>
         /// shows nothing, as for no selection or several songs. The chart is read again only when it's a
-        /// different file.
+        /// different file, or after <see cref="ReloadChart"/>. The song's <see cref="HighwaySong.VocalsShift"/> moves the
+        /// lane as the offset does, without being one.
         /// </summary>
         /// <param name="hasVocalStem">The song will have a vocals audio track.</param>
         public void Refresh(HighwaySong? song, bool hasVocalStem)
@@ -238,7 +256,12 @@ namespace ChartPacker.ViewModels
             string key = chart.StagedPath ?? $"{song.Entry.FullPath}|{chart.Name}";
             if (key != _chartKey)
             {
-                Clear(null);
+                // Read again in place, what's drawn stays until it's built; anything else starts afresh.
+                if (_keepScene)
+                    _version++;
+                else
+                    Clear(null);
+                _keepScene = false;
                 HasChart = true;
                 _chartKey = key;
                 _ = LoadAsync(song, chart, key);
@@ -247,9 +270,10 @@ namespace ChartPacker.ViewModels
             {
                 _ = BuildAsync();
             }
-            else
+            else if (_bytes is not null)
             {
-                // Only the offset may have changed, as when the draft's offsets are cleared.
+                // Only the offset may have changed, as when the draft's offsets are cleared. Until the chart is read
+                // there's nothing of it to move; what's still drawn of the chart read before stays as it was.
                 ApplyOffset();
             }
 
@@ -323,6 +347,7 @@ namespace ChartPacker.ViewModels
             _chartKey = null;
             _chartName = null;
             _bytes = null;
+            _keepScene = false;
             _builtKey = null;
             _shown = null;
             _shownBytes = null;
@@ -358,7 +383,7 @@ namespace ChartPacker.ViewModels
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 if (version == _version)
-                    Note = string.Format(CultureInfo.CurrentCulture, Strings.LyricsUnreadableFormat, ex.Message);
+                    ShowUnread(key, string.Format(CultureInfo.CurrentCulture, Strings.LyricsUnreadableFormat, ex.Message));
                 return;
             }
 
@@ -366,13 +391,24 @@ namespace ChartPacker.ViewModels
                 return;
             if (bytes is null)
             {
-                Note = Strings.LyricsNoChart;
+                ShowUnread(key, Strings.LyricsNoChart);
                 return;
             }
 
             _bytes = bytes;
             _chartName = chart.Name;
             await BuildAsync();
+        }
+
+        /// <summary>
+        /// Shows <paramref name="note"/> for the chart at <paramref name="key"/>, which wasn't read: nothing drawn before it was
+        /// read again stays. It stays known as read, so it isn't read again until it's a different one.
+        /// </summary>
+        private void ShowUnread(string key, string note)
+        {
+            Clear(note);
+            HasChart = true;
+            _chartKey = key;
         }
 
         /// <summary>
@@ -474,12 +510,12 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Moves the lane by the draft's offset, and by how far the delay has moved since the vocals were built; says
+        /// Moves the lane by the draft's offset and the song's shift, and by how far the delay has moved since the vocals were built; says
         /// so when the offset puts the vocals before the start. The delay leaves that alone: it moves the song's first tick with them.
         /// </summary>
         private void ApplyOffset()
         {
-            int offset = _song?.Draft.VocalsOffset ?? 0;
+            int offset = (_song?.Draft.VocalsOffset ?? 0) + (_song?.VocalsShift ?? 0);
             var delayMoved = _song is { } song && _shown is not null ? SongChartSettings.DelayOf(song.Metadata, _chartOffset) - _delay : TimeSpan.Zero;
             TimeShift = TimeSpan.FromMilliseconds(offset) - _lead + delayMoved;
 

@@ -42,10 +42,9 @@ public static class SongTracks
             }
         }
 
-        return tracks
+        return [.. tracks
             .OrderBy(t => AudioStems.OrderOf(t.Stem))
-            .ThenBy(t => t.StoredName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .ThenBy(t => t.StoredName, StringComparer.OrdinalIgnoreCase)];
     }
 
     /// <summary>
@@ -57,6 +56,6 @@ public static class SongTracks
     {
         ArgumentNullException.ThrowIfNull(storedNames);
         ArgumentNullException.ThrowIfNull(stem);
-        return storedNames.Where(n => stem.Equals(AudioStems.StemOf(n), StringComparison.OrdinalIgnoreCase)).ToList();
+        return [.. storedNames.Where(n => stem.Equals(AudioStems.StemOf(n), StringComparison.OrdinalIgnoreCase))];
     }
 }

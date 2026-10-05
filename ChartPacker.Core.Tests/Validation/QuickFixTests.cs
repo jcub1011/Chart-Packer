@@ -18,7 +18,7 @@ public sealed class QuickFixTests
     {
         var fix = Single([P("pro_drums", value)], SngRules.Sng060);
 
-        CollectionAssert.AreEqual(new[] { new MetadataEdit("pro_drums", expected) }, fix.Edits.ToArray());
+        Assert.AreSequenceEqual([new MetadataEdit("pro_drums", expected)], [.. fix.Edits]);
     }
 
     [TestMethod]
@@ -26,7 +26,7 @@ public sealed class QuickFixTests
     {
         var fix = Single([P("album", "")], SngRules.Sng061);
 
-        CollectionAssert.AreEqual(new[] { new MetadataEdit("album", null) }, fix.Edits.ToArray());
+        Assert.AreSequenceEqual([new MetadataEdit("album", null)], [.. fix.Edits]);
     }
 
     [TestMethod]
@@ -38,7 +38,7 @@ public sealed class QuickFixTests
     {
         var fix = Single([P("name", value)], SngRules.Sng021);
 
-        CollectionAssert.AreEqual(new[] { new MetadataEdit("name", expected) }, fix.Edits.ToArray());
+        Assert.AreSequenceEqual([new MetadataEdit("name", expected)], [.. fix.Edits]);
     }
 
     [TestMethod]
@@ -46,7 +46,7 @@ public sealed class QuickFixTests
     {
         var fix = Single([P("name", ";\r\n")], SngRules.Sng021);
 
-        CollectionAssert.AreEqual(new[] { new MetadataEdit("name", null) }, fix.Edits.ToArray());
+        Assert.AreSequenceEqual([new MetadataEdit("name", null)], [.. fix.Edits]);
     }
 
     [TestMethod]
@@ -54,7 +54,7 @@ public sealed class QuickFixTests
     {
         var fix = Single([P("Frets", "Someone")], SngRules.Sng025);
 
-        CollectionAssert.AreEqual(new[] { new MetadataEdit("Frets", null), new MetadataEdit("charter", "Someone") }, fix.Edits.ToArray());
+        Assert.AreSequenceEqual([new MetadataEdit("Frets", null), new MetadataEdit("charter", "Someone")], [.. fix.Edits]);
     }
 
     [TestMethod]
@@ -62,7 +62,7 @@ public sealed class QuickFixTests
     {
         IReadOnlyList<KeyValuePair<string, string>> pairs = [P("frets", "Someone"), P("Charter", "Someone else")];
 
-        Assert.IsFalse(QuickFixRegistry.ProposeAll(pairs).Any(f => f.RuleId == SngRules.Sng025));
+        Assert.DoesNotContain(f => f.RuleId == SngRules.Sng025, QuickFixRegistry.ProposeAll(pairs));
     }
 
     [TestMethod]
@@ -90,7 +90,7 @@ public sealed class QuickFixTests
     {
         var fix = QuickFixRegistry.ProposeAll([P("name", "B")], ["name"]).Single(f => f.RuleId == SngRules.Sng022);
 
-        CollectionAssert.AreEqual(new[] { new MetadataEdit("name", "B") }, fix.Edits.ToArray());
+        Assert.AreSequenceEqual([new MetadataEdit("name", "B")], [.. fix.Edits]);
     }
 
     [TestMethod]
@@ -98,12 +98,12 @@ public sealed class QuickFixTests
     {
         var fix = Single([P("name", "A"), P("Name", "A")], SngRules.Sng022);
 
-        CollectionAssert.AreEqual(new[] { new MetadataEdit("name", "A") }, fix.Edits.ToArray());
+        Assert.AreSequenceEqual([new MetadataEdit("name", "A")], [.. fix.Edits]);
     }
 
     [TestMethod]
     public void AnSngsRepeatsThatDifferHaveNoFix() =>
-        Assert.IsFalse(QuickFixRegistry.ProposeAll([P("name", "A"), P("Name", "B")]).Any(f => f.RuleId == SngRules.Sng022));
+        Assert.DoesNotContain(f => f.RuleId == SngRules.Sng022, QuickFixRegistry.ProposeAll([P("name", "A"), P("Name", "B")]));
 
     [TestMethod]
     public void FixingARepeatedSongIniKeyClearsItAndSavesItOnce()
@@ -114,7 +114,7 @@ public sealed class QuickFixTests
         Assert.AreEqual(1, QuickFixRegistry.FixKey(item, "name"));
 
         var findings = MetadataValidator.Validate(item.Draft.ApplyTo(original), item.RemainingDuplicateKeys());
-        Assert.IsFalse(findings.Any(f => f.RuleId == SngRules.Sng022));
+        Assert.DoesNotContain(f => f.RuleId == SngRules.Sng022, findings);
         Assert.AreEqual("[song]\nname = A\n", SongIni.ApplyEdits("[song]\nname = B\nname = A\n", item.Draft));
     }
 
@@ -139,9 +139,9 @@ public sealed class QuickFixTests
         Single(original, ruleId).ApplyTo(item);
 
         var fixedPairs = item.Draft.ApplyTo(original);
-        Assert.IsFalse(MetadataValidator.Validate(fixedPairs).Any(f => f.RuleId == ruleId));
+        Assert.DoesNotContain(f => f.RuleId == ruleId, MetadataValidator.Validate(fixedPairs));
         CollectionAssert.IsSubsetOf(new[] { P("artist", "B"), P("genre", "rock") }, fixedPairs.ToArray());
-        Assert.IsFalse(item.Draft.Changes.Any(c => c.Key is "artist" or "genre"));
+        Assert.DoesNotContain(c => c.Key is "artist" or "genre", item.Draft.Changes);
     }
 
     [TestMethod]
@@ -166,7 +166,7 @@ public sealed class QuickFixTests
         int applied = QuickFixRegistry.FixKey(item, "FRETS");
 
         Assert.AreEqual(2, applied);
-        CollectionAssert.AreEqual(new[] { P("charter", "ab") }, item.Draft.ApplyTo(original).ToArray());
+        Assert.AreSequenceEqual([P("charter", "ab")], [.. item.Draft.ApplyTo(original)]);
     }
 
     [TestMethod]
@@ -177,7 +177,7 @@ public sealed class QuickFixTests
 
         QuickFixRegistry.FixKey(item, "frets", includeHints: false);
 
-        CollectionAssert.AreEqual(new[] { P("frets", "ab") }, item.Draft.ApplyTo(original).ToArray());
+        Assert.AreSequenceEqual([P("frets", "ab")], [.. item.Draft.ApplyTo(original)]);
     }
 
     [TestMethod]

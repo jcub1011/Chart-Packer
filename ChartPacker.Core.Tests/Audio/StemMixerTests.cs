@@ -282,6 +282,31 @@ public sealed class StemMixerTests
         Assert.AreEqual(3100, mixer.PositionFrames);
     }
 
+    [TestMethod]
+    public void EachChangeToAStemsSwitchesIsCounted()
+    {
+        var mixer = Mixer(("guitar", Constant(0.2f)), ("bass", Constant(0.3f)));
+        int version = mixer.SwitchVersion;
+        int volumes = mixer.VolumeVersion;
+
+        mixer.Stems[0].IsMuted = true;
+        mixer.Stems[1].IsSolo = true;
+        Assert.AreEqual(version + 2, mixer.SwitchVersion);
+        Assert.AreEqual(volumes, mixer.VolumeVersion);
+
+        // A volume is counted apart, as a slider dragged changes it many times a second.
+        mixer.Stems[1].Volume = 0.5f;
+        Assert.AreEqual(version + 2, mixer.SwitchVersion);
+        Assert.AreEqual(volumes + 1, mixer.VolumeVersion);
+
+        // Set to what they are already, nothing changes.
+        mixer.Stems[0].IsMuted = true;
+        mixer.Stems[1].IsSolo = true;
+        mixer.Stems[1].Volume = 0.5f;
+        Assert.AreEqual(version + 2, mixer.SwitchVersion);
+        Assert.AreEqual(volumes + 1, mixer.VolumeVersion);
+    }
+
     private static FakeSource Constant(float value, int frames = 48000, int rate = Rate) => new(rate, 2, frames, (_, _) => value);
 
     private static FakeSource Ramp() => new(Rate, 2, 48000, (n, _) => RampValue(n));
@@ -289,7 +314,7 @@ public sealed class StemMixerTests
     private static float RampValue(long frame) => frame / 48000f;
 
     private static StemMixer Mixer(params (string Name, IPcmSource Source)[] stems) =>
-        new(stems.Select(s => KeyValuePair.Create(s.Name, s.Source)).ToList());
+        new([.. stems.Select(s => KeyValuePair.Create(s.Name, s.Source))]);
 
     private static float[] Mix(StemMixer mixer, int frames)
     {

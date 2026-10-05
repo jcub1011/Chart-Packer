@@ -36,7 +36,7 @@ public sealed class DecoderTests
         // Every fixture is exactly one second: Opus trims its pre-skip and end padding, MP3 its
         // encoder delay and padding (from the LAME tag).
         Assert.AreEqual(sampleRate, source.LengthFrames);
-        Assert.AreEqual(sampleRate * channels, TestAudio.ReadAll(source).Length);
+        Assert.HasCount(sampleRate * channels, TestAudio.ReadAll(source));
     }
 
     [TestMethod]
@@ -56,7 +56,7 @@ public sealed class DecoderTests
 
         double correlation = TestAudio.CorrelationWithChirp(TestAudio.ReadAll(source), source.Channels, source.SampleRate);
 
-        Assert.IsTrue(correlation > 0.99, $"Correlation with the source sweep was {correlation:F4}.");
+        Assert.IsGreaterThan(0.99, correlation, $"Correlation with the source sweep was {correlation:F4}.");
     }
 
     [TestMethod]
@@ -85,7 +85,7 @@ public sealed class DecoderTests
             float[] read = TestAudio.Read(source, 4096);
 
             int expected = Math.Min(4096, (whole.Length / channels) - target);
-            Assert.AreEqual(expected * channels, read.Length, $"Frames read after seeking to {target}.");
+            Assert.HasCount(expected * channels, read, $"Frames read after seeking to {target}.");
             for (int i = 0; i < read.Length; i++)
                 Assert.AreEqual(whole[(target * channels) + i], read[i], 1e-3f, $"Sample {i} after seeking to {target}.");
         }
@@ -106,7 +106,7 @@ public sealed class DecoderTests
 
         source.SeekToFrame(0);
 
-        CollectionAssert.AreEqual(first, TestAudio.Read(source, 2000));
+        Assert.AreSequenceEqual(first, TestAudio.Read(source, 2000));
     }
 
     [TestMethod]
@@ -190,7 +190,7 @@ public sealed class DecoderTests
         using var actual = AudioDecoder.Open(new MemoryStream(withEmpty), "song.opus", backend);
 
         Assert.AreEqual(expected.LengthFrames, actual.LengthFrames);
-        CollectionAssert.AreEqual(TestAudio.ReadAll(expected), TestAudio.ReadAll(actual));
+        Assert.AreSequenceEqual(TestAudio.ReadAll(expected), TestAudio.ReadAll(actual));
     }
 
     [TestMethod]
@@ -225,18 +225,18 @@ public sealed class DecoderTests
         using (var source = TestAudio.OpenFixture(name, AudioBackend.Managed))
             managed = TestAudio.ReadAll(source);
 
-        Assert.AreEqual(managed.Length, ffmpeg.Length);
+        Assert.HasCount(managed.Length, ffmpeg);
         double signal = 0, noise = 0;
         for (int i = 0; i < managed.Length; i++)
         {
             float difference = Math.Abs(managed[i] - ffmpeg[i]);
-            Assert.IsTrue(difference <= maxDifference, $"Sample {i} differs by {difference}.");
+            Assert.IsLessThanOrEqualTo(maxDifference, difference, $"Sample {i} differs by {difference}.");
             signal += (double)managed[i] * managed[i];
             noise += (double)difference * difference;
         }
 
         double signalToNoise = noise == 0 ? double.PositiveInfinity : 10 * Math.Log10(signal / noise);
-        Assert.IsTrue(signalToNoise >= minSignalToNoise, $"The backends differ by {signalToNoise:F1} dB.");
+        Assert.IsGreaterThanOrEqualTo(minSignalToNoise, signalToNoise, $"The backends differ by {signalToNoise:F1} dB.");
     }
 
     [TestMethod]
@@ -260,7 +260,7 @@ public sealed class DecoderTests
         using var actual = AudioDecoder.Open(File.OpenRead(TestAudio.Fixture(name)), name, AudioBackend.Auto, _ => false);
 
         Assert.AreEqual(expected.GetType(), actual.GetType());
-        CollectionAssert.AreEqual(TestAudio.ReadAll(expected), TestAudio.ReadAll(actual));
+        Assert.AreSequenceEqual(TestAudio.ReadAll(expected), TestAudio.ReadAll(actual));
     }
 
     [TestMethod]
@@ -293,7 +293,7 @@ public sealed class DecoderTests
         {
             Assert.AreEqual(44100, source.LengthFrames);
             float[] read = TestAudio.ReadAll(source);
-            Assert.AreEqual(whole.Length, read.Length);
+            Assert.HasCount(whole.Length, read);
             for (int i = 0; i < read.Length; i++)
                 Assert.AreEqual(whole[i], read[i], 1e-3f, $"Sample {i}.");
         }
@@ -305,7 +305,7 @@ public sealed class DecoderTests
             float[] read = TestAudio.Read(source, 4096);
 
             int expected = Math.Min(4096, 44100 - target);
-            Assert.AreEqual(expected * 2, read.Length, $"Frames read after seeking to {target}.");
+            Assert.HasCount(expected * 2, read, $"Frames read after seeking to {target}.");
             for (int i = 0; i < read.Length; i++)
                 Assert.AreEqual(whole[(target * 2) + i], read[i], 1e-3f, $"Sample {i} after seeking to {target}.");
         }

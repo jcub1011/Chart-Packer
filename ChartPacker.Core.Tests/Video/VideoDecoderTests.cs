@@ -38,16 +38,16 @@ public sealed class VideoDecoderTests
 
         Assert.AreEqual(64, decoder.Width);
         Assert.AreEqual(36, decoder.Height);
-        Assert.IsTrue(Math.Abs(decoder.Duration.TotalSeconds - 2) < 0.2, $"Duration {decoder.Duration}");
+        Assert.IsLessThan(0.2, Math.Abs(decoder.Duration.TotalSeconds - 2), $"Duration {decoder.Duration}");
 
         var times = new List<TimeSpan>();
         while (decoder.Next(out var time))
             times.Add(time);
 
-        Assert.AreEqual(20, times.Count);
+        Assert.HasCount(20, times);
         Assert.AreEqual(TimeSpan.Zero, times[0]);
-        CollectionAssert.AreEqual(times.Order().ToList(), times);
-        Assert.IsTrue(Math.Abs(times[^1].TotalSeconds - 1.9) < 0.01, $"Last frame at {times[^1]}");
+        Assert.AreSequenceEqual(times.Order().ToList(), times);
+        Assert.IsLessThan(0.01, Math.Abs(times[^1].TotalSeconds - 1.9), $"Last frame at {times[^1]}");
     }
 
     [TestMethod]
@@ -71,7 +71,7 @@ public sealed class VideoDecoderTests
 
         Assert.IsTrue(decoder.CopyKept(bgra));
         Assert.IsTrue(Enumerable.Range(0, bgra.Length / 4).All(i => bgra[(i * 4) + 3] == 255));
-        Assert.IsTrue(bgra.Any(b => b != 0 && b != 255));
+        Assert.Contains(b => b != 0 && b != 255, bgra);
     }
 
     [TestMethod]
@@ -87,7 +87,7 @@ public sealed class VideoDecoderTests
 
         Assert.IsFalse(decoder.HasKept);
         Assert.IsTrue(decoder.Next(out var time));
-        Assert.IsTrue(Math.Abs(time.TotalSeconds - 1.0) < 0.01, $"First frame after the seek at {time}");
+        Assert.IsLessThan(0.01, Math.Abs(time.TotalSeconds - 1.0), $"First frame after the seek at {time}");
     }
 
     [TestMethod]
@@ -101,7 +101,7 @@ public sealed class VideoDecoderTests
         File.WriteAllBytes(path, builder.Build());
         var entry = new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song");
 
-        using var decoder = VideoDecoder.Open(SongFile.OpenRead(entry, "video.webm")!, 720);
+        using var decoder = VideoDecoder.Open(SongFile.OpenRead(entry, "video.webm", TestContext.CancellationToken)!, 720);
         int frames = 0;
         while (decoder.Next(out _))
             frames++;
@@ -133,7 +133,7 @@ public sealed class VideoDecoderTests
         byte[] bgra = new byte[64 * 36 * 4];
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (!playback.TryCopyFrame(bgra, ref version) && DateTime.UtcNow < deadline)
-            await published.WaitAsync(TimeSpan.FromMilliseconds(200));
+            await published.WaitAsync(TimeSpan.FromMilliseconds(200), TestContext.CancellationToken);
 
         Assert.IsNull(playback.Error);
         Assert.AreEqual(64, playback.Width);
@@ -141,7 +141,7 @@ public sealed class VideoDecoderTests
         Assert.IsFalse(playback.TryCopyFrame(bgra, ref version));
 
         playback.Dispose();
-        await playback.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await playback.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.CancellationToken);
         File.Delete(copy);
     }
 
@@ -160,13 +160,13 @@ public sealed class VideoDecoderTests
         byte[] bgra = new byte[64 * 36 * 4];
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (!playback.TryCopyFrame(bgra, ref version) && DateTime.UtcNow < deadline)
-            await published.WaitAsync(TimeSpan.FromMilliseconds(200));
+            await published.WaitAsync(TimeSpan.FromMilliseconds(200), TestContext.CancellationToken);
 
         Assert.IsNull(playback.Error);
         Assert.IsGreaterThan(0, version);
 
         playback.Dispose();
-        await playback.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await playback.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.CancellationToken);
     }
 
     [TestMethod]
@@ -174,18 +174,20 @@ public sealed class VideoDecoderTests
     {
         var playback = new VideoPlayback(() => new MemoryStream([1, 2, 3, 4]), 720);
         playback.Dispose();
-        await playback.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await playback.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.CancellationToken);
 
         var failing = new VideoPlayback(() => new MemoryStream([.. Enumerable.Range(0, 4096).Select(i => (byte)i)]), 720);
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (failing.Error is null && DateTime.UtcNow < deadline)
-            await Task.Delay(20);
+            await Task.Delay(20, TestContext.CancellationToken);
 
         Assert.IsNotNull(failing.Error);
         failing.Dispose();
-        await failing.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await failing.WhenClosedAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.CancellationToken);
     }
 
     private static VideoDecoder Open(string name, int maxWidth) =>
         VideoDecoder.Open(File.OpenRead(Path.Combine(Fixtures, name)), maxWidth);
+
+    public TestContext TestContext { get; set; }
 }

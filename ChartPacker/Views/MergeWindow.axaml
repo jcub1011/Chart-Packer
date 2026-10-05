@@ -5,6 +5,7 @@
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:conv="using:ChartPacker.Converters"
         xmlns:views="using:ChartPacker.Views"
         mc:Ignorable="d" d:DesignWidth="1560" d:DesignHeight="900"
         x:Class="ChartPacker.Views.MergeWindow"
@@ -13,19 +14,61 @@
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1560" Height="900"
         MinWidth="1000" MinHeight="520"
+        CanMinimize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
 
+    <Window.Resources>
+        <!-- A chart difficulty's letter and its note counts, in the games' colours, as the inspector shows them. -->
+        <conv:DifficultyBrushConverter x:Key="DifficultyLetterBrush"
+                                       Level0="{StaticResource DifficultyEasyBrush}"
+                                       Level1="{StaticResource DifficultyMediumBrush}"
+                                       Level2="{StaticResource DifficultyHardBrush}"
+                                       Level3="{StaticResource DifficultyExpertBrush}"
+                                       Fallback="{StaticResource SystemControlForegroundBaseMediumBrush}" />
+        <!-- A part row's instrument, as the inspector's icon shows it. -->
+        <conv:DifficultyGlyphConverter x:Key="DifficultyGlyph"
+                                       Guitar="{StaticResource InstrumentGuitarGeometry}"
+                                       Bass="{StaticResource InstrumentBassGeometry}"
+                                       Rhythm="{StaticResource InstrumentRhythmGeometry}"
+                                       Drums="{StaticResource InstrumentDrumsGeometry}"
+                                       ProDrums="{StaticResource InstrumentProDrumsGeometry}"
+                                       Keys="{StaticResource InstrumentKeysGeometry}"
+                                       ProKeys="{StaticResource InstrumentProKeysGeometry}"
+                                       Vocals="{StaticResource InstrumentVocalsGeometry}"
+                                       Harmonies="{StaticResource InstrumentHarmoniesGeometry}"
+                                       Dance="{StaticResource InstrumentDanceGeometry}"
+                                       Band="{StaticResource InstrumentBandGeometry}" />
+        <!-- A row's fixed icon: the audio waveform, an art placeholder, or MIDI. -->
+        <conv:MergeRowIconConverter x:Key="MergeRowIcon"
+                                    Waveform="{StaticResource WaveformIconGeometry}"
+                                    Midi="{StaticResource MidiIconGeometry}"
+                                    AlbumArt="{StaticResource AlbumArtIconGeometry}"
+                                    Background="{StaticResource BackgroundIconGeometry}"
+                                    Video="{StaticResource VideoIconGeometry}" />
+        <!-- Shortens a link's label in the middle in the drop-down, so the list stays a sensible width. -->
+        <conv:MiddleTruncateConverter x:Key="MiddleTruncate" />
+        <!-- Behind a row that still needs a choice, with the amber bar at its left. -->
+        <SolidColorBrush x:Key="NeedsChoiceTintBrush" Color="#14FBBF24" />
+    </Window.Resources>
+
     <Window.Styles>
-        <Style Selector="TextBlock.merge-heading">
+        <!-- A section's heading and what it's for, as the inspector heads its sections. -->
+        <Style Selector="TextBlock.section">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Opacity" Value="0.6" />
         </Style>
         <Style Selector="TextBlock.merge-description">
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Opacity" Value="0.5" />
             <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="StackPanel.preview-status">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="StackPanel.preview-status.updating">
+            <Setter Property="Opacity" Value="1" />
         </Style>
         <Style Selector="TextBlock.warning">
             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
@@ -35,74 +78,278 @@
             <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
-        <!-- One choice. Outlined in amber while it still has to be made. -->
-        <Style Selector="Border.choice-row">
+        <!-- A long path gives way in the middle, as the library's Input and Output do; the whole path is in its tooltip. -->
+        <Style Selector="TextBlock.path">
+            <Setter Property="TextTrimming" Value="PathSegmentEllipsis" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- A section's rows, on the panel's surface, divided by hairlines. The table has no bottom edge:
+             the last row's divider is it. -->
+        <Style Selector="Border.table">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1,1,1,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <Style Selector="Border.merge-row">
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        <!-- The bar at a row's left, there (transparent) on every row so marking one doesn't shift it:
+             amber with a faint tint while the row still needs a choice, as the inspector marks an invalid value. -->
+        <Style Selector="Border.row-mark">
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.row-mark.needs-choice">
+            <Setter Property="BorderBrush" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource NeedsChoiceTintBrush}" />
+        </Style>
+
+        <!-- A row's icon, in a small circle like the inspector's instrument icons. -->
+        <Style Selector="Border.row-icon">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="CornerRadius" Value="13" />
             <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="Border.choice-row.needs-choice">
-            <Setter Property="BorderBrush" Value="{DynamicResource WarningTextBrush}" />
+        <Style Selector="Border.row-icon PathIcon">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+        </Style>
+        <Style Selector="CheckBox.include">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- The rows' gutter: icons and labels, or while the panel is narrow ("compact", which
+             MergeWindow.axaml.cs sets on the window) just the Include box and icon, so the songs get the room. MergeWindow.axaml.cs sizes the panel from these widths plus the 8px margins. -->
+        <Style Selector=":is(Control).gutter">
+            <Setter Property="Width" Value="152" />
+        </Style>
+        <Style Selector=":is(Window).compact :is(Control).gutter">
+            <Setter Property="Width" Value="56" />
+        </Style>
+        <Style Selector=":is(Window).compact :is(Control).icon-label">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <!-- "Choose which song…" under a row's label; the amber bar alone says it while the panel is narrow. -->
+        <Style Selector="TextBlock.needs-text">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="TextBlock.needs-text.shown">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector=":is(Window).compact TextBlock.needs-text">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <!-- A row left out: struck through and dimmed, as the inspector shows a removed row. -->
+        <Style Selector="TextBlock.removed">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+        <Style Selector="ItemsControl.excluded">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+
+        <!-- A cell: one song's take on the row, picked like a library row is selected - tinted, with the
+             violet bar at its left. Radio buttons, so one per row is picked, drawn as flat toggles. -->
+        <Style Selector="RadioButton.cell">
+            <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Cursor" Value="Hand" />
+            <!-- A song without the thing can still say why, e.g. that its chart can't be read. -->
+            <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+        </Style>
+        <Style Selector="RadioButton.cell:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="RadioButton.cell:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <!-- Fluent shrinks a pressed button a little; across a cell that reads as the row moving. -->
+        <Style Selector="RadioButton.cell:pressed">
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <Style Selector="RadioButton.cell:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.cell:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter, RadioButton.cell:checked:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#558B5CF6" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+            </Setter>
+        </Style>
+        <!-- A song without the thing: its dash, dimmed, on nothing. -->
+        <Style Selector="RadioButton.cell:disabled">
+            <Setter Property="Cursor" Value="Arrow" />
+        </Style>
+        <Style Selector="RadioButton.cell:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <!-- The kept audio's song in the alignment row. -->
+        <Style Selector="Border.chip.reference">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Border.chip.reference > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
         </Style>
     </Window.Styles>
 
     <Window.DataTemplates>
-        <!-- A row: its label, then one cell per song and a last one for leaving the thing out, lined up with the headers. -->
+        <!-- A row: an Include checkbox where it can be left out, its icon and label, then one cell per song. -->
         <DataTemplate DataType="vm:MergeChoiceViewModel">
-            <Border Classes="choice-row" Classes.needs-choice="{Binding NeedsChoice}">
-                <Grid ColumnDefinitions="180,*" ColumnSpacing="8">
-                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}" />
-                        <TextBlock Classes="warning"
-                                   FontSize="11"
-                                   IsVisible="{Binding NeedsChoice}"
-                                   Text="{x:Static res:Strings.MergeNeedsChoice}" />
-                    </StackPanel>
-                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Options}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Rows="1" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:MergeOptionViewModel">
-                                <!-- The panel keeps the cell's column when its button is hidden. -->
-                                <Panel Margin="3,0">
-                                    <RadioButton GroupName="{Binding GroupName}"
+            <Border Classes="merge-row">
+                <Border Classes="row-mark" Classes.needs-choice="{Binding ShowNeedsChoice}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <DockPanel Grid.Column="0" Classes="gutter" Margin="8,6" VerticalAlignment="Center">
+                            <CheckBox DockPanel.Dock="Left"
+                                      Classes="include"
+                                      Margin="0,0,8,0"
+                                      IsChecked="{Binding IsIncluded}"
+                                      IsVisible="{Binding CanExclude}"
+                                      ToolTip.Tip="{Binding IncludeToolTip}"
+                                      AutomationProperties.Name="{Binding IncludeName}" />
+                            <!-- Its tooltip names the row while the label is hidden. -->
+                            <Panel DockPanel.Dock="Left"
+                                   Margin="0,0,8,0"
+                                   Background="Transparent"
+                                   IsVisible="{Binding HasRowIcon}"
+                                   ToolTip.Tip="{Binding Label}">
+                                <Border Classes="row-icon" IsVisible="{Binding HasGlyph}">
+                                    <PathIcon Data="{Binding Glyph, Converter={StaticResource DifficultyGlyph}}" />
+                                </Border>
+                                <Border Classes="row-icon" IsVisible="{Binding HasStaticIcon}">
+                                    <PathIcon Data="{Binding IconKind, Converter={StaticResource MergeRowIcon}}" />
+                                </Border>
+                            </Panel>
+                            <!-- A row with an icon loses its label while the panel is narrow; one without, e.g. a metadata key, keeps it. -->
+                            <StackPanel Spacing="1" VerticalAlignment="Center" Classes.icon-label="{Binding HasRowIcon}">
+                                <TextBlock Text="{Binding Label}"
+                                           Classes.removed="{Binding IsExcluded}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Label}" />
+                                <TextBlock Classes="warning needs-text"
+                                           Classes.shown="{Binding ShowNeedsChoice}"
+                                           FontSize="11"
+                                           Text="{x:Static res:Strings.MergeNeedsChoice}" />
+                            </StackPanel>
+                        </DockPanel>
+                        <!-- Left out, the cells dim; picking one includes the row again. -->
+                        <ItemsControl Grid.Column="1"
+                                      Margin="0,4,4,4"
+                                      Classes.excluded="{Binding IsExcluded}"
+                                      ItemsSource="{Binding SourceOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:MergeOptionViewModel">
+                                    <RadioButton Classes="cell"
+                                                 Margin="2,0"
+                                                 GroupName="{Binding GroupName}"
                                                  IsChecked="{Binding IsSelected}"
                                                  IsEnabled="{Binding IsAvailable}"
-                                                 IsVisible="{Binding IsShown}"
-                                                 HorizontalAlignment="Stretch"
                                                  ToolTip.Tip="{Binding ToolTip}"
                                                  AutomationProperties.Name="{Binding ToolTip}">
                                         <StackPanel Spacing="1">
+                                            <!-- A part's difficulties, in the games' colours, as the inspector shows them. -->
+                                            <ItemsControl ItemsSource="{Binding DifficultyItems}" IsVisible="{Binding HasDifficulties}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="vm:MergeDifficultyItem">
+                                                        <TextBlock Text="{Binding Letter}"
+                                                                   FontSize="12"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{Binding Difficulty, Converter={StaticResource DifficultyLetterBrush}}" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                             <!-- A value can carry rich-text tags (colours, bold…), which are drawn as the inspector draws them. -->
-                                            <TextBlock ctl:RichTextMarkup.Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
-                                            <!-- A part's note counts, under its difficulty letters in the same order. -->
-                                            <TextBlock Classes="muted"
-                                                       FontSize="11"
-                                                       Text="{Binding Counts}"
-                                                       IsVisible="{Binding HasCounts}"
+                                            <TextBlock ctl:RichTextMarkup.Text="{Binding Text}"
+                                                       IsVisible="{Binding ShowText}"
                                                        TextTrimming="CharacterEllipsis" />
+                                            <!-- Compact text, e.g. a stem count; the full text stays in the tooltip. -->
+                                            <TextBlock Text="{Binding Summary}"
+                                                       IsVisible="{Binding ShowSummary}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <!-- A part's note counts, under its difficulty letters in the same order; every count is in the tooltip. -->
+                                            <ItemsControl ItemsSource="{Binding NoteCountItems}" IsVisible="{Binding HasNoteCounts}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="vm:MergeNoteCountItem">
+                                                        <TextBlock Text="{Binding Text}"
+                                                                   FontSize="11"
+                                                                   Foreground="{Binding Difficulty, Converter={StaticResource DifficultyLetterBrush}}" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                             <TextBlock Classes="muted"
                                                        FontSize="11"
                                                        Text="{Binding Detail}"
                                                        IsVisible="{Binding HasDetail}"
                                                        TextTrimming="CharacterEllipsis" />
+                                            <!-- What to know about the song, e.g. that its unsaved edits aren't included; all of it is in the tooltip. -->
+                                            <TextBlock Classes="warning"
+                                                       FontSize="11"
+                                                       MaxLines="2"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding Warning}"
+                                                       IsVisible="{Binding HasWarning}" />
                                         </StackPanel>
                                     </RadioButton>
-                                </Panel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
             </Border>
         </DataTemplate>
     </Window.DataTemplates>
 
-    <Grid RowDefinitions="*,Auto" ColumnDefinitions="3*,Auto,2*">
+    <Grid x:Name="MergeRoot" RowDefinitions="*,Auto" ColumnDefinitions="3*,Auto,2*">
+        <!-- Columns (0) choices, (1) splitter, (2) preview. MergeWindow.axaml.cs indexes these. -->
         <Panel Grid.Row="0" Grid.Column="0">
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
@@ -113,86 +360,202 @@
                 <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.MergeLoading}" />
             </StackPanel>
 
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding !IsLoading}">
-                <StackPanel Margin="20,14,20,20" Spacing="18" IsEnabled="{Binding IsReady}">
-                    <!-- The songs, one column each, above the cells of every row. -->
-                    <Grid ColumnDefinitions="180,*" ColumnSpacing="8" Margin="11,0">
-                        <ItemsControl Grid.Column="1" ItemsSource="{Binding Sources}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Rows="1" Columns="{Binding ColumnCount}" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="vm:MergeSourceViewModel">
-                                    <StackPanel Margin="3,0" Spacing="1">
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
-                                        <TextBlock Classes="muted" FontSize="12" Text="{Binding Artist}" IsVisible="{Binding HasArtist}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock FontSize="12" ctl:RichTextMarkup.Text="{Binding Charter}" IsVisible="{Binding HasCharter}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CharterPlainText}" />
-                                        <Border Classes="chip" HorizontalAlignment="Left" Margin="0,2,0,0">
-                                            <TextBlock Text="{Binding Format}" />
-                                        </Border>
-                                        <TextBlock Classes="warning" FontSize="11" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="merge-heading" Text="{x:Static res:Strings.MergeSectionChart}" />
+            <ScrollViewer x:Name="LeftScroll"
+                          HorizontalScrollBarVisibility="Auto"
+                          AllowAutoHide="False"
+                          IsVisible="{Binding !IsLoading}">
+                <!-- MergeWindow.axaml.cs sets its width: the viewport's, or wider when the songs don't fit at their narrowest. -->
+                <StackPanel x:Name="ColumnsPanel" HorizontalAlignment="Left" Margin="16,4,16,20" IsEnabled="{Binding IsReady}">
+                    <StackPanel Margin="0,14,0,8" Spacing="2">
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.MergeSectionChart}" />
                         <TextBlock Classes="merge-description" Text="{x:Static res:Strings.MergeBaseDescription}" />
+                    </StackPanel>
+                    <Border Classes="table">
                         <ContentControl Content="{Binding BaseChoice}" />
-                    </StackPanel>
+                    </Border>
 
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="merge-heading" Text="{x:Static res:Strings.MergeSectionParts}" />
+                    <StackPanel Margin="0,22,0,8" Spacing="2">
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.MergeSectionParts}" />
                         <TextBlock Classes="merge-description" Text="{x:Static res:Strings.MergePartsDescription}" />
-                        <ItemsControl ItemsSource="{Binding Parts}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="6" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
                     </StackPanel>
+                    <Border Classes="table">
+                        <ItemsControl ItemsSource="{Binding Parts}" />
+                    </Border>
 
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="merge-heading" Text="{x:Static res:Strings.MergeSectionAudio}" />
+                    <TextBlock Classes="section" Margin="0,22,0,8" Text="{x:Static res:Strings.MergeSectionAudio}" />
+                    <Border Classes="table">
                         <ContentControl Content="{Binding AudioChoice}" />
-                    </StackPanel>
+                    </Border>
 
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="merge-heading" Text="{x:Static res:Strings.MergeSectionAssets}" />
-                        <ItemsControl ItemsSource="{Binding Assets}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="6" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
+                    <!-- How far each song moves to line up with the kept audio: one cell per song. -->
+                    <StackPanel Margin="0,22,0,8" Spacing="2">
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.MergeSectionAlignment}" />
+                        <TextBlock Classes="merge-description" Text="{x:Static res:Strings.MergeAlignmentDescription}" />
                     </StackPanel>
+                    <!-- The buttons on a row of their own, so the description never makes room for what lining up is doing;
+                         that shows after them, where it moves nothing. -->
+                    <StackPanel Margin="0,0,0,8" Orientation="Horizontal" Spacing="6">
+                        <Button Classes="labelled"
+                                Content="{x:Static res:Strings.MergeAutoAlignButton}"
+                                Command="{Binding AutoAlignCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.MergeAutoAlignToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.MergeAutoAlignButton}" />
+                        <Button Classes="labelled"
+                                Content="{x:Static res:Strings.MergeAlignmentResetButton}"
+                                Command="{Binding ResetAlignmentCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.MergeAlignmentResetToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentResetButton}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,0,0,0" VerticalAlignment="Center" IsVisible="{Binding IsAligning}">
+                            <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" />
+                            <TextBlock Classes="muted" VerticalAlignment="Center" Text="{Binding AligningText}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Classes="warning" Margin="0,0,0,8" Text="{Binding AlignmentMessage}" IsVisible="{Binding HasAlignmentMessage}" />
+                    <Border Classes="table">
+                        <Border Classes="merge-row">
+                            <Border Classes="row-mark">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <DockPanel Grid.Column="0" Classes="gutter" Margin="8,6" VerticalAlignment="Top">
+                                        <Border DockPanel.Dock="Left"
+                                                Classes="row-icon"
+                                                Margin="0,0,8,0"
+                                                ToolTip.Tip="{x:Static res:Strings.MergeAlignmentLabel}">
+                                            <PathIcon Data="{StaticResource OffsetIconGeometry}" />
+                                        </Border>
+                                        <TextBlock Classes="icon-label"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Text="{x:Static res:Strings.MergeAlignmentLabel}" />
+                                    </DockPanel>
+                                    <ItemsControl Grid.Column="1" Margin="0,6,4,8" ItemsSource="{Binding Alignment}" IsEnabled="{Binding !IsAligning}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Rows="1" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="vm:MergeAlignmentCellViewModel">
+                                                <StackPanel Margin="2,0" Spacing="4" VerticalAlignment="Top">
+                                                    <Border Classes="chip large reference"
+                                                            Margin="0,4,0,0"
+                                                            IsVisible="{Binding IsReference}"
+                                                            ToolTip.Tip="{x:Static res:Strings.MergeAlignmentReference}"
+                                                            AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentReference}">
+                                                        <TextBlock Text="{x:Static res:Strings.MergeReferenceShort}" />
+                                                    </Border>
+                                                    <StackPanel Spacing="4" IsVisible="{Binding CanMove}">
+                                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+                                                            <NumericUpDown Grid.Column="0"
+                                                                           ctl:DragScrub.IsEnabled="True"
+                                                                           MinWidth="0"
+                                                                           HorizontalAlignment="Stretch"
+                                                                           ShowButtonSpinner="False"
+                                                                           VerticalAlignment="Center"
+                                                                           Value="{Binding Offset}"
+                                                                           Increment="1"
+                                                                           Minimum="-2147483648"
+                                                                           Maximum="2147483647"
+                                                                           FormatString="+0;-0;0"
+                                                                           AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentOffsetName}">
+                                                                <ToolTip.Tip>
+                                                                    <StackPanel MaxWidth="320" Spacing="6">
+                                                                        <!-- How far its link moves it, from which song. -->
+                                                                        <TextBlock TextWrapping="Wrap"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Text="{Binding LinkNote}"
+                                                                                   IsVisible="{Binding HasLinkNote}" />
+                                                                        <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
+                                                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                                                    </StackPanel>
+                                                                </ToolTip.Tip>
+                                                            </NumericUpDown>
+                                                            <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                                                            <Button Grid.Column="2"
+                                                                    Classes="tool"
+                                                                    VerticalAlignment="Center"
+                                                                    Command="{Binding CompareCommand}"
+                                                                    ToolTip.Tip="{x:Static res:Strings.MergeCompareToolTip}"
+                                                                    AutomationProperties.Name="{x:Static res:Strings.MergeCompareToolTip}">
+                                                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" />
+                                                            </Button>
+                                                        </Grid>
+                                                        <!-- Wheeling over the selector scrolls the panel; it never changes the link. -->
+                                                        <ctl:NoWheelComboBox HorizontalAlignment="Stretch"
+                                                                              MinWidth="0"
+                                                                              ItemsSource="{Binding Options}"
+                                                                              SelectedItem="{Binding SelectedOption}"
+                                                                              IsVisible="{Binding CanLink}"
+                                                                              ToolTip.Tip="{Binding SelectedOption.Label}"
+                                                                              AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentLinkName}">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate DataType="vm:MergeAlignmentOptionViewModel">
+                                                                    <TextBlock Text="{Binding Label, Converter={StaticResource MiddleTruncate}, ConverterParameter=60}"
+                                                                               ToolTip.Tip="{Binding Label}" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                            <ComboBox.SelectionBoxItemTemplate>
+                                                                <DataTemplate DataType="vm:MergeAlignmentOptionViewModel">
+                                                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                                </DataTemplate>
+                                                            </ComboBox.SelectionBoxItemTemplate>
+                                                        </ctl:NoWheelComboBox>
+                                                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap" Text="{Binding Note}" IsVisible="{Binding HasNote}" />
+                                                        <TextBlock Classes="warning" FontSize="11" Text="{Binding Warning}" IsVisible="{Binding HasWarning}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Border>
+                        </Border>
+                    </Border>
 
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="merge-heading" Text="{x:Static res:Strings.MergeSectionMetadata}" />
+                    <TextBlock Classes="section" Margin="0,22,0,8" Text="{x:Static res:Strings.MergeSectionAssets}" />
+                    <Border Classes="table">
+                        <ItemsControl ItemsSource="{Binding Assets}" />
+                    </Border>
+
+                    <StackPanel Margin="0,22,0,8" Spacing="2">
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.MergeSectionMetadata}" />
                         <TextBlock Classes="merge-description" Text="{x:Static res:Strings.MergeMetadataDescription}" />
-                        <ItemsControl ItemsSource="{Binding Metadata}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="6" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
-                        <TextBlock Classes="muted" IsVisible="{Binding HasNoConflicts}" Text="{x:Static res:Strings.MergeNoConflicts}" />
                     </StackPanel>
+                    <Border Classes="table" IsVisible="{Binding !HasNoConflicts}">
+                        <ItemsControl ItemsSource="{Binding Metadata}" />
+                    </Border>
+                    <TextBlock Classes="muted" FontSize="12" IsVisible="{Binding HasNoConflicts}" Text="{x:Static res:Strings.MergeNoConflicts}" />
 
-                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6" Margin="11,0">
-                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold" Text="{x:Static res:Strings.MergeCharterLabel}" />
-                        <SelectableTextBlock Grid.Row="0" Grid.Column="1" ctl:RichTextMarkup.Text="{Binding CharterPreview}" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold" Text="{x:Static res:Strings.MergeOutputLabel}" />
-                        <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TargetText}" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="warning" Text="{Binding TargetProblem}" IsVisible="{Binding HasTargetProblem}" />
-                    </Grid>
+                    <!-- What the merge makes: who charted it, and where it goes. -->
+                    <Border Classes="table" Margin="0,22,0,0">
+                        <StackPanel>
+                            <Border Classes="merge-row">
+                                <Grid ColumnDefinitions="168,*" Margin="3,0,0,0">
+                                    <TextBlock Grid.Column="0" Classes="caption" Margin="8,8" VerticalAlignment="Center" Text="{x:Static res:Strings.MergeCharterLabel}" />
+                                    <SelectableTextBlock Grid.Column="1"
+                                                         Margin="13,8,12,8"
+                                                         VerticalAlignment="Center"
+                                                         TextWrapping="Wrap"
+                                                         ctl:RichTextMarkup.Text="{Binding CharterPreview}" />
+                                </Grid>
+                            </Border>
+                            <Border Classes="merge-row">
+                                <Grid ColumnDefinitions="168,*" RowDefinitions="Auto,Auto" Margin="3,0,0,0">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" Margin="8,8" VerticalAlignment="Center" Text="{x:Static res:Strings.MergeOutputLabel}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1"
+                                               Classes="path"
+                                               Margin="13,8,12,8"
+                                               Text="{Binding TargetText}"
+                                               ToolTip.Tip="{Binding TargetText}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1"
+                                               Classes="warning"
+                                               FontSize="12"
+                                               Margin="13,0,12,8"
+                                               Text="{Binding TargetProblem}"
+                                               IsVisible="{Binding HasTargetProblem}" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Panel>
@@ -208,9 +571,11 @@
             <DockPanel>
                 <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <TextBlock Grid.Column="0" Classes="merge-heading" VerticalAlignment="Center" Text="{x:Static res:Strings.MergePreviewHeading}" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsPreviewUpdating}">
-                            <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" />
+                        <TextBlock Grid.Column="0" Classes="section" VerticalAlignment="Center" Text="{x:Static res:Strings.MergePreviewHeading}" />
+                        <!-- Always laid out, only faded in, so the heading's row keeps its height and the preview doesn't jump as it appears. -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsHitTestVisible="False"
+                                    Classes="preview-status" Classes.updating="{Binding IsPreviewUpdating}">
+                            <Arc Classes="spinner" Classes.active="{Binding IsPreviewUpdating}" Width="14" Height="14" StrokeThickness="2" />
                             <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.MergePreviewUpdating}" />
                         </StackPanel>
                     </Grid>

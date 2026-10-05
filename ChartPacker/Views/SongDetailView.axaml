@@ -1125,9 +1125,10 @@
                         <StackPanel.Resources>
                             <x:Double x:Key="SliderHorizontalHeight">20</x:Double>
                         </StackPanel.Resources>
-                        <!-- The audio offset, the master volume and the playback speed sit at the right of the header; each track
-                             has its own level in the mix below. The offset moves every track alike, as song.ini's delay does. -->
-                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                        <!-- The audio offset, the master volume, the playback speed and pitch correction sit at the right of the
+                             header; each track has its own level in the mix below. The offset moves every track alike, as
+                             song.ini's delay does. -->
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                             <TextBlock Grid.Column="0" Classes="section" Text="{Binding Player.TracksHeader}" />
                             <StackPanel Grid.Column="1"
                                         Classes="timing"
@@ -1211,6 +1212,15 @@
                                     </Style>
                                 </ComboBox.Styles>
                             </ComboBox>
+                            <ToggleButton Grid.Column="6"
+                                          Classes="tool"
+                                          VerticalAlignment="Center"
+                                          IsChecked="{Binding Player.PitchCorrection}"
+                                          IsVisible="{Binding Player.HasTracks}"
+                                          ToolTip.Tip="{x:Static res:Strings.PitchCorrectionToolTip}"
+                                          AutomationProperties.Name="{x:Static res:Strings.PitchCorrectionLabel}">
+                                <PathIcon Width="14" Height="14" Data="{StaticResource PitchCorrectionIconGeometry}" />
+                            </ToggleButton>
                         </Grid>
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.NoTracks}" IsVisible="{Binding !Player.HasTracks}" />
 

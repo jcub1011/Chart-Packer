@@ -20,12 +20,15 @@ public sealed record LibraryLoadProgress(IReadOnlyList<LoadedSong> Songs, int Fo
 /// </summary>
 public static class SongLibraryLoader
 {
+    /// <summary>The most songs read at once, however high the parallelism, since each reader has a thread of its own.</summary>
+    public const int MaxReaders = 64;
+
     private static readonly TimeSpan ReportInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// Finds the songs under <paramref name="root"/> and reads their metadata, both on the thread
     /// pool. Up to <paramref name="parallelism"/> folders are searched, and up to
-    /// <paramref name="parallelism"/> songs read, at once.
+    /// <paramref name="parallelism"/> songs read (at most <see cref="MaxReaders"/>), at once.
     /// </summary>
     /// <remarks>
     /// Reports come about every 100 ms while there's something new, one at a time, and a last one
@@ -110,21 +113,39 @@ public static class SongLibraryLoader
         }
     }
 
+    /// <summary>
+    /// Reads the songs on threads of their own, up to <see cref="MaxReaders"/>. Reads block on the disk, and many
+    /// blocking at once on the thread pool would starve it, while a hard drive needs many requests waiting to
+    /// order its seeks well.
+    /// </summary>
     private static async Task ReadAllAsync(int parallelism, LoadState state, CancellationTokenSource stop)
     {
-        var options = new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = stop.Token };
+        var readers = new Task[Math.Min(parallelism, MaxReaders)];
+        for (int i = 0; i < readers.Length; i++)
+            readers[i] = Task.Factory.StartNew(() => ReadSongs(state, stop.Token), stop.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
         try
         {
-            await Parallel.ForEachAsync(state.Songs.Reader.ReadAllAsync(stop.Token), options, async (song, token) =>
-            {
-                var summary = await SongSummaryReader.TryReadAsync(song.Entry, token).ConfigureAwait(false);
-                state.Read.Enqueue(new LoadedSong(song.Entry, song.Position, summary));
-            }).ConfigureAwait(false);
+            await Task.WhenAll(readers).ConfigureAwait(false);
         }
         catch
         {
             await stop.CancelAsync().ConfigureAwait(false);
             throw;
+        }
+    }
+
+    /// <summary>Reads songs as they're found until the search is over and every song found has been taken.</summary>
+    private static void ReadSongs(LoadState state, CancellationToken cancellationToken)
+    {
+        var songs = state.Songs.Reader;
+        while (songs.WaitToReadAsync(cancellationToken).AsTask().GetAwaiter().GetResult())
+        {
+            while (songs.TryRead(out var song))
+            {
+                var summary = SongSummaryReader.TryRead(song.Entry, cancellationToken);
+                state.Read.Enqueue(new LoadedSong(song.Entry, song.Position, summary));
+            }
         }
     }
 

@@ -112,7 +112,7 @@ public sealed class SongFileGateTests
         read.Dispose();
         read.Dispose();
 
-        using var write = await gate.WriteAsync([Song]).WaitAsync(TimeSpan.FromSeconds(5));
+        using var write = await gate.WriteAsync([Song]).WaitAsync(TimeSpan.FromSeconds(5), TestContext.CancellationToken);
         var next = gate.ReadAsync([Song]);
 
         await AssertWaitingAsync(next);
@@ -125,4 +125,6 @@ public sealed class SongFileGateTests
         await Task.Delay(Settle);
         Assert.IsFalse(turn.IsCompleted, "The turn was given while the song was busy.");
     }
+
+    public TestContext TestContext { get; set; }
 }

@@ -235,7 +235,7 @@ public sealed class SettingEditTests
     {
         var edit = (IChoiceEdit)Choice().BeginEdit();
 
-        CollectionAssert.AreEqual(new[] { "A", "B", "C" }, edit.ChoiceLabels.ToArray());
+        Assert.AreSequenceEqual(["A", "B", "C"], [.. edit.ChoiceLabels]);
         Assert.AreEqual(1, edit.SelectedIndex);
 
         edit.SelectedIndex = 2;
@@ -253,14 +253,14 @@ public sealed class SettingEditTests
         var changes = RecordChanges(edit);
 
         edit.Value = 2;
-        CollectionAssert.AreEqual(new[] { "Value", "IsModified", "IsDefault" }, changes);
+        Assert.AreSequenceEqual(["Value", "IsModified", "IsDefault"], changes);
 
         changes.Clear();
         edit.Value = 2;
         Assert.IsEmpty(changes);
 
         edit.Value = 3;
-        CollectionAssert.AreEqual(new[] { "Value", "IsDefault" }, changes);
+        Assert.AreSequenceEqual(["Value", "IsDefault"], changes);
     }
 
     [TestMethod]

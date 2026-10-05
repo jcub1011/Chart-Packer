@@ -135,9 +135,6 @@ namespace ChartPacker.ViewModels
         // How often a track being read shows what has been read of it.
         private static readonly TimeSpan PeaksProgressInterval = TimeSpan.FromMilliseconds(250);
 
-        // Tracks are read side by side, leaving a core for the interface and playback.
-        private static readonly int ReadParallelism = Math.Max(1, Environment.ProcessorCount - 1);
-
         private readonly Func<int, IAudioOutput> _openOutput;
         private readonly DispatcherTimer _timer;
         private SongEntry? _entry;
@@ -203,6 +200,7 @@ namespace ChartPacker.ViewModels
             _settings = settings;
             Volume = settings.Settings.MasterVolume;
             PlaybackSpeed = settings.PlaybackSpeed;
+            PitchCorrection = settings.Settings.PitchCorrection;
             ShowWaveforms = settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
@@ -267,12 +265,19 @@ namespace ChartPacker.ViewModels
         public partial double Volume { get; set; }
 
         /// <summary>
-        /// How fast the song plays, as a fraction from 0.01 to 10: 1 is its own speed. The pitch moves with it. Shared by
-        /// every song and player for this run, but not saved.
+        /// How fast the song plays, as a fraction from 0.01 to 10: 1 is its own speed. The pitch moves with it unless
+        /// <see cref="PitchCorrection"/> is on. Shared by every song and player for this run, but not saved.
         /// </summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PlaybackSpeedText))]
         public partial double PlaybackSpeed { get; set; } = 1;
+
+        /// <summary>
+        /// Whether a <see cref="PlaybackSpeed"/> other than 100% keeps the song's pitch, rather than raising or lowering it
+        /// with the speed. Kept in the settings.
+        /// </summary>
+        [ObservableProperty]
+        public partial bool PitchCorrection { get; set; }
 
         /// <summary>The speeds the playback speed box offers, as it shows them; any whole percent in range can be typed too.</summary>
         public static IReadOnlyList<string> PlaybackSpeedPresets { get; } =
@@ -450,12 +455,13 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Takes up the settings again, as after another player sharing them changed them: the master volume, the
-        /// playback speed, and which visualisers are shown.
+        /// playback speed and pitch correction, and which visualisers are shown.
         /// </summary>
         public void ReloadSettings()
         {
             Volume = _settings.Settings.MasterVolume;
             PlaybackSpeed = _settings.PlaybackSpeed;
+            PitchCorrection = _settings.Settings.PitchCorrection;
             ShowWaveforms = _settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
@@ -470,6 +476,12 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The seek slider is held; see <see cref="BeginScrub"/>.</summary>
         public bool IsScrubbing { get; private set; }
+
+        /// <summary>
+        /// Goes up each time the tracks are let go, for another song or other tracks, which stops playback and sends it back
+        /// to the start; how a reload of the shown song tells it took playback down, rather than the user stopping it.
+        /// </summary>
+        public int TracksGeneration { get; private set; }
 
         /// <summary>
         /// Where playback is right now, read from the player rather than <see cref="PositionSeconds"/>, which
@@ -535,6 +547,7 @@ namespace ChartPacker.ViewModels
             CancelPeaks();
             if (!isSameSong)
                 ClearPeaks();
+            TracksGeneration++;
             Close();
             _entry = entry;
             Tracks.Clear();
@@ -610,6 +623,7 @@ namespace ChartPacker.ViewModels
         {
             CancelPeaks();
             ClearPeaks();
+            TracksGeneration++;
             Close();
             _entry = null;
             Tracks.Clear();
@@ -641,12 +655,12 @@ namespace ChartPacker.ViewModels
         /// <summary>The spectrum of what's being heard, for the visualiser behind the details panel. On the UI thread.</summary>
         public bool TryReadSpectrum(Span<float> levels)
         {
-            if (!ShowSpectrum || _player is not { } player || !player.TryReadHeard(_heard))
+            if (!ShowSpectrum || _player is not { } player || !player.TryReadHeard(_heard, out double rate))
                 return false;
 
             _analyzer ??= new SpectrumAnalyzer();
-            // What's heard is played faster or slower than it was mixed, and higher or lower with it.
-            int heardRate = Math.Max(1, (int)Math.Round(player.Mixer.OutputRate * PlaybackSpeed));
+            // Without pitch correction, what's heard is played faster or slower than it was mixed, and higher or lower with it.
+            int heardRate = Math.Max(1, (int)Math.Round(rate));
             _analyzer.Analyze(_heard, heardRate, levels);
             return true;
         }
@@ -723,6 +737,43 @@ namespace ChartPacker.ViewModels
             SetPosition(0);
         }
 
+        /// <summary>
+        /// Puts playback back at <paramref name="position"/> after the shown song was reloaded, e.g. the merge
+        /// preview was staged again: the seek bar moves there in any case, and playing resumes when
+        /// <paramref name="resume"/> is set. Nothing happens when there's nothing playable to go back to.
+        /// </summary>
+        public async Task RestorePlaybackAsync(TimeSpan position, bool resume)
+        {
+            double seconds = Math.Max(0, position.TotalSeconds);
+            double timeline = TimelineSeconds;
+            if (timeline > 0)
+                seconds = Math.Min(seconds, timeline);
+
+            // While scrubbing the slider owns the position; a reload must not fight it.
+            if (IsScrubbing)
+                return;
+
+            SetPosition(seconds);
+
+            if (!resume || IsScrubbing)
+                return;
+
+            if (await EnsureOpenAsync() is not { } player)
+                return;
+
+            // The length may only be known now that the audio is open.
+            double playable = Math.Max(TimelineSeconds, player.Length.TotalSeconds);
+            if (playable > 0 && seconds > playable)
+            {
+                seconds = playable;
+                SetPosition(seconds);
+            }
+
+            player.Seek(TimeSpan.FromSeconds(seconds));
+            player.Play();
+            SetPlaying(player.IsPlaying);
+        }
+
         private bool CanJumpToPreview() => PreviewStart is not null && CanPlay();
 
         /// <summary>Plays from the song's preview start.</summary>
@@ -794,57 +845,21 @@ namespace ChartPacker.ViewModels
                 // Separate from the player's own sources, which are for the audio thread alone.
                 using var audio = SongAudio.Open(entry, [.. keys.Keys], cancellationToken);
 
-                // Every chunk of every track at once, each from a source of its own. The tracks' first chunks go first, the
-                // longest track's first of all, so each track fills in from its start at the same pace and the mix keeps up.
-                var reads = audio.Tracks
-                    .Where(t => t.Source is not null)
-                    .OrderByDescending(t => t.Source!.LengthFrames)
-                    .Select(opened => new TrackRead(opened, partial => ShowPeaks(opened.Track, partial, isComplete: false, cancellationToken), PeaksProgressInterval, resolution))
-                    .ToList();
-                var chunks = reads
-                    .SelectMany(read => Enumerable.Range(0, read.Reader.ChunkCount).Select(index => (Read: read, Index: index)))
-                    .OrderBy(chunk => chunk.Index)
-                    .ToList();
-
-                var options = new ParallelOptions { CancellationToken = cancellationToken, MaxDegreeOfParallelism = ReadParallelism };
-                Parallel.ForEach(chunks, options, chunk =>
-                {
-                    var read = chunk.Read;
-                    var track = read.Opened.Track;
-                    try
+                // Each track fills in from its start at the same pace, so the mix keeps up. One that can't be read has no
+                // waveform, and what was read of it goes, so the mix isn't left waiting on it.
+                ChunkedPeaksRead.Read(
+                    audio,
+                    resolution,
+                    completed: (opened, peaks) =>
                     {
-                        if (!read.HasFailed)
-                        {
-                            // The first chunk is read from the source opened for the track; the rest open their own.
-                            if (chunk.Index == 0)
-                            {
-                                read.Reader.ReadChunk(0, read.Opened.Source!, cancellationToken);
-                            }
-                            else
-                            {
-                                using var source = audio.OpenSource(track);
-                                read.Reader.ReadChunk(chunk.Index, source, cancellationToken);
-                            }
-                        }
-
-                        read.EndChunk(() =>
-                        {
-                            var peaks = read.Reader.Finish();
-                            ShowPeaks(track, peaks, isComplete: true, cancellationToken);
-                            if (keys[track] is { } key)
-                                StemPeaksCache.Shared.Add(key, peaks);
-                        });
-                    }
-                    catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
-                    {
-                        // The read was stopped; the other tracks carry on.
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-                    {
-                        // This track has no waveform, and what was read of it goes, so the mix isn't left waiting on it; the other tracks carry on.
-                        read.Fail(() => ForgetPeaks(track, cancellationToken));
-                    }
-                });
+                        ShowPeaks(opened.Track, peaks, isComplete: true, cancellationToken);
+                        if (keys[opened.Track] is { } key)
+                            StemPeaksCache.Shared.Add(key, peaks);
+                    },
+                    failed: opened => ForgetPeaks(opened.Track, cancellationToken),
+                    progress: (opened, partial) => ShowPeaks(opened.Track, partial, isComplete: false, cancellationToken),
+                    PeaksProgressInterval,
+                    cancellationToken);
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException)
             {
@@ -1047,6 +1062,13 @@ namespace ChartPacker.ViewModels
                 _player.Speed = (float)speed;
         }
 
+        partial void OnPitchCorrectionChanged(bool value)
+        {
+            _settings.Settings.PitchCorrection = value;
+            if (_player is not null)
+                _player.PitchCorrection = value;
+        }
+
         partial void OnShowWaveformsChanged(bool value)
         {
             _settings.Settings.ShowWaveforms = value;
@@ -1161,6 +1183,7 @@ namespace ChartPacker.ViewModels
                 _audio = audio;
                 _player = player;
                 player.Volume = (float)Volume;
+                player.PitchCorrection = PitchCorrection;
                 player.Speed = (float)PlaybackSpeed;
                 player.CapturesHeard = ShowSpectrum;
                 foreach (var row in Tracks)
@@ -1321,73 +1344,5 @@ namespace ChartPacker.ViewModels
                 _isUpdatingPosition = false;
             }
         }
-
-        /// <summary>
-        /// One track's waveform, read in chunks on several threads: whether a chunk's read failed, which takes the
-        /// whole track's waveform with it, and how many chunks are left before it's done.
-        /// </summary>
-        private sealed class TrackRead
-        {
-            // Held while the track's peaks are shown or forgotten, so that none are shown once they've been forgotten.
-            private readonly Lock _lock = new();
-            private bool _hasFailed;
-            private int _remaining;
-
-            /// <param name="show">Shows the peaks read so far, unless the read has failed.</param>
-            public TrackRead(OpenedTrack opened, Action<StemPeaks> show, TimeSpan progressInterval, WaveformResolution resolution)
-            {
-                Opened = opened;
-                Reader = new StemPeaksReader(opened.Track.StoredName, opened.Source!, Show, progressInterval, resolution: resolution);
-                _remaining = Reader.ChunkCount;
-
-                void Show(StemPeaks partial)
-                {
-                    lock (_lock)
-                    {
-                        if (!_hasFailed)
-                            show(partial);
-                    }
-                }
-            }
-
-            public OpenedTrack Opened { get; }
-
-            public StemPeaksReader Reader { get; }
-
-            public bool HasFailed
-            {
-                get
-                {
-                    lock (_lock)
-                        return _hasFailed;
-                }
-            }
-
-            /// <summary>Marks the read failed, calling <paramref name="forget"/> the first time.</summary>
-            public void Fail(Action forget)
-            {
-                lock (_lock)
-                {
-                    if (_hasFailed)
-                        return;
-                    _hasFailed = true;
-                    forget();
-                }
-            }
-
-            /// <summary>Counts a chunk as done with, calling <paramref name="finish"/> once they all are, unless the read has failed.</summary>
-            public void EndChunk(Action finish)
-            {
-                if (Interlocked.Decrement(ref _remaining) != 0)
-                    return;
-
-                lock (_lock)
-                {
-                    if (!_hasFailed)
-                        finish();
-                }
-            }
-        }
-
     }
 }

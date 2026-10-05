@@ -142,8 +142,27 @@ public static class SongIni
             return new SongIniReadResult(SongIniStatus.TooLarge, []);
 
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-        string text = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        return FromText(await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false));
+    }
 
+    /// <summary>Reads <paramref name="path"/> like <see cref="ReadAsync"/>, blocking the calling thread.</summary>
+    /// <inheritdoc cref="ReadAsync" path="/exception"/>
+    public static SongIniReadResult Read(string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096);
+        if (stream.Length > MaxFileSize)
+            return new SongIniReadResult(SongIniStatus.TooLarge, []);
+
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        string text = reader.ReadToEnd();
+        cancellationToken.ThrowIfCancellationRequested();
+        return FromText(text);
+    }
+
+    private static SongIniReadResult FromText(string text)
+    {
         var duplicateKeys = new List<string>();
         var pairs = Parse(new StringReader(text), duplicateKeys);
         return pairs is null

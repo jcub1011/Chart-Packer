@@ -23,16 +23,16 @@ public sealed class PackPlannerTests
         Write("Song.OGG", "audio");
         Write("desktop.ini", "junk");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.IsFalse(plan.HasErrors);
-        CollectionAssert.AreEquivalent(new[] { "notes.chart", "song.ogg" }, plan.Included.Select(f => f.StoredName).ToArray());
+        Assert.AreSequenceEqual(["notes.chart", "song.ogg"], [.. plan.Included.Select(f => f.StoredName)], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         CollectionAssert.Contains(plan.Excluded.ToArray(), "desktop.ini");
         CollectionAssert.Contains(plan.Excluded.ToArray(), "song.ini");
         var junk = plan.Findings.Single(f => f.RuleId == SngRules.Sng072);
         Assert.AreEqual(Severity.Info, junk.Severity);
-        StringAssert.Contains(junk.Message, "desktop.ini");
-        CollectionAssert.AreEqual(new[] { KeyValuePair.Create("name", "Test") }, plan.Metadata.ToArray());
+        Assert.Contains("desktop.ini", junk.Message);
+        Assert.AreSequenceEqual([KeyValuePair.Create("name", "Test")], [.. plan.Metadata]);
     }
 
     [TestMethod]
@@ -42,10 +42,10 @@ public sealed class PackPlannerTests
         Write("stems/a.ogg", "1");
         Write("stems/b.ogg", "2");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(plan.Included);
-        Assert.AreEqual(1, plan.Findings.Count(f => f.RuleId == SngRules.Sng073));
+        Assert.ContainsSingle(f => f.RuleId == SngRules.Sng073, plan.Findings);
     }
 
     [TestMethod]
@@ -54,7 +54,7 @@ public sealed class PackPlannerTests
         Write("song.ini", "[song]\nname = A\n");
         Write("stems/a.ogg", "1");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName, new PackOptions(IncludeSubfolders: true));
+        var plan = await PackPlanner.PlanAsync(_root.FullName, new PackOptions(IncludeSubfolders: true), TestContext.CancellationToken);
 
         Assert.AreEqual("stems/a.ogg", plan.Included.Single().StoredName);
     }
@@ -66,7 +66,7 @@ public sealed class PackPlannerTests
         Write("__MACOSX/._song.ogg", "1");
         Write("old.sng", "2");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName, new PackOptions(IncludeSubfolders: true));
+        var plan = await PackPlanner.PlanAsync(_root.FullName, new PackOptions(IncludeSubfolders: true), TestContext.CancellationToken);
 
         Assert.IsEmpty(plan.Included);
         Assert.AreEqual(2, plan.Findings.Count(f => f.RuleId == SngRules.Sng072));
@@ -77,7 +77,7 @@ public sealed class PackPlannerTests
     {
         Write("song.ini", "[song]\nloading_phrase = Hello; world\n");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.IsTrue(plan.HasErrors);
         Assert.AreEqual(SngRules.Sng021, plan.Findings.Single(f => f.Severity == Severity.Error).RuleId);
@@ -88,7 +88,7 @@ public sealed class PackPlannerTests
     {
         Write("song.ini", "[song]\nname = A\nalbum =\n");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.IsFalse(plan.HasErrors);
         Assert.AreEqual("name", plan.Metadata.Single().Key);
@@ -100,7 +100,7 @@ public sealed class PackPlannerTests
     {
         Write("song.ini", "[other]\nname = A\n");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.IsFalse(plan.HasErrors);
         Assert.IsEmpty(plan.Metadata);
@@ -112,7 +112,7 @@ public sealed class PackPlannerTests
     {
         Write("notes.chart", "x");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(Severity.Warning, plan.Findings.Single(f => f.RuleId == SngRules.Sng070).Severity);
     }
@@ -123,7 +123,7 @@ public sealed class PackPlannerTests
         Write("song.ini", "[song]\nname = A\n");
         Write("notes..chart", "x");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(SngRules.Sng030, plan.Findings.Single(f => f.Severity == Severity.Error).RuleId);
         Assert.IsEmpty(plan.Included);
@@ -139,7 +139,7 @@ public sealed class PackPlannerTests
         Write("Song.ogg", "1");
         Write("song.ogg", "2");
 
-        var plan = await PackPlanner.PlanAsync(_root.FullName);
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
         Assert.AreEqual(SngRules.Sng032, plan.Findings.Single(f => f.Severity == Severity.Error).RuleId);
     }
@@ -154,12 +154,12 @@ public sealed class PackPlannerTests
         Write("desktop.ini", "junk");
         var options = new PackOptions(IncludeSubfolders: true);
 
-        var fromFolder = await PackPlanner.PlanAsync(_root.FullName, options);
-        var fromListing = await PackPlanner.PlanAsync(_root.FullName, SongFolderListing.List(_root.FullName), options);
+        var fromFolder = await PackPlanner.PlanAsync(_root.FullName, options, TestContext.CancellationToken);
+        var fromListing = await PackPlanner.PlanAsync(_root.FullName, SongFolderListing.List(_root.FullName, TestContext.CancellationToken), options, TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(fromFolder.Included.ToArray(), fromListing.Included.ToArray());
-        CollectionAssert.AreEqual(fromFolder.Excluded.ToArray(), fromListing.Excluded.ToArray());
-        CollectionAssert.AreEqual(fromFolder.Metadata.ToArray(), fromListing.Metadata.ToArray());
+        Assert.AreSequenceEqual([.. fromFolder.Included], [.. fromListing.Included]);
+        Assert.AreSequenceEqual([.. fromFolder.Excluded], [.. fromListing.Excluded]);
+        Assert.AreSequenceEqual([.. fromFolder.Metadata], [.. fromListing.Metadata]);
     }
 
     private void Write(string relative, string content)
@@ -168,4 +168,6 @@ public sealed class PackPlannerTests
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
     }
+
+    public TestContext TestContext { get; set; }
 }

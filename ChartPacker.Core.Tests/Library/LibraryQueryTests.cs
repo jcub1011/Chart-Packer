@@ -44,7 +44,7 @@ public sealed class LibraryQueryTests
     [TestMethod]
     public void DefaultKeepsEverythingInScanOrder()
     {
-        CollectionAssert.AreEqual(All, Apply(LibraryQuery.Default));
+        Assert.AreSequenceEqual(All, Apply(LibraryQuery.Default));
         Assert.IsTrue(LibraryQuery.Default.KeepsScanOrder);
         Assert.IsFalse(LibraryQuery.Default.IsFiltering);
         Assert.AreEqual(0, LibraryQuery.Default.ActiveFilterCount);
@@ -53,19 +53,19 @@ public sealed class LibraryQueryTests
     [TestMethod]
     public void SearchMatchesFileNameTitleOrArtist()
     {
-        CollectionAssert.AreEqual(new[] { Charlie }, Apply(new() { Search = "CHARLIE" }));
-        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { Search = "alpha" }));
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { Search = "band" }));
+        Assert.AreSequenceEqual([Charlie], Apply(new() { Search = "CHARLIE" }));
+        Assert.AreSequenceEqual([Alpha, Delta], Apply(new() { Search = "alpha" }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { Search = "band" }));
     }
 
     [TestMethod]
     public void SearchIgnoresAccents() =>
-        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { Search = "beyonce" }));
+        Assert.AreSequenceEqual([Alpha], Apply(new() { Search = "beyonce" }));
 
     [TestMethod]
     public void EverySearchWordMustMatch()
     {
-        CollectionAssert.AreEqual(new[] { Delta }, Apply(new() { Search = "alpha another" }));
+        Assert.AreSequenceEqual([Delta], Apply(new() { Search = "alpha another" }));
         Assert.IsEmpty(Apply(new() { Search = "alpha missing" }));
     }
 
@@ -76,19 +76,19 @@ public sealed class LibraryQueryTests
     [TestMethod]
     public void FiltersByType()
     {
-        CollectionAssert.AreEqual(new[] { Alpha, Charlie }, Apply(new() { IncludeFolders = false }));
-        CollectionAssert.AreEqual(new[] { Bravo, Delta }, Apply(new() { IncludeSng = false }));
+        Assert.AreSequenceEqual([Alpha, Charlie], Apply(new() { IncludeFolders = false }));
+        Assert.AreSequenceEqual([Bravo, Delta], Apply(new() { IncludeSng = false }));
         Assert.IsEmpty(Apply(new() { IncludeSng = false, IncludeFolders = false }));
     }
 
     [TestMethod]
     public void TextFiltersMatchPartOfTheirField()
     {
-        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { TitleContains = " ALPHA " }));
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { ArtistContains = "band" }));
-        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { AlbumContains = "first" }));
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { GenreContains = "rock" }));
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { CharterContains = "two" }));
+        Assert.AreSequenceEqual([Alpha, Delta], Apply(new() { TitleContains = " ALPHA " }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { ArtistContains = "band" }));
+        Assert.AreSequenceEqual([Alpha], Apply(new() { AlbumContains = "first" }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { GenreContains = "rock" }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { CharterContains = "two" }));
     }
 
     [TestMethod]
@@ -96,27 +96,27 @@ public sealed class LibraryQueryTests
     {
         var query = new LibraryQuery { TitleContains = "   " };
 
-        CollectionAssert.AreEqual(All, Apply(query));
+        Assert.AreSequenceEqual(All, Apply(query));
         Assert.AreEqual(0, query.ActiveFilterCount);
     }
 
     [TestMethod]
     public void RangesIncludeTheirBoundsAndExcludeMissingValues()
     {
-        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { YearMin = 2004 }));
-        CollectionAssert.AreEqual(new[] { Alpha, Bravo }, Apply(new() { YearMax = 2004 }));
-        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { YearMin = 2000, YearMax = 2005 }));
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { LengthMinMs = 200_000 }));
-        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { SizeMaxBytes = 10_000_000 }));
+        Assert.AreSequenceEqual([Alpha, Delta], Apply(new() { YearMin = 2004 }));
+        Assert.AreSequenceEqual([Alpha, Bravo], Apply(new() { YearMax = 2004 }));
+        Assert.AreSequenceEqual([Alpha], Apply(new() { YearMin = 2000, YearMax = 2005 }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { LengthMinMs = 200_000 }));
+        Assert.AreSequenceEqual([Alpha, Delta], Apply(new() { SizeMaxBytes = 10_000_000 }));
     }
 
     [TestMethod]
     public void FiltersByUnsavedChanges() =>
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { OnlyUnsaved = true }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { OnlyUnsaved = true }));
 
     [TestMethod]
     public void FiltersCombine() =>
-        CollectionAssert.AreEqual(new[] { Delta }, Apply(new() { Search = "alpha", IncludeSng = false }));
+        Assert.AreSequenceEqual([Delta], Apply(new() { Search = "alpha", IncludeSng = false }));
 
     [TestMethod]
     public void CountsEachActiveFilterOnce()
@@ -140,45 +140,45 @@ public sealed class LibraryQueryTests
     {
         const LibraryInstruments guitarDrums = LibraryInstruments.Guitar | LibraryInstruments.Drums;
 
-        CollectionAssert.AreEqual(new[] { Alpha, Bravo }, Apply(new() { Instruments = new(LibraryInstruments.Guitar, LibraryInstruments.None) }));
-        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { Instruments = new(guitarDrums, LibraryInstruments.None, SetMatch.All) }));
-        CollectionAssert.AreEqual(new[] { Alpha, Bravo }, Apply(new() { Instruments = new(guitarDrums, LibraryInstruments.None, SetMatch.Any) }));
+        Assert.AreSequenceEqual([Alpha, Bravo], Apply(new() { Instruments = new(LibraryInstruments.Guitar, LibraryInstruments.None) }));
+        Assert.AreSequenceEqual([Alpha], Apply(new() { Instruments = new(guitarDrums, LibraryInstruments.None, SetMatch.All) }));
+        Assert.AreSequenceEqual([Alpha, Bravo], Apply(new() { Instruments = new(guitarDrums, LibraryInstruments.None, SetMatch.Any) }));
     }
 
     [TestMethod]
     public void ExcludedItemsHideSongsWithThemAndSongsNotReadYet()
     {
-        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { Instruments = new(LibraryInstruments.None, LibraryInstruments.Vocals) }));
-        CollectionAssert.AreEqual(new[] { Delta }, Apply(new() { Difficulties = new(LibraryDifficulties.None, LibraryDifficulties.Expert) }));
+        Assert.AreSequenceEqual([Alpha, Delta], Apply(new() { Instruments = new(LibraryInstruments.None, LibraryInstruments.Vocals) }));
+        Assert.AreSequenceEqual([Delta], Apply(new() { Difficulties = new(LibraryDifficulties.None, LibraryDifficulties.Expert) }));
     }
 
     [TestMethod]
     public void IncludedAndExcludedItemsCombine() =>
-        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { Instruments = new(LibraryInstruments.Guitar, LibraryInstruments.Vocals) }));
+        Assert.AreSequenceEqual([Alpha], Apply(new() { Instruments = new(LibraryInstruments.Guitar, LibraryInstruments.Vocals) }));
 
     [TestMethod]
     public void FiltersByDifficultiesAndStems()
     {
-        CollectionAssert.AreEqual(new[] { Alpha, Bravo }, Apply(new() { Difficulties = new(LibraryDifficulties.Expert, LibraryDifficulties.None) }));
-        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { Stems = new(LibraryStems.Drums | LibraryStems.Bass, LibraryStems.None, SetMatch.Any) }));
+        Assert.AreSequenceEqual([Alpha, Bravo], Apply(new() { Difficulties = new(LibraryDifficulties.Expert, LibraryDifficulties.None) }));
+        Assert.AreSequenceEqual([Alpha, Delta], Apply(new() { Stems = new(LibraryStems.Drums | LibraryStems.Bass, LibraryStems.None, SetMatch.Any) }));
 
         // Only the song stem: it included, every other excluded.
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { Stems = new(LibraryStems.Song, ~LibraryStems.Song) }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { Stems = new(LibraryStems.Song, ~LibraryStems.Song) }));
     }
 
     [TestMethod]
     public void FiltersByBackgroundsAndAlbumArt()
     {
-        CollectionAssert.AreEqual(new[] { Alpha }, Apply(new() { Video = FilterPresence.Includes }));
-        CollectionAssert.AreEqual(new[] { Bravo, Delta }, Apply(new() { Video = FilterPresence.Excludes }));
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { BackgroundImage = FilterPresence.Includes }));
-        CollectionAssert.AreEqual(new[] { Alpha, Delta }, Apply(new() { AlbumArt = FilterPresence.Includes }));
-        CollectionAssert.AreEqual(new[] { Bravo }, Apply(new() { AlbumArt = FilterPresence.Excludes }));
+        Assert.AreSequenceEqual([Alpha], Apply(new() { Video = FilterPresence.Includes }));
+        Assert.AreSequenceEqual([Bravo, Delta], Apply(new() { Video = FilterPresence.Excludes }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { BackgroundImage = FilterPresence.Includes }));
+        Assert.AreSequenceEqual([Alpha, Delta], Apply(new() { AlbumArt = FilterPresence.Includes }));
+        Assert.AreSequenceEqual([Bravo], Apply(new() { AlbumArt = FilterPresence.Excludes }));
     }
 
     [TestMethod]
     public void ContentFiltersThatAreOffKeepSongsNotReadYet() =>
-        CollectionAssert.AreEqual(All, Apply(new() { Instruments = new(LibraryInstruments.None, LibraryInstruments.None, SetMatch.Any), Video = FilterPresence.Either }));
+        Assert.AreSequenceEqual(All, Apply(new() { Instruments = new(LibraryInstruments.None, LibraryInstruments.None, SetMatch.Any), Video = FilterPresence.Either }));
 
     [TestMethod]
     public void CountsEachContentFilterOnce()
@@ -209,33 +209,33 @@ public sealed class LibraryQueryTests
     [TestMethod]
     public void SortsByTitleIgnoringCaseWithMissingLast()
     {
-        CollectionAssert.AreEqual(new[] { Alpha, Delta, Bravo, Charlie }, Apply(new() { SortField = LibrarySortField.Title }));
-        CollectionAssert.AreEqual(new[] { Bravo, Delta, Alpha, Charlie }, Apply(new() { SortField = LibrarySortField.Title, Descending = true }));
+        Assert.AreSequenceEqual([Alpha, Delta, Bravo, Charlie], Apply(new() { SortField = LibrarySortField.Title }));
+        Assert.AreSequenceEqual([Bravo, Delta, Alpha, Charlie], Apply(new() { SortField = LibrarySortField.Title, Descending = true }));
     }
 
     [TestMethod]
     public void SortsNumbersWithMissingLast()
     {
-        CollectionAssert.AreEqual(new[] { Bravo, Alpha, Delta, Charlie }, Apply(new() { SortField = LibrarySortField.Year }));
-        CollectionAssert.AreEqual(new[] { Delta, Alpha, Bravo, Charlie }, Apply(new() { SortField = LibrarySortField.Year, Descending = true }));
-        CollectionAssert.AreEqual(new[] { Bravo, Alpha, Charlie, Delta }, Apply(new() { SortField = LibrarySortField.Length, Descending = true }));
-        CollectionAssert.AreEqual(new[] { Delta, Alpha, Bravo, Charlie }, Apply(new() { SortField = LibrarySortField.Size }));
+        Assert.AreSequenceEqual([Bravo, Alpha, Delta, Charlie], Apply(new() { SortField = LibrarySortField.Year }));
+        Assert.AreSequenceEqual([Delta, Alpha, Bravo, Charlie], Apply(new() { SortField = LibrarySortField.Year, Descending = true }));
+        Assert.AreSequenceEqual([Bravo, Alpha, Charlie, Delta], Apply(new() { SortField = LibrarySortField.Length, Descending = true }));
+        Assert.AreSequenceEqual([Delta, Alpha, Bravo, Charlie], Apply(new() { SortField = LibrarySortField.Size }));
     }
 
     [TestMethod]
     public void TiesKeepScanOrderInEitherDirection()
     {
-        CollectionAssert.AreEqual(new[] { Alpha, Charlie, Bravo, Delta }, Apply(new() { SortField = LibrarySortField.Type }));
-        CollectionAssert.AreEqual(new[] { Bravo, Delta, Alpha, Charlie }, Apply(new() { SortField = LibrarySortField.Type, Descending = true }));
+        Assert.AreSequenceEqual([Alpha, Charlie, Bravo, Delta], Apply(new() { SortField = LibrarySortField.Type }));
+        Assert.AreSequenceEqual([Bravo, Delta, Alpha, Charlie], Apply(new() { SortField = LibrarySortField.Type, Descending = true }));
     }
 
     [TestMethod]
     public void ScanOrderDescendingReverses() =>
-        CollectionAssert.AreEqual(All.Reverse().ToArray(), Apply(new() { Descending = true }));
+        Assert.AreSequenceEqual([.. All.Reverse()], Apply(new() { Descending = true }));
 
     [TestMethod]
     public void SortsByFileName() =>
-        CollectionAssert.AreEqual(new[] { Delta, Charlie, Bravo, Alpha }, Apply(new() { SortField = LibrarySortField.FileName, Descending = true }));
+        Assert.AreSequenceEqual([Delta, Charlie, Bravo, Alpha], Apply(new() { SortField = LibrarySortField.FileName, Descending = true }));
 
     [TestMethod]
     public void MatchesAgreesWithApply()
@@ -273,7 +273,7 @@ public sealed class LibraryQueryTests
                 var sorted = scanOrdered.ToList();
                 sorted.Sort(query.CreateComparer(f => f, byScanOrder));
 
-                CollectionAssert.AreEqual(query.Apply(scanOrdered, f => f), sorted, $"{field}, descending: {descending}");
+                Assert.AreSequenceEqual(query.Apply(scanOrdered, f => f), sorted, $"{field}, descending: {descending}");
             }
         }
     }

@@ -105,7 +105,7 @@ public sealed class SongIniEditTests
         string after = SongIni.ApplyEdits(before, draft);
 
         var expected = draft.ApplyTo(SongIni.Parse(new StringReader(before))!);
-        CollectionAssert.AreEqual(expected, SongIni.Parse(new StringReader(after))!.ToArray());
+        Assert.AreSequenceEqual(expected, [.. SongIni.Parse(new StringReader(after))!]);
     }
 
     [TestMethod]
@@ -113,9 +113,9 @@ public sealed class SongIniEditTests
     {
         string path = Path.Combine(_root.FullName, "song.ini");
 
-        await SongIni.ApplyEditsAsync(path, Draft(d => d.Set("name", "A")));
+        await SongIni.ApplyEditsAsync(path, Draft(d => d.Set("name", "A")), TestContext.CancellationToken);
 
-        var read = await SongIni.ReadAsync(path);
+        var read = await SongIni.ReadAsync(path, TestContext.CancellationToken);
         Assert.AreEqual(SongIniStatus.Ok, read.Status);
         Assert.AreEqual(KeyValuePair.Create("name", "A"), read.Pairs.Single());
         Assert.AreEqual((byte)'[', File.ReadAllBytes(path)[0]);
@@ -127,11 +127,10 @@ public sealed class SongIniEditTests
         string path = Path.Combine(_root.FullName, "Song.INI");
         File.WriteAllBytes(path, [.. Encoding.UTF8.Preamble, .. "[song]\r\nname = Ä\r\n"u8]);
 
-        await SongIni.ApplyEditsAsync(path, Draft(d => d.Set("artist", "Ö")));
+        await SongIni.ApplyEditsAsync(path, Draft(d => d.Set("artist", "Ö")), TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(
-            (byte[])[.. Encoding.UTF8.Preamble, .. "[song]\r\nname = Ä\r\nartist = Ö\r\n"u8],
-            File.ReadAllBytes(path));
+        Assert.AreSequenceEqual(
+            (byte[])[.. Encoding.UTF8.Preamble, .. "[song]\r\nname = Ä\r\nartist = Ö\r\n"u8], File.ReadAllBytes(path));
         Assert.IsFalse(File.Exists(path + SongIni.TempSuffix));
     }
 
@@ -142,7 +141,7 @@ public sealed class SongIniEditTests
         File.WriteAllText(path, "[song]\n" + new string('x', (int)SongIni.MaxFileSize));
         long length = new FileInfo(path).Length;
 
-        await Assert.ThrowsAsync<IOException>(() => SongIni.ApplyEditsAsync(path, Draft(d => d.Set("name", "A"))));
+        await Assert.ThrowsAsync<IOException>(() => SongIni.ApplyEditsAsync(path, Draft(d => d.Set("name", "A")), TestContext.CancellationToken));
 
         Assert.AreEqual(length, new FileInfo(path).Length);
         Assert.IsFalse(File.Exists(path + SongIni.TempSuffix));
@@ -154,4 +153,6 @@ public sealed class SongIniEditTests
         edit(draft);
         return draft;
     }
+
+    public TestContext TestContext { get; set; }
 }

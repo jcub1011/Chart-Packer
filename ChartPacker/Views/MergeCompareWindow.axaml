@@ -1,0 +1,165 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:ChartPacker.ViewModels"
+        xmlns:res="using:ChartPacker.Resources"
+        xmlns:ctl="using:ChartPacker.Controls"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="640"
+        x:Class="ChartPacker.Views.MergeCompareWindow"
+        x:DataType="vm:MergeCompareViewModel"
+        Title="{Binding Title}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="1200" Height="640"
+        MinWidth="720" MinHeight="420"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.compare-heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.compare-description">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+        <StackPanel Grid.Row="0" Margin="20,14,20,8" Spacing="4">
+            <TextBlock Classes="compare-heading" Text="{Binding Heading}" />
+            <TextBlock Classes="compare-description" Text="{Binding Description}" />
+        </StackPanel>
+
+        <!-- The parts compared, the offset, and the view's zoom. -->
+        <Grid Grid.Row="1" Margin="20,0,20,8" ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="16">
+            <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Classes="muted" FontSize="11" Text="{Binding ReferenceName}" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                <ComboBox MinWidth="180"
+                          ItemsSource="{Binding ReferenceParts}"
+                          SelectedItem="{Binding SelectedReferencePart}"
+                          AutomationProperties.Name="{x:Static res:Strings.MergeCompareReferencePartName}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate DataType="vm:ComparePartOption">
+                            <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Classes="muted" FontSize="11" Text="{Binding SongName}" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                <ComboBox MinWidth="180"
+                          ItemsSource="{Binding SongParts}"
+                          SelectedItem="{Binding SelectedSongPart}"
+                          AutomationProperties.Name="{x:Static res:Strings.MergeCompareSongPartName}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate DataType="vm:ComparePartOption">
+                            <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="2">
+                <TextBlock Classes="muted" FontSize="11" Text="{x:Static res:Strings.MergeAlignmentLabel}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                   Width="84"
+                                   ShowButtonSpinner="False"
+                                   VerticalAlignment="Center"
+                                   Value="{Binding Offset}"
+                                   Increment="1"
+                                   Minimum="-2147483648"
+                                   Maximum="2147483647"
+                                   FormatString="+0;-0;0"
+                                   AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentOffsetName}">
+                        <ToolTip.Tip>
+                            <StackPanel Spacing="6">
+                                <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                            </StackPanel>
+                        </ToolTip.Tip>
+                    </NumericUpDown>
+                    <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.HighwayOffsetUnit}" />
+                    <Button Command="{Binding RevertCommand}"
+                            Content="{x:Static res:Strings.MergeCompareRevertButton}"
+                            ToolTip.Tip="{x:Static res:Strings.MergeCompareRevertToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.MergeCompareRevertButton}" />
+                </StackPanel>
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom" IsVisible="{Binding IsLoadingAudio}">
+                <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" />
+                <TextBlock Classes="muted" VerticalAlignment="Center" Text="{x:Static res:Strings.MergeAligningAudio}" />
+            </StackPanel>
+            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom">
+                <Button Content="{x:Static res:Strings.MergeCompareZoomOut}" Click="OnZoomOut" AutomationProperties.Name="{x:Static res:Strings.MergeCompareZoomOut}" />
+                <Button Content="{x:Static res:Strings.MergeCompareZoomIn}" Click="OnZoomIn" AutomationProperties.Name="{x:Static res:Strings.MergeCompareZoomIn}" />
+                <Button Content="{x:Static res:Strings.MergeCompareShowStart}" Click="OnShowStart" AutomationProperties.Name="{x:Static res:Strings.MergeCompareShowStart}" />
+                <Button Content="{x:Static res:Strings.MergeCompareShowAll}" Click="OnShowAll" AutomationProperties.Name="{x:Static res:Strings.MergeCompareShowAll}" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2" Margin="20,0,20,8" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <ctl:AlignmentTimelineView x:Name="Timeline"
+                                           ReferenceName="{Binding ReferenceName}"
+                                           SongName="{Binding SongName}"
+                                           ReferenceWaveform="{Binding ReferenceWaveform}"
+                                           SongWaveform="{Binding SongWaveform}"
+                                           ReferenceNotes="{Binding SelectedReferencePart.Notes, FallbackValue={x:Null}}"
+                                           SongNotes="{Binding SelectedSongPart.Notes, FallbackValue={x:Null}}"
+                                           OffsetSeconds="{Binding OffsetSeconds}"
+                                           VerticalAlignment="Top"
+                                           AutomationProperties.Name="{x:Static res:Strings.MergeCompareTimelineName}" />
+            </ScrollViewer>
+        </Border>
+
+        <!-- Where each of the song's links would put it, to jump to. -->
+        <StackPanel Grid.Row="3" Margin="20,0,20,8" Spacing="4">
+            <TextBlock Classes="warning" FontSize="12" Text="{Binding AudioMessage}" IsVisible="{Binding HasAudioMessage}" />
+            <StackPanel Spacing="4" IsVisible="{Binding HasEstimates}">
+                <TextBlock Classes="muted" FontSize="11" Text="{x:Static res:Strings.MergeCompareJumpTo}" />
+                <ItemsControl ItemsSource="{Binding Estimates}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:CompareEstimate">
+                            <Button Content="{Binding Label}"
+                                    FontSize="12"
+                                    Command="{Binding $parent[ItemsControl].((vm:MergeCompareViewModel)DataContext).JumpCommand}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Label}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+
+        <Border Grid.Row="4" Classes="toolbar" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <Button Classes="accent"
+                        MinWidth="96"
+                        HorizontalContentAlignment="Center"
+                        Content="{x:Static res:Strings.MergeCompareApplyButton}"
+                        Command="{Binding ApplyCommand}"
+                        IsDefault="True"
+                        AutomationProperties.Name="{x:Static res:Strings.MergeCompareApplyButton}" />
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Content="{x:Static res:Strings.CancelButton}"
+                        Command="{Binding CancelCommand}"
+                        IsCancel="True"
+                        AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -14,8 +14,18 @@ public sealed record MidiPart(string Id, IReadOnlyList<string> TrackNames, IRead
     /// <summary>Whether the part is one of <see cref="MidiPartCatalog.Known"/>.</summary>
     public bool IsKnown => MidiPartCatalog.Known.Any(p => p.Id == Id);
 
-    /// <summary>Whether <paramref name="trackName"/> is one of its tracks, ignoring case and surrounding space.</summary>
-    public bool Has(string trackName) => TrackNames.Contains(trackName.Trim(), StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Whether <paramref name="trackName"/> is one of its tracks, ignoring case and surrounding space; but a track
+    /// <see cref="MidiLayout.TrackNames"/> lists only by its exact name, as YARG reads no other.
+    /// </summary>
+    public bool Has(string trackName)
+    {
+        ArgumentNullException.ThrowIfNull(trackName);
+        string name = trackName.Trim();
+        if (!TrackNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+            return false;
+        return MidiLayout.TrackNames.ContainsKey(trackName) || !MidiLayout.TrackNames.ContainsKey(name.ToUpperInvariant());
+    }
 }
 
 /// <summary>The parts of a chart's MIDI file, and the tracks that aren't part of any (events, venue, beat).</summary>

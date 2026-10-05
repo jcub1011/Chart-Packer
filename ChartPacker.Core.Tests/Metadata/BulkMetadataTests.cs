@@ -12,7 +12,7 @@ public sealed class BulkMetadataTests
 
         var rows = BulkMetadata.BuildRows(items);
 
-        CollectionAssert.AreEqual(new[] { "album", "artist", "name" }, rows.Select(r => r.Key).ToArray());
+        Assert.AreSequenceEqual(["album", "artist", "name"], [.. rows.Select(r => r.Key)]);
     }
 
     [TestMethod]
@@ -22,7 +22,7 @@ public sealed class BulkMetadataTests
 
         BulkMetadata.Set(items, "album", "Z");
 
-        CollectionAssert.AreEqual(new[] { "album", "Charter", "name" }, BulkMetadata.BuildRows(items).Select(r => r.Key).ToArray());
+        Assert.AreSequenceEqual(["album", "Charter", "name"], [.. BulkMetadata.BuildRows(items).Select(r => r.Key)]);
     }
 
     [TestMethod]
@@ -53,8 +53,8 @@ public sealed class BulkMetadataTests
         var originals = new[]
         {
             new[] { P("name", "Song 1"), P("artist", "Band A"), P("year", "1999") },
-            new[] { P("name", "Song 2"), P("artist", "Band B") },
-            new[] { P("artist", "Band C"), P("name", "Song 3") },
+            [P("name", "Song 2"), P("artist", "Band B")],
+            [P("artist", "Band C"), P("name", "Song 3")],
         };
         var items = Items(originals);
 
@@ -64,9 +64,9 @@ public sealed class BulkMetadataTests
         Assert.AreEqual(new BulkMetadataRow("name", "Renamed", MetadataRowState.Edited), rows.Single(r => r.Key == "name"));
         Assert.IsTrue(rows.Single(r => r.Key == "artist").IsDistinct);
 
-        CollectionAssert.AreEqual(new[] { P("name", "Renamed"), P("artist", "Band A"), P("year", "1999") }, items[0].Draft.ApplyTo(originals[0]));
-        CollectionAssert.AreEqual(new[] { P("name", "Renamed"), P("artist", "Band B") }, items[1].Draft.ApplyTo(originals[1]));
-        CollectionAssert.AreEqual(new[] { P("artist", "Band C"), P("name", "Renamed") }, items[2].Draft.ApplyTo(originals[2]));
+        Assert.AreSequenceEqual([P("name", "Renamed"), P("artist", "Band A"), P("year", "1999")], items[0].Draft.ApplyTo(originals[0]));
+        Assert.AreSequenceEqual([P("name", "Renamed"), P("artist", "Band B")], items[1].Draft.ApplyTo(originals[1]));
+        Assert.AreSequenceEqual([P("artist", "Band C"), P("name", "Renamed")], items[2].Draft.ApplyTo(originals[2]));
         Assert.IsTrue(items.All(i => i.Draft.Keys.SequenceEqual(["name"])));
     }
 
@@ -128,7 +128,7 @@ public sealed class BulkMetadataTests
         Assert.AreEqual(new BulkMetadataRow("genre", "Rock", MetadataRowState.Added), BulkMetadata.BuildRows(items).Single(r => r.Key == "genre"));
 
         BulkMetadata.Remove(items, "genre");
-        Assert.IsFalse(BulkMetadata.BuildRows(items).Any(r => r.Key == "genre"));
+        Assert.DoesNotContain(r => r.Key == "genre", BulkMetadata.BuildRows(items));
         Assert.IsTrue(items.All(i => i.Draft.IsEmpty));
     }
 
@@ -150,7 +150,7 @@ public sealed class BulkMetadataTests
     public void UnsetDifficultyIsHiddenUntilEdited()
     {
         var items = Items([P("name", "A"), P("diff_bass", "-1")]);
-        Assert.IsFalse(BulkMetadata.BuildRows(items).Any(r => r.Key == "diff_bass"));
+        Assert.DoesNotContain(r => r.Key == "diff_bass", BulkMetadata.BuildRows(items));
 
         BulkMetadata.Set(items, "diff_bass", "3");
 
@@ -188,7 +188,7 @@ public sealed class BulkMetadataTests
 
         var rows = BulkMetadata.BuildRows(items, DifficultySlots.Contains);
 
-        CollectionAssert.AreEqual(new[] { "diff_foo", "name" }, rows.Select(r => r.Key).ToArray());
+        Assert.AreSequenceEqual(["diff_foo", "name"], [.. rows.Select(r => r.Key)]);
     }
 
     [TestMethod]
@@ -197,7 +197,7 @@ public sealed class BulkMetadataTests
         var items = Items([P("diff_guitar", "-1")]);
 
         Assert.AreEqual(new BulkMetadataRow("diff_guitar", "-1", MetadataRowState.Unchanged), BulkMetadata.RowOf(items, "diff_guitar"));
-        Assert.IsFalse(BulkMetadata.BuildRows(items).Any(r => r.Key == "diff_guitar"));
+        Assert.DoesNotContain(r => r.Key == "diff_guitar", BulkMetadata.BuildRows(items));
     }
 
     [TestMethod]
@@ -218,7 +218,7 @@ public sealed class BulkMetadataTests
         item.Draft.Set("NAME", "A");
         item.Draft.Remove("artist");
 
-        CollectionAssert.AreEqual(new[] { "genre" }, item.RemainingDuplicateKeys().ToArray());
+        Assert.AreSequenceEqual(["genre"], [.. item.RemainingDuplicateKeys()]);
     }
 
     [TestMethod]

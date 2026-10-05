@@ -14,7 +14,7 @@ public sealed class SngMaskTests
 
         SngMask.Apply(data, ExampleMask);
 
-        CollectionAssert.AreEqual(new byte[] { 0x51, 0x52, 0x53 }, data);
+        Assert.AreSequenceEqual(new byte[] { 0x51, 0x52, 0x53 }, data);
     }
 
     [TestMethod]
@@ -27,7 +27,7 @@ public sealed class SngMaskTests
 
         SngMask.Apply(data, mask);
 
-        CollectionAssert.AreEqual(expected, data);
+        Assert.AreSequenceEqual(expected, data);
     }
 
     [TestMethod]
@@ -47,7 +47,7 @@ public sealed class SngMaskTests
         }
 
         Assert.AreEqual(whole.Length, pos);
-        CollectionAssert.AreEqual(whole, chunked);
+        Assert.AreSequenceEqual(whole, chunked);
     }
 
     [TestMethod]
@@ -61,7 +61,7 @@ public sealed class SngMaskTests
         SngMask.Apply(data, mask, 12345);
         SngMask.Apply(data, mask, 12345);
 
-        CollectionAssert.AreEqual(original, data);
+        Assert.AreSequenceEqual(original, data);
     }
 
     [TestMethod]

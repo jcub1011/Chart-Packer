@@ -23,12 +23,12 @@ public sealed class UnpackerTests
         string sng = WriteBytes("example.sng", SngReaderTests.WorkedExample);
         string target = Path.Combine(_root.FullName, "example");
 
-        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false);
+        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false, TestContext.CancellationToken);
 
         Assert.IsTrue(result.Extracted);
         Assert.IsEmpty(result.Findings);
         Assert.AreEqual("ABC", File.ReadAllText(Path.Combine(target, "notes.chart")));
-        StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "name = Test");
+        Assert.Contains("name = Test", File.ReadAllText(Path.Combine(target, "song.ini")));
         AssertNoTempFolders();
     }
 
@@ -45,7 +45,7 @@ public sealed class UnpackerTests
         string target = Path.Combine(outer, "song");
         var before = Directory.EnumerateFileSystemEntries(_root.FullName, "*", SearchOption.AllDirectories).ToHashSet();
 
-        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false);
+        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false, TestContext.CancellationToken);
 
         Assert.IsTrue(result.CompletedWithErrors);
         Assert.AreEqual(SngRules.Sng033, result.Findings.Single(f => f.Severity == Severity.Error).RuleId);
@@ -55,7 +55,7 @@ public sealed class UnpackerTests
         Assert.IsTrue(
             created.All(p => p == outer || p.StartsWith(target, StringComparison.Ordinal)),
             string.Join(Environment.NewLine, created));
-        CollectionAssert.AreEquivalent(new[] { "notes.chart", "song.ini" }, Directory.GetFiles(target).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(["notes.chart", "song.ini"], Directory.GetFiles(target).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -64,10 +64,10 @@ public sealed class UnpackerTests
         string sng = await CraftAsync([("song.ini", "[song]\nname = Stored\n"u8.ToArray())], [KeyValuePair.Create("name", "Generated")]);
         string target = Path.Combine(_root.FullName, "song");
 
-        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false);
+        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false, TestContext.CancellationToken);
 
         Assert.AreEqual(SngRules.Sng053, result.Findings.Single().RuleId);
-        StringAssert.Contains(File.ReadAllText(Path.Combine(target, "song.ini")), "name = Generated");
+        Assert.Contains("name = Generated", File.ReadAllText(Path.Combine(target, "song.ini")));
     }
 
     [TestMethod]
@@ -76,7 +76,7 @@ public sealed class UnpackerTests
         string sng = WriteBytes("bad.sng", "NOTSNG-and-more-bytes-than-a-header"u8.ToArray());
         string target = Path.Combine(_root.FullName, "bad");
 
-        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false);
+        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false, TestContext.CancellationToken);
 
         Assert.IsFalse(result.Extracted);
         Assert.AreEqual(SngRules.Sng001, result.Findings.Single().RuleId);
@@ -90,7 +90,7 @@ public sealed class UnpackerTests
         string sng = WriteBytes("example.sng", SngReaderTests.WorkedExample);
         string target = Directory.CreateDirectory(Path.Combine(_root.FullName, "example")).FullName;
 
-        await Assert.ThrowsAsync<IOException>(() => Unpacker.UnpackAsync(sng, target, overwrite: false));
+        await Assert.ThrowsAsync<IOException>(() => Unpacker.UnpackAsync(sng, target, overwrite: false, TestContext.CancellationToken));
 
         Assert.IsEmpty(Directory.GetFileSystemEntries(target));
     }
@@ -103,7 +103,7 @@ public sealed class UnpackerTests
         File.WriteAllText(Path.Combine(target, "notes.chart"), "old");
         File.WriteAllText(Path.Combine(target, "mine.txt"), "keep");
 
-        var result = await Unpacker.UnpackAsync(sng, target, overwrite: true);
+        var result = await Unpacker.UnpackAsync(sng, target, overwrite: true, TestContext.CancellationToken);
 
         Assert.IsTrue(result.Extracted);
         Assert.AreEqual("ABC", File.ReadAllText(Path.Combine(target, "notes.chart")));
@@ -134,21 +134,20 @@ public sealed class UnpackerTests
         File.WriteAllText(Path.Combine(source, "readme.txt"), "hello");
         File.WriteAllText(Path.Combine(source, "song.ini"), "[song]\nname = Title\nartist = Band\nalbum =\ndelay = 0\n");
 
-        var plan = await PackPlanner.PlanAsync(source);
+        var plan = await PackPlanner.PlanAsync(source, cancellationToken: TestContext.CancellationToken);
         string sng = Path.Combine(_root.FullName, "packed.sng");
-        var verify = await Packer.PackAsync(plan, sng, overwrite: false);
+        var verify = await Packer.PackAsync(plan, sng, overwrite: false, cancellationToken: TestContext.CancellationToken);
         string target = Path.Combine(_root.FullName, "unpacked");
-        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false);
+        var result = await Unpacker.UnpackAsync(sng, target, overwrite: false, TestContext.CancellationToken);
 
         Assert.IsEmpty(verify);
         Assert.IsEmpty(result.Findings);
         foreach (string name in new[] { "song.ogg", "notes.chart", "readme.txt" })
-            CollectionAssert.AreEqual(File.ReadAllBytes(Path.Combine(source, name)), File.ReadAllBytes(Path.Combine(target, name)), name);
+            Assert.AreSequenceEqual(File.ReadAllBytes(Path.Combine(source, name)), File.ReadAllBytes(Path.Combine(target, name)), name);
 
-        var pairs = (await SongIni.ReadAsync(Path.Combine(target, "song.ini"))).Pairs;
-        CollectionAssert.AreEqual(
-            new[] { KeyValuePair.Create("name", "Title"), KeyValuePair.Create("artist", "Band"), KeyValuePair.Create("delay", "0") },
-            pairs.ToArray());
+        var pairs = (await SongIni.ReadAsync(Path.Combine(target, "song.ini"), TestContext.CancellationToken)).Pairs;
+        Assert.AreSequenceEqual(
+            [KeyValuePair.Create("name", "Title"), KeyValuePair.Create("artist", "Band"), KeyValuePair.Create("delay", "0")], [.. pairs]);
     }
 
     private void AssertNoTempFolders() =>
@@ -174,7 +173,9 @@ public sealed class UnpackerTests
         }
 
         string sng = Path.Combine(_root.FullName, Guid.NewGuid().ToString("N") + ".sng");
-        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata ?? [], list, overwrite: false);
+        await SngWriter.WriteAsync(sng, SngMask.Generate(), metadata ?? [], list, overwrite: false, cancellationToken: TestContext.CancellationToken);
         return sng;
     }
+
+    public TestContext TestContext { get; set; }
 }

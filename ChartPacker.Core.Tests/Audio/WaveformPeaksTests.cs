@@ -20,11 +20,11 @@ public sealed class WaveformPeaksTests
             _ => 0.1f,
         });
 
-        var peaks = WaveformPeaks.Compute("guitar", source);
+        var peaks = WaveformPeaks.Compute("guitar", source, TestContext.CancellationToken);
 
         Assert.AreEqual("guitar", peaks.Name);
-        CollectionAssert.AreEqual(new[] { 0f, -0.25f, 0f }, peaks.Min.ToArray());
-        CollectionAssert.AreEqual(new[] { 0.5f, 0.75f, 0.1f }, peaks.Max.ToArray());
+        Assert.AreSequenceEqual([0f, -0.25f, 0f], [.. peaks.Min]);
+        Assert.AreSequenceEqual([0.5f, 0.75f, 0.1f], [.. peaks.Max]);
     }
 
     [TestMethod]
@@ -33,14 +33,14 @@ public sealed class WaveformPeaksTests
     [DataRow(1, 1)]
     [DataRow(0, 0)]
     public void ABucketIsMadeForEveryTwentyMilliseconds(int frames, int expected) =>
-        Assert.AreEqual(expected, WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, frames, (_, _) => 0.1f)).Count);
+        Assert.AreEqual(expected, WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, frames, (_, _) => 0.1f), TestContext.CancellationToken).Count);
 
     [TestMethod]
     public void BucketsFollowTimeWhateverTheSampleRate()
     {
         // One second is 50 buckets at any rate, including one that doesn't divide evenly.
-        Assert.AreEqual(50, WaveformPeaks.Compute("x", new TestAudio.FakeSource(44100, 1, 44100, (_, _) => 0.1f)).Count);
-        Assert.AreEqual(50, WaveformPeaks.Compute("x", new TestAudio.FakeSource(48000, 1, 48000, (_, _) => 0.1f)).Count);
+        Assert.AreEqual(50, WaveformPeaks.Compute("x", new TestAudio.FakeSource(44100, 1, 44100, (_, _) => 0.1f), TestContext.CancellationToken).Count);
+        Assert.AreEqual(50, WaveformPeaks.Compute("x", new TestAudio.FakeSource(48000, 1, 48000, (_, _) => 0.1f), TestContext.CancellationToken).Count);
     }
 
     [TestMethod]
@@ -48,7 +48,7 @@ public sealed class WaveformPeaksTests
     {
         var source = new TestAudio.FakeSource(Rate, 2, 20, (_, c) => c == 0 ? 0.8f : -0.2f);
 
-        var peaks = WaveformPeaks.Compute("x", source);
+        var peaks = WaveformPeaks.Compute("x", source, TestContext.CancellationToken);
 
         Assert.AreEqual(0.3f, peaks.Max[0], 1e-6f);
     }
@@ -58,7 +58,7 @@ public sealed class WaveformPeaksTests
     {
         var source = new TestAudio.FakeSource(Rate, 1, 100, (_, _) => 0.5f) { IsDamaged = true };
 
-        Assert.AreEqual(0, WaveformPeaks.Compute("x", source).Count);
+        Assert.AreEqual(0, WaveformPeaks.Compute("x", source, TestContext.CancellationToken).Count);
     }
 
     [TestMethod]
@@ -129,7 +129,7 @@ public sealed class WaveformPeaksTests
     {
         var mix = WaveformPeaks.Mix([Stem(0.25f, muted: false, frames: 20), Stem(0.5f, muted: false, frames: 60)]);
 
-        CollectionAssert.AreEqual(new[] { 0.75f, 0.5f, 0.5f }, mix.Max.ToArray());
+        Assert.AreSequenceEqual([0.75f, 0.5f, 0.5f], [.. mix.Max]);
         Assert.AreEqual(0.06, mix.Seconds, 1e-9);
     }
 
@@ -171,8 +171,8 @@ public sealed class WaveformPeaksTests
     {
         // Positive for the first half second and negative for the second, at rates that divide it differently.
         static float Step(long n, int rate) => n < rate / 2 ? 0.25f : -0.25f;
-        var a = new AudibleStem(WaveformPeaks.Compute("a", new TestAudio.FakeSource(44100, 1, 44100, (n, _) => Step(n, 44100))), false, false);
-        var b = new AudibleStem(WaveformPeaks.Compute("b", new TestAudio.FakeSource(48000, 1, 48000, (n, _) => Step(n, 48000))), false, false);
+        var a = new AudibleStem(WaveformPeaks.Compute("a", new TestAudio.FakeSource(44100, 1, 44100, (n, _) => Step(n, 44100)), TestContext.CancellationToken), false, false);
+        var b = new AudibleStem(WaveformPeaks.Compute("b", new TestAudio.FakeSource(48000, 1, 48000, (n, _) => Step(n, 48000)), TestContext.CancellationToken), false, false);
 
         var mix = WaveformPeaks.Mix([a, b]);
 
@@ -187,7 +187,7 @@ public sealed class WaveformPeaksTests
     public void AStemHeardAloneGivesItsOwnPeaks()
     {
         // A single sample the 2 kHz grid misses still shows.
-        var spike = WaveformPeaks.Compute("spike", new TestAudio.FakeSource(48000, 1, 960, (n, _) => n == 7 ? 0.9f : 0f));
+        var spike = WaveformPeaks.Compute("spike", new TestAudio.FakeSource(48000, 1, 960, (n, _) => n == 7 ? 0.9f : 0f), TestContext.CancellationToken);
 
         var mix = WaveformPeaks.Mix([new AudibleStem(spike, false, false, 0.5f), Stem(0.25f, muted: true)]);
 
@@ -200,21 +200,21 @@ public sealed class WaveformPeaksTests
         var snapshots = new List<StemPeaks>();
         var source = new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f);
 
-        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero);
+        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero, TestContext.CancellationToken);
 
         Assert.AreEqual(500, peaks.Count);
-        Assert.IsTrue(snapshots.Count >= 2, $"{snapshots.Count} snapshots.");
+        Assert.IsGreaterThanOrEqualTo(2, snapshots.Count, $"{snapshots.Count} snapshots.");
         int filled = 0;
         foreach (var snapshot in snapshots)
         {
             Assert.AreEqual(peaks.Count, snapshot.Count);
             int count = snapshot.Max.TakeWhile(v => v == 0.5f).Count();
-            Assert.IsTrue(count > filled, "Each snapshot has more read than the last.");
+            Assert.IsGreaterThan(filled, count, "Each snapshot has more read than the last.");
             Assert.IsTrue(snapshot.Max.Skip(count).All(v => v == 0f), "What hasn't been read is silent.");
             filled = count;
         }
 
-        CollectionAssert.AreEqual(WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f)).Max.ToArray(), peaks.Max.ToArray());
+        Assert.AreSequenceEqual([.. WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f), TestContext.CancellationToken).Max], [.. peaks.Max]);
     }
 
     [TestMethod]
@@ -224,10 +224,10 @@ public sealed class WaveformPeaksTests
         var snapshots = new List<StemPeaks>();
         var source = new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f) { LengthFrames = 6000 };
 
-        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero);
+        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero, TestContext.CancellationToken);
 
-        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f));
-        CollectionAssert.AreEqual(expected.Max.ToArray(), peaks.Max.ToArray());
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f), TestContext.CancellationToken);
+        Assert.AreSequenceEqual([.. expected.Max], [.. peaks.Max]);
         Assert.AreEqual(expected.SizeBytes, peaks.SizeBytes);
 
         var first = snapshots[0];
@@ -248,11 +248,11 @@ public sealed class WaveformPeaksTests
     {
         var source = new TestAudio.FakeSource(Rate, 1, 1000, (_, _) => 0.5f) { LengthFrames = 5000 };
 
-        var peaks = WaveformPeaks.Compute("x", source);
+        var peaks = WaveformPeaks.Compute("x", source, TestContext.CancellationToken);
 
-        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 1000, (_, _) => 0.5f));
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 1000, (_, _) => 0.5f), TestContext.CancellationToken);
         Assert.AreEqual(50, peaks.Count);
-        CollectionAssert.AreEqual(expected.Max.ToArray(), peaks.Max.ToArray());
+        Assert.AreSequenceEqual([.. expected.Max], [.. peaks.Max]);
         Assert.AreEqual(expected.SizeBytes, peaks.SizeBytes);
     }
 
@@ -262,10 +262,10 @@ public sealed class WaveformPeaksTests
         var snapshots = new List<StemPeaks>();
         var source = new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f) { LengthFrames = -1 };
 
-        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero);
+        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero, TestContext.CancellationToken);
 
         Assert.AreEqual(500, peaks.Count);
-        Assert.AreEqual(0, snapshots.Count);
+        Assert.IsEmpty(snapshots);
     }
 
     [TestMethod]
@@ -304,7 +304,7 @@ public sealed class WaveformPeaksTests
         var snapshots = new List<StemPeaks>();
         var source = new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f);
 
-        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero);
+        var peaks = WaveformPeaks.Compute("x", source, snapshots.Add, TimeSpan.Zero, TestContext.CancellationToken);
 
         int read = 0;
         foreach (var snapshot in snapshots)
@@ -316,8 +316,8 @@ public sealed class WaveformPeaksTests
         }
 
         Assert.AreEqual(peaks.Count, peaks.ReadCount);
-        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f));
-        CollectionAssert.AreEqual(expected.Rms.ToArray(), peaks.Rms.ToArray());
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f), TestContext.CancellationToken);
+        Assert.AreSequenceEqual([.. expected.Rms], [.. peaks.Rms]);
     }
 
     [TestMethod]
@@ -342,7 +342,7 @@ public sealed class WaveformPeaksTests
     public void ThePeakIsOfWhatHasBeenReadOnly()
     {
         var snapshots = new List<StemPeaks>();
-        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n >= 9000 ? 0.75f : -0.25f), snapshots.Add, TimeSpan.Zero);
+        var peaks = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n >= 9000 ? 0.75f : -0.25f), snapshots.Add, TimeSpan.Zero, TestContext.CancellationToken);
         var snapshot = snapshots[0];
 
         Assert.IsLessThan(snapshot.Count, snapshot.ReadCount);
@@ -372,10 +372,10 @@ public sealed class WaveformPeaksTests
 
         Assert.AreEqual(snapshot.Count, partial.Count);
         Assert.AreEqual(snapshot.ReadCount, partial.ReadCount);
-        CollectionAssert.AreEqual(snapshot.Max.ToArray(), partial.Max.ToArray());
+        Assert.AreSequenceEqual([.. snapshot.Max], [.. partial.Max]);
         Assert.AreEqual(3, whole.ReadCount);
-        CollectionAssert.AreEqual(peaks.Min.ToArray(), whole.Min.ToArray());
-        CollectionAssert.AreEqual(peaks.Rms.ToArray(), whole.Rms.ToArray());
+        Assert.AreSequenceEqual([.. peaks.Min], [.. whole.Min]);
+        Assert.AreSequenceEqual([.. peaks.Rms], [.. whole.Rms]);
         Assert.AreEqual(0.06, whole.ReadSeconds, 1e-9);
     }
 
@@ -390,11 +390,11 @@ public sealed class WaveformPeaksTests
     [DataRow(22050, 22050, 3)]
     public void ChunksReadInAnyOrderGiveTheSamePeaksAsOneRead(int rate, int frames, int chunkBuckets)
     {
-        var expected = WaveformPeaks.Compute("x", Wavy(rate, frames));
+        var expected = WaveformPeaks.Compute("x", Wavy(rate, frames), TestContext.CancellationToken);
 
         var reader = new StemPeaksReader("x", Wavy(rate, frames), chunkBuckets: chunkBuckets);
         for (int i = reader.ChunkCount - 1; i >= 0; i--)
-            reader.ReadChunk(i, Wavy(rate, frames));
+            reader.ReadChunk(i, Wavy(rate, frames), TestContext.CancellationToken);
 
         AssertSamePeaks(expected, reader.Finish());
     }
@@ -402,10 +402,10 @@ public sealed class WaveformPeaksTests
     [TestMethod]
     public void ChunksReadSideBySideGiveTheSamePeaksAsOneRead()
     {
-        var expected = WaveformPeaks.Compute("x", Wavy(44100, 20 * 44100));
+        var expected = WaveformPeaks.Compute("x", Wavy(44100, 20 * 44100), TestContext.CancellationToken);
 
         var reader = new StemPeaksReader("x", Wavy(44100, 20 * 44100), chunkBuckets: 50);
-        Parallel.For(0, reader.ChunkCount, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i => reader.ReadChunk(i, Wavy(44100, 20 * 44100)));
+        Parallel.For(0, reader.ChunkCount, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i => reader.ReadChunk(i, Wavy(44100, 20 * 44100), TestContext.CancellationToken));
 
         Assert.AreEqual(20, reader.ChunkCount);
         AssertSamePeaks(expected, reader.Finish());
@@ -418,8 +418,8 @@ public sealed class WaveformPeaksTests
         var reader = new StemPeaksReader("x", Source(), chunkBuckets: 7);
 
         Assert.AreEqual(1, reader.ChunkCount);
-        reader.ReadChunk(0, Source());
-        AssertSamePeaks(WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f)), reader.Finish());
+        reader.ReadChunk(0, Source(), TestContext.CancellationToken);
+        AssertSamePeaks(WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f), TestContext.CancellationToken), reader.Finish());
     }
 
     [TestMethod]
@@ -431,10 +431,10 @@ public sealed class WaveformPeaksTests
         var reader = new StemPeaksReader("x", Source(), snapshots.Add, TimeSpan.Zero, chunkBuckets: 100);
 
         foreach (int i in new[] { 0, 2, 1, 4, 3 })
-            reader.ReadChunk(i, Source());
+            reader.ReadChunk(i, Source(), TestContext.CancellationToken);
 
         // Chunk 2 adds nothing while chunk 1 isn't read, nor chunk 4 while 3 isn't.
-        CollectionAssert.AreEqual(new[] { 99, 100, 199, 300, 399 }, snapshots.Select(s => s.ReadCount).ToArray());
+        Assert.AreSequenceEqual([99, 100, 199, 300, 399], [.. snapshots.Select(s => s.ReadCount)]);
         foreach (var snapshot in snapshots)
         {
             Assert.AreEqual(500, snapshot.Count);
@@ -442,7 +442,7 @@ public sealed class WaveformPeaksTests
             Assert.IsTrue(snapshot.Max.Skip(snapshot.ReadCount).All(v => v == 0f), "What hasn't been read from the start is silent.");
         }
 
-        AssertSamePeaks(WaveformPeaks.Compute("x", Source()), reader.Finish());
+        AssertSamePeaks(WaveformPeaks.Compute("x", Source(), TestContext.CancellationToken), reader.Finish());
     }
 
     [TestMethod]
@@ -451,9 +451,9 @@ public sealed class WaveformPeaksTests
         static TestAudio.FakeSource Source() => new(Rate, 1, 6000, (_, _) => 0.5f);
         var reader = new StemPeaksReader("x", Source(), chunkBuckets: 100);
 
-        reader.ReadChunk(0, Source());
-        reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 6000, (_, _) => 0.5f) { IsDamaged = true });
-        reader.ReadChunk(2, Source());
+        reader.ReadChunk(0, Source(), TestContext.CancellationToken);
+        reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 6000, (_, _) => 0.5f) { IsDamaged = true }, TestContext.CancellationToken);
+        reader.ReadChunk(2, Source(), TestContext.CancellationToken);
         var peaks = reader.Finish();
 
         Assert.AreEqual(300, peaks.Count);
@@ -471,9 +471,9 @@ public sealed class WaveformPeaksTests
 
         Assert.AreEqual(3, reader.ChunkCount);
         for (int i = 0; i < reader.ChunkCount; i++)
-            reader.ReadChunk(i, Source());
+            reader.ReadChunk(i, Source(), TestContext.CancellationToken);
 
-        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f));
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 10000, (n, _) => n % 20 == 3 ? 0.5f : 0f), TestContext.CancellationToken);
         var peaks = reader.Finish();
         AssertSamePeaks(expected, peaks);
         Assert.AreEqual(expected.SizeBytes, peaks.SizeBytes);
@@ -485,9 +485,9 @@ public sealed class WaveformPeaksTests
         static TestAudio.FakeSource Source() => new(Rate, 1, 1000, (_, _) => 0.5f) { LengthFrames = 5000 };
         var reader = new StemPeaksReader("x", Source(), chunkBuckets: 40);
         for (int i = 0; i < reader.ChunkCount; i++)
-            reader.ReadChunk(i, Source());
+            reader.ReadChunk(i, Source(), TestContext.CancellationToken);
 
-        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 1000, (_, _) => 0.5f));
+        var expected = WaveformPeaks.Compute("x", new TestAudio.FakeSource(Rate, 1, 1000, (_, _) => 0.5f), TestContext.CancellationToken);
         var peaks = reader.Finish();
         AssertSamePeaks(expected, peaks);
         Assert.AreEqual(expected.SizeBytes, peaks.SizeBytes);
@@ -507,9 +507,9 @@ public sealed class WaveformPeaksTests
     public void AChunkIsReadOnlyOnce()
     {
         var reader = new StemPeaksReader("x", new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f), chunkBuckets: 100);
-        reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f));
+        reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f), TestContext.CancellationToken);
 
-        Assert.ThrowsExactly<InvalidOperationException>(() => reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f)));
+        Assert.ThrowsExactly<InvalidOperationException>(() => reader.ReadChunk(1, new TestAudio.FakeSource(Rate, 1, 10000, (_, _) => 0.5f), TestContext.CancellationToken));
     }
 
     [TestMethod]
@@ -525,7 +525,7 @@ public sealed class WaveformPeaksTests
     {
         StemPeaks expected;
         using (var source = TestAudio.OpenFixture(name, backend))
-            expected = WaveformPeaks.Compute(name, source);
+            expected = WaveformPeaks.Compute(name, source, TestContext.CancellationToken);
 
         // A second in chunks of 7 buckets: every chunk but the first seeks.
         StemPeaksReader reader;
@@ -535,7 +535,7 @@ public sealed class WaveformPeaksTests
         Parallel.For(0, reader.ChunkCount, i =>
         {
             using var source = TestAudio.OpenFixture(name, backend);
-            reader.ReadChunk(i, source);
+            reader.ReadChunk(i, source, TestContext.CancellationToken);
         });
 
         // A seek lands within rounding of a straight read.
@@ -559,7 +559,7 @@ public sealed class WaveformPeaksTests
 
     private static void AssertClose(IReadOnlyList<float> expected, IReadOnlyList<float> actual, float delta, string what)
     {
-        Assert.AreEqual(expected.Count, actual.Count, what);
+        Assert.HasCount(expected.Count, actual, what);
         for (int i = 0; i < expected.Count; i++)
             Assert.AreEqual(expected[i], actual[i], delta, $"{what} of bucket {i}.");
     }
@@ -589,4 +589,6 @@ public sealed class WaveformPeaksTests
             WaveformPeaks.Compute("stem", new TestAudio.FakeSource(Rate, 1, frames, (n, _) => n % 2 == 0 ? level : -level)),
             muted,
             solo);
+
+    public TestContext TestContext { get; set; }
 }

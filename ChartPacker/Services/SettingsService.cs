@@ -85,6 +85,16 @@ namespace ChartPacker.Services
             if (!double.IsFinite(settings.LibraryPaneWidth) || settings.LibraryPaneWidth < AppSettings.MinLibraryPaneWidth)
                 settings.LibraryPaneWidth = AppSettings.DefaultLibraryPaneWidth;
 
+            if (!double.IsFinite(settings.MergePreviewFraction)
+                || settings.MergePreviewFraction < AppSettings.MinMergePreviewFraction
+                || settings.MergePreviewFraction > AppSettings.MaxMergePreviewFraction)
+                settings.MergePreviewFraction = AppSettings.DefaultMergePreviewFraction;
+
+            if (!double.IsFinite(settings.ValidatorListFraction)
+                || settings.ValidatorListFraction < AppSettings.MinValidatorListFraction
+                || settings.ValidatorListFraction > AppSettings.MaxValidatorListFraction)
+                settings.ValidatorListFraction = AppSettings.DefaultValidatorListFraction;
+
             settings.ScanMaxDepth = Math.Clamp(settings.ScanMaxDepth, 0, AppSettings.MaxScanMaxDepth);
 
             if (settings.ScanParallelism < AppSettings.MinScanParallelism)

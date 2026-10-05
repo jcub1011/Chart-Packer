@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ChartPacker.Audio.Waveforms;
@@ -14,9 +15,11 @@ namespace ChartPacker.Services
         public const double MinLibraryPaneWidth = 200;
         public const int DefaultScanMaxDepth = 2;
         public const int MaxScanMaxDepth = 10;
-        public const int DefaultScanParallelism = 4;
+        // Reading a song is mostly parsing its chart, so a reader per processor keeps every core busy.
+        public static readonly int DefaultScanParallelism = Environment.ProcessorCount;
         public const int MinScanParallelism = 1;
         public const double DefaultMasterVolume = 1;
+        public const bool DefaultPitchCorrection = true;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
         public const DedupKindPreference DefaultDedupKeepPreference = DedupKindPreference.PreferSng;
         public const double DefaultHighwayNoteSpeed = 1;
@@ -31,9 +34,24 @@ namespace ChartPacker.Services
         public const double DefaultLaneFineScrubFactor = 5;
         public const double MinLaneFineScrubFactor = 2;
         public const double MaxLaneFineScrubFactor = 20;
+        public const double DefaultMergePreviewFraction = 0.4;
+        public const double MinMergePreviewFraction = 0.2;
+        public const double MaxMergePreviewFraction = 0.8;
+        public const double DefaultValidatorListFraction = 0.4;
+        public const double MinValidatorListFraction = 0.2;
+        public const double MaxValidatorListFraction = 0.8;
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
+
+        /// <summary>Whether the merge songs editor was maximized when it was last closed.</summary>
+        public bool MergeWindowMaximized { get; set; }
+
+        /// <summary>Share of the merge songs editor's width given to the preview (right) panel, from 0 to 1.</summary>
+        public double MergePreviewFraction { get; set; } = DefaultMergePreviewFraction;
+
+        /// <summary>Share of the Validator window's width given to the song list (left) panel, from 0 to 1.</summary>
+        public double ValidatorListFraction { get; set; } = DefaultValidatorListFraction;
 
         /// <summary>How many folder levels below the picked folder the library scan searches.</summary>
         public int ScanMaxDepth { get; set; } = DefaultScanMaxDepth;
@@ -73,6 +91,9 @@ namespace ChartPacker.Services
 
         /// <summary>The audio player's master volume, from 0 to 1.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
+
+        /// <summary>Whether playing faster or slower keeps the audio's pitch, instead of raising or lowering it with the speed.</summary>
+        public bool PitchCorrection { get; set; } = DefaultPitchCorrection;
 
         /// <summary>Whether the player reads and draws waveforms. Off, no track is read ahead of playback.</summary>
         public bool ShowWaveforms { get; set; } = true;

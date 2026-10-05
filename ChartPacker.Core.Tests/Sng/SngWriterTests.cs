@@ -20,9 +20,9 @@ public sealed class SngWriterTests
     {
         string target = Path.Combine(_root.FullName, "out.sng");
 
-        await SngWriter.WriteAsync(target, ExampleMask, [KeyValuePair.Create("name", "Test")], [Source("notes.chart", "ABC"u8.ToArray())], overwrite: false);
+        await SngWriter.WriteAsync(target, ExampleMask, [KeyValuePair.Create("name", "Test")], [Source("notes.chart", "ABC"u8.ToArray())], overwrite: false, cancellationToken: TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(SngReaderTests.WorkedExample, File.ReadAllBytes(target));
+        Assert.AreSequenceEqual(SngReaderTests.WorkedExample, File.ReadAllBytes(target));
     }
 
     [TestMethod]
@@ -38,13 +38,13 @@ public sealed class SngWriterTests
             [KeyValuePair.Create("name", "Big")],
             [Source("song.ogg", big), Source("notes.chart", "x"u8.ToArray()), Source("empty.txt", [])],
             overwrite: false,
-            verify: true);
+            verify: true, cancellationToken: TestContext.CancellationToken);
 
         Assert.IsEmpty(findings);
-        var read = SngReader.Read(target);
+        var read = SngReader.Read(target, TestContext.CancellationToken);
         Assert.IsEmpty(read.Findings);
-        CollectionAssert.AreEqual(big, Extract(target, read, "song.ogg"));
-        CollectionAssert.AreEqual("x"u8.ToArray(), Extract(target, read, "notes.chart"));
+        Assert.AreSequenceEqual(big, Extract(target, read, "song.ogg"));
+        Assert.AreSequenceEqual("x"u8.ToArray(), Extract(target, read, "notes.chart"));
     }
 
     [TestMethod]
@@ -54,7 +54,7 @@ public sealed class SngWriterTests
         File.WriteAllText(target, "keep");
 
         await Assert.ThrowsAsync<IOException>(() =>
-            SngWriter.WriteAsync(target, ExampleMask, [], [Source("notes.chart", [1])], overwrite: false));
+            SngWriter.WriteAsync(target, ExampleMask, [], [Source("notes.chart", [1])], overwrite: false, cancellationToken: TestContext.CancellationToken));
 
         Assert.AreEqual("keep", File.ReadAllText(target));
         Assert.IsFalse(File.Exists(target + SngWriter.TempSuffix));
@@ -66,9 +66,9 @@ public sealed class SngWriterTests
         string target = Path.Combine(_root.FullName, "out.sng");
         File.WriteAllText(target, new string('x', 10_000));
 
-        await SngWriter.WriteAsync(target, ExampleMask, [KeyValuePair.Create("name", "Test")], [Source("notes.chart", "ABC"u8.ToArray())], overwrite: true);
+        await SngWriter.WriteAsync(target, ExampleMask, [KeyValuePair.Create("name", "Test")], [Source("notes.chart", "ABC"u8.ToArray())], overwrite: true, cancellationToken: TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(SngReaderTests.WorkedExample, File.ReadAllBytes(target));
+        Assert.AreSequenceEqual(SngReaderTests.WorkedExample, File.ReadAllBytes(target));
     }
 
     [TestMethod]
@@ -92,7 +92,7 @@ public sealed class SngWriterTests
         string target = Path.Combine(_root.FullName, "out.sng");
         var source = Source("notes.chart", [1, 2, 3]) with { Length = 5 };
 
-        await Assert.ThrowsAsync<IOException>(() => SngWriter.WriteAsync(target, ExampleMask, [], [source], overwrite: false));
+        await Assert.ThrowsAsync<IOException>(() => SngWriter.WriteAsync(target, ExampleMask, [], [source], overwrite: false, cancellationToken: TestContext.CancellationToken));
 
         Assert.IsFalse(File.Exists(target));
         Assert.IsFalse(File.Exists(target + SngWriter.TempSuffix));
@@ -118,4 +118,6 @@ public sealed class SngWriterTests
     {
         public void Report(long value) => cts.Cancel();
     }
+
+    public TestContext TestContext { get; set; }
 }

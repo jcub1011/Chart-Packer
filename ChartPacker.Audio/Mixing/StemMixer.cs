@@ -9,11 +9,15 @@ public sealed class MixerStem
     private volatile bool _isSolo;
     private volatile string? _error;
     private volatile float _volume = 1f;
+    private readonly Action _switched;
+    private readonly Action _turned;
 
-    internal MixerStem(string name, StemReader reader)
+    internal MixerStem(string name, StemReader reader, Action switched, Action turned)
     {
         Name = name;
         Reader = reader;
+        _switched = switched;
+        _turned = turned;
     }
 
     public string Name { get; }
@@ -21,21 +25,40 @@ public sealed class MixerStem
     public bool IsMuted
     {
         get => _isMuted;
-        set => _isMuted = value;
+        set
+        {
+            if (value == _isMuted)
+                return;
+            _isMuted = value;
+            _switched();
+        }
     }
 
     /// <summary>While any stem is soloed, only soloed stems are heard, muted or not.</summary>
     public bool IsSolo
     {
         get => _isSolo;
-        set => _isSolo = value;
+        set
+        {
+            if (value == _isSolo)
+                return;
+            _isSolo = value;
+            _switched();
+        }
     }
 
     /// <summary>How loud the stem is in the mix, from 0 (silent) up; 1 leaves it as recorded.</summary>
     public float Volume
     {
         get => _volume;
-        set => _volume = float.IsFinite(value) ? Math.Max(0f, value) : 1f;
+        set
+        {
+            float volume = float.IsFinite(value) ? Math.Max(0f, value) : 1f;
+            if (volume == _volume)
+                return;
+            _volume = volume;
+            _turned();
+        }
     }
 
     /// <summary>Why the stem stopped playing, when its audio turned out to be damaged; it's silent from then on.</summary>
@@ -62,6 +85,8 @@ public sealed class StemMixer
     private readonly List<MixerStem> _stems = [];
     private float[] _scratch = [];
     private long _minimumLengthFrames;
+    private int _switchVersion;
+    private int _volumeVersion;
 
     // Every stem was found to have ended by the last mix, while the stems' length isn't known: only silence is left.
     private bool _stemsEnded;
@@ -73,7 +98,13 @@ public sealed class StemMixer
         ArgumentNullException.ThrowIfNull(sources);
         OutputRate = outputRate ?? CommonRate(sources.Select(s => s.Value.SampleRate));
         foreach (var (name, source) in sources)
-            _stems.Add(new MixerStem(name, new StemReader(source, OutputRate)));
+        {
+            _stems.Add(new MixerStem(
+                name,
+                new StemReader(source, OutputRate),
+                () => Interlocked.Increment(ref _switchVersion),
+                () => Interlocked.Increment(ref _volumeVersion)));
+        }
 
         var lengths = _stems.Select(s => s.Reader.LengthFrames).ToList();
         LengthFrames = lengths.Count == 0 ? 0 : lengths.Any(l => l < 0) ? -1 : lengths.Max();
@@ -83,6 +114,18 @@ public sealed class StemMixer
     public int OutputRate { get; }
 
     public IReadOnlyList<MixerStem> Stems => _stems;
+
+    /// <summary>
+    /// Counts changes to the stems' switches (<see cref="MixerStem.IsMuted"/> and <see cref="MixerStem.IsSolo"/>),
+    /// so whoever has mixed ahead can tell when to mix again.
+    /// </summary>
+    public int SwitchVersion => Volatile.Read(ref _switchVersion);
+
+    /// <summary>
+    /// Counts changes to the stems' <see cref="MixerStem.Volume"/>, apart from <see cref="SwitchVersion"/>: a slider
+    /// dragged changes it many times a second, so whoever has mixed ahead can mix again less often for it.
+    /// </summary>
+    public int VolumeVersion => Volatile.Read(ref _volumeVersion);
 
     /// <summary>The longest stem's length, or -1 when a stem's length isn't known.</summary>
     public long LengthFrames { get; }

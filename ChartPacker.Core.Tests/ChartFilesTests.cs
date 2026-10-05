@@ -33,7 +33,7 @@ public sealed class ChartFilesTests
     {
         var files = ChartFiles.FilesOf(["song.ogg", "Notes.mid", "album.png", "notes.chart", "old/notes.chart"]);
 
-        CollectionAssert.AreEqual(new[] { "Notes.mid", "notes.chart" }, files.ToArray());
+        Assert.AreSequenceEqual(["Notes.mid", "notes.chart"], [.. files]);
     }
 
     [TestMethod]

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -20,14 +21,43 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
+    /// <summary>A charted difficulty's letter in a merge cell, colored like the inspector's.</summary>
+    public sealed record MergeDifficultyItem(ChartDifficulty Difficulty, string Letter);
+
+    /// <summary>A part's note count in a merge cell, colored by its difficulty like the inspector's.</summary>
+    public sealed record MergeNoteCountItem(ChartDifficulty? Difficulty, string Text);
+
     /// <summary>One cell of a merge choice: a source, or leaving the thing out.</summary>
-    /// <param name="counts">A part's note counts, easiest first, e.g. <c>312 · 640 · 980</c>.</param>
     /// <param name="toolTip">The tooltip, when there's more to it than <see cref="PlainText"/>.</param>
-    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true, string? counts = null, string? toolTip = null) : ObservableObject
+    /// <param name="summary">Compact text shown instead of <paramref name="text"/>, e.g. <c>3 tracks</c> for audio; the full text stays in the tooltip.</param>
+    /// <param name="difficultyItems">The cell's difficulty letters, colored like the inspector's; empty outside part rows.</param>
+    /// <param name="noteCountItems">The cell's note counts, colored by difficulty like the inspector's; empty outside part rows.</param>
+    /// <param name="warning">What to know about the source, shown under the cell and in its tooltip, e.g. that its chart can't be read.</param>
+    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true, string? toolTip = null, string? summary = null,
+        IReadOnlyList<MergeDifficultyItem>? difficultyItems = null, IReadOnlyList<MergeNoteCountItem>? noteCountItems = null, string? warning = null) : ObservableObject
     {
 
         /// <summary>The source it takes from; <see langword="null"/> to leave the thing out.</summary>
         public int? Source { get; } = source;
+
+        /// <summary>Compact text shown instead of <see cref="Text"/>, when the full text only fits the tooltip.</summary>
+        public string? Summary { get; } = summary;
+
+        public bool HasSummary => !string.IsNullOrEmpty(Summary);
+
+        public IReadOnlyList<MergeDifficultyItem> DifficultyItems { get; } = difficultyItems ?? [];
+
+        public bool HasDifficulties => DifficultyItems.Count > 0;
+
+        public IReadOnlyList<MergeNoteCountItem> NoteCountItems { get; } = noteCountItems ?? [];
+
+        public bool HasNoteCounts => NoteCountItems.Count > 0;
+
+        /// <summary>Whether the cell shows <see cref="Text"/>: only when it has neither colored letters nor a summary.</summary>
+        public bool ShowText => !HasDifficulties && !HasSummary;
+
+        /// <summary>Whether the cell shows <see cref="Summary"/>: only when it has no colored letters.</summary>
+        public bool ShowSummary => !HasDifficulties && HasSummary;
 
         /// <summary>What the cell shows; a metadata value can carry rich-text tags, which are drawn.</summary>
         public string Text { get; } = text;
@@ -39,11 +69,11 @@ namespace ChartPacker.ViewModels
 
         public bool HasDetail => !string.IsNullOrEmpty(Detail);
 
-        public string? Counts { get; } = counts;
+        public string? Warning { get; } = warning;
 
-        public bool HasCounts => !string.IsNullOrEmpty(Counts);
+        public bool HasWarning => !string.IsNullOrEmpty(Warning);
 
-        public string ToolTip => toolTip ?? PlainText;
+        public string ToolTip => HasWarning ? (toolTip ?? PlainText) + Environment.NewLine + Warning : toolTip ?? PlainText;
 
         /// <summary>The source has the thing, so it can be chosen.</summary>
         public bool IsAvailable { get; } = isAvailable;
@@ -64,25 +94,81 @@ namespace ChartPacker.ViewModels
         }
     }
 
+    /// <summary>A merge row's fixed icon.</summary>
+    public enum MergeRowIcon
+    {
+        None,
+        Instrument,
+        Waveform,
+        AlbumArt,
+        Background,
+        Video,
+        Midi,
+    }
+
     /// <summary>A row of the merge window: one thing to take from one of the sources.</summary>
-    public sealed partial class MergeChoiceViewModel(string label, string? key = null) : ObservableObject
+    /// <remarks>
+    /// Rows that can be left out show an Include checkbox in the gutter instead of a leave-out
+    /// column; unchecking it selects the leave-out option, checking it again restores the source.
+    /// </remarks>
+    public sealed partial class MergeChoiceViewModel(string label, string? key = null, DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None) : ObservableObject
     {
         private static int _nextGroup;
         private bool _selecting;
+        private bool _syncingInclude;
+        private int? _lastSource;
+        private List<MergeOptionViewModel>? _sourceOptions;
 
         public string Label { get; } = label;
 
         /// <summary>The part id or metadata key the row is for.</summary>
         public string? Key { get; } = key;
 
+        /// <summary>The row's instrument icon, drawn like the inspector's; <see langword="null"/> outside part rows.</summary>
+        public DifficultyGlyph? Glyph { get; } = glyph;
+
+        public bool HasGlyph => Glyph is not null;
+
+        /// <summary>The row's fixed icon: the audio waveform, an art placeholder, or MIDI.</summary>
+        public MergeRowIcon IconKind { get; } = icon;
+
+        public bool HasStaticIcon => IconKind is not MergeRowIcon.None and not MergeRowIcon.Instrument;
+
+        /// <summary>Whether the gutter shows an icon for the row.</summary>
+        public bool HasRowIcon => HasGlyph || HasStaticIcon;
+
         public string GroupName { get; } = "merge-choice-" + Interlocked.Increment(ref _nextGroup).ToString(CultureInfo.InvariantCulture);
 
         public List<MergeOptionViewModel> Options { get; } = [];
+
+        /// <summary>The per-source cells, without the leave-out option the Include checkbox stands for.</summary>
+        /// <remarks>Worked out once, when first shown: the options are all added before then, and a fresh list would regenerate the cells.</remarks>
+        public IReadOnlyList<MergeOptionViewModel> SourceOptions => _sourceOptions ??= Options.Where(o => o.Source is not null).ToList();
+
+        /// <summary>The leave-out option the Include checkbox stands for, if the row has one.</summary>
+        public MergeOptionViewModel? LeaveOutOption => Options.FirstOrDefault(o => o.Source is null);
+
+        /// <summary>Whether the row can be left out, and so shows the Include checkbox.</summary>
+        /// <remarks>Not when no source has the thing: with nothing to include, it's left out without asking.</remarks>
+        public bool CanExclude => LeaveOutOption is { IsAvailable: true, IsShown: true } && Options.Any(o => o.Source is not null && o.IsAvailable);
+
+        /// <summary>Whether the thing is taken from one of the sources; false leaves it out. Defaults to included.</summary>
+        [ObservableProperty]
+        public partial bool IsIncluded { get; set; } = true;
+
+        public bool IsExcluded => CanExclude && !IsIncluded;
+
+        public string IncludeToolTip => Strings.MergeIncludeToolTip;
+
+        public string IncludeName => string.Format(CultureInfo.CurrentCulture, Strings.MergeIncludeNameFormat, Label);
 
         public MergeOptionViewModel? Selected => Options.FirstOrDefault(o => o.IsSelected);
 
         /// <summary>Nothing is chosen yet, and something must be.</summary>
         public bool NeedsChoice => Selected is null;
+
+        /// <summary>Nothing is chosen yet, and the row is included, so it still has to be made.</summary>
+        public bool ShowNeedsChoice => IsIncluded && NeedsChoice;
 
         /// <summary>The user chose, so defaults no longer follow other choices.</summary>
         public bool IsTouched { get; private set; }
@@ -108,6 +194,7 @@ namespace ChartPacker.ViewModels
                 _selecting = false;
             }
 
+            SyncInclude(option);
             Raise();
         }
 
@@ -131,29 +218,88 @@ namespace ChartPacker.ViewModels
                 _selecting = false;
             }
 
+            if (option.Source is { } s)
+                _lastSource = s;
+            SyncInclude(option);
             Raise();
+        }
+
+        partial void OnIsIncludedChanged(bool value)
+        {
+            if (_syncingInclude)
+                return;
+
+            // The user's choice, so defaults no longer follow other choices, as for clicking a cell.
+            IsTouched = true;
+            _syncingInclude = true;
+            try
+            {
+                if (!value)
+                {
+                    _lastSource = Selected?.Source;
+                    Select(null, force: true);
+                }
+                else if (_lastSource is { } s)
+                {
+                    Select(s, force: true);
+                }
+                else
+                {
+                    // Included again with nothing to restore: force an explicit choice.
+                    _selecting = true;
+                    try
+                    {
+                        foreach (var other in Options)
+                            other.IsSelected = false;
+                    }
+                    finally
+                    {
+                        _selecting = false;
+                    }
+
+                    Raise();
+                }
+            }
+            finally
+            {
+                _syncingInclude = false;
+            }
+
+            OnPropertyChanged(nameof(IsExcluded));
+            OnPropertyChanged(nameof(ShowNeedsChoice));
+        }
+
+        /// <summary>Keeps the Include checkbox with the selection, without feeding back into it.</summary>
+        private void SyncInclude(MergeOptionViewModel? option)
+        {
+            if (!CanExclude || _syncingInclude)
+                return;
+
+            _syncingInclude = true;
+            try
+            {
+                IsIncluded = option?.Source is not null;
+            }
+            finally
+            {
+                _syncingInclude = false;
+            }
         }
 
         private void Raise()
         {
             OnPropertyChanged(nameof(Selected));
             OnPropertyChanged(nameof(NeedsChoice));
+            OnPropertyChanged(nameof(ShowNeedsChoice));
+            OnPropertyChanged(nameof(IsExcluded));
             Changed?.Invoke(this);
         }
     }
 
-    /// <summary>A column header: one of the songs being merged.</summary>
-    /// <param name="Charter">The charter as stored, rich-text tags and all, for the header to draw.</param>
-    public sealed record MergeSourceViewModel(string Title, string? Artist, string? Charter, string Format, string? Problem)
-    {
-        public bool HasArtist => !string.IsNullOrEmpty(Artist);
-
-        public bool HasCharter => !string.IsNullOrEmpty(Charter);
-
-        public string? CharterPlainText => Charter is null ? null : RichText.ToPlainText(Charter);
-
-        public bool HasProblem => !string.IsNullOrEmpty(Problem);
-    }
+    /// <summary>One of the songs being merged: a column of every row.</summary>
+    /// <param name="Title">What the song is called where it's named, e.g. in an alignment link.</param>
+    /// <param name="Problem">What to know about the song, shown in its Base chart cell, e.g. that its unsaved edits aren't included.</param>
+    public sealed record MergeSourceViewModel(string Title, string? Problem);
 
     /// <summary>
     /// The merge window: reads the selected songs, offers a choice wherever they differ, and merges
@@ -162,7 +308,8 @@ namespace ChartPacker.ViewModels
     /// <remarks>
     /// A part only one song has is taken from it; a part several have must be chosen. Metadata the songs
     /// agree on isn't offered. The audio defaults to the song with the most tracks, and the base chart,
-    /// album art and backgrounds follow it until they're chosen.
+    /// album art, backgrounds and metadata follow it until they're chosen: metadata the audio's song
+    /// doesn't set is taken from the first song that does.
     /// </remarks>
     /// <param name="entries">The songs, in the order their columns are shown.</param>
     /// <param name="hasDrafts">Whether each song has unsaved changes, which the merge doesn't see.</param>
@@ -170,10 +317,11 @@ namespace ChartPacker.ViewModels
     /// <param name="policy">What to do when it already exists.</param>
     /// <param name="video">Reads the background video's length, for <c>song_length</c>.</param>
     /// <param name="preview">
-    /// The side panel's inspector, read-only but for its note highway's offsets, with a player of its
-    /// own; it shows the merged song as chosen.
+    /// The side panel's inspector, read-only but for its offsets (the note highway's, the lyrics', the
+    /// audio's and the video's), with a player of its own; it shows the merged song as chosen.
     /// </param>
-    /// <param name="previewDrafts">The preview's drafts: the offsets set on its highway, which the merge applies.</param>
+    /// <param name="previewDrafts">The preview's drafts: the offsets set on it, which the merge applies.</param>
+    /// <param name="settings">Persisted window state: whether the window was maximized and the split ratio.</param>
     public sealed partial class MergeWindowViewModel(
         IReadOnlyList<SongEntry> entries,
         IReadOnlyList<bool> hasDrafts,
@@ -181,10 +329,13 @@ namespace ChartPacker.ViewModels
         OverwritePolicy policy,
         IVideoDurationProbe video,
         SongDetailViewModel preview,
-        MetadataDraftStore previewDrafts) : ViewModelBase
+        MetadataDraftStore previewDrafts,
+        SettingsService settings) : ViewModelBase
     {
+        private readonly SettingsService _settings = settings;
 
-        // The plan the preview was staged with, which its highway's, audio's and video's offsets were set against.
+        // The plan the preview shows, which its highway's, audio's and video's offsets are set against: the one it was staged
+        // with, or the one it shows lined up live, ahead of staging.
         private SongMergePlan? _previewed;
         private SongMergeAnalysis? _analysis;
         private CancellationTokenSource? _cts;
@@ -200,6 +351,20 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The merged song as chosen so far, as the inspector shows a song.</summary>
         public SongDetailViewModel Preview { get; } = preview;
+
+        /// <summary>Whether the window was maximized when last closed. The view applies it on open and writes it back on close.</summary>
+        public bool MergeWindowMaximized
+        {
+            get => _settings.Settings.MergeWindowMaximized;
+            set => _settings.Settings.MergeWindowMaximized = value;
+        }
+
+        /// <summary>Share of the window's width given to the preview panel. The view applies it on open and writes it back on close.</summary>
+        public double MergePreviewFraction
+        {
+            get => _settings.Settings.MergePreviewFraction;
+            set => _settings.Settings.MergePreviewFraction = value;
+        }
 
         /// <summary>The preview is being put together.</summary>
         [ObservableProperty]
@@ -225,8 +390,8 @@ namespace ChartPacker.ViewModels
         /// <summary>Asks the window to close; true when a song was merged.</summary>
         public event Action<bool>? CloseRequested;
 
-        /// <summary>One column per source, plus one for leaving a thing out.</summary>
-        public int ColumnCount => Sources.Count + 1;
+        /// <summary>One column per source; rows that can be left out use an Include checkbox instead of an extra column.</summary>
+        public int ColumnCount => Sources.Count;
 
         public AvaloniaList<MergeSourceViewModel> Sources { get; } = [];
 
@@ -301,6 +466,7 @@ namespace ChartPacker.ViewModels
         /// <summary>Reads the songs and builds the choices.</summary>
         public async Task LoadAsync()
         {
+            Preview.Lyrics.PropertyChanged += OnPreviewLyricsChanged;
             _cts = new CancellationTokenSource();
             try
             {
@@ -330,28 +496,38 @@ namespace ChartPacker.ViewModels
                 string? problem = s.ChartError is { } error ? string.Format(CultureInfo.CurrentCulture, Strings.MergeChartErrorFormat, error)
                     : i < hasDrafts.Count && hasDrafts[i] ? Strings.MergeUnsavedEdits
                     : null;
-                Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, s.Headline.Artist, SongHeadline.CharterMarkup(s.Pairs), FormatOf(s.Format), problem));
+                Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, problem));
             }
 
-            BaseChoice = Choice(Strings.MergeBaseLabel, null, i => sources[i].Chart is not null, i => FormatOf(sources[i].Format), null, leaveOut: null);
+            BaseChoice = Choice(Strings.MergeBaseLabel, null, i => sources[i].Chart is not null, i => FormatOf(sources[i].Format), null, leaveOut: null,
+                icon: MergeRowIcon.Midi, warning: i => Sources[i].Problem);
 
             foreach (var part in analysis.Parts)
             {
                 var row = Choice(ChartLabels.PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), i => RatingOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut,
-                    counts: i => sources[i].Parts.First(p => p.Part.Id == part.Id).NoteCounts);
+                    counts: i => sources[i].Parts.First(p => p.Part.Id == part.Id).NoteCounts,
+                    difficulties: i => sources[i].Parts.First(p => p.Part.Id == part.Id).Difficulties,
+                    glyph: PartGlyphOf(part.Id));
                 var with = analysis.SourcesWith(part.Id);
                 if (with.Count == 1)
                     row.Select(with[0]);
                 Parts.Add(row);
             }
 
-            AudioChoice = Choice(Strings.MergeAudioLabel, null, i => true, i => StemsOf(sources[i]), null, leaveOut: null);
-            Assets.Add(Choice(Strings.MergeAlbumArtLabel, "album", i => sources[i].AlbumArt is not null, i => sources[i].AlbumArt ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone));
-            Assets.Add(Choice(Strings.MergeBackgroundLabel, "background", i => sources[i].BackgroundImage is not null, i => sources[i].BackgroundImage ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone));
-            Assets.Add(Choice(Strings.MergeVideoLabel, "video", i => sources[i].Video is not null, i => sources[i].Video ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone));
+            AudioChoice = Choice(Strings.MergeAudioLabel, null, i => true, i => StemsOf(sources[i]), null, leaveOut: null,
+                summary: i => StemsSummaryOf(sources[i]),
+                icon: MergeRowIcon.Waveform);
+            Assets.Add(Choice(Strings.MergeAlbumArtLabel, "album", i => sources[i].AlbumArt is not null, i => sources[i].AlbumArt ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+                icon: MergeRowIcon.AlbumArt));
+            Assets.Add(Choice(Strings.MergeBackgroundLabel, "background", i => sources[i].BackgroundImage is not null, i => sources[i].BackgroundImage ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+                icon: MergeRowIcon.Background));
+            Assets.Add(Choice(Strings.MergeVideoLabel, "video", i => sources[i].Video is not null, i => sources[i].Video ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+                icon: MergeRowIcon.Video));
 
             foreach (var conflict in analysis.Conflicts)
                 Metadata.Add(Choice(conflict.Key, conflict.Key, i => true, i => conflict.Values[i] ?? Strings.MergeNotSet, null, leaveOut: null));
+
+            BuildAlignment(analysis);
 
             // The audio with the most tracks; the rest follow it until chosen.
             int audio = Enumerable.Range(0, sources.Count)
@@ -367,10 +543,16 @@ namespace ChartPacker.ViewModels
         }
 
         /// <param name="counts">An available cell's note counts, for a part's row.</param>
+        /// <param name="summary">Compact text shown instead of <paramref name="text"/>, e.g. a stem count for audio.</param>
+        /// <param name="difficulties">An available cell's charted difficulties, for a part's colored letters.</param>
+        /// <param name="glyph">The row's instrument icon, drawn like the inspector's.</param>
+        /// <param name="icon">The row's fixed icon: the audio waveform, an art placeholder, or MIDI.</param>
+        /// <param name="warning">What to know about a source, under its cell whether it's available or not.</param>
         private MergeChoiceViewModel Choice(string label, string? key, Func<int, bool> available, Func<int, string> text, Func<int, string?>? detail, string? leaveOut,
-            Func<int, IReadOnlyList<NoteCount>>? counts = null)
+            Func<int, IReadOnlyList<NoteCount>>? counts = null, Func<int, string?>? summary = null, Func<int, IReadOnlyList<ChartDifficulty>>? difficulties = null,
+            DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None, Func<int, string?>? warning = null)
         {
-            var row = new MergeChoiceViewModel(label, key);
+            var row = new MergeChoiceViewModel(label, key, glyph, icon);
             for (int i = 0; i < Sources.Count; i++)
             {
                 bool has = available(i);
@@ -378,8 +560,13 @@ namespace ChartPacker.ViewModels
                 var noteCounts = has && counts is not null ? counts(i) : [];
                 bool counted = noteCounts.Count > 0;
                 row.Options.Add(new MergeOptionViewModel(row, i, shown, detail?.Invoke(i), has,
-                    counts: counted ? string.Join(Strings.MergeNoteCountSeparator, noteCounts.Select(c => c.Count.ToString("N0", CultureInfo.CurrentCulture))) : null,
-                    toolTip: counted ? string.Join(Environment.NewLine, [RichText.ToPlainText(shown), .. noteCounts.Select(NoteCountLine)]) : null));
+                    toolTip: counted ? string.Join(Environment.NewLine, [RichText.ToPlainText(shown), .. noteCounts.Select(NoteCountLine)]) : null,
+                    summary: has ? summary?.Invoke(i) : null,
+                    difficultyItems: has && difficulties is not null
+                        ? difficulties(i).Select(d => new MergeDifficultyItem(d, ChartLabels.DifficultyLetter(d))).ToList()
+                        : [],
+                    noteCountItems: noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture))).ToList(),
+                    warning: warning?.Invoke(i)));
             }
 
             row.Options.Add(leaveOut is null
@@ -403,12 +590,9 @@ namespace ChartPacker.ViewModels
                 Assets[0].Select(Pick(audio, i => sources[i].AlbumArt is not null));
                 Assets[1].Select(Pick(audio, i => sources[i].BackgroundImage is not null));
                 Assets[2].Select(Pick(audio, i => sources[i].Video is not null));
-            }
-
-            if (ReferenceEquals(row, BaseChoice) && row.Selected?.Source is { } chosenBase)
-            {
                 foreach (var conflict in Metadata)
-                    conflict.Select(chosenBase);
+                    conflict.Select(MetadataSourceFor(analysis, conflict.Key!, audio));
+                AlignTo(audio);
             }
 
             Refresh();
@@ -418,6 +602,16 @@ namespace ChartPacker.ViewModels
         private int? Pick(int preferred, Func<int, bool> has) =>
             has(preferred) ? preferred : Enumerable.Range(0, Sources.Count).Cast<int?>().FirstOrDefault(i => has(i!.Value));
 
+        /// <summary>
+        /// Whose value of <paramref name="key"/> is kept until it's chosen: the kept <paramref name="audio"/>'s song when it
+        /// sets the key, otherwise the first song that does, otherwise the audio's song. A blank value isn't set.
+        /// </summary>
+        private int MetadataSourceFor(SongMergeAnalysis analysis, string key, int audio)
+        {
+            var values = analysis.Conflicts.First(c => c.Key == key).Values;
+            return Pick(audio, i => !string.IsNullOrEmpty(values[i])) ?? audio;
+        }
+
         /// <summary>The plan as chosen so far; <see langword="null"/> while something still needs choosing.</summary>
         private SongMergePlan? Plan()
         {
@@ -426,59 +620,72 @@ namespace ChartPacker.ViewModels
             if (Parts.Any(p => p.NeedsChoice) || !Parts.Any(p => p.Selected?.Source is not null))
                 return null;
 
+            // An included asset with nothing chosen would otherwise be left out without a word.
+            if (Assets.Any(a => a.ShowNeedsChoice))
+                return null;
+
             var plan = new SongMergePlan(
                 analysis,
                 baseSource,
                 Parts.Where(p => p.Selected?.Source is not null).ToDictionary(p => p.Key!, p => p.Selected!.Source!.Value),
-                Metadata.ToDictionary(m => m.Key!, m => (int?)(m.Selected?.Source ?? baseSource)),
+                Metadata.ToDictionary(m => m.Key!, m => (int?)(m.Selected?.Source ?? audio)),
                 audio,
                 Assets[0].Selected?.Source,
                 Assets[1].Selected?.Source,
-                Assets[2].Selected?.Source);
+                Assets[2].Selected?.Source,
+                SourceOffsets: SourceOffsets());
 
             // Checked here, not only when the preview is next staged, so a merge straight after a change can't take them.
             var timing = TimingOf(plan);
-            var offsets = PreviewOffsets().Where(p => OffsetApplies(p.Key, plan, timing)).ToDictionary(p => p.Key, p => p.Value);
-            var (audioOffset, videoOffset) = PreviewTimingOffsets();
+            if (PreviewDraft() is not { } draft)
+                return plan;
+
+            var offsets = draft.ChartOffsets.Where(p => OffsetApplies(p.Key, plan, timing)).ToDictionary(p => p.Key, p => p.Value);
+            var (audioOffset, videoOffset) = PreviewTimingOffsets(draft);
             return plan with
             {
                 ChartOffsets = offsets.Count > 0 ? offsets : null,
                 AudioOffset = AudioOffsetApplies(plan, timing) ? audioOffset : 0,
                 VideoOffset = VideoOffsetApplies(plan, timing) ? videoOffset : 0,
+                VocalsOffset = VocalsOffsetApplies(plan, timing) ? draft.VocalsOffset : 0,
             };
         }
 
         /// <summary>
         /// Whether <paramref name="plan"/> stages the <c>delay</c> and the <c>video_start_time</c> as <see cref="_previewed"/>
         /// did: an offset set against one that has since changed, as by choosing another source's value for it, no
-        /// longer means what it did.
+        /// longer means what it did. Lining the songs up moves them both, but an offset set on the preview moves things
+        /// from where the songs are lined up to, so it still means what it did.
         /// </summary>
         private (bool SameDelay, bool SameVideoStart) TimingOf(SongMergePlan plan)
         {
             if (_previewed is not { } previewed)
                 return (false, false);
 
-            var before = SongMerger.BuildMetadata(previewed);
-            var after = SongMerger.BuildMetadata(plan);
+            var before = SongMerger.BuildMetadata(previewed with { SourceOffsets = null });
+            var after = SongMerger.BuildMetadata(plan with { SourceOffsets = null });
             return (TimingOffsets.OffsetOf(TimingOffsets.AudioKey, before, after, TimeSpan.Zero) == 0,
                 TimingOffsets.OffsetOf(TimingOffsets.VideoKey, before, after, TimeSpan.Zero) == 0);
         }
 
-        /// <summary>The offsets set on the preview's highway, against <see cref="_previewed"/>.</summary>
-        private IReadOnlyDictionary<ChartTrackKey, int> PreviewOffsets() =>
-            _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? previewDrafts.Get(folder).ChartOffsets : new Dictionary<ChartTrackKey, int>();
+        /// <summary>
+        /// The preview's draft, which holds the offsets set on it against <see cref="_previewed"/>: the highway's, the lyrics',
+        /// the audio's and the video's. <see langword="null"/> while none are set.
+        /// </summary>
+        private MetadataDraft? PreviewDraft() =>
+            _previewFolder is { } folder && previewDrafts.HasDrafts(folder) ? previewDrafts.Get(folder) : null;
 
         /// <summary>
-        /// The audio and video offsets set on the preview, against <see cref="_previewed"/>: how far its draft moves the
-        /// <c>delay</c> and <c>video_start_time</c> the merge staged it with.
+        /// The audio and video offsets set on the preview, against <see cref="_previewed"/>: how far its <paramref name="draft"/>
+        /// moves the <c>delay</c> and <c>video_start_time</c> the merge staged it with.
         /// </summary>
-        private (int Audio, int Video) PreviewTimingOffsets()
+        private (int Audio, int Video) PreviewTimingOffsets(MetadataDraft draft)
         {
-            if (_previewed is not { } previewed || _previewFolder is not { } folder || !previewDrafts.HasDrafts(folder))
+            if (_previewed is not { } previewed)
                 return (0, 0);
 
             var staged = SongMerger.BuildMetadata(previewed);
-            var drafted = previewDrafts.Get(folder).ApplyTo(staged);
+            var drafted = draft.ApplyTo(staged);
             return (TimingOffsets.OffsetOf(TimingOffsets.AudioKey, staged, drafted, TimeSpan.Zero),
                 TimingOffsets.OffsetOf(TimingOffsets.VideoKey, staged, drafted, TimeSpan.Zero));
         }
@@ -505,34 +712,37 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void RebaseTimingOffsets(SongMergePlan plan)
         {
-            if (_previewFolder is not { } folder || !previewDrafts.HasDrafts(folder))
+            if (PreviewDraft() is not { } draft)
                 return;
 
-            var draft = previewDrafts.Get(folder);
             var staged = SongMerger.BuildMetadata(plan);
             TimingOffsets.Set(draft, TimingOffsets.AudioKey, staged, TimeSpan.Zero, plan.AudioOffset);
             TimingOffsets.Set(draft, TimingOffsets.VideoKey, staged, TimeSpan.Zero, plan.VideoOffset);
         }
 
         /// <summary>
-        /// Whether an offset set on the preview still lines <paramref name="key"/> up in <paramref name="plan"/>:
-        /// its part comes from the same song as when it was set, against the same audio and the same base
-        /// chart, whose tempo map the notes are placed by, and with the same <c>delay</c>, which places them all.
+        /// Whether an offset set on the preview still lines <paramref name="key"/> up in <paramref name="plan"/>: its part
+        /// comes from the same song as when it was set, and the audio offset still applies, as the same base chart's tempo
+        /// map and the same <c>delay</c> place the notes against the same audio.
         /// </summary>
-        private bool OffsetApplies(ChartTrackKey key, SongMergePlan plan, (bool SameDelay, bool SameVideoStart) timing)
+        private bool OffsetApplies(ChartTrackKey key, SongMergePlan plan, (bool SameDelay, bool SameVideoStart) timing) =>
+            AudioOffsetApplies(plan, timing) && _previewed is { } previewed
+            && plan.Analysis.Parts.Where(p => MidiPartCatalog.InstrumentsOf(p).Contains(key.Instrument)).All(p => SamePart(p.Id, previewed, plan));
+
+        /// <summary>
+        /// Whether the offset set on the preview's lyrics still lines the vocals up in <paramref name="plan"/>: the vocals
+        /// and harmonies come from the same songs as when it was set, and the audio offset still applies.
+        /// </summary>
+        private bool VocalsOffsetApplies(SongMergePlan plan, (bool SameDelay, bool SameVideoStart) timing) =>
+            AudioOffsetApplies(plan, timing) && _previewed is { } previewed
+            && SamePart("vocals", previewed, plan) && SamePart("harmonies", previewed, plan);
+
+        /// <summary>Whether <paramref name="partId"/> is taken from the same song in both plans, or left out of both.</summary>
+        private static bool SamePart(string partId, SongMergePlan before, SongMergePlan after)
         {
-            if (_previewed is not { } previewed || previewed.BaseSource != plan.BaseSource || previewed.AudioSource != plan.AudioSource || !timing.SameDelay)
-                return false;
-
-            foreach (var part in plan.Analysis.Parts.Where(p => MidiPartCatalog.InstrumentsOf(p).Contains(key.Instrument)))
-            {
-                bool was = previewed.Parts.TryGetValue(part.Id, out int before);
-                bool now = plan.Parts.TryGetValue(part.Id, out int after);
-                if (was != now || before != after)
-                    return false;
-            }
-
-            return true;
+            bool was = before.Parts.TryGetValue(partId, out int from);
+            bool now = after.Parts.TryGetValue(partId, out int to);
+            return was == now && from == to;
         }
 
         private void Refresh()
@@ -551,8 +761,16 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
+            // Lining the songs up moves the preview right away, the way dragging a highway offset does; the staging that
+            // follows changes nothing shown.
+            PreviewLiveAlignment();
             SchedulePreview();
+            RefreshTarget();
+        }
 
+        /// <summary>Where the merge will write, and why it can't run as chosen, if it can't.</summary>
+        private void RefreshTarget()
+        {
             TargetProblem = null;
             if (Plan() is { } plan)
             {
@@ -563,6 +781,12 @@ namespace ChartPacker.ViewModels
                     TargetProblem = string.Format(CultureInfo.CurrentCulture, Strings.MergeTargetExistsFormat, Path.GetFileName(preferred));
                 else if (SongMerger.IsSource(plan, target))
                     TargetProblem = string.Format(CultureInfo.CurrentCulture, Strings.MergeTargetIsSourceFormat, Path.GetFileName(target));
+
+                // The lyrics say so only of an offset set on vocals the plan still takes; merging would fail on it.
+                else if (plan.VocalsOffset != 0 && Preview.Lyrics.HasProblem)
+                    TargetProblem = Strings.MergeLyricsOffsetBeforeStart;
+                else
+                    TargetProblem = AlignmentProblemOf(plan);
             }
             else
             {
@@ -570,6 +794,16 @@ namespace ChartPacker.ViewModels
             }
 
             MergeCommand.NotifyCanExecuteChanged();
+        }
+
+        /// <summary>
+        /// An offset set on the preview's lyrics that moves the vocals before the song starts can't be merged; see <see cref="RefreshTarget"/>.
+        /// The preview isn't staged again for it, as staging clears the lyrics' problem and would cancel itself.
+        /// </summary>
+        private void OnPreviewLyricsChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(LyricsViewModel.HasProblem) && !IsDone && !_closed)
+                RefreshTarget();
         }
 
         private bool CanMerge() => IsReady && TargetProblem is null && Plan() is not null;
@@ -625,6 +859,7 @@ namespace ChartPacker.ViewModels
         public void OnClosed()
         {
             _closed = true;
+            Preview.Lyrics.PropertyChanged -= OnPreviewLyricsChanged;
             _cts?.Cancel();
             _previewCts?.Cancel();
         }
@@ -714,9 +949,29 @@ namespace ChartPacker.ViewModels
             IsPreviewUpdating = true;
             try
             {
-                // Playback and the background video hold the song's files open; they're let go first.
-                await Preview.ShowAsync([]);
-                await Preview.Player.WhenFilesClosedAsync();
+                // Where playback is, to put it back should reading the song again stop it: the audio, the parts or the
+                // names may change what's staged, but that shouldn't move the playhead.
+                TimeSpan resumeAt = Preview.Player.CurrentPosition;
+                bool wasPlaying = Preview.Player.IsPlaying;
+                bool wasScrubbing = Preview.Player.IsScrubbing;
+                int tracksGeneration = Preview.Player.TracksGeneration;
+
+                // Only the songs' lining-up changed since the chart was read, which the preview already shows: staging
+                // writes the same, and nothing shown is read again. Otherwise it's read again in place; only what holds
+                // a file staging replaces is let go first: playback for other audio, the video for another video.
+                bool live = LiveShiftsOf(plan) is not null;
+                if (!live)
+                {
+                    if (_previewed?.AudioSource != plan.AudioSource)
+                    {
+                        await Preview.ReleaseFilesAsync();
+                    }
+                    else if (_previewed?.VideoSource != plan.VideoSource)
+                    {
+                        Preview.Background.Unload();
+                        await Preview.Background.WhenClosedAsync();
+                    }
+                }
 
                 _previewFolder ??= Directory.CreateTempSubdirectory("chartpacker-merge-preview-").FullName;
                 var warnings = await SongMerger.StageAsync(plan, _previewFolder, video, _staged, cts.Token);
@@ -729,7 +984,27 @@ namespace ChartPacker.ViewModels
                 _previewedPlan = signature;
                 RebaseTimingOffsets(plan);
                 _previewed = plan;
-                await Preview.ShowAsync([new SongEntry(SongEntryKind.SongFolder, _previewFolder, ".", name)]);
+
+                if (live)
+                {
+                    // The rows, files and length catch up with what's staged; the rest already shows it.
+                    await Preview.SyncPreviewStagingAsync(cts.Token);
+                    return;
+                }
+
+                await Preview.ShowAsync([new SongEntry(SongEntryKind.SongFolder, _previewFolder, ".", name)], inPlace: true);
+                if (_closed)
+                    return;
+
+                // What the preview read is what was just staged: the next staging can't start until this one is done.
+                _loadedPlan = plan;
+                _loadedGeneration = Preview.LoadGeneration;
+
+                // Only playback the reload took down, by letting go of its tracks for other ones, goes back to where it
+                // was, playing again if it was, even with another change on its way, which lets go of it again only if it
+                // has to. Otherwise the player was left alone, so a pause or seek meanwhile was the user's, and it stays.
+                if (!wasScrubbing && Preview.Player.TracksGeneration != tracksGeneration && !Preview.Player.IsPlaying)
+                    await Preview.Player.RestorePlaybackAsync(resumeAt, resume: wasPlaying);
             }
             catch (OperationCanceledException)
             {
@@ -754,19 +1029,31 @@ namespace ChartPacker.ViewModels
         /// Drops the highway offsets that no longer apply to <paramref name="plan"/>: those of a part now
         /// taken from another song, or left out, and all of them when the audio, the base chart or the
         /// <c>delay</c> changed. They were set to line the chart as it was up with the audio as it was.
+        /// The lyrics' offset goes the same way, with the vocals or harmonies taken from another song. The preview
+        /// is told, so it doesn't go on showing an offset that's gone.
         /// </summary>
         private void ForgetStaleOffsets(SongMergePlan plan)
         {
-            if (_previewFolder is not { } folder || !previewDrafts.HasDrafts(folder))
+            if (_previewFolder is not { } folder || PreviewDraft() is not { } draft)
                 return;
 
-            var draft = previewDrafts.Get(folder);
             var timing = TimingOf(plan);
-            foreach (var key in draft.ChartOffsets.Keys.Where(k => !OffsetApplies(k, plan, timing)).ToList())
+            var stale = draft.ChartOffsets.Keys.Where(k => !OffsetApplies(k, plan, timing)).ToList();
+            foreach (var key in stale)
                 draft.SetChartOffset(key, 0);
+
+            bool staleVocals = draft.HasVocalsOffset && !VocalsOffsetApplies(plan, timing);
+            if (staleVocals)
+                draft.SetVocalsOffset(0);
+
+            if (stale.Count > 0 || staleVocals)
+                previewDrafts.NotifyChanged(folder);
         }
 
-        /// <summary>What a plan takes from where, to tell whether the preview already shows it; the offsets aren't part of it, as the preview shows them itself.</summary>
+        /// <summary>
+        /// What a plan takes from where, and how far it lines each song up, to tell whether the preview already shows it; the
+        /// preview's own offsets aren't part of it, as the preview shows them itself.
+        /// </summary>
         private static string Signature(SongMergePlan plan) => string.Join(
             ";",
             [
@@ -775,7 +1062,11 @@ namespace ChartPacker.ViewModels
                 $"{plan.AlbumArtSource}/{plan.BackgroundSource}/{plan.VideoSource}",
                 .. plan.Parts.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}"),
                 .. plan.Metadata.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}"),
+                .. (plan.SourceOffsets ?? new Dictionary<int, int>()).OrderBy(p => p.Key).Select(p => $"@{p.Key}={p.Value}"),
             ]);
+
+        // How many of a warning's places it lists before saying how many more there are.
+        private const int WarningTimesShown = 5;
 
         private static string Describe(ChartMergeWarning warning)
         {
@@ -786,7 +1077,15 @@ namespace ChartPacker.ViewModels
                 ChartMergeIssue.NotesChanged => Strings.MergeIssueNotesChangedFormat,
                 _ => Strings.MergeIssueNotesLostFormat,
             };
-            return string.Format(CultureInfo.CurrentCulture, format, TrackName(warning.TrackName), ChartLabels.DifficultyName(warning.Difficulty));
+            string text = string.Format(CultureInfo.CurrentCulture, format, TrackName(warning.TrackName), ChartLabels.DifficultyName(warning.Difficulty));
+            if (warning.Times.Count == 0)
+                return text;
+
+            // Where, as song time in the source chart, so they can be found in a chart editor.
+            string times = string.Join(", ", warning.Times.Take(WarningTimesShown).Select(t => Controls.AlignmentTimelineView.FormatTime(t.TotalSeconds, 1)));
+            if (warning.Times.Count > WarningTimesShown)
+                times = string.Format(CultureInfo.CurrentCulture, Strings.MergeIssueMoreTimesFormat, times, warning.Times.Count - WarningTimesShown);
+            return string.Format(CultureInfo.CurrentCulture, Strings.MergeIssueTimesFormat, text, times);
         }
 
         private static string TrackName(string track) => MidiPartCatalog.PartOf(track) is { IsKnown: true } part ? ChartLabels.PartName(part) : track;
@@ -797,6 +1096,10 @@ namespace ChartPacker.ViewModels
             MergeChartFormat.Chart => Strings.MergeFormatChart,
             _ => Strings.MergeFormatNone,
         };
+
+        /// <summary>The part's instrument icon, drawn like the inspector's; <see langword="null"/> for a part that isn't known.</summary>
+        private static DifficultyGlyph? PartGlyphOf(string partId) =>
+            DifficultySlots.All.FirstOrDefault(s => s.PartId == partId)?.Glyph;
 
         /// <summary>The difficulties a source's part has notes for, as letters; for a part that isn't read, just that it's there.</summary>
         private static string DifficultiesOf(MergeSource source, string partId)
@@ -818,5 +1121,13 @@ namespace ChartPacker.ViewModels
 
         private static string StemsOf(MergeSource source) =>
             source.AudioFiles.Count == 0 ? Strings.MergeStemsNone : string.Join(", ", source.AudioFiles);
+
+        /// <summary>Compact audio cell text, e.g. <c>3 tracks</c>; <see langword="null"/> shows the full text instead.</summary>
+        private static string? StemsSummaryOf(MergeSource source) => source.AudioFiles.Count switch
+        {
+            0 => null,
+            1 => Strings.MergeStemsOne,
+            var n => string.Format(CultureInfo.CurrentCulture, Strings.MergeStemsFormat, n),
+        };
     }
 }

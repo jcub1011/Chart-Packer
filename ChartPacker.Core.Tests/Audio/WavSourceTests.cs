@@ -24,7 +24,7 @@ public sealed class WavSourceTests
         Assert.AreEqual(2, source.Channels);
         Assert.AreEqual(3, source.LengthFrames);
         float[] read = TestAudio.ReadAll(source);
-        Assert.AreEqual(samples.Length, read.Length);
+        Assert.HasCount(samples.Length, read);
         for (int i = 0; i < samples.Length; i++)
             Assert.AreEqual(samples[i], read[i], tolerance + 1e-6f, $"Sample {i}.");
     }
@@ -37,7 +37,7 @@ public sealed class WavSourceTests
         source.SeekToFrame(600);
         float[] read = TestAudio.Read(source, 3);
 
-        Assert.AreEqual(3, read.Length);
+        Assert.HasCount(3, read);
         Assert.AreEqual(0.6f, read[0], 1e-4f);
         Assert.AreEqual(0.602f, read[2], 1e-4f);
     }

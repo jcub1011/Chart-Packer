@@ -52,6 +52,12 @@ public enum MergeKeyRule
 
     /// <summary>Worked out from the merged song.</summary>
     SongLength,
+
+    /// <summary>
+    /// Worked out from the merged chart: the <c>sustain_cutoff_threshold</c> its sustains need, and no
+    /// <c>multiplier_note</c>, as its star power is on 116.
+    /// </summary>
+    FromChart,
 }
 
 /// <summary>A part one source has.</summary>
@@ -132,7 +138,7 @@ public sealed class SongMergeAnalysis
 {
     private static readonly HashSet<string> BaseKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        "hopo_frequency", "hopofreq", "eighthnote_hopo", "sustain_cutoff_threshold", "multiplier_note", "end_events", "sysex_slider", "sysex_pro_slide",
+        "hopo_frequency", "hopofreq", "eighthnote_hopo", "end_events", "sysex_slider", "sysex_pro_slide",
     };
 
     private static readonly HashSet<string> AudioKeys = new(StringComparer.OrdinalIgnoreCase) { "preview_start_time", "preview_end_time", "preview", "tuning_offset_cents" };
@@ -142,19 +148,17 @@ public sealed class SongMergeAnalysis
     private SongMergeAnalysis(IReadOnlyList<MergeSource> sources)
     {
         Sources = sources;
-        Parts = sources
+        Parts = [.. sources
             .SelectMany(s => s.Parts.Select(p => p.Part))
             .DistinctBy(p => p.Id)
             .OrderBy(MidiPartCatalog.OrderOf)
-            .ThenBy(p => p.Id, StringComparer.Ordinal)
-            .ToList();
+            .ThenBy(p => p.Id, StringComparer.Ordinal)];
 
         var keys = sources.SelectMany(s => s.Pairs.Select(p => p.Key)).Distinct(StringComparer.OrdinalIgnoreCase);
-        Conflicts = keys
+        Conflicts = [.. keys
             .Where(k => RuleOf(k) == MergeKeyRule.Chosen)
-            .Select(k => new MetadataConflict(k, sources.Select(s => s.Value(k)).ToList()))
-            .Where(c => c.Values.Distinct(StringComparer.Ordinal).Count() > 1)
-            .ToList();
+            .Select(k => new MetadataConflict(k, [.. sources.Select(s => s.Value(k))]))
+            .Where(c => c.Values.Distinct(StringComparer.Ordinal).Count() > 1)];
     }
 
     /// <summary>The songs, in the order they were given.</summary>
@@ -168,7 +172,10 @@ public sealed class SongMergeAnalysis
 
     /// <summary>The indexes of the sources that have <paramref name="partId"/>.</summary>
     public IReadOnlyList<int> SourcesWith(string partId) =>
-        Enumerable.Range(0, Sources.Count).Where(i => Sources[i].HasPart(partId)).ToList();
+        [.. Enumerable.Range(0, Sources.Count).Where(i => Sources[i].HasPart(partId))];
+
+    /// <summary>The song.ini key for how long a MIDI note must be held to be a sustain.</summary>
+    internal const string SustainCutoffKey = "sustain_cutoff_threshold";
 
     /// <summary>Where the merged song's value for <paramref name="key"/> comes from.</summary>
     public static MergeKeyRule RuleOf(string key)
@@ -178,6 +185,8 @@ public sealed class SongMergeAnalysis
         {
             "charter" => MergeKeyRule.Charter,
             "song_length" => MergeKeyRule.SongLength,
+            SustainCutoffKey or "multiplier_note" or "star_power_note" => MergeKeyRule.FromChart,
+            "delay_seconds" => MergeKeyRule.Delay,
             "delay" => MergeKeyRule.Delay,
             "cover" => MergeKeyRule.AlbumArt,
             "background" => MergeKeyRule.Background,
@@ -244,11 +253,12 @@ public sealed class SongMergeAnalysis
     private static List<MergeSourcePart> PartsOf(MidiChart chart, MergeSource source)
     {
         var (_, _, chunks) = MidiFile.ReadChunks(chart.Midi);
-        var names = chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.NameOf(chart.Midi, MidiFile.ReadEvents(chart.Midi, c))).OfType<string>().ToList();
+        var names = chunks.Where(c => c.Id == "MTrk").Select(c => MidiChartReader.NameOf(chart.Midi, MidiFile.ReadEvents(chart.Midi, c))).OfType<string>().ToList();
         var contents = ChartContents.PartsOf(ChartReader.Read(chart.Midi, ChartFiles.MidiName, chart.Options), chart.Midi);
 
-        return names
-            .Select(MidiPartCatalog.PartOf)
+        // A track counts as its part only where the merge would take it, so an instrument track YARG doesn't read isn't offered.
+        return [.. names
+            .Select(n => MidiPartCatalog.PartOf(n) is { } p && p.Has(n) ? p : null)
             .OfType<MidiPart>()
             .DistinctBy(p => p.Id)
             .OrderBy(MidiPartCatalog.OrderOf)
@@ -261,14 +271,13 @@ public sealed class SongMergeAnalysis
                     (read?.Difficulties ?? LibraryDifficulties.None).ToDifficulties(),
                     p.Keys.Count > 0 ? source.Value(p.Keys[0]) : null,
                     read?.NoteCounts ?? []);
-            })
-            .ToList();
+            })];
     }
 
     private static async Task<IReadOnlyList<KeyValuePair<string, string>>> ReadPairsAsync(SongEntry entry, IReadOnlyList<string> stored, CancellationToken cancellationToken)
     {
         if (entry.Kind == SongEntryKind.SngFile)
-            return SngReader.Read(entry.FullPath, cancellationToken).Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList();
+            return [.. SngReader.Read(entry.FullPath, cancellationToken).Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value))];
 
         string? ini = stored.FirstOrDefault(n => n.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase));
         return ini is null ? [] : (await SongIni.ReadAsync(Path.Combine(entry.FullPath, ini), cancellationToken).ConfigureAwait(false)).Pairs;

@@ -51,7 +51,7 @@ public sealed class SettingsSessionTests
         var catalog = Catalog();
         var session = new SettingsSession(catalog);
 
-        CollectionAssert.AreEqual(catalog.Definitions.ToArray(), session.Edits.Select(e => e.Definition).ToArray());
+        Assert.AreSequenceEqual([.. catalog.Definitions], [.. session.Edits.Select(e => e.Definition)]);
         Assert.AreSame(session.Edits[1], session.EditFor(catalog.Definitions[1]));
     }
 

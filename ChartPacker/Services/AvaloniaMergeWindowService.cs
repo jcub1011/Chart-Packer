@@ -48,11 +48,14 @@ namespace ChartPacker.Services
                 PreviewNote = Strings.MergePreviewNote,
             };
 
-            var viewModel = new MergeWindowViewModel(entries, [.. entries.Select(e => drafts.HasDrafts(e.FullPath))], outputFolder, policy, video, preview, previewDrafts);
+            var viewModel = new MergeWindowViewModel(entries, [.. entries.Select(e => drafts.HasDrafts(e.FullPath))], outputFolder, policy, video, preview, previewDrafts, settings);
             var dialog = new MergeWindow { DataContext = viewModel };
             _ = viewModel.LoadAsync();
             WindowChrome.UseOwnerIcon(dialog, window);
             await dialog.ShowDialog(window);
+            // OnClosing captured the maximized state and split ratio into the settings; persist them now
+            // rather than waiting for the main window to close, so they survive a crash.
+            settings.Save();
             await viewModel.ShutdownAsync();
             mainPlayer.ReloadSettings();
             mainHighway.ReloadSettings();

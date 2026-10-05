@@ -25,12 +25,12 @@ public sealed class SongLibraryLoaderTests
         WriteText("Folder Song/song.ini", "[song]\nname = Folder Song\n");
 
         var reports = new List<LibraryLoadProgress>();
-        int total = await SongLibraryLoader.LoadAsync(_root.FullName, 2, parallelism, new SyncProgress(reports.Add));
+        int total = await SongLibraryLoader.LoadAsync(_root.FullName, 2, parallelism, new SyncProgress(reports.Add), TestContext.CancellationToken);
 
         var songs = reports.SelectMany(r => r.Songs).ToList();
-        var expected = SongLibraryScanner.Enumerate(_root.FullName, 2).ToList();
+        var expected = SongLibraryScanner.Enumerate(_root.FullName, 2, TestContext.CancellationToken).ToList();
         Assert.AreEqual(41, total);
-        CollectionAssert.AreEqual(expected, songs.OrderBy(s => s.Position).Select(s => s.Entry).ToList());
+        Assert.AreSequenceEqual(expected, [.. songs.OrderBy(s => s.Position).Select(s => s.Entry)]);
         Assert.IsTrue(songs.All(s => s.Summary is not null));
         Assert.AreEqual("Folder Song", songs.Single(s => s.Entry.Kind == SongEntryKind.SongFolder).Summary!.Pairs.Single().Value);
         Assert.AreEqual("Song 7", songs.Single(s => s.Entry.DisplayName == "song07").Summary!.Pairs.Single().Value);
@@ -43,7 +43,7 @@ public sealed class SongLibraryLoaderTests
             WriteSng($"song{i}.sng", $"Song {i}");
 
         var reports = new List<LibraryLoadProgress>();
-        await SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(reports.Add));
+        await SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(reports.Add), TestContext.CancellationToken);
 
         var last = reports[^1];
         Assert.IsTrue(last.SearchComplete);
@@ -58,7 +58,7 @@ public sealed class SongLibraryLoaderTests
             WriteSng($"f{i % 3}/song{i}.sng", $"Song {i}");
 
         var reports = new List<LibraryLoadProgress>();
-        await SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(reports.Add));
+        await SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(reports.Add), TestContext.CancellationToken);
 
         int read = 0;
         foreach (var report in reports)
@@ -83,7 +83,7 @@ public sealed class SongLibraryLoaderTests
                 overlapped = true;
             Thread.Sleep(5);
             Interlocked.Decrement(ref inside);
-        }));
+        }), TestContext.CancellationToken);
 
         Assert.IsFalse(overlapped);
     }
@@ -92,7 +92,7 @@ public sealed class SongLibraryLoaderTests
     public async Task EmptyFolderGivesOneFinalReport()
     {
         var reports = new List<LibraryLoadProgress>();
-        int total = await SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(reports.Add));
+        int total = await SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(reports.Add), TestContext.CancellationToken);
 
         Assert.AreEqual(0, total);
         Assert.IsTrue(reports[^1].SearchComplete);
@@ -102,22 +102,51 @@ public sealed class SongLibraryLoaderTests
     [TestMethod]
     public void MissingRootThrows() =>
         Assert.ThrowsExactly<DirectoryNotFoundException>(
-            () => SongLibraryLoader.LoadAsync(Path.Combine(_root.FullName, "nope"), 2, 4, new SyncProgress(_ => { })));
+            () => SongLibraryLoader.LoadAsync(Path.Combine(_root.FullName, "nope"), 2, 4, new SyncProgress(_ => { }), TestContext.CancellationToken));
 
     [TestMethod]
     public void ParallelismBelowOneThrows() =>
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(
-            () => SongLibraryLoader.LoadAsync(_root.FullName, 2, 0, new SyncProgress(_ => { })));
+            () => SongLibraryLoader.LoadAsync(_root.FullName, 2, 0, new SyncProgress(_ => { }), TestContext.CancellationToken));
 
     [TestMethod]
-    public async Task CancelledLoadThrows()
+    [DataRow(4)]
+    [DataRow(int.MaxValue)]
+    public async Task CancelledLoadThrows(int parallelism)
     {
         WriteSng("a.sng", "A");
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(_ => { }), cts.Token));
+            () => SongLibraryLoader.LoadAsync(_root.FullName, 2, parallelism, new SyncProgress(_ => { }), cts.Token));
+    }
+
+    [TestMethod]
+    public async Task LoadCancelledPartWayStopsEveryReader()
+    {
+        for (int i = 0; i < 200; i++)
+            WriteSng($"f{i % 10}/song{i:D3}.sng", $"Song {i}");
+
+        // Cancelled once the first song has been read, while the rest are still being read or found.
+        using var cts = new CancellationTokenSource();
+        var load = SongLibraryLoader.LoadAsync(_root.FullName, 2, SongLibraryLoader.MaxReaders, new SyncProgress(r =>
+        {
+            if (r.Read > 0 && !r.SearchComplete)
+                cts.Cancel();
+        }), cts.Token);
+
+        try
+        {
+            await load.WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        // Either way it ended: cancelled, or done before a report came while it was still searching.
+        Assert.IsTrue(load.IsCompleted);
+        Assert.IsTrue(load.IsCanceled || load.IsCompletedSuccessfully, load.Exception?.ToString());
     }
 
     private void WriteSng(string relative, string name) =>
@@ -137,4 +166,6 @@ public sealed class SongLibraryLoaderTests
     {
         public void Report(LibraryLoadProgress value) => onReport(value);
     }
+
+    public TestContext TestContext { get; set; }
 }

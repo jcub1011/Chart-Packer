@@ -34,11 +34,11 @@ internal sealed record StemLocation(string Label, string Path, string? Entry, do
     public static IReadOnlyList<StemLocation> FromEnvironment()
     {
         string value = Environment.GetEnvironmentVariable(Variable) ?? throw new InvalidOperationException($"{Variable} isn't set: run DecodeBench itself, not its benchmarks.");
-        return value.Split(RecordSeparator).Select(record =>
+        return [.. value.Split(RecordSeparator).Select(record =>
         {
             string[] fields = record.Split(FieldSeparator);
             return new StemLocation(fields[0], fields[1], fields[2].Length == 0 ? null : fields[2], double.Parse(fields[3], System.Globalization.CultureInfo.InvariantCulture));
-        }).ToList();
+        })];
     }
 
     /// <summary>
@@ -89,10 +89,9 @@ internal sealed record StemLocation(string Label, string Path, string? Entry, do
         if (read.Header is null)
             return [];
 
-        return read.Files
+        return [.. read.Files
             .Where(f => AudioExtensions.Contains(System.IO.Path.GetExtension(f.Name).ToLowerInvariant()))
-            .SelectMany(f => Probe(path, f.Name, "sng"))
-            .ToList();
+            .SelectMany(f => Probe(path, f.Name, "sng"))];
     }
 
     /// <summary>The stem with a label of its shape, or nothing when the app can't decode it.</summary>

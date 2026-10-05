@@ -191,7 +191,7 @@ public static class VocalReader
     {
         tempo ??= ChartReader.Read(bytes, ChartFiles.ChartName).Tempo;
         var lines = ChartTextReader.Sections(ChartTextReader.Decode(bytes))
-            .Where(s => s.Name.Equals("Events", StringComparison.OrdinalIgnoreCase))
+            .Where(s => s.Name == "Events")
             .SelectMany(s => s.Lines);
 
         return ChartVocals(lines, tempo.Resolution) is var (lyrics, phrases)

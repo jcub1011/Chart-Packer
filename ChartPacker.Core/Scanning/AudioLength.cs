@@ -16,6 +16,8 @@ namespace ChartPacker.Core.Scanning;
 /// </remarks>
 public static class AudioLength
 {
+    private const int BufferSize = 64 * 1024;
+
     static AudioLength()
     {
         // ATL writes the stack trace of every file it can't parse to the console by default.
@@ -41,7 +43,7 @@ public static class AudioLength
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                using var stream = new FileStream(Path.Combine(folder, file.RelativePath), FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var stream = new FileStream(Path.Combine(folder, file.RelativePath), FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize);
                 longest = Max(longest, MeasureMs(stream, file.RelativePath));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -66,12 +68,15 @@ public static class AudioLength
             return null;
 
         long? longest = null;
-        foreach (var file in read.Files.Where(f => IsAudioFile(f.Name)))
+
+        // In the order they're stored, so a hard drive's head sweeps forward through the file.
+        foreach (var file in read.Files.Where(f => IsAudioFile(f.Name)).OrderBy(f => f.Offset))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                using var stream = new SngEntryStream(sng, file, header.Mask.Span);
+                // Buffered, since ATL reads its headers a few bytes at a time and each read would otherwise be a call to the OS.
+                using var stream = new BufferedStream(new SngEntryStream(sng, file, header.Mask.Span), BufferSize);
                 longest = Max(longest, MeasureMs(stream, file.Name));
             }
             catch (Exception ex) when (ex is IOException or ArgumentOutOfRangeException)

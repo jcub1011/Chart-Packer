@@ -39,7 +39,7 @@ public sealed class SngReaderTests
         Assert.IsEmpty(result.Findings);
         Assert.IsNotNull(result.Header);
         Assert.AreEqual(1u, result.Header.Version);
-        CollectionAssert.AreEqual(Enumerable.Range(0x10, 16).Select(b => (byte)b).ToArray(), result.Header.Mask.ToArray());
+        Assert.AreSequenceEqual([.. Enumerable.Range(0x10, 16).Select(b => (byte)b)], result.Header.Mask.ToArray());
         Assert.AreEqual(new SngMetadataPair("name", "Test", 26 + 16), result.Metadata.Single());
         Assert.AreEqual(new SngFileEntry("notes.chart", 3, 110), result.Files.Single());
     }
@@ -49,7 +49,7 @@ public sealed class SngReaderTests
     {
         byte[] built = new SngBuilder().AddMetadata("name", "Test").AddFile("notes.chart", [0x51, 0x52, 0x53]).Build();
 
-        CollectionAssert.AreEqual(WorkedExample, built);
+        Assert.AreSequenceEqual(WorkedExample, built);
     }
 
     [TestMethod]
@@ -57,7 +57,7 @@ public sealed class SngReaderTests
     {
         string path = Write(WorkedExample);
 
-        var result = await SngReader.ReadAsync(path);
+        var result = await SngReader.ReadAsync(path, TestContext.CancellationToken);
 
         Assert.AreEqual("Test", result.Metadata.Single().Value);
         Assert.AreEqual("notes.chart", result.Files.Single().Name);
@@ -75,7 +75,7 @@ public sealed class SngReaderTests
             .Build());
 
         Assert.IsEmpty(result.Findings);
-        CollectionAssert.AreEqual(new[] { "notes.mid", "empty.txt", "extra/readme.txt" }, result.Files.Select(f => f.Name).ToArray());
+        Assert.AreSequenceEqual(["notes.mid", "empty.txt", "extra/readme.txt"], [.. result.Files.Select(f => f.Name)]);
     }
 
     [TestMethod]
@@ -107,7 +107,7 @@ public sealed class SngReaderTests
     {
         var result = Read(Valid(b => b.LengthOverrides[0] = 1_000));
 
-        Assert.IsTrue(result.Findings.Any(f => f.RuleId == SngRules.Sng003 && f.Severity == Severity.Error));
+        Assert.Contains(f => f.RuleId == SngRules.Sng003 && f.Severity == Severity.Error, result.Findings);
     }
 
     [TestMethod]
@@ -136,7 +136,7 @@ public sealed class SngReaderTests
         // misaligned too, so other findings follow; only SNG010 is asserted.
         var result = Read(Valid(b => b.FileMetaLen = 8 + 1 + 11 + 16 - 1));
 
-        Assert.IsTrue(result.Findings.Any(f => f.RuleId == SngRules.Sng010));
+        Assert.Contains(f => f.RuleId == SngRules.Sng010, result.Findings);
     }
 
     [TestMethod]
@@ -177,7 +177,7 @@ public sealed class SngReaderTests
     {
         var result = Read(TwoFiles(b => b.OffsetOverrides[1] = DataStartOfTwoFiles + 1, extraData: 1));
 
-        Assert.IsTrue(result.Findings.Any(f => f.RuleId == SngRules.Sng040 && f.Message.Contains("overlap", StringComparison.Ordinal)));
+        Assert.Contains(f => f.RuleId == SngRules.Sng040 && f.Message.Contains("overlap", StringComparison.Ordinal), result.Findings);
     }
 
     [TestMethod]
@@ -259,6 +259,57 @@ public sealed class SngReaderTests
         }
     }
 
+    [TestMethod]
+    public void SectionsCrossingTheEndOfThePrefixReadTheSame()
+    {
+        // With one pair "k" = V bytes, the index's length field is at 51 + V and the FileData's at 95 + V, so these
+        // put every field after the metadata on each side of, and across, the end of the first read.
+        for (int valueLength = SngReader.PrefixSize - 110; valueLength <= SngReader.PrefixSize - 40; valueLength++)
+        {
+            string value = new('v', valueLength);
+            var result = Read(new SngBuilder().AddMetadata("k", value).AddFile("notes.chart", [1, 2, 3]).Build());
+
+            Assert.IsEmpty(result.Findings, $"Value of {valueLength} bytes.");
+            Assert.AreEqual(value, result.Metadata.Single().Value);
+            Assert.AreEqual(new SngFileEntry("notes.chart", 3, (ulong)(103 + valueLength)), result.Files.Single());
+        }
+    }
+
+    [TestMethod]
+    public void MetadataLargerThanThePrefixReadsTheSame()
+    {
+        string value = new('v', 3 * SngReader.PrefixSize);
+        var result = Read(new SngBuilder().AddMetadata("name", "Big").AddMetadata("lyrics", value).AddFile("notes.chart", [1, 2, 3]).Build());
+
+        Assert.IsEmpty(result.Findings);
+        Assert.AreSequenceEqual(["Big", value], result.Metadata.Select(p => p.Value).ToArray());
+        Assert.AreEqual("notes.chart", result.Files.Single().Name);
+    }
+
+    [TestMethod]
+    public void FileTruncatedPastThePrefixIsReported()
+    {
+        byte[] full = new SngBuilder().AddMetadata("k", new string('v', 2 * SngReader.PrefixSize)).AddFile("notes.chart", [1, 2, 3]).Build();
+
+        AssertOnly(Read(full[..(SngReader.PrefixSize + 10)]), SngRules.Sng003);
+    }
+
+    [TestMethod]
+    public void ReadingAHandleMatchesReadingThePathAndLeavesItOpen()
+    {
+        string path = Write(TwoFiles(_ => { }));
+        var byPath = SngReader.Read(path, TestContext.CancellationToken);
+
+        using var handle = File.OpenHandle(path);
+        var byHandle = SngReader.Read(handle, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(byPath.Metadata.ToArray(), byHandle.Metadata.ToArray());
+        Assert.AreSequenceEqual(byPath.Files.ToArray(), byHandle.Files.ToArray());
+        Assert.IsEmpty(byHandle.Findings);
+        Assert.IsFalse(handle.IsClosed);
+        Assert.AreEqual(new FileInfo(path).Length, RandomAccess.GetLength(handle));
+    }
+
     /// <summary>
     /// Where file data starts for <see cref="TwoFiles"/>: header 26, metadataLen 8, metadata
     /// 8 + (4 + 4 + 4 + 3), fileMetaLen 8, index 8 + 2 × (1 + 5 + 16), fileDataLen 8.
@@ -292,7 +343,7 @@ public sealed class SngReaderTests
         return builder.Build();
     }
 
-    private SngReadResult Read(byte[] bytes) => SngReader.Read(Write(bytes));
+    private SngReadResult Read(byte[] bytes) => SngReader.Read(Write(bytes), TestContext.CancellationToken);
 
     private string Write(byte[] bytes)
     {
@@ -304,8 +355,8 @@ public sealed class SngReaderTests
     private static string[] RuleIds(SngReadResult result) => [.. result.Findings.Select(f => f.RuleId).Distinct()];
 
     private static void AssertOnly(SngReadResult result, string ruleId) =>
-        CollectionAssert.AreEqual(
-            new[] { ruleId },
-            RuleIds(result),
-            string.Join(Environment.NewLine, result.Findings.Select(f => $"{f.RuleId}: {f.Message}")));
+        Assert.AreSequenceEqual(
+            [ruleId], RuleIds(result), string.Join(Environment.NewLine, result.Findings.Select(f => $"{f.RuleId}: {f.Message}")));
+
+    public TestContext TestContext { get; set; }
 }

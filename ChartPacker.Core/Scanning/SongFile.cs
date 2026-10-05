@@ -22,9 +22,7 @@ public static class SongFile
 
         if (entry.Kind != SongEntryKind.SngFile)
         {
-            return new DirectoryInfo(entry.FullPath).EnumerateFiles()
-                .Select(f => new StoredFile(f.Name, f.Length))
-                .ToList();
+            return [.. new DirectoryInfo(entry.FullPath).EnumerateFiles().Select(f => new StoredFile(f.Name, f.Length))];
         }
 
         var read = SngReader.Read(entry.FullPath, cancellationToken);
@@ -54,12 +52,13 @@ public static class SongFile
 
         return await Task.Run(() =>
         {
-            var read = SngReader.Read(entry.FullPath, cancellationToken);
+            using SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var read = SngReader.Read(handle, cancellationToken);
             if (read.Header is not { } header)
                 return null;
 
             var file = read.Files.FirstOrDefault(f => f.Name.Equals(storedName, StringComparison.OrdinalIgnoreCase));
-            return file is null ? null : ReadFromSng(entry.FullPath, header, file, maxBytes, cancellationToken);
+            return file is null ? null : ReadFromSng(handle, header, file, maxBytes, cancellationToken);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -86,7 +85,7 @@ public static class SongFile
         SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         try
         {
-            var read = SngReader.Read(entry.FullPath, cancellationToken);
+            var read = SngReader.Read(handle, cancellationToken);
             var file = read.Header is null ? null : read.Files.FirstOrDefault(f => f.Name.Equals(storedName, StringComparison.OrdinalIgnoreCase));
             if (file is null)
             {
@@ -146,15 +145,45 @@ public static class SongFile
     /// <summary>Unmasks the stored <paramref name="file"/> of the <c>.sng</c> at <paramref name="path"/>, or returns <see langword="null"/> when it's larger than <paramref name="maxBytes"/>.</summary>
     internal static byte[]? ReadFromSng(string path, SngHeader header, SngFileEntry file, long maxBytes, CancellationToken cancellationToken)
     {
-        // Capped so the length always fits a byte array.
-        if (file.Length > (ulong)Math.Min(maxBytes, Array.MaxLength))
+        if (!Fits(file, maxBytes))
             return null;
 
         using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var data = new MemoryStream((int)file.Length);
-        SngFileData.CopyUnmasked(handle, file, header.Mask.Span, data, cancellationToken);
-        return data.ToArray();
+        return ReadFromSng(handle, header, file, maxBytes, cancellationToken);
     }
+
+    /// <summary>
+    /// Unmasks the stored <paramref name="file"/> of the <c>.sng</c> open as <paramref name="sng"/>, or returns
+    /// <see langword="null"/> when it's larger than <paramref name="maxBytes"/>. The handle stays open.
+    /// </summary>
+    /// <exception cref="IOException">The file can't be read, or the stored file runs past its end.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    internal static byte[]? ReadFromSng(SafeFileHandle sng, SngHeader header, SngFileEntry file, long maxBytes, CancellationToken cancellationToken)
+    {
+        if (!Fits(file, maxBytes))
+            return null;
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Read straight into the result and unmasked there, rather than through a copy buffer.
+        var data = new byte[(int)file.Length];
+        Span<byte> rest = data;
+        long offset = checked((long)file.Offset);
+        while (!rest.IsEmpty)
+        {
+            int read = RandomAccess.Read(sng, rest, offset);
+            if (read == 0)
+                throw new EndOfStreamException("The file got shorter while it was being read.");
+            rest = rest[read..];
+            offset += read;
+        }
+
+        SngMask.Apply(data, header.Mask.Span);
+        return data;
+    }
+
+    // Capped so the length always fits a byte array.
+    private static bool Fits(SngFileEntry file, long maxBytes) => file.Length <= (ulong)Math.Min(maxBytes, Array.MaxLength);
 
     /// <summary>
     /// The path of the file in <paramref name="folder"/> named <paramref name="name"/>, ignoring case:

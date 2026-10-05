@@ -26,13 +26,13 @@ public sealed class SongAudioTests
         builder.AddFile("guitar.wav", Masked(builder, guitar)).AddFile("notes.chart", [1, 2, 3]).AddFile("song.wav", Masked(builder, song));
         var entry = WriteSng(builder);
 
-        using (var audio = SongAudio.Open(entry, [Track("guitar.wav"), Track("song.wav")]))
+        using (var audio = SongAudio.Open(entry, [Track("guitar.wav"), Track("song.wav")], TestContext.CancellationToken))
         {
             Assert.IsTrue(audio.Tracks.All(t => t.Error is null));
-            Assert.AreEqual(2, audio.Sources.Count);
+            Assert.HasCount(2, audio.Sources);
 
             float[] guitarSamples = ReadAll(audio.Tracks[0].Source!);
-            Assert.AreEqual(100, guitarSamples.Length);
+            Assert.HasCount(100, guitarSamples);
             Assert.AreEqual(0.5f, guitarSamples[50], 1e-4f);
             Assert.AreEqual(-0.25f, ReadAll(audio.Tracks[1].Source!)[1], 1e-4f);
         }
@@ -50,7 +50,7 @@ public sealed class SongAudioTests
         File.WriteAllBytes(staged, Wav(50, 8000, 1, (_, _) => -0.5f));
         var entry = new SongEntry(SongEntryKind.SongFolder, folder, "Song", "Song");
 
-        using (var audio = SongAudio.Open(entry, [Track("guitar.wav"), new SongTrack("bass.wav", "bass", staged)]))
+        using (var audio = SongAudio.Open(entry, [Track("guitar.wav"), new SongTrack("bass.wav", "bass", staged)], TestContext.CancellationToken))
         {
             Assert.AreEqual(0.5f, ReadAll(audio.Tracks[0].Source!)[0], 1e-4f);
             Assert.AreEqual(-0.5f, ReadAll(audio.Tracks[1].Source!)[0], 1e-4f);
@@ -67,13 +67,13 @@ public sealed class SongAudioTests
         builder.AddFile("guitar.wav", Masked(builder, Wav(100, 8000, 1, (_, _) => 0.1f))).AddFile("bass.ogg", Masked(builder, [1, 2, 3, 4]));
         var entry = WriteSng(builder);
 
-        using var audio = SongAudio.Open(entry, [Track("bass.ogg"), Track("guitar.wav"), Track("drums.wav")]);
+        using var audio = SongAudio.Open(entry, [Track("bass.ogg"), Track("guitar.wav"), Track("drums.wav")], TestContext.CancellationToken);
 
         Assert.IsNotNull(audio.Tracks[0].Error);
         Assert.IsNull(audio.Tracks[0].Source);
         Assert.IsNull(audio.Tracks[1].Error);
         Assert.IsNotNull(audio.Tracks[2].Error);
-        Assert.AreEqual(1, audio.Sources.Count);
+        Assert.HasCount(1, audio.Sources);
     }
 
     [TestMethod]
@@ -83,7 +83,7 @@ public sealed class SongAudioTests
         File.WriteAllBytes(staged, Wav(10, 8000, 1, (_, _) => 0.1f));
         var entry = new SongEntry(SongEntryKind.SngFile, Path.Combine(_root.FullName, "Missing.sng"), "Missing.sng", "Missing");
 
-        using var audio = SongAudio.Open(entry, [new SongTrack("keys.wav", "keys", staged)]);
+        using var audio = SongAudio.Open(entry, [new SongTrack("keys.wav", "keys", staged)], TestContext.CancellationToken);
 
         Assert.IsNull(audio.Tracks[0].Error);
     }
@@ -96,7 +96,7 @@ public sealed class SongAudioTests
         builder.AddFile("song.wav", Masked(builder, song));
         var entry = WriteSng(builder);
 
-        using (var audio = SongAudio.Open(entry, [Track("song.wav")]))
+        using (var audio = SongAudio.Open(entry, [Track("song.wav")], TestContext.CancellationToken))
         {
             float[] expected = ReadAll(audio.Tracks[0].Source!);
 
@@ -109,7 +109,7 @@ public sealed class SongAudioTests
             Task.WaitAll(reads);
 
             foreach (var read in reads)
-                CollectionAssert.AreEqual(expected, read.Result);
+                Assert.AreSequenceEqual(expected, read.Result);
         }
 
         File.Delete(entry.FullPath);
@@ -122,7 +122,7 @@ public sealed class SongAudioTests
         builder.AddFile("guitar.wav", Masked(builder, Wav(100, 8000, 1, (_, _) => 0.1f)));
         var entry = WriteSng(builder);
 
-        using var audio = SongAudio.Open(entry, [Track("guitar.wav"), Track("drums.wav")]);
+        using var audio = SongAudio.Open(entry, [Track("guitar.wav"), Track("drums.wav")], TestContext.CancellationToken);
 
         audio.OpenSource(audio.Tracks[0].Track).Dispose();
         Assert.ThrowsExactly<FileNotFoundException>(() => audio.OpenSource(audio.Tracks[1].Track));
@@ -133,7 +133,7 @@ public sealed class SongAudioTests
     {
         var entry = new SongEntry(SongEntryKind.SngFile, Path.Combine(_root.FullName, "Missing.sng"), "Missing.sng", "Missing");
 
-        Assert.ThrowsExactly<FileNotFoundException>(() => SongAudio.Open(entry, [Track("guitar.wav")]));
+        Assert.ThrowsExactly<FileNotFoundException>(() => SongAudio.Open(entry, [Track("guitar.wav")], TestContext.CancellationToken));
     }
 
     private static SongTrack Track(string name) => new(name, AudioStems.StemOf(name)!, null);
@@ -151,4 +151,6 @@ public sealed class SongAudioTests
         File.WriteAllBytes(path, builder.Build());
         return new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song");
     }
+
+    public TestContext TestContext { get; set; }
 }

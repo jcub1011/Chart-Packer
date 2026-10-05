@@ -664,7 +664,10 @@
     <value>Playback speed</value>
   </data>
   <data name="PlaybackSpeedToolTip" xml:space="preserve">
-    <value>Playback speed, from 1% to 1000%; pick one or type a percent. The pitch changes with it. Shared by every song, and back to 100% when the app starts again.</value>
+    <value>Playback speed, from 1% to 1000%; pick one or type a percent. Shared by every song, and back to 100% when the app starts again.</value>
+  </data>
+  <data name="PitchCorrectionToolTip" xml:space="preserve">
+    <value>Keep the pitch when playing faster or slower. When off, the pitch rises and falls with the speed.</value>
   </data>
   <data name="TrackVolumeName" xml:space="preserve">
     <value>Track volume in the mix</value>
@@ -942,6 +945,16 @@
   </data>
   <data name="VolumeKeywords" xml:space="preserve">
     <value>volume sound loudness</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="PitchCorrectionLabel" xml:space="preserve">
+    <value>Keep pitch when changing speed</value>
+  </data>
+  <data name="PitchCorrectionDescription" xml:space="preserve">
+    <value>Play songs faster or slower at their own pitch, by stretching the audio in time. When off, the pitch rises and falls with the speed.</value>
+  </data>
+  <data name="PitchCorrectionKeywords" xml:space="preserve">
+    <value>pitch correction keep preserve tempo time stretch speed slow fast chipmunk</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="SettingsCategoryVisualizers" xml:space="preserve">
@@ -1357,6 +1370,12 @@
   <data name="InstrumentGhlBass" xml:space="preserve">
     <value>GHL Bass</value>
   </data>
+  <data name="InstrumentGhlRhythm" xml:space="preserve">
+    <value>GHL Rhythm</value>
+  </data>
+  <data name="InstrumentGhlCoop" xml:space="preserve">
+    <value>GHL Guitar Co-op</value>
+  </data>
   <data name="InstrumentProDrums" xml:space="preserve">
     <value>Pro Drums</value>
   </data>
@@ -1530,6 +1549,185 @@
   <data name="MergeVideoLabel" xml:space="preserve">
     <value>Background video</value>
   </data>
+  <data name="MergeSectionAlignment" xml:space="preserve">
+    <value>Alignment</value>
+  </data>
+  <data name="MergeAlignmentDescription" xml:space="preserve">
+    <value>How far each song's chart moves to line up with the kept audio; its parts, lyrics and video move with it. Auto-align lines each song up with one already lined up: by a part they share, the pattern of its notes all through the song or its first notes, or else by their audio, each mixed down. Fine-tune each part afterwards with the note highway's offsets.</value>
+  </data>
+  <data name="MergeAlignmentLabel" xml:space="preserve">
+    <value>Offset</value>
+  </data>
+  <data name="MergeAutoAlignButton" xml:space="preserve">
+    <value>Auto-align</value>
+  </data>
+  <data name="MergeAutoAlignToolTip" xml:space="preserve">
+    <value>Works out how far each song is from the kept audio, by the parts the songs share or else by their audio, and lines them all up. Offsets typed by hand are replaced. The first time, each song's audio is read, which can take a few seconds.</value>
+  </data>
+  <data name="MergeAlignmentResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="MergeAlignmentResetToolTip" xml:space="preserve">
+    <value>Moves every song back to where its own chart has it.</value>
+  </data>
+  <data name="MergeAligning" xml:space="preserve">
+    <value>Lining up…</value>
+  </data>
+  <data name="MergeAligningAudio" xml:space="preserve">
+    <value>Reading the audio…</value>
+  </data>
+  <data name="MergeAlignmentReference" xml:space="preserve">
+    <value>Kept audio: the others line up with it</value>
+  </data>
+  <data name="MergeReferenceShort" xml:space="preserve">
+    <value>Kept audio</value>
+    <comment>Chip in a merge alignment cell for the song with the kept audio. The full explanation, in its tooltip, is MergeAlignmentReference.</comment>
+  </data>
+  <data name="MergeAlignmentNoChart" xml:space="preserve">
+    <value>No chart to line up by</value>
+  </data>
+  <data name="MergeAlignmentByHand" xml:space="preserve">
+    <value>Set by hand</value>
+    <comment>The link choice for a song moved only by the offset typed for it.</comment>
+  </data>
+  <data name="MergeAlignmentOptionFormat" xml:space="preserve">
+    <value>{0} · {1} · {2}</value>
+    <comment>A link choice: {0} is the song lined up with, {1} the part they share, {2} how (MergeAlignmentPatternFormat or MergeAlignmentFirstNotes).</comment>
+  </data>
+  <data name="MergeAlignmentPatternFormat" xml:space="preserve">
+    <value>note pattern, {0:P0} line up</value>
+    <comment>{0} is the share of the part's notes that line up, from 0 to 1.</comment>
+  </data>
+  <data name="MergeAlignmentFirstNotes" xml:space="preserve">
+    <value>first notes</value>
+  </data>
+  <data name="MergeAlignmentAudioPart" xml:space="preserve">
+    <value>Audio</value>
+    <comment>In a link choice, in place of the part shared: the songs are lined up by their audio.</comment>
+  </data>
+  <data name="MergeAlignmentAudioFormat" xml:space="preserve">
+    <value>{0:P0} alike</value>
+    <comment>{0} is how alike the two songs' audio is at the offset, from 0 to 1.</comment>
+  </data>
+  <data name="MergeAlignmentAudioWeakFormat" xml:space="preserve">
+    <value>The audio is only {0:P0} alike: the songs may be different recordings, or the offset may be wrong.</value>
+  </data>
+  <data name="MergeAlignmentAudioUnreadFormat" xml:space="preserve">
+    <value>The audio of {0} couldn't be read, so it's lined up by its chart alone.</value>
+    <comment>{0} lists the songs, e.g. "Song A, Song B".</comment>
+  </data>
+  <data name="MergeAlignmentLinkFormat" xml:space="preserve">
+    <value>{0:+0;-0;0} ms from {1}</value>
+    <comment>At the top of a linked song's offset tooltip: {0} is how far the link moves it from the song it's lined up with, {1} that song.</comment>
+  </data>
+  <data name="MergeAlignmentFirstNotesHint" xml:space="preserve">
+    <value>Only the first notes line it up: check both charts start at the same place in the song.</value>
+  </data>
+  <data name="MergeAlignmentAmbiguous" xml:space="preserve">
+    <value>Another offset, about a beat out, lines up nearly as well.</value>
+  </data>
+  <data name="MergeAlignmentNarrowed" xml:space="preserve">
+    <value>The notes repeat, so it was looked for near the first notes.</value>
+  </data>
+  <data name="MergeAlignmentNarrowedByAudio" xml:space="preserve">
+    <value>The notes repeat, so it was looked for near where the audio puts it.</value>
+  </data>
+  <data name="MergeAlignmentAudioDisagreesFormat" xml:space="preserve">
+    <value>Its audio puts it at {0:+0;-0;0} ms, {1:+0;-0;0} ms from here: check which is right.</value>
+    <comment>{0} is where the song's audio puts it against the kept audio; {1} how far that is from where it is now.</comment>
+  </data>
+  <data name="MergeAlignmentPatternDisagreesFormat" xml:space="preserve">
+    <value>Its note pattern ({1:P0} line up) puts it {0:+0;-0;0} ms from here instead.</value>
+    <comment>{0} is how far the part's note pattern puts the song from where its first notes do; {1} the share of notes that line up there.</comment>
+  </data>
+  <data name="MergeAlignmentDriftFormat" xml:space="preserve">
+    <value>The end of the song lines up {0:+0;-0} ms from its start: the songs may differ in length or speed.</value>
+  </data>
+  <data name="MergeAlignmentUnreached" xml:space="preserve">
+    <value>No part or audio in common with a song that's lined up.</value>
+  </data>
+  <data name="MergeAlignmentNoLinks" xml:space="preserve">
+    <value>Some songs share no part or audio with the kept audio's song, or with one lined up with it; set those by hand.</value>
+  </data>
+  <data name="MergeAlignmentFailedFormat" xml:space="preserve">
+    <value>The songs couldn't be lined up: {0}</value>
+  </data>
+  <data name="MergeAlignmentOffsetName" xml:space="preserve">
+    <value>Alignment offset</value>
+  </data>
+  <data name="MergeAlignmentOffsetToolTip" xml:space="preserve">
+    <value>How far everything from this song moves, in milliseconds, later when positive. A value typed for a linked song is added to its link, and the songs lined up with it follow.</value>
+  </data>
+  <data name="MergeAlignmentLinkName" xml:space="preserve">
+    <value>Lined up by</value>
+  </data>
+  <data name="MergeCompareButton" xml:space="preserve">
+    <value>Compare…</value>
+  </data>
+  <data name="MergeCompareToolTip" xml:space="preserve">
+    <value>Line this song up by eye: its waveform and notes against the kept audio's song's.</value>
+  </data>
+  <data name="MergeCompareTitleFormat" xml:space="preserve">
+    <value>Line up {0}</value>
+    <comment>The window's title. {0} is the song being lined up.</comment>
+  </data>
+  <data name="MergeCompareHeadingFormat" xml:space="preserve">
+    <value>Line up {0} with {1}</value>
+    <comment>{0} is the song being lined up, {1} the kept audio's song.</comment>
+  </data>
+  <data name="MergeCompareDescriptionFormat" xml:space="preserve">
+    <value>Drag {0}'s lanes sideways until its waveform and notes line up with those above them; drag anywhere else to move along the song. Scroll to zoom, or with Shift held to move along it. Hold Ctrl for a finer drag.</value>
+    <comment>{0} is the song being lined up.</comment>
+  </data>
+  <data name="MergeCompareNoAudioFormat" xml:space="preserve">
+    <value>{0} has no audio that can be read, so only its notes are shown.</value>
+  </data>
+  <data name="MergeCompareVocals" xml:space="preserve">
+    <value>Vocals</value>
+  </data>
+  <data name="MergeCompareReferencePartName" xml:space="preserve">
+    <value>The kept audio's song's part</value>
+  </data>
+  <data name="MergeCompareSongPartName" xml:space="preserve">
+    <value>This song's part</value>
+  </data>
+  <data name="MergeCompareRevertButton" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="MergeCompareRevertToolTip" xml:space="preserve">
+    <value>Back to the offset the song had when this opened.</value>
+  </data>
+  <data name="MergeCompareZoomIn" xml:space="preserve">
+    <value>Zoom in</value>
+  </data>
+  <data name="MergeCompareZoomOut" xml:space="preserve">
+    <value>Zoom out</value>
+  </data>
+  <data name="MergeCompareShowStart" xml:space="preserve">
+    <value>First notes</value>
+    <comment>Moves the view to just before the first notes.</comment>
+  </data>
+  <data name="MergeCompareShowAll" xml:space="preserve">
+    <value>Whole song</value>
+    <comment>Zooms the view out to show both songs from end to end.</comment>
+  </data>
+  <data name="MergeCompareTimelineName" xml:space="preserve">
+    <value>Both songs on one timeline</value>
+  </data>
+  <data name="MergeCompareJumpTo" xml:space="preserve">
+    <value>Jump to where a link puts it</value>
+  </data>
+  <data name="MergeCompareEstimateFormat" xml:space="preserve">
+    <value>{0}: {1:+0;-0;0} ms</value>
+    <comment>{0} is a link choice, as the alignment cell lists it; {1} where it puts the song.</comment>
+  </data>
+  <data name="MergeCompareApplyButton" xml:space="preserve">
+    <value>Use this offset</value>
+  </data>
+  <data name="MergeAlignmentBeforeStartFormat" xml:space="preserve">
+    <value>Lining up moves {0} before the song starts. Move its song later, or choose another base chart.</value>
+    <comment>{0} lists the parts, e.g. "Guitar, Drums".</comment>
+  </data>
   <data name="MergeSectionMetadata" xml:space="preserve">
     <value>Metadata</value>
   </data>
@@ -1547,6 +1745,13 @@
   </data>
   <data name="MergeLeaveOut" xml:space="preserve">
     <value>Leave out</value>
+  </data>
+  <data name="MergeIncludeToolTip" xml:space="preserve">
+    <value>Include this in the merge — uncheck to leave it out</value>
+  </data>
+  <data name="MergeIncludeNameFormat" xml:space="preserve">
+    <value>Include {0}</value>
+    <comment>Accessible name of a merge row's Include checkbox. {0} is the row's label, e.g. "Guitar".</comment>
   </data>
   <data name="MergeNone" xml:space="preserve">
     <value>None</value>
@@ -1571,6 +1776,14 @@
   </data>
   <data name="MergeStemsNone" xml:space="preserve">
     <value>No audio</value>
+  </data>
+  <data name="MergeStemsOne" xml:space="preserve">
+    <value>1 track</value>
+    <comment>Compact merge audio cell for a song with a single audio file. The file names stay in the tooltip.</comment>
+  </data>
+  <data name="MergeStemsFormat" xml:space="preserve">
+    <value>{0:N0} tracks</value>
+    <comment>Compact merge audio cell. {0} is the number of audio files. The file names stay in the tooltip.</comment>
   </data>
   <data name="MergeDifficultyFormat" xml:space="preserve">
     <value>diff {0}</value>
@@ -1605,6 +1818,9 @@
   <data name="MergeTargetIsSourceFormat" xml:space="preserve">
     <value>{0} is one of the songs being merged, so it can't be written over.</value>
   </data>
+  <data name="MergeLyricsOffsetBeforeStart" xml:space="preserve">
+    <value>The lyrics offset set on the preview would start the vocals before the song does. Move them later to merge.</value>
+  </data>
   <data name="MergeMerging" xml:space="preserve">
     <value>Merging…</value>
   </data>
@@ -1631,6 +1847,12 @@
   </data>
   <data name="MergeIssueNotesLostFormat" xml:space="preserve">
     <value>{0} {1}: some notes landed on the same tick and were combined</value>
+  </data>
+  <data name="MergeIssueTimesFormat" xml:space="preserve">
+    <value>{0}, at {1}</value>
+  </data>
+  <data name="MergeIssueMoreTimesFormat" xml:space="preserve">
+    <value>{0} and {1} more</value>
   </data>
   <data name="MergePartProKeys" xml:space="preserve">
     <value>Pro Keys</value>
@@ -2204,17 +2426,35 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Every song passes validation ({0} checked).</value>
     <comment>{0} is how many songs were checked.</comment>
   </data>
-  <data name="ValidatorIssueCountFormat" xml:space="preserve">
-    <value>Issues: {0}</value>
-    <comment>{0} is how many keys of the song fail.</comment>
+  <data name="ValidatorNoIssuesFormat" xml:space="preserve">
+    <value>Analyzed {0} songs, no validation issues found.</value>
+    <comment>Shown in a small dialog instead of the Validator window when every song passes. {0} is how many songs were checked.</comment>
+  </data>
+  <data name="ValidatorCheckFailedFormat" xml:space="preserve">
+    <value>The songs couldn't be checked: {0}</value>
+    <comment>Shown in a small dialog instead of the Validator window when the check stops on an error before any song fails. {0} is why.</comment>
+  </data>
+  <data name="ValidatorFixableCountFormat" xml:space="preserve">
+    <value>{0} fixable</value>
+    <comment>A chip on a song in the Validator's list. {0} is how many of its failing keys have a quick fix.</comment>
+  </data>
+  <data name="ValidatorFixableCountToolTip" xml:space="preserve">
+    <value>Issues a quick fix can correct</value>
+  </data>
+  <data name="ValidatorManualCountFormat" xml:space="preserve">
+    <value>{0} manual</value>
+    <comment>A chip on a song in the Validator's list. {0} is how many of its issues have no quick fix.</comment>
+  </data>
+  <data name="ValidatorManualCountToolTip" xml:space="preserve">
+    <value>Issues without a quick fix, to correct by hand in the inspector</value>
+  </data>
+  <data name="ValidatorSelectSongFixesFormat" xml:space="preserve">
+    <value>Select the quick fixes of {0}</value>
+    <comment>Accessible name of a song's check box in the Validator's list, which ticks or clears its fixable issues. {0} is the song's title.</comment>
   </data>
   <data name="ValidatorIssueLineFormat" xml:space="preserve">
     <value>{0}: {1}</value>
-    <comment>A song's failing key in the Validator's list: {0} is the key, {1} the message.</comment>
-  </data>
-  <data name="ValidatorMoreIssuesFormat" xml:space="preserve">
-    <value>…and {0} more</value>
-    <comment>{0} is how many more failing keys the song has than are listed.</comment>
+    <comment>A song's failing key in the Validator's list, as its check box is named: {0} is the key, {1} the message.</comment>
   </data>
   <data name="ValidatorFixed" xml:space="preserve">
     <value>Passes now</value>
@@ -2253,6 +2493,74 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorFixDescriptionFormat" xml:space="preserve">
     <value>Quick fix: {0}</value>
     <comment>Under a fixable issue in the Validator's list. {0} is what the fix does, e.g. "Change to True".</comment>
+  </data>
+  <data name="ValidatorFilterToolTip" xml:space="preserve">
+    <value>Filter issues</value>
+  </data>
+  <data name="ValidatorFilterFixLabel" xml:space="preserve">
+    <value>Fix</value>
+    <comment>Heading of the Validator filter's Quick fix and Manual fix chips.</comment>
+  </data>
+  <data name="ValidatorFilterQuickFix" xml:space="preserve">
+    <value>Quick fix</value>
+    <comment>Validator filter chip: shows only issues with a quick fix.</comment>
+  </data>
+  <data name="ValidatorFilterManual" xml:space="preserve">
+    <value>Manual fix</value>
+    <comment>Validator filter chip: shows only issues without a quick fix.</comment>
+  </data>
+  <data name="ValidatorFilterTypeLabel" xml:space="preserve">
+    <value>Type</value>
+    <comment>Heading of the Validator filter's chips for each kind of issue found.</comment>
+  </data>
+  <data name="ValidatorFilterKeyLabel" xml:space="preserve">
+    <value>Metadata key</value>
+    <comment>Heading of the Validator filter's chips for each metadata key that fails in a listed song.</comment>
+  </data>
+  <data name="ValidatorFilterNoTypes" xml:space="preserve">
+    <value>No issues found yet.</value>
+  </data>
+  <data name="ValidatorFilterChipFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+    <comment>A Validator filter chip. {0} is what it shows, e.g. "Empty value"; {1} is how many listed songs have it.</comment>
+  </data>
+  <data name="ValidatorFilterChipToolTipFormat" xml:space="preserve">
+    <value>{0}: {1} songs. Turn on chips to show only the issues that match them.</value>
+    <comment>{0} is what the chip shows, e.g. "Empty value"; {1} is how many listed songs have it.</comment>
+  </data>
+  <data name="ValidatorShownSummaryFormat" xml:space="preserve">
+    <value>Showing {0} of {1} listed songs</value>
+    <comment>Under the Validator's status while a filter is on. {0} is how many songs are shown, {1} how many are listed.</comment>
+  </data>
+  <data name="ValidatorNoMatches" xml:space="preserve">
+    <value>No songs have issues that match the filters.</value>
+  </data>
+  <data name="ValidatorTypeDuplicateKey" xml:space="preserve">
+    <value>Duplicate key</value>
+  </data>
+  <data name="ValidatorTypeEmptyKey" xml:space="preserve">
+    <value>Empty key</value>
+  </data>
+  <data name="ValidatorTypeKeyCharacter" xml:space="preserve">
+    <value>Forbidden character in key</value>
+  </data>
+  <data name="ValidatorTypeValueCharacter" xml:space="preserve">
+    <value>Forbidden character in value</value>
+  </data>
+  <data name="ValidatorTypeWrongType" xml:space="preserve">
+    <value>Wrong value type</value>
+    <comment>A known key's value isn't the kind it should be, e.g. a word where a number belongs.</comment>
+  </data>
+  <data name="ValidatorTypeBoolean" xml:space="preserve">
+    <value>Non-standard True/False</value>
+    <comment>A yes/no key written as true, 1 or similar rather than exactly True or False.</comment>
+  </data>
+  <data name="ValidatorTypeEmptyValue" xml:space="preserve">
+    <value>Empty value</value>
+  </data>
+  <data name="ValidatorTypeUnreadable" xml:space="preserve">
+    <value>Couldn't be read</value>
+    <comment>A song whose metadata couldn't be read at all.</comment>
   </data>
   <data name="QuickFixMenu" xml:space="preserve">
     <value>Quick Fix</value>
