@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using ChartPacker.Audio.Waveforms;
+using ChartPacker.Core.Charting;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Settings;
@@ -21,7 +22,7 @@ namespace ChartPacker.Services
     /// </remarks>
     public static class AppSettingsCatalog
     {
-        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads)
+        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads, SettingsService settings)
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
@@ -33,9 +34,11 @@ namespace ChartPacker.Services
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
+            var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
+            var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing],
+                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, charter, newCharts],
                 [
                     new IntegerSetting
                     {
@@ -303,8 +306,37 @@ namespace ChartPacker.Services
                         Get = () => player.LaneFineScrubFactor,
                         Set = factor => player.LaneFineScrubFactor = factor,
                     },
+                    new TextSetting
+                    {
+                        Id = "charter.defaultCharterName",
+                        Category = newCharts,
+                        Label = Strings.DefaultCharterNameLabel,
+                        Description = Strings.DefaultCharterNameDescription,
+                        Keywords = Words(Strings.DefaultCharterNameKeywords),
+                        DefaultValue = "",
+                        Placeholder = Strings.DefaultCharterNamePlaceholder,
+                        ForbiddenCharacters = ";",
+                        Get = () => settings.Settings.DefaultCharterName,
+                        Set = name => settings.Settings.DefaultCharterName = name.Trim(),
+                    },
+                    new ChoiceSetting<int>
+                    {
+                        Id = "charter.defaultResolution",
+                        Category = newCharts,
+                        Label = Strings.DefaultChartResolutionLabel,
+                        Description = Strings.DefaultChartResolutionDescription,
+                        Keywords = Words(Strings.DefaultChartResolutionKeywords),
+                        DefaultValue = NewChartSettings.DefaultResolution,
+                        Choices = [.. NewChartSettings.Resolutions.Select(r => new SettingChoice<int>(r, ResolutionLabel(r)))],
+                        Get = () => settings.Settings.DefaultChartResolution,
+                        Set = resolution => settings.Settings.DefaultChartResolution = resolution,
+                    },
                 ]);
         }
+
+        /// <summary>A resolution as the new-chart wizard and Settings show it, e.g. "480 ticks per beat".</summary>
+        public static string ResolutionLabel(int resolution) =>
+            string.Format(CultureInfo.CurrentCulture, Strings.ChartResolutionFormat, resolution);
 
         private static string[] Words(string text) => text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
     }

@@ -1,0 +1,222 @@
+using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charts;
+using ChartPacker.Core.Ini;
+using ChartPacker.Core.Packing;
+using ChartPacker.Core.Sng;
+using ChartPacker.Core.Tests.Audio;
+using ChartPacker.Core.Validation;
+
+namespace ChartPacker.Core.Tests.Charting;
+
+[TestClass]
+public sealed class NewChartCreatorTests
+{
+    private const int SampleRate = 8000;
+
+    private DirectoryInfo _root = null!;
+    private string _sources = null!;
+    private string _library = null!;
+
+    [TestInitialize]
+    public void CreateRoot()
+    {
+        _root = Directory.CreateTempSubdirectory("chartpacker-newchart-");
+        _sources = Directory.CreateDirectory(Path.Combine(_root.FullName, "sources")).FullName;
+        _library = Directory.CreateDirectory(Path.Combine(_root.FullName, "library")).FullName;
+    }
+
+    [TestCleanup]
+    public void DeleteRoot() => _root.Delete(recursive: true);
+
+    private NewChartRequest Request(params NewChartStem[] stems) => new()
+    {
+        ParentFolder = _library,
+        FolderName = "Artist - Song",
+        Name = "Song",
+        Artist = "Artist",
+        Stems = stems,
+        Chart = new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro),
+    };
+
+    [TestMethod]
+    public async Task TheFolderHoldsTheStemsArtChartAndMetadata()
+    {
+        // AC C1.4: the files are stored as their stems, lowercased.
+        var request = Request(
+            new NewChartStem(Source("Guitar.OGG", "guitar"u8), "guitar"),
+            new NewChartStem(Source("Drums.ogg", "drums"u8), "drums"),
+            new NewChartStem(Source("mix.mp3", "mix"u8), "song")) with
+        {
+            AlbumArtPath = Source("Cover.PNG", "png"u8),
+        };
+
+        string folder = await NewChartCreator.CreateAsync(request, TestContext.CancellationToken);
+
+        Assert.AreEqual(Path.Combine(_library, "Artist - Song"), folder);
+        Assert.AreSequenceEqual(
+            ["album.png", "drums.ogg", "guitar.ogg", "notes.mid", "song.ini", "song.mp3"],
+            [.. Directory.GetFiles(folder).Select(Path.GetFileName).Order(StringComparer.Ordinal)]);
+        Assert.AreEqual("guitar", File.ReadAllText(Path.Combine(folder, "guitar.ogg")));
+        Assert.AreEqual("png", File.ReadAllText(Path.Combine(folder, "album.png")));
+        Assert.AreEqual(480, ChartReader.Read(File.ReadAllBytes(Path.Combine(folder, "notes.mid")), "notes.mid").Tempo.Resolution);
+
+        var ini = await SongIni.ReadAsync(Path.Combine(folder, SongIni.FileName), TestContext.CancellationToken);
+        CollectionAssert.Contains(ini.Pairs.ToList(), KeyValuePair.Create("name", "Song"));
+        CollectionAssert.Contains(ini.Pairs.ToList(), KeyValuePair.Create("pro_drums", "True"));
+        AssertNothingStaged();
+    }
+
+    [TestMethod]
+    public async Task TheSongIsAsLongAsItsLongestStemButNotThePreview()
+    {
+        var request = Request(
+            new NewChartStem(Wav("a.wav", seconds: 1), "song"),
+            new NewChartStem(Wav("b.wav", seconds: 2), "guitar"),
+            new NewChartStem(Wav("c.wav", seconds: 3), "preview"));
+
+        string folder = await NewChartCreator.CreateAsync(request, TestContext.CancellationToken);
+
+        var ini = await SongIni.ReadAsync(Path.Combine(folder, SongIni.FileName), TestContext.CancellationToken);
+        Assert.AreEqual("2000", ini.Pairs.Single(p => p.Key == "song_length").Value);
+    }
+
+    [TestMethod]
+    public async Task ASongWithOneStemValidatesAndPacks()
+    {
+        // AC C1.1, as far as it can go before the editor exists.
+        string folder = await NewChartCreator.CreateAsync(Request(new NewChartStem(Wav("mix.wav", seconds: 1), "song")), TestContext.CancellationToken);
+
+        var plan = await PackPlanner.PlanAsync(folder, cancellationToken: TestContext.CancellationToken);
+        Assert.IsFalse(plan.HasErrors, string.Join(Environment.NewLine, plan.Findings));
+        Assert.IsFalse(plan.Findings.Any(f => f.RuleId == SngRules.Sng052));
+        Assert.IsEmpty(MetadataValidator.Validate(plan.Metadata).Where(MetadataValidator.IsFailing));
+
+        string sng = Path.Combine(_root.FullName, "Artist - Song.sng");
+        var findings = await Packer.PackAsync(plan, sng, overwrite: false, cancellationToken: TestContext.CancellationToken);
+        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
+        Assert.IsTrue(SngReader.Read(sng, TestContext.CancellationToken).Files.Any(f => f.Name == "notes.mid"));
+    }
+
+    [TestMethod]
+    public async Task ASongWithoutAudioTakesTheEnteredLengthAndWarnsOfIt()
+    {
+        string folder = await NewChartCreator.CreateAsync(Request() with { Length = TimeSpan.FromMinutes(3) }, TestContext.CancellationToken);
+
+        var ini = await SongIni.ReadAsync(Path.Combine(folder, SongIni.FileName), TestContext.CancellationToken);
+        Assert.AreEqual("180000", ini.Pairs.Single(p => p.Key == "song_length").Value);
+
+        var plan = await PackPlanner.PlanAsync(folder, cancellationToken: TestContext.CancellationToken);
+        Assert.IsFalse(plan.HasErrors);
+        Assert.AreEqual(Severity.Warning, plan.Findings.Single(f => f.RuleId == SngRules.Sng052).Severity);
+    }
+
+    [TestMethod]
+    public async Task AnExistingFolderIsNeverTouched()
+    {
+        // AC C1.3.
+        string existing = Directory.CreateDirectory(Path.Combine(_library, "Artist - Song")).FullName;
+        File.WriteAllText(Path.Combine(existing, "keep.txt"), "keep");
+
+        await Assert.ThrowsAsync<IOException>(() => NewChartCreator.CreateAsync(Request(new NewChartStem(Wav("mix.wav", 1), "song")), TestContext.CancellationToken));
+
+        Assert.AreSequenceEqual([Path.Combine(existing, "keep.txt")], Directory.GetFileSystemEntries(existing));
+        Assert.AreEqual("keep", File.ReadAllText(Path.Combine(existing, "keep.txt")));
+        AssertNothingStaged();
+    }
+
+    [TestMethod]
+    public async Task AnExistingFileWithTheNameIsNeverTouched()
+    {
+        string existing = Path.Combine(_library, "Artist - Song");
+        File.WriteAllText(existing, "keep");
+
+        await Assert.ThrowsAsync<IOException>(() => NewChartCreator.CreateAsync(Request(), TestContext.CancellationToken));
+
+        Assert.AreEqual("keep", File.ReadAllText(existing));
+        AssertNothingStaged();
+    }
+
+    [TestMethod]
+    public async Task CancellingLeavesNothingBehind()
+    {
+        // AC C1.2.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => NewChartCreator.CreateAsync(Request(new NewChartStem(Wav("mix.wav", 1), "song")), cts.Token));
+
+        Assert.IsEmpty(Directory.GetFileSystemEntries(_library));
+    }
+
+    [TestMethod]
+    public async Task AStemThatCantBeCopiedLeavesNothingBehind()
+    {
+        // AC C1.2.
+        var request = Request(
+            new NewChartStem(Wav("mix.wav", 1), "song"),
+            new NewChartStem(Path.Combine(_sources, "missing.ogg"), "guitar"));
+
+        await Assert.ThrowsAsync<FileNotFoundException>(() => NewChartCreator.CreateAsync(request, TestContext.CancellationToken));
+
+        Assert.IsEmpty(Directory.GetFileSystemEntries(_library));
+    }
+
+    [TestMethod]
+    public async Task AStemThatsInUseLeavesNothingBehind()
+    {
+        // AC C1.2.
+        string locked = Wav("locked.wav", 1);
+        using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                await Assert.ThrowsAsync<IOException>(() => NewChartCreator.CreateAsync(Request(new NewChartStem(locked, "song")), TestContext.CancellationToken));
+                Assert.IsEmpty(Directory.GetFileSystemEntries(_library));
+            }
+        }
+    }
+
+    [TestMethod]
+    public async Task TwoFilesCantShareAStem()
+    {
+        var request = Request(new NewChartStem(Wav("a.wav", 1), "song"), new NewChartStem(Wav("b.wav", 1), "Song"));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => NewChartCreator.CreateAsync(request, TestContext.CancellationToken));
+
+        Assert.IsEmpty(Directory.GetFileSystemEntries(_library));
+    }
+
+    [TestMethod]
+    public async Task AFolderNameBreakingTheFilenameRulesIsRefused()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => NewChartCreator.CreateAsync(Request() with { FolderName = "CON" }, TestContext.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(() => NewChartCreator.CreateAsync(Request() with { FolderName = "a/b" }, TestContext.CancellationToken));
+
+        Assert.IsEmpty(Directory.GetFileSystemEntries(_library));
+    }
+
+    [TestMethod]
+    public async Task AMissingParentFolderIsRefused()
+    {
+        var request = Request() with { ParentFolder = Path.Combine(_root.FullName, "nowhere") };
+
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(() => NewChartCreator.CreateAsync(request, TestContext.CancellationToken));
+
+        Assert.IsFalse(Directory.Exists(request.ParentFolder));
+    }
+
+    private string Source(string name, ReadOnlySpan<byte> bytes)
+    {
+        string path = Path.Combine(_sources, name);
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
+
+    private string Wav(string name, double seconds) =>
+        Source(name, TestAudio.Wav((int)(seconds * SampleRate), SampleRate, 1, (_, _) => 0));
+
+    private void AssertNothingStaged() =>
+        Assert.IsFalse(Directory.EnumerateFileSystemEntries(_library).Any(p => p.EndsWith(StagingPath.Suffix, StringComparison.Ordinal)));
+
+    public TestContext TestContext { get; set; }
+}

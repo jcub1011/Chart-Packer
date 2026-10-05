@@ -87,6 +87,12 @@
                       MinWidth="160"
                       AutomationProperties.Name="{Binding Label}" />
         </DataTemplate>
+        <DataTemplate DataType="svm:TextSettingViewModel">
+            <TextBox Text="{Binding Value}"
+                     PlaceholderText="{Binding Placeholder}"
+                     Width="220"
+                     AutomationProperties.Name="{Binding Label}" />
+        </DataTemplate>
         <DataTemplate DataType="svm:FolderSettingViewModel">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="{Binding DisplayText}"

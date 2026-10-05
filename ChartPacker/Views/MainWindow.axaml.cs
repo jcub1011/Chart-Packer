@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Input;
 using ChartPacker.ViewModels;
 
 namespace ChartPacker.Views
@@ -23,6 +24,21 @@ namespace ChartPacker.Views
                 RestoreLibraryPaneWidth();
             };
             Closing += OnClosing;
+
+            // Audio files dropped anywhere on the window start a new chart with them (charter-spec C1).
+            DragDrop.SetAllowDrop(this, true);
+            AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            AddHandler(DragDrop.DropEvent, OnDrop);
+        }
+
+        private void OnDragOver(object? sender, DragEventArgs e) =>
+            e.DragEffects = DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
+
+        private void OnDrop(object? sender, DragEventArgs e)
+        {
+            var files = DroppedFiles.AudioOf(e);
+            if (files.Count > 0 && DataContext is MainWindowViewModel vm)
+                _ = vm.Library.NewChartAsync(files);
         }
 
         // Set once the user has agreed to lose their unsaved metadata changes.

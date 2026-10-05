@@ -68,6 +68,21 @@ namespace ChartPacker.Services
             return files.Count > 0 ? files[0].TryGetLocalPath() : null;
         }
 
+        public async Task<IReadOnlyList<string>> PickAudioFilesAsync(string title)
+        {
+            if (topLevel() is not { } owner)
+                return [];
+
+            var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = title,
+                AllowMultiple = true,
+                FileTypeFilter = [Audio],
+            });
+
+            return [.. files.Select(f => f.TryGetLocalPath()).OfType<string>()];
+        }
+
         public async Task<string?> PickBackgroundAsync(string title)
         {
             if (topLevel() is not { } owner)

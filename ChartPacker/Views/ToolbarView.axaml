@@ -130,6 +130,16 @@
                                 <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DedupButton}" />
                             </StackPanel>
                         </Button>
+                        <Button Classes="labelled"
+                                Margin="2,0,0,0"
+                                Command="{Binding Library.NewChartCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.NewChartToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.NewChartButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ctl:LineIcon Data="{StaticResource NewChartStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.NewChartButton}" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
             </WrapPanel>

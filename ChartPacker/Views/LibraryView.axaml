@@ -516,11 +516,17 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <TextBlock Classes="muted centered"
-                       VerticalAlignment="Center"
-                       Margin="16"
-                       Text="{x:Static res:Strings.LibraryPrompt}"
-                       IsVisible="{Binding ShowPrompt}" />
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Margin="16"
+                        Spacing="10"
+                        IsVisible="{Binding ShowPrompt}">
+                <TextBlock Classes="muted centered" Text="{x:Static res:Strings.LibraryPrompt}" TextWrapping="Wrap" />
+                <Button HorizontalAlignment="Center"
+                        Content="{x:Static res:Strings.NewChartButton}"
+                        Command="{Binding NewChartCommand}"
+                        ToolTip.Tip="{x:Static res:Strings.NewChartToolTip}" />
+            </StackPanel>
 
             <StackPanel VerticalAlignment="Center"
                         HorizontalAlignment="Center"
@@ -539,11 +545,17 @@
                        Text="{x:Static res:Strings.NotScannedHint}"
                        IsVisible="{Binding ShowNotScanned}" />
 
-            <TextBlock Classes="muted centered"
-                       VerticalAlignment="Center"
-                       Margin="16"
-                       Text="{x:Static res:Strings.EmptyFolder}"
-                       IsVisible="{Binding ShowEmpty}" />
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Margin="16"
+                        Spacing="10"
+                        IsVisible="{Binding ShowEmpty}">
+                <TextBlock Classes="muted centered" Text="{x:Static res:Strings.EmptyFolder}" TextWrapping="Wrap" />
+                <Button HorizontalAlignment="Center"
+                        Content="{x:Static res:Strings.NewChartButton}"
+                        Command="{Binding NewChartCommand}"
+                        ToolTip.Tip="{x:Static res:Strings.NewChartToolTip}" />
+            </StackPanel>
 
             <StackPanel VerticalAlignment="Center"
                         HorizontalAlignment="Center"

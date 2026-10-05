@@ -85,6 +85,7 @@ namespace ChartPacker.ViewModels.Settings
             IntegerSetting integer => new IntegerSettingViewModel((SettingEdit<int>)edit, integer),
             RangeSetting range => new RangeSettingViewModel((SettingEdit<double>)edit, range),
             FolderSetting folder => new FolderSettingViewModel((SettingEdit<string?>)edit, folder, folderPicker),
+            TextSetting text => new TextSettingViewModel((SettingEdit<string>)edit, text),
             _ when edit is IChoiceEdit choice => new ChoiceSettingViewModel(edit, choice),
             _ => throw new NotSupportedException($"No editor for setting '{edit.Definition.Id}' ({edit.Definition.GetType().Name})."),
         };
@@ -162,6 +163,26 @@ namespace ChartPacker.ViewModels.Settings
         }
 
         protected override void OnValueChanged() => OnPropertyChanged(nameof(SelectedIndex));
+    }
+
+    /// <summary>A line of text, shown as a text box.</summary>
+    public sealed class TextSettingViewModel(SettingEdit<string> edit, TextSetting definition) : SettingViewModel(edit)
+    {
+        public string? Placeholder => definition.Placeholder;
+
+        public string Value
+        {
+            get => edit.Value;
+            set
+            {
+                edit.Value = value;
+
+                // A dropped character: show the staged value.
+                OnPropertyChanged(nameof(Value));
+            }
+        }
+
+        protected override void OnValueChanged() => OnPropertyChanged(nameof(Value));
     }
 
     /// <summary>A folder path, shown as its path (or what happens without one) and a Browse button.</summary>

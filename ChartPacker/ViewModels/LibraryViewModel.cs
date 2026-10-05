@@ -57,6 +57,8 @@ namespace ChartPacker.ViewModels
         private readonly IValidatorWindowService _validatorWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
+        private readonly INewChartWindowService _newChartWindow;
+        private readonly NoticeViewModel _notice;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
         // Every scanned song, in scan order (by Position), whether or not it passes the filters.
@@ -96,6 +98,8 @@ namespace ChartPacker.ViewModels
         /// <param name="validatorWindow">Shows the Validator window for the selected songs.</param>
         /// <param name="reveal">Shows the selected songs in the file manager.</param>
         /// <param name="downloads">Saves copies of the selected songs as song folders.</param>
+        /// <param name="newChartWindow">Shows the New chart wizard.</param>
+        /// <param name="notice">Says where a new chart was made.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -106,7 +110,9 @@ namespace ChartPacker.ViewModels
             IDedupWindowService dedupWindow,
             IValidatorWindowService validatorWindow,
             IFileRevealService reveal,
-            IDownloadService downloads)
+            IDownloadService downloads,
+            INewChartWindowService newChartWindow,
+            NoticeViewModel notice)
         {
             _folderPicker = folderPicker;
             _settings = settings;
@@ -116,6 +122,8 @@ namespace ChartPacker.ViewModels
             _validatorWindow = validatorWindow;
             _reveal = reveal;
             _downloads = downloads;
+            _newChartWindow = newChartWindow;
+            _notice = notice;
             Player = player;
             Player.PropertyChanged += (_, e) =>
             {
@@ -449,6 +457,51 @@ namespace ChartPacker.ViewModels
         /// <summary>Opens the Validator window, which lists the selected songs whose metadata fails validation, to fix them.</summary>
         [RelayCommand(CanExecute = nameof(CanValidate))]
         private Task ValidateAsync() => _validatorWindow.ShowAsync(SelectedEntries);
+
+        /// <summary>Opens the New chart wizard with no audio files yet.</summary>
+        [RelayCommand]
+        private Task NewChartAsync() => NewChartAsync([]);
+
+        /// <summary>
+        /// Opens the New chart wizard with <paramref name="audioFiles"/>, e.g. ones dropped on the main window.
+        /// A song made inside the library's folder is listed by a rescan and selected; either way the
+        /// notice says where it was made.
+        /// </summary>
+        public async Task NewChartAsync(IReadOnlyList<string> audioFiles)
+        {
+            if (await _newChartWindow.ShowAsync(audioFiles, FolderPath) is not { } created)
+                return;
+
+            if (!IsListable(created) || !CanRescan())
+            {
+                _notice.ShowSaved(string.Format(CultureInfo.CurrentCulture, Strings.NewChartCreatedOutsideFormat, created), [created]);
+                return;
+            }
+
+            _notice.ShowSaved(string.Format(CultureInfo.CurrentCulture, Strings.NewChartCreatedFormat, Path.GetFileName(created)), [created]);
+            if (!await StartScan(FolderPath!, _settings.Settings.ScanMaxDepth))
+                return;
+
+            // Found under the library's folder as the file system spells it, which may differ in case from the path picked.
+            var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            string target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(created));
+            if (Entries.FirstOrDefault(i => string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(i.Entry.FullPath)), target, comparison)) is { } item)
+                Selection.SelectedIndex = Entries.IndexOf(item);
+        }
+
+        /// <summary>Whether a scan of the library's folder, to its depth, finds the song folder <paramref name="path"/>.</summary>
+        private bool IsListable(string path)
+        {
+            if (FolderPath is null)
+                return false;
+
+            string relative = Path.GetRelativePath(Path.GetFullPath(FolderPath), Path.GetFullPath(path));
+            if (relative == "." || relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
+                return false;
+
+            int depth = relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries).Length;
+            return depth <= _settings.Settings.ScanMaxDepth;
+        }
 
         private bool CanDeduplicate() => FolderPath is not null && !Job.IsRunning;
 

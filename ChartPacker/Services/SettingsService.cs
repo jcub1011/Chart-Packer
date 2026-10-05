@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+using ChartPacker.Core.Charting;
 using ChartPacker.Core.Library;
 
 namespace ChartPacker.Services
@@ -139,6 +141,14 @@ namespace ChartPacker.Services
             settings.LaneFineScrubFactor = double.IsFinite(settings.LaneFineScrubFactor)
                 ? Math.Clamp(settings.LaneFineScrubFactor, AppSettings.MinLaneFineScrubFactor, AppSettings.MaxLaneFineScrubFactor)
                 : AppSettings.DefaultLaneFineScrubFactor;
+
+            settings.DefaultCharterName ??= "";
+
+            if (!NewChartSettings.Resolutions.Contains(settings.DefaultChartResolution))
+                settings.DefaultChartResolution = NewChartSettings.DefaultResolution;
+
+            if (string.IsNullOrWhiteSpace(settings.LastNewChartFolder))
+                settings.LastNewChartFolder = null;
         }
     }
 }

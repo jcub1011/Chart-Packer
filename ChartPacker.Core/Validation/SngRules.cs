@@ -66,6 +66,9 @@ public static class SngRules
     /// <summary>There are bytes after the end of the FileData section.</summary>
     public const string Sng043 = "SNG043";
 
+    /// <summary>There is no registered audio stem.</summary>
+    public const string Sng052 = "SNG052";
+
     /// <summary><c>song.ini</c> is stored as a file.</summary>
     public const string Sng053 = "SNG053";
 
