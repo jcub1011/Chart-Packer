@@ -2477,6 +2477,70 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Quick fix: {0}</value>
     <comment>Under a fixable issue in the Validator's list. {0} is what the fix does, e.g. "Change to True".</comment>
   </data>
+  <data name="ValidatorFilterToolTip" xml:space="preserve">
+    <value>Filter issues</value>
+  </data>
+  <data name="ValidatorFilterFixLabel" xml:space="preserve">
+    <value>Fix</value>
+    <comment>Heading of the Validator filter's Quick fix and Manual fix chips.</comment>
+  </data>
+  <data name="ValidatorFilterQuickFix" xml:space="preserve">
+    <value>Quick fix</value>
+    <comment>Validator filter chip: shows only issues with a quick fix.</comment>
+  </data>
+  <data name="ValidatorFilterManual" xml:space="preserve">
+    <value>Manual fix</value>
+    <comment>Validator filter chip: shows only issues without a quick fix.</comment>
+  </data>
+  <data name="ValidatorFilterTypeLabel" xml:space="preserve">
+    <value>Type</value>
+    <comment>Heading of the Validator filter's chips for each kind of issue found.</comment>
+  </data>
+  <data name="ValidatorFilterNoTypes" xml:space="preserve">
+    <value>No issues found yet.</value>
+  </data>
+  <data name="ValidatorFilterChipFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+    <comment>A Validator filter chip. {0} is what it shows, e.g. "Empty value"; {1} is how many listed songs have it.</comment>
+  </data>
+  <data name="ValidatorFilterChipToolTipFormat" xml:space="preserve">
+    <value>{0}: {1} songs. Turn on chips to show only the issues that match them.</value>
+    <comment>{0} is what the chip shows, e.g. "Empty value"; {1} is how many listed songs have it.</comment>
+  </data>
+  <data name="ValidatorShownSummaryFormat" xml:space="preserve">
+    <value>Showing {0} of {1} listed songs</value>
+    <comment>Under the Validator's status while a filter is on. {0} is how many songs are shown, {1} how many are listed.</comment>
+  </data>
+  <data name="ValidatorNoMatches" xml:space="preserve">
+    <value>No songs have issues that match the filters.</value>
+  </data>
+  <data name="ValidatorTypeDuplicateKey" xml:space="preserve">
+    <value>Duplicate key</value>
+  </data>
+  <data name="ValidatorTypeEmptyKey" xml:space="preserve">
+    <value>Empty key</value>
+  </data>
+  <data name="ValidatorTypeKeyCharacter" xml:space="preserve">
+    <value>Forbidden character in key</value>
+  </data>
+  <data name="ValidatorTypeValueCharacter" xml:space="preserve">
+    <value>Forbidden character in value</value>
+  </data>
+  <data name="ValidatorTypeWrongType" xml:space="preserve">
+    <value>Wrong value type</value>
+    <comment>A known key's value isn't the kind it should be, e.g. a word where a number belongs.</comment>
+  </data>
+  <data name="ValidatorTypeBoolean" xml:space="preserve">
+    <value>Non-standard True/False</value>
+    <comment>A yes/no key written as true, 1 or similar rather than exactly True or False.</comment>
+  </data>
+  <data name="ValidatorTypeEmptyValue" xml:space="preserve">
+    <value>Empty value</value>
+  </data>
+  <data name="ValidatorTypeUnreadable" xml:space="preserve">
+    <value>Couldn't be read</value>
+    <comment>A song whose metadata couldn't be read at all.</comment>
+  </data>
   <data name="QuickFixMenu" xml:space="preserve">
     <value>Quick Fix</value>
     <comment>Right-click menu item on a metadata row that applies the row's quick fix to the draft; disabled when it has none.</comment>

@@ -33,6 +33,12 @@ namespace ChartPacker.ViewModels
     /// Issues with a quick fix can be ticked and fixed together. Fixes only go into the drafts; Save all changes
     /// writes every listed song's draft.
     /// </para>
+    /// <para>
+    /// The filter narrows the issues shown to those with or without a quick fix, and to some types. A song shows
+    /// while one of its issues does. Ticking every fix, and Fix selected, only reach the issues shown; ticks on hidden
+    /// ones are kept for when they show again. A song shown stays shown when it's checked again, as one that comes to
+    /// pass does, until the filter changes.
+    /// </para>
     /// </remarks>
     public sealed partial class ValidatorWindowViewModel : ViewModelBase
     {
@@ -50,6 +56,15 @@ namespace ChartPacker.ViewModels
 
         // The listed songs, by full path.
         private readonly Dictionary<string, ValidatorSongViewModel> _byPath = new(StringComparer.Ordinal);
+
+        // The songs in ShownSongs, to look up without walking it.
+        private readonly HashSet<ValidatorSongViewModel> _shown = [];
+
+        // The IDs of the type chips that are on.
+        private readonly HashSet<string> _typesOn = new(StringComparer.Ordinal);
+
+        // Set while every chip is turned off at once, so the list is filtered once at the end.
+        private bool _clearingFilters;
 
         // Set while many issues are ticked at once, so the counts are worked out once at the end.
         private bool _selectingAll;
@@ -89,6 +104,9 @@ namespace ChartPacker.ViewModels
             _confirmation = confirmation;
             _parallelism = parallelism;
             Inspector = inspector;
+            QuickFixChip = new ValidatorFilterChipViewModel("quick", Strings.ValidatorFilterQuickFix, OnFilterChanged);
+            ManualChip = new ValidatorFilterChipViewModel("manual", Strings.ValidatorFilterManual, OnFilterChanged);
+            FixChips = [QuickFixChip, ManualChip];
             _drafts.DraftsChanged += OnDraftsChanged;
             _job.PropertyChanged += OnJobPropertyChanged;
             Inspector.PropertyChanged += OnInspectorPropertyChanged;
@@ -112,6 +130,34 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The songs that failed when checked, in selection order.</summary>
         public AvaloniaList<ValidatorSongViewModel> Songs { get; } = [];
+
+        /// <summary>The listed songs the filter shows, in selection order.</summary>
+        public AvaloniaList<ValidatorSongViewModel> ShownSongs { get; } = [];
+
+        /// <summary>Shows only issues with a quick fix (with <see cref="ManualChip"/>, every issue).</summary>
+        public ValidatorFilterChipViewModel QuickFixChip { get; }
+
+        /// <summary>Shows only issues without a quick fix (with <see cref="QuickFixChip"/>, every issue).</summary>
+        public ValidatorFilterChipViewModel ManualChip { get; }
+
+        /// <summary>The Quick fix and Manual fix chips.</summary>
+        public IReadOnlyList<ValidatorFilterChipViewModel> FixChips { get; }
+
+        /// <summary>A chip for each type of issue the listed songs have, and any turned on since they stopped having it.</summary>
+        public AvaloniaList<ValidatorFilterChipViewModel> TypeChips { get; } = [];
+
+        public bool HasTypeChips => TypeChips.Count > 0;
+
+        /// <summary>How many chips are on, for the badge on the filter button.</summary>
+        public int ActiveFilterCount => FixChips.Count(c => c.IsOn) + _typesOn.Count;
+
+        public bool HasActiveFilters => ActiveFilterCount > 0;
+
+        /// <summary>How many of the listed songs the filter shows.</summary>
+        public string ShownSummaryText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorShownSummaryFormat, ShownSongs.Count, Songs.Count);
+
+        /// <summary>Songs are listed but the filter shows none of them.</summary>
+        public bool ShowNoMatches => HasActiveFilters && ShownSongs.Count == 0 && Songs.Count > 0;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ShowPickPrompt), nameof(ShowInspector))]
@@ -152,7 +198,7 @@ namespace ChartPacker.ViewModels
 
         public bool ShowPickPrompt => SelectedSong is null;
 
-        /// <summary>Some listed issue has a quick fix.</summary>
+        /// <summary>Some issue shown has a quick fix.</summary>
         public bool HasFixes => _fixableCount > 0;
 
         /// <summary>How many ticked issues Fix selected would fix.</summary>
@@ -161,9 +207,9 @@ namespace ChartPacker.ViewModels
         public string FixSelectedText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorFixSelectedFormat, SelectedFixCount);
 
         /// <summary>
-        /// Whether every issue with a quick fix is ticked: <see langword="null"/> when only some are. Setting it ticks
-        /// or clears them all; clearing it while only some are ticked ticks them all, so a click on the partly ticked
-        /// box selects everything first.
+        /// Whether every issue shown with a quick fix is ticked: <see langword="null"/> when only some are. Setting it
+        /// ticks or clears them all; clearing it while only some are ticked ticks them all, so a click on the partly
+        /// ticked box selects everything first.
         /// </summary>
         public bool? AllFixesSelected
         {
@@ -189,7 +235,7 @@ namespace ChartPacker.ViewModels
             }
         }
 
-        private IEnumerable<ValidatorIssueViewModel> FixableIssues => Songs.SelectMany(s => s.Issues).Where(i => i.IsFixable);
+        private IEnumerable<ValidatorIssueViewModel> FixableIssues => ShownSongs.SelectMany(s => s.ShownIssues).Where(i => i.IsFixable);
 
         /// <summary>Reads and checks every song, listing the ones that fail as they're found.</summary>
         public async Task LoadAsync()
@@ -251,15 +297,15 @@ namespace ChartPacker.ViewModels
         private bool CanFixSelected() => !IsSaving && !Inspector.IsSaving && SelectedFixCount > 0;
 
         /// <summary>
-        /// Applies the ticked issues' quick fixes to their songs' drafts, each worked out from the song as drafted
-        /// now. Nothing is saved.
+        /// Applies the quick fixes of the ticked issues shown to their songs' drafts, each worked out from the song as
+        /// drafted now. Nothing is saved.
         /// </summary>
         [RelayCommand(CanExecute = nameof(CanFixSelected))]
         private void FixSelected()
         {
             // Fixing a song checks it again, which replaces its issues, so the ticked ones are gathered first.
-            var work = Songs
-                .Select(s => (Song: s, Keys: s.Issues.Where(i => i.IsFixable && i.IsSelected).Select(i => i.Key).ToList()))
+            var work = ShownSongs
+                .Select(s => (Song: s, Keys: s.ShownIssues.Where(i => i.IsFixable && i.IsSelected).Select(i => i.Key).ToList()))
                 .Where(w => w.Keys.Count > 0)
                 .ToList();
 
@@ -330,26 +376,173 @@ namespace ChartPacker.ViewModels
                 return;
 
             Checked++;
-            var song = new ValidatorSongViewModel(index, report, OnIssueSelectionChanged);
+            var song = new ValidatorSongViewModel(index, report, OnIssueSelectionChanged, IsIssueShown);
             song.Check(DraftOf(report.Entry));
             if (song.IsFixed)
                 return;
 
-            // Reads finish in any order; the list keeps the selection's, which it's sorted by.
-            int low = 0, high = Songs.Count;
+            InsertSorted(Songs, song);
+            _byPath[report.Entry.FullPath] = song;
+            ShowIfMatching(song);
+            OnPropertyChanged(nameof(ShownSummaryText));
+            OnPropertyChanged(nameof(ShowNoMatches));
+            ScheduleRefreshCounts();
+            _firstFailure.TrySetResult(true);
+        }
+
+        /// <summary>Reads finish in any order; the lists keep the selection's, which they're sorted by.</summary>
+        private static void InsertSorted(AvaloniaList<ValidatorSongViewModel> list, ValidatorSongViewModel song)
+        {
+            int low = 0, high = list.Count;
             while (low < high)
             {
                 int mid = (low + high) / 2;
-                if (Songs[mid].Index < index)
+                if (list[mid].Index < song.Index)
                     low = mid + 1;
                 else
                     high = mid;
             }
 
-            Songs.Insert(low, song);
-            _byPath[report.Entry.FullPath] = song;
-            ScheduleRefreshCounts();
-            _firstFailure.TrySetResult(true);
+            list.Insert(low, song);
+        }
+
+        /// <summary>Whether the filter shows <paramref name="issue"/>: it has a quick fix or not as the Fix chips ask, and one of the types turned on.</summary>
+        private bool IsIssueShown(ValidatorIssueViewModel issue)
+        {
+            if ((QuickFixChip.IsOn || ManualChip.IsOn) && !(issue.IsFixable ? QuickFixChip.IsOn : ManualChip.IsOn))
+                return false;
+
+            return _typesOn.Count == 0 || issue.Types.Any(_typesOn.Contains);
+        }
+
+        private bool IsSongShown(ValidatorSongViewModel song) => !HasActiveFilters || song.HasShownIssue;
+
+        /// <summary>
+        /// Shows a song the filter now matches, as when it's listed or checked again. A song already shown is left
+        /// shown even when it no longer matches, so the list doesn't move under the pointer.
+        /// </summary>
+        private void ShowIfMatching(ValidatorSongViewModel song)
+        {
+            if (_shown.Contains(song) || !IsSongShown(song))
+                return;
+
+            InsertSorted(ShownSongs, song);
+            _shown.Add(song);
+            OnPropertyChanged(nameof(ShownSummaryText));
+            OnPropertyChanged(nameof(ShowNoMatches));
+        }
+
+        /// <summary>A chip was turned on or off: every song's issues are filtered again, and the list shows the songs that now match.</summary>
+        private void OnFilterChanged()
+        {
+            if (_clearingFilters)
+                return;
+
+            _typesOn.Clear();
+            foreach (var chip in TypeChips)
+            {
+                if (chip.IsOn)
+                    _typesOn.Add(chip.Id);
+            }
+
+            foreach (var song in Songs)
+                song.ApplyFilter();
+
+            var shown = Songs.Where(IsSongShown).ToHashSet();
+
+            // The picked song is let go of before it leaves the list, rather than by the list as it goes.
+            if (SelectedSong is { } picked && !shown.Contains(picked))
+                SelectedSong = null;
+
+            // Songs still shown stay where they are, so the picked one stays picked.
+            for (int i = ShownSongs.Count - 1; i >= 0; i--)
+            {
+                if (!shown.Contains(ShownSongs[i]))
+                    ShownSongs.RemoveAt(i);
+            }
+
+            foreach (var song in Songs)
+            {
+                if (shown.Contains(song) && !_shown.Contains(song))
+                    InsertSorted(ShownSongs, song);
+            }
+
+            _shown.Clear();
+            _shown.UnionWith(shown);
+
+            OnPropertyChanged(nameof(ActiveFilterCount));
+            OnPropertyChanged(nameof(HasActiveFilters));
+            OnPropertyChanged(nameof(ShownSummaryText));
+            OnPropertyChanged(nameof(ShowNoMatches));
+            ClearFiltersCommand.NotifyCanExecuteChanged();
+
+            // A type chip turned off once its songs no longer have it goes.
+            RefreshFilterChips();
+            RefreshSelection();
+        }
+
+        private bool CanClearFilters() => HasActiveFilters;
+
+        /// <summary>Turns every chip off, so every listed song and issue shows.</summary>
+        [RelayCommand(CanExecute = nameof(CanClearFilters))]
+        private void ClearFilters()
+        {
+            _clearingFilters = true;
+            try
+            {
+                foreach (var chip in FixChips.Concat(TypeChips))
+                    chip.IsOn = false;
+            }
+            finally
+            {
+                _clearingFilters = false;
+            }
+
+            OnFilterChanged();
+        }
+
+        /// <summary>
+        /// Counts the listed songs each chip matches. A type the songs have gets a chip, in the catalogue's order; one
+        /// they no longer have loses it, unless it's on, so a filter in use never goes out of sight.
+        /// </summary>
+        private void RefreshFilterChips()
+        {
+            int quick = 0, manual = 0;
+            var songsByType = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var song in Songs)
+            {
+                if (song.HasFixes)
+                    quick++;
+                if (song.HasManual)
+                    manual++;
+                foreach (string type in song.IssueTypes)
+                    songsByType[type] = songsByType.GetValueOrDefault(type) + 1;
+            }
+
+            QuickFixChip.Count = quick;
+            ManualChip.Count = manual;
+
+            for (int i = TypeChips.Count - 1; i >= 0; i--)
+            {
+                var chip = TypeChips[i];
+                chip.Count = songsByType.GetValueOrDefault(chip.Id);
+                if (chip.Count == 0 && !chip.IsOn)
+                    TypeChips.RemoveAt(i);
+            }
+
+            foreach (var (type, count) in songsByType)
+            {
+                if (TypeChips.Any(c => c.Id == type))
+                    continue;
+
+                var chip = new ValidatorFilterChipViewModel(type, ValidatorIssueTypes.NameOf(type), OnFilterChanged) { Count = count };
+                int at = 0;
+                while (at < TypeChips.Count && ValidatorIssueTypes.Order.Compare(TypeChips[at].Id, type) < 0)
+                    at++;
+                TypeChips.Insert(at, chip);
+            }
+
+            OnPropertyChanged(nameof(HasTypeChips));
         }
 
         /// <summary>A listed song's draft changed, here or anywhere: it's checked again, from disk once the draft is gone.</summary>
@@ -361,6 +554,7 @@ namespace ChartPacker.ViewModels
             if (_drafts.HasDrafts(path))
             {
                 song.Check(DraftOf(song.Entry));
+                ShowIfMatching(song);
                 ScheduleRefreshCounts();
             }
             else
@@ -375,6 +569,7 @@ namespace ChartPacker.ViewModels
             {
                 var report = await SongMetadataCheck.ReadAsync(song.Entry, _closing.Token);
                 song.Update(report, DraftOf(song.Entry));
+                ShowIfMatching(song);
                 ScheduleRefreshCounts();
             }
             catch (OperationCanceledException)
@@ -425,6 +620,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(FailingCount));
             OnPropertyChanged(nameof(StatusText));
             SaveAllCommand.NotifyCanExecuteChanged();
+            RefreshFilterChips();
             RefreshSelection();
         }
 
@@ -455,17 +651,20 @@ namespace ChartPacker.ViewModels
     public sealed partial class ValidatorSongViewModel : ObservableObject
     {
         private readonly Action _selectionChanged;
+        private readonly Func<ValidatorIssueViewModel, bool> _isShown;
         private SongMetadataReport _report;
 
         // Set while the song's own box ticks or clears its issues, so the change is reported once at the end.
         private bool _settingAll;
 
         /// <param name="selectionChanged">Called when one of the song's issues is ticked or cleared.</param>
-        public ValidatorSongViewModel(int index, SongMetadataReport report, Action selectionChanged)
+        /// <param name="isShown">Whether the window's filter shows an issue.</param>
+        public ValidatorSongViewModel(int index, SongMetadataReport report, Action selectionChanged, Func<ValidatorIssueViewModel, bool> isShown)
         {
             Index = index;
             _report = report;
             _selectionChanged = selectionChanged;
+            _isShown = isShown;
             Title = report.Entry.DisplayName;
         }
 
@@ -513,8 +712,22 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The failing keys, each with why, and a note first when the song can't be edited.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(ShowIssues))]
         public partial IReadOnlyList<ValidatorIssueViewModel> Issues { get; set; } = [];
+
+        /// <summary>The issues the filter shows, and the note, which always shows.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ShowIssues))]
+        public partial IReadOnlyList<ValidatorIssueViewModel> ShownIssues { get; set; } = [];
+
+        /// <summary>The filter shows one of the song's issues, not counting the note.</summary>
+        public bool HasShownIssue { get; private set; }
+
+        /// <summary>An issue shown has a quick fix, so the song's box can tick it.</summary>
+        [ObservableProperty]
+        public partial bool HasShownFixes { get; set; }
+
+        /// <summary>The types of the song's issues, each once.</summary>
+        public IReadOnlyCollection<string> IssueTypes { get; private set; } = [];
 
         /// <summary>How many failing keys have a quick fix.</summary>
         [ObservableProperty]
@@ -530,7 +743,7 @@ namespace ChartPacker.ViewModels
 
         public string ManualCountText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorManualCountFormat, ManualCount);
 
-        /// <summary>Some issue has a quick fix, so the song's box can tick it.</summary>
+        /// <summary>Some issue has a quick fix, shown or not.</summary>
         public bool HasFixes => FixableCount > 0;
 
         public bool HasManual => ManualCount > 0;
@@ -544,12 +757,12 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(ShowIssues))]
         public partial bool IsExpanded { get; set; }
 
-        public bool ShowIssues => IsExpanded && Issues.Count > 0;
+        public bool ShowIssues => IsExpanded && ShownIssues.Count > 0;
 
         public string SelectFixesName => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorSelectSongFixesFormat, Title);
 
         /// <summary>
-        /// Whether every issue of the song with a quick fix is ticked: <see langword="null"/> when only some are.
+        /// Whether every issue shown of the song with a quick fix is ticked: <see langword="null"/> when only some are.
         /// Setting it ticks or clears them all; clearing it while only some are ticked ticks them all, so a click on
         /// the partly ticked box selects everything first.
         /// </summary>
@@ -558,7 +771,7 @@ namespace ChartPacker.ViewModels
             get
             {
                 int fixable = 0, selected = 0;
-                foreach (var issue in Issues)
+                foreach (var issue in ShownIssues)
                 {
                     if (!issue.IsFixable)
                         continue;
@@ -579,7 +792,7 @@ namespace ChartPacker.ViewModels
                 _settingAll = true;
                 try
                 {
-                    foreach (var issue in Issues)
+                    foreach (var issue in ShownIssues)
                     {
                         if (issue.IsFixable)
                             issue.IsSelected = select;
@@ -621,7 +834,7 @@ namespace ChartPacker.ViewModels
             if (_report.ReadError is { } error)
             {
                 string unreadable = string.Format(CultureInfo.CurrentCulture, Strings.ValidatorUnreadableFormat, error);
-                SetIssues([new ValidatorIssueViewModel("", unreadable, null, false, OnIssueSelectionChanged)], 0, 1);
+                SetIssues([new ValidatorIssueViewModel("", unreadable, [ValidatorIssueTypes.Unreadable], null, false, OnIssueSelectionChanged)], 0, 1);
                 IsFixed = false;
                 return;
             }
@@ -638,7 +851,7 @@ namespace ChartPacker.ViewModels
             if (!_report.CanEdit && byKey.Count > 0)
             {
                 string reason = string.Format(CultureInfo.CurrentCulture, Strings.SngHasErrorsFormat, _report.Entry.DisplayName);
-                issues.Add(new ValidatorIssueViewModel("", reason, null, false, OnIssueSelectionChanged));
+                issues.Add(new ValidatorIssueViewModel("", reason, [], null, false, OnIssueSelectionChanged));
             }
 
             int fixable = 0;
@@ -653,7 +866,8 @@ namespace ChartPacker.ViewModels
                     fixable++;
 
                 string message = string.Join(" ", group.Select(f => f.Message).Distinct(StringComparer.Ordinal));
-                issues.Add(new ValidatorIssueViewModel(group.Key, message, fix, fix is not null && selected.Contains(group.Key), OnIssueSelectionChanged));
+                List<string> types = [.. group.Select(f => f.RuleId).Distinct(StringComparer.Ordinal)];
+                issues.Add(new ValidatorIssueViewModel(group.Key, message, types, fix, fix is not null && selected.Contains(group.Key), OnIssueSelectionChanged));
             }
 
             IsFixed = byKey.Count == 0;
@@ -663,8 +877,18 @@ namespace ChartPacker.ViewModels
         private void SetIssues(IReadOnlyList<ValidatorIssueViewModel> issues, int fixable, int manual)
         {
             Issues = issues;
+            IssueTypes = issues.SelectMany(i => i.Types).ToHashSet(StringComparer.Ordinal);
             FixableCount = fixable;
             ManualCount = manual;
+            ApplyFilter();
+        }
+
+        /// <summary>Works out which issues the window's filter shows, as it changes or the song is checked again.</summary>
+        public void ApplyFilter()
+        {
+            ShownIssues = [.. Issues.Where(i => i.IsNote || _isShown(i))];
+            HasShownIssue = ShownIssues.Any(i => !i.IsNote);
+            HasShownFixes = ShownIssues.Any(i => i.IsFixable);
             OnPropertyChanged(nameof(AllSelected));
         }
 
@@ -685,13 +909,15 @@ namespace ChartPacker.ViewModels
 
         /// <param name="key">The failing key, or empty for a note about the song as a whole.</param>
         /// <param name="message">Why it fails.</param>
+        /// <param name="types">The rules it breaks, as <see cref="ValidatorIssueTypes"/> knows them; none for a note.</param>
         /// <param name="fixDescription">What the key's quick fix does, or <see langword="null"/> without one.</param>
         /// <param name="isSelected">Whether it starts ticked.</param>
         /// <param name="selectionChanged">Called when it's ticked or cleared.</param>
-        public ValidatorIssueViewModel(string key, string message, string? fixDescription, bool isSelected, Action selectionChanged)
+        public ValidatorIssueViewModel(string key, string message, IReadOnlyList<string> types, string? fixDescription, bool isSelected, Action selectionChanged)
         {
             Key = key;
             Message = message;
+            Types = types;
             FixDescription = fixDescription;
             IsSelected = isSelected;
             _selectionChanged = selectionChanged;
@@ -703,6 +929,12 @@ namespace ChartPacker.ViewModels
         public bool HasKey => Key.Length > 0;
 
         public string Message { get; }
+
+        /// <summary>The rules it breaks, which the type filter matches.</summary>
+        public IReadOnlyList<string> Types { get; }
+
+        /// <summary>A note about the song, such as why it can't be edited, rather than a failing key. The filter always shows it.</summary>
+        public bool IsNote => Types.Count == 0;
 
         /// <summary>The key and why it fails, as the issue's check box is named.</summary>
         public string Text => HasKey ? string.Format(CultureInfo.CurrentCulture, Strings.ValidatorIssueLineFormat, Key, Message) : Message;

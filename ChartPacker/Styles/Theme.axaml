@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:ChartPacker.Controls">
 
     <!-- The app is dark only. Colours not covered by the Fluent palette in App.axaml live here.
          These come after FluentTheme, so the Accent* keys override its accent-button colours. -->
@@ -117,6 +118,33 @@
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
 
+    <!-- A filter button is tinted while a filter narrows its list, with the number of filters in a badge. -->
+    <Style Selector="Button.tool.active">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.tool.active /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+    </Style>
+    <Style Selector="Border.badge">
+        <Setter Property="MinWidth" Value="14" />
+        <Setter Property="Height" Value="14" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="Padding" Value="3,0" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="0,2,2,0" />
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+        </Setter>
+    </Style>
+    <Style Selector="Border.badge > TextBlock">
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
     <!-- Toolbar buttons with an icon and a label: Pack, Unpack, Save. -->
     <Style Selector="Button.labelled">
         <Setter Property="Height" Value="28" />
@@ -165,5 +193,46 @@
     <Style Selector="Border.banner.error">
         <Setter Property="BorderBrush" Value="#66F87171" />
         <Setter Property="Background" Value="#1FF87171" />
+    </Style>
+
+    <!-- A filter flyout's sections. -->
+    <Style Selector="StackPanel.filter-section">
+        <Setter Property="Spacing" Value="6" />
+    </Style>
+    <Style Selector="StackPanel.filter-section TextBlock.label">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="StackPanel.filter-section NumericUpDown">
+        <Setter Property="ShowButtonSpinner" Value="False" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+    </Style>
+
+    <!-- Filter chips: plain while off, the accent while on. The library's three-state chips add their own
+         Includes and Excludes looks in LibraryView.axaml. -->
+    <Style Selector=":is(Button).filterChip">
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="CornerRadius" Value="11" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <Style Selector=":is(Button).filterChip ctl|LineIcon">
+        <Setter Property="StrokeThickness" Value="1.75" />
+        <Setter Property="Margin" Value="-3,0,0,0" />
+    </Style>
+    <Style Selector="ToggleButton.filterChip:checked">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.filterChip:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.filterChip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#558B5CF6" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
 </Styles>
