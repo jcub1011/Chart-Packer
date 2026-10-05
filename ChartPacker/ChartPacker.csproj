@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <!-- The program version. This is the only place it is defined; everything else reads it from the build. -->
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <!-- Keep the informational version a plain semver, without the SDK's "+<commit sha>" suffix. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <TargetFramework>net10.0</TargetFramework>
