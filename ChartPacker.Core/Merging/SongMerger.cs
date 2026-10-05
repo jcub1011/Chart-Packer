@@ -479,9 +479,9 @@ public static class SongMerger
         var moves = new Dictionary<ChartInstrument, int>();
         foreach (var (partId, source) in pending.Parts)
         {
+            // A part that doesn't move is still counted, so another on its instrument that does is caught.
             int delta = (ShiftOf(pending, base1, source) - ShiftOf(staged, base0, source)) - (base1 - base0);
-            if (delta == 0)
-                continue;
+
             // A part no source has is rejected when staged; the staging reports it.
             if (pending.Analysis.Parts.FirstOrDefault(p => p.Id == partId) is not { } part)
                 continue;
@@ -494,7 +494,7 @@ public static class SongMerger
         }
 
         var tracks = new Dictionary<ChartTrackKey, int>();
-        foreach (var (instrument, delta) in moves)
+        foreach (var (instrument, delta) in moves.Where(m => m.Value != 0))
             foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
                 tracks[new ChartTrackKey(instrument, difficulty)] = delta;
 

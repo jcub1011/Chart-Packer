@@ -469,6 +469,12 @@ namespace ChartPacker.ViewModels
         public bool IsScrubbing { get; private set; }
 
         /// <summary>
+        /// Goes up each time the tracks are let go, for another song or other tracks, which stops playback and sends it back
+        /// to the start; how a reload of the shown song tells it took playback down, rather than the user stopping it.
+        /// </summary>
+        public int TracksGeneration { get; private set; }
+
+        /// <summary>
         /// Where playback is right now, read from the player rather than <see cref="PositionSeconds"/>, which
         /// only moves on a timer; or, while scrubbing or before the first play, where the seek bar is.
         /// </summary>
@@ -532,6 +538,7 @@ namespace ChartPacker.ViewModels
             CancelPeaks();
             if (!isSameSong)
                 ClearPeaks();
+            TracksGeneration++;
             Close();
             _entry = entry;
             Tracks.Clear();
@@ -607,6 +614,7 @@ namespace ChartPacker.ViewModels
         {
             CancelPeaks();
             ClearPeaks();
+            TracksGeneration++;
             Close();
             _entry = null;
             Tracks.Clear();

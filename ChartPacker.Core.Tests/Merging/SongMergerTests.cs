@@ -439,6 +439,22 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task PreviewShiftsFallBackWhenAPartThatStaysSharesAnInstrumentWithOneThatMoves()
+    {
+        // PART REAL_DRUMS_PS is drums too, but the base's PART DRUMS, which doesn't move, is what the drums lane shows.
+        var proDrums = DrumsAndBass();
+        File.WriteAllBytes(Path.Combine(proDrums.FullPath, "notes.mid"), new MidiBuilder()
+            .Track("tempo").Tempo(0, 120)
+            .Track("PART REAL_DRUMS_PS").Note(0, 96).Note(480, 97)
+            .Build());
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), proDrums], TestContext.CancellationToken);
+        var staged = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0, ["PART REAL_DRUMS_PS"] = 1 });
+        var pending = staged with { SourceOffsets = new Dictionary<int, int> { [1] = 250 } };
+
+        Assert.IsNull(SongMerger.PreviewShifts(staged, pending));
+    }
+
+    [TestMethod]
     public async Task PreviewShiftsStayLiveWhenVocalsAndHarmoniesMoveTogether()
     {
         var lyricLessVocals = DrumsAndBass();

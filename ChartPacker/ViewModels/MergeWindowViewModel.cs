@@ -149,7 +149,8 @@ namespace ChartPacker.ViewModels
         public MergeOptionViewModel? LeaveOutOption => Options.FirstOrDefault(o => o.Source is null);
 
         /// <summary>Whether the row can be left out, and so shows the Include checkbox.</summary>
-        public bool CanExclude => LeaveOutOption is { IsAvailable: true, IsShown: true };
+        /// <remarks>Not when no source has the thing: with nothing to include, it's left out without asking.</remarks>
+        public bool CanExclude => LeaveOutOption is { IsAvailable: true, IsShown: true } && Options.Any(o => o.Source is not null && o.IsAvailable);
 
         /// <summary>Whether the thing is taken from one of the sources; false leaves it out. Defaults to included.</summary>
         [ObservableProperty]
@@ -619,6 +620,10 @@ namespace ChartPacker.ViewModels
             if (Parts.Any(p => p.NeedsChoice) || !Parts.Any(p => p.Selected?.Source is not null))
                 return null;
 
+            // An included asset with nothing chosen would otherwise be left out without a word.
+            if (Assets.Any(a => a.ShowNeedsChoice))
+                return null;
+
             var plan = new SongMergePlan(
                 analysis,
                 baseSource,
@@ -949,6 +954,7 @@ namespace ChartPacker.ViewModels
                 TimeSpan resumeAt = Preview.Player.CurrentPosition;
                 bool wasPlaying = Preview.Player.IsPlaying;
                 bool wasScrubbing = Preview.Player.IsScrubbing;
+                int tracksGeneration = Preview.Player.TracksGeneration;
 
                 // Only the songs' lining-up changed since the chart was read, which the preview already shows: staging
                 // writes the same, and nothing shown is read again. Otherwise it's read again in place; only what holds
@@ -994,13 +1000,11 @@ namespace ChartPacker.ViewModels
                 _loadedPlan = plan;
                 _loadedGeneration = Preview.LoadGeneration;
 
-                // Playback that went on through the reload needs nothing. Otherwise it went with it, for other tracks;
-                // it goes back to where it was, playing again if it was, even with another change on its way, which
-                // lets go of it again only if it has to.
-                if (wasPlaying && !wasScrubbing && !Preview.Player.IsPlaying)
-                    await Preview.Player.RestorePlaybackAsync(resumeAt, resume: true);
-                else if (!wasPlaying && !wasScrubbing && Preview.Player.PositionSeconds != resumeAt.TotalSeconds)
-                    await Preview.Player.RestorePlaybackAsync(resumeAt, resume: false);
+                // Only playback the reload took down, by letting go of its tracks for other ones, goes back to where it
+                // was, playing again if it was, even with another change on its way, which lets go of it again only if it
+                // has to. Otherwise the player was left alone, so a pause or seek meanwhile was the user's, and it stays.
+                if (!wasScrubbing && Preview.Player.TracksGeneration != tracksGeneration && !Preview.Player.IsPlaying)
+                    await Preview.Player.RestorePlaybackAsync(resumeAt, resume: wasPlaying);
             }
             catch (OperationCanceledException)
             {
