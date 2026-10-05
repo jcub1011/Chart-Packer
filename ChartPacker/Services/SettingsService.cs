@@ -90,6 +90,11 @@ namespace ChartPacker.Services
                 || settings.MergePreviewFraction > AppSettings.MaxMergePreviewFraction)
                 settings.MergePreviewFraction = AppSettings.DefaultMergePreviewFraction;
 
+            if (!double.IsFinite(settings.ValidatorListFraction)
+                || settings.ValidatorListFraction < AppSettings.MinValidatorListFraction
+                || settings.ValidatorListFraction > AppSettings.MaxValidatorListFraction)
+                settings.ValidatorListFraction = AppSettings.DefaultValidatorListFraction;
+
             settings.ScanMaxDepth = Math.Clamp(settings.ScanMaxDepth, 0, AppSettings.MaxScanMaxDepth);
 
             if (settings.ScanParallelism < AppSettings.MinScanParallelism)

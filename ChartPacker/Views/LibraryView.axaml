@@ -120,61 +120,7 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
 
-        <!-- The filter button is tinted while a filter narrows the list, with the number of filters in a badge. -->
-        <Style Selector="Button.tool.active">
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-        </Style>
-        <Style Selector="Button.tool.active /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
-        </Style>
-        <Style Selector="Border.badge">
-            <Setter Property="MinWidth" Value="14" />
-            <Setter Property="Height" Value="14" />
-            <Setter Property="CornerRadius" Value="7" />
-            <Setter Property="Padding" Value="3,0" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="VerticalAlignment" Value="Top" />
-            <Setter Property="Margin" Value="0,2,2,0" />
-            <Setter Property="Background">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
-        </Style>
-        <Style Selector="Border.badge > TextBlock">
-            <Setter Property="FontSize" Value="9" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <!-- The sort and filter flyout. -->
-        <Style Selector="StackPanel.filter-section">
-            <Setter Property="Spacing" Value="6" />
-        </Style>
-        <Style Selector="StackPanel.filter-section TextBlock.label">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="StackPanel.filter-section NumericUpDown">
-            <Setter Property="ShowButtonSpinner" Value="False" />
-            <Setter Property="Minimum" Value="0" />
-            <Setter Property="MinWidth" Value="0" />
-        </Style>
-
-        <!-- Content filter chips: plain for Either, the accent for Includes, rose for Excludes. -->
-        <Style Selector="Button.filterChip">
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="Padding" Value="8,2" />
-            <Setter Property="CornerRadius" Value="11" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
-        </Style>
-        <Style Selector="Button.filterChip ctl|LineIcon">
-            <Setter Property="StrokeThickness" Value="1.75" />
-            <Setter Property="Margin" Value="-3,0,0,0" />
-        </Style>
+        <!-- Content filter chips: plain for Either (Theme.axaml), the accent for Includes, rose for Excludes. -->
         <Style Selector="Button.filterChip.includes">
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
         </Style>
