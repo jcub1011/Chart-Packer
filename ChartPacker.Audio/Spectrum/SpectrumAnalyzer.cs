@@ -1,3 +1,5 @@
+using ChartPacker.Audio.Dsp;
+
 namespace ChartPacker.Audio.Spectrum;
 
 /// <summary>
@@ -24,7 +26,7 @@ public sealed class SpectrumAnalyzer
     private const double TiltCentreHz = 1000;
 
     private readonly Fft _fft = new(FftSize);
-    private readonly float[] _window = new float[FftSize];
+    private readonly float[] _window = Windowing.PeriodicHann(FftSize);
     private readonly float _windowSum;
     private readonly float[] _re = new float[FftSize];
     private readonly float[] _im = new float[FftSize];
@@ -35,12 +37,8 @@ public sealed class SpectrumAnalyzer
 
     public SpectrumAnalyzer()
     {
-        for (int i = 0; i < FftSize; i++)
-        {
-            // The periodic Hann window.
-            _window[i] = (float)(0.5 * (1 - Math.Cos(2 * Math.PI * i / FftSize)));
-            _windowSum += _window[i];
-        }
+        foreach (float weight in _window)
+            _windowSum += weight;
     }
 
     /// <summary>Fills <paramref name="levels"/> with the level of each band in <paramref name="samples"/>, at <paramref name="sampleRate"/>.</summary>

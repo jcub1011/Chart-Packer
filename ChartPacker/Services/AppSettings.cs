@@ -19,6 +19,7 @@ namespace ChartPacker.Services
         public static readonly int DefaultScanParallelism = Environment.ProcessorCount;
         public const int MinScanParallelism = 1;
         public const double DefaultMasterVolume = 1;
+        public const bool DefaultPitchCorrection = true;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;
         public const DedupKindPreference DefaultDedupKeepPreference = DedupKindPreference.PreferSng;
         public const double DefaultHighwayNoteSpeed = 1;
@@ -92,7 +93,7 @@ namespace ChartPacker.Services
         public double MasterVolume { get; set; } = DefaultMasterVolume;
 
         /// <summary>Whether playing faster or slower keeps the audio's pitch, instead of raising or lowering it with the speed.</summary>
-        public bool PitchCorrection { get; set; } = true;
+        public bool PitchCorrection { get; set; } = DefaultPitchCorrection;
 
         /// <summary>Whether the player reads and draws waveforms. Off, no track is read ahead of playback.</summary>
         public bool ShowWaveforms { get; set; } = true;

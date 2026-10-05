@@ -6,9 +6,10 @@ namespace ChartPacker.Audio.Dsp;
 /// nudged to wherever it lines up best with the grain before so the waveform carries on smoothly.
 /// </summary>
 /// <remarks>
-/// Grains are 40 ms long under a Hann window, one every 20 ms of output, each looked for within 12 ms of where it
-/// belongs. The search compares the channels' sum, and both channels take the grain from the same place, so the stereo
-/// image holds. Pulls its input from a reader as it needs it; used from one thread at a time.
+/// Grains are 40 ms long under a Hann window, one every 20 ms of output, each centred on where the input is heard to
+/// have got to by its middle and looked for within 12 ms of there. The search compares the channels' sum, and both
+/// channels take the grain from the same place, so the stereo image holds. Pulls its input from a reader as it needs it;
+/// used from one thread at a time.
 /// </remarks>
 public sealed class TimeStretcher
 {
@@ -41,15 +42,20 @@ public sealed class TimeStretcher
     // The second half of the last grain, windowed, waiting to be added to the first half of the next.
     private readonly float[] _overlap;
 
-    // The output of the last step, of which _readyOffset frames have been read.
+    // The output of the last step, of which _readyOffset frames have been read; each of its frames stands for
+    // _readyRatio frames of the input.
     private readonly float[] _ready;
     private int _readyOffset;
     private int _readyCount;
+    private double _readyRatio = 1;
 
     private bool _primed;
     private bool _finished;
+
+    // Where the last grain was taken from, and the input frame it stands for at its middle: where the input is heard to
+    // have got to at the end of the output it finished.
     private long _lastGrain;
-    private double _analysisPosition;
+    private double _lastCenter;
     private double _ratio = 1;
 
     /// <summary>Reads the next frames of input into an interleaved stereo span.</summary>
@@ -66,11 +72,7 @@ public sealed class TimeStretcher
         _read = read;
         _hop = Math.Max(16, (int)Math.Round(sampleRate * 0.020));
         _tolerance = Math.Max(CoarseStep, (int)Math.Round(sampleRate * 0.012));
-
-        // A periodic Hann window: two of them half a window apart add up to 1 everywhere.
-        _window = new float[2 * _hop];
-        for (int n = 0; n < _window.Length; n++)
-            _window[n] = (float)(0.5 - (0.5 * Math.Cos(2 * Math.PI * n / _window.Length)));
+        _window = Windowing.PeriodicHann(2 * _hop);
 
         _in = new float[(4 * _hop + 2 * _tolerance) * 2];
         _mono = new float[(2 * _tolerance) + _hop + 1];
@@ -81,7 +83,7 @@ public sealed class TimeStretcher
 
     /// <summary>
     /// How fast the input plays, from <see cref="MinRatio"/> to <see cref="MaxRatio"/>: 2 plays it in half the time,
-    /// at the same pitch. Takes effect at the next grain.
+    /// at the same pitch. Takes effect at the next grain, within 20 ms of output.
     /// </summary>
     public double Ratio
     {
@@ -94,7 +96,7 @@ public sealed class TimeStretcher
 
     /// <summary>
     /// Forgets everything held, for input that starts again at <paramref name="sourceFrame"/>, as after a seek. The
-    /// output carries on from exactly there: its first frames are the input's own.
+    /// output carries on from exactly there: its first frame is the input's own.
     /// </summary>
     public void Reset(long sourceFrame)
     {
@@ -103,10 +105,23 @@ public sealed class TimeStretcher
         _inCount = 0;
         _inputEnded = false;
         _readyOffset = _readyCount = 0;
+        _readyRatio = _ratio;
         _primed = false;
         _finished = false;
-        _analysisPosition = sourceFrame;
+        _lastCenter = sourceFrame;
         SourcePosition = sourceFrame;
+    }
+
+    /// <summary>
+    /// Lets go of the input held, for input that has changed since it was read, as when a stem is muted: the reader is
+    /// to start again at the frame returned. What's been put together of the output already plays as it was, and fades
+    /// into the new input over the next grain.
+    /// </summary>
+    public long ForgetInput()
+    {
+        _inCount = 0;
+        _inputEnded = false;
+        return _inStart;
     }
 
     /// <summary>Stretches the next frames of input into <paramref name="stereo"/> (interleaved left, right).</summary>
@@ -130,7 +145,7 @@ public sealed class TimeStretcher
             if (_inputEnded)
             {
                 double left = _inStart + _inCount - SourcePosition;
-                count = left <= 0 ? 0 : (int)Math.Min(count, Math.Ceiling(left / _ratio));
+                count = left <= 0 ? 0 : (int)Math.Min(count, Math.Ceiling(left / _readyRatio));
                 if (count == 0)
                 {
                     _finished = true;
@@ -141,7 +156,7 @@ public sealed class TimeStretcher
             _ready.AsSpan(_readyOffset * 2, count * 2).CopyTo(stereo[(done * 2)..]);
             done += count;
             _readyOffset += count;
-            SourcePosition += count * _ratio;
+            SourcePosition += count * _readyRatio;
         }
 
         return done;
@@ -153,36 +168,41 @@ public sealed class TimeStretcher
         int hop = _hop;
         if (!_primed)
         {
-            // The first grain is the input itself, so the output starts exactly where it was asked to and doesn't fade in.
+            // As if a grain centred on the start had gone before, so the output's first frame is the input's own and
+            // it doesn't fade in.
             long start = _inStart;
-            Fill(start + (2 * hop));
+            Fill(start + hop);
             for (int n = 0; n < hop; n++)
             {
-                _ready[2 * n] = Sample(start + n, 0);
-                _ready[(2 * n) + 1] = Sample(start + n, 1);
-                _overlap[2 * n] = _window[hop + n] * Sample(start + hop + n, 0);
-                _overlap[(2 * n) + 1] = _window[hop + n] * Sample(start + hop + n, 1);
+                _overlap[2 * n] = _window[hop + n] * Sample(start + n, 0);
+                _overlap[(2 * n) + 1] = _window[hop + n] * Sample(start + n, 1);
             }
 
-            _lastGrain = start;
+            _lastGrain = start - hop;
+            _lastCenter = start;
             _primed = true;
-            _analysisPosition += hop * _ratio;
-            return;
         }
 
-        long target = (long)Math.Round(_analysisPosition);
+        // This grain is centred where the input is heard to have got to at the end of the output it starts.
+        double center = _lastCenter + (hop * _ratio);
+        long target = (long)Math.Round(center) - hop;
         long natural = _lastGrain + hop;
-        Discard(Math.Min(target - _tolerance, natural));
 
+        // The last grain carrying on, which this one is matched against, is taken before the input it's in is let go.
+        Fill(natural + hop);
+        for (int n = 0; n < hop; n++)
+            _natural[n] = Sample(natural + n, 0) + Sample(natural + n, 1);
+
+        // Input from before the start, as after a reset, isn't there to take a grain from.
         long low = Math.Max(target - _tolerance, _inStart);
         long high = Math.Max(low, target + _tolerance);
+        Discard(low);
 
-        // Read as far as this grain's search, and as far as the output it makes stands for, so the input's end is
-        // known before the output passes it.
-        long nextAnalysis = (long)Math.Ceiling(_analysisPosition + (hop * _ratio));
-        Fill(Math.Max(Math.Max(high + (2 * hop), natural + hop), nextAnalysis));
+        // Read as far as this grain's search, which is past the input the output it makes stands for, so the input's
+        // end is known before the output passes it.
+        Fill(high + (2 * hop));
 
-        long grain = BestGrain(low, high, natural, target);
+        long grain = BestGrain(low, high, target);
         for (int n = 0; n < hop; n++)
         {
             for (int c = 0; c < 2; c++)
@@ -193,21 +213,18 @@ public sealed class TimeStretcher
             }
         }
 
+        _readyRatio = _ratio;
         _lastGrain = grain;
-        _analysisPosition += hop * _ratio;
+        _lastCenter = center;
     }
 
     /// <summary>
     /// Where from <paramref name="low"/> to <paramref name="high"/> the next grain starts: where the input looks most like
-    /// the last grain carrying on from <paramref name="natural"/>, nearest <paramref name="target"/> on a tie.
+    /// <see cref="_natural"/>, the last grain carrying on, nearest <paramref name="target"/> on a tie.
     /// </summary>
-    private long BestGrain(long low, long high, long natural, long target)
+    private long BestGrain(long low, long high, long target)
     {
-        int hop = _hop;
-        for (int n = 0; n < hop; n++)
-            _natural[n] = Sample(natural + n, 0) + Sample(natural + n, 1);
-
-        int span = (int)(high - low) + hop;
+        int span = (int)(high - low) + _hop;
         for (int n = 0; n < span; n++)
             _mono[n] = Sample(low + n, 0) + Sample(low + n, 1);
 

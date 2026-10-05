@@ -655,12 +655,12 @@ namespace ChartPacker.ViewModels
         /// <summary>The spectrum of what's being heard, for the visualiser behind the details panel. On the UI thread.</summary>
         public bool TryReadSpectrum(Span<float> levels)
         {
-            if (!ShowSpectrum || _player is not { } player || !player.TryReadHeard(_heard))
+            if (!ShowSpectrum || _player is not { } player || !player.TryReadHeard(_heard, out double rate))
                 return false;
 
             _analyzer ??= new SpectrumAnalyzer();
             // Without pitch correction, what's heard is played faster or slower than it was mixed, and higher or lower with it.
-            int heardRate = Math.Max(1, (int)Math.Round(player.HeardSampleRate));
+            int heardRate = Math.Max(1, (int)Math.Round(rate));
             _analyzer.Analyze(_heard, heardRate, levels);
             return true;
         }

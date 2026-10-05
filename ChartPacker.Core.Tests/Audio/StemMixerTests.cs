@@ -282,6 +282,24 @@ public sealed class StemMixerTests
         Assert.AreEqual(3100, mixer.PositionFrames);
     }
 
+    [TestMethod]
+    public void EachChangeToAStemsSwitchesIsCounted()
+    {
+        var mixer = Mixer(("guitar", Constant(0.2f)), ("bass", Constant(0.3f)));
+        int version = mixer.SwitchVersion;
+
+        mixer.Stems[0].IsMuted = true;
+        mixer.Stems[1].IsSolo = true;
+        mixer.Stems[1].Volume = 0.5f;
+        Assert.AreEqual(version + 3, mixer.SwitchVersion);
+
+        // Set to what they are already, nothing changes.
+        mixer.Stems[0].IsMuted = true;
+        mixer.Stems[1].IsSolo = true;
+        mixer.Stems[1].Volume = 0.5f;
+        Assert.AreEqual(version + 3, mixer.SwitchVersion);
+    }
+
     private static FakeSource Constant(float value, int frames = 48000, int rate = Rate) => new(rate, 2, frames, (_, _) => value);
 
     private static FakeSource Ramp() => new(Rate, 2, 48000, (n, _) => RampValue(n));

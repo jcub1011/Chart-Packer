@@ -161,7 +161,7 @@ namespace ChartPacker.Services
                         Label = Strings.PitchCorrectionLabel,
                         Description = Strings.PitchCorrectionDescription,
                         Keywords = Words(Strings.PitchCorrectionKeywords),
-                        DefaultValue = true,
+                        DefaultValue = AppSettings.DefaultPitchCorrection,
                         Get = () => player.PitchCorrection,
                         Set = correct => player.PitchCorrection = correct,
                     },

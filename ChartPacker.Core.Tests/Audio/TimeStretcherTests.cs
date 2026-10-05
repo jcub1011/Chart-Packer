@@ -7,6 +7,9 @@ public sealed class TimeStretcherTests
 {
     private const int Rate = 48000;
 
+    // The stretcher's grain step: 20 ms.
+    private const int Hop = Rate / 50;
+
     [TestMethod]
     [DataRow(0.01)]
     [DataRow(0.5)]
@@ -16,6 +19,7 @@ public sealed class TimeStretcherTests
     [DataRow(2.0)]
     [DataRow(4.0)]
     [DataRow(10.0)]
+    [DataRow(100.0)]
     public void TheOutputLastsAsLongAsTheInputOverTheRatio(double ratio)
     {
         var input = new Input(Rate / 2, (n, _) => Sine(n, 440));
@@ -66,22 +70,94 @@ public sealed class TimeStretcherTests
     }
 
     [TestMethod]
-    public void TheOutputStartsAsTheInputAfterAReset()
+    [DataRow(0.1)]
+    [DataRow(1.5)]
+    public void TheOutputStartsFromTheInputAfterAReset(double ratio)
     {
         var input = new Input(Rate * 2, (n, c) => Sine(n, c == 0 ? 440 : 330));
-        var stretcher = Stretcher(input, 1.5);
+        var stretcher = Stretcher(input, ratio);
         stretcher.Read(new float[Rate]);
 
         input.Position = Rate;
         stretcher.Reset(Rate);
-        var output = new float[512 * 2];
+        var output = new float[Hop * 2];
         stretcher.Read(output);
 
-        for (int n = 0; n < 512; n++)
+        // Its first frame is the input's own, and it carries on from there without a jump or a fade in.
+        Assert.AreEqual(Sine(Rate, 440), output[0]);
+        Assert.AreEqual(Sine(Rate, 330), output[1]);
+        for (int n = 2; n < output.Length; n++)
+            Assert.IsLessThan(0.05f, Math.Abs(output[n] - output[n - 2]));
+    }
+
+    [TestMethod]
+    public void AtItsOwnSpeedTheOutputIsTheInput()
+    {
+        var input = new Input(Rate, (n, c) => Sine(n, c == 0 ? 440 : 330));
+        input.Position = 1000;
+
+        float[] output = ReadAll(Stretcher(input, 1));
+
+        Assert.AreEqual(Rate - 1000, output.Length / 2);
+        for (int n = 0; n < output.Length / 2; n++)
         {
-            Assert.AreEqual(Sine(Rate + n, 440), output[2 * n]);
-            Assert.AreEqual(Sine(Rate + n, 330), output[(2 * n) + 1]);
+            Assert.AreEqual(Sine(1000 + n, 440), output[2 * n], 1e-6f);
+            Assert.AreEqual(Sine(1000 + n, 330), output[(2 * n) + 1], 1e-6f);
         }
+    }
+
+    [TestMethod]
+    [DataRow(0.1)]
+    [DataRow(4.0)]
+    public void AClickIsHeardWhereItsSourcePositionIs(double ratio)
+    {
+        // Silence but for one frame, about a second in, where a grain is centred at either ratio.
+        const int click = 46080;
+        var input = new Input(Rate * 2, (n, _) => n == click ? 1f : 0f);
+
+        float[] output = ReadAll(Stretcher(input, ratio));
+
+        // It's in every grain that takes it in, weighted by where in each grain it falls: in all, it's heard where the
+        // output stands for it. A grain starting where it stood for, rather than centred there, would hear it a hop early.
+        double weight = 0, sum = 0;
+        for (int n = 0; n < output.Length / 2; n++)
+        {
+            weight += output[2 * n];
+            sum += output[2 * n] * (double)n;
+        }
+
+        Assert.AreEqual(click / ratio, sum / weight, Hop / 8.0);
+    }
+
+    [TestMethod]
+    public void ARatioChangeTakesEffectAtTheNextGrain()
+    {
+        var input = new Input(Rate * 2, (n, _) => Sine(n, 440));
+        var stretcher = Stretcher(input, 0.75);
+        stretcher.Read(new float[4 * Hop * 2]);
+
+        stretcher.Ratio = 2;
+        stretcher.Read(new float[4 * Hop * 2]);
+
+        Assert.AreEqual((4 * Hop * 0.75) + (4 * Hop * 2), stretcher.SourcePosition, 1e-6);
+    }
+
+    [TestMethod]
+    [DataRow(0.1)]
+    [DataRow(2.5)]
+    public void InputForgottenAndReadAgainCarriesOnAsBefore(double ratio)
+    {
+        var input = new Input(Rate * 2, (n, _) => (float)(Sine(n, 440) + (0.3 * Sine(n, 97))));
+        float[] whole = ReadAll(Stretcher(input, ratio));
+
+        input.Position = 0;
+        var stretcher = Stretcher(input, ratio);
+        var first = new float[(Hop * 5 / 2) * 2];
+        stretcher.Read(first);
+        input.Position = stretcher.ForgetInput();
+        float[] rest = ReadAll(stretcher);
+
+        CollectionAssert.AreEqual(whole, first.Concat(rest).ToArray());
     }
 
     [TestMethod]

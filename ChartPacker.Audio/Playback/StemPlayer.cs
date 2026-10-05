@@ -14,7 +14,9 @@ namespace ChartPacker.Audio.Playback;
 /// most <see cref="QueueMilliseconds"/>: the queue holds that long of playback at any
 /// <see cref="Speed"/>. Seeking drops the queue, so it's heard at once. With
 /// <see cref="PitchCorrection"/> on, the mix goes through a <see cref="TimeStretcher"/> on its
-/// way to the output. The player owns the output but not the mixer's sources; dispose it before them.
+/// way to the output, which mixes what it holds again when a switch changes, so the switch is heard
+/// less than 40 ms later than that, as the grain it was putting together fades out. The player owns
+/// the output but not the mixer's sources; dispose it before them.
 /// </remarks>
 public sealed class StemPlayer : IDisposable
 {
@@ -43,15 +45,21 @@ public sealed class StemPlayer : IDisposable
     private float _speed;
     private bool _pitchCorrection;
 
+    // A new Speed or PitchCorrection for the playback thread to take up without dropping the queue.
+    private bool _retune;
+
     // Frames written to the output since it was opened: what's been played is this less what's still queued.
     private long _writtenFrames;
 
-    // Since the last seek, the output plays the mix from _epochSource on, each frame written standing for _epochRatio
-    // frames of it: 1 as mixed, or the speed when it's stretched. Set on the playback thread, at a seek.
-    private long _epochOutput;
-    private long _epochSource;
-    private double _epochRatio = 1;
+    // Whether the mix goes through the stretcher, which plays it at the device's own speed. Set on the playback thread,
+    // under _lock.
     private bool _stretching;
+
+    // The stems' switches as the stretcher's input was mixed with. Playback thread only.
+    private int _mixedSwitches;
+
+    // Which frame of the mix each frame written stands for. Under _lock, with _writtenFrames.
+    private readonly PositionMap _map = new();
 
     // What was written lately, by output frame, for TryReadHeard. Written and read under _lock, with _writtenFrames.
     private readonly OutputTap _tap = new();
@@ -149,8 +157,9 @@ public sealed class StemPlayer : IDisposable
 
     /// <summary>
     /// How fast playback runs, from 0.01 to 100; 1 plays at the audio's own speed. The pitch moves with it unless
-    /// <see cref="PitchCorrection"/> is on. Heard at once, queued audio included. <see cref="Position"/> stays in the
-    /// audio's own time.
+    /// <see cref="PitchCorrection"/> is on. Without it, a change is heard at once, queued audio included; with it, what
+    /// follows the queue is stretched to the new speed, so it's heard once the queue has played, without a break.
+    /// <see cref="Position"/> stays in the audio's own time.
     /// </summary>
     public float Speed
     {
@@ -196,19 +205,6 @@ public sealed class StemPlayer : IDisposable
     }
 
     /// <summary>
-    /// The rate what <see cref="TryReadHeard"/> gives is heard at: the mixer's rate while it's stretched in time, or played
-    /// as mixed, and that times the speed while the device plays it faster or slower.
-    /// </summary>
-    public double HeardSampleRate
-    {
-        get
-        {
-            lock (_lock)
-                return _stretching ? _mixer.OutputRate : _mixer.OutputRate * (double)_output.Speed;
-        }
-    }
-
-    /// <summary>
     /// Whether what's played is kept for <see cref="TryReadHeard"/>. Off, the playback thread doesn't keep it,
     /// and once it's on again nothing is heard until enough has been played since.
     /// </summary>
@@ -227,18 +223,24 @@ public sealed class StemPlayer : IDisposable
     }
 
     /// <summary>
-    /// Copies the <paramref name="mono"/>.Length frames heard last, channels averaged: what goes to the output, as
-    /// heard at <see cref="HeardSampleRate"/>, before <see cref="Volume"/>.
+    /// Copies the <paramref name="mono"/>.Length frames heard last, channels averaged: what goes to the output,
+    /// before <see cref="Volume"/>.
     /// </summary>
+    /// <param name="sampleRate">
+    /// The rate they're heard at: the mixer's, times the speed while the device plays the mix faster or slower rather
+    /// than it being stretched in time.
+    /// </param>
     /// <returns>
     /// <see langword="false"/>, leaving <paramref name="mono"/> as it was, while nothing is playing, during a seek,
     /// while <see cref="CapturesHeard"/> is off, or until that much has been heard since the start, the last seek
     /// or it was turned on.
     /// </returns>
-    public bool TryReadHeard(Span<float> mono)
+    public bool TryReadHeard(Span<float> mono, out double sampleRate)
     {
         lock (_lock)
         {
+            // While the mix is stretched, the device plays at its own speed.
+            sampleRate = _mixer.OutputRate * (double)_output.Speed;
             if (_disposed || !_playing || !_capturesHeard || _pendingSeek is not null)
                 return false;
             return _tap.TryRead(Math.Max(0, _writtenFrames - _output.QueuedFrames), mono);
@@ -313,16 +315,21 @@ public sealed class StemPlayer : IDisposable
     private TimeSpan FramesToTime(long frames) => TimeSpan.FromSeconds((double)frames / _mixer.OutputRate);
 
     /// <summary>The frame of the mix being heard now. Under <see cref="_lock"/>.</summary>
-    private long HeardSourceFrame()
-    {
-        long played = Math.Max(0, _writtenFrames - _output.QueuedFrames - _epochOutput);
-        return _epochSource + (long)Math.Round(played * _epochRatio);
-    }
+    private long HeardSourceFrame() => (long)Math.Round(_map.SourceAt(Math.Max(0, _writtenFrames - _output.QueuedFrames)));
+
+    /// <summary>
+    /// Whether the queue can be kept through a new <see cref="Speed"/> or <see cref="PitchCorrection"/>, which it can
+    /// while the device's speed stays as it is: stretched, the device plays at its own speed, so the mix can go on being
+    /// stretched at the new speed, 1 included, as long as it's to be stretched or is to play at its own speed; played as
+    /// mixed at the device's own speed, it can start being stretched. Under <see cref="_lock"/>.
+    /// </summary>
+    private bool KeepsQueue() => _stretching ? _pitchCorrection || _speed == 1 : _output.Speed == 1;
 
     /// <summary>
     /// Takes up a new <see cref="Speed"/> or <see cref="PitchCorrection"/>. Played as mixed before and after, the device
-    /// just plays the queue at the new speed. Otherwise the queue was or will be stretched at a speed that's no longer
-    /// right, so playback starts again from what's heard now, at the new one. Under <see cref="_lock"/>.
+    /// just plays the queue at the new speed. Otherwise, while the queue can be kept, the playback thread stretches what
+    /// follows it at the new speed; when it can't, as the device's speed has to change, playback starts again from what's
+    /// heard now. Under <see cref="_lock"/>.
     /// </summary>
     private void ApplySpeed()
     {
@@ -336,8 +343,33 @@ public sealed class StemPlayer : IDisposable
         if (_disposed || _error is not null)
             return;
 
-        _pendingSeek ??= HeardSourceFrame();
+        if (KeepsQueue())
+            _retune = true;
+        else
+            _pendingSeek ??= HeardSourceFrame();
         Monitor.PulseAll(_lock);
+    }
+
+    /// <summary>Takes up what <see cref="ApplySpeed"/> asked for without dropping the queue. On the playback thread, under <see cref="_lock"/>.</summary>
+    private void Retune()
+    {
+        if (!_stretching && !(_pitchCorrection && _speed != 1))
+            return;
+
+        if (!KeepsQueue())
+        {
+            _pendingSeek ??= HeardSourceFrame();
+            return;
+        }
+
+        _stretcher.Ratio = _speed;
+        if (!_stretching)
+        {
+            // What's queued plays as mixed at the device's own speed, and is carried on from, stretched.
+            _stretcher.Reset(_mixer.PositionFrames);
+            _mixedSwitches = _mixer.SwitchVersion;
+            _stretching = true;
+        }
     }
 
     private void Run()
@@ -347,10 +379,18 @@ public sealed class StemPlayer : IDisposable
             long? seek;
             lock (_lock)
             {
-                while (!_disposed && !_playing && _pendingSeek is null)
+                while (!_disposed && !_playing && _pendingSeek is null && !_retune)
                     Monitor.Wait(_lock);
                 if (_disposed)
                     return;
+
+                if (_pendingSeek is null && _retune)
+                {
+                    _retune = false;
+                    Retune();
+                    if (!_playing && _pendingSeek is null)
+                        continue;
+                }
 
                 seek = _pendingSeek;
             }
@@ -365,21 +405,21 @@ public sealed class StemPlayer : IDisposable
                     {
                         // The speed is taken up here, with the queue empty, so everything queued from now on is at it.
                         _stretching = _pitchCorrection && _speed != 1;
-                        _epochRatio = _stretching ? _speed : 1;
-                        _epochOutput = _writtenFrames;
-                        _epochSource = _mixer.PositionFrames;
                         _output.Speed = _stretching ? 1 : _speed;
+                        _map.Reset(_writtenFrames, _mixer.PositionFrames);
                         _tap.Clear();
+                        _retune = false;
                         if (_pendingSeek == seek)
                             _pendingSeek = null;
+
+                        if (_stretching)
+                        {
+                            _stretcher.Ratio = _speed;
+                            _stretcher.Reset(_mixer.PositionFrames);
+                        }
                     }
 
-                    if (_stretching)
-                    {
-                        _stretcher.Ratio = _epochRatio;
-                        _stretcher.Reset(_epochSource);
-                    }
-
+                    _mixedSwitches = _mixer.SwitchVersion;
                     continue;
                 }
 
@@ -393,16 +433,29 @@ public sealed class StemPlayer : IDisposable
                     continue;
                 }
 
+                // The stretcher holds mix it hasn't played yet, as long as a second at a slow speed: a switched stem has it
+                // mixed again, so the switch is heard once the queue has played rather than once that has too.
+                int switches = _mixer.SwitchVersion;
+                if (_stretching && switches != _mixedSwitches)
+                {
+                    _mixedSwitches = switches;
+                    _mixer.Seek(_stretcher.ForgetInput());
+                }
+
                 var chunk = _chunk.AsSpan(0, Math.Min(_chunk.Length, target * 2));
+                double from = _stretching ? _stretcher.SourcePosition : _mixer.PositionFrames;
                 int frames = _stretching ? _stretcher.Read(chunk) : _mixer.Mix(chunk);
                 if (frames > 0)
                 {
+                    double to = _stretching ? _stretcher.SourcePosition : _mixer.PositionFrames;
+
                     // Together, so Position never sees one without the other. Queuing only copies.
                     lock (_lock)
                     {
                         _output.Write(_chunk.AsSpan(0, frames * 2));
                         if (_capturesHeard)
                             _tap.Write(_chunk.AsSpan(0, frames * 2), _writtenFrames);
+                        _map.Add(_writtenFrames, frames, from, to);
                         _writtenFrames += frames;
                     }
                 }
@@ -436,7 +489,7 @@ public sealed class StemPlayer : IDisposable
     {
         lock (_lock)
         {
-            if (!_disposed && _pendingSeek is null && _playing)
+            if (!_disposed && _pendingSeek is null && !_retune && _playing)
                 Monitor.Wait(_lock, 5);
         }
     }

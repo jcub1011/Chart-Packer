@@ -1,3 +1,4 @@
+using ChartPacker.Audio.Dsp;
 using ChartPacker.Audio.Spectrum;
 
 namespace ChartPacker.Core.Tests.Audio;
@@ -185,6 +186,17 @@ public sealed class SpectrumTests
         Assert.IsFalse(tap.TryRead(6, mono));
         Assert.IsTrue(tap.TryRead(103, mono));
         Assert.AreSequenceEqual([101f, 102f], mono);
+    }
+
+    [TestMethod]
+    public void TwoPeriodicHannWindowsHalfAWindowApartAddUpToOne()
+    {
+        float[] window = Windowing.PeriodicHann(64);
+
+        Assert.AreEqual(0f, window[0]);
+        Assert.AreEqual(1f, window[32]);
+        for (int n = 0; n < 32; n++)
+            Assert.AreEqual(1f, window[n] + window[n + 32], 1e-6f);
     }
 
     /// <summary>The band a frequency falls in, from the bands' spacing: even in pitch from 40 Hz to 16 kHz.</summary>
