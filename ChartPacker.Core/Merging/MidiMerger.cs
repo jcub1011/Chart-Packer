@@ -93,7 +93,8 @@ public static class MidiMerger
         foreach (var track in placed)
         {
             SustainCutoff.Normalize(track.Messages, track.Gems.Notes, track.Gems.Sustains.Contains, SustainCutoff.Of(baseFile.Division, cutoff));
-            MoveStarPower(track.Messages, track.Source.Options.MidiStarPowerPitch);
+            if (MidiLayout.TrackNames.ContainsKey(track.Name))
+                MoveStarPower(track.Messages, track.Source.Options.MidiStarPowerPitch);
         }
 
         // As merged, the drums read as their source's song.ini has them, the HOPOs as the base's, and star power is on 116.
@@ -159,7 +160,8 @@ public static class MidiMerger
 
     /// <summary>
     /// Puts a source's star power on 116, as the merged song.ini has no <c>multiplier_note</c>: from 103, where its
-    /// song.ini had it there, leaving out what was on 116, which wasn't star power.
+    /// song.ini had it there, leaving out what was on 116, which wasn't star power. Only for the tracks
+    /// <see cref="MidiLayout.TrackNames"/> lists: vocals, harmonies and the pro tracks keep theirs on 116 whatever it says.
     /// </summary>
     private static void MoveStarPower(List<MidiMessage> messages, int starPowerPitch)
     {
@@ -247,7 +249,7 @@ public static class MidiMerger
             .Select(c =>
             {
                 var events = MidiFile.ReadEvents(midi, c);
-                return new ParsedTrack(c, events, MidiFile.NameOf(midi, events));
+                return new ParsedTrack(c, events, MidiChartReader.NameOf(midi, events));
             })
             .ToList();
         return new ParsedFile(division, tracks, MidiChartReader.TempoOf(midi, division, [.. tracks.Select(t => t.Events)]));

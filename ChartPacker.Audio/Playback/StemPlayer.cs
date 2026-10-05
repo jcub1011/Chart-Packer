@@ -25,6 +25,10 @@ public sealed class StemPlayer : IDisposable
 
     private const int ChunkMilliseconds = 20;
 
+    // The least time between mixing the stretcher's input again for a change of volume, so a slider dragged doesn't
+    // seek every stem each chunk.
+    private const int VolumeRemixMilliseconds = 150;
+
     private readonly StemMixer _mixer;
     private readonly IAudioOutput _output;
     private readonly TimeStretcher _stretcher;
@@ -55,8 +59,11 @@ public sealed class StemPlayer : IDisposable
     // under _lock.
     private bool _stretching;
 
-    // The stems' switches as the stretcher's input was mixed with. Playback thread only.
+    // The stems' switches and volumes as the stretcher's input was mixed with, and when it was last mixed again for a
+    // volume. Playback thread only.
     private int _mixedSwitches;
+    private int _mixedVolumes;
+    private long _volumesRemixedAt;
 
     // Which frame of the mix each frame written stands for. Under _lock, with _writtenFrames.
     private readonly PositionMap _map = new();
@@ -368,6 +375,7 @@ public sealed class StemPlayer : IDisposable
             // What's queued plays as mixed at the device's own speed, and is carried on from, stretched.
             _stretcher.Reset(_mixer.PositionFrames);
             _mixedSwitches = _mixer.SwitchVersion;
+            _mixedVolumes = _mixer.VolumeVersion;
             _stretching = true;
         }
     }
@@ -420,6 +428,7 @@ public sealed class StemPlayer : IDisposable
                     }
 
                     _mixedSwitches = _mixer.SwitchVersion;
+                    _mixedVolumes = _mixer.VolumeVersion;
                     continue;
                 }
 
@@ -434,11 +443,16 @@ public sealed class StemPlayer : IDisposable
                 }
 
                 // The stretcher holds mix it hasn't played yet, as long as a second at a slow speed: a switched stem has it
-                // mixed again, so the switch is heard once the queue has played rather than once that has too.
+                // mixed again, so the switch is heard once the queue has played rather than once that has too. A volume is
+                // mixed again at most every VolumeRemixMilliseconds, as a slider dragged changes it with nearly every chunk.
                 int switches = _mixer.SwitchVersion;
-                if (_stretching && switches != _mixedSwitches)
+                int volumes = _mixer.VolumeVersion;
+                long now = Environment.TickCount64;
+                if (_stretching && (switches != _mixedSwitches || (volumes != _mixedVolumes && now - _volumesRemixedAt >= VolumeRemixMilliseconds)))
                 {
                     _mixedSwitches = switches;
+                    _mixedVolumes = volumes;
+                    _volumesRemixedAt = now;
                     _mixer.Seek(_stretcher.ForgetInput());
                 }
 

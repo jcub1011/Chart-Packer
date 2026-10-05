@@ -131,6 +131,49 @@ public sealed class MidiMergerTests
     }
 
     [TestMethod]
+    public void VocalStarPowerStaysOn116WhateverMultiplierNoteSays()
+    {
+        // multiplier_note moves only the instrument tracks' star power: the vocals' overdrive is on 116 regardless.
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());
+        var other = new MidiChart(
+            new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART VOCALS").Note(0, 105, 480).Note(0, 116, 480).Note(0, 60, 100).Note(240, 103, 10).Build(),
+            TimeSpan.Zero,
+            ChartReadOptions.From([new("multiplier_note", "103")]));
+
+        var result = MidiMerger.Merge(baseChart, [(other, MidiPartCatalog.PartOf("PART VOCALS")!)]);
+
+        Assert.AreSequenceEqual([60, 103, 105, 116], [.. NoteOnPitches(result.Midi, "PART VOCALS").Order()]);
+    }
+
+    [TestMethod]
+    public void ATrackIsNamedAsTheReaderNamesIt()
+    {
+        // Of the names at tick 0, the first YARG recognizes; and an instrument track only by its exact name.
+        var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());
+        var renamed = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120)
+            .Track("Track 1").Meta(0, 0x03, Encoding.ASCII.GetBytes("PART GUITAR")).Note(0, 96)
+            .Build());
+        var spaced = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Track("PART GUITAR ").Note(0, 96).Build());
+
+        var merged = MidiMerger.Merge(baseChart, [(renamed, Guitar)]);
+        Assert.AreEqual(0, ChartReaderTests.Notes(ChartReader.Read(merged.Midi, "notes.mid"), ChartInstrument.Guitar).Single().Lane);
+
+        Assert.DoesNotContain("PART GUITAR", Encoding.Latin1.GetString(MidiMerger.Merge(baseChart, [(spaced, Guitar)]).Midi));
+    }
+
+    [TestMethod]
+    public void APartHasAnInstrumentTrackOnlyByItsExactName()
+    {
+        Assert.IsTrue(Guitar.Has("PART GUITAR"));
+        Assert.IsFalse(Guitar.Has("PART GUITAR "));
+        Assert.IsFalse(Guitar.Has("part guitar"));
+
+        // Tracks the note reader skips are matched leniently, as the vocal reader reads them.
+        var vocals = MidiPartCatalog.PartOf("PART VOCALS")!;
+        Assert.IsTrue(vocals.Has("part vocals "));
+    }
+
+    [TestMethod]
     public void TheLaterPartGuitarIsTheOneMerged()
     {
         var baseChart = Chart(new MidiBuilder().Track("tempo").Tempo(0, 120).Build());
@@ -225,4 +268,11 @@ public sealed class MidiMergerTests
     private static MidiChart Chart(byte[] midi) => new(midi, TimeSpan.Zero, ChartReadOptions.Default);
 
     private static ChartDocument Read(MidiChart chart) => ChartReader.Read(chart.Midi, "notes.mid");
+
+    private static IEnumerable<int> NoteOnPitches(byte[] midi, string trackName)
+    {
+        var (_, _, chunks) = MidiFile.ReadChunks(midi);
+        var events = chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.ReadEvents(midi, c)).First(e => MidiFile.NameOf(midi, e) == trackName);
+        return events.Where(e => e.Kind == 0x90 && e.DataLength >= 2 && midi[e.DataStart + 1] > 0).Select(e => (int)midi[e.DataStart]);
+    }
 }

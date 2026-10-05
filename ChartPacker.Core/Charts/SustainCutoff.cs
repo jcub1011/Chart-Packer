@@ -48,23 +48,23 @@ internal static class SustainCutoff
 
     /// <summary>
     /// The notes at <paramref name="pitches"/> among <paramref name="messages"/>, which are in tick order,
-    /// paired first on, first off as <see cref="MidiChartReader"/> pairs them; a note never let go is left out.
+    /// paired as <see cref="MidiChartReader"/> pairs them: a note-on with the next note-off of its pitch and channel,
+    /// a second note-on while one is held ignored, and a note never let go left out.
     /// </summary>
     public static List<Held> NotesOf(IReadOnlyList<MidiMessage> messages, IReadOnlySet<int> pitches)
     {
         var notes = new List<Held>();
-        var held = new Dictionary<int, Queue<int>>();
+        var held = new Dictionary<(int Pitch, int Channel), int>();
         for (int i = 0; i < messages.Count; i++)
         {
             byte[] bytes = messages[i].Bytes;
             if (bytes.Length < 3 || (bytes[0] & 0xF0) is not (0x80 or 0x90) || !pitches.Contains(bytes[1]))
                 continue;
 
-            if (!held.TryGetValue(bytes[1], out var starts))
-                held[bytes[1]] = starts = new Queue<int>();
+            var key = (bytes[1], bytes[0] & 0x0F);
             if ((bytes[0] & 0xF0) == 0x90 && bytes[2] > 0)
-                starts.Enqueue(i);
-            else if (starts.TryDequeue(out int on))
+                held.TryAdd(key, i);
+            else if (held.Remove(key, out int on))
                 notes.Add(new Held(bytes[1], on, i));
         }
 
@@ -87,7 +87,8 @@ internal static class SustainCutoff
                 var note = list[i];
                 long start = messages[note.On].Tick;
                 long end = messages[note.Off].Tick;
-                long next = i + 1 < list.Count ? messages[list[i + 1].On].Tick : long.MaxValue;
+                // The next note of the pitch that starts later: one on the same tick, on another channel, isn't in the way.
+                long next = list.Skip(i + 1).Select(n => messages[n.On].Tick).FirstOrDefault(t => t > start, long.MaxValue);
 
                 long want = end;
                 if (!isSustain(note) && end - start >= cutoff)

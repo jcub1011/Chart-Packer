@@ -148,8 +148,7 @@ public static class SongMerger
                     // which YARG takes from delay unless it's 0, then delay_seconds, then the chart's offset.
                     if (!key.Equals("delay", StringComparison.OrdinalIgnoreCase))
                         return null;
-                    if (SongIniValues.Integer(baseSource.Value(key)) is { } ms && ms != 0)
-                        return baseSource.Value(key);
+                    // Written as the whole milliseconds the chart is placed with, as delay is read strictly from here on.
                     return baseSource.Chart is { Delay: var offset } && offset != TimeSpan.Zero
                         ? Math.Round(offset.TotalMilliseconds, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture)
                         : null;
@@ -626,7 +625,7 @@ public static class SongMerger
         foreach (var chunk in MidiFile.ReadChunks(midi).Chunks.Where(c => c.Id == "MTrk"))
         {
             var events = MidiFile.ReadEvents(midi, chunk);
-            if (MidiFile.NameOf(midi, events) is not { } name || !part.Has(name))
+            if (MidiChartReader.NameOf(midi, events) is not { } name || !part.Has(name))
                 continue;
 
             foreach (var e in events)

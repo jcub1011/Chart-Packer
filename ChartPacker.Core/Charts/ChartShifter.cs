@@ -215,7 +215,7 @@ public static class ChartShifter
         foreach (var chunk in chunks.Where(c => c.Id == "MTrk"))
         {
             var events = MidiFile.ReadEvents(bytes, chunk);
-            if (MidiFile.NameOf(bytes, events) is not { } name || !MidiLayout.TrackNames.TryGetValue(name, out var instrument) || !done.Add(instrument))
+            if (MidiChartReader.NameOf(bytes, events) is not { } name || !MidiLayout.TrackNames.TryGetValue(name, out var instrument) || !done.Add(instrument))
                 continue;
 
             var byDifficulty = offsets.Where(p => p.Key.Instrument == instrument).ToDictionary(p => p.Key.Difficulty, p => p.Value);

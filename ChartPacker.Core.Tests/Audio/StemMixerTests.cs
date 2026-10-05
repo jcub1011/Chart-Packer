@@ -287,17 +287,24 @@ public sealed class StemMixerTests
     {
         var mixer = Mixer(("guitar", Constant(0.2f)), ("bass", Constant(0.3f)));
         int version = mixer.SwitchVersion;
+        int volumes = mixer.VolumeVersion;
 
         mixer.Stems[0].IsMuted = true;
         mixer.Stems[1].IsSolo = true;
+        Assert.AreEqual(version + 2, mixer.SwitchVersion);
+        Assert.AreEqual(volumes, mixer.VolumeVersion);
+
+        // A volume is counted apart, as a slider dragged changes it many times a second.
         mixer.Stems[1].Volume = 0.5f;
-        Assert.AreEqual(version + 3, mixer.SwitchVersion);
+        Assert.AreEqual(version + 2, mixer.SwitchVersion);
+        Assert.AreEqual(volumes + 1, mixer.VolumeVersion);
 
         // Set to what they are already, nothing changes.
         mixer.Stems[0].IsMuted = true;
         mixer.Stems[1].IsSolo = true;
         mixer.Stems[1].Volume = 0.5f;
-        Assert.AreEqual(version + 3, mixer.SwitchVersion);
+        Assert.AreEqual(version + 2, mixer.SwitchVersion);
+        Assert.AreEqual(volumes + 1, mixer.VolumeVersion);
     }
 
     private static FakeSource Constant(float value, int frames = 48000, int rate = Rate) => new(rate, 2, frames, (_, _) => value);

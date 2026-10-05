@@ -325,6 +325,18 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task ABaseDelayReadLenientlyIsMovedFromWhatItIsReadAs()
+    {
+        // YARG reads 250.5 as 250 ms; moving the base 40 ms later makes it 290, not 40 from a delay taken as unset.
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(delay: "250.5"), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["drums"] = 0 });
+
+        Assert.AreEqual("250", SongMerger.BuildMetadata(plan).Single(p => p.Key == "delay").Value);
+        var moved = plan with { SourceOffsets = new Dictionary<int, int> { [0] = 40 } };
+        Assert.AreEqual("290", SongMerger.BuildMetadata(moved).Single(p => p.Key == "delay").Value);
+    }
+
+    [TestMethod]
     public async Task PreviewShiftsShowChoosingAnOffsetLikeStagingIt()
     {
         var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
@@ -608,7 +620,7 @@ public sealed class SongMergerTests
         [.. Directory.EnumerateDirectories(Path.GetTempPath(), "chartpacker-merge-*")];
 
     /// <summary>A folder song: pro-less drums and bass in MIDI at 480 ticks a beat, the full mix, and album art.</summary>
-    private SongEntry DrumsAndBass(string genre = "Rock", int? sustainCutoff = null)
+    private SongEntry DrumsAndBass(string genre = "Rock", int? sustainCutoff = null, string? delay = null)
     {
         var folder = _root.CreateSubdirectory("A " + Guid.NewGuid().ToString("N")[..6]);
         File.WriteAllText(Path.Combine(folder.FullName, "song.ini"), $"""
@@ -622,6 +634,7 @@ public sealed class SongMergerTests
             diff_bass = 2
             preview_start_time = 1000
             {(sustainCutoff is { } cutoff ? $"sustain_cutoff_threshold = {cutoff}" : "")}
+            {(delay is not null ? $"delay = {delay}" : "")}
             """);
         File.WriteAllBytes(Path.Combine(folder.FullName, "notes.mid"), new MidiBuilder()
             .Track("tempo").Tempo(0, 120)

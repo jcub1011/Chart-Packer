@@ -253,11 +253,12 @@ public sealed class SongMergeAnalysis
     private static List<MergeSourcePart> PartsOf(MidiChart chart, MergeSource source)
     {
         var (_, _, chunks) = MidiFile.ReadChunks(chart.Midi);
-        var names = chunks.Where(c => c.Id == "MTrk").Select(c => MidiFile.NameOf(chart.Midi, MidiFile.ReadEvents(chart.Midi, c))).OfType<string>().ToList();
+        var names = chunks.Where(c => c.Id == "MTrk").Select(c => MidiChartReader.NameOf(chart.Midi, MidiFile.ReadEvents(chart.Midi, c))).OfType<string>().ToList();
         var contents = ChartContents.PartsOf(ChartReader.Read(chart.Midi, ChartFiles.MidiName, chart.Options), chart.Midi);
 
+        // A track counts as its part only where the merge would take it, so an instrument track YARG doesn't read isn't offered.
         return [.. names
-            .Select(MidiPartCatalog.PartOf)
+            .Select(n => MidiPartCatalog.PartOf(n) is { } p && p.Has(n) ? p : null)
             .OfType<MidiPart>()
             .DistinctBy(p => p.Id)
             .OrderBy(MidiPartCatalog.OrderOf)
