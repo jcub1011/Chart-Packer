@@ -10,6 +10,7 @@ using Avalonia.Collections;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ChartPacker.Audio.Decoding;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Library;
 using ChartPacker.Core.Merging;
@@ -150,6 +151,10 @@ namespace ChartPacker.ViewModels
 
         // The one selected song's total size on disk.
         private ulong _totalSize;
+
+        // How far the merge preview draws the chart and the vocals it read moved, lining its songs up before that's staged;
+        // see ShowPreviewAlignment. Let go whenever the chart is read again.
+        private (IReadOnlyDictionary<ChartTrackKey, int> Chart, int Vocals)? _previewShifts;
 
         // Decoded album art by image hash: the first song's art, and every staged replacement.
         private Dictionary<string, Bitmap> _artImages = [];
@@ -351,6 +356,12 @@ namespace ChartPacker.ViewModels
         /// </summary>
         public string? PreviewNote { get; init; }
 
+        /// <summary>
+        /// How many times songs have been shown: it changes whenever the chart is read again, so whatever was worked out
+        /// against the chart read before, as <see cref="ShowPreviewAlignment"/>'s shifts are, no longer applies.
+        /// </summary>
+        public int LoadGeneration { get; private set; }
+
         /// <summary>More than one item is selected: only the merged metadata is shown.</summary>
         [ObservableProperty]
         public partial bool IsBulk { get; set; }
@@ -538,7 +549,12 @@ namespace ChartPacker.ViewModels
             : null;
 
         /// <summary>Loads <paramref name="entries"/>, replacing whatever is shown. A newer call cancels an older one.</summary>
-        public async Task ShowAsync(IReadOnlyList<SongEntry> entries)
+        /// <param name="inPlace">
+        /// For the one song shown, read again where it is, as the merge preview is once it's staged again: what's shown stays,
+        /// playback and the background video going on, until what's read replaces it, rather than the panel emptying while
+        /// it's read. Playback stops only when its tracks changed. For anything else the songs are loaded as usual.
+        /// </param>
+        public async Task ShowAsync(IReadOnlyList<SongEntry> entries, bool inPlace = false)
         {
             // This reads what's shown afresh, so a reload another panel's change was waiting on is done by it.
             _externalChangeTimer.Stop();
@@ -548,6 +564,97 @@ namespace ChartPacker.ViewModels
             using var cts = new CancellationTokenSource();
             _loadCts = cts;
 
+            // The chart is read again, so the shifts drawn on it, made against the one read before, are let go.
+            LoadGeneration++;
+            _previewShifts = null;
+
+            inPlace = inPlace && !IsBulk && !IsSaving && ErrorMessage is null
+                && entries is [var entry] && _entries is [var shown] && _songs.Count == 1
+                && entry.FullPath.Equals(shown.FullPath, StringComparison.Ordinal);
+            if (inPlace)
+            {
+                // The chart and lyrics are read again, still drawn until they are.
+                Highway.ReloadChart();
+                Lyrics.ReloadChart();
+                _entries = entries;
+                Title = entries[0].DisplayName;
+            }
+            else
+            {
+                ClearShown(entries);
+            }
+
+            if (entries.Count == 0)
+            {
+                _loadCts = null;
+                return;
+            }
+
+            // Drafts live on the UI thread, so the staged images to show are picked out here.
+            var stagedSources = entries
+                .Select(e => _drafts.Get(e.FullPath).AlbumArt?.SourcePath)
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            var stagedBackgrounds = entries
+                .SelectMany(e => SongBackgrounds.Kinds.Select(k => _drafts.Get(e.FullPath).GetBackground(k)?.SourcePath))
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            try
+            {
+                var loaded = await Task.Run(
+                    async () =>
+                    {
+                        var selection = entries.Count == 1 ? await LoadSingleAsync(entries[0], cts.Token) : await LoadBulkAsync(entries, cts.Token);
+                        var art = await LoadArtAsync(selection.Songs, stagedSources, cts.Token);
+                        try
+                        {
+                            var backgrounds = await BackgroundViewModel.LoadAsync(
+                                [.. selection.Songs.Select(s => s.Pairs is null ? null : s.Entry)], stagedBackgrounds, cts.Token);
+                            return selection with { Art = art, Backgrounds = backgrounds };
+                        }
+                        catch
+                        {
+                            DisposeLater(art.Images.Values);
+                            throw;
+                        }
+                    },
+                    cts.Token);
+
+                if (_loadCts == cts)
+                {
+                    Apply(loaded, inPlace);
+                }
+                else
+                {
+                    DisposeLater(loaded.Art.Images.Values);
+                    DisposeLater(loaded.Backgrounds.Images.Values);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (_loadCts == cts)
+                    ErrorMessage = string.Format(CultureInfo.CurrentCulture, Strings.DetailUnreadableFormat, ex.Message);
+            }
+            finally
+            {
+                if (_loadCts == cts)
+                {
+                    _loadCts = null;
+                    IsLoading = false;
+                    RefreshState();
+                }
+            }
+        }
+
+        /// <summary>Empties the panel for <paramref name="entries"/>, about to be loaded, letting go of everything shown before.</summary>
+        private void ClearShown(IReadOnlyList<SongEntry> entries)
+        {
             // Playback is of what's shown, and holds its files open; so does the background video.
             Player.Unload();
             ForgetSongLength();
@@ -596,73 +703,6 @@ namespace ChartPacker.ViewModels
             CancelAdd();
             IsLoading = entries.Count > 0;
             RefreshState();
-
-            if (entries.Count == 0)
-            {
-                _loadCts = null;
-                return;
-            }
-
-            // Drafts live on the UI thread, so the staged images to show are picked out here.
-            var stagedSources = entries
-                .Select(e => _drafts.Get(e.FullPath).AlbumArt?.SourcePath)
-                .OfType<string>()
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-            var stagedBackgrounds = entries
-                .SelectMany(e => SongBackgrounds.Kinds.Select(k => _drafts.Get(e.FullPath).GetBackground(k)?.SourcePath))
-                .OfType<string>()
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            try
-            {
-                var loaded = await Task.Run(
-                    async () =>
-                    {
-                        var selection = entries.Count == 1 ? await LoadSingleAsync(entries[0], cts.Token) : await LoadBulkAsync(entries, cts.Token);
-                        var art = await LoadArtAsync(selection.Songs, stagedSources, cts.Token);
-                        try
-                        {
-                            var backgrounds = await BackgroundViewModel.LoadAsync(
-                                [.. selection.Songs.Select(s => s.Pairs is null ? null : s.Entry)], stagedBackgrounds, cts.Token);
-                            return selection with { Art = art, Backgrounds = backgrounds };
-                        }
-                        catch
-                        {
-                            DisposeLater(art.Images.Values);
-                            throw;
-                        }
-                    },
-                    cts.Token);
-
-                if (_loadCts == cts)
-                {
-                    Apply(loaded);
-                }
-                else
-                {
-                    DisposeLater(loaded.Art.Images.Values);
-                    DisposeLater(loaded.Backgrounds.Images.Values);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                if (_loadCts == cts)
-                    ErrorMessage = string.Format(CultureInfo.CurrentCulture, Strings.DetailUnreadableFormat, ex.Message);
-            }
-            finally
-            {
-                if (_loadCts == cts)
-                {
-                    _loadCts = null;
-                    IsLoading = false;
-                    RefreshState();
-                }
-            }
         }
 
         /// <summary>Ends editing on every row but <paramref name="row"/>, dropping text that wasn't committed.</summary>
@@ -1491,7 +1531,7 @@ namespace ChartPacker.ViewModels
         /// Lets go of every file of the shown songs this panel holds open, which would stop them being replaced or
         /// deleted: playback's, and the background video's. They're opened again when the songs are next shown.
         /// </summary>
-        private async Task ReleaseFilesAsync()
+        internal async Task ReleaseFilesAsync()
         {
             Player.Unload();
             Background.Unload();
@@ -1648,6 +1688,82 @@ namespace ChartPacker.ViewModels
             Lyrics.Refresh(HighwaySongOf(), HasVocalStem());
         }
 
+        /// <summary>
+        /// Shows the merge preview's songs lined up as chosen, before that's staged, while an alignment offset is dragged:
+        /// the chart and lyrics already read drawn moved by <paramref name="chartShifts"/> and <paramref name="vocalsShift"/>,
+        /// against the <c>delay</c> and <c>video_start_time</c> of <paramref name="metadata"/>, the song.ini that staging
+        /// writes for it. Nothing is read; playback and the video go on, the video along its new timeline. The shifts
+        /// last until the song is next shown, which reads the chart afresh.
+        /// </summary>
+        /// <returns>Whether it's shown: there's one song, as the preview has.</returns>
+        public bool ShowPreviewAlignment(IReadOnlyDictionary<ChartTrackKey, int> chartShifts, int vocalsShift, IReadOnlyList<KeyValuePair<string, string>> metadata)
+        {
+            if (_songs is not [var song] || IsBulk || IsSaving)
+                return false;
+
+            // Lining up moves only these keys; the rest of what's staged, song_length and all, stays as it is until it's staged.
+            var original = song.Item.Original.ToList();
+            foreach (string key in (string[])[TimingOffsets.AudioKey, TimingOffsets.VideoKey])
+            {
+                string? value = metadata.FirstOrDefault(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) is { Key: not null } pair ? pair.Value : null;
+                int at = original.FindIndex(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+                if (value is null)
+                    original.RemoveAll(p => p.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+                else if (at >= 0)
+                    original[at] = KeyValuePair.Create(original[at].Key, value);
+                else
+                    original.Add(KeyValuePair.Create(key, value));
+            }
+
+            _songs = [song with { Item = song.Item with { Original = original } }];
+            _previewShifts = (chartShifts, vocalsShift);
+            RebuildRows();
+            SyncTimingOffsets();
+            RefreshPlayback();
+            return true;
+        }
+
+        /// <summary>
+        /// Brings what's shown up to date with the files the merge preview just staged again, as <see cref="ShowPreviewAlignment"/>
+        /// already shows them: the song's listing, metadata rows, offsets, files and length are read afresh. The chart, lyrics,
+        /// background video and playback are left alone, as lining the songs up changes none of what they read.
+        /// </summary>
+        public async Task SyncPreviewStagingAsync(CancellationToken cancellationToken)
+        {
+            if (_songs is not [var song] || IsBulk || _entries.Count != 1 || IsSaving)
+                return;
+
+            LoadedSelection selection;
+            try
+            {
+                selection = await Task.Run(() => LoadSingleAsync(song.Entry, cancellationToken), cancellationToken);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            // Another load took over meanwhile; its truth wins.
+            if (_songs is not [var current] || !ReferenceEquals(current, song))
+                return;
+
+            var loaded = selection.Songs.Single();
+            if (loaded.Pairs is not { } pairs)
+                return;
+
+            _diskFiles = selection.Files;
+            _totalSize = selection.TotalSize;
+            _songs = [song with { Item = song.Item with { Original = pairs, DuplicateKeys = loaded.DuplicateKeys } }];
+            _loadNote = selection.MetadataNote;
+            SizeText = ByteSizeFormatter.Format(_totalSize);
+            RebuildRows();
+            SyncTimingOffsets();
+            RebuildFiles();
+        }
+
         /// <summary>Shows the one selected song's audio and video offsets, as its draft has its timing keys.</summary>
         private void SyncTimingOffsets()
         {
@@ -1682,8 +1798,12 @@ namespace ChartPacker.ViewModels
             VideoOffset.CanEdit = CanEditOffsets() && Background.HasVideoKind;
         }
 
-        private void Apply(LoadedSelection loaded)
+        /// <param name="inPlace">The song shown read again in place; see <see cref="ShowAsync"/>.</param>
+        private void Apply(LoadedSelection loaded, bool inPlace = false)
         {
+            // In place, what's shown is replaced, rather than having been let go before reading.
+            var oldArt = inPlace ? _artImages : null;
+
             _songs = [.. loaded.Songs
                 .Select((s, i) => (Song: s, ArtHash: loaded.Art.DiskHashes[i], Backgrounds: loaded.Backgrounds.Stored.ElementAtOrDefault(i) ?? StoredBackgrounds.None))
                 .Where(x => x.Song.Pairs is not null)
@@ -1693,7 +1813,9 @@ namespace ChartPacker.ViewModels
             _stagedArt = loaded.Art.Staged;
             _diskFiles = loaded.Files;
             _totalSize = loaded.TotalSize;
-            Background.Apply(loaded.Backgrounds);
+            Background.Apply(loaded.Backgrounds, keepShown: inPlace);
+            if (oldArt is not null)
+                DisposeLater(oldArt.Values);
 
             // A staged image that can no longer be read (moved, say) is reported like a bad pick.
             ArtError = _songs
@@ -1720,6 +1842,8 @@ namespace ChartPacker.ViewModels
                 SizeText = ByteSizeFormatter.Format(_totalSize);
             }
 
+            if (inPlace)
+                Findings.Clear();
             Findings.AddRange(loaded.Findings);
             RebuildRows();
             RefreshArt();
@@ -2032,7 +2156,8 @@ namespace ChartPacker.ViewModels
         /// <summary>The one selected song as the note highway needs it, or <see langword="null"/> when there isn't one.</summary>
         private HighwaySong? HighwaySongOf() =>
             _songs is [var song] && !IsBulk
-                ? new HighwaySong(song.Entry, song.Item.Draft, song.Item.Draft.ApplyTo(song.Item.Original), [.. _diskFiles.Select(f => f.Path)])
+                ? new HighwaySong(song.Entry, song.Item.Draft, song.Item.Draft.ApplyTo(song.Item.Original), [.. _diskFiles.Select(f => f.Path)],
+                    _previewShifts?.Chart, _previewShifts?.Vocals ?? 0)
                 : null;
 
         /// <summary>Whether the one selected song will have a vocals audio track once its draft is saved.</summary>
