@@ -664,7 +664,10 @@
     <value>Playback speed</value>
   </data>
   <data name="PlaybackSpeedToolTip" xml:space="preserve">
-    <value>Playback speed, from 1% to 1000%; pick one or type a percent. The pitch changes with it. Shared by every song, and back to 100% when the app starts again.</value>
+    <value>Playback speed, from 1% to 1000%; pick one or type a percent. Shared by every song, and back to 100% when the app starts again.</value>
+  </data>
+  <data name="PitchCorrectionToolTip" xml:space="preserve">
+    <value>Keep the pitch when playing faster or slower. When off, the pitch rises and falls with the speed.</value>
   </data>
   <data name="TrackVolumeName" xml:space="preserve">
     <value>Track volume in the mix</value>
@@ -942,6 +945,16 @@
   </data>
   <data name="VolumeKeywords" xml:space="preserve">
     <value>volume sound loudness</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
+  <data name="PitchCorrectionLabel" xml:space="preserve">
+    <value>Keep pitch when changing speed</value>
+  </data>
+  <data name="PitchCorrectionDescription" xml:space="preserve">
+    <value>Play songs faster or slower at their own pitch, by stretching the audio in time. When off, the pitch rises and falls with the speed.</value>
+  </data>
+  <data name="PitchCorrectionKeywords" xml:space="preserve">
+    <value>pitch correction keep preserve tempo time stretch speed slow fast chipmunk</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="SettingsCategoryVisualizers" xml:space="preserve">

@@ -232,13 +232,13 @@ public sealed class StemPlayerTests
 
         player.Play();
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
-        Assert.IsFalse(player.TryReadHeard(heard), "Nothing has been heard yet.");
+        Assert.IsFalse(player.TryReadHeard(heard, out _), "Nothing has been heard yet.");
 
         PlayFor(output, Rate / 2);
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
 
         // Half a second has been heard: the window ends there, however much more is queued.
-        Assert.IsTrue(player.TryReadHeard(heard));
+        Assert.IsTrue(player.TryReadHeard(heard, out _));
         Assert.AreEqual((float)((Rate / 2) - 1) / (Rate * 10), heard[^1], 1e-6f);
         Assert.AreEqual((float)((Rate / 2) - heard.Length) / (Rate * 10), heard[0], 1e-6f);
     }
@@ -254,15 +254,15 @@ public sealed class StemPlayerTests
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
 
         player.Pause();
-        Assert.IsFalse(player.TryReadHeard(heard));
+        Assert.IsFalse(player.TryReadHeard(heard, out _));
 
         player.Play();
         player.Seek(TimeSpan.FromSeconds(4));
         WaitUntil(() => output.Clears > 0 && output.QueuedFrames >= QueueTarget);
-        Assert.IsFalse(player.TryReadHeard(heard), "Nothing has been heard since the seek.");
+        Assert.IsFalse(player.TryReadHeard(heard, out _), "Nothing has been heard since the seek.");
 
         output.Drain(heard.Length);
-        Assert.IsTrue(player.TryReadHeard(heard));
+        Assert.IsTrue(player.TryReadHeard(heard, out _));
         Assert.AreEqual(4f / 10, heard[0], 1e-4f);
     }
 
@@ -278,18 +278,186 @@ public sealed class StemPlayerTests
         player.CapturesHeard = false;
         PlayFor(output, Rate / 2);
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
-        Assert.IsFalse(player.TryReadHeard(heard));
+        Assert.IsFalse(player.TryReadHeard(heard, out _));
 
         player.CapturesHeard = true;
-        Assert.IsFalse(player.TryReadHeard(heard), "Nothing was kept while it was off.");
+        Assert.IsFalse(player.TryReadHeard(heard, out _), "Nothing was kept while it was off.");
 
         PlayFor(output, Rate / 2);
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
 
         // A second has been heard in all: the window ends there, from what was played after it was turned on.
-        Assert.IsTrue(player.TryReadHeard(heard));
+        Assert.IsTrue(player.TryReadHeard(heard, out _));
         Assert.AreEqual((float)(Rate - 1) / (Rate * 10), heard[^1], 1e-6f);
         Assert.AreEqual((float)(Rate - heard.Length) / (Rate * 10), heard[0], 1e-6f);
+    }
+
+    [TestMethod]
+    public void WithPitchCorrectionTheDevicePlaysAtItsOwnSpeed()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.PitchCorrection = true;
+        player.Speed = 2;
+
+        player.Play();
+
+        // The mix is stretched before it's queued, so the queue plays as written and holds QueueMilliseconds of it.
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        Thread.Sleep(50);
+        Assert.AreEqual(1f, output.Speed);
+        Assert.IsLessThan(QueueTarget + (Rate / 20), output.QueuedFrames, $"{output.QueuedFrames} frames were queued.");
+        player.TryReadHeard(new float[1], out double heardRate);
+        Assert.AreEqual(Rate, heardRate);
+    }
+
+    [TestMethod]
+    public void WithPitchCorrectionThePositionMovesAtTheSpeed()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.PitchCorrection = true;
+        player.Speed = 2;
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // Half a second of output is a second of the song at twice the speed.
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        player.Pause();
+        Assert.AreEqual(1, player.Position.TotalSeconds, 0.001);
+    }
+
+    [TestMethod]
+    public void SwitchingPitchCorrectionCarriesOnFromWhatIsHeard()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.Speed = 2;
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        PlayFor(output, Rate / 2);
+        Assert.AreEqual(2f, output.Speed);
+        player.TryReadHeard(new float[1], out double heardRate);
+        Assert.AreEqual(2.0 * Rate, heardRate);
+
+        int clears = output.Clears;
+        player.PitchCorrection = true;
+
+        // What was queued unstretched is dropped, and the song carries on, stretched, from where it was heard.
+        Assert.AreEqual(0.5, player.Position.TotalSeconds, 0.001);
+        WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
+        Assert.AreEqual(1f, output.Speed);
+        Assert.AreEqual(0.5f / 10, output.FirstSampleAfterLastClear ?? float.NaN, 1e-6f);
+        player.TryReadHeard(new float[1], out heardRate);
+        Assert.AreEqual(Rate, heardRate);
+    }
+
+    [TestMethod]
+    [DataRow(1f)]
+    [DataRow(2f)]
+    public void WithPitchCorrectionASpeedChangeKeepsTheQueue(float from)
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.PitchCorrection = true;
+        player.Speed = from;
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        PlayFor(output, Rate / 4);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        player.Speed = 1.5f;
+        Assert.AreEqual(0.25 * from, player.Position.TotalSeconds, 0.001);
+
+        // What was queued, and stretched at the old speed meanwhile, plays out; what follows is at the new speed.
+        PlayFor(output, QueueTarget * 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        double before = player.Position.TotalSeconds;
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        player.Pause();
+
+        Assert.AreEqual(before + 0.75, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual(0, output.Clears);
+        Assert.AreEqual(1f, output.Speed);
+    }
+
+    [TestMethod]
+    public void WhileStretchedASwitchIsHeardOnceTheQueueHasPlayed()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.PitchCorrection = true;
+        player.Speed = 0.1f;
+        player.Play();
+        PlayFor(output, Rate / 4);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        long muted = output.WrittenFrames;
+        player.Mixer.Stems[0].IsMuted = true;
+        PlayFor(output, QueueTarget + (Rate / 10));
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The stretcher's mix is mixed again: past the chunk being put together then, what was left of a grain step and
+        // the step fading out of it, it's silent. Unmixed again, half a second of the old mix would follow at this speed.
+        float[] written = output.WrittenLeft();
+        int from = (int)muted + (4 * Rate / 50);
+        Assert.IsGreaterThan(from, written.Length);
+        for (int n = from; n < written.Length; n++)
+            Assert.AreEqual(0f, written[n], $"Frame {n - muted} after the mute was heard.");
+    }
+
+    [TestMethod]
+    public void WithoutPitchCorrectionASpeedChangeKeepsTheQueue()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        player.Speed = 1.5f;
+        Thread.Sleep(30);
+
+        Assert.AreEqual(0, output.Clears);
+        Assert.AreEqual(1.5f, output.Speed);
+    }
+
+    [TestMethod]
+    public void AtItsOwnSpeedPitchCorrectionPlaysTheMixAsItIs()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        var heard = new float[2048];
+        player.PitchCorrection = true;
+
+        player.Play();
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        Assert.AreEqual(0, output.Clears);
+        Assert.IsTrue(player.TryReadHeard(heard, out _));
+        for (int n = 0; n < heard.Length; n++)
+            Assert.AreEqual((float)((Rate / 2) - heard.Length + n) / (Rate * 10), heard[n]);
+    }
+
+    [TestMethod]
+    public void TheEndStopsPlaybackWhileStretching()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 0.1);
+        player.PitchCorrection = true;
+        player.Speed = 2;
+
+        player.Play();
+        WaitUntil(() =>
+        {
+            output.Drain(output.QueuedFrames);
+            return player.IsEnded;
+        });
+
+        Assert.IsNull(player.Error);
+        Assert.AreEqual(0.1, player.Position.TotalSeconds, 0.001);
     }
 
     [TestMethod]
@@ -339,6 +507,7 @@ public sealed class StemPlayerTests
         private int _queued;
         private int _largestWrite;
         private float? _firstAfterClear;
+        private readonly List<float> _writtenLeft = [];
 
         public int SampleRate => Rate;
 
@@ -383,6 +552,23 @@ public sealed class StemPlayerTests
             }
         }
 
+        /// <summary>How many frames have been written since the start.</summary>
+        public long WrittenFrames
+        {
+            get
+            {
+                lock (_lock)
+                    return _writtenLeft.Count;
+            }
+        }
+
+        /// <summary>The left channel of everything written since the start.</summary>
+        public float[] WrittenLeft()
+        {
+            lock (_lock)
+                return [.. _writtenLeft];
+        }
+
         public void Write(ReadOnlySpan<float> stereo)
         {
             if (FailWrites)
@@ -394,6 +580,8 @@ public sealed class StemPlayerTests
                     _firstAfterClear = stereo[0];
                 _queued += stereo.Length / 2;
                 _largestWrite = Math.Max(_largestWrite, stereo.Length / 2);
+                for (int i = 0; i < stereo.Length; i += 2)
+                    _writtenLeft.Add(stereo[i]);
             }
         }
 
