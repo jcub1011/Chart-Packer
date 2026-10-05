@@ -86,66 +86,107 @@ internal static class MidiFile
     /// <exception cref="ChartFormatException">The track is malformed.</exception>
     public static List<MidiEvent> ReadEvents(byte[] bytes, MidiChunk chunk)
     {
-        var events = new List<MidiEvent>();
-        int pos = chunk.DataStart;
-        int end = chunk.End;
-        long tick = 0;
-        byte running = 0;
+        // Note events take 3 or 4 bytes with running status, so this is about enough, and seldom grows.
+        var events = new List<MidiEvent>(chunk.Length / 3);
+        var reader = new EventReader(chunk);
+        while (reader.Next(bytes) is { } e)
+            events.Add(e);
 
-        while (pos < end)
+        return events;
+    }
+
+    /// <summary>
+    /// The name of the track <paramref name="chunk"/>, from its first track-name event, as <see cref="NameOf(byte[], List{MidiEvent})"/>
+    /// gives it, reading only as far as that event.
+    /// </summary>
+    /// <exception cref="ChartFormatException">The track is malformed before its name.</exception>
+    public static string? NameOf(byte[] bytes, MidiChunk chunk)
+    {
+        var reader = new EventReader(chunk);
+        while (reader.Next(bytes) is { } e)
         {
-            tick += ReadVlq(bytes, ref pos, end);
-            if (pos >= end)
+            if (TextOf(bytes, e, 0x03) is { } name)
+                return name.Trim();
+        }
+
+        return null;
+    }
+
+    /// <summary>Reads the whole track <paramref name="chunk"/>, as <see cref="ReadEvents"/> does, without keeping its events.</summary>
+    /// <exception cref="ChartFormatException">The track is malformed.</exception>
+    public static void Check(byte[] bytes, MidiChunk chunk)
+    {
+        var reader = new EventReader(chunk);
+        while (reader.Next(bytes) is not null)
+        {
+        }
+    }
+
+    /// <summary>Reads a track's events one at a time.</summary>
+    internal struct EventReader(MidiChunk chunk)
+    {
+        private readonly int _end = chunk.End;
+        private int _pos = chunk.DataStart;
+        private long _tick;
+        private byte _running;
+
+        /// <summary>The next event, or <see langword="null"/> at the end of the track.</summary>
+        /// <exception cref="ChartFormatException">The track is malformed.</exception>
+        public MidiEvent? Next(byte[] bytes)
+        {
+            if (_pos >= _end)
+                return null;
+
+            _tick += ReadVlq(bytes, ref _pos, _end);
+            if (_pos >= _end)
                 throw Malformed();
 
             byte status;
-            if (bytes[pos] >= 0x80)
+            if (bytes[_pos] >= 0x80)
             {
                 // Sysex and meta events should cancel running status, but charting tools rely on it
                 // lasting past them, as other chart readers allow.
-                status = bytes[pos++];
+                status = bytes[_pos++];
                 if (status < 0xF0)
-                    running = status;
+                    _running = status;
             }
-            else if (running != 0)
+            else if (_running != 0)
             {
-                status = running;
+                status = _running;
             }
             else
             {
                 throw Malformed();
             }
 
-            int dataStart = pos;
+            int dataStart = _pos;
             switch (status)
             {
                 case < 0xF0:
-                    pos += (status & 0xF0) is 0xC0 or 0xD0 ? 1 : 2;
+                    _pos += (status & 0xF0) is 0xC0 or 0xD0 ? 1 : 2;
                     break;
                 case 0xF0 or 0xF7:
                 {
-                    long length = ReadVlq(bytes, ref pos, end);
-                    pos += (int)length;
+                    long length = ReadVlq(bytes, ref _pos, _end);
+                    _pos += (int)length;
                     break;
                 }
 
                 case 0xFF:
                 {
-                    pos++;
-                    long length = ReadVlq(bytes, ref pos, end);
-                    pos += (int)length;
+                    _pos++;
+                    long length = ReadVlq(bytes, ref _pos, _end);
+                    _pos += (int)length;
                     break;
                 }
                 default:
                     throw Malformed();
             }
 
-            if (pos > end)
+            if (_pos > _end)
                 throw Malformed();
-            events.Add(new MidiEvent(tick, status, dataStart, pos - dataStart));
+            return new MidiEvent(_tick, status, dataStart, _pos - dataStart);
         }
-
-        return events;
     }
 
     /// <summary>A meta event's type, and where its data is.</summary>

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ChartPacker.Audio.Waveforms;
@@ -14,7 +15,8 @@ namespace ChartPacker.Services
         public const double MinLibraryPaneWidth = 200;
         public const int DefaultScanMaxDepth = 2;
         public const int MaxScanMaxDepth = 10;
-        public const int DefaultScanParallelism = 4;
+        // Reading a song is mostly parsing its chart, so a reader per processor keeps every core busy.
+        public static readonly int DefaultScanParallelism = Environment.ProcessorCount;
         public const int MinScanParallelism = 1;
         public const double DefaultMasterVolume = 1;
         public const OverwritePolicy DefaultOverwritePolicy = OverwritePolicy.Skip;

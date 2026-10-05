@@ -259,6 +259,57 @@ public sealed class SngReaderTests
         }
     }
 
+    [TestMethod]
+    public void SectionsCrossingTheEndOfThePrefixReadTheSame()
+    {
+        // With one pair "k" = V bytes, the index's length field is at 51 + V and the FileData's at 95 + V, so these
+        // put every field after the metadata on each side of, and across, the end of the first read.
+        for (int valueLength = SngReader.PrefixSize - 110; valueLength <= SngReader.PrefixSize - 40; valueLength++)
+        {
+            string value = new('v', valueLength);
+            var result = Read(new SngBuilder().AddMetadata("k", value).AddFile("notes.chart", [1, 2, 3]).Build());
+
+            Assert.IsEmpty(result.Findings, $"Value of {valueLength} bytes.");
+            Assert.AreEqual(value, result.Metadata.Single().Value);
+            Assert.AreEqual(new SngFileEntry("notes.chart", 3, (ulong)(103 + valueLength)), result.Files.Single());
+        }
+    }
+
+    [TestMethod]
+    public void MetadataLargerThanThePrefixReadsTheSame()
+    {
+        string value = new('v', 3 * SngReader.PrefixSize);
+        var result = Read(new SngBuilder().AddMetadata("name", "Big").AddMetadata("lyrics", value).AddFile("notes.chart", [1, 2, 3]).Build());
+
+        Assert.IsEmpty(result.Findings);
+        Assert.AreSequenceEqual(["Big", value], result.Metadata.Select(p => p.Value).ToArray());
+        Assert.AreEqual("notes.chart", result.Files.Single().Name);
+    }
+
+    [TestMethod]
+    public void FileTruncatedPastThePrefixIsReported()
+    {
+        byte[] full = new SngBuilder().AddMetadata("k", new string('v', 2 * SngReader.PrefixSize)).AddFile("notes.chart", [1, 2, 3]).Build();
+
+        AssertOnly(Read(full[..(SngReader.PrefixSize + 10)]), SngRules.Sng003);
+    }
+
+    [TestMethod]
+    public void ReadingAHandleMatchesReadingThePathAndLeavesItOpen()
+    {
+        string path = Write(TwoFiles(_ => { }));
+        var byPath = SngReader.Read(path, TestContext.CancellationToken);
+
+        using var handle = File.OpenHandle(path);
+        var byHandle = SngReader.Read(handle, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual(byPath.Metadata.ToArray(), byHandle.Metadata.ToArray());
+        Assert.AreSequenceEqual(byPath.Files.ToArray(), byHandle.Files.ToArray());
+        Assert.IsEmpty(byHandle.Findings);
+        Assert.IsFalse(handle.IsClosed);
+        Assert.AreEqual(new FileInfo(path).Length, RandomAccess.GetLength(handle));
+    }
+
     /// <summary>
     /// Where file data starts for <see cref="TwoFiles"/>: header 26, metadataLen 8, metadata
     /// 8 + (4 + 4 + 4 + 3), fileMetaLen 8, index 8 + 2 × (1 + 5 + 16), fileDataLen 8.

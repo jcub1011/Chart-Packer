@@ -36,6 +36,10 @@ public static class SngReader
     private const int MinPairSize = 4 + 4;
     private const int MinFileEntrySize = 1 + 8 + 8;
 
+    // How much of the file's start is read in one go: enough for the header, metadata and index of a
+    // typical .sng, so they don't each cost a read (and, on a hard drive, possibly a seek).
+    internal const int PrefixSize = 64 * 1024;
+
     private static ReadOnlySpan<byte> Identifier => "SNGPKG"u8;
 
     /// <summary>Reads <paramref name="path"/> on the thread pool.</summary>
@@ -56,12 +60,24 @@ public static class SngReader
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return Read(handle, cancellationToken);
+    }
+
+    /// <summary>Reads the <c>.sng</c> open as <paramref name="handle"/>, which stays open. Malformed content produces findings; only I/O failures throw.</summary>
+    /// <remarks>Lets a caller read the index and then the files it lists through one handle, so they're of the same file.</remarks>
+    /// <exception cref="IOException">The file can't be read.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    public static SngReadResult Read(SafeFileHandle handle, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(handle);
         return new Parser(handle, cancellationToken).Parse();
     }
 
     private sealed class Parser(SafeFileHandle handle, CancellationToken cancellationToken)
     {
         private readonly long _length = RandomAccess.GetLength(handle);
+        // The file's first bytes, read once; reads inside them are served from here.
+        private byte[] _prefix = [];
         private readonly List<Finding> _findings = [];
         private readonly List<SngMetadataPair> _metadata = [];
         private readonly List<SngFileEntry> _files = [];
@@ -71,6 +87,7 @@ public static class SngReader
 
         public SngReadResult Parse()
         {
+            ReadPrefix();
             ParseSections();
             return new SngReadResult(_header, _metadata, _files, _findings);
         }
@@ -375,9 +392,36 @@ public static class SngReader
             return BinaryPrimitives.ReadUInt64LittleEndian(buffer);
         }
 
+        /// <summary>
+        /// Reads up to <see cref="PrefixSize"/> bytes from the start of the file. A file that gets shorter meanwhile
+        /// leaves a shorter prefix, and the reads past it fail as they would have without one.
+        /// </summary>
+        private void ReadPrefix()
+        {
+            var prefix = new byte[(int)Math.Min(_length, PrefixSize)];
+            int filled = 0;
+            while (filled < prefix.Length)
+            {
+                int read = RandomAccess.Read(handle, prefix.AsSpan(filled), filled);
+                if (read == 0)
+                    break;
+                filled += read;
+            }
+
+            _prefix = filled == prefix.Length ? prefix : prefix[..filled];
+        }
+
         /// <summary>Fills <paramref name="buffer"/> from <paramref name="offset"/>. Callers have already checked the range is inside the file.</summary>
         private void ReadExact(long offset, Span<byte> buffer)
         {
+            if (offset < _prefix.Length)
+            {
+                int cached = (int)Math.Min(buffer.Length, _prefix.Length - offset);
+                _prefix.AsSpan((int)offset, cached).CopyTo(buffer);
+                buffer = buffer[cached..];
+                offset += cached;
+            }
+
             while (!buffer.IsEmpty)
             {
                 int read = RandomAccess.Read(handle, buffer, offset);

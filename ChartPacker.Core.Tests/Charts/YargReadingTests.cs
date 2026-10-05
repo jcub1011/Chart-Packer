@@ -108,6 +108,16 @@ public sealed class YargReadingTests
     }
 
     [TestMethod]
+    public void ChartLinesAtATickKeepTheirFileOrderWhenSorted()
+    {
+        var events = ChartTextReader.TrackEvents(["192 = N 1 0", "0 = N 4 0", "0 = N 2 0", "0 = S 2 10", "96 = N 3 0"]);
+
+        Assert.AreSequenceEqual(
+            [(0L, 'N', 4), (0L, 'N', 2), (0L, 'S', 2), (96L, 'N', 3), (192L, 'N', 1)],
+            [.. events.Select(e => (e.Tick, e.Type, e.Number))]);
+    }
+
+    [TestMethod]
     public void ChartMustStartWithSongThenSyncTrack()
     {
         byte[] noSync = Encoding.UTF8.GetBytes("[Song]\n{\n  Resolution = 192\n}\n[ExpertSingle]\n{\n  0 = N 0 0\n}\n");

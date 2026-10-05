@@ -115,9 +115,10 @@ internal static class ChartTextReader
             if (ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums)
                 continue;
             var events = TrackEvents(lines);
-            var notes = Frets(key, events, hopoThreshold, options, StarPowerOf(events));
+            var starPower = StarPowerOf(events);
+            var notes = Frets(key, events, hopoThreshold, options, starPower);
             if (notes.Count > 0)
-                tracks[key] = new NoteTrack(notes, StarPowerOf(events));
+                tracks[key] = new NoteTrack(notes, starPower);
         }
 
         var layout = DrumsLayoutOf(sections, options);
@@ -268,32 +269,52 @@ internal static class ChartTextReader
     internal readonly record struct TrackEvent(long Tick, char Type, int Number, long Length, string Text);
 
     /// <summary>A note section's lines as events, in tick order, those at a tick in the order given.</summary>
-    internal static List<TrackEvent> TrackEvents(IEnumerable<string> lines) =>
-        [.. lines.Select(Event).OfType<TrackEvent>().Select((e, i) => (e, i)).OrderBy(p => p.e.Tick).ThenBy(p => p.i).Select(p => p.e)];
+    internal static List<TrackEvent> TrackEvents(IEnumerable<string> lines)
+    {
+        var events = lines is ICollection<string> all ? new List<TrackEvent>(all.Count) : [];
+        foreach (string line in lines)
+        {
+            if (Event(line) is { } e)
+                events.Add(e);
+        }
+
+        // Charts are almost always in order already. OrderBy is stable, so those at a tick keep their order.
+        for (int i = 1; i < events.Count; i++)
+        {
+            if (events[i].Tick < events[i - 1].Tick)
+                return [.. events.OrderBy(e => e.Tick)];
+        }
+
+        return events;
+    }
 
     /// <summary>One note-section line as an event; <see langword="null"/> when its tick isn't digits or it has no type.</summary>
+    /// <remarks>Read as spans, so only a text event's text becomes a string: a library scan reads every line of every chart.</remarks>
     internal static TrackEvent? Event(string line)
     {
-        string tickText = SplitOnce(line, '=', out string rest);
-        if (tickText.Length == 0 || !tickText.All(char.IsAsciiDigit))
+        var tickText = SplitOnce(line.AsSpan(), '=', out var rest);
+        if (tickText.IsEmpty || tickText.ContainsAnyExceptInRange('0', '9'))
             return null;
         long tick = 0;
         foreach (char c in tickText)
             tick = unchecked((uint)((tick * 10) + (c - '0')));
 
-        string type = NextWord(rest, out rest);
-        if (type.Length == 0)
+        var type = SplitOnce(rest, ' ', out rest);
+        if (type.IsEmpty)
             return null;
         if (type[0] == 'E')
-            return new TrackEvent(tick, 'E', 0, 0, ChartTextEvents.Normalize(TrimOnce(rest, '"')));
+            return new TrackEvent(tick, 'E', 0, 0, ChartTextEvents.Normalize(TrimOnce(rest, '"').ToString()));
 
-        int number = FastInt(NextWord(rest, out rest));
-        long length = (uint)FastInt(NextWord(rest, out _));
+        int number = FastInt(SplitOnce(rest, ' ', out rest));
+        long length = (uint)FastInt(SplitOnce(rest, ' ', out _));
         return new TrackEvent(tick, type[0], number, length, string.Empty);
     }
 
     /// <summary>A number read as YARG's <c>FastInt32Parse</c> reads it: each character's distance from <c>0</c>, as a digit, wrapping.</summary>
-    internal static int FastInt(string text)
+    internal static int FastInt(string text) => FastInt(text.AsSpan());
+
+    /// <inheritdoc cref="FastInt(string)"/>
+    internal static int FastInt(ReadOnlySpan<char> text)
     {
         int value = 0;
         foreach (char c in text)
@@ -314,9 +335,23 @@ internal static class ChartTextReader
         return text[..at].Trim();
     }
 
+    /// <inheritdoc cref="SplitOnce(string, char, out string)"/>
+    private static ReadOnlySpan<char> SplitOnce(ReadOnlySpan<char> text, char separator, out ReadOnlySpan<char> rest)
+    {
+        int at = text.IndexOf(separator);
+        if (at < 0)
+        {
+            rest = [];
+            return text.Trim();
+        }
+
+        rest = text[(at + 1)..].Trim();
+        return text[..at].Trim();
+    }
+
     private static string NextWord(string text, out string rest) => SplitOnce(text, ' ', out rest);
 
-    private static string TrimOnce(string text, char c)
+    private static ReadOnlySpan<char> TrimOnce(ReadOnlySpan<char> text, char c)
     {
         if (text.Length > 0 && text[0] == c)
             text = text[1..];
@@ -354,9 +389,18 @@ internal static class ChartTextReader
             if (end < 0)
                 throw new ChartFormatException($"The section [{name}] isn't closed with }}.");
 
-            sections.Add((name, [.. text[(body + 1)..end].Split('\n').Select(l => l.Trim())]));
+            sections.Add((name, Lines(text.AsSpan((body + 1)..end))));
             index = end + 1;
         }
+    }
+
+    /// <summary>The trimmed lines of <paramref name="body"/>, split at each <c>\n</c>: one string apiece and no copies besides.</summary>
+    private static List<string> Lines(ReadOnlySpan<char> body)
+    {
+        var lines = new List<string>();
+        foreach (var range in body.Split('\n'))
+            lines.Add(body[range].Trim().ToString());
+        return lines;
     }
 
     /// <summary>The next <paramref name="c"/> from <paramref name="start"/> with only spaces or control characters before it on its line.</summary>
@@ -376,6 +420,11 @@ internal static class ChartTextReader
 
     internal static string Decode(byte[] bytes)
     {
+        // UTF-8, with or without its byte order mark, in one go. A file that may start with another encoding's mark
+        // (UTF-16's or UTF-32's begin 00, FE or FF) goes through the reader, which tells them apart.
+        if (bytes.Length == 0 || bytes[0] is not (0x00 or 0xFE or 0xFF))
+            return Encoding.UTF8.GetString(bytes.AsSpan().StartsWith("﻿"u8) ? bytes.AsSpan(3) : bytes);
+
         using var reader = new StreamReader(new MemoryStream(bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         return reader.ReadToEnd();
     }

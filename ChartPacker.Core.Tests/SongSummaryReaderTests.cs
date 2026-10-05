@@ -126,6 +126,43 @@ public sealed class SongSummaryReaderTests
     }
 
     [TestMethod]
+    public async Task SngChartLargerThanTheFirstReadIsUnmaskedWhole()
+    {
+        // Enough notes that the chart runs well past the index, with its first byte at an odd place in the mask's cycle.
+        var midiBuilder = new MidiBuilder().Track().Tempo(0, 120).Track("PART GUITAR");
+        for (int i = 0; i < 20_000; i++)
+            midiBuilder.Note(i * 120, 96 + (i % 5));
+        byte[] midi = midiBuilder.Build();
+        Assert.IsGreaterThan(SngReader.PrefixSize, midi.Length);
+
+        var builder = new SngBuilder();
+        byte[] masked = (byte[])midi.Clone();
+        SngMask.Apply(masked, builder.Mask);
+        byte[] bytes = builder.AddMetadata("song_length", "1000").AddFile("a.bin", new byte[37]).AddFile("notes.mid", masked).Build();
+        string path = Path.Combine(_root.FullName, "Song.sng");
+        File.WriteAllBytes(path, bytes);
+
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
+
+        Assert.AreEqual(ChartContents.Read(midi, "notes.mid"), summary.Chart);
+        Assert.AreEqual(new ChartContents(LibraryInstruments.Guitar, LibraryDifficulties.Expert), summary.Chart);
+    }
+
+    [TestMethod]
+    public async Task SngChartRunningPastTheEndIsUnknown()
+    {
+        var builder = new SngBuilder().AddMetadata("song_length", "1000").AddFile("notes.mid", new byte[10]);
+        builder.LengthOverrides[0] = 1_000;
+        string path = Path.Combine(_root.FullName, "Song.sng");
+        File.WriteAllBytes(path, builder.Build());
+
+        var summary = await SongSummaryReader.ReadAsync(new SongEntry(SongEntryKind.SngFile, path, "Song.sng", "Song"), TestContext.CancellationToken);
+
+        Assert.IsNull(summary.Chart);
+        Assert.AreEqual("1000", summary.Pairs.Single().Value);
+    }
+
+    [TestMethod]
     public async Task SongWithoutChartHasNone()
     {
         string folder = CreateFolder("Song");
