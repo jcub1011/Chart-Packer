@@ -9,7 +9,7 @@ namespace ChartPacker.ViewModels
     /// A chip of the Validator's filter, e.g. Quick fix or Empty value, that's on or off, with how many listed songs
     /// it would match.
     /// </summary>
-    /// <param name="id">What it matches: a type's ID, or a name of its own for the Fix chips.</param>
+    /// <param name="id">What it matches: a type's ID, a metadata key, or a name of its own for the Fix chips.</param>
     /// <param name="name">What it's shown as.</param>
     /// <param name="changed">Called when <see cref="IsOn"/> changes.</param>
     public sealed partial class ValidatorFilterChipViewModel(string id, string name, Action changed) : ObservableObject

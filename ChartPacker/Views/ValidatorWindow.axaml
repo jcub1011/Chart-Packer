@@ -29,6 +29,19 @@
                 </StackPanel>
             </ToggleButton>
         </DataTemplate>
+
+        <!-- A metadata key's chip: as above, with the key in the monospace its chip in the issue list uses. -->
+        <DataTemplate x:Key="ValidatorKeyChipTemplate" x:DataType="vm:ValidatorFilterChipViewModel">
+            <ToggleButton Classes="filterChip"
+                          IsChecked="{Binding IsOn}"
+                          ToolTip.Tip="{Binding ToolTip}"
+                          AutomationProperties.Name="{Binding Label}">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                    <ctl:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsOn}" />
+                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontFamily="Consolas, Menlo, monospace" />
+                </StackPanel>
+            </ToggleButton>
+        </DataTemplate>
     </Window.Resources>
 
     <Window.Styles>
@@ -214,6 +227,24 @@
                                                 <TextBlock Classes="muted"
                                                            FontSize="12"
                                                            IsVisible="{Binding !HasTypeChips}"
+                                                           Text="{x:Static res:Strings.ValidatorFilterNoTypes}" />
+                                            </StackPanel>
+
+                                            <!-- Only the metadata keys that fail in the listed songs, not every key. -->
+                                            <StackPanel Classes="filter-section">
+                                                <TextBlock Classes="caption" Text="{x:Static res:Strings.ValidatorFilterKeyLabel}" />
+                                                <ItemsControl ItemsSource="{Binding KeyChips}"
+                                                              ItemTemplate="{StaticResource ValidatorKeyChipTemplate}"
+                                                              IsVisible="{Binding HasKeyChips}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                </ItemsControl>
+                                                <TextBlock Classes="muted"
+                                                           FontSize="12"
+                                                           IsVisible="{Binding !HasKeyChips}"
                                                            Text="{x:Static res:Strings.ValidatorFilterNoTypes}" />
                                             </StackPanel>
 

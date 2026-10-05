@@ -34,7 +34,8 @@ namespace ChartPacker.ViewModels
     /// writes every listed song's draft.
     /// </para>
     /// <para>
-    /// The filter narrows the issues shown to those with or without a quick fix, and to some types. A song shows
+    /// The filter narrows the issues shown to those with or without a quick fix, of some types, and of some keys;
+    /// only the types and keys that fail in the listed songs are offered. A song shows
     /// while one of its issues does. Ticking every fix, and Fix selected, only reach the issues shown; ticks on hidden
     /// ones are kept for when they show again. A song shown stays shown when it's checked again, as one that comes to
     /// pass does, until the filter changes.
@@ -62,6 +63,9 @@ namespace ChartPacker.ViewModels
 
         // The IDs of the type chips that are on.
         private readonly HashSet<string> _typesOn = new(StringComparer.Ordinal);
+
+        // The keys of the key chips that are on; keys are compared ignoring case, as song.ini does.
+        private readonly HashSet<string> _keysOn = new(StringComparer.OrdinalIgnoreCase);
 
         // Set while every chip is turned off at once, so the list is filtered once at the end.
         private bool _clearingFilters;
@@ -148,8 +152,13 @@ namespace ChartPacker.ViewModels
 
         public bool HasTypeChips => TypeChips.Count > 0;
 
+        /// <summary>A chip for each metadata key that fails in a listed song, and any turned on since it stopped failing.</summary>
+        public AvaloniaList<ValidatorFilterChipViewModel> KeyChips { get; } = [];
+
+        public bool HasKeyChips => KeyChips.Count > 0;
+
         /// <summary>How many chips are on, for the badge on the filter button.</summary>
-        public int ActiveFilterCount => FixChips.Count(c => c.IsOn) + _typesOn.Count;
+        public int ActiveFilterCount => FixChips.Count(c => c.IsOn) + _typesOn.Count + _keysOn.Count;
 
         public bool HasActiveFilters => ActiveFilterCount > 0;
 
@@ -406,10 +415,16 @@ namespace ChartPacker.ViewModels
             list.Insert(low, song);
         }
 
-        /// <summary>Whether the filter shows <paramref name="issue"/>: it has a quick fix or not as the Fix chips ask, and one of the types turned on.</summary>
+        /// <summary>
+        /// Whether the filter shows <paramref name="issue"/>: it has a quick fix or not as the Fix chips ask, one of the
+        /// types turned on, and one of the keys turned on.
+        /// </summary>
         private bool IsIssueShown(ValidatorIssueViewModel issue)
         {
             if ((QuickFixChip.IsOn || ManualChip.IsOn) && !(issue.IsFixable ? QuickFixChip.IsOn : ManualChip.IsOn))
+                return false;
+
+            if (_keysOn.Count > 0 && !_keysOn.Contains(issue.Key))
                 return false;
 
             return _typesOn.Count == 0 || issue.Types.Any(_typesOn.Contains);
@@ -439,11 +454,9 @@ namespace ChartPacker.ViewModels
                 return;
 
             _typesOn.Clear();
-            foreach (var chip in TypeChips)
-            {
-                if (chip.IsOn)
-                    _typesOn.Add(chip.Id);
-            }
+            _typesOn.UnionWith(TypeChips.Where(c => c.IsOn).Select(c => c.Id));
+            _keysOn.Clear();
+            _keysOn.UnionWith(KeyChips.Where(c => c.IsOn).Select(c => c.Id));
 
             foreach (var song in Songs)
                 song.ApplyFilter();
@@ -476,7 +489,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ShowNoMatches));
             ClearFiltersCommand.NotifyCanExecuteChanged();
 
-            // A type chip turned off once its songs no longer have it goes.
+            // A chip turned off once its songs no longer have its type or key goes.
             RefreshFilterChips();
             RefreshSelection();
         }
@@ -490,7 +503,7 @@ namespace ChartPacker.ViewModels
             _clearingFilters = true;
             try
             {
-                foreach (var chip in FixChips.Concat(TypeChips))
+                foreach (var chip in FixChips.Concat(TypeChips).Concat(KeyChips))
                     chip.IsOn = false;
             }
             finally
@@ -502,13 +515,15 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Counts the listed songs each chip matches. A type the songs have gets a chip, in the catalogue's order; one
-        /// they no longer have loses it, unless it's on, so a filter in use never goes out of sight.
+        /// Counts the listed songs each chip matches. A type or key that fails in the songs gets a chip, types in the
+        /// catalogue's order and keys alphabetically; one that no longer fails loses it, unless it's on, so a filter
+        /// in use never goes out of sight.
         /// </summary>
         private void RefreshFilterChips()
         {
             int quick = 0, manual = 0;
             var songsByType = new Dictionary<string, int>(StringComparer.Ordinal);
+            var songsByKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (var song in Songs)
             {
                 if (song.HasFixes)
@@ -517,32 +532,49 @@ namespace ChartPacker.ViewModels
                     manual++;
                 foreach (string type in song.IssueTypes)
                     songsByType[type] = songsByType.GetValueOrDefault(type) + 1;
+                foreach (string key in song.IssueKeys)
+                    songsByKey[key] = songsByKey.GetValueOrDefault(key) + 1;
             }
 
             QuickFixChip.Count = quick;
             ManualChip.Count = manual;
+            SyncChips(TypeChips, songsByType, ValidatorIssueTypes.NameOf, ValidatorIssueTypes.Order);
+            SyncChips(KeyChips, songsByKey, key => key, StringComparer.OrdinalIgnoreCase);
+            OnPropertyChanged(nameof(HasTypeChips));
+            OnPropertyChanged(nameof(HasKeyChips));
+        }
 
-            for (int i = TypeChips.Count - 1; i >= 0; i--)
+        /// <summary>
+        /// Brings <paramref name="chips"/> in line with <paramref name="counts"/>, which compares IDs as the chips
+        /// should: a chip per ID, sorted by <paramref name="order"/>, and none for an ID no song has unless it's on.
+        /// </summary>
+        private void SyncChips(
+            AvaloniaList<ValidatorFilterChipViewModel> chips,
+            Dictionary<string, int> counts,
+            Func<string, string> nameOf,
+            IComparer<string> order)
+        {
+            var listed = new HashSet<string>(counts.Comparer);
+            for (int i = chips.Count - 1; i >= 0; i--)
             {
-                var chip = TypeChips[i];
-                chip.Count = songsByType.GetValueOrDefault(chip.Id);
+                var chip = chips[i];
+                chip.Count = counts.GetValueOrDefault(chip.Id);
                 if (chip.Count == 0 && !chip.IsOn)
-                    TypeChips.RemoveAt(i);
+                    chips.RemoveAt(i);
+                else
+                    listed.Add(chip.Id);
             }
 
-            foreach (var (type, count) in songsByType)
+            foreach (var (id, count) in counts)
             {
-                if (TypeChips.Any(c => c.Id == type))
+                if (listed.Contains(id))
                     continue;
 
-                var chip = new ValidatorFilterChipViewModel(type, ValidatorIssueTypes.NameOf(type), OnFilterChanged) { Count = count };
                 int at = 0;
-                while (at < TypeChips.Count && ValidatorIssueTypes.Order.Compare(TypeChips[at].Id, type) < 0)
+                while (at < chips.Count && order.Compare(chips[at].Id, id) < 0)
                     at++;
-                TypeChips.Insert(at, chip);
+                chips.Insert(at, new ValidatorFilterChipViewModel(id, nameOf(id), OnFilterChanged) { Count = count });
             }
-
-            OnPropertyChanged(nameof(HasTypeChips));
         }
 
         /// <summary>A listed song's draft changed, here or anywhere: it's checked again, from disk once the draft is gone.</summary>
@@ -729,6 +761,9 @@ namespace ChartPacker.ViewModels
         /// <summary>The types of the song's issues, each once.</summary>
         public IReadOnlyCollection<string> IssueTypes { get; private set; } = [];
 
+        /// <summary>The failing keys, each once ignoring case. An empty key is left out; its type covers it.</summary>
+        public IReadOnlyCollection<string> IssueKeys { get; private set; } = [];
+
         /// <summary>How many failing keys have a quick fix.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(FixableCountText), nameof(HasFixes))]
@@ -878,6 +913,7 @@ namespace ChartPacker.ViewModels
         {
             Issues = issues;
             IssueTypes = issues.SelectMany(i => i.Types).ToHashSet(StringComparer.Ordinal);
+            IssueKeys = issues.Where(i => i.HasKey).Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
             FixableCount = fixable;
             ManualCount = manual;
             ApplyFilter();

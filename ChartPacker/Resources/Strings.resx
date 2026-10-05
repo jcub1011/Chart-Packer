@@ -2496,6 +2496,10 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Type</value>
     <comment>Heading of the Validator filter's chips for each kind of issue found.</comment>
   </data>
+  <data name="ValidatorFilterKeyLabel" xml:space="preserve">
+    <value>Metadata key</value>
+    <comment>Heading of the Validator filter's chips for each metadata key that fails in a listed song.</comment>
+  </data>
   <data name="ValidatorFilterNoTypes" xml:space="preserve">
     <value>No issues found yet.</value>
   </data>
