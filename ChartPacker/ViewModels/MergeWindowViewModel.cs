@@ -32,8 +32,9 @@ namespace ChartPacker.ViewModels
     /// <param name="summary">Compact text shown instead of <paramref name="text"/>, e.g. <c>3 tracks</c> for audio; the full text stays in the tooltip.</param>
     /// <param name="difficultyItems">The cell's difficulty letters, colored like the inspector's; empty outside part rows.</param>
     /// <param name="noteCountItems">The cell's note counts, colored by difficulty like the inspector's; empty outside part rows.</param>
+    /// <param name="warning">What to know about the source, shown under the cell and in its tooltip, e.g. that its chart can't be read.</param>
     public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true, string? toolTip = null, string? summary = null,
-        IReadOnlyList<MergeDifficultyItem>? difficultyItems = null, IReadOnlyList<MergeNoteCountItem>? noteCountItems = null) : ObservableObject
+        IReadOnlyList<MergeDifficultyItem>? difficultyItems = null, IReadOnlyList<MergeNoteCountItem>? noteCountItems = null, string? warning = null) : ObservableObject
     {
 
         /// <summary>The source it takes from; <see langword="null"/> to leave the thing out.</summary>
@@ -68,7 +69,11 @@ namespace ChartPacker.ViewModels
 
         public bool HasDetail => !string.IsNullOrEmpty(Detail);
 
-        public string ToolTip => toolTip ?? PlainText;
+        public string? Warning { get; } = warning;
+
+        public bool HasWarning => !string.IsNullOrEmpty(Warning);
+
+        public string ToolTip => HasWarning ? (toolTip ?? PlainText) + Environment.NewLine + Warning : toolTip ?? PlainText;
 
         /// <summary>The source has the thing, so it can be chosen.</summary>
         public bool IsAvailable { get; } = isAvailable;
@@ -290,26 +295,10 @@ namespace ChartPacker.ViewModels
         }
     }
 
-    /// <summary>A column header: one of the songs being merged.</summary>
-    /// <param name="Charter">The charter as stored, rich-text tags and all, for the tooltip.</param>
-    /// <param name="Format">The full chart format, for the tooltip; the header shows <see cref="FormatShort"/>.</param>
-    public sealed record MergeSourceViewModel(string Title, string? Artist, string? Charter, string Format, string? Problem)
-    {
-        public bool HasArtist => !string.IsNullOrEmpty(Artist);
-
-        public bool HasCharter => !string.IsNullOrEmpty(Charter);
-
-        public string? CharterPlainText => Charter is null ? null : RichText.ToPlainText(Charter);
-
-        /// <summary>Compact chart format for the header chip; the full text stays in the tooltip.</summary>
-        public string FormatShort => Format == Strings.MergeFormatChart ? Strings.MergeFormatChartShort : Format;
-
-        /// <summary>The header's tooltip: title, artist and charter, each on its own line.</summary>
-        public string HeaderToolTip => string.Join(Environment.NewLine,
-            new[] { Title, Artist, CharterPlainText }.Where(s => !string.IsNullOrEmpty(s))!);
-
-        public bool HasProblem => !string.IsNullOrEmpty(Problem);
-    }
+    /// <summary>One of the songs being merged: a column of every row.</summary>
+    /// <param name="Title">What the song is called where it's named, e.g. in an alignment link.</param>
+    /// <param name="Problem">What to know about the song, shown in its Base chart cell, e.g. that its unsaved edits aren't included.</param>
+    public sealed record MergeSourceViewModel(string Title, string? Problem);
 
     /// <summary>
     /// The merge window: reads the selected songs, offers a choice wherever they differ, and merges
@@ -318,7 +307,8 @@ namespace ChartPacker.ViewModels
     /// <remarks>
     /// A part only one song has is taken from it; a part several have must be chosen. Metadata the songs
     /// agree on isn't offered. The audio defaults to the song with the most tracks, and the base chart,
-    /// album art and backgrounds follow it until they're chosen.
+    /// album art, backgrounds and metadata follow it until they're chosen: metadata the audio's song
+    /// doesn't set is taken from the first song that does.
     /// </remarks>
     /// <param name="entries">The songs, in the order their columns are shown.</param>
     /// <param name="hasDrafts">Whether each song has unsaved changes, which the merge doesn't see.</param>
@@ -505,11 +495,11 @@ namespace ChartPacker.ViewModels
                 string? problem = s.ChartError is { } error ? string.Format(CultureInfo.CurrentCulture, Strings.MergeChartErrorFormat, error)
                     : i < hasDrafts.Count && hasDrafts[i] ? Strings.MergeUnsavedEdits
                     : null;
-                Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, s.Headline.Artist, SongHeadline.CharterMarkup(s.Pairs), FormatOf(s.Format), problem));
+                Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, problem));
             }
 
             BaseChoice = Choice(Strings.MergeBaseLabel, null, i => sources[i].Chart is not null, i => FormatOf(sources[i].Format), null, leaveOut: null,
-                icon: MergeRowIcon.Midi);
+                icon: MergeRowIcon.Midi, warning: i => Sources[i].Problem);
 
             foreach (var part in analysis.Parts)
             {
@@ -556,9 +546,10 @@ namespace ChartPacker.ViewModels
         /// <param name="difficulties">An available cell's charted difficulties, for a part's colored letters.</param>
         /// <param name="glyph">The row's instrument icon, drawn like the inspector's.</param>
         /// <param name="icon">The row's fixed icon: the audio waveform, an art placeholder, or MIDI.</param>
+        /// <param name="warning">What to know about a source, under its cell whether it's available or not.</param>
         private MergeChoiceViewModel Choice(string label, string? key, Func<int, bool> available, Func<int, string> text, Func<int, string?>? detail, string? leaveOut,
             Func<int, IReadOnlyList<NoteCount>>? counts = null, Func<int, string?>? summary = null, Func<int, IReadOnlyList<ChartDifficulty>>? difficulties = null,
-            DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None)
+            DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None, Func<int, string?>? warning = null)
         {
             var row = new MergeChoiceViewModel(label, key, glyph, icon);
             for (int i = 0; i < Sources.Count; i++)
@@ -573,7 +564,8 @@ namespace ChartPacker.ViewModels
                     difficultyItems: has && difficulties is not null
                         ? difficulties(i).Select(d => new MergeDifficultyItem(d, ChartLabels.DifficultyLetter(d))).ToList()
                         : [],
-                    noteCountItems: noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture))).ToList()));
+                    noteCountItems: noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture))).ToList(),
+                    warning: warning?.Invoke(i)));
             }
 
             row.Options.Add(leaveOut is null
@@ -597,13 +589,9 @@ namespace ChartPacker.ViewModels
                 Assets[0].Select(Pick(audio, i => sources[i].AlbumArt is not null));
                 Assets[1].Select(Pick(audio, i => sources[i].BackgroundImage is not null));
                 Assets[2].Select(Pick(audio, i => sources[i].Video is not null));
-                AlignTo(audio);
-            }
-
-            if (ReferenceEquals(row, BaseChoice) && row.Selected?.Source is { } chosenBase)
-            {
                 foreach (var conflict in Metadata)
-                    conflict.Select(chosenBase);
+                    conflict.Select(MetadataSourceFor(analysis, conflict.Key!, audio));
+                AlignTo(audio);
             }
 
             Refresh();
@@ -612,6 +600,16 @@ namespace ChartPacker.ViewModels
         /// <summary><paramref name="preferred"/> when it has the thing, otherwise the first source that does.</summary>
         private int? Pick(int preferred, Func<int, bool> has) =>
             has(preferred) ? preferred : Enumerable.Range(0, Sources.Count).Cast<int?>().FirstOrDefault(i => has(i!.Value));
+
+        /// <summary>
+        /// Whose value of <paramref name="key"/> is kept until it's chosen: the kept <paramref name="audio"/>'s song when it
+        /// sets the key, otherwise the first song that does, otherwise the audio's song. A blank value isn't set.
+        /// </summary>
+        private int MetadataSourceFor(SongMergeAnalysis analysis, string key, int audio)
+        {
+            var values = analysis.Conflicts.First(c => c.Key == key).Values;
+            return Pick(audio, i => !string.IsNullOrEmpty(values[i])) ?? audio;
+        }
 
         /// <summary>The plan as chosen so far; <see langword="null"/> while something still needs choosing.</summary>
         private SongMergePlan? Plan()
@@ -625,7 +623,7 @@ namespace ChartPacker.ViewModels
                 analysis,
                 baseSource,
                 Parts.Where(p => p.Selected?.Source is not null).ToDictionary(p => p.Key!, p => p.Selected!.Source!.Value),
-                Metadata.ToDictionary(m => m.Key!, m => (int?)(m.Selected?.Source ?? baseSource)),
+                Metadata.ToDictionary(m => m.Key!, m => (int?)(m.Selected?.Source ?? audio)),
                 audio,
                 Assets[0].Selected?.Source,
                 Assets[1].Selected?.Source,

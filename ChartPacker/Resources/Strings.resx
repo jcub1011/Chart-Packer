@@ -1570,10 +1570,6 @@
     <value>Kept audio</value>
     <comment>Chip in a merge alignment cell for the song with the kept audio. The full explanation, in its tooltip, is MergeAlignmentReference.</comment>
   </data>
-  <data name="MergeSourcesCaption" xml:space="preserve">
-    <value>Take from</value>
-    <comment>Caption at the left of the merge window's pinned row of song headers, above the row labels.</comment>
-  </data>
   <data name="MergeAlignmentNoChart" xml:space="preserve">
     <value>No chart to line up by</value>
   </data>
@@ -1609,7 +1605,7 @@
   </data>
   <data name="MergeAlignmentLinkFormat" xml:space="preserve">
     <value>{0:+0;-0;0} ms from {1}</value>
-    <comment>Under a linked song's offset: {0} is how far the link moves it from the song it's lined up with, {1} that song.</comment>
+    <comment>At the top of a linked song's offset tooltip: {0} is how far the link moves it from the song it's lined up with, {1} that song.</comment>
   </data>
   <data name="MergeAlignmentFirstNotesHint" xml:space="preserve">
     <value>Only the first notes line it up: check both charts start at the same place in the song.</value>
@@ -1761,10 +1757,6 @@
   </data>
   <data name="MergeFormatChart" xml:space="preserve">
     <value>.chart (converted)</value>
-  </data>
-  <data name="MergeFormatChartShort" xml:space="preserve">
-    <value>CHART</value>
-    <comment>Short chip in a merge source header for a .chart chart. The full text is MergeFormatChart.</comment>
   </data>
   <data name="MergeFormatNone" xml:space="preserve">
     <value>No chart</value>

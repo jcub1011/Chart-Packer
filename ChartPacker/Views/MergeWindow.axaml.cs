@@ -2,7 +2,6 @@ using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Threading.Tasks;
-using Avalonia;
 using Avalonia.Controls;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
@@ -50,12 +49,6 @@ namespace ChartPacker.Views
 
             // Raised when the viewport changes size too, e.g. the splitter moves or the vertical bar appears.
             LeftScroll.ScrollChanged += (_, _) => FitColumns();
-            // Scrolled sideways over the headers (Shift+wheel), the rows follow.
-            HeaderScroll.ScrollChanged += (_, _) =>
-            {
-                if (!HeaderScroll.Offset.X.Equals(LeftScroll.Offset.X))
-                    LeftScroll.Offset = LeftScroll.Offset.WithX(HeaderScroll.Offset.X);
-            };
             DataContextChanged += (_, _) =>
             {
                 AttachSources();
@@ -65,9 +58,8 @@ namespace ChartPacker.Views
         }
 
         /// <summary>
-        /// Gives the rows and the pinned headers one width: the viewport's when there's room, so the
-        /// columns stretch, or wide enough for one narrowest cell per source, so the panel scrolls
-        /// sideways instead of squeezing. Narrow, the rows show only their icons, not their labels. A set width means everything inside is measured against it,
+        /// Gives the rows one width: the viewport's when there's room, so the columns stretch, or wide
+        /// enough for one narrowest cell per source, so the panel scrolls sideways instead of squeezing. Narrow, the rows show only their icons, not their labels. A set width means everything inside is measured against it,
         /// so long values trim and paragraphs wrap rather than widening the panel; only more sources
         /// than fit scroll it.
         /// </summary>
@@ -99,18 +91,8 @@ namespace ChartPacker.Views
             if (!width.Equals(_lastWidth))
             {
                 ColumnsPanel.Width = width;
-                HeaderPanel.Width = width;
                 _lastWidth = width;
             }
-
-            // The headers have no vertical scroll bar; leaving its width free at their right lets them
-            // scroll as far as the rows do, so they stay over their columns at the far end.
-            double bar = Math.Max(0, LeftScroll.Bounds.Width - viewport);
-            if (!bar.Equals(HeaderScroll.Margin.Right))
-                HeaderScroll.Margin = new Thickness(0, 0, bar, 0);
-
-            if (!HeaderScroll.Offset.X.Equals(LeftScroll.Offset.X))
-                HeaderScroll.Offset = HeaderScroll.Offset.WithX(LeftScroll.Offset.X);
         }
 
         private void AttachSources()

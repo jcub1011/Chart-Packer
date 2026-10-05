@@ -55,7 +55,14 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial decimal? Offset { get; set; } = 0;
 
-        /// <summary>How far its link moves it, from which song; or why it isn't lined up.</summary>
+        /// <summary>How far its link moves it, from which song; in the offset box's tooltip.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasLinkNote))]
+        public partial string? LinkNote { get; set; }
+
+        public bool HasLinkNote => LinkNote is not null;
+
+        /// <summary>Why it isn't lined up.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasNote))]
         public partial string? Note { get; set; }
@@ -70,7 +77,7 @@ namespace ChartPacker.ViewModels
         public bool HasWarning => Warning is not null;
 
         /// <summary>Shows what the window worked out: the links it can be lined up by, the one it is, and how far it moves.</summary>
-        internal void Show(IReadOnlyList<MergeAlignmentOptionViewModel> options, AlignmentChoice? choice, int offset, string? note, string? warning)
+        internal void Show(IReadOnlyList<MergeAlignmentOptionViewModel> options, AlignmentChoice? choice, int offset, string? linkNote, string? note, string? warning)
         {
             _updating = true;
             try
@@ -84,6 +91,7 @@ namespace ChartPacker.ViewModels
 
                 SelectedOption = Options.FirstOrDefault(o => Equals(o.Choice, choice)) ?? Options.FirstOrDefault();
                 Offset = offset;
+                LinkNote = linkNote;
                 Note = note;
                 Warning = warning;
             }
@@ -481,7 +489,7 @@ namespace ChartPacker.ViewModels
                 cell.IsReference = cell.Source == reference;
                 if (cell.IsReference)
                 {
-                    cell.Show([], null, 0, null, null);
+                    cell.Show([], null, 0, null, null, null);
                     continue;
                 }
 
@@ -495,7 +503,7 @@ namespace ChartPacker.ViewModels
 
                 var choice = _choices.GetValueOrDefault(cell.Source);
                 var warnings = new[] { WarningOf(choice), DisagreementOf(cell.Source, reference, offsets[cell.Source], choice) }.OfType<string>().ToList();
-                cell.Show(options, choice, offsets[cell.Source], NoteOf(cell, choice, options.Count), warnings.Count > 0 ? string.Join(" ", warnings) : null);
+                cell.Show(options, choice, offsets[cell.Source], LinkNoteOf(choice), NoteOf(cell, choice, options.Count), warnings.Count > 0 ? string.Join(" ", warnings) : null);
             }
         }
 
@@ -512,11 +520,16 @@ namespace ChartPacker.ViewModels
             return new MergeAlignmentOptionViewModel(choice, string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentOptionFormat, Sources[choice.Link.From].Title, by, how));
         }
 
+        /// <summary>How far <paramref name="choice"/> moves the song from the one it's lined up with; <see langword="null"/> without a link.</summary>
+        private string? LinkNoteOf(AlignmentChoice? choice) =>
+            choice is null ? null : string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentLinkFormat, choice.OffsetMs, Sources[choice.Link.From].Title);
+
+        /// <summary>Why the song isn't lined up; <see langword="null"/> when it's linked, or could be.</summary>
         /// <param name="optionCount">How many options the cell offers, setting it by hand included.</param>
         private string? NoteOf(MergeAlignmentCellViewModel cell, AlignmentChoice? choice, int optionCount)
         {
             if (choice is not null)
-                return string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentLinkFormat, choice.OffsetMs, Sources[choice.Link.From].Title);
+                return null;
             if (_links is null)
                 return cell.HasChart ? null : Strings.MergeAlignmentNoChart;
             return optionCount <= 1 ? Strings.MergeAlignmentUnreached : null;
