@@ -7,5 +7,6 @@
   <Project Path="ChartPacker.Video/ChartPacker.Video.csproj" />
   <Folder Name="/tools/">
     <Project Path="tools/DecodeBench/DecodeBench.csproj" />
+    <Project Path="tools/ScanBench/ScanBench.csproj" />
   </Folder>
 </Solution>

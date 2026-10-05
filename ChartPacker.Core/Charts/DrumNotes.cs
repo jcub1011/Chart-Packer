@@ -74,8 +74,8 @@ internal static class DrumNotes
 
             var events = mixes.GetValueOrDefault(difficulty) ?? [];
             int next = 0;
-            var built = new List<(Gem, NoteFlags)>();
-            foreach (var gem in list.OrderBy(g => g.Tick))
+            var built = new List<(Gem, NoteFlags)>(list.Count);
+            foreach (var gem in TickOrder.Sorted(list, static g => g.Tick))
             {
                 while (next < events.Count && events[next].Tick <= gem.Tick)
                     flip = events[next++].DiscoFlip;

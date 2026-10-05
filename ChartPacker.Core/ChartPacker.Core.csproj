@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ChartPacker.Core.Tests" />
+    <InternalsVisibleTo Include="ScanBench" />
   </ItemGroup>
 
   <ItemGroup>

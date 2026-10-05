@@ -192,22 +192,26 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
     }
 
     /// <summary>Adds the MIDI file's parts the note reader skips, such as vocals, that have a note.</summary>
+    /// <remarks>
+    /// The note reader has read every track of <paramref name="bytes"/> by now, so they're well formed. Only each
+    /// track's name is read to start with, and only the tracks of parts counted here in full.
+    /// </remarks>
     private static void AddUnreadParts(byte[] bytes, Dictionary<string, PartTally> parts, int noteLimit)
     {
         var (_, _, chunks) = MidiFile.ReadChunks(bytes);
         foreach (var chunk in chunks)
         {
-            if (chunk.Id != "MTrk")
-                continue;
-
-            var events = MidiFile.ReadEvents(bytes, chunk);
-            if (MidiFile.NameOf(bytes, events) is not { } name
+            if (chunk.Id != "MTrk"
+                || MidiFile.NameOf(bytes, chunk) is not { } name
                 || MidiPartCatalog.PartOf(name) is not { IsKnown: true } part
-                || MidiPartCatalog.InstrumentsOf(part).Count > 0
-                || !HasNote(bytes, events))
+                || MidiPartCatalog.InstrumentsOf(part).Count > 0)
             {
                 continue;
             }
+
+            var events = MidiFile.ReadEvents(bytes, chunk);
+            if (!HasNote(bytes, events))
+                continue;
 
             var tally = TallyOf(parts, part.Id);
             if (ProStringParts.Contains(part.Id))

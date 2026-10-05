@@ -110,14 +110,43 @@ public sealed class SongLibraryLoaderTests
             () => SongLibraryLoader.LoadAsync(_root.FullName, 2, 0, new SyncProgress(_ => { }), TestContext.CancellationToken));
 
     [TestMethod]
-    public async Task CancelledLoadThrows()
+    [DataRow(4)]
+    [DataRow(int.MaxValue)]
+    public async Task CancelledLoadThrows(int parallelism)
     {
         WriteSng("a.sng", "A");
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => SongLibraryLoader.LoadAsync(_root.FullName, 2, 4, new SyncProgress(_ => { }), cts.Token));
+            () => SongLibraryLoader.LoadAsync(_root.FullName, 2, parallelism, new SyncProgress(_ => { }), cts.Token));
+    }
+
+    [TestMethod]
+    public async Task LoadCancelledPartWayStopsEveryReader()
+    {
+        for (int i = 0; i < 200; i++)
+            WriteSng($"f{i % 10}/song{i:D3}.sng", $"Song {i}");
+
+        // Cancelled once the first song has been read, while the rest are still being read or found.
+        using var cts = new CancellationTokenSource();
+        var load = SongLibraryLoader.LoadAsync(_root.FullName, 2, SongLibraryLoader.MaxReaders, new SyncProgress(r =>
+        {
+            if (r.Read > 0 && !r.SearchComplete)
+                cts.Cancel();
+        }), cts.Token);
+
+        try
+        {
+            await load.WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        // Either way it ended: cancelled, or done before a report came while it was still searching.
+        Assert.IsTrue(load.IsCompleted);
+        Assert.IsTrue(load.IsCanceled || load.IsCompletedSuccessfully, load.Exception?.ToString());
     }
 
     private void WriteSng(string relative, string name) =>

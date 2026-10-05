@@ -83,12 +83,13 @@ public static class AlbumArt
 
     private static Task<byte[]?> ReadFromSng(string path, long maxBytes, CancellationToken cancellationToken)
     {
-        var read = SngReader.Read(path, cancellationToken);
+        using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var read = SngReader.Read(handle, cancellationToken);
         if (read.Header is not { } header)
             return Task.FromResult<byte[]?>(null);
 
         var file = Pick(read.Files, f => f.Name);
-        return Task.FromResult(file is null ? null : SongFile.ReadFromSng(path, header, file, maxBytes, cancellationToken));
+        return Task.FromResult(file is null ? null : SongFile.ReadFromSng(handle, header, file, maxBytes, cancellationToken));
     }
 
     /// <summary>The first of <paramref name="items"/> whose name is the most preferred album-art name.</summary>

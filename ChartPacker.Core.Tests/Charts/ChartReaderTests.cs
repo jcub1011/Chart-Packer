@@ -194,6 +194,26 @@ public sealed class ChartReaderTests
     }
 
     [TestMethod]
+    public void MidiTomMarkersMarkOnlyTheirOwnPadOnEveryDifficulty()
+    {
+        // The blue tom marker, under yellow, blue and green on Expert (98-100) and Hard (86-88).
+        byte[] midi = new MidiBuilder().Track().Tempo(0, 120).Track("PART DRUMS")
+            .Note(0, 111, 10).Note(0, 98).Note(0, 99).Note(0, 100).Note(0, 86).Note(0, 87).Note(0, 88)
+            .Build();
+        var chart = ChartReader.Read(midi, "notes.mid");
+
+        foreach (var difficulty in new[] { ChartDifficulty.Expert, ChartDifficulty.Hard })
+        {
+            Assert.AreSequenceEqual(
+                [
+                    new ChartNote(0, 0, 1, NoteFlags.Cymbal),
+                    new ChartNote(0, 0, 2, NoteFlags.None),
+                    new ChartNote(0, 0, 3, NoteFlags.Cymbal),
+                ], Notes(chart, ChartInstrument.Drums, difficulty));
+        }
+    }
+
+    [TestMethod]
     public void MidiDrumsWithoutTomMarkersAreCymbalsUnlessProDrumsIsFalse()
     {
         // YARG takes a MIDI chart's drums as pro drums unless song.ini says they aren't.

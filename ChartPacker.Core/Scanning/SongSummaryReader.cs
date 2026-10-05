@@ -43,7 +43,7 @@ public static class SongSummaryReader
     public static Task<SongSummary> ReadAsync(SongEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        return Task.Run(() => ReadCoreAsync(entry, cancellationToken), cancellationToken);
+        return Task.Run(() => Read(entry, cancellationToken), cancellationToken);
     }
 
     /// <summary>
@@ -51,12 +51,19 @@ public static class SongSummaryReader
     /// malformed file can fail in ways other than an IO error, and one song shouldn't stop a library scan.
     /// </summary>
     /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
-    public static async Task<SongSummary?> TryReadAsync(SongEntry entry, CancellationToken cancellationToken = default)
+    public static Task<SongSummary?> TryReadAsync(SongEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
+        return Task.Run(() => TryRead(entry, cancellationToken), cancellationToken);
+    }
+
+    /// <summary>Like <see cref="TryReadAsync"/>, blocking the calling thread.</summary>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    internal static SongSummary? TryRead(SongEntry entry, CancellationToken cancellationToken)
+    {
         try
         {
-            return await ReadAsync(entry, cancellationToken).ConfigureAwait(false);
+            return Read(entry, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -64,38 +71,46 @@ public static class SongSummaryReader
         }
     }
 
-    private static async Task<SongSummary> ReadCoreAsync(SongEntry entry, CancellationToken cancellationToken)
+    /// <summary>Like <see cref="ReadAsync"/>, blocking the calling thread.</summary>
+    /// <inheritdoc cref="ReadAsync" path="/exception"/>
+    internal static SongSummary Read(SongEntry entry, CancellationToken cancellationToken)
     {
-        if (entry.Kind == SongEntryKind.SngFile)
-        {
-            var result = SngReader.Read(entry.FullPath, cancellationToken);
-            var pairs = result.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList();
-            ulong sngSize = (ulong)new FileInfo(entry.FullPath).Length;
-            var names = result.Files.Select(f => f.Name).Where(n => !n.Contains('/')).ToList();
-            var chart = ReadSngChart(entry.FullPath, result, pairs, cancellationToken);
-            if (HasLength(pairs))
-                return new SongSummary(pairs, sngSize, names, chart);
+        cancellationToken.ThrowIfCancellationRequested();
+        return entry.Kind == SongEntryKind.SngFile ? ReadSng(entry.FullPath, cancellationToken) : ReadFolder(entry.FullPath, cancellationToken);
+    }
 
-            using SafeFileHandle handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            return new SongSummary(pairs, sngSize, names, chart, AudioLength.LongestInSng(handle, result, cancellationToken));
-        }
+    /// <remarks>Everything is read through one handle: on a hard drive each open and each read can cost a seek.</remarks>
+    private static SongSummary ReadSng(string path, CancellationToken cancellationToken)
+    {
+        using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var result = SngReader.Read(handle, cancellationToken);
+        var pairs = result.Metadata.Select(p => KeyValuePair.Create(p.Key, p.Value)).ToList();
+        ulong size = (ulong)RandomAccess.GetLength(handle);
+        var names = result.Files.Select(f => f.Name).Where(n => !n.Contains('/')).ToList();
+        var chart = ReadSngChart(handle, result, pairs, cancellationToken);
+        return HasLength(pairs)
+            ? new SongSummary(pairs, size, names, chart)
+            : new SongSummary(pairs, size, names, chart, AudioLength.LongestInSng(handle, result, cancellationToken));
+    }
 
-        var files = SongFolderListing.List(entry.FullPath, cancellationToken);
+    private static SongSummary ReadFolder(string folder, CancellationToken cancellationToken)
+    {
+        var files = SongFolderListing.List(folder, cancellationToken);
         ulong size = (ulong)files.Sum(f => f.Length);
         var storedNames = files.Select(f => f.RelativePath).Where(n => !n.Contains('/')).ToList();
 
         var songIni = files.FirstOrDefault(f => f.RelativePath.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase));
-        IReadOnlyList<KeyValuePair<string, string>> folderPairs = songIni is null
+        IReadOnlyList<KeyValuePair<string, string>> pairs = songIni is null
             ? []
-            : (await SongIni.ReadAsync(Path.Combine(entry.FullPath, songIni.RelativePath), cancellationToken).ConfigureAwait(false)).Pairs;
-        var folderChart = await ReadFolderChartAsync(entry.FullPath, storedNames, folderPairs, cancellationToken).ConfigureAwait(false);
+            : SongIni.Read(Path.Combine(folder, songIni.RelativePath), cancellationToken).Pairs;
+        var chart = ReadFolderChart(folder, files, pairs, cancellationToken);
 
-        return HasLength(folderPairs)
-            ? new SongSummary(folderPairs, size, storedNames, folderChart)
-            : new SongSummary(folderPairs, size, storedNames, folderChart, AudioLength.LongestInFolder(entry.FullPath, files, cancellationToken));
+        return HasLength(pairs)
+            ? new SongSummary(pairs, size, storedNames, chart)
+            : new SongSummary(pairs, size, storedNames, chart, AudioLength.LongestInFolder(folder, files, cancellationToken));
     }
 
-    private static ChartContents? ReadSngChart(string path, SngReadResult result, IReadOnlyList<KeyValuePair<string, string>> pairs, CancellationToken cancellationToken)
+    private static ChartContents? ReadSngChart(SafeFileHandle sng, SngReadResult result, IReadOnlyList<KeyValuePair<string, string>> pairs, CancellationToken cancellationToken)
     {
         if (result.Header is not { } header)
             return null;
@@ -108,7 +123,7 @@ public static class SongSummaryReader
 
         try
         {
-            return SongFile.ReadFromSng(path, header, file, ChartReader.MaxBytes, cancellationToken) is { } bytes
+            return SongFile.ReadFromSng(sng, header, file, ChartReader.MaxBytes, cancellationToken) is { } bytes
                 ? ChartContents.Read(bytes, file.Name, ChartReadOptions.From(pairs))
                 : null;
         }
@@ -119,17 +134,22 @@ public static class SongSummaryReader
         }
     }
 
-    private static async Task<ChartContents?> ReadFolderChartAsync(
+    private static ChartContents? ReadFolderChart(
         string folder,
-        IReadOnlyList<string> storedNames,
+        IReadOnlyList<FolderFileEntry> files,
         IReadOnlyList<KeyValuePair<string, string>> pairs,
         CancellationToken cancellationToken)
     {
-        if (ChartReader.Pick(storedNames) is not { } name)
+        if (ChartReader.Pick(files.Select(f => f.RelativePath).Where(n => !n.Contains('/'))) is not { } name)
             return ChartContents.None;
 
-        var bytes = await SongFile.ReadFileAsync(Path.Combine(folder, name), ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false);
-        return bytes is null ? null : ChartContents.Read(bytes, name, ChartReadOptions.From(pairs));
+        // The listing's size saves asking the file system again.
+        if (files.First(f => f.RelativePath == name).Length > ChartReader.MaxBytes)
+            return null;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var bytes = File.ReadAllBytes(Path.Combine(folder, name));
+        return ChartContents.Read(bytes, name, ChartReadOptions.From(pairs));
     }
 
     private static bool HasLength(IReadOnlyList<KeyValuePair<string, string>> pairs) => SongHeadline.From(pairs).LengthMs is not null;
