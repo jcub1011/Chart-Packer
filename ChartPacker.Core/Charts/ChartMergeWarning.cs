@@ -55,19 +55,14 @@ internal static class NoteCheck
 
         // A note on one side only moved or changed lane, or, when there are fewer, was lost.
         var unmatched = actual.Count < expected.Count ? ChartMergeIssue.NotesLost : ChartMergeIssue.NotesChanged;
-        int i = 0, j = 0;
-        while (i < expected.Count || j < actual.Count)
+        foreach (var (e, a) in Join(expected, actual))
         {
-            int order = i == expected.Count ? 1
-                : j == actual.Count ? -1
-                : (expected[i].Tick, expected[i].Lane).CompareTo((actual[j].Tick, actual[j].Lane));
-            if (order != 0)
+            if (e is not { } want || a is not { } got)
             {
-                Found(unmatched, order < 0 ? expected[i++].Tick : actual[j++].Tick);
+                Found(unmatched, (e ?? a)!.Value.Tick);
                 continue;
             }
 
-            var (want, got) = (expected[i++], actual[j++]);
             if ((want.Length > 0) != (got.Length > 0))
                 Found(ChartMergeIssue.SustainsChanged, want.Tick);
 
@@ -80,6 +75,27 @@ internal static class NoteCheck
         }
 
         return new Result(issue, fixes, [.. ticks]);
+    }
+
+    /// <summary>
+    /// The notes of <paramref name="expected"/> and <paramref name="actual"/>, each in tick then lane order, paired by
+    /// tick and lane in order: a note on one side only is paired with null on the other.
+    /// </summary>
+    public static IEnumerable<(ChartNote? Expected, ChartNote? Actual)> Join(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote> actual)
+    {
+        int i = 0, j = 0;
+        while (i < expected.Count || j < actual.Count)
+        {
+            int order = i == expected.Count ? 1
+                : j == actual.Count ? -1
+                : (expected[i].Tick, expected[i].Lane).CompareTo((actual[j].Tick, actual[j].Lane));
+            if (order < 0)
+                yield return (expected[i++], null);
+            else if (order > 0)
+                yield return (null, actual[j++]);
+            else
+                yield return (expected[i++], actual[j++]);
+        }
     }
 
     /// <summary>
