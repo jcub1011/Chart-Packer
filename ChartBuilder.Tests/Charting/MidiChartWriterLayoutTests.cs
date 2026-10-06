@@ -143,7 +143,7 @@ public sealed class MidiChartWriterLayoutTests
         // [ENABLE_CHART_DYNAMICS] goes when no note is an accent or a ghost, and comes back with one.
         Assert.IsFalse(saved.PartOf(ChartInstrument.Drums)!.ChartDynamics);
         drums.ChartDynamics = false;
-        drums[Hard].Notes.Add(new EditableNote(480, 1, 0, NoteDynamics.Accent));
+        drums[Hard].Notes.Add(new EditableNote(480, 1, 1, NoteDynamics.Accent));
         Assert.IsTrue(MidiChartWriter.Normalize(chart).PartOf(ChartInstrument.Drums)!.ChartDynamics);
         AssertWritesChecked(chart);
     }

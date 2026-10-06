@@ -94,6 +94,8 @@ public sealed class EditableChartTests
         Assert.ThrowsExactly<ArgumentException>(() => drums.Notes.Add(new EditableNote(0, 1, ChartNote.OpenLane)));
         Assert.ThrowsExactly<ArgumentException>(() => drums.Notes.Add(new EditableNote(0, 1, 1, DoubleKick: true)));
         Assert.ThrowsExactly<ArgumentException>(() => hardDrums.Notes.Add(new EditableNote(0, 1, 0, DoubleKick: true)));
+        Assert.ThrowsExactly<ArgumentException>(() => drums.Notes.Add(new EditableNote(0, 1, 0, NoteDynamics.Accent)));
+        Assert.ThrowsExactly<ArgumentException>(() => drums.Notes.Add(new EditableNote(0, 1, 0, NoteDynamics.Ghost, DoubleKick: true)));
         Assert.IsTrue(ghl.Notes.Add(new EditableNote(0, 1, 5)));
         Assert.IsTrue(guitar.Notes.Add(new EditableNote(0, 0, ChartNote.OpenLane)));
         Assert.IsTrue(drums.Notes.Add(new EditableNote(0, 1, 5, NoteDynamics.Ghost)));

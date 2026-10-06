@@ -136,16 +136,21 @@ public sealed class GameViewTests
     // Drums.
 
     [TestMethod]
-    public void TheKicksAccentsAndGhostsAreDroppedAndThePadsKept()
+    public void ThePadsAccentsAndGhostsAreReadAndTheKicksAreNormalHits()
     {
         var chart = new EditableChart(480);
         var drums = chart.AddPart(ChartInstrument.Drums);
         drums.ChartDynamics = true;
         var expert = drums[Expert];
-        expert.Notes.Add(new EditableNote(0, 1, 0, NoteDynamics.Accent));
+        expert.Notes.Add(new EditableNote(0, 1, 0));
         expert.Notes.Add(new EditableNote(0, 1, 1, NoteDynamics.Accent));
-        expert.Notes.Add(new EditableNote(480, 1, 0, NoteDynamics.Ghost, DoubleKick: true));
+        expert.Notes.Add(new EditableNote(480, 1, 0, DoubleKick: true));
         expert.Notes.Add(new EditableNote(480, 1, 2, NoteDynamics.Ghost));
+
+        // The model can't hold a kick's, which the games never read.
+        Assert.ThrowsExactly<ArgumentException>(() => expert.Notes.Add(new EditableNote(960, 1, 0, NoteDynamics.Accent)));
+
+        // A file's kick velocities are ignored.
         byte[] midi = Song()
             .Track("PART DRUMS")
             .Text(0, "[ENABLE_CHART_DYNAMICS]")

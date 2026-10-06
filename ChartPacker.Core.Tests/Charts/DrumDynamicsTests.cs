@@ -126,12 +126,12 @@ public sealed class DrumDynamicsTests
     }
 
     [TestMethod]
-    public void NoteCheckIgnoresAccentsAndGhostsUnlessToldNotTo()
+    public void NoteCheckIgnoresAccentsAndGhostsOnlyWhenToldTo()
     {
         ChartNote[] expected = [new(0, 0, 0, NoteFlags.None), new(100, 0, 1, NoteFlags.Cymbal)];
         ChartNote[] actual = [new(0, 0, 0, NoteFlags.Accent), new(100, 0, 1, NoteFlags.Cymbal | NoteFlags.Ghost)];
 
-        var masked = NoteCheck.Compare(expected, actual);
+        var masked = NoteCheck.Compare(expected, actual, NoteFlags.Accent | NoteFlags.Ghost);
         var exact = NoteCheck.Compare(expected, actual, NoteFlags.None);
 
         Assert.IsNull(masked.Issue);

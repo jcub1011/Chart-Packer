@@ -61,12 +61,14 @@ public sealed class AddPart : ChartCommand
 }
 
 /// <summary>
-/// Removes a part and everything on its track (charter-spec C2 item 6). The part is kept, to put back as it was when the
-/// removal is undone. Removing drums clears the song's drum variant, as a chart without drums has none, and undoing puts
-/// it back.
+/// Removes a part and everything on its track (charter-spec C2 item 6), with the passthrough tracks the reader would take
+/// for its instrument (a second <c>PART BASS</c>, say), which would otherwise be read as the part once it's gone. The part
+/// and those tracks are kept, to put back as they were when the removal is undone. Removing drums clears the song's drum
+/// variant, as a chart without drums has none, and undoing puts it back.
 /// </summary>
 public sealed class RemovePart(ChartInstrument instrument) : ChartCommand
 {
+    private readonly List<(int Index, PassthroughTrack Track)> _passthrough = [];
     private EditablePart? _removed;
     private DrumsVariant? _previousVariant;
 
@@ -85,11 +87,23 @@ public sealed class RemovePart(ChartInstrument instrument) : ChartCommand
             song |= SongChanges.DrumsVariant;
         }
 
+        // From the last, so the indexes of those still to remove don't change.
+        _passthrough.Clear();
+        for (int i = chart.Passthrough.Count - 1; i >= 0; i--)
+        {
+            if (chart.Passthrough[i].ReadAs() == Instrument)
+                _passthrough.Add((i, chart.RemovePassthroughAt(i)));
+        }
+
         return ChartChange.Of([PartEdits.Whole(Instrument)], song);
     }
 
     private protected override void Undo(EditableChart chart)
     {
+        // From the first, so each goes back where it was.
+        for (int i = _passthrough.Count - 1; i >= 0; i--)
+            chart.InsertPassthrough(_passthrough[i].Index, _passthrough[i].Track);
+        _passthrough.Clear();
         chart.AddPart(_removed!);
         chart.DrumsVariant = _previousVariant;
         _removed = null;

@@ -267,7 +267,7 @@ public sealed class MidiChartWriterTests
     public void WriteCheckedReportsAndLogsWhatDoesNotReadBack()
     {
         // A drums big rock ending with no [coda] before it reads back as a drum fill; an anchor without a tempo
-        // marker reads back as a raw event.
+        // marker is left out when it's read back.
         var chart = NewChart(ChartInstrument.Drums);
         chart.Name = "Unsaveable";
         var drums = chart.PartOf(ChartInstrument.Drums)!;
@@ -289,7 +289,7 @@ public sealed class MidiChartWriterTests
 
         Assert.IsFalse(result.IsValid);
         Assert.AreSequenceEqual(
-            [(ModelDifferenceKind.Anchor, (long?)960), (ModelDifferenceKind.TempoTrackEvent, 960), (ModelDifferenceKind.Phrase, 480)],
+            [(ModelDifferenceKind.Anchor, (long?)960), (ModelDifferenceKind.Phrase, 480)],
             result.ModelDifferences.Select(d => (d.Kind, d.Tick)).ToList());
         Assert.IsEmpty(result.GameDifferences);
         var issue = Assert.ContainsSingle(result.ReloadIssues);
@@ -297,7 +297,7 @@ public sealed class MidiChartWriterTests
 
         var error = Assert.ContainsSingle(sink.Events.Where(e => e.Level == LogEventLevel.Error && IsFrom(e, typeof(MidiChartWriter))));
         Assert.AreEqual("\"Unsaveable\"", error.Properties["Name"].ToString());
-        Assert.AreEqual("3", error.Properties["ModelDifferences"].ToString());
+        Assert.AreEqual("2", error.Properties["ModelDifferences"].ToString());
         Assert.AreEqual("1", error.Properties["ReloadIssues"].ToString());
         Assert.Contains("Phrase Drums  at 480", error.Properties["First"].ToString());
     }

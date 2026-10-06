@@ -149,7 +149,8 @@ public static class ChartToMidi
             warnings.Clear();
             foreach (var (key, notes) in expected)
             {
-                var result = NoteCheck.Compare(notes, reads, key);
+                // The .chart's notes are read without their accents and ghosts, which the MIDI read back has.
+                var result = NoteCheck.Compare(notes, reads, key, NoteFlags.Accent | NoteFlags.Ghost);
                 string name = TrackNames[key.Instrument];
                 if (result.HopoFixes.Count > 0 && pass == 0)
                 {

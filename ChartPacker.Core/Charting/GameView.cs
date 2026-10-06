@@ -154,7 +154,7 @@ public static class GameView
             foreach (var note in track.Notes.OrderBy(static n => n.Tick).ThenBy(static n => n.Length).ThenBy(static n => n.DoubleKick ? -1 : n.Lane))
             {
                 // YARG reads accents and ghosts on the pads alone: never the kick or the 2x kick.
-                var dynamics = part.ChartDynamics && note.Lane > 0 ? DynamicsOf(note.Dynamics) : NoteFlags.None;
+                var dynamics = part.ChartDynamics && note.Lane > 0 ? note.Dynamics.ToFlags() : NoteFlags.None;
                 list.Add(new DrumHit(note.Tick, note.DoubleKick ? -1 : note.Lane, dynamics));
             }
 
@@ -191,13 +191,6 @@ public static class GameView
         // OrderBy is stable, so those alike keep the order they were added in.
         return [.. texts.OrderBy(static t => t.Tick).ThenBy(static t => t.Place).Select(static t => (t.Tick, t.Text))];
     }
-
-    private static NoteFlags DynamicsOf(NoteDynamics dynamics) => dynamics switch
-    {
-        NoteDynamics.Accent => NoteFlags.Accent,
-        NoteDynamics.Ghost => NoteFlags.Ghost,
-        _ => NoteFlags.None,
-    };
 }
 
 /// <summary>

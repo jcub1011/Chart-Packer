@@ -2,7 +2,7 @@ using ChartPacker.Core.Charts;
 
 namespace ChartPacker.Core.Charting;
 
-/// <summary>How hard a drum note is hit, as the author set it.</summary>
+/// <summary>How hard a drum pad note is hit, as the author set it. A kick is always a normal hit, as the games read it.</summary>
 public enum NoteDynamics
 {
     /// <summary>A normal hit.</summary>
@@ -13,6 +13,21 @@ public enum NoteDynamics
 
     /// <summary>A ghost note, hit softer: velocity 1 on a track with <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
     Ghost,
+}
+
+/// <summary>A note's <see cref="NoteDynamics"/> as the games' <see cref="NoteFlags"/> have them, and back.</summary>
+internal static class NoteDynamicsFlags
+{
+    public static NoteFlags ToFlags(this NoteDynamics dynamics) => dynamics switch
+    {
+        NoteDynamics.Accent => NoteFlags.Accent,
+        NoteDynamics.Ghost => NoteFlags.Ghost,
+        _ => NoteFlags.None,
+    };
+
+    /// <summary>The dynamics of <paramref name="flags"/>' accent or ghost; their other flags are ignored.</summary>
+    public static NoteDynamics DynamicsOf(NoteFlags flags) =>
+        (flags & NoteFlags.Accent) != 0 ? NoteDynamics.Accent : (flags & NoteFlags.Ghost) != 0 ? NoteDynamics.Ghost : NoteDynamics.None;
 }
 
 /// <summary>
@@ -30,7 +45,7 @@ public enum NoteDynamics
 /// three white frets then the three black; <see cref="ChartNote.OpenLane"/> an open note. Drums are numbered by pad:
 /// 0 the kick, 1 red, 2 yellow, 3 blue, 4 the fourth pad (green, or five-lane orange), 5 the fifth (five-lane green).
 /// </param>
-/// <param name="Dynamics">Accent or ghost, drums only.</param>
+/// <param name="Dynamics">Accent or ghost, on a drum pad only.</param>
 /// <param name="DoubleKick">An Expert+ second kick: lane 0, on Expert drums only.</param>
 public readonly record struct EditableNote(long Tick, long Length, int Lane, NoteDynamics Dynamics = NoteDynamics.None, bool DoubleKick = false)
 {

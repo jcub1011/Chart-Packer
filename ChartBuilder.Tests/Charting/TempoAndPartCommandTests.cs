@@ -320,6 +320,27 @@ public sealed class TempoAndPartCommandTests
         Refuses<InvalidOperationException>(chart, new RemovePart(ChartInstrument.Bass));
     }
 
+    [TestMethod]
+    public void RemovePartTakesThePassthroughTracksReadAsItsInstrumentSoTheChartStillSaves()
+    {
+        // The second PART BASS passes through; left behind, it would be read as the bass part once that's gone.
+        byte[] midi = MidiChartLoaderTests.Song()
+            .Track("PART BASS").Note(0, 96)
+            .Track("PART VOCALS").Note(0, 60)
+            .Track("PART BASS").Note(480, 97)
+            .Track("PART KEYS").Note(0, 96)
+            .Track("PART GUITAR").Note(0, 96)
+            .Build();
+        var chart = MidiChartLoader.Load(midi, ChartReadOptions.Default).Chart;
+        Assert.AreSequenceEqual(["PART VOCALS", "PART BASS", "PART KEYS"], chart.Passthrough.Select(t => t.Name).ToList());
+
+        var after = AppliesRevertsAndRedoes(chart, new RemovePart(ChartInstrument.Bass));
+
+        Assert.AreSequenceEqual(["PART VOCALS", "PART KEYS"], after.Passthrough.Select(t => t.Name).ToList());
+        var result = MidiChartWriter.WriteChecked(after, MidiChartWriter.SettingsAfterSave(after, ChartReadOptions.Default));
+        Assert.IsTrue(result.IsValid, $"{DescribeModel(result.ModelDifferences)} {GameViewTests.Describe(result.GameDifferences)} {string.Join("; ", result.ReloadIssues)}");
+    }
+
     private static void Swap<T>(TickList<T> list, T from, T to)
     {
         Assert.IsTrue(list.Remove(from));

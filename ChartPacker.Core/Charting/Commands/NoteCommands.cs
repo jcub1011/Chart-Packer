@@ -103,7 +103,8 @@ public sealed class RemoveNotes : ChartCommand
 
 /// <summary>
 /// Moves notes of one track by a number of ticks and lanes, each keeping its length, accent or ghost and kick. None may
-/// land on a note that isn't moving, or in a lane the part hasn't.
+/// land on a note that isn't moving, or in a lane the part hasn't. An open note or a kick moves only in time, and no note
+/// moves into the open or kick lane, as that would make it another kind of note.
 /// </summary>
 /// <remarks>
 /// A chord's forcing and tap belong to its tick. When every note of a chord moves, its marking moves with them, added to
@@ -155,6 +156,10 @@ public sealed class MoveNotes : ChartCommand
             if (tick < 0)
                 throw new InvalidOperationException(Invariant($"Moving {Describe(note)} {TickDelta} ticks would put it before the start of the song."));
             moved[i] = note with { Tick = tick, Lane = note.Lane + LaneDelta };
+
+            // Moving between an open (or a kick) and the other lanes would change what the note is, not where it is.
+            if (LaneDelta != 0 && (IsApart(track.Kind, note.Lane) || IsApart(track.Kind, moved[i].Lane)))
+                throw new ArgumentException(Invariant($"{Describe(note)} can't move to lane {moved[i].Lane}: an open note or a kick only moves in time."));
             try
             {
                 track.Notes.Check(moved[i]);
@@ -201,6 +206,9 @@ public sealed class MoveNotes : ChartCommand
         foreach (var (tick, previous) in _flags)
             track.SetFlags(tick, previous);
     }
+
+    /// <summary>Whether <paramref name="lane"/> is one a note can't move into or out of by lanes: a fret part's open, or the drums' kick.</summary>
+    private static bool IsApart(ChartInstrumentKind kind, int lane) => lane == (kind == ChartInstrumentKind.Drums ? 0 : ChartNote.OpenLane);
 
     // The marking of each tick it changes, once the chords whose notes all move have taken their marking with them.
     private List<(long Tick, ChordFlags Flags)> FlagsAfter(EditableTrack track)
@@ -291,7 +299,7 @@ public sealed class SetSustain : ChartCommand
     private protected override void Undo(EditableChart chart) => NoteEdits.Replace(TrackOf(chart, Part, Difficulty).Notes, _changed, _notes);
 }
 
-/// <summary>Makes drum notes accents, ghosts or normal hits.</summary>
+/// <summary>Makes drum pad notes accents, ghosts or normal hits. A kick, which is always a normal hit, is refused.</summary>
 public sealed class SetDynamics : ChartCommand
 {
     private readonly EditableNote[] _notes;

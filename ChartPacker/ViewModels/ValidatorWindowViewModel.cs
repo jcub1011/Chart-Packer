@@ -975,7 +975,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool IsSelected { get; set; } = isSelected;
 
-        // Null while the constructor sets the starting tick, which isn't a change to report.
-        partial void OnIsSelectedChanged(bool value) => _selectionChanged?.Invoke();
+        // The initializer sets the backing field, so the starting tick isn't reported.
+        partial void OnIsSelectedChanged(bool value) => _selectionChanged();
     }
 }

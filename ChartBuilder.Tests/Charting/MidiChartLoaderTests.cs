@@ -165,7 +165,7 @@ public sealed class MidiChartLoaderTests
     }
 
     [TestMethod]
-    public void AnAnchorIsReadAtItsTempoMarkerAndKeptRawElsewhere()
+    public void AnAnchorIsReadAtItsTempoMarkerAndLeftOutElsewhere()
     {
         var result = Load(Song()
             .Tempo(960, 100)
@@ -177,13 +177,12 @@ public sealed class MidiChartLoaderTests
         var chart = result.Chart;
 
         Assert.AreSequenceEqual([new TempoAnchor(960, 1_500_000)], chart.TempoMap.Anchors.ToList());
-        // Not written as the writer writes one: kept as it is, and not an issue, as it isn't an anchor.
+        // Not written as the writer writes one: kept as it is, and not an issue, as it isn't an anchor. The anchors
+        // without a marker of their own are left out.
         Assert.AreSequenceEqual(
             [
                 new RawEvent(0, TextBytes(0x01, "[chartpacker_anchor 007]")),
                 new RawEvent(0, TextBytes(0x01, "[chartpacker_anchor soon]")),
-                new RawEvent(480, TextBytes(0x01, "[chartpacker_anchor 250000]")),
-                new RawEvent(960, TextBytes(0x01, "[chartpacker_anchor 1500001]")),
             ],
             chart.TempoTrackRaw.ToList());
         Assert.AreSequenceEqual(
@@ -195,20 +194,35 @@ public sealed class MidiChartLoaderTests
     }
 
     [TestMethod]
-    public void ATempoOrTimeSignatureTheModelCannotHoldIsKeptRawWithAnIssue()
+    public void ATempoOrTimeSignatureTheModelCannotHoldIsLeftOutWithAnIssue()
     {
         var result = Load(Song().Meta(480, 0x51, [0, 0, 0]).Meta(960, 0x58, [0, 2, 24, 8]));
         var chart = result.Chart;
 
         Assert.AreSequenceEqual([new TempoChange(0, 500_000)], chart.TempoMap.Tempos.ToList());
         Assert.AreSequenceEqual([new TimeSignatureMarker(0, 4, 4)], chart.TempoMap.TimeSignatures.ToList());
-        Assert.AreSequenceEqual([new RawEvent(480, [0xFF, 0x51, 3, 0, 0, 0]), new RawEvent(960, [0xFF, 0x58, 4, 0, 2, 24, 8])], chart.TempoTrackRaw.ToList());
+        Assert.IsEmpty(chart.TempoTrackRaw);
         Assert.AreSequenceEqual(
             [
                 new ChartLoadIssue(ChartLoadIssueKind.UnholdableTempo, null, null, 480),
                 new ChartLoadIssue(ChartLoadIssueKind.UnholdableTimeSignature, null, null, 960),
             ],
             result.Issues.ToList());
+    }
+
+    [TestMethod]
+    public void ATempoTrackTheModelCannotHoldAllOfStillSaves()
+    {
+        // Kept raw, each would be an issue again when the save reads it back, and the chart could never be saved.
+        var chart = Load(Song()
+            .Meta(480, 0x51, [0, 0, 0])
+            .Meta(960, 0x58, [0, 2, 24, 8])
+            .Text(1440, "[chartpacker_anchor 250000]")
+            .Track("PART GUITAR").Note(0, 96)).Chart;
+
+        var result = MidiChartWriter.WriteChecked(chart, MidiChartWriter.SettingsAfterSave(chart, ChartReadOptions.Default));
+
+        Assert.IsTrue(result.IsValid, $"{MidiChartWriterTests.DescribeModel(result.ModelDifferences)} {string.Join("; ", result.ReloadIssues)}");
     }
 
     [TestMethod]

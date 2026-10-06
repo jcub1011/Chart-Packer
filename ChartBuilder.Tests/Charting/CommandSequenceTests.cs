@@ -184,9 +184,10 @@ public sealed class CommandSequenceTests
         private IChartCommand? SetSustain(EditableChart chart) =>
             TrackWithNotes(chart) is var (part, track) ? new SetSustain(part, track.Difficulty, SomeNotes(track), random.Next(1, 8) * Snap) : null;
 
+        // A kick is always a normal hit, so only pads are given.
         private IChartCommand? SetDynamics(EditableChart chart) =>
-            TrackWithNotes(chart, ChartInstrumentKind.Drums) is var (part, track)
-                ? new SetDynamics(part, track.Difficulty, SomeNotes(track), (NoteDynamics)random.Next(3))
+            TrackWithNotes(chart, ChartInstrumentKind.Drums) is var (part, track) && SomeNotes(track).Where(n => n.Lane > 0).ToList() is { Count: > 0 } pads
+                ? new SetDynamics(part, track.Difficulty, pads, (NoteDynamics)random.Next(3))
                 : null;
 
         private IChartCommand? SetChordFlags(EditableChart chart)
@@ -291,7 +292,7 @@ public sealed class CommandSequenceTests
             int last = chart.DrumsVariant == DrumsVariant.FiveLane ? 5 : 4;
             int lane = random.Next(0, last + 1);
             bool doubleKick = lane == 0 && track.Difficulty == ChartDifficulty.Expert && random.Next(4) == 0;
-            return new EditableNote(tick, 1, lane, (NoteDynamics)random.Next(3), doubleKick);
+            return new EditableNote(tick, 1, lane, lane > 0 ? (NoteDynamics)random.Next(3) : NoteDynamics.None, doubleKick);
         }
 
         private (ChartInstrument Part, EditableTrack Track)? TrackWithNotes(EditableChart chart, ChartInstrumentKind? kind = null, ChartInstrumentKind? notKind = null)

@@ -18,9 +18,10 @@ public static class SongFolderFiles
     /// <para>The temp files are then moved into place, and only then are the removed files deleted.
     /// So in the worst case, a crash or failure between the moves and the deletes, the folder holds
     /// both the old files and the new ones; it's never left with neither. A removed file that only
-    /// differs from an added one in letter case is the exception: it's deleted before the moves,
-    /// because on a case-insensitive file system deleting it afterwards would delete the new file.
-    /// A removed file with the same name as an added one is left for the add to replace.</para>
+    /// differs from an added one in letter case is renamed aside before the moves, because on a
+    /// case-insensitive file system deleting it afterwards would delete the new file; it's put back
+    /// if its add isn't moved into place, and deleted with the other removals otherwise. A removed
+    /// file with the same name as an added one is left for the add to replace.</para>
     /// <para>A removed file that no longer exists is skipped. A delete that fails doesn't stop the
     /// others. Folders a removal empties are kept.</para>
     /// </remarks>
@@ -43,13 +44,17 @@ public static class SongFolderFiles
         var targets = adds.Select(file => Resolve(root, file.StoredName)).ToList();
 
         // A removal with an add's exact path is replaced by the add's move, so it isn't deleted at all.
-        // One that differs only in case is deleted before the moves, the rest after them.
+        // One that differs only in case is set aside before the moves, and the rest deleted after them.
         var exactTargets = targets.ToHashSet(StringComparer.Ordinal);
         var caseTargets = targets.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var deleteFirst = removePaths.Where(path => !exactTargets.Contains(path) && caseTargets.Contains(path)).ToList();
+        var toSetAside = removePaths
+            .Where(path => !exactTargets.Contains(path) && caseTargets.Contains(path))
+            .Select(path => new SetAside(path, targets.FindIndex(t => t.Equals(path, StringComparison.OrdinalIgnoreCase)), $"{path}.{Guid.NewGuid():N}.tmp"))
+            .ToList();
         var deleteLast = removePaths.Where(path => !caseTargets.Contains(path)).ToList();
 
         var temps = new List<string>(adds.Count);
+        var setAside = new List<SetAside>(toSetAside.Count);
         int moved = 0;
         try
         {
@@ -66,10 +71,12 @@ public static class SongFolderFiles
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (string path in deleteFirst)
+            foreach (var file in toSetAside)
             {
-                if (File.Exists(path))
-                    File.Delete(path);
+                if (!File.Exists(file.Path))
+                    continue;
+                File.Move(file.Path, file.Aside);
+                setAside.Add(file);
             }
 
             for (; moved < temps.Count; moved++)
@@ -80,11 +87,21 @@ public static class SongFolderFiles
             // A temp that was moved is now the target, which is never deleted here.
             foreach (string temp in temps.Skip(moved))
                 TryDelete(temp);
+
+            // A file set aside goes back where it was, unless its add has taken its place.
+            foreach (var file in setAside)
+            {
+                if (file.Add >= moved)
+                    TryMove(file.Aside, file.Path);
+                else
+                    TryDelete(file.Aside);
+            }
+
             throw;
         }
 
         Exception? firstFailure = null;
-        foreach (string path in deleteLast)
+        foreach (string path in deleteLast.Concat(setAside.Select(f => f.Aside)))
         {
             try
             {
@@ -114,6 +131,17 @@ public static class SongFolderFiles
         return path;
     }
 
+    private static void TryMove(string from, string to)
+    {
+        try
+        {
+            File.Move(from, to);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     private static void TryDelete(string path)
     {
         try
@@ -124,4 +152,10 @@ public static class SongFolderFiles
         {
         }
     }
+
+    /// <summary>A removed file that only differs from an added one in letter case, renamed aside while the adds move into place.</summary>
+    /// <param name="Path">Where it is.</param>
+    /// <param name="Add">The index of the add it differs from.</param>
+    /// <param name="Aside">Where it's put while the adds move.</param>
+    private readonly record struct SetAside(string Path, int Add, string Aside);
 }

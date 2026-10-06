@@ -81,7 +81,6 @@ public static class MidiChartWriter
     // A Phase Shift sysex event's key in its phase: after every note event's.
     private const int SysexKey = 1 << 10;
 
-    private const int NormalVelocity = 100;
     private const int DownbeatPitch = 12;
     private const int BeatPitch = 13;
 
@@ -312,7 +311,7 @@ public static class MidiChartWriter
         {
             int b = MidiLayout.BaseOf(kind, difficulty.Difficulty);
             foreach (var note in difficulty.Notes)
-                track.Note(note.Tick, note.Length, PitchOf(kind, b, note), drums && part.ChartDynamics ? VelocityOf(note.Dynamics) : NormalVelocity);
+                track.Note(note.Tick, note.Length, PitchOf(kind, b, note), drums && part.ChartDynamics ? MidiLayout.DrumVelocityOf(note.Dynamics.ToFlags()) : MidiLayout.NormalVelocity);
 
             if (drums)
             {
@@ -404,21 +403,13 @@ public static class MidiChartWriter
         _ => note.Lane == ChartNote.OpenLane ? b - 1 : b + note.Lane,
     };
 
-    /// <summary>A drum note's velocity on a track with <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
-    private static int VelocityOf(NoteDynamics dynamics) => dynamics switch
-    {
-        NoteDynamics.Accent => MidiLayout.AccentVelocity,
-        NoteDynamics.Ghost => MidiLayout.GhostVelocity,
-        _ => NormalVelocity,
-    };
-
     /// <summary>A roll's or trill's velocity, which takes it down to its lowest difficulty (charter-spec §7.2).</summary>
     private static int LaneVelocityOf(ChartDifficulty? lowest) => lowest switch
     {
         ChartDifficulty.Easy => 25,
         ChartDifficulty.Medium => 35,
         ChartDifficulty.Hard => 45,
-        _ => NormalVelocity,
+        _ => MidiLayout.NormalVelocity,
     };
 
     private static byte[] Text(long tick, byte type, string text) => MidiMessage.Text(tick, type, text).Bytes;
@@ -431,7 +422,7 @@ public static class MidiChartWriter
         long last = 0;
         try
         {
-            var reader = new MidiFile.EventReader(ChunkOf(track));
+            var reader = new MidiFile.EventReader(track.ChunkOf());
             while (reader.Next(track.Array) is { } e)
                 last = e.Tick;
         }
@@ -442,9 +433,6 @@ public static class MidiChartWriter
 
         return last;
     }
-
-    private static MidiChunk ChunkOf(PassthroughTrack track) =>
-        new(track.ChunkType, 0, PassthroughTrack.HeaderLength, track.Array.Length - PassthroughTrack.HeaderLength);
 
     // Passthrough tracks.
 
@@ -469,23 +457,12 @@ public static class MidiChartWriter
 
     private static Place PlaceOf(PassthroughTrack track, EditableChart chart)
     {
-        if (!track.IsTrack)
-            return Place.Anywhere;
-        string? name;
-        try
-        {
-            name = MidiChartReader.NameOf(track.Array, ChunkOf(track));
-        }
-        catch (ChartFormatException)
-        {
-            return Place.Anywhere;
-        }
-
+        string? name = track.ReaderName();
         if (name == "EVENTS")
             return Place.AfterParts;
-        if (name is null || !MidiLayout.TrackNames.TryGetValue(name, out var instrument) || chart.PartOf(instrument) is null)
+        if (track.ReadAs() is not { } instrument || chart.PartOf(instrument) is null)
             return Place.Anywhere;
-        if (MidiLayout.OverridingTrackNames.Contains(name))
+        if (MidiLayout.OverridingTrackNames.Contains(name!))
             return Place.BeforeParts;
 
         // Written under a name that replaces it, the part wins wherever another track of its instrument is.
@@ -663,75 +640,63 @@ public static class MidiChartWriter
 
     /// <summary>Merges the part's overlapping phrases on the same pitches.</summary>
     /// <returns>How many phrases were merged into others.</returns>
-    private static int MergePhrases(EditablePart part)
-    {
-        var phrases = part.Phrases.ToList();
-        var merged = new List<Phrase>(phrases.Count);
-        foreach (var group in phrases.GroupBy(static p => p.Kind is PhraseKind.BigRockEnding ? PhraseKind.DrumFill : p.Kind))
+    private static int MergePhrases(EditablePart part) => MergeOverlapping(
+        part.Phrases,
+        static p => p.Kind is PhraseKind.BigRockEnding ? PhraseKind.DrumFill : p.Kind,
+        static p => p.Tick,
+        static p => p.Length,
+        static (c, p) => c with
         {
-            Phrase? current = null;
-            foreach (var phrase in group)
-            {
-                if (current is { } c && Overlap(c.Tick, c.Length, phrase.Tick))
-                {
-                    current = c with
-                    {
-                        Length = Math.Max(c.Tick + c.Length, phrase.Tick + phrase.Length) - c.Tick,
-                        LowestDifficulty = c.LowestDifficulty is { } a && phrase.LowestDifficulty is { } b ? (a < b ? a : b) : c.LowestDifficulty,
-                    };
-                    continue;
-                }
-
-                if (current is { } done)
-                    merged.Add(done);
-                current = phrase;
-            }
-
-            if (current is { } rest)
-                merged.Add(rest);
-        }
-
-        int count = phrases.Count - merged.Count;
-        if (count == 0)
-            return 0;
-        part.Phrases.Clear();
-        foreach (var phrase in merged)
-            part.Phrases.Add(phrase);
-        return count;
-    }
+            Length = Math.Max(c.Tick + c.Length, p.Tick + p.Length) - c.Tick,
+            LowestDifficulty = c.LowestDifficulty is { } a && p.LowestDifficulty is { } b ? (a < b ? a : b) : c.LowestDifficulty,
+        });
 
     /// <summary>Merges the part's overlapping tom markers on one pad.</summary>
     /// <returns>How many markers were merged into others.</returns>
-    private static int MergeTomMarkers(EditablePart part)
+    private static int MergeTomMarkers(EditablePart part) => MergeOverlapping(
+        part.TomMarkers,
+        static m => m.Pad,
+        static m => m.Tick,
+        static m => m.Length,
+        static (c, m) => c with { Length = Math.Max(c.Tick + c.Length, m.Tick + m.Length) - c.Tick });
+
+    /// <summary>
+    /// Merges the overlapping markers of <paramref name="markers"/> that share a key, in tick order: each into the one
+    /// it overlaps, as <paramref name="merge"/> combines them.
+    /// </summary>
+    /// <returns>How many markers were merged into others.</returns>
+    private static int MergeOverlapping<T, TKey>(TickList<T> markers, Func<T, TKey> keyOf, Func<T, long> tickOf, Func<T, long> lengthOf, Func<T, T, T> merge)
     {
-        var markers = part.TomMarkers.ToList();
-        var merged = new List<TomMarker>(markers.Count);
-        foreach (var pad in markers.GroupBy(static m => m.Pad))
+        var all = markers.ToList();
+        var merged = new List<T>(all.Count);
+        foreach (var group in all.GroupBy(keyOf))
         {
-            TomMarker? current = null;
-            foreach (var marker in pad)
+            bool any = false;
+            T current = default!;
+            foreach (var marker in group)
             {
-                if (current is { } c && Overlap(c.Tick, c.Length, marker.Tick))
+                if (any && Overlap(tickOf(current), lengthOf(current), tickOf(marker)))
                 {
-                    current = c with { Length = Math.Max(c.Tick + c.Length, marker.Tick + marker.Length) - c.Tick };
+                    current = merge(current, marker);
                     continue;
                 }
 
-                if (current is { } done)
-                    merged.Add(done);
+                if (any)
+                    merged.Add(current);
                 current = marker;
+                any = true;
             }
 
-            if (current is { } rest)
-                merged.Add(rest);
+            if (any)
+                merged.Add(current);
         }
 
-        int count = markers.Count - merged.Count;
+        int count = all.Count - merged.Count;
         if (count == 0)
             return 0;
-        part.TomMarkers.Clear();
+        markers.Clear();
         foreach (var marker in merged)
-            part.TomMarkers.Add(marker);
+            markers.Add(marker);
         return count;
     }
 
@@ -778,7 +743,7 @@ public static class MidiChartWriter
         /// pitch, and its note-off among the note-offs where it ends, or straight after its note-on when it's held for no
         /// ticks.
         /// </summary>
-        public void Note(long tick, long length, int pitch, int velocity = NormalVelocity)
+        public void Note(long tick, long length, int pitch, int velocity = MidiLayout.NormalVelocity)
         {
             Add(tick, PartEventOrder.NoteOn, pitch * 2, MidiMessage.NoteOn(tick, pitch, velocity).Bytes);
             if (length == 0)

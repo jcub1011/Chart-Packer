@@ -12,7 +12,8 @@ namespace ChartPacker.Core.Charting;
 /// <remarks>
 /// <list type="bullet">
 /// <item>The tempo track gives the song's name, the tempo and time-signature markers at the ticks YARG reads them at,
-/// and the anchors; its other events are kept as raw events.</item>
+/// and the anchors; a marker or anchor the model can't hold is left out, with a <see cref="ChartLoadIssue"/>, and its
+/// other events are kept as raw events.</item>
 /// <item><c>EVENTS</c> gives the global text events; its other events are kept as raw events.</item>
 /// <item>Each part track <see cref="MidiChartReader"/> reads gives a part, but <c>PART KEYS</c>, which v1 doesn't edit
 /// (§7.4). What the model holds elsewhere (notes, markers, phrases and the part's settings) is taken from it; what the
@@ -110,7 +111,8 @@ public static class MidiChartLoader
 
     /// <summary>
     /// The tempo track: its name, its tempo and time-signature markers at the ticks YARG reads them at, its anchors at
-    /// their markers', and the rest as raw events where they are. The end of the track is left to the writer.
+    /// their markers', and the rest as raw events where they are, but for the markers and anchors the model can't hold,
+    /// which are left out with an issue. The end of the track is left to the writer.
     /// </summary>
     private static void LoadTempoTrack(byte[] bytes, List<MidiEvent> events, EditableChart chart, List<ChartLoadIssue> issues)
     {
@@ -136,11 +138,15 @@ public static class MidiChartLoader
             if (taken[i])
                 continue;
             var e = events[i];
+            // Written back raw, what the model can't hold would be an issue again on every save's read-back, so it's
+            // left out: the games don't read it either.
             if (unholdable.TryGetValue(i, out var kind))
             {
                 issues.Add(new ChartLoadIssue(kind, null, null, e.Tick));
+                continue;
             }
-            else if (e.IsMeta)
+
+            if (e.IsMeta)
             {
                 var (type, start, length) = MidiFile.MetaOf(bytes, e);
                 if (type == MidiFile.EndOfTrack)
@@ -158,6 +164,7 @@ public static class MidiChartLoader
                     if (!map.Tempos.At(tick).IsEmpty && map.Anchors.Add(new TempoAnchor(tick, microseconds)))
                         continue;
                     issues.Add(new ChartLoadIssue(ChartLoadIssueKind.StrayAnchor, null, null, e.Tick));
+                    continue;
                 }
             }
 
@@ -318,6 +325,7 @@ public static class MidiChartLoader
         {
             var sysex = PhaseShiftMarkers();
             var taps = MarkersOn(MidiLayout.TapPitch);
+            var tapIndex = Index(taps);
             foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
             {
                 int b = MidiLayout.BaseOf(Kind, difficulty);
@@ -341,7 +349,7 @@ public static class MidiChartLoader
                 // As the reader: the first of each lane at a tick is kept, then Phase Shift open phrases make the notes
                 // they cover open, which the model can hold only one of at a tick.
                 var track = _part[difficulty];
-                var opens = For(sysex, difficulty, MidiLayout.SysexOpen);
+                var opens = Index(For(sysex, difficulty, MidiLayout.SysexOpen));
                 foreach (var gem in KeepFirst(gems, difficulty, static c => c.Lane))
                 {
                     var note = gem.Note;
@@ -354,16 +362,18 @@ public static class MidiChartLoader
 
                 var forceHopo = MarkersOn(b + MidiLayout.ForceHopoOffset(Kind));
                 var forceStrum = MarkersOn(b + MidiLayout.ForceStrumOffset(Kind));
-                var sysexTaps = For(sysex, difficulty, MidiLayout.SysexTap);
+                var hopoIndex = Index(forceHopo);
+                var strumIndex = Index(forceStrum);
+                var sysexTaps = Index(For(sysex, difficulty, MidiLayout.SysexTap));
                 long? last = null;
                 foreach (var note in track.Notes)
                 {
                     if (note.Tick == last)
                         continue;
                     last = note.Tick;
-                    var flags = (Cover(forceHopo, note.Tick) ? ChordFlags.ForceHopo : ChordFlags.None)
-                        | (Cover(forceStrum, note.Tick) ? ChordFlags.ForceStrum : ChordFlags.None)
-                        | (Cover(taps, note.Tick) | Cover(sysexTaps, note.Tick) ? ChordFlags.Tap : ChordFlags.None);
+                    var flags = (Cover(hopoIndex, note.Tick) ? ChordFlags.ForceHopo : ChordFlags.None)
+                        | (Cover(strumIndex, note.Tick) ? ChordFlags.ForceStrum : ChordFlags.None)
+                        | (Cover(tapIndex, note.Tick) | Cover(sysexTaps, note.Tick) ? ChordFlags.Tap : ChordFlags.None);
                     if (flags != ChordFlags.None)
                         track.SetFlags(note.Tick, flags);
                 }
@@ -380,7 +390,7 @@ public static class MidiChartLoader
             }
         }
 
-        /// <summary>Each difficulty's drum notes, with their accents and ghosts once the track has <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
+        /// <summary>Each difficulty's drum notes, with their pads' accents and ghosts once the track has <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
         private void Drums()
         {
             foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
@@ -401,7 +411,9 @@ public static class MidiChartLoader
                     if (IsPhantom(hit))
                         continue;
                     var note = hit.Note;
-                    var dynamics = _track.HasChartDynamics(note) ? DynamicsOf(note.Velocity) : NoteDynamics.None;
+
+                    // As the reader: a kick's velocity is never an accent or a ghost, so the model doesn't hold one.
+                    var dynamics = _track.HasChartDynamics(note) ? NoteDynamicsFlags.DynamicsOf(MidiLayout.DrumDynamicsOf(hit.Lane, note.Velocity)) : NoteDynamics.None;
                     track.Notes.Add(new EditableNote(note.Start, note.End - note.Start, Math.Max(0, hit.Lane), dynamics, DoubleKick: hit.Lane == -1));
                 }
 
@@ -620,20 +632,20 @@ public static class MidiChartLoader
         }
 
         /// <summary>Whether any of <paramref name="markers"/> covers <paramref name="tick"/>, marking those that do as used.</summary>
-        private static bool Cover(List<Marker> markers, long tick)
+        private static bool Cover(TickSpanIndex<Marker> markers, long tick)
         {
             bool covered = false;
-            foreach (var marker in markers)
+            foreach (var marker in markers.Covering(tick))
             {
-                if (marker.Span.Covers(tick))
-                {
-                    marker.Used = true;
-                    covered = true;
-                }
+                marker.Used = true;
+                covered = true;
             }
 
             return covered;
         }
+
+        /// <summary><paramref name="markers"/>, found by the ticks they cover.</summary>
+        private static TickSpanIndex<Marker> Index(List<Marker> markers) => new(markers, static m => m.Span);
 
         private void Unused(List<Marker> markers, ChartDifficulty? difficulty)
         {
@@ -665,14 +677,6 @@ public static class MidiChartLoader
 
         private void Issue(ChartLoadIssueKind kind, ChartDifficulty? difficulty, long tick, int? pitch) =>
             _issues.Add(new ChartLoadIssue(kind, _part.Instrument, difficulty, tick, pitch));
-
-        /// <summary>A drum note's accent or ghost by its note-on velocity, as YARG reads them once dynamics are on.</summary>
-        private static NoteDynamics DynamicsOf(int velocity) => velocity switch
-        {
-            MidiLayout.AccentVelocity => NoteDynamics.Accent,
-            MidiLayout.GhostVelocity => NoteDynamics.Ghost,
-            _ => NoteDynamics.None,
-        };
 
         /// <summary>
         /// The lowest difficulty a roll or trill reaches, by its velocity (charter-spec §7.2): 21 to 30 Easy, 31 to 40

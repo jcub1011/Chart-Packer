@@ -151,6 +151,26 @@ public sealed class SongFolderFilesTests
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
+    public async Task AMoveThatFailsPutsBackARemovalThatOnlyDiffersFromAnAddInCase()
+    {
+        // Only Windows refuses to replace a file that's open, as access denied.
+        string folder = CreateFolder(("Song.ogg", [1, 1, 1]), ("a.ini", [2]));
+        string ini = WriteLoose("a.ini", [8]);
+        string audio = WriteLoose("song.ogg", [9]);
+
+        using (new FileStream(Path.Combine(folder, "a.ini"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => SongFolderFiles.ApplyAsync(
+                folder, ["Song.ogg"], [new AddedFile("a.ini", ini, 1), new AddedFile("song.ogg", audio, 1)], TestContext.CancellationToken));
+        }
+
+        Assert.AreSequenceEqual(["Song.ogg", "a.ini"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual(new byte[] { 1, 1, 1 }, File.ReadAllBytes(Path.Combine(folder, "Song.ogg")));
+        Assert.IsEmpty(Directory.GetFiles(folder, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ADeleteThatFailsAfterTheMovesLeavesTheOldAndNewFilesBoth()
     {
         // AC C2.4.

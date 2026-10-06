@@ -127,14 +127,14 @@ public sealed class CommandTests
     public void MovingEveryNoteOfAChordTakesItsMarkingWithIt()
     {
         var chart = EditableChartSamples.Full();
-        var command = new MoveNotes(Guitar, Expert, [new EditableNote(480, 240, 2), new EditableNote(480, 1, ChartNote.OpenLane)], 480, 1);
+        var command = new MoveNotes(Guitar, Expert, [new EditableNote(480, 240, 2), new EditableNote(480, 1, ChartNote.OpenLane)], 480, 0);
 
         var after = AppliesRevertsAndRedoes(chart, command);
 
         var track = after.PartOf(Guitar)![Expert];
-        Assert.AreSequenceEqual([new EditableNote(0, 1, 0), new EditableNote(960, 1, 0), new EditableNote(960, 240, 3)], track.Notes.ToList());
+        Assert.AreSequenceEqual([new EditableNote(0, 1, 0), new EditableNote(960, 1, ChartNote.OpenLane), new EditableNote(960, 240, 2)], track.Notes.ToList());
         Assert.AreSequenceEqual([new FlaggedChord(960, ChordFlags.ForceHopo)], track.FlaggedChords.ToList());
-        Assert.AreSequenceEqual([new EditableNote(960, 240, 3), new EditableNote(960, 1, 0)], command.Moved);
+        Assert.AreSequenceEqual([new EditableNote(960, 240, 2), new EditableNote(960, 1, ChartNote.OpenLane)], command.Moved);
         Assert.AreSequenceEqual([new ChartLocation(Guitar, Expert, 480, 720), new ChartLocation(Guitar, Expert, 960, 1200)], command.Affected.Regions);
     }
 
@@ -199,8 +199,20 @@ public sealed class CommandTests
     {
         var chart = EditableChartSamples.Full();
 
-        // The open note moves up a lane onto the green at 0.
-        Refuses<InvalidOperationException>(chart, new MoveNotes(Guitar, Expert, [new EditableNote(480, 1, ChartNote.OpenLane)], -480, 1));
+        // The yellow moves down two lanes onto the green at 0.
+        Refuses<InvalidOperationException>(chart, new MoveNotes(Guitar, Expert, [new EditableNote(480, 240, 2)], -480, -2));
+    }
+
+    [TestMethod]
+    public void MoveNotesRefusesAMoveThatChangesWhatANoteIs()
+    {
+        var chart = EditableChartSamples.Full();
+
+        // A fret moving down onto the open lane, an open moving up, a pad moving down onto the kick, and a kick moving up.
+        Refuses<ArgumentException>(chart, new MoveNotes(Guitar, Expert, [new EditableNote(0, 1, 0)], 0, -1));
+        Refuses<ArgumentException>(chart, new MoveNotes(Guitar, Expert, [new EditableNote(480, 1, ChartNote.OpenLane)], 960, 1));
+        Refuses<ArgumentException>(chart, new MoveNotes(Drums, Expert, [new EditableNote(0, 1, 2, NoteDynamics.Accent)], 960, -2));
+        Refuses<ArgumentException>(chart, new MoveNotes(Drums, Expert, [new EditableNote(0, 1, 0)], 960, 1));
     }
 
     [TestMethod]
@@ -244,11 +256,20 @@ public sealed class CommandTests
     {
         var chart = EditableChartSamples.Full();
 
-        var after = AppliesRevertsAndRedoes(chart, new SetDynamics(Drums, Expert, [new EditableNote(0, 1, 0), new EditableNote(0, 1, 2, NoteDynamics.Accent)], NoteDynamics.Ghost));
+        var after = AppliesRevertsAndRedoes(chart, new SetDynamics(Drums, Expert, [new EditableNote(0, 1, 2, NoteDynamics.Accent), new EditableNote(480, 1, 3, NoteDynamics.Ghost)], NoteDynamics.Ghost));
 
-        Assert.IsTrue(after.PartOf(Drums)![Expert].TryGetNote(0, 0, false, out var kick));
         Assert.IsTrue(after.PartOf(Drums)![Expert].TryGetNote(0, 2, false, out var yellow));
-        Assert.AreEqual((NoteDynamics.Ghost, NoteDynamics.Ghost), (kick.Dynamics, yellow.Dynamics));
+        Assert.IsTrue(after.PartOf(Drums)![Expert].TryGetNote(480, 3, false, out var blue));
+        Assert.AreEqual((NoteDynamics.Ghost, NoteDynamics.Ghost), (yellow.Dynamics, blue.Dynamics));
+    }
+
+    [TestMethod]
+    public void SetDynamicsRefusesAKickWhichTheGamesAlwaysPlayAsANormalHit()
+    {
+        var chart = EditableChartSamples.Full();
+
+        Refuses<ArgumentException>(chart, new SetDynamics(Drums, Expert, [new EditableNote(0, 1, 0), new EditableNote(0, 1, 2, NoteDynamics.Accent)], NoteDynamics.Ghost));
+        Refuses<ArgumentException>(chart, new SetDynamics(Drums, Expert, [new EditableNote(0, 1, 0, DoubleKick: true)], NoteDynamics.Accent));
     }
 
     [TestMethod]

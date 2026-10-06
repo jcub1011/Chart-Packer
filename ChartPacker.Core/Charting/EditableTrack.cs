@@ -104,8 +104,9 @@ public sealed class EditableTrack
         ArgumentOutOfRangeException.ThrowIfNegative(note.Length, nameof(note));
         if (note.Lane < EditableNote.FirstLane(kind) || note.Lane > EditableNote.LastLane(kind))
             throw new ArgumentException($"A {kind} note can't be in lane {note.Lane}.", nameof(note));
-        if (note.Dynamics != NoteDynamics.None && (kind != ChartInstrumentKind.Drums || !Enum.IsDefined(note.Dynamics)))
-            throw new ArgumentException("Only a drum note can be an accent or a ghost.", nameof(note));
+        // The games read accents and ghosts on the pads alone: a kick's would be shown but never played.
+        if (note.Dynamics != NoteDynamics.None && (kind != ChartInstrumentKind.Drums || note.Lane == 0 || !Enum.IsDefined(note.Dynamics)))
+            throw new ArgumentException("Only a drum pad note can be an accent or a ghost.", nameof(note));
         if (note.DoubleKick && (kind != ChartInstrumentKind.Drums || note.Lane != 0 || difficulty != ChartDifficulty.Expert))
             throw new ArgumentException("A 2x kick is a kick on Expert drums.", nameof(note));
     }

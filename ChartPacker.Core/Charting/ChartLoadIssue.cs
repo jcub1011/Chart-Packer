@@ -4,20 +4,19 @@ namespace ChartPacker.Core.Charting;
 
 /// <summary>
 /// What <see cref="MidiChartLoader"/> couldn't take into the model as written. Each is something the games don't read
-/// either, or read differently from how the model could hold it, so leaving it out (or keeping it as a raw event)
-/// keeps the chart playing as it did.
+/// either, or read differently from how the model could hold it, so leaving it out keeps the chart playing as it did.
 /// </summary>
 public enum ChartLoadIssueKind
 {
-    /// <summary>A tempo marker of 0 microseconds per beat, which the model can't hold: kept as a raw event on the tempo track.</summary>
+    /// <summary>A tempo marker of 0 microseconds per beat, which the model can't hold and the games skip: left out.</summary>
     UnholdableTempo,
 
-    /// <summary>A time signature of 0 beats, which the model can't hold: kept as a raw event on the tempo track.</summary>
+    /// <summary>A time signature of 0 beats, which the model can't hold and the games skip: left out.</summary>
     UnholdableTimeSignature,
 
     /// <summary>
-    /// A <c>[chartpacker_anchor]</c> event that isn't at a tempo marker's tick, or a second one at a tick: kept as a raw
-    /// event on the tempo track rather than as an anchor.
+    /// A <c>[chartpacker_anchor]</c> event that isn't at a tempo marker's tick, or a second one at a tick: left out, as
+    /// it anchors nothing.
     /// </summary>
     StrayAnchor,
 

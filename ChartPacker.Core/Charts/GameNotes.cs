@@ -9,6 +9,92 @@ internal readonly record struct TickSpan(long Start, long End)
     public bool Covers(long tick) => tick == Start || (tick > Start && tick < End);
 }
 
+/// <summary>Markers or phrases, found by the ticks they cover in O(log n) rather than by checking every one.</summary>
+internal static class TickSpanIndex
+{
+    public static TickSpanIndex<TickSpan> Of(IReadOnlyList<TickSpan> spans) => new(spans, static s => s);
+}
+
+/// <summary>
+/// <typeparamref name="T"/>s, each over a <see cref="TickSpan"/>, found by the ticks they cover. They're sorted by start,
+/// each with how far the spans up to it reach, so a tick is looked up from the last span starting at or before it, back
+/// only as far as an earlier one can still reach it: O(log n), and more only where spans overlap.
+/// </summary>
+internal sealed class TickSpanIndex<T>
+{
+    private readonly T[] _items;
+    private readonly TickSpan[] _spans;
+
+    // The furthest end of the spans up to each one.
+    private readonly long[] _reach;
+
+    public TickSpanIndex(IEnumerable<T> items, Func<T, TickSpan> spanOf)
+    {
+        // Stable, so those starting together keep their order.
+        _items = [.. items.OrderBy(i => spanOf(i).Start)];
+        _spans = [.. _items.Select(spanOf)];
+        _reach = new long[_spans.Length];
+        long reach = long.MinValue;
+        for (int i = 0; i < _spans.Length; i++)
+            _reach[i] = reach = Math.Max(reach, _spans[i].End);
+    }
+
+    /// <summary>Whether any span covers <paramref name="tick"/>.</summary>
+    public bool Covers(long tick)
+    {
+        for (int i = LastStartingBy(tick); i >= 0 && CanCover(i, tick); i--)
+        {
+            if (_spans[i].Covers(tick))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>How many spans cover <paramref name="tick"/>.</summary>
+    public int CountCovering(long tick)
+    {
+        int count = 0;
+        for (int i = LastStartingBy(tick); i >= 0 && CanCover(i, tick); i--)
+        {
+            if (_spans[i].Covers(tick))
+                count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>The items whose spans cover <paramref name="tick"/>, the latest starting first.</summary>
+    public IEnumerable<T> Covering(long tick)
+    {
+        for (int i = LastStartingBy(tick); i >= 0 && CanCover(i, tick); i--)
+        {
+            if (_spans[i].Covers(tick))
+                yield return _items[i];
+        }
+    }
+
+    // Whether the span at i, or one before it, can cover the tick: one starting on it does, and of those starting
+    // before it, only one reaching past it.
+    private bool CanCover(int i, long tick) => _spans[i].Start == tick || _reach[i] > tick;
+
+    // The index of the last span starting at or before the tick, or -1.
+    private int LastStartingBy(long tick)
+    {
+        int lo = 0, hi = _spans.Length;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (_spans[mid].Start <= tick)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+
+        return lo - 1;
+    }
+}
+
 /// <summary>A drum note as a chart's lanes have it, before its tom markers and the drums' layout shape it.</summary>
 /// <param name="Pad">0 the kick to 5 the fifth pad, as <see cref="DrumGem.Pad"/> has them, or -1 the Expert+ double kick.</param>
 /// <param name="Dynamics"><see cref="NoteFlags.Accent"/>, <see cref="NoteFlags.Ghost"/>, or none, as <see cref="DrumGem.Dynamics"/> has them.</param>
@@ -42,6 +128,10 @@ internal static class GameNotes
     {
         TickOrder.Sort(gems, static g => g.Tick);
         TickOrder.KeepFirstOfEach(gems, static g => g.Tick, static g => g.Lane);
+        var opens = TickSpanIndex.Of(sysexOpens);
+        var hopos = TickSpanIndex.Of(forceHopo);
+        var strums = TickSpanIndex.Of(forceStrum);
+        var tapped = TickSpanIndex.Of(taps);
 
         // Phase Shift open phrases make every note in them open.
         var items = CollectionsMarshal.AsSpan(gems);
@@ -51,11 +141,11 @@ internal static class GameNotes
             items[i] = gem with
             {
                 Length = gem.Length >= cutoff ? gem.Length : 0,
-                Lane = Covered(sysexOpens, gem.Tick) ? ChartNote.OpenLane : gem.Lane,
+                Lane = opens.Covers(gem.Tick) ? ChartNote.OpenLane : gem.Lane,
             };
         }
 
-        var marks = new Func<long, FretMarks>(tick => new FretMarks(false, Covered(forceHopo, tick), Covered(forceStrum, tick), Covered(taps, tick)));
+        var marks = new Func<long, FretMarks>(tick => new FretMarks(false, hopos.Covers(tick), strums.Covers(tick), tapped.Covers(tick)));
         return NoteBuilder.Frets(gems, hopoThreshold, marks, starPower, midiChordRule: true);
     }
 
@@ -77,13 +167,14 @@ internal static class GameNotes
     {
         var gems = new Dictionary<ChartDifficulty, List<DrumGem>>();
         var mixes = new Dictionary<ChartDifficulty, List<(long, bool)>>();
+        var tomIndexes = toms.Select(TickSpanIndex.Of).ToArray();
         foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
         {
             var of = hits.GetValueOrDefault(difficulty) ?? [];
             var list = new List<DrumGem>(of.Count);
             foreach (var hit in of)
             {
-                bool cymbal = hit.Pad is >= 2 and <= 4 && CountCovering(toms[hit.Pad - 2], hit.Tick) % 2 == 0;
+                bool cymbal = hit.Pad is >= 2 and <= 4 && tomIndexes[hit.Pad - 2].CountCovering(hit.Tick) % 2 == 0;
                 list.Add(new DrumGem(hit.Tick, Math.Max(0, hit.Pad), cymbal, DoubleKick: hit.Pad == -1, hit.Dynamics));
             }
 
@@ -131,30 +222,5 @@ internal static class GameNotes
         }
 
         return new ChartDocument(tempo, result, null, drumsLayout == DrumsLayout.FiveLane) { IsProDrums = drumsLayout == DrumsLayout.Pro };
-    }
-
-    // Loops rather than LINQ: these run for every note, and a lambda capturing the tick would be an allocation each
-    // time. Indexed rather than foreach, which would box the list's enumerator.
-    private static bool Covered(IReadOnlyList<TickSpan> spans, long tick)
-    {
-        for (int i = 0; i < spans.Count; i++)
-        {
-            if (spans[i].Covers(tick))
-                return true;
-        }
-
-        return false;
-    }
-
-    private static int CountCovering(IReadOnlyList<TickSpan> spans, long tick)
-    {
-        int count = 0;
-        for (int i = 0; i < spans.Count; i++)
-        {
-            if (spans[i].Covers(tick))
-                count++;
-        }
-
-        return count;
     }
 }

@@ -212,14 +212,14 @@ public sealed class MidiChartLoaderPartTests
 
         Assert.IsTrue(NotesOf(without, Expert).All(n => n.Dynamics == NoteDynamics.None));
         Assert.IsFalse(without.ChartDynamics);
-        // Let go before the event, so read without dynamics; the kick's are kept, though the games ignore them.
+        // Let go before the event, so read without dynamics; the kicks' velocities are left, as the games ignore them.
         Assert.AreSequenceEqual(
             [
                 new EditableNote(0, 10, 1),
-                new EditableNote(480, 60, 0, NoteDynamics.Accent),
+                new EditableNote(480, 60, 0),
                 new EditableNote(480, 60, 1, NoteDynamics.Ghost),
                 new EditableNote(480, 60, 2),
-                new EditableNote(960, 60, 0, NoteDynamics.Accent, DoubleKick: true),
+                new EditableNote(960, 60, 0, DoubleKick: true),
             ],
             NotesOf(with, Expert));
         Assert.IsTrue(with.ChartDynamics);

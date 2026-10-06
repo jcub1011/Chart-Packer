@@ -136,7 +136,8 @@ public static class MidiMerger
                     var expected = sourceDoc.Tracks[key].Notes
                         .Select(n => n with { Tick = track.Map(n.Tick), Length = n.Length > 0 ? track.Map(n.Tick + n.Length) - track.Map(n.Tick) : 0 })
                         .ToList();
-                    var result = NoteCheck.Compare(expected, reads, key);
+                    // Both are MIDI reads, so an accent or ghost lost or changed is a difference too.
+                    var result = NoteCheck.Compare(expected, reads, key, NoteFlags.None);
                     if (result.HopoFixes.Count > 0 && pass == 0)
                     {
                         track.Messages.AddRange(NoteCheck.ForceMarkers(ChartInstruments.KindOf(instrument), difficulty, result.HopoFixes));

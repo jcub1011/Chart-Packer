@@ -38,10 +38,10 @@ internal static class NoteCheck
 
     /// <summary>Compares <paramref name="actual"/> with <paramref name="expected"/>, note by note, by tick and lane.</summary>
     /// <param name="ignore">
-    /// The flags not compared: by default accents and ghosts, which a MIDI chart read back has but a <c>.chart</c>
-    /// read doesn't.
+    /// The flags not compared: accents and ghosts when the notes expected come from a <c>.chart</c> read, which hasn't
+    /// them though the MIDI chart read back has; none when both are MIDI reads.
     /// </param>
-    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote>? actual, NoteFlags ignore = NoteFlags.Accent | NoteFlags.Ghost)
+    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote>? actual, NoteFlags ignore)
     {
         actual ??= [];
         ChartMergeIssue? issue = null;
@@ -118,7 +118,7 @@ internal static class NoteCheck
     /// from <see cref="ReadEveryWay"/>: what the first read finds, and the HOPO fixes any of them need.
     /// </summary>
     /// <param name="ignore">The flags not compared, as <see cref="Compare(IReadOnlyList{ChartNote}, IReadOnlyList{ChartNote}?, NoteFlags)"/> takes them.</param>
-    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartDocument> reads, ChartTrackKey key, NoteFlags ignore = NoteFlags.Accent | NoteFlags.Ghost)
+    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartDocument> reads, ChartTrackKey key, NoteFlags ignore)
     {
         var results = reads.Select(r => Compare(expected, r.Tracks.GetValueOrDefault(key)?.Notes, ignore)).ToList();
         return results[0] with { HopoFixes = [.. results.SelectMany(r => r.HopoFixes).DistinctBy(f => f.Tick).OrderBy(f => f.Tick)] };

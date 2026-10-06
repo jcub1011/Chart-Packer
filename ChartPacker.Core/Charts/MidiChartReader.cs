@@ -14,6 +14,9 @@ internal static class MidiLayout
     /// <summary>A drum pad note's velocity that makes it a ghost, on a track with <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
     public const int GhostVelocity = 1;
 
+    /// <summary>The velocity a note is written with when nothing rides on it.</summary>
+    public const int NormalVelocity = 100;
+
     /// <summary>The pro-drums tom markers for yellow, blue and green.</summary>
     public const int FirstTomPitch = 110;
 
@@ -100,6 +103,23 @@ internal static class MidiLayout
     /// the kick, its Expert+ double kick.
     /// </summary>
     public static int? DrumPadOf(int offset) => offset is >= -1 and <= 5 ? offset : null;
+
+    /// <summary>
+    /// A drum note's accent or ghost by its note-on velocity, as YARG reads them once <c>ENABLE_CHART_DYNAMICS</c> is on:
+    /// on a pad, exactly 127 is an accent and exactly 1 a ghost; any other velocity, and any kick, a normal note.
+    /// </summary>
+    /// <param name="pad">As <see cref="DrumPadOf"/> gives it: 0 the kick, -1 the double kick.</param>
+    public static NoteFlags DrumDynamicsOf(int pad, int velocity) => pad <= 0 ? NoteFlags.None : velocity switch
+    {
+        AccentVelocity => NoteFlags.Accent,
+        GhostVelocity => NoteFlags.Ghost,
+        _ => NoteFlags.None,
+    };
+
+    /// <summary>The velocity a drum note is written with on a track with <c>ENABLE_CHART_DYNAMICS</c>, as <see cref="DrumDynamicsOf"/> reads it back.</summary>
+    /// <param name="dynamics"><see cref="NoteFlags.Accent"/>, <see cref="NoteFlags.Ghost"/> or neither.</param>
+    public static int DrumVelocityOf(NoteFlags dynamics) =>
+        (dynamics & NoteFlags.Accent) != 0 ? AccentVelocity : (dynamics & NoteFlags.Ghost) != 0 ? GhostVelocity : NormalVelocity;
 
     /// <summary>How far a fret difficulty's force-HOPO marker is above its <see cref="BaseOf"/>: just above orange, or black 3.</summary>
     public static int ForceHopoOffset(ChartInstrumentKind kind) => kind == ChartInstrumentKind.SixFret ? 7 : 5;
@@ -394,7 +414,7 @@ internal static class MidiChartReader
             {
                 // YARG reads accents and ghosts on the pads alone: never the kick or the Expert+ double kick.
                 if (MidiLayout.DrumPadOf(note.Pitch - b) is { } pad)
-                    list.Add(new DrumHit(note.Start, pad, pad > 0 && track.HasChartDynamics(note) ? DynamicsOf(note.Velocity) : NoteFlags.None));
+                    list.Add(new DrumHit(note.Start, pad, track.HasChartDynamics(note) ? MidiLayout.DrumDynamicsOf(pad, note.Velocity) : NoteFlags.None));
             }
 
             hits[difficulty] = list;
@@ -404,15 +424,4 @@ internal static class MidiChartReader
         IReadOnlyList<TickSpan>[] toms = [.. Enumerable.Range(MidiLayout.FirstTomPitch, 3).Select(track.Spans)];
         return GameNotes.Drums(hits, toms, [.. track.Texts.Select(t => (t.Tick, t.Text))], starPower, layout);
     }
-
-    /// <summary>
-    /// A pad note's accent or ghost by its note-on velocity, as YARG reads them once <c>ENABLE_CHART_DYNAMICS</c> is
-    /// on: exactly 127 is an accent and exactly 1 a ghost; any other velocity is a normal note.
-    /// </summary>
-    private static NoteFlags DynamicsOf(int velocity) => velocity switch
-    {
-        MidiLayout.AccentVelocity => NoteFlags.Accent,
-        MidiLayout.GhostVelocity => NoteFlags.Ghost,
-        _ => NoteFlags.None,
-    };
 }

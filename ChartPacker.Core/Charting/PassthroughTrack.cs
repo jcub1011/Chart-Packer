@@ -65,6 +65,28 @@ public sealed class PassthroughTrack : IEquatable<PassthroughTrack>
     /// <summary>The bytes themselves, for the writer, which mustn't change them.</summary>
     internal byte[] Array => _chunk;
 
+    /// <summary>The track's name as the reader takes it, or null when it has none, isn't a track or can't be read.</summary>
+    internal string? ReaderName()
+    {
+        if (!IsTrack)
+            return null;
+        try
+        {
+            return MidiChartReader.NameOf(_chunk, ChunkOf());
+        }
+        catch (ChartFormatException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The instrument the reader takes the track for, by its name, or null when it takes it for none.</summary>
+    internal ChartInstrument? ReadAs() =>
+        ReaderName() is { } name && MidiLayout.TrackNames.TryGetValue(name, out var instrument) ? instrument : null;
+
+    /// <summary>The chunk, as the readers take one.</summary>
+    internal MidiChunk ChunkOf() => new(ChunkType, 0, HeaderLength, _chunk.Length - HeaderLength);
+
     /// <summary>
     /// The track with each event, its end included, moved to the tick <paramref name="map"/> gives (charter-spec §4.2):
     /// the same events, with the same bytes, in the same order, only their deltas changed. A chunk that isn't a track,
@@ -88,7 +110,7 @@ public sealed class PassthroughTrack : IEquatable<PassthroughTrack>
         if (!IsTrack)
             return this;
 
-        var events = MidiFile.ReadEvents(_chunk, new MidiChunk(ChunkType, 0, HeaderLength, _chunk.Length - HeaderLength));
+        var events = MidiFile.ReadEvents(_chunk, ChunkOf());
         long previous = 0;
         for (int i = 0; i < events.Count; i++)
         {
