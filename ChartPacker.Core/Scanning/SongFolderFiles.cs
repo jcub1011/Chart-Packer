@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Metadata;
 
@@ -12,14 +13,21 @@ public static class SongFolderFiles
     /// </summary>
     /// <remarks>
     /// <para>Names are relative to the folder, with <c>/</c> between segments. Every added file is
-    /// copied to a temp file before anything is deleted, so a copy that fails leaves the folder as
+    /// copied to a temp file before anything else changes, so a copy that fails leaves the folder as
     /// it was, and a source may be one of the files being removed or replaced.</para>
-    /// <para>A removed file that no longer exists is skipped. Folders a removal empties are kept.</para>
+    /// <para>The temp files are then moved into place, and only then are the removed files deleted.
+    /// So in the worst case, a crash or failure between the moves and the deletes, the folder holds
+    /// both the old files and the new ones; it's never left with neither. A removed file that only
+    /// differs from an added one in letter case is the exception: it's deleted before the moves,
+    /// because on a case-insensitive file system deleting it afterwards would delete the new file.
+    /// A removed file with the same name as an added one is left for the add to replace.</para>
+    /// <para>A removed file that no longer exists is skipped. A delete that fails doesn't stop the
+    /// others. Folders a removal empties are kept.</para>
     /// </remarks>
     /// <exception cref="ArgumentException">A name is the folder's <c>song.ini</c>, which is edited as metadata, or points outside the folder.</exception>
-    /// <exception cref="IOException">A file can't be read, written or deleted.</exception>
+    /// <exception cref="IOException">A file can't be read, written or deleted. The first failed delete is thrown once every delete has been tried.</exception>
     /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
-    /// <exception cref="OperationCanceledException">Cancelled before anything was deleted.</exception>
+    /// <exception cref="OperationCanceledException">Cancelled before anything in the folder changed.</exception>
     public static async Task ApplyAsync(
         string folder,
         IReadOnlyCollection<string> removes,
@@ -34,7 +42,15 @@ public static class SongFolderFiles
         var removePaths = removes.Select(name => Resolve(root, name)).ToList();
         var targets = adds.Select(file => Resolve(root, file.StoredName)).ToList();
 
+        // A removal with an add's exact path is replaced by the add's move, so it isn't deleted at all.
+        // One that differs only in case is deleted before the moves, the rest after them.
+        var exactTargets = targets.ToHashSet(StringComparer.Ordinal);
+        var caseTargets = targets.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var deleteFirst = removePaths.Where(path => !exactTargets.Contains(path) && caseTargets.Contains(path)).ToList();
+        var deleteLast = removePaths.Where(path => !caseTargets.Contains(path)).ToList();
+
         var temps = new List<string>(adds.Count);
+        int moved = 0;
         try
         {
             for (int i = 0; i < adds.Count; i++)
@@ -50,21 +66,39 @@ public static class SongFolderFiles
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (string path in removePaths)
+            foreach (string path in deleteFirst)
             {
                 if (File.Exists(path))
                     File.Delete(path);
             }
 
-            for (int i = 0; i < temps.Count; i++)
-                File.Move(temps[i], targets[i], overwrite: true);
+            for (; moved < temps.Count; moved++)
+                File.Move(temps[moved], targets[moved], overwrite: true);
         }
         catch
         {
-            foreach (string temp in temps)
+            // A temp that was moved is now the target, which is never deleted here.
+            foreach (string temp in temps.Skip(moved))
                 TryDelete(temp);
             throw;
         }
+
+        Exception? firstFailure = null;
+        foreach (string path in deleteLast)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                firstFailure ??= ex;
+            }
+        }
+
+        if (firstFailure is not null)
+            ExceptionDispatchInfo.Throw(firstFailure);
     }
 
     /// <summary>The full path of <paramref name="name"/> in the folder at <paramref name="root"/>.</summary>
