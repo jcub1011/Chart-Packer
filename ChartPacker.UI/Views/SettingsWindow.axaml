@@ -161,7 +161,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate DataType="svm:SettingViewModel">
                                                 <Border Classes="setting-row" Classes.modified="{Binding IsModified}" Classes.locked="{Binding !IsEnabled}">
-                                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
                                                         <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                                             <StackPanel Classes="setting-text" Spacing="2">
                                                                 <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
@@ -173,9 +173,38 @@
                                                                        Text="{Binding LockedNote}"
                                                                        IsVisible="{Binding !IsEnabled}" />
                                                         </StackPanel>
-                                                        <ContentControl Grid.Column="1" Content="{Binding}" VerticalAlignment="Center" IsEnabled="{Binding IsEnabled}" />
+                                                        <!-- The setting's own buttons. They act at once, so they stay enabled while the setting is locked. -->
+                                                        <ItemsControl Grid.Column="1"
+                                                                      ItemsSource="{Binding Actions}"
+                                                                      IsVisible="{Binding HasActions}"
+                                                                      VerticalAlignment="Center">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Orientation="Horizontal" Spacing="8" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate DataType="svm:SettingActionViewModel">
+                                                                    <Panel>
+                                                                        <!-- An icon button, as the reset button is, with the label as its tooltip. -->
+                                                                        <Button Classes="tool"
+                                                                                Command="{Binding RunCommand}"
+                                                                                IsVisible="{Binding HasIcon}"
+                                                                                ToolTip.Tip="{Binding Label}"
+                                                                                AutomationProperties.Name="{Binding Label}">
+                                                                            <ctl:LineIcon Data="{Binding Icon}" />
+                                                                        </Button>
+                                                                        <Button Content="{Binding Label}"
+                                                                                Command="{Binding RunCommand}"
+                                                                                IsVisible="{Binding !HasIcon}"
+                                                                                AutomationProperties.Name="{Binding Label}" />
+                                                                    </Panel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <ContentControl Grid.Column="2" Content="{Binding}" VerticalAlignment="Center" IsEnabled="{Binding IsEnabled}" />
                                                         <!-- Fixed width, so the editor doesn't shift when the button appears. -->
-                                                        <Panel Grid.Column="2" Width="32" VerticalAlignment="Center">
+                                                        <Panel Grid.Column="3" Width="32" VerticalAlignment="Center">
                                                             <Button Classes="tool"
                                                                     Command="{Binding ResetCommand}"
                                                                     IsVisible="{Binding !IsDefault}"

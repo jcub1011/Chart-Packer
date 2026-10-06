@@ -21,7 +21,7 @@ namespace ChartPacker.Services
     /// </remarks>
     public static class AppSettingsCatalog
     {
-        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads)
+        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads, SettingsService settings)
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
@@ -33,9 +33,11 @@ namespace ChartPacker.Services
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
+            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing],
+                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, logging],
                 [
                     new IntegerSetting
                     {
@@ -303,6 +305,7 @@ namespace ChartPacker.Services
                         Get = () => player.LaneFineScrubFactor,
                         Set = factor => player.LaneFineScrubFactor = factor,
                     },
+                    AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
                 ]);
         }
     }

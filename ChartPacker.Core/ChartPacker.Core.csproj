@@ -26,10 +26,12 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ChartPacker.Core.Tests" />
+    <InternalsVisibleTo Include="ChartBuilder.Tests" />
     <InternalsVisibleTo Include="ScanBench" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Serilog" />
     <PackageReference Include="z440.atl.core" />
   </ItemGroup>
 </Project>

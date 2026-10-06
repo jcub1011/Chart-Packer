@@ -20,6 +20,9 @@ namespace ChartBuilder.Services
         /// <summary>The most a saved panel width or timeline height is restored as: wider than an 8K screen.</summary>
         public const double MaxEditorPanelSize = 8192;
 
+        /// <summary>Whether Chart Builder writes log files (<see cref="ChartPacker.AppLog"/>).</summary>
+        public bool LoggingEnabled { get; set; } = true;
+
         /// <summary>The name a new chart's <c>charter</c> is filled in with. Empty for none.</summary>
         public string DefaultCharterName { get; set; } = "";
 

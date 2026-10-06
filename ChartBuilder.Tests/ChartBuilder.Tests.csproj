@@ -1,0 +1,28 @@
+<Project Sdk="MSTest.Sdk/4.4.1">
+  <!-- Tests for Chart Builder's code: the editable chart model, its loader and writer, commands and lint
+       (ChartPacker.Core/Charting). Chart Packer's code is tested in ChartPacker.Core.Tests. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- MSTest.Sdk picks its packages' versions; this raises code coverage's. -->
+    <MicrosoftTestingExtensionsCodeCoverageVersion>18.11.2</MicrosoftTestingExtensionsCodeCoverageVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Shared with ChartPacker.Core.Tests rather than copied: the MIDI fixture builder, and the guard that fails the
+       run if a test touches the real config folder (every test project carries one). -->
+  <ItemGroup>
+    <Compile Include="..\ChartPacker.Core.Tests\Charts\MidiBuilder.cs" Link="Shared\MidiBuilder.cs" />
+    <Compile Include="..\ChartPacker.Core.Tests\Isolation\FolderSnapshot.cs" Link="Shared\FolderSnapshot.cs" />
+    <Compile Include="..\ChartPacker.Core.Tests\Isolation\UserConfigGuard.cs" Link="Shared\UserConfigGuard.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageVersion Update="Microsoft.Testing.Extensions.TrxReport" Version="2.5.0" />
+  </ItemGroup>
+
+</Project>

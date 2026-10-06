@@ -152,6 +152,10 @@ jobs:
         shell: pwsh
         run: dotnet test --project ChartPacker.Core.Tests/ChartPacker.Core.Tests.csproj --configuration Release
 
+      - name: Test Chart Builder
+        shell: pwsh
+        run: dotnet test --project ChartBuilder.Tests/ChartBuilder.Tests.csproj --configuration Release
+
       - name: Publish
         shell: pwsh
         run: |
