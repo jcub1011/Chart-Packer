@@ -131,10 +131,9 @@ internal static class NoteCheck
             yield break;
 
         int b = MidiLayout.BaseOf(kind, difficulty);
-        int forceHopo = kind == ChartInstrumentKind.SixFret ? b + 7 : b + 5;
         foreach (var (tick, hopo) in fixes)
         {
-            int pitch = hopo ? forceHopo : forceHopo + 1;
+            int pitch = b + (hopo ? MidiLayout.ForceHopoOffset(kind) : MidiLayout.ForceStrumOffset(kind));
             yield return MidiMessage.NoteOn(tick, pitch);
             yield return MidiMessage.NoteOff(tick + 1, pitch);
         }
