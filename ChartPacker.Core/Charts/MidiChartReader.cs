@@ -114,6 +114,31 @@ internal static class MidiLayout
             : null;
 }
 
+/// <summary>A tempo or time-signature event of a sync track that YARG reads, at the tick YARG reads it at.</summary>
+/// <param name="Index">Its index among the track's events.</param>
+/// <param name="Tick">Its tick as YARG counts it: the track's first event's delta later than written.</param>
+/// <param name="IsTempo">A tempo event, rather than a time signature.</param>
+/// <param name="MicrosecondsPerQuarter">A tempo's beat, as written.</param>
+/// <param name="Numerator">A time signature's beats per measure, as written.</param>
+/// <param name="DenominatorPower">A time signature's note value, as the power of two written.</param>
+/// <param name="ClocksPerClick">A time signature's MIDI clocks per metronome click.</param>
+/// <param name="ThirtySecondsPerQuarter">A time signature's thirty-second notes per MIDI quarter note.</param>
+internal readonly record struct MidiSyncEvent(
+    int Index,
+    long Tick,
+    bool IsTempo,
+    int MicrosecondsPerQuarter = 0,
+    int Numerator = 0,
+    int DenominatorPower = 0,
+    byte ClocksPerClick = 0,
+    byte ThirtySecondsPerQuarter = 0);
+
+/// <summary>The track YARG reads an instrument from.</summary>
+/// <param name="Chunk">Its index among the file's chunks after the header, the sync track being 0.</param>
+/// <param name="Name">Its name, as <see cref="MidiChartReader.NameOf(byte[], List{MidiEvent})"/> takes it.</param>
+/// <param name="Events">Its events.</param>
+internal readonly record struct MidiPartTrack(int Chunk, string Name, List<MidiEvent> Events);
+
 /// <summary>
 /// Reads a <c>notes.mid</c> as YARG does (<c>MidReader</c> in YARG.Core): the tempo map, and the tracks named in
 /// <see cref="MidiLayout.TrackNames"/>. Everything else (vocals, venue, events, pro keys) is skipped.
@@ -136,36 +161,15 @@ internal static class MidiChartReader
     /// <exception cref="ChartFormatException">The file isn't a MIDI file YARG can read, or is malformed.</exception>
     public static ChartDocument Read(byte[] bytes, ChartReadOptions options)
     {
-        var (_, resolution, all) = MidiFile.ReadChunks(bytes);
-        var chunks = all.Skip(1).ToList();
-        if (chunks.Count == 0 || chunks[0].Id != "MTrk")
-            throw new ChartFormatException("The MIDI file doesn't start with a track.");
-
+        var (resolution, chunks) = ChunksOf(bytes);
         var tempo = TempoOf(bytes, resolution, [MidiFile.ReadEvents(bytes, chunks[0])]);
-
-        // Every track is read, so a malformed one fails the file, but only the events of the tracks taken are kept:
-        // vocals, venue and the like are often most of a file.
-        var parts = new Dictionary<ChartInstrument, List<MidiEvent>>();
-        foreach (var chunk in chunks.Skip(1))
-        {
-            if (chunk.Id != "MTrk")
-                continue;
-            if (NameOf(bytes, chunk) is { } name
-                && MidiLayout.TrackNames.TryGetValue(name, out var instrument)
-                && (!parts.ContainsKey(instrument) || MidiLayout.OverridingTrackNames.Contains(name)))
-            {
-                parts[instrument] = MidiFile.ReadEvents(bytes, chunk);
-            }
-            else
-            {
-                MidiFile.Check(bytes, chunk);
-            }
-        }
+        var parts = PartTracksOf(bytes, chunks);
 
         var read = new List<(ChartInstrument, IReadOnlyDictionary<ChartDifficulty, List<ChartNote>>, IReadOnlyList<StarPowerPhrase>)>(parts.Count);
         DrumsLayout? drumsLayout = null;
-        foreach (var (instrument, events) in parts)
+        foreach (var (instrument, part) in parts)
         {
+            var events = part.Events;
             var kind = ChartInstruments.KindOf(instrument);
             var track = MidiTrackNotes.Of(bytes, events, kind == ChartInstrumentKind.FiveFret);
             var starPower = GameNotes.StarPower(track.Spans(options.MidiStarPowerPitch));
@@ -186,6 +190,51 @@ internal static class MidiChartReader
         return GameNotes.Document(tempo, read, drumsLayout);
     }
 
+    /// <summary>The file's division, and its chunks after the header, the sync track first, as YARG takes them.</summary>
+    /// <exception cref="ChartFormatException">The file isn't a MIDI file, or doesn't start with a track.</exception>
+    internal static (int Resolution, List<MidiChunk> Chunks) ChunksOf(byte[] bytes)
+    {
+        var (_, resolution, all) = MidiFile.ReadChunks(bytes);
+        var chunks = all.Skip(1).ToList();
+        if (chunks.Count == 0 || chunks[0].Id != "MTrk")
+            throw new ChartFormatException("The MIDI file doesn't start with a track.");
+        return (resolution, chunks);
+    }
+
+    /// <summary>
+    /// The track YARG reads each instrument from: of the tracks after the sync track named in
+    /// <see cref="MidiLayout.TrackNames"/>, the first of each instrument, except that a later one named in
+    /// <see cref="MidiLayout.OverridingTrackNames"/> replaces it.
+    /// </summary>
+    /// <remarks>
+    /// Every track is read, so a malformed one fails the file, but only the events of the tracks taken are kept:
+    /// vocals, venue and the like are often most of a file.
+    /// </remarks>
+    /// <param name="chunks">The file's chunks after its header, the sync track first, as <see cref="ChunksOf"/> gives them.</param>
+    /// <exception cref="ChartFormatException">A track is malformed.</exception>
+    internal static Dictionary<ChartInstrument, MidiPartTrack> PartTracksOf(byte[] bytes, List<MidiChunk> chunks)
+    {
+        var parts = new Dictionary<ChartInstrument, MidiPartTrack>();
+        for (int i = 1; i < chunks.Count; i++)
+        {
+            var chunk = chunks[i];
+            if (chunk.Id != "MTrk")
+                continue;
+            if (NameOf(bytes, chunk) is { } name
+                && MidiLayout.TrackNames.TryGetValue(name, out var instrument)
+                && (!parts.ContainsKey(instrument) || MidiLayout.OverridingTrackNames.Contains(name)))
+            {
+                parts[instrument] = new MidiPartTrack(i, name, MidiFile.ReadEvents(bytes, chunk));
+            }
+            else
+            {
+                MidiFile.Check(bytes, chunk);
+            }
+        }
+
+        return parts;
+    }
+
     /// <summary>
     /// The tempo map, from the tempo and time-signature events of the first of <paramref name="tracks"/>, YARG's
     /// sync track, each the first event's delta later than written, as YARG counts them.
@@ -194,18 +243,51 @@ internal static class MidiChartReader
     {
         var tempos = new List<TempoChange>();
         var signatures = new List<TimeSignature>();
-        var sync = tracks.Count > 0 ? tracks[0] : [];
-        long shift = sync.Count > 0 ? sync[0].Tick : 0;
-        foreach (var e in sync.Where(e => e.IsMeta))
+        foreach (var e in SyncEventsOf(bytes, tracks.Count > 0 ? tracks[0] : []))
         {
-            var (type, start, length) = MidiFile.MetaOf(bytes, e);
-            if (type == 0x51 && length == 3)
-                tempos.Add(new TempoChange(e.Tick + shift, (bytes[start] << 16) | (bytes[start + 1] << 8) | bytes[start + 2]));
-            else if (type == 0x58 && length >= 2 && bytes[start + 1] < 7)
-                signatures.Add(new TimeSignature(e.Tick + shift, bytes[start], 1 << bytes[start + 1]));
+            if (e.IsTempo)
+                tempos.Add(new TempoChange(e.Tick, e.MicrosecondsPerQuarter));
+            else
+                signatures.Add(new TimeSignature(e.Tick, e.Numerator, 1 << e.DenominatorPower));
         }
 
         return new TempoMap(resolution, tempos.OrderBy(t => t.Tick), signatures.OrderBy(s => s.Tick));
+    }
+
+    /// <summary>
+    /// The tempo and time-signature events YARG reads from the sync track <paramref name="sync"/>, in order, each the
+    /// first event's delta later than written, as YARG counts them: tempos 3 bytes long, and time signatures of at
+    /// least 2 bytes whose denominator is below 2^7.
+    /// </summary>
+    internal static List<MidiSyncEvent> SyncEventsOf(byte[] bytes, List<MidiEvent> sync)
+    {
+        var read = new List<MidiSyncEvent>();
+        long shift = sync.Count > 0 ? sync[0].Tick : 0;
+        for (int index = 0; index < sync.Count; index++)
+        {
+            var e = sync[index];
+            if (!e.IsMeta)
+                continue;
+            var (type, start, length) = MidiFile.MetaOf(bytes, e);
+            if (type == 0x51 && length == 3)
+            {
+                read.Add(new MidiSyncEvent(index, e.Tick + shift, IsTempo: true, MicrosecondsPerQuarter: (bytes[start] << 16) | (bytes[start + 1] << 8) | bytes[start + 2]));
+            }
+            else if (type == 0x58 && length >= 2 && bytes[start + 1] < 7)
+            {
+                // The metronome bytes, which the games ignore, are MIDI's usual 24 and 8 when the event leaves them out.
+                read.Add(new MidiSyncEvent(
+                    index,
+                    e.Tick + shift,
+                    IsTempo: false,
+                    Numerator: bytes[start],
+                    DenominatorPower: bytes[start + 1],
+                    ClocksPerClick: length >= 3 ? bytes[start + 2] : (byte)24,
+                    ThirtySecondsPerQuarter: length >= 4 ? bytes[start + 3] : (byte)8));
+            }
+        }
+
+        return read;
     }
 
     /// <summary>
@@ -230,7 +312,7 @@ internal static class MidiChartReader
 
     /// <summary>The name of the track <paramref name="chunk"/>, as <see cref="NameOf(byte[], List{MidiEvent})"/> takes it, reading only its events at tick 0.</summary>
     /// <exception cref="ChartFormatException">The track is malformed among them.</exception>
-    private static string? NameOf(byte[] bytes, MidiChunk chunk)
+    internal static string? NameOf(byte[] bytes, MidiChunk chunk)
     {
         string? first = null;
         var reader = new MidiFile.EventReader(chunk);
@@ -258,7 +340,7 @@ internal static class MidiChartReader
     /// The drums' layout (see <see cref="DrumsLayouts"/>), from song.ini and the track's events in order: a
     /// fifth-pad note-on (65, 77, 89 or 101), or any tom marker event.
     /// </summary>
-    private static DrumsLayout DrumsLayoutOf(byte[] bytes, List<MidiEvent> events, ChartReadOptions options)
+    internal static DrumsLayout DrumsLayoutOf(byte[] bytes, List<MidiEvent> events, ChartReadOptions options)
     {
         var layouts = new DrumsLayouts(options, midi: true);
         foreach (var e in events)

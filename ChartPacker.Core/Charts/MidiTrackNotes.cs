@@ -132,13 +132,11 @@ internal sealed class MidiTrackNotes
             }
             else if (e.IsSysex)
             {
-                var data = MidiFile.SysexOf(bytes, e);
-                if (data.Length != 8 || data[0] != 0x50 || data[1] != 0x53 || data[2] != 0 || data[3] != 0 || data[6] > 1)
+                if (PhaseShiftOf(bytes, e) is not (int difficulty, int code, bool isOn))
                     continue;
 
-                int difficulty = data[4], code = data[5];
                 int at = IndexOfHeldSysex(heldSysex, difficulty, code);
-                if (data[6] == 1)
+                if (isOn)
                 {
                     if (at < 0)
                         heldSysex.Add((difficulty, code, e.Tick, index));
@@ -162,6 +160,20 @@ internal sealed class MidiTrackNotes
         }
 
         return track;
+    }
+
+    /// <summary>
+    /// A Phase Shift sysex event's difficulty, code and whether it's an on event, if <paramref name="e"/> is one:
+    /// exactly <c>50 53 00 00</c>, the difficulty, the code, and 1 for on or 0 for off.
+    /// </summary>
+    public static (int Difficulty, int Code, bool On)? PhaseShiftOf(byte[] bytes, MidiEvent e)
+    {
+        if (!e.IsSysex)
+            return null;
+        var data = MidiFile.SysexOf(bytes, e);
+        if (data.Length != 8 || data[0] != 0x50 || data[1] != 0x53 || data[2] != 0 || data[3] != 0 || data[6] > 1)
+            return null;
+        return (data[4], data[5], data[6] == 1);
     }
 
     private HashSet<int> ConsumedOf()
