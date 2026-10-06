@@ -7,6 +7,7 @@ using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartPacker;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -15,12 +16,13 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartBuilder.ViewModels
 {
     /// <summary>
-    /// The Editor window: a toolbar, the Chart Inspector and Properties panels either side, and the timeline along the
-    /// bottom. So far only the layout: the tools, undo and Chart settings are placeholders.
+    /// The Editor window: a toolbar, the lanes in the middle with the Chart Inspector and Properties panels either side,
+    /// and the timeline along the bottom. So far only the layout: the tools, undo, Chart settings and the lanes' bodies
+    /// are placeholders.
     /// </summary>
     /// <remarks>
     /// The panels' sizes are view state, applied and captured by the window; they're kept here between the two so
-    /// <see cref="SaveLayout"/> can persist them.
+    /// <see cref="SaveLayout"/> can persist them. So are the lanes' sizes, which the lane dock captures.
     /// </remarks>
     public sealed partial class EditorWindowViewModel : ViewModelBase
     {
@@ -45,6 +47,7 @@ namespace ChartBuilder.ViewModels
             TimelineHeight = saved.EditorTimelineHeight;
             IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
+            Lanes = new LaneDockViewModel(LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
         }
 
         public string Title { get; } = string.Format(CultureInfo.CurrentCulture, Strings.EditorWindowTitleFormat, Strings.EditorUntitledChart);
@@ -57,6 +60,9 @@ namespace ChartBuilder.ViewModels
         public partial string? Notice { get; set; }
 
         public bool HasNotice => Notice is not null;
+
+        /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
+        public LaneDockViewModel Lanes { get; }
 
         /// <summary>The Chart Inspector panel's width while expanded, as the user last set it.</summary>
         public double LeftPanelWidth { get; set; }
@@ -115,7 +121,7 @@ namespace ChartBuilder.ViewModels
         {
         }
 
-        /// <summary>Saves the panels' sizes and whether they're collapsed, for the next Editor window.</summary>
+        /// <summary>Saves the panels' sizes and whether they're collapsed, and the lanes, for the next Editor window.</summary>
         public void SaveLayout()
         {
             var saved = _settings.Settings;
@@ -124,6 +130,7 @@ namespace ChartBuilder.ViewModels
             saved.EditorTimelineHeight = TimelineHeight;
             saved.EditorLeftPanelCollapsed = IsLeftPanelCollapsed;
             saved.EditorRightPanelCollapsed = IsRightPanelCollapsed;
+            saved.EditorLanes = Lanes.Layout.ToState();
             _settings.Save();
         }
 

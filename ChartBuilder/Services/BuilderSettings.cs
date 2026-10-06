@@ -1,4 +1,5 @@
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Layout;
 
 namespace ChartBuilder.Services
 {
@@ -39,5 +40,8 @@ namespace ChartBuilder.Services
 
         /// <summary>Whether the editor's right panel is collapsed to a strip along the window's edge.</summary>
         public bool EditorRightPanelCollapsed { get; set; }
+
+        /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
+        public LaneDockState? EditorLanes { get; set; }
     }
 }

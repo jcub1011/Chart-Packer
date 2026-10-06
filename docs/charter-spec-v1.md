@@ -1535,16 +1535,16 @@ editor's tools in its toolbar, and closing the Editor brings the launcher back.
 
 ```txt
 ┌ Untitled chart - Chart Builder ───────────────────────────────────────────────────────┐
-│ [◎ Chart Builder v0.3.0] [⚙ ▾] [Select|Place|Erase|Sustain|Phrase|Tempo] [⟲ ⟳]        │
+│ [◎ Chart Builder v0.3.0] [⚙ ◉] [Select|Place|Erase|Sustain|Phrase|Tempo] [⟲ ⟳]        │
 ├─────────────────────┬────────────────────────────────────────────┬────────────────────┤
-│ Chart Inspector   « │                                            │ Properties       » │
-│                     │                                            │                    │
-│ Artist – Title      │        highway or timeline canvas          │ Note  m41 · beat 3 │
-│ [album art]         │                                            │ Tick  78,960       │
-│ Tracks              │                                            │ …                  │
-│ Chart files         │                                            │                    │
-│ Other files         │                                            │                    │
-│ Findings            │                                            │                    │
+│ Chart Inspector   « │ Guitar·X ▾ + ✕┃Bass·X ▾ + ✕┃Drums·X ▾ + ✕  │ Properties       » │
+│                     │              ┃             ┃               │                    │
+│ Artist – Title      │   highway    ┃   highway   ┃   highway     │ Note  m41 · beat 3 │
+│ [album art]         │              ┃             ┃               │ Tick  78,960       │
+│ Tracks              │              ┃             ┃               │ …                  │
+│ Chart files         ├━━━━━━━━━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━┤                    │
+│ Other files         │ Vocals ▾                              + ✕  │                    │
+│ Findings            │   vocals                                   │                    │
 │ Metadata            │                                            │                    │
 ╞═════════════════════╧════════════════════════════════════════════╧════════════════════╡
 │ Timeline                                                              1:38.4 / 4:12.0 │
@@ -1553,8 +1553,17 @@ editor's tools in its toolbar, and closing the Editor brings the launcher back.
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- The ⚙ menu has **Chart settings** and **Program settings**. The toolbar's groups wrap onto more
-  rows as the window narrows.
+- The ⚙ menu has **Chart settings** and **Program settings**. The ◉ (View) menu will choose which
+  lanes are shown; it is a placeholder so far. The toolbar's groups wrap onto more rows as the
+  window narrows.
+- The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part. They are
+  docked like Visual Studio's tool windows: dragging a lane's header shows guides on the lane under
+  the pointer and on the edges of the whole area, and dropping on one docks the lane against that
+  edge. A lane's highway is always vertical; only the room it takes is tall or wide. ━ splitters
+  resize the lanes. Each lane's ▾ menu switches its part (each part is shown at most once), + adds a
+  lane (a highway to the right of the last one, a vocal part the full width along the bottom), and ✕
+  closes it. The lanes, where they are and their sizes are saved (`LaneDockLayout`, in
+  `ChartPacker.Core/Charting/Layout/`).
 - « and » collapse a panel to a strip along that edge, with its tab titles turned on their side.
   Clicking a title brings the panel back. The panel widths, whether each is collapsed, and the
   timeline's height (the ═ splitter above it) are saved.

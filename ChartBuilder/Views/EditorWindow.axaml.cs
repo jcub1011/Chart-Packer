@@ -142,6 +142,7 @@ namespace ChartBuilder.Views
 
             // Only what the user chose is saved, never a size the window was too small for.
             AbsorbSplitterChanges(vm);
+            LaneHost.CaptureSizes();
             vm.SaveLayout();
         }
     }

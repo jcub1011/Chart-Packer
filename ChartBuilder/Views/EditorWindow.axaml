@@ -23,6 +23,10 @@
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
     </Window.KeyBindings>
 
+    <Window.Resources>
+        <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
+    </Window.Resources>
+
     <Window.Styles>
         <!-- Centred messages standing in for content that isn't built yet. -->
         <Style Selector="StackPanel.placeholder">
@@ -62,22 +66,35 @@
                     </Border>
 
                     <Border Classes="toolbar-group">
-                        <Button Classes="tool"
-                                ToolTip.Tip="{x:Static res:Strings.SettingsMenuToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.SettingsMenuButton}">
-                            <ctl:LineIcon Data="{StaticResource SettingsStroke}" />
-                            <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                                    <MenuItem Header="{x:Static res:Strings.ChartSettingsMenuItem}"
-                                              Command="{Binding OpenChartSettingsCommand}"
-                                              ToolTip.Tip="{x:Static res:Strings.ComingSoonToolTip}"
-                                              ToolTip.ShowOnDisabled="True" />
-                                    <MenuItem Header="{x:Static res:Strings.ProgramSettingsMenuItem}"
-                                              Command="{Binding OpenProgramSettingsCommand}"
-                                              InputGesture="Ctrl+OemComma" />
-                                </MenuFlyout>
-                            </Button.Flyout>
-                        </Button>
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <Button Classes="tool"
+                                    ToolTip.Tip="{x:Static res:Strings.SettingsMenuToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.SettingsMenuButton}">
+                                <ctl:LineIcon Data="{StaticResource SettingsStroke}" />
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                        <MenuItem Header="{x:Static res:Strings.ChartSettingsMenuItem}"
+                                                  Command="{Binding OpenChartSettingsCommand}"
+                                                  ToolTip.Tip="{x:Static res:Strings.ComingSoonToolTip}"
+                                                  ToolTip.ShowOnDisabled="True" />
+                                        <MenuItem Header="{x:Static res:Strings.ProgramSettingsMenuItem}"
+                                                  Command="{Binding OpenProgramSettingsCommand}"
+                                                  InputGesture="Ctrl+OemComma" />
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <!-- Which lanes are shown. A placeholder until its controls are built. -->
+                            <Button Classes="tool"
+                                    ToolTip.Tip="{x:Static res:Strings.ViewMenuToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.ViewMenuButton}">
+                                <ctl:LineIcon Data="{StaticResource ViewStroke}" />
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedLeft">
+                                        <TextBlock Classes="muted" Text="{x:Static res:Strings.ViewMenuPlaceholder}" />
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                        </StackPanel>
                     </Border>
 
                     <!-- The editing tools (charter-spec §4.5: EditorTools). Placeholders until the editor can edit. -->
@@ -168,10 +185,34 @@
                           Background="{DynamicResource SubtleBorderBrush}"
                           IsVisible="{Binding !IsLeftPanelCollapsed}" />
 
-            <!-- The chart: the highway and timeline editors go here. -->
-            <StackPanel Grid.Column="2" Classes="placeholder">
-                <TextBlock Classes="muted centered" Text="{x:Static res:Strings.EditorCanvasPlaceholder}" />
-            </StackPanel>
+            <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. -->
+            <Panel Grid.Column="2">
+                <bctl:LaneDockHost x:Name="LaneHost"
+                                   Lanes="{Binding Lanes}"
+                                   IsVisible="{Binding Lanes.HasLanes}"
+                                   SplitterBrush="{DynamicResource SubtleBorderBrush}"
+                                   GuideBrush="{DynamicResource ToolbarGroupBrush}"
+                                   GuideBorderBrush="{DynamicResource SubtleBorderBrush}"
+                                   AccentBrush="{DynamicResource AccentTextBrush}"
+                                   PreviewBrush="{DynamicResource AccentTintBrush}" />
+                <StackPanel Classes="placeholder" IsVisible="{Binding !Lanes.HasLanes}">
+                    <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.NoLanesOpen}" />
+                    <TextBlock Classes="muted centered" FontSize="12" Text="{x:Static res:Strings.NoLanesOpenHint}" />
+                    <Button Classes="labelled"
+                            Margin="0,8,0,0"
+                            HorizontalAlignment="Center"
+                            AutomationProperties.Name="{x:Static res:Strings.AddLaneButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.AddLaneButton}" />
+                        </StackPanel>
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                        ItemsSource="{Binding Lanes.AddMenu, Converter={StaticResource LaneMenu}}" />
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </Panel>
 
             <GridSplitter Grid.Column="3"
                           ResizeDirection="Columns"

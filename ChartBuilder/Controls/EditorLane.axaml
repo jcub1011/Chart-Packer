@@ -1,0 +1,96 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:ctl="using:ChartPacker.Controls"
+             xmlns:bctl="using:ChartBuilder.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="480"
+             x:Class="ChartBuilder.Controls.EditorLane"
+             x:DataType="vm:EditorLaneViewModel"
+             Background="{DynamicResource SurfaceBrush}">
+
+    <!-- One of the Editor's lanes: a header like a docked tool window's, which picks the part, adds and closes lanes,
+         and is dragged to dock the lane elsewhere (LaneDockHost); and the lane's body, a placeholder so far. -->
+    <UserControl.Resources>
+        <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- The part picker: the lane's title, with a chevron for its menu. -->
+        <Style Selector="Button.lane-part">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="8,0,6,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.lane-part:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Button.lane-part:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+
+        <!-- The lane being dragged, while it is. -->
+        <Style Selector="bctl|EditorLane.dragging">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+        <Border x:Name="Header"
+                DockPanel.Dock="Top"
+                Height="34"
+                Padding="3,0"
+                Background="{DynamicResource ToolbarBrush}"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Cursor="DragMove"
+                ToolTip.Tip="{x:Static res:Strings.LaneDragToolTip}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Button Grid.Column="0"
+                        Classes="lane-part"
+                        ToolTip.Tip="{x:Static res:Strings.LanePartToolTip}"
+                        AutomationProperties.Name="{Binding Title}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock FontSize="13"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding Title}" />
+                        <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                    </StackPanel>
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                    ItemsSource="{Binding PartMenu, Converter={StaticResource LaneMenu}}" />
+                    </Button.Flyout>
+                </Button>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <Button Classes="tool"
+                            ToolTip.Tip="{x:Static res:Strings.LaneAddToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneAddToolTip}">
+                        <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                        ItemsSource="{Binding AddMenu, Converter={StaticResource LaneMenu}}" />
+                        </Button.Flyout>
+                    </Button>
+                    <Button Classes="tool"
+                            Command="{Binding CloseCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.LaneCloseToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneCloseToolTip}">
+                        <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <StackPanel Classes="placeholder">
+            <TextBlock Classes="muted centered" Text="{Binding Placeholder}" />
+        </StackPanel>
+    </DockPanel>
+</UserControl>

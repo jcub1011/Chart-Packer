@@ -150,6 +150,15 @@
   <data name="SettingsMenuToolTip" xml:space="preserve">
     <value>Chart and program settings</value>
   </data>
+  <data name="ViewMenuButton" xml:space="preserve">
+    <value>View</value>
+  </data>
+  <data name="ViewMenuToolTip" xml:space="preserve">
+    <value>Choose which lanes are shown</value>
+  </data>
+  <data name="ViewMenuPlaceholder" xml:space="preserve">
+    <value>Lane controls are coming soon.</value>
+  </data>
   <data name="ChartSettingsMenuItem" xml:space="preserve">
     <value>Chart settings…</value>
   </data>
@@ -218,9 +227,50 @@
   <data name="PropertiesNothingSelectedHint" xml:space="preserve">
     <value>Select a note, phrase or tempo marker to see its properties.</value>
   </data>
-  <data name="EditorCanvasPlaceholder" xml:space="preserve">
-    <value>The chart goes here.</value>
-    <comment>Stands in for the highway and timeline editors.</comment>
+  <data name="LaneTitleFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment>A highway lane's title: its instrument and difficulty, e.g. "Guitar · Expert".</comment>
+  </data>
+  <data name="LaneVocals" xml:space="preserve">
+    <value>Vocals</value>
+    <comment>The lead vocals lane, PART VOCALS.</comment>
+  </data>
+  <data name="LaneHarmonyFormat" xml:space="preserve">
+    <value>Harmony {0}</value>
+    <comment>A harmony vocals lane, e.g. "Harmony 2".</comment>
+  </data>
+  <data name="LaneVocalsGroup" xml:space="preserve">
+    <value>Vocals</value>
+    <comment>The vocal parts' group in a lane's part menu.</comment>
+  </data>
+  <data name="LanePartToolTip" xml:space="preserve">
+    <value>Choose what this lane shows</value>
+  </data>
+  <data name="LaneAddToolTip" xml:space="preserve">
+    <value>Add a lane</value>
+  </data>
+  <data name="LaneCloseToolTip" xml:space="preserve">
+    <value>Close this lane</value>
+  </data>
+  <data name="LaneDragToolTip" xml:space="preserve">
+    <value>Drag to dock this lane somewhere else</value>
+  </data>
+  <data name="LaneHighwayPlaceholder" xml:space="preserve">
+    <value>The highway goes here.</value>
+    <comment>Stands in for a highway lane's editor.</comment>
+  </data>
+  <data name="LaneVocalsPlaceholder" xml:space="preserve">
+    <value>The vocals lane goes here.</value>
+    <comment>Stands in for a vocals lane's editor.</comment>
+  </data>
+  <data name="NoLanesOpen" xml:space="preserve">
+    <value>No lanes open</value>
+  </data>
+  <data name="NoLanesOpenHint" xml:space="preserve">
+    <value>Add a lane to show a part's highway or vocals.</value>
+  </data>
+  <data name="AddLaneButton" xml:space="preserve">
+    <value>Add lane</value>
   </data>
   <data name="TimelineHeading" xml:space="preserve">
     <value>Timeline</value>
