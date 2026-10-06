@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
+using ChartPacker;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Settings;
+using ChartPacker.Resources;
 
 namespace ChartBuilder.Services
 {
@@ -16,9 +18,11 @@ namespace ChartBuilder.Services
         {
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
+            var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [charter, newCharts],
+                [charter, newCharts, general, logging],
                 [
                     new TextSetting
                     {
@@ -45,6 +49,7 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.DefaultChartResolution,
                         Set = resolution => settings.Settings.DefaultChartResolution = resolution,
                     },
+                    AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
                 ]);
         }
 

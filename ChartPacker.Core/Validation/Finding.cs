@@ -6,4 +6,6 @@ namespace ChartPacker.Core.Validation;
 /// <param name="Message">A plain-language description, ready to show to the user.</param>
 /// <param name="Offset">Byte offset in the <c>.sng</c> of the structure at fault, when there is one.</param>
 /// <param name="Key">The metadata key at fault, for a finding about one key's pair.</param>
-public sealed record Finding(string RuleId, Severity Severity, string Message, long? Offset = null, string? Key = null);
+/// <param name="Location">The place in a chart at fault, for a finding about the chart's contents.</param>
+public sealed record Finding(
+    string RuleId, Severity Severity, string Message, long? Offset = null, string? Key = null, ChartLocation? Location = null);

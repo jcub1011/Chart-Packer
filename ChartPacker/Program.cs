@@ -1,4 +1,6 @@
 ﻿using Avalonia;
+using ChartPacker.Core;
+using ChartPacker.Services;
 using System;
 
 namespace ChartPacker
@@ -9,8 +11,12 @@ namespace ChartPacker
         // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
         // yet and stuff might break.
         [STAThread]
-        public static void Main(string[] args) => BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        public static int Main(string[] args)
+        {
+            // Read ahead of App, which loads the settings again, so that startup is logged too.
+            bool logging = SettingsService.Load(UserConfigPaths.SettingsFile).Settings.LoggingEnabled;
+            return AppLog.Run("chartpacker", logging, () => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args));
+        }
 
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()

@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="ChartPacker/ChartPacker.csproj" />
+  <Project Path="ChartBuilder.Tests/ChartBuilder.Tests.csproj" />
   <Project Path="ChartBuilder/ChartBuilder.csproj" />
   <Project Path="ChartPacker.Audio/ChartPacker.Audio.csproj" />
   <Project Path="ChartPacker.Core/ChartPacker.Core.csproj" />

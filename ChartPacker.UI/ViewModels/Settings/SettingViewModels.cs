@@ -2,7 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using ChartPacker.Services;
@@ -22,10 +26,16 @@ namespace ChartPacker.ViewModels.Settings
         protected SettingViewModel(SettingEdit edit)
         {
             _edit = edit;
+            Actions = [.. edit.Definition.Actions.Select(a => new SettingActionViewModel(a))];
             edit.PropertyChanged += OnEditPropertyChanged;
         }
 
         public string Label => _edit.Definition.Label;
+
+        /// <summary>The setting's buttons, shown beside its editor (<see cref="SettingDefinition.Actions"/>).</summary>
+        public IReadOnlyList<SettingActionViewModel> Actions { get; }
+
+        public bool HasActions => Actions.Count > 0;
 
         public string Description => _edit.Definition.Description;
 
@@ -74,6 +84,22 @@ namespace ChartPacker.ViewModels.Settings
                     break;
             }
         }
+    }
+
+    /// <summary>A button in a setting's row. It acts at once, whether or not the setting can be changed.</summary>
+    public sealed partial class SettingActionViewModel(SettingAction action)
+    {
+        /// <summary>The button's text, or with an <see cref="Icon"/>, its tooltip.</summary>
+        public string Label => action.Label;
+
+        /// <summary>The line icon shown instead of the text, or <see langword="null"/> for a text button.</summary>
+        public Geometry? Icon { get; } =
+            action.IconKey is { } key && Application.Current?.TryFindResource(key, out object? icon) == true ? icon as Geometry : null;
+
+        public bool HasIcon => Icon is not null;
+
+        [RelayCommand]
+        private void Run() => action.Run();
     }
 
     /// <summary>Picks the editor for a setting by its kind. A new kind needs a case here and a DataTemplate.</summary>

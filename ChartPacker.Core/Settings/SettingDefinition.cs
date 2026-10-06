@@ -27,9 +27,24 @@ public abstract class SettingDefinition
     /// </summary>
     public string? RequiresId { get; init; }
 
+    /// <summary>
+    /// Buttons shown beside the setting's editor, such as one that opens the folder a setting writes to. They
+    /// act straight away, not on OK or Apply, and stay usable while the setting itself is locked or off.
+    /// </summary>
+    public IReadOnlyList<SettingAction> Actions { get; init; } = [];
+
     /// <summary>Starts staging a change to this setting, from its current value.</summary>
     public abstract SettingEdit BeginEdit();
 }
+
+/// <summary>A button in a setting's row, and what it does when clicked.</summary>
+/// <param name="Label">The button's text; with an <paramref name="IconKey"/>, its tooltip and accessible name instead.</param>
+/// <param name="Run">What the button does.</param>
+/// <param name="IconKey">
+/// The resource key of a line icon to show instead of the text, such as <c>InputFolderStroke</c>, or
+/// <see langword="null"/> for a text button. The settings window looks the key up in its app's resources.
+/// </param>
+public sealed record SettingAction(string Label, Action Run, string? IconKey = null);
 
 /// <summary>A setting whose value is a <typeparamref name="T"/>.</summary>
 public abstract class SettingDefinition<T> : SettingDefinition

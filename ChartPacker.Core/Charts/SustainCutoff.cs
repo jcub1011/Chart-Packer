@@ -34,10 +34,11 @@ internal static class SustainCutoff
         foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
         {
             int b = MidiLayout.BaseOf(kind, difficulty);
-            int low = kind == ChartInstrumentKind.FiveFret && enhancedOpens ? b - 1 : b;
-            int high = kind == ChartInstrumentKind.SixFret ? b + 6 : b + 4;
-            for (int pitch = low; pitch <= high; pitch++)
-                pitches.Add(pitch);
+            for (int offset = -1; offset <= 6; offset++)
+            {
+                if (MidiLayout.FretLaneOf(kind, offset, kind == ChartInstrumentKind.FiveFret && enhancedOpens) is not null)
+                    pitches.Add(b + offset);
+            }
         }
 
         return pitches;

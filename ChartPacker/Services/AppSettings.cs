@@ -89,6 +89,9 @@ namespace ChartPacker.Services
         /// <summary>Whether the library list is sorted from last to first.</summary>
         public bool LibrarySortDescending { get; set; }
 
+        /// <summary>Whether Chart Packer writes log files (<see cref="AppLog"/>).</summary>
+        public bool LoggingEnabled { get; set; } = true;
+
         /// <summary>The audio player's master volume, from 0 to 1.</summary>
         public double MasterVolume { get; set; } = DefaultMasterVolume;
 

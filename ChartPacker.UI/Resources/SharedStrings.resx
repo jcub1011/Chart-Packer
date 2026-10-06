@@ -121,6 +121,28 @@
   <data name="SettingsBrowseButton" xml:space="preserve">
     <value>Browse…</value>
   </data>
+  <data name="SettingsCategoryGeneral" xml:space="preserve">
+    <value>General</value>
+    <comment>A top-level category in the Settings window, for settings that are about the app as a whole.</comment>
+  </data>
+  <data name="SettingsCategoryLogging" xml:space="preserve">
+    <value>Logging</value>
+  </data>
+  <data name="LoggingEnabledLabel" xml:space="preserve">
+    <value>Write log files</value>
+  </data>
+  <data name="LoggingEnabledDescriptionFormat" xml:space="preserve">
+    <value>Records what the app does in a log file each day, to help track down problems. The last {0} days are kept.</value>
+    <comment>{0} is the number of daily log files kept, e.g. 7.</comment>
+  </data>
+  <data name="LoggingEnabledKeywords" xml:space="preserve">
+    <value>log logs logging diagnostics debug troubleshooting crash</value>
+    <comment>Extra words, separated by spaces, that find the logging setting in the Settings search.</comment>
+  </data>
+  <data name="OpenLogFolderButton" xml:space="preserve">
+    <value>Open log folder</value>
+    <comment>The tooltip of the folder icon button beside the logging setting, which opens the folder the log files are written to.</comment>
+  </data>
   <data name="OkButton" xml:space="preserve">
     <value>OK</value>
   </data>

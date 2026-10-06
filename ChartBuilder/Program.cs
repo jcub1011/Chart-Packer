@@ -1,4 +1,7 @@
 using Avalonia;
+using ChartBuilder.Services;
+using ChartPacker;
+using ChartPacker.Core;
 using System;
 
 namespace ChartBuilder
@@ -9,8 +12,12 @@ namespace ChartBuilder
         // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
         // yet and stuff might break.
         [STAThread]
-        public static void Main(string[] args) => BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        public static int Main(string[] args)
+        {
+            // Read ahead of App, which loads the settings again, so that startup is logged too.
+            bool logging = BuilderSettingsService.Load(UserConfigPaths.BuilderSettingsFile).Settings.LoggingEnabled;
+            return AppLog.Run("chartbuilder", logging, () => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args));
+        }
 
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()

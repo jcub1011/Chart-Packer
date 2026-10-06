@@ -4,7 +4,8 @@ namespace ChartPacker.Core.Charts;
 /// <param name="Pad">0 kick, 1 red, 2 yellow, 3 blue, 4 the fourth pad (green, or five-lane orange), 5 the fifth (five-lane green).</param>
 /// <param name="Cymbal">Marked a cymbal: yellow, blue and the fourth pad only.</param>
 /// <param name="DoubleKick">An Expert+ second kick.</param>
-internal readonly record struct DrumGem(long Tick, int Pad, bool Cymbal, bool DoubleKick);
+/// <param name="Dynamics"><see cref="NoteFlags.Accent"/>, <see cref="NoteFlags.Ghost"/>, or none: added to the note's flags as it is.</param>
+internal readonly record struct DrumGem(long Tick, int Pad, bool Cymbal, bool DoubleKick, NoteFlags Dynamics = NoteFlags.None);
 
 /// <summary>
 /// Text events as YARG reads them (<c>TextEvents</c> in YARG.Core): the text between the first <c>[</c> and
@@ -94,7 +95,7 @@ internal static class DrumNotes
 
     private static (Gem, NoteFlags) Shape(DrumGem gem, DrumsLayout layout, bool flip)
     {
-        var flags = gem.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None;
+        var flags = (gem.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None) | gem.Dynamics;
         if (gem.Pad == 0)
             return (new Gem(gem.Tick, 0, ChartNote.OpenLane), flags);
         if (layout == DrumsLayout.FiveLane)

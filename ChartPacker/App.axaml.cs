@@ -66,7 +66,7 @@ namespace ChartPacker
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, new ChartBuilderLauncher(), notice);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
-                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway, downloads), settingsPicker, settings.Save));
+                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway, downloads, settings), settingsPicker, settings.Save));
 
                 window.DataContext = new MainWindowViewModel(
                     library,

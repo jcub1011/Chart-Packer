@@ -106,18 +106,16 @@ namespace ChartPacker.ViewModels
     }
 
     /// <summary>What <see cref="PlayerViewModel.TrackWaveformsChanged"/> is about.</summary>
-    public sealed class TrackWaveformsChangedEventArgs : EventArgs
+    public sealed class TrackWaveformsChangedEventArgs(IReadOnlySet<string>? stems) : EventArgs
     {
         /// <summary>The tracks shown changed, so every waveform may have.</summary>
         public static readonly TrackWaveformsChangedEventArgs Tracks = new(null);
-
-        public TrackWaveformsChangedEventArgs(IReadOnlySet<string>? stems) => Stems = stems;
 
         /// <summary>
         /// The stems whose waveforms more has been read of, or which were dropped, with the tracks as they were;
         /// <see langword="null"/> when the tracks shown changed.
         /// </summary>
-        public IReadOnlySet<string>? Stems { get; }
+        public IReadOnlySet<string>? Stems { get; } = stems;
 
         /// <summary>Whether any of <paramref name="stems"/> may have a different waveform now.</summary>
         public bool Touches(IEnumerable<string> stems) => Stems is not { } changed || stems.Any(changed.Contains);

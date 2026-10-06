@@ -27,4 +27,32 @@ public static class UserConfigPaths
 
     /// <summary>Chart Builder's settings file. Each app writes only its own (charter-spec §10).</summary>
     public static string BuilderSettingsFile => Path.Combine(ConfigFolder, "builder-settings.json");
+
+    /// <summary>
+    /// Where both apps write their logs: <c>%LOCALAPPDATA%\ChartPacker\Logs</c>,
+    /// <c>~/Library/Logs/ChartPacker</c>, or <c>$XDG_STATE_HOME/ChartPacker/logs</c>
+    /// (<c>~/.local/state</c> when unset). It is outside <see cref="ConfigFolder"/>, so a running app
+    /// never changes the config folder while the tests' guard is watching it.
+    /// </summary>
+    public static string LogFolder
+    {
+        get
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChartPacker", "Logs");
+            }
+
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (OperatingSystem.IsMacOS())
+            {
+                return Path.Combine(home, "Library", "Logs", "ChartPacker");
+            }
+
+            string? state = Environment.GetEnvironmentVariable("XDG_STATE_HOME");
+            string root = string.IsNullOrEmpty(state) ? Path.Combine(home, ".local", "state") : state;
+            return Path.Combine(root, "ChartPacker", "logs");
+        }
+    }
 }
