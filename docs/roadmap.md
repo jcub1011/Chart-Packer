@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Current as of 2026-10-06 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) |
+| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), step 2: playback and calibration |
 
 ---
 
@@ -20,7 +20,7 @@ its exit criteria. This file owns only the order and the status.
 | ----: | --------- | ------ | ---------- |
 | 1 | [CM0: Split](#cm0-split) | Done (cleanup left) | — |
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | CM0 |
-| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **Next** | CM1 |
+| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | CM1 |
 | 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Not started | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | CM3, CM4 |
@@ -37,7 +37,7 @@ Packer's **Edit chart** is in place, and stays disabled until CM2
 (`ChartBuilderLauncher.CanOpenSongs`).
 
 **Built ahead of plan.** The wizard was replaced by the Editor window
-([C1](charter-spec-v1.md#c1-new-chart-from-scratch)), and the Editor's shell already exists:
+([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), and the Editor's shell already exists:
 
 - the toolbar;
 - the collapsible side panels;
@@ -50,8 +50,8 @@ the Properties panel and the tools are still placeholders.
 **Cleanup:**
 
 - **The wizard's back end** (`ChartPacker.Core/Charting/NewChart*.cs`, with its tests) is used
-  only by tests now. Keep it as the reference for Chart settings until that spec exists
-  ([CM2](#cm2-calibration-chart-settings-and-5-fret-editing)), then remove it or reuse it.
+  only by tests now. Chart settings' **Create** reuses it
+  ([CM2](#cm2-calibration-chart-settings-and-5-fret-editing) step 4), so it stays.
 - **Shared dialogs.** `ConfirmDialog` and `MessageDialog` are still in `ChartPacker/Views`. They
   move to `ChartPacker.UI` when Chart Builder first needs them.
 - **`ViewLocator`.** Chart Builder doesn't have one yet. It arrives with `ChartEditorViewModel`
@@ -129,18 +129,24 @@ before any canvas depends on it.
 
 ## CM2: Calibration, chart settings and 5-fret editing
 
-**Status: next.** It builds on CM1's model, writer and lint engine, which are done.
+**Status: in progress.** Step 1 is done, and step 2 has started. It builds on CM1's model, writer
+and lint engine.
 
 This is the first milestone with a working editor. Its steps, in order:
 
-1. **Specify Chart settings.** It replaces the removed wizard
-   ([C1](charter-spec-v1.md#c1-new-chart-from-scratch)), and restates C1's acceptance criteria.
-   It is a document, so it can be written while CM1 is being built. It blocks steps 3 and 4.
+1. **Specify Chart settings.** *Done.* It replaces the removed wizard
+   ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), and restates C1's acceptance
+   criteria. Chart settings is a dialog for the chart's timing and parts, plus what a new song
+   folder needs; everything else about the song is edited in the Chart Inspector.
 2. **Playback and calibration.**
    - The playback changes ([§4.4.1](charter-spec-v1.md#441-playback-changes)): the post-stretch
-     mix, the true source position and `SmoothPosition`.
-   - `Synth`.
-   - [C11](charter-spec-v1.md#c11-calibration-tool) calibration, with the shared latency file.
+     mix, the true source position and `SmoothPosition`. *Built*, with AC C10.1's test: `StemPlayer`
+     lays `Sounds` over the stretched mix, maps the grains played (`TimeStretcher.PlayedPosition`),
+     and has `SmoothPosition`.
+   - `Synth`. *Built*, in `ChartPacker.Audio/Synthesis/`, with `MetronomeSchedule`.
+   - [C11](charter-spec-v1.md#c11-calibration-tool) calibration, with the shared latency file. Still
+     to do: the output's device name, ID and `DeviceChanged`, `audio-latency.json`, the tap-test
+     estimator and `CalibrationWindow`.
 
    Calibration comes first because every timing judgement after it depends on it.
 3. **Open and import** ([C2](charter-spec-v1.md#c2-open-and-import)).
@@ -148,8 +154,9 @@ This is the first milestone with a working editor. Its steps, in order:
      ([§4.8](charter-spec-v1.md#48-launching-and-coordination)).
    - **Edit chart** turned on (`CanOpenSongs`).
    - The launcher's **Open chart** and recent songs.
-4. **New chart through Chart settings** ([C1](charter-spec-v1.md#c1-new-chart-from-scratch)),
-   without **Detect from audio**.
+4. **New chart and Chart settings** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)),
+   without **Detect from audio**: New chart's **Create** (through `NewChartCreator`), and Chart
+   settings on an open song, with the resolution change and its warning.
 5. **The editor.**
    - [C3](charter-spec-v1.md#c3-editor-layout) both views. The player and highway view models
      move to `ChartPacker.UI` here.

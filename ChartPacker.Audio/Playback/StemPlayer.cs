@@ -17,6 +17,8 @@ namespace ChartPacker.Audio.Playback;
 /// way to the output, which mixes what it holds again when a switch changes, so the switch is heard
 /// less than 40 ms later than that, as the grain it was putting together fades out. The player owns
 /// the output but not the mixer's sources; dispose it before them.
+/// <para><see cref="Sounds"/> are laid over the mix after it's stretched, each where the frames played reach its frame
+/// of the mix, so a click is never smeared and stays on its beat at any speed (charter-spec §4.4.1).</para>
 /// </remarks>
 public sealed class StemPlayer : IDisposable
 {
@@ -28,6 +30,12 @@ public sealed class StemPlayer : IDisposable
     // The least time between mixing the stretcher's input again for a change of volume, so a slider dragged doesn't
     // seek every stem each chunk.
     private const int VolumeRemixMilliseconds = 150;
+
+    // Stretched, each grain's frames are mapped in this many pieces, so the map follows the grains' fade closely.
+    private const int PiecesPerGrain = 8;
+
+    // How far SmoothPosition may drift from Position before it's put straight back on it.
+    private const int SmoothSnapMilliseconds = 50;
 
     private readonly StemMixer _mixer;
     private readonly IAudioOutput _output;
@@ -72,9 +80,34 @@ public sealed class StemPlayer : IDisposable
     private readonly OutputTap _tap = new();
     private bool _capturesHeard = true;
 
+    // The sounds laid over the mix: the schedule, set from any thread; and, on the playback thread, the frame of the
+    // mix it's been asked up to, the sounds playing, the pieces of the chunk being written, and the sounds' mix of it.
+    private ISoundSchedule? _sounds;
+    private float _soundVolume = 1;
+    private long _soundsFrom;
+    private readonly List<ScheduledSound> _found = [];
+    private readonly List<Voice> _voices = [];
+    private readonly List<Piece> _pieces = [];
+    private readonly float[] _soundMix;
+
+    // SmoothPosition's clock, and where it was last put: _smoothFrame of the mix at _smoothAt, when Position was
+    // _smoothHeard. Under _lock.
+    private readonly TimeProvider _clock;
+    private bool _smoothValid;
+    private double _smoothFrame;
+    private long _smoothAt;
+    private long _smoothHeard;
+
     /// <param name="mixer">What to play.</param>
     /// <param name="output">Where to play it, at <paramref name="mixer"/>'s rate. The player owns it.</param>
-    public StemPlayer(StemMixer mixer, IAudioOutput output)
+    /// <param name="clock">What <see cref="SmoothPosition"/> runs on; the system's monotonic clock if not given.</param>
+    public StemPlayer(StemMixer mixer, IAudioOutput output, TimeProvider? clock = null)
+        : this(mixer, output, clock, QueueMilliseconds)
+    {
+    }
+
+    /// <param name="queueMilliseconds">How much to keep queued, for tests that play minutes at a time.</param>
+    internal StemPlayer(StemMixer mixer, IAudioOutput output, TimeProvider? clock, int queueMilliseconds)
     {
         ArgumentNullException.ThrowIfNull(mixer);
         ArgumentNullException.ThrowIfNull(output);
@@ -86,7 +119,9 @@ public sealed class StemPlayer : IDisposable
         _speed = float.IsFinite(output.Speed) && output.Speed > 0 ? output.Speed : 1;
         _stretcher = new TimeStretcher(mixer.OutputRate, mixer.Mix);
         _chunk = new float[mixer.OutputRate * ChunkMilliseconds / 1000 * 2];
-        _queueTarget = mixer.OutputRate * QueueMilliseconds / 1000;
+        _soundMix = new float[_chunk.Length / 2];
+        _clock = clock ?? TimeProvider.System;
+        _queueTarget = (int)((long)mixer.OutputRate * queueMilliseconds / 1000);
         _minimumChunk = Math.Max(1, mixer.OutputRate / 1000);
         _thread = new Thread(Run) { IsBackground = true, Name = "Audio playback" };
         _thread.Start();
@@ -156,10 +191,79 @@ public sealed class StemPlayer : IDisposable
         }
     }
 
+    /// <summary>
+    /// <see cref="Position"/> moving smoothly: it only moves when the device takes more of the queue, every few
+    /// milliseconds, so this carries it on between, at the speed, by a monotonic clock. When <see cref="Position"/>
+    /// moves, this takes up half of how far apart they are, or all of it past 50 ms; it's put back on it by a seek, a
+    /// change of speed, playing and pausing. While paused it's <see cref="Position"/>. What's drawn against the audio
+    /// follows this (charter-spec §4.4.1).
+    /// </summary>
+    public TimeSpan SmoothPosition
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_pendingSeek is { } target)
+                {
+                    _smoothValid = false;
+                    return FramesToTime(target);
+                }
+
+                long heard = HeardSourceFrame();
+                if (!_playing)
+                {
+                    _smoothValid = false;
+                    return FramesToTime(heard);
+                }
+
+                long now = _clock.GetTimestamp();
+                if (!_smoothValid)
+                {
+                    _smoothValid = true;
+                    _smoothFrame = _smoothHeard = heard;
+                    _smoothAt = now;
+                    return FramesToTime(heard);
+                }
+
+                double framesPerTick = _mixer.OutputRate * (double)_speed / _clock.TimestampFrequency;
+                double smooth = _smoothFrame + ((now - _smoothAt) * framesPerTick);
+                if (heard != _smoothHeard)
+                {
+                    double error = heard - smooth;
+                    smooth = Math.Abs(error) > _mixer.OutputRate * SmoothSnapMilliseconds / 1000.0 ? heard : smooth + (error / 2);
+                    _smoothFrame = smooth;
+                    _smoothAt = now;
+                    _smoothHeard = heard;
+                }
+
+                return FramesToTime(smooth);
+            }
+        }
+    }
+
     public float Volume
     {
         get => _output.Volume;
         set => _output.Volume = value;
+    }
+
+    /// <summary>
+    /// The sounds laid over the mix, such as the metronome's clicks; none if <see langword="null"/>. A new schedule is
+    /// taken up from the next chunk mixed: sounds already playing play out, and the new one's sounds start from where the
+    /// last one's were asked up to.
+    /// </summary>
+    public ISoundSchedule? Sounds
+    {
+        get => Volatile.Read(ref _sounds);
+        set => Volatile.Write(ref _sounds, value);
+    }
+
+    /// <summary>How loud <see cref="Sounds"/> are, from 0, apart from the stems; under <see cref="Volume"/>, which is the output's.</summary>
+    public float SoundVolume
+    {
+        get => Volatile.Read(ref _soundVolume);
+        set => Volatile.Write(ref _soundVolume, float.IsFinite(value) ? Math.Max(0, value) : 1);
     }
 
     /// <summary>
@@ -183,6 +287,7 @@ public sealed class StemPlayer : IDisposable
                 if (speed == _speed)
                     return;
                 _speed = speed;
+                _smoothValid = false;
                 ApplySpeed();
             }
         }
@@ -206,6 +311,7 @@ public sealed class StemPlayer : IDisposable
                 if (value == _pitchCorrection)
                     return;
                 _pitchCorrection = value;
+                _smoothValid = false;
                 ApplySpeed();
             }
         }
@@ -269,6 +375,7 @@ public sealed class StemPlayer : IDisposable
             }
 
             _playing = true;
+            _smoothValid = false;
             _output.Resume();
             Monitor.PulseAll(_lock);
         }
@@ -282,6 +389,7 @@ public sealed class StemPlayer : IDisposable
                 return;
 
             _playing = false;
+            _smoothValid = false;
             _output.Pause();
             Monitor.PulseAll(_lock);
         }
@@ -319,7 +427,7 @@ public sealed class StemPlayer : IDisposable
         _output.Dispose();
     }
 
-    private TimeSpan FramesToTime(long frames) => TimeSpan.FromSeconds((double)frames / _mixer.OutputRate);
+    private TimeSpan FramesToTime(double frames) => TimeSpan.FromSeconds(frames / _mixer.OutputRate);
 
     /// <summary>The frame of the mix being heard now. Under <see cref="_lock"/>.</summary>
     private long HeardSourceFrame() => (long)Math.Round(_map.SourceAt(Math.Max(0, _writtenFrames - _output.QueuedFrames)));
@@ -427,6 +535,9 @@ public sealed class StemPlayer : IDisposable
                         }
                     }
 
+                    // Sounds start again from where the mix does; those playing are dropped with the queue.
+                    _voices.Clear();
+                    _soundsFrom = frame;
                     _mixedSwitches = _mixer.SwitchVersion;
                     _mixedVolumes = _mixer.VolumeVersion;
                     continue;
@@ -457,19 +568,24 @@ public sealed class StemPlayer : IDisposable
                 }
 
                 var chunk = _chunk.AsSpan(0, Math.Min(_chunk.Length, target * 2));
-                double from = _stretching ? _stretcher.SourcePosition : _mixer.PositionFrames;
-                int frames = _stretching ? _stretcher.Read(chunk) : _mixer.Mix(chunk);
+                _pieces.Clear();
+                int frames = _stretching ? ReadStretched(chunk) : ReadMixed(chunk);
                 if (frames > 0)
                 {
-                    double to = _stretching ? _stretcher.SourcePosition : _mixer.PositionFrames;
+                    var written = _chunk.AsSpan(0, frames * 2);
+                    bool sounds = MixSounds(frames);
 
-                    // Together, so Position never sees one without the other. Queuing only copies.
+                    // Together, so Position never sees one without the other. Queuing only copies. What's heard is
+                    // kept without the sounds, which aren't the song.
                     lock (_lock)
                     {
-                        _output.Write(_chunk.AsSpan(0, frames * 2));
                         if (_capturesHeard)
-                            _tap.Write(_chunk.AsSpan(0, frames * 2), _writtenFrames);
-                        _map.Add(_writtenFrames, frames, from, to);
+                            _tap.Write(written, _writtenFrames);
+                        if (sounds)
+                            AddSounds(written);
+                        _output.Write(written);
+                        foreach (var piece in _pieces)
+                            _map.Add(_writtenFrames + piece.Offset, piece.Frames, piece.From, piece.To);
                         _writtenFrames += frames;
                     }
                 }
@@ -486,6 +602,133 @@ public sealed class StemPlayer : IDisposable
             {
                 Stop(ended: false, error: ex.Message);
             }
+        }
+    }
+
+    /// <summary>Mixes the next frames into <paramref name="chunk"/> as they are, as one piece. On the playback thread.</summary>
+    private int ReadMixed(Span<float> chunk)
+    {
+        double from = _mixer.PositionFrames;
+        int frames = _mixer.Mix(chunk);
+        if (frames > 0)
+            _pieces.Add(new Piece(0, frames, from, _mixer.PositionFrames));
+        return frames;
+    }
+
+    /// <summary>
+    /// Stretches the next frames into <paramref name="chunk"/>, a few pieces to each grain, so each piece's frames play
+    /// the mix evenly between where it starts and ends. On the playback thread.
+    /// </summary>
+    private int ReadStretched(Span<float> chunk)
+    {
+        int frames = chunk.Length / 2;
+        int most = Math.Max(1, _stretcher.GrainStep / PiecesPerGrain);
+        int done = 0;
+        while (done < frames)
+        {
+            int left = _stretcher.FramesToNextGrain;
+            int count = Math.Min(frames - done, left > 0 ? Math.Min(left, most) : most);
+            double from = _stretcher.PlayedPosition;
+            int read = _stretcher.Read(chunk.Slice(done * 2, count * 2));
+            if (read == 0)
+                break;
+
+            _pieces.Add(new Piece(done, read, from, _stretcher.PlayedPosition));
+            done += read;
+        }
+
+        return done;
+    }
+
+    /// <summary>
+    /// Starts the sounds the frames in <see cref="_pieces"/> reach, and mixes every sound playing into
+    /// <see cref="_soundMix"/> for those <paramref name="frames"/>. On the playback thread.
+    /// </summary>
+    /// <returns>Whether any sound plays in them.</returns>
+    private bool MixSounds(int frames)
+    {
+        if (Sounds is { } schedule)
+        {
+            // Stretched, the frames played can step back a little; a sound starts once they first reach it.
+            double reached = double.MinValue;
+            foreach (var piece in _pieces)
+                reached = Math.Max(reached, Math.Max(piece.From, piece.To));
+
+            long to = (long)Math.Floor(reached) + 1;
+            if (to > _soundsFrom)
+            {
+                _found.Clear();
+                schedule.SoundsBetween(_soundsFrom, to, _found);
+                _soundsFrom = to;
+
+                // Played as mixed, the device plays it at the speed, so each sound is read that much faster or slower
+                // to be heard at its own pitch and length.
+                double speed = _stretching ? 1 : Math.Max(TimeStretcher.MinRatio, _output.Speed);
+                foreach (var sound in _found)
+                {
+                    if (sound.Gain > 0)
+                        _voices.Add(new Voice(sound.Sound, sound.Gain, OffsetOf(sound.SourceFrame), sound.Sound.SampleRate / (_mixer.OutputRate * speed)));
+                }
+            }
+        }
+
+        if (_voices.Count == 0)
+            return false;
+
+        var mix = _soundMix.AsSpan(0, frames);
+        mix.Clear();
+        for (int v = _voices.Count - 1; v >= 0; v--)
+        {
+            var voice = _voices[v];
+            var samples = voice.Sound.Samples;
+            int n = voice.Start;
+            double at = voice.At;
+            for (; n < frames && at < samples.Length; n++, at += voice.Step)
+            {
+                int i = (int)at;
+                double fraction = at - i;
+                float next = i + 1 < samples.Length ? samples[i + 1] : 0f;
+                mix[n] += voice.Gain * (float)(samples[i] + ((next - samples[i]) * fraction));
+            }
+
+            if (at >= samples.Length)
+                _voices.RemoveAt(v);
+            else
+                _voices[v] = voice with { Start = Math.Max(0, voice.Start - frames), At = at };
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Which frame of the chunk in <see cref="_pieces"/> first plays <paramref name="sourceFrame"/> of the mix: the
+    /// first, if it was played before it; past the chunk, if only its very end does.
+    /// </summary>
+    private int OffsetOf(long sourceFrame)
+    {
+        foreach (var piece in _pieces)
+        {
+            if (sourceFrame > Math.Max(piece.From, piece.To))
+                continue;
+            if (sourceFrame <= Math.Min(piece.From, piece.To))
+                return piece.Offset + (piece.To >= piece.From ? 0 : piece.Frames);
+
+            double into = (sourceFrame - piece.From) / (piece.To - piece.From);
+            return piece.Offset + (int)Math.Round(into * piece.Frames);
+        }
+
+        return 0;
+    }
+
+    /// <summary>Adds <see cref="_soundMix"/>, at <see cref="SoundVolume"/>, to both channels of <paramref name="stereo"/>.</summary>
+    private void AddSounds(Span<float> stereo)
+    {
+        float volume = SoundVolume;
+        for (int n = 0; n < stereo.Length / 2; n++)
+        {
+            float sound = _soundMix[n] * volume;
+            stereo[2 * n] = Math.Clamp(stereo[2 * n] + sound, -1f, 1f);
+            stereo[(2 * n) + 1] = Math.Clamp(stereo[(2 * n) + 1] + sound, -1f, 1f);
         }
     }
 
@@ -519,9 +762,19 @@ public sealed class StemPlayer : IDisposable
             _playing = false;
             _ended = ended;
             _error = error;
+            _smoothValid = false;
             _output.Pause();
         }
 
         Stopped?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary><paramref name="Frames"/> frames from <paramref name="Offset"/> into a chunk, playing the mix evenly from <paramref name="From"/> to <paramref name="To"/>.</summary>
+    private readonly record struct Piece(int Offset, int Frames, double From, double To);
+
+    /// <summary>
+    /// A sound playing: from frame <paramref name="Start"/> of the next chunk on, it's read from <paramref name="At"/>
+    /// frames in, <paramref name="Step"/> of its frames to each frame written.
+    /// </summary>
+    private readonly record struct Voice(SynthSound Sound, float Gain, int Start, double Step, double At = 0);
 }

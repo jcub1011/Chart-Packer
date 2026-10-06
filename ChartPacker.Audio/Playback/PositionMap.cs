@@ -4,10 +4,14 @@ namespace ChartPacker.Audio.Playback;
 /// Which frame of the mix each frame written to the output stands for, over the last few changes of speed. Frames
 /// written at one speed make one segment, its frames standing for evenly spaced frames of the mix between its ends.
 /// </summary>
-/// <remarks>Keeps the latest <see cref="Capacity"/> segments, far more than an output queues. Not thread-safe.</remarks>
+/// <remarks>
+/// <para>Stretched, the frames played follow the grains, so a segment is a few milliseconds of output and the mix can
+/// even step back a little from one to the next (<see cref="Dsp.TimeStretcher.PlayedPosition"/>).</para>
+/// <para>Keeps the latest <see cref="Capacity"/> segments, far more than an output queues. Not thread-safe.</para>
+/// </remarks>
 internal sealed class PositionMap
 {
-    private const int Capacity = 64;
+    internal const int Capacity = 256;
 
     // A ring, oldest at _first.
     private readonly Segment[] _segments = new Segment[Capacity];
@@ -83,6 +87,31 @@ internal sealed class PositionMap
         }
 
         return _segments[_first].Source;
+    }
+
+    /// <summary>
+    /// The first output frame kept that stands for <paramref name="sourceFrame"/> of the mix, between frames where it
+    /// falls between two: before what's kept, where that starts; past what's been written, where it ends.
+    /// </summary>
+    public double OutputAt(double sourceFrame)
+    {
+        if (_count == 0)
+            return 0;
+
+        for (int i = 0; i < _count; i++)
+        {
+            var segment = _segments[(_first + i) % Capacity];
+            if (i == 0 && sourceFrame <= Math.Min(segment.Source, segment.SourceEnd))
+                return segment.Output;
+            if (segment.Frames == 0 || sourceFrame < Math.Min(segment.Source, segment.SourceEnd) || sourceFrame > Math.Max(segment.Source, segment.SourceEnd))
+                continue;
+
+            double span = segment.SourceEnd - segment.Source;
+            return span == 0 ? segment.Output : segment.Output + ((sourceFrame - segment.Source) / span * segment.Frames);
+        }
+
+        var last = _segments[(_first + _count - 1) % Capacity];
+        return last.Output + last.Frames;
     }
 
     private record struct Segment(long Output, long Frames, double Source, double SourceEnd)
