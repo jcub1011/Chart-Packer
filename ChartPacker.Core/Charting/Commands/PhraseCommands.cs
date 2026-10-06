@@ -6,19 +6,13 @@ namespace ChartPacker.Core.Charting.Commands;
 /// Adds a phrase to a part. Drum fills, rolls and trills are drums' only; overlapping phrases are allowed, and saving
 /// merges them (see <see cref="MidiChartWriter.Normalize"/>).
 /// </summary>
-public sealed class AddPhrase : ChartCommand
+public sealed class AddPhrase(ChartInstrument part, Phrase phrase) : ChartCommand
 {
     private int _index = -1;
 
-    public AddPhrase(ChartInstrument part, Phrase phrase)
-    {
-        Part = part;
-        Phrase = phrase;
-    }
+    public ChartInstrument Part { get; } = part;
 
-    public ChartInstrument Part { get; }
-
-    public Phrase Phrase { get; }
+    public Phrase Phrase { get; } = phrase;
 
     private protected override ChartChange Do(EditableChart chart)
     {
@@ -32,20 +26,14 @@ public sealed class AddPhrase : ChartCommand
 }
 
 /// <summary>Removes a phrase from a part.</summary>
-public sealed class RemovePhrase : ChartCommand
+/// <param name="phrase">The phrase, exactly as the part has it.</param>
+public sealed class RemovePhrase(ChartInstrument part, Phrase phrase) : ChartCommand
 {
     private int _index = -1;
 
-    /// <param name="phrase">The phrase, exactly as the part has it.</param>
-    public RemovePhrase(ChartInstrument part, Phrase phrase)
-    {
-        Part = part;
-        Phrase = phrase;
-    }
+    public ChartInstrument Part { get; } = part;
 
-    public ChartInstrument Part { get; }
-
-    public Phrase Phrase { get; }
+    public Phrase Phrase { get; } = phrase;
 
     private protected override ChartChange Do(EditableChart chart)
     {

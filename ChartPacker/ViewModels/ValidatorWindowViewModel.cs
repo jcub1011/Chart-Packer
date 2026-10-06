@@ -687,28 +687,19 @@ namespace ChartPacker.ViewModels
     /// A song in the Validator's list: what it's called and who it's by, how many of its keys fail with and without a
     /// quick fix, and, once opened, each of them and why.
     /// </summary>
-    public sealed partial class ValidatorSongViewModel : ObservableObject
+    /// <param name="selectionChanged">Called when one of the song's issues is ticked or cleared.</param>
+    /// <param name="isShown">Whether the window's filter shows an issue.</param>
+    public sealed partial class ValidatorSongViewModel(int index, SongMetadataReport report, Action selectionChanged, Func<ValidatorIssueViewModel, bool> isShown) : ObservableObject
     {
-        private readonly Action _selectionChanged;
-        private readonly Func<ValidatorIssueViewModel, bool> _isShown;
-        private SongMetadataReport _report;
+        private readonly Action _selectionChanged = selectionChanged;
+        private readonly Func<ValidatorIssueViewModel, bool> _isShown = isShown;
+        private SongMetadataReport _report = report;
 
         // Set while the song's own box ticks or clears its issues, so the change is reported once at the end.
         private bool _settingAll;
 
-        /// <param name="selectionChanged">Called when one of the song's issues is ticked or cleared.</param>
-        /// <param name="isShown">Whether the window's filter shows an issue.</param>
-        public ValidatorSongViewModel(int index, SongMetadataReport report, Action selectionChanged, Func<ValidatorIssueViewModel, bool> isShown)
-        {
-            Index = index;
-            _report = report;
-            _selectionChanged = selectionChanged;
-            _isShown = isShown;
-            Title = report.Entry.DisplayName;
-        }
-
         /// <summary>Where the song is in the selection.</summary>
-        public int Index { get; }
+        public int Index { get; } = index;
 
         public SongEntry Entry => _report.Entry;
 
@@ -720,7 +711,7 @@ namespace ChartPacker.ViewModels
         /// <summary>The name as drafted, or the file or folder name.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(SelectFixesName))]
-        public partial string Title { get; set; }
+        public partial string Title { get; set; } = report.Entry.DisplayName;
 
         /// <summary>The artist as drafted, without rich-text tags; null when there is none.</summary>
         [ObservableProperty]
@@ -946,35 +937,25 @@ namespace ChartPacker.ViewModels
     }
 
     /// <summary>A failing key of a song in the Validator's list, which can be ticked for Fix selected when it has a quick fix.</summary>
-    public sealed partial class ValidatorIssueViewModel : ObservableObject
+    /// <param name="key">The failing key, or empty for a note about the song as a whole.</param>
+    /// <param name="message">Why it fails.</param>
+    /// <param name="types">The rules it breaks, as <see cref="ValidatorIssueTypes"/> knows them; none for a note.</param>
+    /// <param name="fixDescription">What the key's quick fix does, or <see langword="null"/> without one.</param>
+    /// <param name="isSelected">Whether it starts ticked.</param>
+    /// <param name="selectionChanged">Called when it's ticked or cleared.</param>
+    public sealed partial class ValidatorIssueViewModel(string key, string message, IReadOnlyList<string> types, string? fixDescription, bool isSelected, Action selectionChanged) : ObservableObject
     {
-        private readonly Action _selectionChanged;
+        private readonly Action _selectionChanged = selectionChanged;
 
-        /// <param name="key">The failing key, or empty for a note about the song as a whole.</param>
-        /// <param name="message">Why it fails.</param>
-        /// <param name="types">The rules it breaks, as <see cref="ValidatorIssueTypes"/> knows them; none for a note.</param>
-        /// <param name="fixDescription">What the key's quick fix does, or <see langword="null"/> without one.</param>
-        /// <param name="isSelected">Whether it starts ticked.</param>
-        /// <param name="selectionChanged">Called when it's ticked or cleared.</param>
-        public ValidatorIssueViewModel(string key, string message, IReadOnlyList<string> types, string? fixDescription, bool isSelected, Action selectionChanged)
-        {
-            Key = key;
-            Message = message;
-            Types = types;
-            FixDescription = fixDescription;
-            IsSelected = isSelected;
-            _selectionChanged = selectionChanged;
-        }
-
-        public string Key { get; }
+        public string Key { get; } = key;
 
         /// <summary>The key is shown as a chip before the message; a note about the whole song has none.</summary>
         public bool HasKey => Key.Length > 0;
 
-        public string Message { get; }
+        public string Message { get; } = message;
 
         /// <summary>The rules it breaks, which the type filter matches.</summary>
-        public IReadOnlyList<string> Types { get; }
+        public IReadOnlyList<string> Types { get; } = types;
 
         /// <summary>A note about the song, such as why it can't be edited, rather than a failing key. The filter always shows it.</summary>
         public bool IsNote => Types.Count == 0;
@@ -983,7 +964,7 @@ namespace ChartPacker.ViewModels
         public string Text => HasKey ? string.Format(CultureInfo.CurrentCulture, Strings.ValidatorIssueLineFormat, Key, Message) : Message;
 
         /// <summary>What the quick fix does, e.g. "Change to True"; <see langword="null"/> without one.</summary>
-        public string? FixDescription { get; }
+        public string? FixDescription { get; } = fixDescription;
 
         public bool IsFixable => FixDescription is not null;
 
@@ -992,7 +973,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>Ticked for Fix selected.</summary>
         [ObservableProperty]
-        public partial bool IsSelected { get; set; }
+        public partial bool IsSelected { get; set; } = isSelected;
 
         // Null while the constructor sets the starting tick, which isn't a change to report.
         partial void OnIsSelectedChanged(bool value) => _selectionChanged?.Invoke();

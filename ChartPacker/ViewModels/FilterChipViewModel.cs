@@ -56,27 +56,19 @@ namespace ChartPacker.ViewModels
     }
 
     /// <summary>A group of <see cref="FilterChipViewModel"/>s, such as the instruments, with how its included chips combine.</summary>
-    public sealed partial class FilterChipGroupViewModel : ObservableObject
+    /// <param name="label">The group's heading.</param>
+    /// <param name="chips">Each chip's name and bit.</param>
+    /// <param name="changed">Called when a chip or <see cref="MatchAny"/> changes.</param>
+    public sealed partial class FilterChipGroupViewModel(string label, IEnumerable<(string Name, int Flag)> chips, Action changed) : ObservableObject
     {
-        private readonly Action _changed;
+        private readonly Action _changed = changed;
 
-        /// <param name="label">The group's heading.</param>
-        /// <param name="chips">Each chip's name and bit.</param>
-        /// <param name="changed">Called when a chip or <see cref="MatchAny"/> changes.</param>
-        public FilterChipGroupViewModel(string label, IEnumerable<(string Name, int Flag)> chips, Action changed)
-        {
-            _changed = changed;
-            Label = label;
-            MatchName = string.Format(CultureInfo.CurrentCulture, Strings.FilterMatchName, label);
-            Chips = [.. chips.Select(c => new FilterChipViewModel(c.Name, c.Flag, changed))];
-        }
-
-        public string Label { get; }
+        public string Label { get; } = label;
 
         /// <summary>The accessible name of the All/Any buttons.</summary>
-        public string MatchName { get; }
+        public string MatchName { get; } = string.Format(CultureInfo.CurrentCulture, Strings.FilterMatchName, label);
 
-        public IReadOnlyList<FilterChipViewModel> Chips { get; }
+        public IReadOnlyList<FilterChipViewModel> Chips { get; } = [.. chips.Select(c => new FilterChipViewModel(c.Name, c.Flag, changed))];
 
         /// <summary>A song needs at least one included chip rather than all of them.</summary>
         [ObservableProperty]

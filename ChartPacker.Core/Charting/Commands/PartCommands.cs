@@ -65,14 +65,12 @@ public sealed class AddPart : ChartCommand
 /// removal is undone. Removing drums clears the song's drum variant, as a chart without drums has none, and undoing puts
 /// it back.
 /// </summary>
-public sealed class RemovePart : ChartCommand
+public sealed class RemovePart(ChartInstrument instrument) : ChartCommand
 {
     private EditablePart? _removed;
     private DrumsVariant? _previousVariant;
 
-    public RemovePart(ChartInstrument instrument) => Instrument = instrument;
-
-    public ChartInstrument Instrument { get; }
+    public ChartInstrument Instrument { get; } = instrument;
 
     private protected override ChartChange Do(EditableChart chart)
     {

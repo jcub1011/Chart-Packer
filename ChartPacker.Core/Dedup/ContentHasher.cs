@@ -18,17 +18,15 @@ public sealed class SongChangedException(string message) : IOException(message);
 /// Every <c>.sng</c> has its own random mask (sng-spec §5), so the same song packed twice has
 /// different bytes on disk. Only the unmasked contents can be compared.
 /// </remarks>
-public sealed class ContentHasher
+/// <param name="bytesHashed">Told how many bytes each chunk read adds, if given.</param>
+public sealed class ContentHasher(IProgress<long>? bytesHashed = null)
 {
     private const int BufferSize = 1024 * 1024;
 
     private readonly ConcurrentDictionary<(string Path, string Name), Lazy<Task<string>>> _hashes = new();
-    private readonly IProgress<long>? _bytes;
+    private readonly IProgress<long>? _bytes = bytesHashed;
     private long _bytesHashed;
     private int _filesHashed;
-
-    /// <param name="bytesHashed">Told how many bytes each chunk read adds, if given.</param>
-    public ContentHasher(IProgress<long>? bytesHashed = null) => _bytes = bytesHashed;
 
     /// <summary>Bytes read and hashed so far.</summary>
     public long BytesHashed => Interlocked.Read(ref _bytesHashed);

@@ -6,21 +6,15 @@ namespace ChartPacker.Core.Charting.Commands;
 /// Adds a text event to <c>EVENTS</c>, such as a section, or to a part's track. It goes after the events already at its
 /// tick.
 /// </summary>
-public sealed class AddTextEvent : ChartCommand
+/// <param name="part">The part whose track it goes on, or null for <c>EVENTS</c>.</param>
+public sealed class AddTextEvent(ChartInstrument? part, TextEvent textEvent) : ChartCommand
 {
     private int _index = -1;
 
-    /// <param name="part">The part whose track it goes on, or null for <c>EVENTS</c>.</param>
-    public AddTextEvent(ChartInstrument? part, TextEvent textEvent)
-    {
-        Part = part;
-        Event = textEvent;
-    }
-
     /// <summary>The part whose track it goes on, or null for <c>EVENTS</c>.</summary>
-    public ChartInstrument? Part { get; }
+    public ChartInstrument? Part { get; } = part;
 
-    public TextEvent Event { get; }
+    public TextEvent Event { get; } = textEvent;
 
     private protected override ChartChange Do(EditableChart chart)
     {
@@ -34,22 +28,16 @@ public sealed class AddTextEvent : ChartCommand
 }
 
 /// <summary>Removes a text event from <c>EVENTS</c> or a part's track: the first of its tick that's equal to it.</summary>
-public sealed class RemoveTextEvent : ChartCommand
+/// <param name="part">The part whose track it's on, or null for <c>EVENTS</c>.</param>
+/// <param name="textEvent">The event, exactly as the track has it.</param>
+public sealed class RemoveTextEvent(ChartInstrument? part, TextEvent textEvent) : ChartCommand
 {
     private int _index = -1;
 
-    /// <param name="part">The part whose track it's on, or null for <c>EVENTS</c>.</param>
-    /// <param name="textEvent">The event, exactly as the track has it.</param>
-    public RemoveTextEvent(ChartInstrument? part, TextEvent textEvent)
-    {
-        Part = part;
-        Event = textEvent;
-    }
-
     /// <summary>The part whose track it's on, or null for <c>EVENTS</c>.</summary>
-    public ChartInstrument? Part { get; }
+    public ChartInstrument? Part { get; } = part;
 
-    public TextEvent Event { get; }
+    public TextEvent Event { get; } = textEvent;
 
     private protected override ChartChange Do(EditableChart chart)
     {

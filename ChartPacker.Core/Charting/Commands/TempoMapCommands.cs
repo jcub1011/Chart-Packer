@@ -7,17 +7,15 @@ namespace ChartPacker.Core.Charting.Commands;
 /// tempo map changes. A tick has at most one marker placed by the editor; one that has a marker is changed with
 /// <see cref="SetTempo"/>.
 /// </summary>
-public sealed class AddTempo : ChartCommand
+/// <param name="marker">
+/// The marker, in whole microseconds per quarter note as MIDI stores it
+/// (<see cref="EditableTempoMap.MicrosecondsPerQuarterOf"/> gives them from a BPM).
+/// </param>
+public sealed class AddTempo(TempoChange marker) : ChartCommand
 {
     private int _index = -1;
 
-    /// <param name="marker">
-    /// The marker, in whole microseconds per quarter note as MIDI stores it
-    /// (<see cref="EditableTempoMap.MicrosecondsPerQuarterOf"/> gives them from a BPM).
-    /// </param>
-    public AddTempo(TempoChange marker) => Marker = marker;
-
-    public TempoChange Marker { get; }
+    public TempoChange Marker { get; } = marker;
 
     private protected override ChartChange Do(EditableChart chart)
     {
@@ -36,15 +34,13 @@ public sealed class AddTempo : ChartCommand
 /// Removes a tempo marker, keeping ticks. Its anchor, if it has one and no other marker is at its tick, goes with it, and
 /// comes back when the removal is undone. The marker the song starts with can be changed but not removed.
 /// </summary>
-public sealed class RemoveTempo : ChartCommand
+/// <param name="marker">The marker, exactly as the tempo map has it.</param>
+public sealed class RemoveTempo(TempoChange marker) : ChartCommand
 {
     private int _index = -1;
     private TempoAnchor? _anchor;
 
-    /// <param name="marker">The marker, exactly as the tempo map has it.</param>
-    public RemoveTempo(TempoChange marker) => Marker = marker;
-
-    public TempoChange Marker { get; }
+    public TempoChange Marker { get; } = marker;
 
     private protected override ChartChange Do(EditableChart chart)
     {
@@ -125,16 +121,14 @@ public sealed class SetTempo : ChartCommand
 /// Adds a time-signature marker (charter-spec C4 item 1): a numerator from 1 to <see cref="MaxNumerator"/> and a
 /// power-of-two denominator. A tick has at most one marker placed by the editor.
 /// </summary>
-public sealed class AddTimeSignature : ChartCommand
+public sealed class AddTimeSignature(TimeSignatureMarker marker) : ChartCommand
 {
     /// <summary>The most beats a measure placed in the editor can have. A loaded chart can have more, up to 255.</summary>
     public const int MaxNumerator = 64;
 
     private int _index = -1;
 
-    public AddTimeSignature(TimeSignatureMarker marker) => Marker = marker;
-
-    public TimeSignatureMarker Marker { get; }
+    public TimeSignatureMarker Marker { get; } = marker;
 
     private protected override ChartChange Do(EditableChart chart)
     {
@@ -150,14 +144,12 @@ public sealed class AddTimeSignature : ChartCommand
 }
 
 /// <summary>Removes a time-signature marker. The one the song starts with can be changed but not removed.</summary>
-public sealed class RemoveTimeSignature : ChartCommand
+/// <param name="marker">The marker, exactly as the tempo map has it.</param>
+public sealed class RemoveTimeSignature(TimeSignatureMarker marker) : ChartCommand
 {
     private int _index = -1;
 
-    /// <param name="marker">The marker, exactly as the tempo map has it.</param>
-    public RemoveTimeSignature(TimeSignatureMarker marker) => Marker = marker;
-
-    public TimeSignatureMarker Marker { get; }
+    public TimeSignatureMarker Marker { get; } = marker;
 
     private protected override ChartChange Do(EditableChart chart)
     {

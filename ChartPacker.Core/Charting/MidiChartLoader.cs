@@ -256,28 +256,17 @@ public static class MidiChartLoader
     }
 
     /// <summary>Reads one part track into its <see cref="EditablePart"/>.</summary>
-    private sealed class PartLoader
+    private sealed class PartLoader(byte[] bytes, List<MidiEvent> events, EditablePart part, ChartReadOptions options, List<ChartLoadIssue> issues)
     {
-        private readonly byte[] _bytes;
-        private readonly List<MidiEvent> _events;
-        private readonly EditablePart _part;
-        private readonly ChartReadOptions _options;
-        private readonly List<ChartLoadIssue> _issues;
-        private readonly MidiTrackNotes _track;
+        private readonly byte[] _bytes = bytes;
+        private readonly List<MidiEvent> _events = events;
+        private readonly EditablePart _part = part;
+        private readonly ChartReadOptions _options = options;
+        private readonly List<ChartLoadIssue> _issues = issues;
+        private readonly MidiTrackNotes _track = MidiTrackNotes.Of(bytes, events, part.Kind == ChartInstrumentKind.FiveFret);
 
         // The events the model has taken, or left out: the rest are kept as text and raw events.
-        private readonly bool[] _taken;
-
-        public PartLoader(byte[] bytes, List<MidiEvent> events, EditablePart part, ChartReadOptions options, List<ChartLoadIssue> issues)
-        {
-            _bytes = bytes;
-            _events = events;
-            _part = part;
-            _options = options;
-            _issues = issues;
-            _track = MidiTrackNotes.Of(bytes, events, part.Kind == ChartInstrumentKind.FiveFret);
-            _taken = new bool[events.Count];
-        }
+        private readonly bool[] _taken = new bool[events.Count];
 
         private ChartInstrumentKind Kind => _part.Kind;
 
