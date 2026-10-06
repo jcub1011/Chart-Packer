@@ -11,7 +11,8 @@ internal readonly record struct TickSpan(long Start, long End)
 
 /// <summary>A drum note as a chart's lanes have it, before its tom markers and the drums' layout shape it.</summary>
 /// <param name="Pad">0 the kick to 5 the fifth pad, as <see cref="DrumGem.Pad"/> has them, or -1 the Expert+ double kick.</param>
-internal readonly record struct DrumHit(long Tick, int Pad);
+/// <param name="Dynamics"><see cref="NoteFlags.Accent"/>, <see cref="NoteFlags.Ghost"/>, or none, as <see cref="DrumGem.Dynamics"/> has them.</param>
+internal readonly record struct DrumHit(long Tick, int Pad, NoteFlags Dynamics = NoteFlags.None);
 
 /// <summary>
 /// Turns a MIDI chart's lanes into the notes YARG plays (<c>MoonSongLoader</c> in YARG.Core), once each note's
@@ -83,7 +84,7 @@ internal static class GameNotes
             foreach (var hit in of)
             {
                 bool cymbal = hit.Pad is >= 2 and <= 4 && CountCovering(toms[hit.Pad - 2], hit.Tick) % 2 == 0;
-                list.Add(new DrumGem(hit.Tick, Math.Max(0, hit.Pad), cymbal, DoubleKick: hit.Pad == -1));
+                list.Add(new DrumGem(hit.Tick, Math.Max(0, hit.Pad), cymbal, DoubleKick: hit.Pad == -1, hit.Dynamics));
             }
 
             TickOrder.Sort(list, static g => g.Tick);

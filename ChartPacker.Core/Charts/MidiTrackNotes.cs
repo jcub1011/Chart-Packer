@@ -29,7 +29,8 @@ internal readonly record struct MidiText(long Tick, byte Type, string Text, int 
 /// <item>A Phase Shift sysex event is exactly <c>50 53 00 00</c>, the difficulty, the code, and 1 for on or 0 for
 /// off; an on pairs with the next off of its difficulty and code, as a note does.</item>
 /// <item>Text events are any text type but the copyright and the track name. For five-fret tracks,
-/// <c>ENHANCED_OPENS</c> turns on open notes for those let go after it.</item>
+/// <c>ENHANCED_OPENS</c> turns on open notes for those let go after it; for drums tracks,
+/// <c>ENABLE_CHART_DYNAMICS</c> turns on accents and ghosts for those let go after it (see <see cref="HasChartDynamics"/>).</item>
 /// </list>
 /// </remarks>
 internal sealed class MidiTrackNotes
@@ -44,8 +45,21 @@ internal sealed class MidiTrackNotes
     /// <summary>The Phase Shift sysex phrases, in the order they're let go.</summary>
     public List<MidiSysexSpan> Sysex { get; } = [];
 
-    /// <summary>The text events, in order, <c>ENHANCED_OPENS</c> among them.</summary>
+    /// <summary>The text events, in order, <c>ENHANCED_OPENS</c> and <c>ENABLE_CHART_DYNAMICS</c> among them.</summary>
     public List<MidiText> Texts { get; } = [];
+
+    /// <summary>
+    /// The index among the track's events of its first <c>ENABLE_CHART_DYNAMICS</c> text event, bracketed or not,
+    /// or null if it has none. Only drums tracks read it.
+    /// </summary>
+    public int? ChartDynamics { get; private set; }
+
+    /// <summary>
+    /// Whether <c>ENABLE_CHART_DYNAMICS</c> had turned on accents and ghosts when <paramref name="note"/> was let go.
+    /// YARG reads a note when it's let go, and the event switches how it reads the drums track's notes from there
+    /// on, not for the whole track, so a note let go before it is read without them.
+    /// </summary>
+    public bool HasChartDynamics(MidiNote note) => ChartDynamics is { } at && note.OffIndex > at;
 
     /// <summary>
     /// The indexes of the events read here: the note-ons and note-offs paired, the sysex events paired, and the
@@ -141,6 +155,8 @@ internal sealed class MidiTrackNotes
                 string normalized = ChartTextEvents.Normalize(text);
                 if (normalized == "ENHANCED_OPENS" && enhancedOpens)
                     opensOn = true;
+                else if (normalized == "ENABLE_CHART_DYNAMICS")
+                    track.ChartDynamics ??= index;
                 track.Texts.Add(new MidiText(e.Tick, type, normalized, index));
             }
         }

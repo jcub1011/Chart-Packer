@@ -37,7 +37,11 @@ internal static class NoteCheck
     public readonly record struct Result(ChartMergeIssue? Issue, IReadOnlyList<(long Tick, bool Hopo)> HopoFixes, IReadOnlyList<long> Ticks);
 
     /// <summary>Compares <paramref name="actual"/> with <paramref name="expected"/>, note by note, by tick and lane.</summary>
-    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote>? actual)
+    /// <param name="ignore">
+    /// The flags not compared: by default accents and ghosts, which a MIDI chart read back has but a <c>.chart</c>
+    /// read doesn't.
+    /// </param>
+    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote>? actual, NoteFlags ignore = NoteFlags.Accent | NoteFlags.Ghost)
     {
         actual ??= [];
         ChartMergeIssue? issue = null;
@@ -68,7 +72,7 @@ internal static class NoteCheck
                 Found(ChartMergeIssue.SustainsChanged, want.Tick);
 
             // A force marker puts a HOPO right whatever else differs, unless the note is a tap.
-            var differ = want.Flags ^ got.Flags;
+            var differ = (want.Flags ^ got.Flags) & ~ignore;
             if ((differ & NoteFlags.Hopo) != 0 && ((want.Flags | got.Flags) & NoteFlags.Tap) == 0 && (fixes.Count == 0 || fixes[^1].Item1 != want.Tick))
                 fixes.Add((want.Tick, (want.Flags & NoteFlags.Hopo) != 0));
             if ((differ & ~NoteFlags.Hopo) != 0)
@@ -97,9 +101,10 @@ internal static class NoteCheck
     /// Compares <paramref name="expected"/> with <paramref name="key"/>'s notes in each of <paramref name="reads"/>,
     /// from <see cref="ReadEveryWay"/>: what the first read finds, and the HOPO fixes any of them need.
     /// </summary>
-    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartDocument> reads, ChartTrackKey key)
+    /// <param name="ignore">The flags not compared, as <see cref="Compare(IReadOnlyList{ChartNote}, IReadOnlyList{ChartNote}?, NoteFlags)"/> takes them.</param>
+    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartDocument> reads, ChartTrackKey key, NoteFlags ignore = NoteFlags.Accent | NoteFlags.Ghost)
     {
-        var results = reads.Select(r => Compare(expected, r.Tracks.GetValueOrDefault(key)?.Notes)).ToList();
+        var results = reads.Select(r => Compare(expected, r.Tracks.GetValueOrDefault(key)?.Notes, ignore)).ToList();
         return results[0] with { HopoFixes = [.. results.SelectMany(r => r.HopoFixes).DistinctBy(f => f.Tick).OrderBy(f => f.Tick)] };
     }
 

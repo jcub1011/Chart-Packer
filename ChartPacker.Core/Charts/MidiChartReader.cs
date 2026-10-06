@@ -8,6 +8,12 @@ internal static class MidiLayout
     public const int StarPowerPitch = 116;
     public const int DoubleKickPitch = 95;
 
+    /// <summary>A drum pad note's velocity that makes it an accent, on a track with <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
+    public const int AccentVelocity = 127;
+
+    /// <summary>A drum pad note's velocity that makes it a ghost, on a track with <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
+    public const int GhostVelocity = 1;
+
     /// <summary>The pro-drums tom markers for yellow, blue and green.</summary>
     public const int FirstTomPitch = 110;
 
@@ -121,6 +127,8 @@ internal static class MidiLayout
 /// <item>A note-on pairs with the next note-off of its pitch and channel; a second note-on while one is held is
 /// ignored, and a note never let go is lost. Notes are taken as they're let go, and the first of two on a tick
 /// and fret or pad is kept.</item>
+/// <item>On a drums track, a pad note let go after an <c>[ENABLE_CHART_DYNAMICS]</c> event is an accent at velocity
+/// 127 and a ghost at velocity 1. Without the event every note is a normal note, whatever its velocity.</item>
 /// </list>
 /// </remarks>
 internal static class MidiChartReader
@@ -302,8 +310,9 @@ internal static class MidiChartReader
             var list = new List<DrumHit>();
             foreach (var note in track.Notes)
             {
+                // YARG reads accents and ghosts on the pads alone: never the kick or the Expert+ double kick.
                 if (MidiLayout.DrumPadOf(note.Pitch - b) is { } pad)
-                    list.Add(new DrumHit(note.Start, pad));
+                    list.Add(new DrumHit(note.Start, pad, pad > 0 && track.HasChartDynamics(note) ? DynamicsOf(note.Velocity) : NoteFlags.None));
             }
 
             hits[difficulty] = list;
@@ -313,4 +322,15 @@ internal static class MidiChartReader
         IReadOnlyList<TickSpan>[] toms = [.. Enumerable.Range(MidiLayout.FirstTomPitch, 3).Select(track.Spans)];
         return GameNotes.Drums(hits, toms, [.. track.Texts.Select(t => (t.Tick, t.Text))], starPower, layout);
     }
+
+    /// <summary>
+    /// A pad note's accent or ghost by its note-on velocity, as YARG reads them once <c>ENABLE_CHART_DYNAMICS</c> is
+    /// on: exactly 127 is an accent and exactly 1 a ghost; any other velocity is a normal note.
+    /// </summary>
+    private static NoteFlags DynamicsOf(int velocity) => velocity switch
+    {
+        MidiLayout.AccentVelocity => NoteFlags.Accent,
+        MidiLayout.GhostVelocity => NoteFlags.Ghost,
+        _ => NoteFlags.None,
+    };
 }
