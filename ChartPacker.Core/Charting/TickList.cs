@@ -130,7 +130,12 @@ public sealed class TickList<T> : IReadOnlyList<T>
     /// </summary>
     /// <returns>Whether it was added.</returns>
     /// <exception cref="ArgumentException">The item can't be in this list.</exception>
-    internal bool Add(T item)
+    internal bool Add(T item) => Place(item) >= 0;
+
+    /// <summary>Adds <paramref name="item"/> as <see cref="Add"/> does.</summary>
+    /// <returns>The index it went at, for undoing with <see cref="RemoveAt"/>; -1 when it wasn't added.</returns>
+    /// <exception cref="ArgumentException">The item can't be in this list.</exception>
+    internal int Place(T item)
     {
         _check?.Invoke(item);
         int index;
@@ -138,7 +143,7 @@ public sealed class TickList<T> : IReadOnlyList<T>
         {
             index = LowerBound(item);
             if (index < _items.Count && _order(_items[index], item) == 0)
-                return false;
+                return -1;
         }
         else
         {
@@ -147,24 +152,55 @@ public sealed class TickList<T> : IReadOnlyList<T>
 
         _items.Insert(index, item);
         Version++;
-        return true;
+        return index;
+    }
+
+    /// <summary>
+    /// Puts <paramref name="item"/> at <paramref name="index"/>, where it was before <see cref="RemoveAt"/> took it out,
+    /// so that undoing a removal keeps its place among the items it ranks equal with.
+    /// </summary>
+    /// <exception cref="ArgumentException">The item can't be in this list.</exception>
+    /// <exception cref="InvalidOperationException">The item doesn't belong at <paramref name="index"/>.</exception>
+    internal void Insert(int index, T item)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(index, _items.Count);
+        _check?.Invoke(item);
+        int before = index > 0 ? _order(_items[index - 1], item) : -1;
+        int after = index < _items.Count ? _order(item, _items[index]) : -1;
+        if (before > 0 || after > 0 || (_unique && (before == 0 || after == 0)))
+            throw new InvalidOperationException($"{item} doesn't belong at index {index} of the list.");
+
+        _items.Insert(index, item);
+        Version++;
+    }
+
+    /// <summary>Checks that <paramref name="item"/> can be in this list, without adding it.</summary>
+    /// <exception cref="ArgumentException">It can't.</exception>
+    internal void Check(T item) => _check?.Invoke(item);
+
+    /// <summary>The index of the first item equal to <paramref name="item"/>, or -1 when there's none.</summary>
+    internal int IndexOf(T item)
+    {
+        var comparer = EqualityComparer<T>.Default;
+        for (int i = LowerBound(item); i < _items.Count && _order(_items[i], item) == 0; i++)
+        {
+            if (comparer.Equals(_items[i], item))
+                return i;
+        }
+
+        return -1;
     }
 
     /// <summary>Removes the first item equal to <paramref name="item"/>.</summary>
     /// <returns>Whether there was one.</returns>
     internal bool Remove(T item)
     {
-        var comparer = EqualityComparer<T>.Default;
-        for (int i = LowerBound(item); i < _items.Count && _order(_items[i], item) == 0; i++)
-        {
-            if (comparer.Equals(_items[i], item))
-            {
-                RemoveAt(i);
-                return true;
-            }
-        }
-
-        return false;
+        int index = IndexOf(item);
+        if (index < 0)
+            return false;
+        RemoveAt(index);
+        return true;
     }
 
     internal void RemoveAt(int index)
