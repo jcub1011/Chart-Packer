@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Current as of 2026-10-06 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) |
+| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) |
 
 ---
 
@@ -19,8 +19,8 @@ its exit criteria. This file owns only the order and the status.
 | Order | Milestone | Status | Depends on |
 | ----: | --------- | ------ | ---------- |
 | 1 | [CM0: Split](#cm0-split) | Done (cleanup left) | — |
-| 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | **Next** | CM0 |
-| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | Not started | CM1 |
+| 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | CM0 |
+| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **Next** | CM1 |
 | 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Not started | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | CM3, CM4 |
@@ -60,9 +60,48 @@ the Properties panel and the tools are still placeholders.
 
 ## CM1: Model, writer and lint engine
 
-**Status: next.**
+**Status: done.**
 
-**Why it comes first.** Every editing feature works on the editable model, and every save goes
+Most of it is in `ChartPacker.Core/Charting/`, with its tests in the new `ChartBuilder.Tests`.
+
+**What was built:**
+
+- **The editable model.** `EditableChart`, `EditableTempoMap` with anchors, `EditablePart`,
+  `EditableTrack`, `EditableNote`, `Phrase`, `TextEvent`, `RawEvent`, `PassthroughTrack`,
+  `DrumMix` and `TickList<T>`, and `ChartModelComparer` to compare two models.
+- **Loading.** `MidiChartLoader` reads a `notes.mid`, or a `.chart` through `ChartToMidi`, and
+  reports what it couldn't take in as written as `ChartLoadIssue`s.
+- **The game view.** `GameView` projects the model to the `ChartDocument` the games read, and
+  `PartEventOrder` fixes the order a part's events are written in, which the games depend on.
+- **Writing.** `MidiChartWriter` normalizes, writes and checks a save (`WriteChecked`) by reading
+  it back both ways (`ChartReadBack`). `NewChartMidi` now goes through it.
+- **Re-ticking.** `TickMaps.KeepTimes` and `ChartRetick`, for tempo edits that keep times.
+- **Commands and undo.** `IChartCommand`, `CompositeCommand`, `ChartUndoStack` and 23 commands in
+  `Commands/`.
+- **The lint engine** in `Lint/`: rule scopes, `ChartLinter` with full and partial runs,
+  `Finding`'s `ChartLocation`, and chart quick fixes (`IChartQuickFixStrategy`). It has no rules
+  yet.
+- **The reader.** `MidiChartReader` reads accents and ghosts as YARG does. `MidiTrackNotes` and
+  `GameNotes` share the note pairing and the drum rules with the loader and the game view.
+- **Saving.** `SongFolderFiles.ApplyAsync` now moves new files in before deleting
+  ([AC C2.4](charter-spec-v1.md#c2-open-and-import)).
+- **Logging.** Both apps log through Serilog (`ChartPacker.UI/AppLog.cs`), with a Logging setting
+  that opens the log folder.
+
+**Left for later:**
+
+- **The CHR lint rules.** The timing, 5-fret and song rules come with CM2, the drums and phrase
+  rules with CM3.
+- **`song.ini` pending changes from chart quick fixes** (CM2).
+- **Anchor absorption** when a tempo marker is removed or moved (CM2).
+- **Cymbal/tom toggling and drum conversion** (CM3).
+- **The folder save's order.** `DraftWriter.SaveFolderAsync` still writes `song.ini` before the
+  files. This is part of CM2's save work.
+- **Two re-save cases.** A mix kept as text before a standard mix on the same tick, and a tom
+  marker before a fifth-pad note on the same tick. The game view reads both as the games do, but
+  re-saving changes how such a file plays. Each is a candidate for a load issue or a lint rule.
+
+**Why it came first.** Every editing feature works on the editable model, and every save goes
 through the writer and its read-back check. CM1 needs no UI, so it is the cheapest place to get
 correctness right: round trips, lossless passthrough and the game view. This needs to be settled
 before any canvas depends on it.
@@ -77,7 +116,7 @@ before any canvas depends on it.
 - Commands and undo.
 - The lint engine: rule scopes, `Finding`'s chart location, and chart quick fixes.
 - The reorder of `SongFolderFiles.ApplyAsync` to move new files in first, then delete
-  ([§4.6](charter-spec-v1.md#46-saving)). Today it deletes first.
+  ([§4.6](charter-spec-v1.md#46-saving)). It used to delete first.
 
 **Reused, not rewritten.** These existing Core internals carry over:
 
@@ -90,7 +129,7 @@ before any canvas depends on it.
 
 ## CM2: Calibration, chart settings and 5-fret editing
 
-**Status: not started.** It depends on CM1's model, writer and lint engine.
+**Status: next.** It builds on CM1's model, writer and lint engine, which are done.
 
 This is the first milestone with a working editor. Its steps, in order:
 

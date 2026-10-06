@@ -167,12 +167,19 @@ While loading:
 - **Velocities** on a drum track are read as accents and ghosts only when the track has
   `[ENABLE_CHART_DYNAMICS]`. Otherwise every note is normal, whatever its velocity, so a chart that
   used velocity 127 for other reasons doesn't gain accents when dynamics are later turned on.
+  *Settled in CM1:* as YARG reads it, the event counts from where it is, so only notes let go
+  after it are read this way, and the games never read an accent or ghost on the kick or the 2×
+  kick. The writer always puts the event at tick 0 ([§7.3](#73-text-events)).
 - **The drum variant** comes from `pro_drums` and `five_lane_drums` when `song.ini` sets them, and
   otherwise from `DrumsLayouts`' detection (a fifth-pad note means 5-lane; anything else is Pro).
   A detected variant is written on the next save, as a pending change
   ([C17](#c17-save-and-export)).
 - **Tempo** is kept as microseconds per quarter note, so a load and save without edits gives the
   same tempo track.
+- **What can't be loaded as written** (a duplicate note, a note that never ends, a marker that
+  covers no note…) is left out or kept as a `RawEvent`, so the chart still plays as it did. The
+  loader reports each one as a `ChartLoadIssue` with its part, difficulty and tick. *Settled in
+  CM1:* these are not `Finding`s yet; CM2 shows them when a chart is opened.
 
 **Commands and undo.** Every change is an `IChartCommand` with `Apply` and `Revert` (add notes,
 delete notes, move, change sustain, toggle flags, add phrase, edit tempo…). A composite command
@@ -364,8 +371,9 @@ settings file, and nothing is logged with `{@…}` destructuring, so no reflecti
 logs through Serilog's static `Log`, which is silent until an app configures it, so tests write no
 logs.
 
-`THIRD-PARTY-NOTICES.md`'s GuitarGame_ChartFormats entry should be extended to say it is also the
-reference for the MIDI layout in [§7](#midi-layout), with no text copied.
+`THIRD-PARTY-NOTICES.md` credits GuitarGame_ChartFormats as the reference for the MIDI layout in
+[§7](#midi-layout), and YARG.Core for the reading behaviour the reader, loader and game view
+follow. No text or code is copied from either.
 
 ### 4.8 Launching and coordination
 
@@ -1733,7 +1741,7 @@ nothing is migrated. The wizard's last parent folder was dropped along with the 
 | Memory | The spectrogram stays within its budget and is never written to disk. The undo stack keeps every step but stores changes, not copies of the chart, and stays under 64 MB for a session of 10,000 edits. |
 | Timing accuracy | What is drawn against the audio is within 1 ms of `SmoothPosition` − latency × speed, before display refresh ([§4.4.1](#441-playback-changes)). Metronome clicks and hit sounds are mixed after the time-stretcher and are sample-accurate in the mix. |
 | Durability | A `.sng` save is atomic (the `.sng` rewrite). A song folder save is atomic per file (temp file and rename), and moves new files in before removing old ones ([§4.6](#46-saving)). Autosave never writes into the song. |
-| Robustness | A malformed `notes.mid` opens as far as it can, with findings. It never crashes the app. Unknown tracks and events are kept. |
+| Robustness | A malformed `notes.mid` opens as far as it can, with findings (in CM1, `ChartLoadIssue`s, [§4.1](#editable-model)). It never crashes the app. Unknown tracks and events are kept. |
 | AOT | Zero trim and AOT warnings. No reflection, and no new packages apart from Serilog ([§4.7](#47-dependencies)). |
 | Privacy | No network access, as now. |
 

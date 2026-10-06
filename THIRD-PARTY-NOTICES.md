@@ -46,7 +46,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - **Used for:** the `song.ini` tag lists that sng-spec §6.3 names as the metadata key registry.
   `ChartPacker.Core/Metadata/KnownKeys.cs` takes its key names and value types from the Standard
   Tags and the Clone Hero, Phase Shift, Frets on Fire X and Editor on Fire tag lists. No text is
-  copied; the key descriptions are Chart-Packer's own.
+  copied; the key descriptions are Chart-Packer's own. It is also the reference for the
+  `notes.mid` layout in [docs/charter-spec-v1.md](docs/charter-spec-v1.md) §7, which `MidiLayout`
+  (`ChartPacker.Core/Charts/MidiChartReader.cs`), `MidiChartLoader` and `MidiChartWriter`
+  (`ChartPacker.Core/Charting/`) follow. No text is copied there either.
+
+### YARG.Core
+
+- **Project:** [YARC-Official/YARG.Core](https://github.com/YARC-Official/YARG.Core)
+- **Used for:** how the games read a chart. The `.chart` and MIDI readers, the drum and note
+  conversion, and Chart Builder's loader and game view (`ChartPacker.Core/Charts/` and
+  `Charting/`) follow YARG's reading behaviour, observed from its source. No code is copied.
+  Source files whose behaviour follows YARG name the upstream type in their documentation
+  comments.
 
 ### Audio formats
 
