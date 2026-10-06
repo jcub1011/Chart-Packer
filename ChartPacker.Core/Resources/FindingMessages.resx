@@ -258,6 +258,9 @@
     <value>Remove the repeats</value>
     <comment>A quick fix that keeps one line of a key stored more than once, with the value it has.</comment>
   </data>
+  <data name="NoAudioStem" xml:space="preserve">
+    <value>There's no audio stem (song, guitar, drums and the like), so the song plays in silence.</value>
+  </data>
   <data name="NoSongIni" xml:space="preserve">
     <value>There's no song.ini, so the .sng will have no metadata.</value>
   </data>

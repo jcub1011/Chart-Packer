@@ -1978,9 +1978,9 @@
                                     Command="{Binding CommitAddCommand}"
                                     AutomationProperties.Name="{x:Static res:Strings.AddButton}" />
                             <Button Grid.Column="3"
-                                    Content="{x:Static res:Strings.CancelButton}"
+                                    Content="{x:Static res:SharedStrings.CancelButton}"
                                     Command="{Binding CancelAddCommand}"
-                                    AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                                    AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
                         </Grid>
                         <TextBlock Classes="error" Text="{Binding NewRowError}" IsVisible="{Binding HasNewRowError}" />
                     </StackPanel>

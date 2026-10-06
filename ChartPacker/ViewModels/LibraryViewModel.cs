@@ -13,6 +13,7 @@ using Avalonia.Controls.Selection;
 using Avalonia.Threading;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
+using ChartPacker.Core.Launching;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
@@ -57,6 +58,8 @@ namespace ChartPacker.ViewModels
         private readonly IValidatorWindowService _validatorWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
+        private readonly IChartBuilderLauncher _chartBuilder;
+        private readonly NoticeViewModel _notice;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
         // Every scanned song, in scan order (by Position), whether or not it passes the filters.
@@ -96,6 +99,8 @@ namespace ChartPacker.ViewModels
         /// <param name="validatorWindow">Shows the Validator window for the selected songs.</param>
         /// <param name="reveal">Shows the selected songs in the file manager.</param>
         /// <param name="downloads">Saves copies of the selected songs as song folders.</param>
+        /// <param name="chartBuilder">Starts Chart Builder to edit the selected song's chart.</param>
+        /// <param name="notice">Says why Chart Builder couldn't be started.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -106,7 +111,9 @@ namespace ChartPacker.ViewModels
             IDedupWindowService dedupWindow,
             IValidatorWindowService validatorWindow,
             IFileRevealService reveal,
-            IDownloadService downloads)
+            IDownloadService downloads,
+            IChartBuilderLauncher chartBuilder,
+            NoticeViewModel notice)
         {
             _folderPicker = folderPicker;
             _settings = settings;
@@ -116,6 +123,8 @@ namespace ChartPacker.ViewModels
             _validatorWindow = validatorWindow;
             _reveal = reveal;
             _downloads = downloads;
+            _chartBuilder = chartBuilder;
+            _notice = notice;
             Player = player;
             Player.PropertyChanged += (_, e) =>
             {
@@ -236,6 +245,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
         public partial int SelectedCount { get; set; }
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
@@ -449,6 +459,24 @@ namespace ChartPacker.ViewModels
         /// <summary>Opens the Validator window, which lists the selected songs whose metadata fails validation, to fix them.</summary>
         [RelayCommand(CanExecute = nameof(CanValidate))]
         private Task ValidateAsync() => _validatorWindow.ShowAsync(SelectedEntries);
+
+        // One song at a time, and not while a job may be writing it. Off altogether until Chart Builder opens songs.
+        private bool CanEditChart() => ChartBuilderLauncher.CanOpenSongs && SelectedCount == 1 && !Job.IsRunning;
+
+        /// <summary>Edit chart's tooltip, which says why it's off while Chart Builder can't open songs yet.</summary>
+        public string EditChartToolTip =>
+            ChartBuilderLauncher.CanOpenSongs ? Strings.EditChartToolTip : Strings.EditChartComingToolTip;
+
+        /// <summary>Opens the selected song in Chart Builder (charter-spec C2). Only one song is edited at a time.</summary>
+        [RelayCommand(CanExecute = nameof(CanEditChart))]
+        private void EditChart()
+        {
+            if (SelectedEntries is not [var song])
+                return;
+
+            if (_chartBuilder.Start(BuilderArgs.ForSong(song.FullPath)) is { } problem)
+                _notice.ShowError(problem);
+        }
 
         private bool CanDeduplicate() => FolderPath is not null && !Job.IsRunning;
 
@@ -930,6 +958,7 @@ namespace ChartPacker.ViewModels
             MergeCommand.NotifyCanExecuteChanged();
             ValidateCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
+            EditChartCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>

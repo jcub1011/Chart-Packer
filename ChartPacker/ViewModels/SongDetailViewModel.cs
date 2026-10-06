@@ -911,7 +911,7 @@ namespace ChartPacker.ViewModels
             ArtError = null;
             if (AlbumArt.StoredNameFor(path) is null)
             {
-                ArtError = Strings.ArtNotAnImage;
+                ArtError = SharedStrings.ArtNotAnImage;
                 return;
             }
 
@@ -2529,19 +2529,19 @@ namespace ChartPacker.ViewModels
                 if (length > AlbumArt.DefaultMaxBytes)
                 {
                     string limit = ByteSizeFormatter.Format((ulong)AlbumArt.DefaultMaxBytes);
-                    return (new StagedArt(null, length, string.Format(CultureInfo.CurrentCulture, Strings.ArtTooLargeFormat, limit)), null);
+                    return (new StagedArt(null, length, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtTooLargeFormat, limit)), null);
                 }
 
                 bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return (new StagedArt(null, 0, string.Format(CultureInfo.CurrentCulture, Strings.ArtUnreadableFormat, ex.Message)), null);
+                return (new StagedArt(null, 0, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtUnreadableFormat, ex.Message)), null);
             }
 
             return Decode(bytes) is { } bitmap
                 ? (new StagedArt(Hash(bytes), bytes.Length, null), bitmap)
-                : (new StagedArt(null, bytes.Length, Strings.ArtNotAnImage), null);
+                : (new StagedArt(null, bytes.Length, SharedStrings.ArtNotAnImage), null);
         }
 
         private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));

@@ -19,6 +19,9 @@
 #define AppName "Chart Packer"
 #define AppExe "ChartPacker.exe"
 #define AppIcon "ChartPacker.ico"
+; Chart Builder, the chart editor, is a second app in the same install (docs/charter-spec-v1.md §4.8).
+#define BuilderName "Chart Builder"
+#define BuilderExe "ChartBuilder.exe"
 #define AppUrl "https://github.com/jcub1011/Chart-Packer"
 
 [Setup]
@@ -54,16 +57,19 @@ WizardStyle=modern
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon} ({#AppName})"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "builderdesktopicon"; Description: "{cm:CreateDesktopIcon} ({#BuilderName})"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
-; The executable has no icon of its own, so the shortcuts use this one.
+; The executables have no icons of their own, so the shortcuts use this one.
 Source: "..\ChartPacker\Assets\avalonia-logo.ico"; DestDir: "{app}"; DestName: "{#AppIcon}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\{#AppIcon}"
+Name: "{group}\{#BuilderName}"; Filename: "{app}\{#BuilderExe}"; IconFilename: "{app}\{#AppIcon}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\{#AppIcon}"; Tasks: desktopicon
+Name: "{autodesktop}\{#BuilderName}"; Filename: "{app}\{#BuilderExe}"; IconFilename: "{app}\{#AppIcon}"; Tasks: builderdesktopicon
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent

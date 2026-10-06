@@ -1,10 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- The program version. This is the only place it is defined; everything else reads it from the build. -->
-    <Version>0.3.0</Version>
-    <!-- Keep the informational version a plain semver, without the SDK's "+<commit sha>" suffix. -->
-    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- The version is set in Directory.Build.props, shared with Chart Builder. -->
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -19,21 +16,31 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
-    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ChartPacker.Audio\ChartPacker.Audio.csproj" />
     <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <ProjectReference Include="..\ChartPacker.UI\ChartPacker.UI.csproj" />
     <ProjectReference Include="..\ChartPacker.Video\ChartPacker.Video.csproj" />
+  </ItemGroup>
+
+  <!-- In Debug, building Chart Packer builds Chart Builder too, and Chart Packer is told where it is, so Edit
+       chart can start it from its own output folder (ChartBuilderLauncher). Installed or published, the two
+       share a folder instead. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <ProjectReference Include="..\ChartBuilder\ChartBuilder.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <AssemblyMetadata Include="ChartBuilderDebugFolder"
+                      Value="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\ChartBuilder\bin\$(Configuration)\$(TargetFramework)'))" />
   </ItemGroup>
 
   <ItemGroup>

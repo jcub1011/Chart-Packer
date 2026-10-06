@@ -55,11 +55,21 @@ Goals:
 
 ```txt
 Chart-Packer.slnx
-├── ChartPacker/              Avalonia desktop app (MVVM)            (exists)
+├── ChartPacker/              Chart Packer: Avalonia desktop app (MVVM)            (exists)
+├── ChartBuilder/             Chart Builder: the chart editor, a second app ([charter-spec](charter-spec-v1.md))
+├── ChartPacker.UI/           Avalonia library shared by both apps: theme, dialogs, pickers, settings window
 ├── ChartPacker.Audio/        Audio decoding, mixing and playback (F7)
 ├── ChartPacker.Core/         UI-free library: format, validation, pack/unpack pipelines
 └── ChartPacker.Core.Tests/   MSTest tests for Core and Audio
 ```
+
+**Two apps, one install.** Chart Packer and Chart Builder are separate Native AOT executables that
+share the libraries above. Both build against the same package versions (central package
+management in `Directory.Packages.props`), so they publish into one folder and share one copy of
+each native library. The version is set once, in `Directory.Build.props`. `build/publish.ps1`
+publishes both, and fails if the two would put different files under the same name. The installer
+(`installer/ChartPacker.iss`) installs both, with a Start menu entry for each. How the two apps
+work together is in [charter-spec §4.8](charter-spec-v1.md#48-launching-and-coordination).
 
 ### 4.1 `ChartPacker.Core`
 
@@ -97,7 +107,7 @@ through `IProgress<T>`.
 
 | Constraint | How it is enforced |
 | ---------- | ------------------ |
-| AOT publish | `<PublishAot>true</PublishAot>` on `ChartPacker` (already set in the scaffold) |
+| AOT publish | `<PublishAot>true</PublishAot>` on `ChartPacker` (already set in the scaffold) and on `ChartBuilder` |
 | AOT-safe library | `<IsAotCompatible>true</IsAotCompatible>` on `ChartPacker.Core` and `ChartPacker.Audio`, which turns on the trim, AOT and single-file analyzers |
 | No warnings | Trim and AOT warnings (`IL2xxx`, `IL3xxx`) are **errors** in Release builds |
 | Compiled bindings only | `<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>`. Reflection bindings are not used. |
@@ -108,8 +118,8 @@ through `IProgress<T>`.
 **Dependency budget.**
 
 - `ChartPacker.Core` has **zero** third-party packages; it uses only the BCL.
-- `ChartPacker` may use `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent`,
-  `Avalonia.Fonts.Inter` and `CommunityToolkit.Mvvm`. It may also use
+- `ChartPacker`, `ChartBuilder` and `ChartPacker.UI` may use `Avalonia`, `Avalonia.Desktop`,
+  `Avalonia.Themes.Fluent`, `Avalonia.Fonts.Inter` and `CommunityToolkit.Mvvm`. It may also use
   `AvaloniaUI.DiagnosticsSupport`, but only in **Debug** builds (the scaffold already excludes
   it from other configurations).
 - Tests may use MSTest (via `MSTest.Sdk`) and Microsoft.Testing.Platform, opted into for

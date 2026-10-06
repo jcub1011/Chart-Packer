@@ -17,11 +17,11 @@
             <Button x:Name="ConfirmButton" Click="OnConfirm" />
             <!-- Cancel is the default, so Enter and Escape both keep the changes. -->
             <Button Classes="accent"
-                    Content="{x:Static res:Strings.CancelButton}"
+                    Content="{x:Static res:SharedStrings.CancelButton}"
                     IsDefault="True"
                     IsCancel="True"
                     Click="OnCancel"
-                    AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                    AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
         </StackPanel>
     </StackPanel>
 </Window>

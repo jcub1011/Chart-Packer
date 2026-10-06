@@ -155,10 +155,10 @@
                         AutomationProperties.Name="{x:Static res:Strings.MergeCompareApplyButton}" />
                 <Button MinWidth="80"
                         HorizontalContentAlignment="Center"
-                        Content="{x:Static res:Strings.CancelButton}"
+                        Content="{x:Static res:SharedStrings.CancelButton}"
                         Command="{Binding CancelCommand}"
                         IsCancel="True"
-                        AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                        AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
             </StackPanel>
         </Border>
     </Grid>

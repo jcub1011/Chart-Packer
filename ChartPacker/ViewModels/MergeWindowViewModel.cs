@@ -461,7 +461,7 @@ namespace ChartPacker.ViewModels
 
         public bool HasWarnings => Warnings.Count > 0;
 
-        public string CloseLabel => IsDone ? Strings.CloseButton : Strings.CancelButton;
+        public string CloseLabel => IsDone ? Strings.CloseButton : SharedStrings.CancelButton;
 
         /// <summary>Reads the songs and builds the choices.</summary>
         public async Task LoadAsync()

@@ -162,6 +162,34 @@ public sealed class PackPlannerTests
         Assert.AreSequenceEqual([.. fromFolder.Metadata], [.. fromListing.Metadata]);
     }
 
+    [TestMethod]
+    public async Task ASongWithoutAudioIsWarnedOf()
+    {
+        Write("song.ini", "[song]\nname = Test\n");
+        Write("notes.mid", "x");
+        Write("stems/guitar.ogg", "not at the top");
+        Write("backing.ogg", "not a stem");
+
+        var plan = await PackPlanner.PlanAsync(_root.FullName, new PackOptions(IncludeSubfolders: true), TestContext.CancellationToken);
+
+        Assert.IsFalse(plan.HasErrors);
+        Assert.AreEqual(Severity.Warning, plan.Findings.Single(f => f.RuleId == SngRules.Sng052).Severity);
+    }
+
+    [TestMethod]
+    [DataRow("song.ogg")]
+    [DataRow("Drums_2.WAV")]
+    [DataRow("preview.mp3")]
+    public async Task AnyStemIsAudio(string name)
+    {
+        Write("song.ini", "[song]\nname = Test\n");
+        Write(name, "audio");
+
+        var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
+
+        Assert.IsFalse(plan.Findings.Any(f => f.RuleId == SngRules.Sng052));
+    }
+
     private void Write(string relative, string content)
     {
         string path = Path.Combine(_root.FullName, relative.Replace('/', Path.DirectorySeparatorChar));

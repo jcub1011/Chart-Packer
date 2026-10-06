@@ -112,6 +112,30 @@ public sealed class ChoiceSetting<T> : SettingDefinition<T>
 /// <summary>A value of a <see cref="ChoiceSetting{T}"/> and the text shown for it.</summary>
 public sealed record SettingChoice<T>(T Value, string Label);
 
+/// <summary>A line of text.</summary>
+public sealed class TextSetting : SettingDefinition<string>
+{
+    /// <summary>What to show in the box while it's empty.</summary>
+    public string? Placeholder { get; init; }
+
+    /// <summary>Characters the value can't hold, which are dropped as they're typed, e.g. what <c>song.ini</c> can't store.</summary>
+    public string ForbiddenCharacters { get; init; } = "";
+
+    /// <summary>
+    /// Null becomes empty, and line breaks and <see cref="ForbiddenCharacters"/> are dropped. Spaces are
+    /// kept, even at the ends, since the value is coerced as it's typed.
+    /// </summary>
+    public override string Coerce(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "";
+
+        return value.AsSpan().IndexOfAny(ForbiddenCharacters + "\r\n") < 0
+            ? value
+            : string.Concat(value.Where(c => c is not ('\r' or '\n') && !ForbiddenCharacters.Contains(c)));
+    }
+}
+
 /// <summary>A folder path, or <see langword="null"/> for none.</summary>
 public sealed class FolderSetting : SettingDefinition<string?>
 {

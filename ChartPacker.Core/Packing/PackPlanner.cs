@@ -145,6 +145,9 @@ public static class PackPlanner
             included.Add(new SngSourceFile(stored, Path.Combine(folder, relative), file.Length));
         }
 
+        if (!included.Any(f => AudioStems.StemOf(f.StoredName) is not null))
+            findings.Add(new Finding(SngRules.Sng052, Severity.Warning, FindingMessages.NoAudioStem));
+
         var metadata = await ReadMetadataAsync(folder, songIni, findings, cancellationToken).ConfigureAwait(false);
         return new PackPlan(folder, included, excluded, metadata, findings);
     }
