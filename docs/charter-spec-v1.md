@@ -89,7 +89,7 @@ saved as `pro_drums` and `five_lane_drums` in `song.ini`, as the games read it
 ```txt
 Chart-Packer.slnx
 ├── ChartPacker/                  Chart Packer app: library, inspector, packing. Launches Chart Builder (§4.8)
-├── ChartBuilder/                 Chart Builder app (new): home screen, editor, canvases, calibration tool, new-chart wizard
+├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases, calibration tool
 ├── ChartPacker.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
 │                                 settings window, shared controls, and later the player and highway view models
 ├── ChartPacker.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synth/ (click, beep, hit sounds)
@@ -283,9 +283,24 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
 
 - **Its own composition root, `MainWindow` and `ViewLocator`**, wired by hand as Chart Packer's
   are. Settings are Chart Builder's own ([§10](#10-settings)).
-- **Home screen**, shown when no song is given on the command line: icon tiles for **New chart**,
-  **Open chart** (a folder or `.sng`) and **Settings**, and recent songs. Opening a song replaces it with the editor, which fills the
-  main window. Closing the song goes back to the home screen.
+- **Launcher** (the home screen), shown when no song is given on the command line: icon tiles for
+  **New chart**, **Open chart** (a folder or `.sng`) and **Settings**, and recent songs. It is a
+  window of its own. **New chart**, or opening a song, closes it and opens an **Editor window** in
+  its place. Closing the Editor brings the launcher back.
+- **Editor window** ([§8](#8-ui-outline)):
+  - **Toolbar.** It shows the program's icon and version, a **Settings** menu with **Chart
+    settings** and **Program settings**, the editing tools, and **Undo** and **Redo**. Its groups
+    wrap onto more rows as the window narrows rather than scrolling.
+  - **Side panels, tabbed and docked like Visual Studio's tool windows.** The left one has the
+    **Chart Inspector** tab: Chart Packer's inspector without the background video or image, the
+    note highway or the lyric lane, which the editor itself shows. The right one has the
+    **Properties** tab, which shows the selection ([C3](#c3-editor-layout)).
+  - Each panel can be resized, and collapsed to a strip along the window's edge that brings it back
+    when clicked. Their widths and whether each is collapsed are saved
+    ([§10](#10-settings)).
+  - **Timeline**, along the bottom at the window's full width. It shows the chart's notes over the
+    waveform of the whole mix. It can be resized (the height is saved) and scrubbed.
+  - The chart's canvas (below) fills the middle.
 - **`ChartEditorView` / `ChartEditorViewModel`**, added to the explicit mapping in `ViewLocator`
   (there is no reflection-based lookup).
 - **Two custom-drawn canvases over one model**: `HighwayEditorCanvas` (vertical) and
@@ -293,10 +308,9 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   (place, select, erase, sustain, phrase, tempo), so behaviour is the same in both. Drawing builds
   on `NoteHighwayView`/`HighwayScene` (note shapes, lane colours, beat lines) and
   `LaneWaveformPainter`.
-- **`CalibrationWindow`** ([C11](#c11-calibration-tool)) and **`NewChartWizard`**
-  ([C1](#c1-new-chart-from-scratch)) are dialogs. They use the shared `WindowChrome` for the dark
-  title bar and icon, as the other dialogs do.
-- **Drag and drop.** Chart Builder's main window takes dropped audio files, which open the wizard
+- **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
+  `WindowChrome` for the dark title bar and icon, as the other dialogs do.
+- **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
   with them ([C1](#c1-new-chart-from-scratch)), and a dropped song folder or `.sng`, which opens it
   ([C2](#c2-open-and-import)). Chart Packer's main window takes no drops for Chart Builder.
 - Strings go in Chart Builder's own `Strings.resx`, and strings both apps use go in
@@ -356,7 +370,7 @@ same song at once, and Chart Packer re-reads the songs Chart Builder may have ch
 | --------- | ----- |
 | *(none)* | The home screen ([§4.5](#45-app-chartbuilder)) |
 | `[--] <song path>` | That song folder or `.sng` in the editor ([C2](#c2-open-and-import)) |
-| `--new [--] [<audio file>…]` | The new-chart wizard, with the audio files. Its location starts on the last folder used ([C1](#c1-new-chart-from-scratch)). |
+| `--new [--] [<audio file>…]` | A new chart in the Editor window, with the audio files ([C1](#c1-new-chart-from-scratch)) |
 | `--calibrate` | The calibration tool ([C11](#c11-calibration-tool)) |
 
 `--` ends the options, so a path that starts with `-` is still a path. Paths are made absolute against
@@ -392,7 +406,7 @@ window is activated, as it is when the user comes back from Chart Builder.
 - Chart Packer remembers the songs it opened in Chart Builder, with each one's chart and
   `song.ini` sizes and modified times. When its window is activated, it re-reads the songs that
   changed, so the library, inspector and packer show them.
-- Chart Packer never starts the new-chart wizard, so a song Chart Builder creates appears in its
+- Chart Packer never starts a new chart, so a song Chart Builder creates appears in its
   library on the next scan.
 - Chart Packer re-reads the shared latency file ([§10](#10-settings)) when its window is
   activated.
@@ -411,17 +425,24 @@ shown in the app's findings panel. Chart lint rules are listed in [§6](#lint-ru
 art. It is opened in the editor, and appears in Chart Packer's library
 ([§4.8](#48-launching-and-coordination)).
 
-**Entry points.** The wizard is part of Chart Builder. It opens from:
+**Entry points.** A new chart is started from:
 
-- **New chart** on Chart Builder's home screen;
-- audio files dropped on Chart Builder's main window, which open the wizard with them
-  ([§4.5](#45-app-chartbuilder));
+- **New chart** on Chart Builder's launcher;
+- audio files dropped on the launcher ([§4.5](#45-app-chartbuilder));
 - `ChartBuilder --new` on the command line ([§4.8](#48-launching-and-coordination)).
+
+Each closes the launcher and opens an empty **Editor window** ([§4.5](#45-app-chartbuilder)).
 
 Chart Packer has no **New chart**. Charts are created in Chart Builder, and Chart Packer's only way
 into it is **Edit chart** ([C2](#c2-open-and-import)).
 
-**Behaviour:** a four-step wizard. **Back** and **Next** keep every step's values.
+> **Superseded: the wizard has been removed.** The song is to be set up from the Editor's **Chart
+> settings** instead, and that design is still to be specified. Until then, the empty Editor doesn't
+> use the audio files it was started with. The wizard's steps, **Create** and acceptance criteria
+> below are kept as the reference for what setting up a song has to cover. They no longer describe
+> the app.
+
+**Behaviour (superseded):** a four-step wizard. **Back** and **Next** keep every step's values.
 
 1. **Song.**
    - Fields: name, artist, album, genre, year and charter.
@@ -458,7 +479,7 @@ into it is **Edit chart** ([C2](#c2-open-and-import)).
      exists as soon as it has a note.
    - Parts can be added later ([C2](#c2-open-and-import)).
 
-**Create:**
+**Create (superseded):**
 
 - The **location** is chosen on the Parts step, beside **Create**. It is a parent folder (by
   default the last one used, or the library root) plus
@@ -478,7 +499,7 @@ into it is **Edit chart** ([C2](#c2-open-and-import)).
 - **How it is written.** Everything is written into a temp folder beside the target, which is then
   renamed into place. A failure or cancel leaves nothing behind.
 
-Acceptance criteria:
+Acceptance criteria (superseded with the wizard; to be restated for Chart settings):
 
 - **AC C1.1** A chart created with one stem and no notes validates with no errors
   ([project-spec F3](project-spec-v1.md#f3-validate)), packs to a `.sng`, and reopens in the editor
@@ -510,8 +531,8 @@ Acceptance criteria:
    - Each Chart Builder window has one chart open. A song that another Chart Builder already has
      open isn't opened a second time ([§4.8](#48-launching-and-coordination)).
 2. **Which chart is opened.** `ChartReader.Pick` chooses: `notes.mid` if there is one, otherwise
-   `notes.chart`. A song with neither is offered **New chart in this song**, which runs the
-   wizard's Timing and Parts steps.
+   `notes.chart`. A song with neither is offered **New chart in this song**, which sets up its
+   timing and parts as a new chart does ([C1](#c1-new-chart-from-scratch)).
 3. **`.chart` import.**
    - The chart is converted with `ChartToMidi`. Any `ChartMergeWarning`s are shown before the
      editor opens, with the times they happen at, and the user can go ahead or cancel.
@@ -1221,7 +1242,7 @@ Acceptance criteria:
      say-so;
    - `multiplier_note` removed, when the chart had star power on 103
      ([§7.2](#72-shared-markers-every-difficulty));
-   - `delay`, from the wizard's lead-in ([C1](#c1-new-chart-from-scratch)), a `.chart` import's
+   - `delay`, from a new chart's lead-in ([C1](#c1-new-chart-from-scratch)), a `.chart` import's
      Offset ([C2](#c2-open-and-import)), or **Find first downbeat**
      ([C14](#c14-onset-and-beat-assist));
    - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import)).
@@ -1483,10 +1504,11 @@ are unchanged, and red stays red.
 
 ## 8. UI outline
 
-Chart Builder has its own main window. It shows the home screen until a song is open, and then the
-editor, with the editor's tools in its toolbar.
+Chart Builder has two top-level windows, and only one is open at a time. The launcher (the home
+screen) shows until a chart is started or opened. Then the Editor window takes its place, with the
+editor's tools in its toolbar, and closing the Editor brings the launcher back.
 
-**Home screen:**
+**Launcher (home screen):**
 
 ```txt
 ┌ Chart Builder ─────────────────────────────────────────────────────────┐
@@ -1505,6 +1527,38 @@ editor, with the editor's tools in its toolbar.
 │   Drop audio files to start a new chart, or a song to open it.          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Editor window:**
+
+```txt
+┌ Untitled chart - Chart Builder ───────────────────────────────────────────────────────┐
+│ [◎ Chart Builder v0.3.0] [⚙ ▾] [Select|Place|Erase|Sustain|Phrase|Tempo] [⟲ ⟳]        │
+├─────────────────────┬────────────────────────────────────────────┬────────────────────┤
+│ Chart Inspector   « │                                            │ Properties       » │
+│                     │                                            │                    │
+│ Artist – Title      │        highway or timeline canvas          │ Note  m41 · beat 3 │
+│ [album art]         │                                            │ Tick  78,960       │
+│ Tracks              │                                            │ …                  │
+│ Chart files         │                                            │                    │
+│ Other files         │                                            │                    │
+│ Findings            │                                            │                    │
+│ Metadata            │                                            │                    │
+╞═════════════════════╧════════════════════════════════════════════╧════════════════════╡
+│ Timeline                                                              1:38.4 / 4:12.0 │
+│ 0:00      0:30      1:00      1:30   │  2:00      2:30      3:00      3:30      4:00  │
+│ ▁▂▅▇█▇▅▃▂▁▂▃▅▇▅▃▁▂▃▅▇█▇▅▃▂▁▂▃▅▇▅▃▂▁▂│▅▇█▇▅▃▂▁▂▃▅▇▅▃▁▂▃▅▇█▇▅▃▂▁   notes over the mix   │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- The ⚙ menu has **Chart settings** and **Program settings**. The toolbar's groups wrap onto more
+  rows as the window narrows.
+- « and » collapse a panel to a strip along that edge, with its tab titles turned on their side.
+  Clicking a title brings the panel back. The panel widths, whether each is collapsed, and the
+  timeline's height (the ═ splitter above it) are saved.
+- Dragging or clicking on the timeline scrubs the playhead.
+
+The two mock-ups below show the canvas in each view. They were drawn before the Editor window's
+layout, so their part picker, findings and transport bar have still to be placed in it.
 
 **Highway view:**
 
@@ -1541,27 +1595,6 @@ editor, with the editor's tools in its toolbar.
 │   Open       │ ═══════════                                                            │
 │   Onsets     │ ·  ·  ·   ·  · · ·   ·  ·   ·                                          │
 ```
-
-**New-chart wizard:**
-
-```txt
-┌ New chart ─────────────────────────────────────────────────────────────┐
-│  ① Song  ─  ② Audio  ─  ③ Timing  ─  ④ Parts                          │
-│                                                                         │
-│  Audio files                                                            │
-│  ┌───────────────────────────────────────────────────────────────────┐ │
-│  │ Guitar.OGG     → [guitar ▾]   3:58.2   Vorbis 44.1 kHz   ✓        │ │
-│  │ Drums.ogg      → [drums  ▾]   3:58.2   Vorbis 44.1 kHz   ✓        │ │
-│  │ mix.mp3        → [song   ▾]   3:58.4   MP3 44.1 kHz      ✓        │ │
-│  └───────────────────────────────────────────────────────────────────┘ │
-│  [Add files…]   [ ] No audio — length [ 3:00 ]                          │
-│                                                                         │
-│                                          [Cancel]  [Back]  [Next →]    │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-The location and folder name are chosen on the last step (Parts), beside **Create**
-([C1](#c1-new-chart-from-scratch)).
 
 **Calibration tool:**
 
@@ -1634,7 +1667,7 @@ save writes its own temp file and renames it into place.
 | File | Owner | Holds |
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
-| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the wizard's last-used values (the last parent folder) and the recent songs |
+| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height) and the recent songs |
 | `audio-latency.json` | Chart Builder's calibration tool | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when its window is activated ([§4.8](#48-launching-and-coordination)). |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
@@ -1657,7 +1690,7 @@ opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
 | Prompt for calibration on first editor use | On |
 | Autosave interval | 2 minutes |
-| Default charter name | Empty. Prefills `charter` in the wizard, and fills an empty `charter` on save |
+| Default charter name | Empty. Prefills `charter` for a new chart, and fills an empty `charter` on save |
 | Default difficulty reduction rules | As in [C9](#c9-difficulty-authoring). The Reduce dialog starts from them, and its changes apply to one run only. |
 
 There is no existing playback-offset setting in `AppSettings` to extend. The latency is new. It is
@@ -1666,9 +1699,10 @@ plus the fallback, and is looked up in that order ([C11](#c11-calibration-tool))
 written to a temp file and renamed into place, as `settings.json` is, so a reader never sees half
 of it.
 
-The wizard's settings (default charter name, default resolution and last parent folder) moved
-from `AppSettings` to `BuilderSettings` when the wizard moved to Chart Builder, before any release
-included them, so nothing is migrated.
+The new-chart settings (default charter name and default resolution) moved from `AppSettings` to
+`BuilderSettings` when new charts moved to Chart Builder, before any release included them, so
+nothing is migrated. The wizard's last parent folder was dropped along with the wizard
+([C1](#c1-new-chart-from-scratch)).
 
 ## 11. Non-functional requirements
 
@@ -1698,7 +1732,7 @@ included them, so nothing is migrated.
 | Analysis | Synthetic click tracks at fixed and changing tempos for `TempoEstimator`; synthetic drum hits in separate bands for `OnsetDetector`; spectrogram bins checked against known sine frequencies |
 | Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the beep's position in the mixed output for a given latency (AC C11.1) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
-| View models | `ChartEditorViewModel`, the wizard and calibration view models against fake services. There are no automated UI tests, as in v1. |
+| View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
 | Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two `FileStream`s in one test process standing in for two processes, and released when the holder is disposed (AC C2.5); `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
 
 **Test isolation** is as in [project-spec §10](project-spec-v1.md#10-testing-strategy). Tests use
@@ -1712,9 +1746,9 @@ fails the run if anything there changes anyway.
 | --------- | -------- | ------------- |
 | **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartPacker.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and the C1 wizard moved from Chart Packer as it is. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; the wizard opens from Chart Builder's home screen and from dropped audio files |
 | **CM1: Model, writer and lint engine** | `EditableChart` and friends, `MidiChartLoader`, `MidiChartWriter`, passthrough and re-ticking, the game-view projection and extended read-back check, `MidiChartReader` reading dynamics, commands and undo. The lint engine: rule scopes, `Finding`'s chart location, and chart quick fixes. The `SongFolderFiles` order change. And the tests. | Every round-trip and writer-vs-reader test passes, and AC C2.4; zero AOT warnings |
-| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 wizard (without **Detect from audio**), C2 open and import, with **Edit chart** turned on (`ChartBuilderLauncher.CanOpenSongs`), `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), and the player and highway view models moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
+| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart (without **Detect from audio**), C2 open and import, with **Edit chart** turned on (`ChartBuilderLauncher.CanOpenSongs`), `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), and the player and highway view models moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
 | **CM3: Drums and GHL** | C6 all three drum variants and conversion, C7 GHL, C8 phrases and events, and the drums and phrase lint rules | AC C6, C7 and C8 pass |
-| **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and the wizard's **Detect from audio** | AC C12, C13 and C14 pass |
+| **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and new chart's **Detect from audio** | AC C12, C13 and C14 pass |
 | **CM5: Authoring tools** | C9 reduction, C15 record mode, clipboard and transforms, C16 lint in the library, C18 preview and suggested difficulty | AC C9, C15, C16 and C18 pass |
 
 ## 14. Future (after v1)
@@ -1745,9 +1779,12 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   opening it in Chart Builder ([§4.6](#46-saving)).
 - **Settings:** each app writes only its own file. The latency is a shared file that only Chart
   Builder writes ([§10](#10-settings)).
-- **New chart wizard:** part of Chart Builder only. It was moved from Chart Packer as it was, and
-  its design is still to be revisited. Chart Packer has no **New chart**. Its only way into Chart
-  Builder is **Edit chart**, for exactly one selected song.
+- **New chart:** part of Chart Builder only. The wizard that moved from Chart Packer has been
+  removed. New chart opens an empty Editor window, and the song is set up from **Chart settings**,
+  whose design is still to be specified ([C1](#c1-new-chart-from-scratch)). Chart Packer has no
+  **New chart**. Its only way into Chart Builder is **Edit chart**, for exactly one selected song.
+- **Windows:** the launcher and the Editor are separate windows, and only one is open at a time
+  ([§4.5](#45-app-chartbuilder)).
 - **Views:** Highway and Timeline, both in v1.
 - **Spectrogram:** held in memory only, within a budget.
 - **4-lane ↔ 5-lane:** a fixed mapping of Chart Builder's own ([§7.6](#76-drum-layout-conversion)),

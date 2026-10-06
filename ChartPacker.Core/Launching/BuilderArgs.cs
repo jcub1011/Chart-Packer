@@ -9,7 +9,7 @@ public enum BuilderStart
     /// <summary>A song folder or <c>.sng</c>, in the editor.</summary>
     OpenSong,
 
-    /// <summary>The new-chart wizard.</summary>
+    /// <summary>A new chart, in the editor.</summary>
     NewChart,
 
     /// <summary>The audio/visual calibration tool.</summary>
@@ -56,7 +56,7 @@ public sealed record BuilderArgs
     /// <summary>For <see cref="BuilderStart.OpenSong"/>, the song folder or <c>.sng</c>, as a full path.</summary>
     public string? SongPath { get; init; }
 
-    /// <summary>For <see cref="BuilderStart.NewChart"/>, the audio files to start the wizard with, as full paths.</summary>
+    /// <summary>For <see cref="BuilderStart.NewChart"/>, the audio files to start the chart with, as full paths.</summary>
     public IReadOnlyList<string> AudioFiles { get; init; } = [];
 
     /// <summary>Why the arguments can't be used, or null when they can. <see cref="Start"/> is then <see cref="BuilderStart.Home"/>.</summary>

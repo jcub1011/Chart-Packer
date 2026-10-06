@@ -1,0 +1,298 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:views="using:ChartBuilder.Views"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:bctl="using:ChartBuilder.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
+        x:Class="ChartBuilder.Views.EditorWindow"
+        x:DataType="vm:EditorWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{Binding Title}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="1280" Height="800"
+        MinWidth="720" MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenProgramSettingsCommand}" />
+        <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+        <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+    </Window.KeyBindings>
+
+    <Window.Styles>
+        <!-- The side panels' tabs: compact headers along the top, like a docked tool window. -->
+        <Style Selector="TabControl.panel">
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="TabControl.panel TabItem">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="12,0" />
+        </Style>
+        <!-- The tab strip's band, which the collapse button sits at the right of. -->
+        <Style Selector="Border.panelHeader">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+
+        <!-- A collapsed panel: a narrow strip along the window's edge with its tabs' titles turned on their side,
+             like a Visual Studio tool window set to auto-hide. Clicking a title brings the panel back. -->
+        <Style Selector="Border.panelStrip">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+        <Style Selector="Button.stripTab">
+            <Setter Property="Padding" Value="4,12" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.stripTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+
+        <!-- Centred messages standing in for content that isn't built yet. -->
+        <Style Selector="StackPanel.placeholder">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="16" />
+            <Setter Property="Spacing" Value="4" />
+        </Style>
+    </Window.Styles>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <!-- Toolbar (0), panels (1), splitter (2), timeline (3). EditorWindow.axaml.cs indexes these. -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="160" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="160" MinHeight="80" />
+        </Grid.RowDefinitions>
+
+        <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
+        <Border Grid.Row="0" Classes="toolbar">
+            <WrapPanel ItemSpacing="8" LineSpacing="6">
+                <!-- Which program this is, and its version. -->
+                <Border Classes="toolbar-group" Padding="8,3">
+                    <StackPanel Orientation="Horizontal" Spacing="8" Height="28">
+                        <Image Width="20"
+                               Height="20"
+                               VerticalAlignment="Center"
+                               Source="/Assets/avalonia-logo.ico"
+                               AutomationProperties.Name="{x:Static res:Strings.AppName}" />
+                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{x:Static res:Strings.AppName}" />
+                        <TextBlock Classes="muted" VerticalAlignment="Center" FontSize="12" Text="{Binding VersionText}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="toolbar-group">
+                    <Button Classes="tool"
+                            ToolTip.Tip="{x:Static res:Strings.SettingsMenuToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.SettingsMenuButton}">
+                        <ctl:LineIcon Data="{StaticResource SettingsStroke}" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                <MenuItem Header="{x:Static res:Strings.ChartSettingsMenuItem}"
+                                          Command="{Binding OpenChartSettingsCommand}"
+                                          ToolTip.Tip="{x:Static res:Strings.ComingSoonToolTip}"
+                                          ToolTip.ShowOnDisabled="True" />
+                                <MenuItem Header="{x:Static res:Strings.ProgramSettingsMenuItem}"
+                                          Command="{Binding OpenProgramSettingsCommand}"
+                                          InputGesture="Ctrl+OemComma" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </Border>
+
+                <!-- The editing tools (charter-spec §4.5: EditorTools). Placeholders until the editor can edit. -->
+                <Border Classes="toolbar-group">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <StackPanel.Styles>
+                            <Style Selector="Button.labelled">
+                                <Setter Property="IsEnabled" Value="False" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="ToolTip.Tip" Value="{x:Static res:Strings.ComingSoonToolTip}" />
+                                <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+                            </Style>
+                        </StackPanel.Styles>
+                        <Button Classes="labelled" Content="{x:Static res:Strings.ToolSelect}" />
+                        <Button Classes="labelled" Content="{x:Static res:Strings.ToolPlace}" />
+                        <Button Classes="labelled" Content="{x:Static res:Strings.ToolErase}" />
+                        <Button Classes="labelled" Content="{x:Static res:Strings.ToolSustain}" />
+                        <Button Classes="labelled" Content="{x:Static res:Strings.ToolPhrase}" />
+                        <Button Classes="labelled" Content="{x:Static res:Strings.ToolTempo}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="toolbar-group">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Button Classes="tool"
+                                Command="{Binding UndoCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.UndoToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.UndoButton}">
+                            <ctl:LineIcon Data="{StaticResource UndoStroke}" />
+                        </Button>
+                        <!-- Redo is Undo's arrow mirrored. -->
+                        <Button Classes="tool"
+                                Command="{Binding RedoCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.RedoToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.RedoButton}">
+                            <ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+        </Border>
+
+        <Grid x:Name="PanelsGrid" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <!-- Chart Inspector (0), splitter (1), the chart (2), splitter (3), Properties (4).
+                     EditorWindow.axaml.cs indexes these, and sizes the side columns. -->
+                <ColumnDefinition Width="300" MinWidth="180" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="240" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="280" MinWidth="180" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left panel: Chart Inspector. -->
+            <Panel Grid.Column="0">
+                <Panel IsVisible="{Binding !IsLeftPanelCollapsed}" Background="{DynamicResource SurfaceBrush}">
+                    <Border Classes="panelHeader" />
+                    <TabControl Classes="panel">
+                        <TabItem Header="{x:Static res:Strings.ChartInspectorTab}">
+                            <views:ChartInspectorView />
+                        </TabItem>
+                    </TabControl>
+                    <Button Classes="tool"
+                            Margin="0,3,4,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Command="{Binding ToggleLeftPanelCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.CollapsePanelToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.CollapsePanelToolTip}">
+                        <ctl:LineIcon Data="{StaticResource PanelCollapseStroke}" />
+                    </Button>
+                </Panel>
+                <Border Classes="panelStrip"
+                        BorderThickness="0,0,1,0"
+                        IsVisible="{Binding IsLeftPanelCollapsed}">
+                    <Button Classes="stripTab"
+                            Command="{Binding ToggleLeftPanelCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.ExpandPanelToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.ChartInspectorTab}">
+                        <LayoutTransformControl>
+                            <LayoutTransformControl.LayoutTransform>
+                                <RotateTransform Angle="90" />
+                            </LayoutTransformControl.LayoutTransform>
+                            <TextBlock Text="{x:Static res:Strings.ChartInspectorTab}" />
+                        </LayoutTransformControl>
+                    </Button>
+                </Border>
+            </Panel>
+
+            <GridSplitter Grid.Column="1"
+                          ResizeDirection="Columns"
+                          Width="4"
+                          Background="{DynamicResource SubtleBorderBrush}"
+                          IsVisible="{Binding !IsLeftPanelCollapsed}" />
+
+            <!-- The chart: the highway and timeline editors go here. -->
+            <StackPanel Grid.Column="2" Classes="placeholder">
+                <TextBlock Classes="muted centered" Text="{x:Static res:Strings.EditorCanvasPlaceholder}" />
+            </StackPanel>
+
+            <GridSplitter Grid.Column="3"
+                          ResizeDirection="Columns"
+                          Width="4"
+                          Background="{DynamicResource SubtleBorderBrush}"
+                          IsVisible="{Binding !IsRightPanelCollapsed}" />
+
+            <!-- Right panel: Properties, which will show whatever is selected. -->
+            <Panel Grid.Column="4">
+                <Panel IsVisible="{Binding !IsRightPanelCollapsed}" Background="{DynamicResource SurfaceBrush}">
+                    <Border Classes="panelHeader" />
+                    <TabControl Classes="panel">
+                        <TabItem Header="{x:Static res:Strings.PropertiesTab}">
+                            <StackPanel Classes="placeholder">
+                                <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
+                                <TextBlock Classes="muted centered"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
+                            </StackPanel>
+                        </TabItem>
+                    </TabControl>
+                    <!-- The left panel's chevron, mirrored to point at the right-hand edge. -->
+                    <Button Classes="tool"
+                            Margin="0,3,4,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Command="{Binding ToggleRightPanelCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.CollapsePanelToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.CollapsePanelToolTip}">
+                        <ctl:LineIcon Data="{StaticResource PanelCollapseStroke}" RenderTransform="scaleX(-1)" />
+                    </Button>
+                </Panel>
+                <Border Classes="panelStrip"
+                        BorderThickness="1,0,0,0"
+                        IsVisible="{Binding IsRightPanelCollapsed}">
+                    <Button Classes="stripTab"
+                            Command="{Binding ToggleRightPanelCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.ExpandPanelToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.PropertiesTab}">
+                        <LayoutTransformControl>
+                            <LayoutTransformControl.LayoutTransform>
+                                <RotateTransform Angle="90" />
+                            </LayoutTransformControl.LayoutTransform>
+                            <TextBlock Text="{x:Static res:Strings.PropertiesTab}" />
+                        </LayoutTransformControl>
+                    </Button>
+                </Border>
+            </Panel>
+        </Grid>
+
+        <GridSplitter Grid.Row="2"
+                      ResizeDirection="Rows"
+                      Height="4"
+                      Background="{DynamicResource SubtleBorderBrush}" />
+
+        <!-- The timeline, the full width of the window: the notes over the whole mix's waveform, to scrub through
+             the song. A placeholder ruler and waveform so far. -->
+        <DockPanel Grid.Row="3" Background="{DynamicResource SurfaceBrush}">
+            <Border DockPanel.Dock="Top"
+                    Background="{DynamicResource ToolbarBrush}"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="12,4">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Classes="caption" VerticalAlignment="Center" Text="{x:Static res:Strings.TimelineHeading}" />
+                    <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" Text="{Binding PositionText}" />
+                </Grid>
+            </Border>
+            <bctl:TimelinePlaceholder Margin="8,4,8,8"
+                                      Cursor="Hand"
+                                      Position="{Binding TimelinePosition}"
+                                      Length="{Binding TimelineLength}"
+                                      WaveformBrush="{DynamicResource WaveformBrush}"
+                                      TickBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                      PlayheadBrush="{DynamicResource AccentTextBrush}"
+                                      ToolTip.Tip="{x:Static res:Strings.TimelineToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.TimelineHeading}" />
+        </DockPanel>
+    </Grid>
+</Window>

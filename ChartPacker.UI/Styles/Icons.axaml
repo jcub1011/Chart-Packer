@@ -79,6 +79,8 @@
     <StreamGeometry x:Key="DedupStroke">M5.5,4.5 V1.5 H14.5 V10.5 H11.5 M1.5,5.5 H10.5 V14.5 H1.5 Z M4,10 H8</StreamGeometry>
     <StreamGeometry x:Key="FlatStroke">M8,1.5 V5.5 M5.5,3 L8,5.5 L10.5,3 M1.5,8 H14.5 M8,14.5 V10.5 M5.5,13 L8,10.5 L10.5,13</StreamGeometry>
     <StreamGeometry x:Key="UndoStroke">M3,6.5 H10 A3.5,3.5 0 0 1 10,13.5 H6 M6,3.5 L3,6.5 L6,9.5</StreamGeometry>
+    <!-- A chevron pointing at an edge: tuck a side panel away against it. Mirror it for the right-hand edge. -->
+    <StreamGeometry x:Key="PanelCollapseStroke">M3,2.5 V13.5 M12,3.5 L7.5,8 L12,12.5</StreamGeometry>
     <!-- A cog: eight teeth around a hub. -->
     <StreamGeometry x:Key="SettingsStroke">M6.9,1 H9.1 L9.5,2.8 L10.7,3.3 L12.2,2.3 L13.7,3.8 L12.7,5.3 L13.2,6.5 L15,6.9 V9.1 L13.2,9.5 L12.7,10.7 L13.7,12.2 L12.2,13.7 L10.7,12.7 L9.5,13.2 L9.1,15 H6.9 L6.5,13.2 L5.3,12.7 L3.8,13.7 L2.3,12.2 L3.3,10.7 L2.8,9.5 L1,9.1 V6.9 L2.8,6.5 L3.3,5.3 L2.3,3.8 L3.8,2.3 L5.3,3.3 L6.5,2.8 Z M10.25,8 A2.25,2.25 0 1 1 5.75,8 A2.25,2.25 0 1 1 10.25,8 Z</StreamGeometry>
     <!-- A magnifying glass. -->

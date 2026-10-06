@@ -12,7 +12,8 @@ namespace ChartBuilder.Views
             InitializeComponent();
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
 
-            // Audio files dropped anywhere on the window start a new chart with them (charter-spec C1).
+            // Audio files dropped anywhere on the window start a new chart (charter-spec C1). The editor doesn't
+            // take them yet.
             DragDrop.SetAllowDrop(this, true);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
@@ -23,9 +24,8 @@ namespace ChartBuilder.Views
 
         private void OnDrop(object? sender, DragEventArgs e)
         {
-            var files = DroppedFiles.AudioOf(e);
-            if (files.Count > 0 && DataContext is MainWindowViewModel vm)
-                _ = vm.NewChartAsync(files);
+            if (DroppedFiles.AudioOf(e).Count > 0 && DataContext is MainWindowViewModel vm)
+                vm.NewChart();
         }
     }
 }

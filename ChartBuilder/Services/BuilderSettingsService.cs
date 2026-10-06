@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Settings;
@@ -42,8 +43,13 @@ namespace ChartBuilder.Services
             if (!NewChartSettings.Resolutions.Contains(settings.DefaultChartResolution))
                 settings.DefaultChartResolution = NewChartSettings.DefaultResolution;
 
-            if (string.IsNullOrWhiteSpace(settings.LastNewChartFolder))
-                settings.LastNewChartFolder = null;
+            settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
+            settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);
+            settings.EditorTimelineHeight = Size(settings.EditorTimelineHeight, BuilderSettings.MinEditorTimelineHeight, BuilderSettings.DefaultEditorTimelineHeight);
         }
+
+        /// <summary>A saved panel size, at least <paramref name="min"/>; <paramref name="fallback"/> when it isn't a number.</summary>
+        private static double Size(double value, double min, double fallback) =>
+            double.IsFinite(value) ? Math.Max(value, min) : fallback;
     }
 }

@@ -6,13 +6,35 @@ namespace ChartBuilder.Services
     /// <remarks>Chart Packer's are in its own file, so neither app overwrites the other's.</remarks>
     public sealed class BuilderSettings
     {
-        /// <summary>The name the new-chart wizard fills <c>charter</c> in with. Empty for none.</summary>
+        public const double DefaultEditorLeftPanelWidth = 300;
+        public const double DefaultEditorRightPanelWidth = 280;
+        public const double DefaultEditorTimelineHeight = 160;
+
+        /// <summary>The narrowest a side panel can be dragged, and the least a saved width is restored as.</summary>
+        public const double MinEditorPanelWidth = 180;
+
+        /// <summary>The shortest the timeline can be dragged, and the least a saved height is restored as.</summary>
+        public const double MinEditorTimelineHeight = 80;
+
+        /// <summary>The name a new chart's <c>charter</c> is filled in with. Empty for none.</summary>
         public string DefaultCharterName { get; set; } = "";
 
-        /// <summary>The resolution, in ticks per beat, the new-chart wizard starts on: one of <see cref="NewChartSettings.Resolutions"/>.</summary>
+        /// <summary>The resolution, in ticks per beat, a new chart starts on: one of <see cref="NewChartSettings.Resolutions"/>.</summary>
         public int DefaultChartResolution { get; set; } = NewChartSettings.DefaultResolution;
 
-        /// <summary>The folder the last new chart was made in, which the wizard starts on. Null for the folder it's given.</summary>
-        public string? LastNewChartFolder { get; set; }
+        /// <summary>The editor's left panel (Chart Inspector) width, while expanded.</summary>
+        public double EditorLeftPanelWidth { get; set; } = DefaultEditorLeftPanelWidth;
+
+        /// <summary>The editor's right panel (Properties) width, while expanded.</summary>
+        public double EditorRightPanelWidth { get; set; } = DefaultEditorRightPanelWidth;
+
+        /// <summary>The height of the timeline along the bottom of the editor.</summary>
+        public double EditorTimelineHeight { get; set; } = DefaultEditorTimelineHeight;
+
+        /// <summary>Whether the editor's left panel is collapsed to a strip along the window's edge.</summary>
+        public bool EditorLeftPanelCollapsed { get; set; }
+
+        /// <summary>Whether the editor's right panel is collapsed to a strip along the window's edge.</summary>
+        public bool EditorRightPanelCollapsed { get; set; }
     }
 }
