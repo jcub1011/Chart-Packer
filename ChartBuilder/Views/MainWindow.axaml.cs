@@ -13,21 +13,30 @@ namespace ChartBuilder.Views
             InitializeComponent();
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
 
-            // Audio files dropped anywhere on the window start a new chart (charter-spec C1). The Editor can't use
-            // them yet, and says so.
+            // Audio files dropped anywhere on the window start a new chart (charter-spec C1); the Editor can't use
+            // them yet, and says so. A song folder or .sng opens it (C2).
             DragDrop.SetAllowDrop(this, true);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
         }
 
         private void OnDragOver(object? sender, DragEventArgs e) =>
-            e.DragEffects = DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
+            e.DragEffects = DroppedFiles.SongOf(e) is not null || DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
 
         private void OnDrop(object? sender, DragEventArgs e)
         {
+            if (DataContext is not MainWindowViewModel vm)
+                return;
+
+            // Posted, since it closes the launcher (the editor opens in its place) and the drop is still being handled.
+            if (DroppedFiles.SongOf(e) is { } song)
+            {
+                Dispatcher.UIThread.Post(() => _ = vm.OpenSongAsync(song));
+                return;
+            }
+
             var files = DroppedFiles.AudioOf(e);
-            // Posted, since it closes the launcher (New chart opens the editor) and the drop is still being handled.
-            if (files.Count > 0 && DataContext is MainWindowViewModel vm)
+            if (files.Count > 0)
                 Dispatcher.UIThread.Post(() => vm.StartNewChart(files));
         }
     }

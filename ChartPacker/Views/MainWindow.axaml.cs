@@ -23,6 +23,13 @@ namespace ChartPacker.Views
                 RestoreLibraryPaneWidth();
             };
             Closing += OnClosing;
+
+            // Coming back from Chart Builder, the songs it may have saved are read again (charter-spec §4.8).
+            Activated += (_, _) =>
+            {
+                if (DataContext is MainWindowViewModel vm)
+                    _ = vm.OnActivatedAsync();
+            };
         }
 
         // Set once the user has agreed to lose their unsaved metadata changes.

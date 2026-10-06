@@ -25,5 +25,11 @@ namespace ChartPacker.Services
 
         /// <summary>Shows a picker for one chart (.chart, .mid or .midi) or .sng to take lyrics from, and returns its local path, or <see langword="null"/> if cancelled.</summary>
         Task<string?> PickLyricsSourceAsync(string title);
+
+        /// <summary>
+        /// Shows a picker for one song: a .sng, or a song folder's song.ini or chart, which stands for the folder. Returns
+        /// the picked file's local path, or <see langword="null"/> if cancelled.
+        /// </summary>
+        Task<string?> PickSongAsync(string title);
     }
 }

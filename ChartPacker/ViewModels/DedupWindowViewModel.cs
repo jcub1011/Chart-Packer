@@ -36,6 +36,9 @@ namespace ChartPacker.ViewModels
     {
         private readonly DedupRequest _request;
         private readonly Func<string, bool> _hasDrafts;
+
+        // Whether Chart Builder has the song at a path open, so deleting it asks first (charter-spec §4.8).
+        private readonly Func<string, bool>? _isOpenInChartBuilder;
         private readonly SettingsService _settings;
         private readonly IConfirmationService _confirmation;
         private readonly IMergeWindowService _merge;
@@ -70,8 +73,10 @@ namespace ChartPacker.ViewModels
             IConfirmationService confirmation,
             IMergeWindowService merge,
             ITrash? trash,
-            DeletionLog log)
+            DeletionLog log,
+            Func<string, bool>? isOpenInChartBuilder = null)
         {
+            _isOpenInChartBuilder = isOpenInChartBuilder;
             _request = request;
             _hasDrafts = hasDrafts;
             _settings = settings;
@@ -421,6 +426,13 @@ namespace ChartPacker.ViewModels
             string button = string.Format(CultureInfo.CurrentCulture, Strings.DedupConfirmButtonFormat, TrashName);
             if (!await _confirmation.ConfirmAsync(Strings.DedupConfirmTitle, message, button))
                 return;
+
+            if (!await ChartBuilderSongs.ConfirmWriteAsync(
+                    _confirmation, _isOpenInChartBuilder, [.. items.Select(i => i.Victim)],
+                    Strings.ChartBuilderOpenDeleteOneFormat, Strings.ChartBuilderOpenDeleteManyFormat, Strings.DeleteAnywayButton))
+            {
+                return;
+            }
 
             _deleteCts?.Dispose();
             _deleteCts = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);

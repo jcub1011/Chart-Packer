@@ -62,6 +62,10 @@ namespace ChartPacker.ViewModels
         private readonly NoticeViewModel _notice;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
+        // The songs opened in Chart Builder, and what each was on disk when last read, to re-read them once it has
+        // changed them (charter-spec §4.8).
+        private readonly Dictionary<string, (SongEntry Entry, EntryStamp? Stamp)> _editedSongs = new(StringComparer.Ordinal);
+
         // Every scanned song, in scan order (by Position), whether or not it passes the filters.
         private readonly List<LibraryItemViewModel> _allItems = [];
 
@@ -460,23 +464,75 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanValidate))]
         private Task ValidateAsync() => _validatorWindow.ShowAsync(SelectedEntries);
 
-        // One song at a time, and not while a job may be writing it. Off altogether until Chart Builder opens songs.
-        private bool CanEditChart() => ChartBuilderLauncher.CanOpenSongs && SelectedCount == 1 && !Job.IsRunning;
+        // One song at a time, and not while a job may be writing it.
+        private bool CanEditChart() => SelectedCount == 1 && !Job.IsRunning;
 
-        /// <summary>Edit chart's tooltip, which says why it's off while Chart Builder can't open songs yet.</summary>
-        public string EditChartToolTip =>
-            ChartBuilderLauncher.CanOpenSongs ? Strings.EditChartToolTip : Strings.EditChartComingToolTip;
+        public string EditChartToolTip => Strings.EditChartToolTip;
+
+        /// <summary>
+        /// Asked before a song opens in Chart Builder, which can't see this app's drafts: whatever has to be done
+        /// first, such as saving or discarding them (charter-spec C2 item 4). False stops it.
+        /// </summary>
+        public Func<SongEntry, Task<bool>>? PrepareEditChart { get; set; }
 
         /// <summary>Opens the selected song in Chart Builder (charter-spec C2). Only one song is edited at a time.</summary>
         [RelayCommand(CanExecute = nameof(CanEditChart))]
-        private void EditChart()
+        private async Task EditChartAsync()
         {
             if (SelectedEntries is not [var song])
                 return;
+            if (PrepareEditChart is { } prepare && !await prepare(song))
+                return;
 
+            var stamp = await StampAsync(song);
             if (_chartBuilder.Start(BuilderArgs.ForSong(song.FullPath)) is { } problem)
+            {
                 _notice.ShowError(problem);
+                return;
+            }
+
+            _editedSongs[song.FullPath] = (song, stamp);
         }
+
+        /// <summary>
+        /// Re-reads the songs opened in Chart Builder that have changed since they were last read, as when the user comes
+        /// back from saving there (charter-spec §4.8). Chart Builder's processes aren't kept, so every song opened in it
+        /// is checked, for as long as this app runs.
+        /// </summary>
+        /// <returns>The songs that had changed.</returns>
+        public async Task<IReadOnlyList<SongEntry>> RefreshEditedSongsAsync()
+        {
+            var changed = new List<SongEntry>();
+            foreach (var (path, (entry, stamp)) in _editedSongs.ToList())
+            {
+                var now = await StampAsync(entry);
+                if (now == stamp)
+                    continue;
+
+                _editedSongs[path] = (entry, now);
+                changed.Add(entry);
+                if (_itemsByPath.TryGetValue(path, out var item))
+                {
+                    await ReloadSummaryAsync(item);
+                    _albumArt.Reload(item);
+                }
+            }
+
+            return changed;
+        }
+
+        /// <summary>What the song is on disk now, or null when it's gone or can't be read.</summary>
+        private static Task<EntryStamp?> StampAsync(SongEntry entry) => Task.Run(() =>
+        {
+            try
+            {
+                return EntryStamps.Capture(entry.FullPath, entry.Kind);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        });
 
         private bool CanDeduplicate() => FolderPath is not null && !Job.IsRunning;
 

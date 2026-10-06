@@ -2360,8 +2360,33 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="EditChartToolTip" xml:space="preserve">
     <value>Open the selected song's chart in Chart Builder. Select one song to edit it.</value>
   </data>
-  <data name="EditChartComingToolTip" xml:space="preserve">
-    <value>Editing charts comes with Chart Builder's chart editor.</value>
-    <comment>Edit chart's tooltip while Chart Builder can't open songs yet.</comment>
+  <data name="EditChartUnsavedTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="EditChartUnsavedMessageFormat" xml:space="preserve">
+    <value>{0} has metadata changes that aren't saved. Chart Builder opens the song as it is on disk, so save or discard them first.</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="ChartBuilderOpenTitle" xml:space="preserve">
+    <value>Open in Chart Builder</value>
+  </data>
+  <data name="ChartBuilderOpenSaveOneFormat" xml:space="preserve">
+    <value>Chart Builder has {0} open. It may overwrite these changes when it saves the song. Save anyway?</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="ChartBuilderOpenSaveManyFormat" xml:space="preserve">
+    <value>Chart Builder has {0} of these songs open. It may overwrite these changes when it saves them. Save anyway?</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="ChartBuilderOpenDeleteOneFormat" xml:space="preserve">
+    <value>Chart Builder has {0} open. Delete it anyway?</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="ChartBuilderOpenDeleteManyFormat" xml:space="preserve">
+    <value>Chart Builder has {0} of these songs open. Delete them anyway?</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="DeleteAnywayButton" xml:space="preserve">
+    <value>Delete anyway</value>
   </data>
 </root>

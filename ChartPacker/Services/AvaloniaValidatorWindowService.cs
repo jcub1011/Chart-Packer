@@ -31,7 +31,8 @@ namespace ChartPacker.Services
         SongDetailViewModel mainDetail,
         IVideoDurationProbe video,
         NoticeViewModel notice,
-        SongFileGate songFiles) : IValidatorWindowService
+        SongFileGate songFiles,
+        Func<string, bool>? isOpenInChartBuilder = null) : IValidatorWindowService
     {
         // How long the check runs before its progress is shown, so a quick one doesn't flash a dialog.
         private static readonly TimeSpan ProgressDelay = TimeSpan.FromMilliseconds(300);
@@ -64,11 +65,12 @@ namespace ChartPacker.Services
                 new FileRevealService(() => dialog),
                 songFiles,
                 confirmation,
-                saver);
+                saver,
+                isOpenInChartBuilder);
 
             // Songs are read as many at once as a library scan reads.
             int parallelism = Math.Max(settings.Settings.ScanParallelism, AppSettings.MinScanParallelism);
-            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, settings, confirmation);
+            var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, settings, confirmation, isOpenInChartBuilder);
             dialog.DataContext = viewModel;
             _ = viewModel.LoadAsync();
 

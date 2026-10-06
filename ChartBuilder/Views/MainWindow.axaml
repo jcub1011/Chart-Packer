@@ -16,6 +16,7 @@
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+N" Command="{Binding NewChartCommand}" />
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenChartCommand}" />
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
     </Window.KeyBindings>
 
@@ -66,9 +67,18 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
+
+        <!-- A Recent row: the song's name and when it was opened, its path under them. -->
+        <Style Selector="Button.recent">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
     </Window.Styles>
 
-    <!-- The home screen (charter-spec §8). New chart closes it and opens the Editor window in its place. -->
+    <!-- The home screen (charter-spec §8). New chart, or opening a song, closes it and opens the Editor window in its place. -->
     <Grid RowDefinitions="*,Auto">
         <StackPanel VerticalAlignment="Center"
                     HorizontalAlignment="Center"
@@ -95,10 +105,9 @@
                         <TextBlock Text="{x:Static res:Strings.HomeNewChartButton}" />
                     </StackPanel>
                 </Button>
-                <!-- Disabled until Chart Builder can open songs (CM2), which binds it to an open command. -->
                 <Button Classes="launch"
-                        IsEnabled="False"
-                        ToolTip.Tip="{x:Static res:Strings.HomeOpenChartComingToolTip}"
+                        Command="{Binding OpenChartCommand}"
+                        ToolTip.Tip="{x:Static res:Strings.HomeOpenChartToolTip}"
                         AutomationProperties.Name="{x:Static res:Strings.HomeOpenChartButton}">
                     <StackPanel Spacing="10">
                         <Viewbox Width="32" Height="32">
@@ -125,6 +134,41 @@
                     IsVisible="{Binding HasMessage}">
                 <SelectableTextBlock TextWrapping="Wrap" Text="{Binding Message}" />
             </Border>
+
+            <!-- The songs opened lately, the latest first. -->
+            <StackPanel Margin="0,12,0,0" Spacing="4" IsVisible="{Binding HasRecent}">
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.RecentHeading}" />
+                <Border BorderThickness="1"
+                        BorderBrush="{DynamicResource SubtleBorderBrush}"
+                        Background="{DynamicResource ToolbarGroupBrush}"
+                        CornerRadius="6"
+                        Padding="2">
+                    <ScrollViewer MaxHeight="200">
+                        <ItemsControl ItemsSource="{Binding Recent}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RecentSongItem">
+                                    <Button Classes="recent"
+                                            Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).OpenRecentCommand}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip.Tip="{Binding ToolTip}"
+                                            AutomationProperties.Name="{Binding Title}">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                                            <TextBlock Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                            <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="{Binding OpenedText}" />
+                                            <TextBlock Grid.Row="1"
+                                                       Grid.ColumnSpan="2"
+                                                       Classes="muted"
+                                                       FontSize="11"
+                                                       TextTrimming="PrefixCharacterEllipsis"
+                                                       Text="{Binding Path}" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
         </StackPanel>
 
         <!-- The hint, in a strip along the bottom like Chart Packer's notice bar. -->

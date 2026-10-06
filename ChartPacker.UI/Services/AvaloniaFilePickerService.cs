@@ -39,6 +39,16 @@ namespace ChartPacker.Services
             FileType(SharedStrings.LyricsSourceFileTypeFormat, [.. ChartFiles.Extensions, ".sng"], ["application/x-chart", "audio/midi"]),
         ];
 
+        // A folder can't be picked in the same dialog as a file, so a song folder is picked by a file in it.
+        private static readonly FilePickerFileType[] Songs =
+        [
+            new(SharedStrings.SongFileTypeName)
+            {
+                Patterns = ["*.sng", "song.ini", ChartFiles.MidiName, ChartFiles.ChartName],
+                MimeTypes = ["application/octet-stream", "audio/midi"],
+            },
+        ];
+
         public async Task<IReadOnlyList<string>> PickFilesAsync(string title)
         {
             if (topLevel() is not { } owner)
@@ -101,6 +111,8 @@ namespace ChartPacker.Services
         public Task<string?> PickChartAsync(string title) => PickOneAsync(title, Charts);
 
         public Task<string?> PickLyricsSourceAsync(string title) => PickOneAsync(title, LyricsSources);
+
+        public Task<string?> PickSongAsync(string title) => PickOneAsync(title, Songs);
 
         private async Task<string?> PickOneAsync(string title, IReadOnlyList<FilePickerFileType> types)
         {

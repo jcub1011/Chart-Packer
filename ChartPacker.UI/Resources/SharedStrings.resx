@@ -93,6 +93,10 @@
     <value>Charts ({0})</value>
     <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi".</comment>
   </data>
+  <data name="SongFileTypeName" xml:space="preserve">
+    <value>Songs (sng, song.ini, notes.mid, notes.chart)</value>
+    <comment>A file-picker filter: a .sng, or a file in a song folder, which stands for the folder.</comment>
+  </data>
   <data name="LyricsSourceFileTypeFormat" xml:space="preserve">
     <value>Charts and songs ({0})</value>
     <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi, sng".</comment>

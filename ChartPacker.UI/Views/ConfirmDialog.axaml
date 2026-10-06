@@ -15,6 +15,8 @@
         <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button x:Name="ConfirmButton" Click="OnConfirm" />
+            <!-- A second action, such as Discard beside Save; shown only when it's given. -->
+            <Button x:Name="SecondButton" Click="OnSecond" IsVisible="False" />
             <!-- Cancel is the default, so Enter and Escape both keep the changes. -->
             <Button Classes="accent"
                     Content="{x:Static res:SharedStrings.CancelButton}"

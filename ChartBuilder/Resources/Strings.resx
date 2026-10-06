@@ -88,10 +88,6 @@
   <data name="HomeOpenChartButton" xml:space="preserve">
     <value>Open chart</value>
   </data>
-  <data name="HomeOpenChartComingToolTip" xml:space="preserve">
-    <value>Open a song folder or .sng. Comes with the chart editor.</value>
-    <comment>Open chart is disabled until Chart Builder can open songs.</comment>
-  </data>
   <data name="HomeSettingsButton" xml:space="preserve">
     <value>Settings</value>
   </data>
@@ -99,7 +95,7 @@
     <value>Chart Builder's settings (Ctrl+,).</value>
   </data>
   <data name="HomeHint" xml:space="preserve">
-    <value>Drop audio files here to start a new chart. Opening charts comes later.</value>
+    <value>Drop audio files here to start a new chart, or a song folder or .sng to open it.</value>
   </data>
   <data name="ArgsUnknownOptionFormat" xml:space="preserve">
     <value>Chart Builder doesn't know the option {0}.</value>
@@ -108,10 +104,6 @@
   <data name="ArgsUnexpectedArgumentFormat" xml:space="preserve">
     <value>Chart Builder didn't expect {0} on its command line.</value>
     <comment>Started with bad command-line arguments. {0} is the argument.</comment>
-  </data>
-  <data name="OpenSongUnavailableFormat" xml:space="preserve">
-    <value>Chart Builder can't open songs yet, so {0} wasn't opened.</value>
-    <comment>{0} is the song's path.</comment>
   </data>
   <data name="CalibrateUnavailable" xml:space="preserve">
     <value>The calibration tool isn't in Chart Builder yet.</value>
@@ -308,5 +300,134 @@
   </data>
   <data name="InspectorSectionPlaceholder" xml:space="preserve">
     <value>Nothing here yet.</value>
+  </data>
+  <data name="HomeOpenChartToolTip" xml:space="preserve">
+    <value>Open a song folder or .sng in the editor (Ctrl+O).</value>
+  </data>
+  <data name="OpenSongPickerTitle" xml:space="preserve">
+    <value>Open a song: its .sng, or the song.ini or chart in its folder</value>
+  </data>
+  <data name="RecentHeading" xml:space="preserve">
+    <value>Recent</value>
+  </data>
+  <data name="RecentToday" xml:space="preserve">
+    <value>today</value>
+    <comment>When a recent song was last opened.</comment>
+  </data>
+  <data name="RecentYesterday" xml:space="preserve">
+    <value>yesterday</value>
+    <comment>When a recent song was last opened.</comment>
+  </data>
+  <data name="RecentOpenToolTipFormat" xml:space="preserve">
+    <value>Open {0}</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="OpeningSongFormat" xml:space="preserve">
+    <value>Opening {0}…</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="OpenSongMissingFormat" xml:space="preserve">
+    <value>{0} isn't there any more.</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="OpenSongLockedFormat" xml:space="preserve">
+    <value>{0} is already open in another Chart Builder.</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="OpenSongNoChartFormat" xml:space="preserve">
+    <value>{0} has no chart to open. Starting a chart in a song comes with Chart settings.</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="OpenSongTooLargeFormat" xml:space="preserve">
+    <value>{0}'s chart is too large to open.</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="OpenSongUnreadableFormat" xml:space="preserve">
+    <value>{0} couldn't be opened: {1}</value>
+    <comment>{0} is the song's path, {1} the error.</comment>
+  </data>
+  <data name="ImportTitle" xml:space="preserve">
+    <value>Import notes.chart</value>
+  </data>
+  <data name="ImportMessageFormat" xml:space="preserve">
+    <value>{0} has only a notes.chart, which is converted to MIDI to be edited. These don't come out exactly as the .chart has them:
+
+{1}
+
+Open it anyway?</value>
+    <comment>{0} is the song's name, {1} the list of what changed, one to a line.</comment>
+  </data>
+  <data name="ImportConfirmButton" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="ImportIssueSustainsFormat" xml:space="preserve">
+    <value>{0} ({1}): some sustains became plain notes, or the other way round</value>
+    <comment>{0} is the part, {1} the difficulty.</comment>
+  </data>
+  <data name="ImportIssueMarkingsFormat" xml:space="preserve">
+    <value>{0} ({1}): some notes changed what they are (HOPO, tap, cymbal, star power)</value>
+    <comment>{0} is the part, {1} the difficulty.</comment>
+  </data>
+  <data name="ImportIssueNotesChangedFormat" xml:space="preserve">
+    <value>{0} ({1}): some notes moved or changed lane</value>
+    <comment>{0} is the part, {1} the difficulty.</comment>
+  </data>
+  <data name="ImportIssueNotesLostFormat" xml:space="preserve">
+    <value>{0} ({1}): some notes were lost</value>
+    <comment>{0} is the part, {1} the difficulty.</comment>
+  </data>
+  <data name="ImportIssueTimesFormat" xml:space="preserve">
+    <value>{0}, at {1}</value>
+    <comment>{0} is what changed, {1} where, e.g. "0:42.1, 1:03.5".</comment>
+  </data>
+  <data name="ImportIssueMoreTimesFormat" xml:space="preserve">
+    <value>{0} and {1} more</value>
+    <comment>{0} is the first few times, {1} how many more there are.</comment>
+  </data>
+  <data name="LoadIssueNotice" xml:space="preserve">
+    <value>One thing in the chart couldn't be read as written, and was left out, as the games leave it out.</value>
+  </data>
+  <data name="LoadIssuesNoticeFormat" xml:space="preserve">
+    <value>{0} things in the chart couldn't be read as written, and were left out, as the games leave them out.</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="PlayToolTip" xml:space="preserve">
+    <value>Play (Space)</value>
+  </data>
+  <data name="PauseToolTip" xml:space="preserve">
+    <value>Pause (Space)</value>
+  </data>
+  <data name="PlayPauseButton" xml:space="preserve">
+    <value>Play or pause</value>
+  </data>
+  <data name="SpeedToolTip" xml:space="preserve">
+    <value>How fast the song plays</value>
+  </data>
+  <data name="SpeedPercentFormat" xml:space="preserve">
+    <value>{0}%</value>
+    <comment>A playback speed, e.g. "75%".</comment>
+  </data>
+  <data name="PitchCorrectionLabel" xml:space="preserve">
+    <value>Keep pitch</value>
+  </data>
+  <data name="PitchCorrectionToolTip" xml:space="preserve">
+    <value>Keep the song's pitch at speeds other than 100%.</value>
+  </data>
+  <data name="MetronomeLabel" xml:space="preserve">
+    <value>Metronome</value>
+  </data>
+  <data name="MetronomeToolTip" xml:space="preserve">
+    <value>Click on each beat of the chart's tempo map, and louder on each measure.</value>
+  </data>
+  <data name="AudioNoStems" xml:space="preserve">
+    <value>The song has no audio to play.</value>
+  </data>
+  <data name="AudioUnavailableFormat" xml:space="preserve">
+    <value>The audio can't be played: {0}</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="AudioTrackFailedFormat" xml:space="preserve">
+    <value>{0} can't be played: {1}</value>
+    <comment>{0} is the audio file, {1} the error.</comment>
   </data>
 </root>

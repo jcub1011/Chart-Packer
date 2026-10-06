@@ -28,6 +28,9 @@ public static class UserConfigPaths
     /// <summary>Chart Builder's settings file. Each app writes only its own (charter-spec §10).</summary>
     public static string BuilderSettingsFile => Path.Combine(ConfigFolder, "builder-settings.json");
 
+    /// <summary>Where Chart Builder holds a lock file for each song it has open (charter-spec §4.8, <c>SongLock</c>).</summary>
+    public static string LockFolder => Path.Combine(ConfigFolder, "locks");
+
     /// <summary>
     /// Where both apps write their logs: <c>%LOCALAPPDATA%\ChartPacker\Logs</c>,
     /// <c>~/Library/Logs/ChartPacker</c>, or <c>$XDG_STATE_HOME/ChartPacker/logs</c>

@@ -5,7 +5,10 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
+using ChartPacker.Audio.Playback;
+using ChartPacker.Core.Charting;
 using ChartPacker.Core.Launching;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Services;
 using ChartPacker.ViewModels.Settings;
 
@@ -15,7 +18,13 @@ namespace ChartBuilder.Services
     /// Chart Builder's top-level windows: the launcher (home screen) and the Editor. Only one is open at a time,
     /// and closing the Editor brings the launcher back.
     /// </summary>
-    public sealed class BuilderWindows(IClassicDesktopStyleApplicationLifetime desktop, BuilderSettingsService settings) : IEditorWindowService
+    /// <param name="openOutput">Opens the audio output at a rate, for the Editor's playback.</param>
+    /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
+    public sealed class BuilderWindows(
+        IClassicDesktopStyleApplicationLifetime desktop,
+        BuilderSettingsService settings,
+        Func<int, IAudioOutput> openOutput,
+        string lockFolder) : IEditorWindowService
     {
         /// <summary>Makes the launcher the app's main window, opening <paramref name="args"/> over it once it's showing.</summary>
         /// <remarks>Called before the app has started, so the lifetime shows it.</remarks>
@@ -38,7 +47,23 @@ namespace ChartBuilder.Services
         public void OpenEditor(IReadOnlyList<string> audioFiles)
         {
             var editor = new EditorWindow();
-            editor.DataContext = new EditorWindowViewModel(settings, SettingsWindowFor(editor), audioFiles);
+            Open(editor, new EditorWindowViewModel(settings, SettingsWindowFor(editor), audioFiles));
+        }
+
+        public void OpenSong(OpenedSong song, SongLock songLock)
+        {
+            var editor = new EditorWindow();
+            var viewModel = new EditorWindowViewModel(settings, SettingsWindowFor(editor), song, songLock, openOutput);
+            Open(editor, viewModel);
+            _ = viewModel.Playback.OpenAsync();
+        }
+
+        private void Open(EditorWindow editor, EditorWindowViewModel viewModel)
+        {
+            editor.DataContext = viewModel;
+
+            // The song's audio and lock go with the window.
+            editor.Closed += (_, _) => viewModel.Dispose();
 
             // Back to the launcher when the user closes the editor, but not when the app or OS is shutting down. It
             // opens while the editor is still closing, so the app, which exits when its last window closes, stays up.
@@ -57,7 +82,13 @@ namespace ChartBuilder.Services
         private (MainWindow Window, MainWindowViewModel ViewModel) CreateLauncher()
         {
             var launcher = new MainWindow();
-            var viewModel = new MainWindowViewModel(this, SettingsWindowFor(launcher));
+            var viewModel = new MainWindowViewModel(
+                this,
+                SettingsWindowFor(launcher),
+                new AvaloniaFilePickerService(() => launcher),
+                new AvaloniaConfirmationService(() => launcher),
+                settings,
+                lockFolder);
             launcher.DataContext = viewModel;
             return (launcher, viewModel);
         }

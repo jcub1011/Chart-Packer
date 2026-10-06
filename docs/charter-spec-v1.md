@@ -276,6 +276,22 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
   `SmoothPosition`, which interpolates between those updates with a monotonic clock, scaled by the
   speed, and is pulled back onto `Position` when they differ.
 
+*Settled in CM2:*
+
+- **The grains played.** An output frame of a stretched hop is the last grain carrying on and the
+  next fading in, weighted by the window. The position it stands for is the same blend of the two
+  grains' positions (`TimeStretcher.PlayedPosition`). `StemPlayer` maps each grain in eight pieces,
+  so the map follows the fade. Where two grains are nearly as loud as each other, a click in the
+  stems is heard twice, a few milliseconds apart, which no one position can match.
+- **Laying sounds over the mix.** `StemPlayer.Sounds` is an `ISoundSchedule` the playback thread
+  asks for the sounds starting in each chunk's stretch of the mix. A sound starts where the frames
+  played first reach it. A new schedule is handed over whole, never edited, and a seek drops the
+  sounds playing. Played as mixed at another speed, sounds are read at that speed, so the device's
+  resampling leaves them at their own pitch.
+- **`SmoothPosition`** runs on a `TimeProvider` (the system's monotonic clock), takes up half of how
+  far it is from `Position` each time that moves, and all of it past 50 ms or after a seek, a change
+  of speed, playing or pausing.
+
 **Latency and speed.** The calibrated latency ([C11](#c11-calibration-tool)) is in real time, and
 `Position` is in song time. Everything drawn against the audio is drawn at
 **`SmoothPosition` − latency × speed**, so at 50% speed a 40 ms latency is 20 ms of song.
@@ -603,11 +619,11 @@ Acceptance criteria:
 1. **Opening a song.**
    - In Chart Packer, the **Edit chart** button on the toolbar runs `ChartBuilder <song path>`
      ([§4.8](#48-launching-and-coordination)). It is enabled only while exactly one song is
-     selected and no job (pack, unpack, merge, validate, deduplicate) is running. Until Chart
-     Builder can open songs (CM2), it stays disabled, and its tooltip says it comes with the
-     chart editor (`ChartBuilderLauncher.CanOpenSongs`).
-   - In Chart Builder, songs open from **Open** and the recent songs on the home screen, or by
-     dropping a song folder or `.sng` on the window.
+     selected and no job (pack, unpack, merge, validate, deduplicate) is running.
+   - In Chart Builder, songs open from **Open chart** (Ctrl+O) and the recent songs on the home
+     screen, or by dropping a song folder or `.sng` on the window. A folder is picked by a file in
+     it (its `song.ini` or chart), as one dialog can't pick both files and folders, and a file
+     dropped from a song folder opens the folder too.
    - Each Chart Builder window has one chart open. A song that another Chart Builder already has
      open isn't opened a second time ([§4.8](#48-launching-and-coordination)).
 2. **Which chart is opened.** `ChartReader.Pick` chooses: `notes.mid` if there is one, otherwise
@@ -1880,7 +1896,7 @@ fails the run if anything there changes anyway.
 | --------- | -------- | ------------- |
 | **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartPacker.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and the C1 wizard moved from Chart Packer as it is. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; the wizard opens from Chart Builder's home screen and from dropped audio files |
 | **CM1: Model, writer and lint engine** | `EditableChart` and friends, `MidiChartLoader`, `MidiChartWriter`, passthrough and re-ticking, the game-view projection and extended read-back check, `MidiChartReader` reading dynamics, commands and undo. The lint engine: rule scopes, `Finding`'s chart location, and chart quick fixes. The `SongFolderFiles` order change. And the tests. | Every round-trip and writer-vs-reader test passes, and AC C2.4; zero AOT warnings |
-| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart and Chart settings (without **Detect from audio**), C2 open and import, with **Edit chart** turned on (`ChartBuilderLauncher.CanOpenSongs`), `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), and the player and highway view models moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
+| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart and Chart settings (without **Detect from audio**), C2 open and import, with **Edit chart** turned on, `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), and the player and highway view models moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
 | **CM3: Drums and GHL** | C6 all three drum variants and conversion, C7 GHL, C8 phrases and events, and the drums and phrase lint rules | AC C6, C7 and C8 pass |
 | **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and new chart's **Detect from audio** | AC C12, C13 and C14 pass |
 | **CM5: Authoring tools** | C9 reduction, C15 record mode, clipboard and transforms, C16 lint in the library, C18 preview and suggested difficulty | AC C9, C15, C16 and C18 pass |

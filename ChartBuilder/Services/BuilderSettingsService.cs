@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Launching;
 using ChartPacker.Core.Settings;
 
 namespace ChartBuilder.Services
@@ -39,6 +40,9 @@ namespace ChartBuilder.Services
         private static void Sanitize(BuilderSettings settings)
         {
             settings.DefaultCharterName ??= "";
+            settings.RecentSongs = [.. (settings.RecentSongs ?? []).Where(s => s is not null && !string.IsNullOrWhiteSpace(s.Path)).Take(RecentSongs.Max)];
+            foreach (var song in settings.RecentSongs)
+                song.Title ??= "";
 
             if (!NewChartSettings.Resolutions.Contains(settings.DefaultChartResolution))
                 settings.DefaultChartResolution = NewChartSettings.DefaultResolution;

@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Layout;
+using ChartPacker.Core.Launching;
 
 namespace ChartBuilder.Services
 {
@@ -46,5 +48,8 @@ namespace ChartBuilder.Services
 
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
+
+        /// <summary>The songs opened lately, the latest first, as the home screen lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
+        public List<RecentSong> RecentSongs { get; set; } = [];
     }
 }

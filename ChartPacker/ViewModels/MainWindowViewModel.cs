@@ -1,5 +1,9 @@
+using System;
+using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using ChartPacker.Services;
 using CommunityToolkit.Mvvm.Input;
@@ -35,6 +39,70 @@ namespace ChartPacker.ViewModels
                 if (e.PropertyName == nameof(LibraryViewModel.SelectedEntries))
                     _ = Detail.ShowAsync(Library.SelectedEntries);
             };
+            Library.PrepareEditChart = PrepareEditChartAsync;
+        }
+
+        /// <summary>
+        /// Called as the window is activated, as when the user comes back from Chart Builder: re-reads the songs opened
+        /// in it that have changed, and the inspector's, if it's showing one of them (charter-spec §4.8). Never throws.
+        /// </summary>
+        public async Task OnActivatedAsync()
+        {
+            try
+            {
+                var changed = await Library.RefreshEditedSongsAsync();
+                var shown = Library.SelectedEntries;
+                bool showsChanged = changed.Any(c => shown.Any(s => s.FullPath == c.FullPath));
+
+                // Unsaved changes in the inspector are kept as they are rather than shown over.
+                if (showsChanged && !Detail.HasDrafts && !Detail.IsSaving)
+                    await Detail.ShowAsync(shown, inPlace: true);
+            }
+            catch (Exception ex)
+            {
+                // Nothing awaits this, so anything not caught here would be lost.
+                Trace.TraceError($"Re-reading the songs Chart Builder changed failed: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// Before <paramref name="song"/> opens in Chart Builder, which opens it as it is on disk: saves or discards its
+        /// unsaved metadata changes, as the user chooses (charter-spec C2 item 4).
+        /// </summary>
+        /// <returns>Whether to open it.</returns>
+        private async Task<bool> PrepareEditChartAsync(SongEntry song)
+        {
+            if (!_drafts.HasDrafts(song.FullPath))
+                return true;
+
+            var choice = await _confirmation.ChooseAsync(
+                Strings.EditChartUnsavedTitle,
+                string.Format(CultureInfo.CurrentCulture, Strings.EditChartUnsavedMessageFormat, song.DisplayName),
+                Strings.SaveButton,
+                Strings.DiscardButton);
+            switch (choice)
+            {
+                case ConfirmChoice.First:
+                    // The inspector shows the one song selected, so its Save saves it, asking as it does about invalid
+                    // metadata; a save that fails, or is called off, leaves the drafts.
+                    if (Detail.SaveCommand.CanExecute(null))
+                        await Detail.SaveCommand.ExecuteAsync(null);
+                    return !_drafts.HasDrafts(song.FullPath);
+
+                case ConfirmChoice.Second:
+                    if (Detail.DiscardCommand.CanExecute(null))
+                        Detail.DiscardCommand.Execute(null);
+                    if (_drafts.HasDrafts(song.FullPath))
+                    {
+                        _drafts.Get(song.FullPath).Clear();
+                        _drafts.NotifyChanged(song.FullPath);
+                    }
+
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         /// <summary>The window title, with the program version from the project file.</summary>

@@ -49,6 +49,9 @@ namespace ChartPacker
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);
 
                 var videoProbe = new FfmpegVideoDurationProbe();
+                // Whether Chart Builder has a song open, so Chart Packer asks before writing to it (charter-spec §4.8).
+                Func<string, bool> isOpenInChartBuilder = path => SongLock.IsHeld(path, UserConfigPaths.LockFolder);
+
                 // A Merge window belongs to whichever window opens it: the main window, or the Deduplicate window.
                 Func<Func<Window?>, IMergeWindowService> mergeWindowFor = owner =>
                     new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe);
@@ -58,10 +61,12 @@ namespace ChartPacker
                     settings,
                     player,
                     mergeWindowFor,
-                    Path.Combine(UserConfigPaths.ConfigFolder, "dedup-log.jsonl"));
-                var detail = new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation);
+                    Path.Combine(UserConfigPaths.ConfigFolder, "dedup-log.jsonl"),
+                    isOpenInChartBuilder);
+                var detail = new SongDetailViewModel(
+                    drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, isOpenInChartBuilder: isOpenInChartBuilder);
                 var validatorWindow = new AvaloniaValidatorWindowService(
-                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles);
+                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, isOpenInChartBuilder);
                 var library = new LibraryViewModel(
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, new ChartBuilderLauncher(), notice);
                 var settingsWindow = new AvaloniaSettingsWindowService(

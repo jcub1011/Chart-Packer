@@ -48,6 +48,9 @@ namespace ChartPacker.ViewModels
         private readonly JobViewModel _job;
         private readonly DraftSaver _saver;
         private readonly IConfirmationService? _confirmation;
+
+        // Whether Chart Builder has the song at a path open, so saving asks first (charter-spec §4.8).
+        private readonly Func<string, bool>? _isOpenInChartBuilder;
         private readonly SettingsService _settings;
         private readonly int _parallelism;
         private readonly CancellationTokenSource _closing = new();
@@ -97,8 +100,10 @@ namespace ChartPacker.ViewModels
             JobViewModel job,
             DraftSaver saver,
             SettingsService settings,
-            IConfirmationService? confirmation = null)
+            IConfirmationService? confirmation = null,
+            Func<string, bool>? isOpenInChartBuilder = null)
         {
+            _isOpenInChartBuilder = isOpenInChartBuilder;
             ArgumentOutOfRangeException.ThrowIfLessThan(parallelism, 1);
             _entries = entries;
             _drafts = drafts;
@@ -358,6 +363,14 @@ namespace ChartPacker.ViewModels
                 // The drafts, or the job, may have moved on while the dialog was open.
                 if (!CanSaveAll())
                     return;
+            }
+
+            if (!await ChartBuilderSongs.ConfirmWriteAsync(
+                    _confirmation, _isOpenInChartBuilder, [.. SongsToSave.Select(s => s.Entry)],
+                    Strings.ChartBuilderOpenSaveOneFormat, Strings.ChartBuilderOpenSaveManyFormat, Strings.SaveAnywayButton)
+                || !CanSaveAll())
+            {
+                return;
             }
 
             var targets = SongsToSave

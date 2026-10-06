@@ -104,6 +104,9 @@ namespace ChartPacker.ViewModels
         private readonly IFileRevealService? _reveal;
         private readonly SongFileGate _songFiles;
         private readonly IConfirmationService? _confirmation;
+
+        // Whether Chart Builder has the song at a path open, so saving asks first (charter-spec §4.8).
+        private readonly Func<string, bool>? _isOpenInChartBuilder;
         private readonly DraftSaver _saver;
         private CancellationTokenSource? _loadCts;
 
@@ -189,8 +192,10 @@ namespace ChartPacker.ViewModels
             IFileRevealService? reveal = null,
             SongFileGate? songFiles = null,
             IConfirmationService? confirmation = null,
-            DraftSaver? saver = null)
+            DraftSaver? saver = null,
+            Func<string, bool>? isOpenInChartBuilder = null)
         {
+            _isOpenInChartBuilder = isOpenInChartBuilder;
             _drafts = drafts;
             _downloads = downloads;
             _reveal = reveal;
@@ -1468,6 +1473,17 @@ namespace ChartPacker.ViewModels
                     return;
                 dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
             }
+
+            if (!await ChartBuilderSongs.ConfirmWriteAsync(
+                    _confirmation, _isOpenInChartBuilder, [.. dirty.Select(s => s.Entry)],
+                    Strings.ChartBuilderOpenSaveOneFormat, Strings.ChartBuilderOpenSaveManyFormat, Strings.SaveAnywayButton))
+            {
+                return;
+            }
+
+            if (!ReferenceEquals(entries, _entries) || !CanSave())
+                return;
+            dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
 
             CancelAdd();
             IsSaving = true;
