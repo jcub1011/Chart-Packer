@@ -215,11 +215,15 @@ public static class MidiChartLoader
                 : null;
     }
 
+    /// <summary>The anchor event's text for an anchor at <paramref name="microseconds"/> of audio, as <see cref="AnchorOf"/> reads it.</summary>
+    internal static string AnchorTextOf(long microseconds) =>
+        AnchorStart + microseconds.ToString(CultureInfo.InvariantCulture) + AnchorEnd;
+
     /// <summary>Whether a meta event of <paramref name="type"/> is a text event: any text type but the track name.</summary>
-    private static bool IsText(int type) => type is >= 0x01 and <= 0x09 and not 0x03;
+    internal static bool IsText(int type) => type is >= 0x01 and <= 0x09 and not 0x03;
 
     /// <summary>Whether a meta event of <paramref name="type"/> is a text event YARG reads, as <see cref="MidiTrackNotes"/> takes them.</summary>
-    private static bool IsReadText(int type) => type is 0x01 or (>= 0x04 and <= 0x09);
+    internal static bool IsReadText(int type) => type is 0x01 or (>= 0x04 and <= 0x09);
 
     private static RawEvent RawOf(byte[] bytes, MidiEvent e) => new(e.Tick, MidiMessage.Of(bytes, e).Bytes);
 
