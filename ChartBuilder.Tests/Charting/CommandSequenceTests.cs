@@ -116,7 +116,7 @@ public sealed class CommandSequenceTests
     /// Makes random commands of every kind from what a chart holds, keeping to what saves and reads back as it is (no
     /// fifth pad on drums that aren't 5-lane, no drum fills or big rock endings moved about <c>[coda]</c>).
     /// </summary>
-    private sealed class RandomCommands(Random random)
+    internal sealed class RandomCommands(Random random)
     {
         private const int Snap = 60;
         private const int Snaps = 256;
