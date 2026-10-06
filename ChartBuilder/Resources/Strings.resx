@@ -327,6 +327,13 @@
   <data name="HomeNewChartToolTip" xml:space="preserve">
     <value>Create a chart from scratch, with or without audio (Ctrl+N).</value>
   </data>
+  <data name="HomeOpenChartButton" xml:space="preserve">
+    <value>Open chart</value>
+  </data>
+  <data name="HomeOpenChartComingToolTip" xml:space="preserve">
+    <value>Open a song folder or .sng. Comes with the chart editor.</value>
+    <comment>Open chart is disabled until Chart Builder can open songs.</comment>
+  </data>
   <data name="HomeSettingsButton" xml:space="preserve">
     <value>Settings</value>
   </data>

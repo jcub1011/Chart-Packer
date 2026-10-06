@@ -283,8 +283,8 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
 
 - **Its own composition root, `MainWindow` and `ViewLocator`**, wired by hand as Chart Packer's
   are. Settings are Chart Builder's own ([§10](#10-settings)).
-- **Home screen**, shown when no song is given on the command line: **New chart**, **Open** (a
-  folder or `.sng`) and recent songs. Opening a song replaces it with the editor, which fills the
+- **Home screen**, shown when no song is given on the command line: icon tiles for **New chart**,
+  **Open chart** (a folder or `.sng`) and **Settings**, and recent songs. Opening a song replaces it with the editor, which fills the
   main window. Closing the song goes back to the home screen.
 - **`ChartEditorView` / `ChartEditorViewModel`**, added to the explicit mapping in `ViewLocator`
   (there is no reflection-based lookup).
@@ -1491,7 +1491,10 @@ editor, with the editor's tools in its toolbar.
 ```txt
 ┌ Chart Builder ─────────────────────────────────────────────────────────┐
 │                                                                         │
-│   [+ New chart]    [Open folder…]    [Open .sng…]                       │
+│              ┌────────────┐  ┌────────────┐  ┌────────────┐             │
+│              │   (icon)   │  │   (icon)   │  │   (icon)   │             │
+│              │ New chart  │  │ Open chart │  │  Settings  │             │
+│              └────────────┘  └────────────┘  └────────────┘             │
 │                                                                         │
 │   Recent                                                                │
 │   ┌───────────────────────────────────────────────────────────────────┐ │
