@@ -52,8 +52,5 @@ public static class NewChartLength
     }
 
     /// <summary><paramref name="length"/> as <see cref="TryParse"/> reads it: <c>M:SS</c>, or <c>H:MM:SS</c> from an hour.</summary>
-    public static string Format(TimeSpan length) =>
-        length.TotalHours >= 1
-            ? ((int)length.TotalHours).ToString(CultureInfo.InvariantCulture) + length.ToString(@"\:mm\:ss", CultureInfo.InvariantCulture)
-            : ((int)length.TotalMinutes).ToString(CultureInfo.InvariantCulture) + length.ToString(@"\:ss", CultureInfo.InvariantCulture);
+    public static string Format(TimeSpan length) => SongTime.Format(length);
 }

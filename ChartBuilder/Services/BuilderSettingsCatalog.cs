@@ -48,7 +48,7 @@ namespace ChartBuilder.Services
                 ]);
         }
 
-        /// <summary>A resolution as the new-chart wizard and Settings show it, e.g. "480 ticks per beat".</summary>
+        /// <summary>A resolution as Settings shows it, e.g. "480 ticks per beat".</summary>
         public static string ResolutionLabel(int resolution) =>
             string.Format(CultureInfo.CurrentCulture, Strings.ChartResolutionFormat, resolution);
     }

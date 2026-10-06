@@ -1,0 +1,93 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:res="using:ChartBuilder.Resources"
+                    xmlns:ctl="using:ChartPacker.Controls"
+                    xmlns:bctl="using:ChartBuilder.Controls">
+
+    <!-- The Editor's side panels (EditorSidePanel.cs): a compact tab along the top, like a docked tool window, or,
+         collapsed, a narrow strip along the window's edge with the tab's title turned on its side. -->
+    <ControlTheme x:Key="{x:Type bctl:EditorSidePanel}" TargetType="bctl:EditorSidePanel">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <Panel Name="PART_Expanded" Background="{DynamicResource SurfaceBrush}">
+                        <!-- The tab strip's band, which the collapse button sits at the right of. -->
+                        <Border Height="34"
+                                VerticalAlignment="Top"
+                                Background="{DynamicResource ToolbarBrush}"
+                                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                BorderThickness="0,0,0,1" />
+                        <TabControl Padding="0">
+                            <TabItem Header="{TemplateBinding Title}"
+                                     Content="{TemplateBinding Body}"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     MinHeight="34"
+                                     Padding="12,0" />
+                        </TabControl>
+                        <Button Classes="tool"
+                                Margin="0,3,4,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Command="{TemplateBinding ToggleCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.CollapsePanelToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.CollapsePanelToolTip}">
+                            <ctl:LineIcon Name="PART_Chevron" Data="{DynamicResource PanelCollapseStroke}" />
+                        </Button>
+                    </Panel>
+                    <Border Name="PART_Strip"
+                            Width="{x:Static bctl:EditorSidePanel.StripWidth}"
+                            Background="{DynamicResource ToolbarBrush}"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}">
+                        <Button Name="PART_StripTab"
+                                Padding="4,12"
+                                Margin="0,4,0,0"
+                                CornerRadius="4"
+                                Background="Transparent"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                VerticalAlignment="Top"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Command="{TemplateBinding ToggleCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.ExpandPanelToolTip}"
+                                AutomationProperties.Name="{TemplateBinding Title}">
+                            <!-- Here rather than in the theme, which can't reach into the button's own template. -->
+                            <Button.Styles>
+                                <Style Selector="Button#PART_StripTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+                                </Style>
+                            </Button.Styles>
+                            <LayoutTransformControl>
+                                <LayoutTransformControl.LayoutTransform>
+                                    <RotateTransform Angle="90" />
+                                </LayoutTransformControl.LayoutTransform>
+                                <TextBlock Text="{TemplateBinding Title}" />
+                            </LayoutTransformControl>
+                        </Button>
+                    </Border>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+
+        <!-- Expanded, or only the strip. Set here rather than on the parts, which a style can't override. -->
+        <Style Selector="^ /template/ Border#PART_Strip">
+            <Setter Property="IsVisible" Value="False" />
+            <Setter Property="BorderThickness" Value="0,0,1,0" />
+        </Style>
+        <Style Selector="^:collapsed /template/ Border#PART_Strip">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="^:collapsed /template/ Panel#PART_Expanded">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+
+        <!-- Along the right edge: the chevron points that way, and the strip's line is on its inner side. -->
+        <Style Selector="^:right /template/ ctl|LineIcon#PART_Chevron">
+            <Setter Property="RenderTransform" Value="scaleX(-1)" />
+        </Style>
+        <Style Selector="^:right /template/ Border#PART_Strip">
+            <Setter Property="BorderThickness" Value="1,0,0,0" />
+        </Style>
+    </ControlTheme>
+</ResourceDictionary>

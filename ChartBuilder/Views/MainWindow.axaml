@@ -68,7 +68,7 @@
         </Style>
     </Window.Styles>
 
-    <!-- The home screen (charter-spec §8). The chart editor replaces it once a song is open. -->
+    <!-- The home screen (charter-spec §8). New chart closes it and opens the Editor window in its place. -->
     <Grid RowDefinitions="*,Auto">
         <StackPanel VerticalAlignment="Center"
                     HorizontalAlignment="Center"
