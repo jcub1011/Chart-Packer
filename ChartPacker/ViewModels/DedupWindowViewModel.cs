@@ -198,7 +198,7 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial string ResultSummary { get; set; } = "";
 
-        public string CloseLabel => IsDeleting ? Strings.DedupStop : IsAnalyzing ? Strings.CancelButton : Strings.CloseButton;
+        public string CloseLabel => IsDeleting ? Strings.DedupStop : IsAnalyzing ? SharedStrings.CancelButton : Strings.CloseButton;
 
         /// <summary>What the window changed, once it's closed.</summary>
         public DedupWindowResult Result => new([.. _removed], OutputsChanged);

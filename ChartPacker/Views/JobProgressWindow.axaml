@@ -221,10 +221,10 @@
                 </StackPanel>
                 <Button Grid.Column="1"
                         VerticalAlignment="Center"
-                        Content="{x:Static res:Strings.CancelButton}"
+                        Content="{x:Static res:SharedStrings.CancelButton}"
                         Command="{Binding CancelCommand}"
                         IsVisible="{Binding IsRunning}"
-                        AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                        AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
             </Grid>
         </Border>
 

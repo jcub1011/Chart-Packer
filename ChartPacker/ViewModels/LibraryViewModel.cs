@@ -13,6 +13,7 @@ using Avalonia.Controls.Selection;
 using Avalonia.Threading;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
+using ChartPacker.Core.Launching;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
@@ -57,7 +58,7 @@ namespace ChartPacker.ViewModels
         private readonly IValidatorWindowService _validatorWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
-        private readonly INewChartWindowService _newChartWindow;
+        private readonly IChartBuilderLauncher _chartBuilder;
         private readonly NoticeViewModel _notice;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
 
@@ -98,8 +99,8 @@ namespace ChartPacker.ViewModels
         /// <param name="validatorWindow">Shows the Validator window for the selected songs.</param>
         /// <param name="reveal">Shows the selected songs in the file manager.</param>
         /// <param name="downloads">Saves copies of the selected songs as song folders.</param>
-        /// <param name="newChartWindow">Shows the New chart wizard.</param>
-        /// <param name="notice">Says where a new chart was made.</param>
+        /// <param name="chartBuilder">Starts Chart Builder to edit the selected song's chart.</param>
+        /// <param name="notice">Says why Chart Builder couldn't be started.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -111,7 +112,7 @@ namespace ChartPacker.ViewModels
             IValidatorWindowService validatorWindow,
             IFileRevealService reveal,
             IDownloadService downloads,
-            INewChartWindowService newChartWindow,
+            IChartBuilderLauncher chartBuilder,
             NoticeViewModel notice)
         {
             _folderPicker = folderPicker;
@@ -122,7 +123,7 @@ namespace ChartPacker.ViewModels
             _validatorWindow = validatorWindow;
             _reveal = reveal;
             _downloads = downloads;
-            _newChartWindow = newChartWindow;
+            _chartBuilder = chartBuilder;
             _notice = notice;
             Player = player;
             Player.PropertyChanged += (_, e) =>
@@ -244,6 +245,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
         public partial int SelectedCount { get; set; }
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
@@ -458,49 +460,22 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanValidate))]
         private Task ValidateAsync() => _validatorWindow.ShowAsync(SelectedEntries);
 
-        /// <summary>Opens the New chart wizard with no audio files yet.</summary>
-        [RelayCommand]
-        private Task NewChartAsync() => NewChartAsync([]);
+        // One song at a time, and not while a job may be writing it. Off altogether until Chart Builder opens songs.
+        private bool CanEditChart() => ChartBuilderLauncher.CanOpenSongs && SelectedCount == 1 && !Job.IsRunning;
 
-        /// <summary>
-        /// Opens the New chart wizard with <paramref name="audioFiles"/>, e.g. ones dropped on the main window.
-        /// A song made inside the library's folder is listed by a rescan and selected; either way the
-        /// notice says where it was made.
-        /// </summary>
-        public async Task NewChartAsync(IReadOnlyList<string> audioFiles)
+        /// <summary>Edit chart's tooltip, which says why it's off while Chart Builder can't open songs yet.</summary>
+        public string EditChartToolTip =>
+            ChartBuilderLauncher.CanOpenSongs ? Strings.EditChartToolTip : Strings.EditChartComingToolTip;
+
+        /// <summary>Opens the selected song in Chart Builder (charter-spec C2). Only one song is edited at a time.</summary>
+        [RelayCommand(CanExecute = nameof(CanEditChart))]
+        private void EditChart()
         {
-            if (await _newChartWindow.ShowAsync(audioFiles, FolderPath) is not { } created)
+            if (SelectedEntries is not [var song])
                 return;
 
-            if (!IsListable(created) || !CanRescan())
-            {
-                _notice.ShowSaved(string.Format(CultureInfo.CurrentCulture, Strings.NewChartCreatedOutsideFormat, created), [created]);
-                return;
-            }
-
-            _notice.ShowSaved(string.Format(CultureInfo.CurrentCulture, Strings.NewChartCreatedFormat, Path.GetFileName(created)), [created]);
-            if (!await StartScan(FolderPath!, _settings.Settings.ScanMaxDepth))
-                return;
-
-            // Found under the library's folder as the file system spells it, which may differ in case from the path picked.
-            var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            string target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(created));
-            if (Entries.FirstOrDefault(i => string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(i.Entry.FullPath)), target, comparison)) is { } item)
-                Selection.SelectedIndex = Entries.IndexOf(item);
-        }
-
-        /// <summary>Whether a scan of the library's folder, to its depth, finds the song folder <paramref name="path"/>.</summary>
-        private bool IsListable(string path)
-        {
-            if (FolderPath is null)
-                return false;
-
-            string relative = Path.GetRelativePath(Path.GetFullPath(FolderPath), Path.GetFullPath(path));
-            if (relative == "." || relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
-                return false;
-
-            int depth = relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries).Length;
-            return depth <= _settings.Settings.ScanMaxDepth;
+            if (_chartBuilder.Start(BuilderArgs.ForSong(song.FullPath)) is { } problem)
+                _notice.ShowError(problem);
         }
 
         private bool CanDeduplicate() => FolderPath is not null && !Job.IsRunning;
@@ -983,6 +958,7 @@ namespace ChartPacker.ViewModels
             MergeCommand.NotifyCanExecuteChanged();
             ValidateCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
+            EditChartCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Charting;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Library;
@@ -131,14 +130,5 @@ namespace ChartPacker.Services
 
         /// <summary>The difficulty last chosen for each instrument, by name. An instrument not listed shows Expert.</summary>
         public Dictionary<string, string>? HighwayDifficulties { get; set; }
-
-        /// <summary>The name the new-chart wizard fills <c>charter</c> in with. Empty for none.</summary>
-        public string DefaultCharterName { get; set; } = "";
-
-        /// <summary>The resolution, in ticks per beat, the new-chart wizard starts on: one of <see cref="NewChartSettings.Resolutions"/>.</summary>
-        public int DefaultChartResolution { get; set; } = NewChartSettings.DefaultResolution;
-
-        /// <summary>The folder the last new chart was made in, which the wizard starts on. Null for the library folder.</summary>
-        public string? LastNewChartFolder { get; set; }
     }
 }

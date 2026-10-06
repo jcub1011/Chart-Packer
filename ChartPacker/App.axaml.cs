@@ -62,12 +62,11 @@ namespace ChartPacker
                 var detail = new SongDetailViewModel(drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation);
                 var validatorWindow = new AvaloniaValidatorWindowService(
                     () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles);
-                var newChartWindow = new AvaloniaNewChartWindowService(() => window, settings);
                 var library = new LibraryViewModel(
-                    folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, newChartWindow, notice);
+                    folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, new ChartBuilderLauncher(), notice);
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
-                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway, downloads, settings), settingsPicker, settings.Save));
+                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway, downloads), settingsPicker, settings.Save));
 
                 window.DataContext = new MainWindowViewModel(
                     library,

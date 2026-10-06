@@ -18,10 +18,10 @@
                 MinWidth="80"
                 HorizontalContentAlignment="Center"
                 Classes="accent"
-                Content="{x:Static res:Strings.OkButton}"
+                Content="{x:Static res:SharedStrings.OkButton}"
                 IsDefault="True"
                 IsCancel="True"
                 Click="OnOk"
-                AutomationProperties.Name="{x:Static res:Strings.OkButton}" />
+                AutomationProperties.Name="{x:Static res:SharedStrings.OkButton}" />
     </StackPanel>
 </Window>

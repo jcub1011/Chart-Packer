@@ -132,12 +132,13 @@
                         </Button>
                         <Button Classes="labelled"
                                 Margin="2,0,0,0"
-                                Command="{Binding Library.NewChartCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.NewChartToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.NewChartButton}">
+                                Command="{Binding Library.EditChartCommand}"
+                                ToolTip.Tip="{Binding Library.EditChartToolTip}"
+                                ToolTip.ShowOnDisabled="True"
+                                AutomationProperties.Name="{x:Static res:Strings.EditChartButton}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ctl:LineIcon Data="{StaticResource NewChartStroke}" />
-                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.NewChartButton}" />
+                                <ctl:LineIcon Data="{StaticResource EditChartStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.EditChartButton}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

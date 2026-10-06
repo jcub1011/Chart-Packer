@@ -22,6 +22,9 @@ public static class UserConfigPaths
         }
     }
 
-    /// <summary>The app's settings file.</summary>
+    /// <summary>Chart Packer's settings file.</summary>
     public static string SettingsFile => Path.Combine(ConfigFolder, "settings.json");
+
+    /// <summary>Chart Builder's settings file. Each app writes only its own (charter-spec §10).</summary>
+    public static string BuilderSettingsFile => Path.Combine(ConfigFolder, "builder-settings.json");
 }

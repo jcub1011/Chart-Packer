@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Linq;
 using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Charting;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Settings;
@@ -22,7 +21,7 @@ namespace ChartPacker.Services
     /// </remarks>
     public static class AppSettingsCatalog
     {
-        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads, SettingsService settings)
+        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads)
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
@@ -34,11 +33,9 @@ namespace ChartPacker.Services
             var audio = new SettingCategory("playback.audio", Strings.SettingsCategoryAudio, playback);
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
-            var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
-            var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, charter, newCharts],
+                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing],
                 [
                     new IntegerSetting
                     {
@@ -46,7 +43,7 @@ namespace ChartPacker.Services
                         Category = scanning,
                         Label = Strings.ScanDepthLabel,
                         Description = Strings.ScanDepthDescription,
-                        Keywords = Words(Strings.ScanDepthKeywords),
+                        Keywords = SettingKeywords.Split(Strings.ScanDepthKeywords),
                         DefaultValue = AppSettings.DefaultScanMaxDepth,
                         Minimum = 0,
                         Maximum = AppSettings.MaxScanMaxDepth,
@@ -59,7 +56,7 @@ namespace ChartPacker.Services
                         Category = scanning,
                         Label = Strings.ScanParallelismLabel,
                         Description = Strings.ScanParallelismDescription,
-                        Keywords = Words(Strings.ScanParallelismKeywords),
+                        Keywords = SettingKeywords.Split(Strings.ScanParallelismKeywords),
                         DefaultValue = AppSettings.DefaultScanParallelism,
                         Minimum = AppSettings.MinScanParallelism,
                         Maximum = int.MaxValue,
@@ -72,7 +69,7 @@ namespace ChartPacker.Services
                         Category = duplicates,
                         Label = Strings.DedupKeepLabel,
                         Description = Strings.DedupKeepDescription,
-                        Keywords = Words(Strings.DedupKeepKeywords),
+                        Keywords = SettingKeywords.Split(Strings.DedupKeepKeywords),
                         DefaultValue = AppSettings.DefaultDedupKeepPreference,
                         Choices =
                         [
@@ -88,7 +85,7 @@ namespace ChartPacker.Services
                         Category = packing,
                         Label = Strings.OutputFolderLabel,
                         Description = Strings.OutputFolderDescription,
-                        Keywords = Words(Strings.OutputFolderKeywords),
+                        Keywords = SettingKeywords.Split(Strings.OutputFolderKeywords),
                         DefaultValue = null,
                         EmptyLabel = Strings.OutputFolderEmpty,
                         PickerTitle = Strings.BrowseOutputDialogTitle,
@@ -101,7 +98,7 @@ namespace ChartPacker.Services
                         Category = packing,
                         Label = Strings.OverwriteLabel,
                         Description = Strings.OverwriteToolTip,
-                        Keywords = Words(Strings.OverwriteKeywords),
+                        Keywords = SettingKeywords.Split(Strings.OverwriteKeywords),
                         DefaultValue = AppSettings.DefaultOverwritePolicy,
                         Choices = [.. library.OverwriteOptions.Select(o => new SettingChoice<OverwritePolicy>(o.Value, o.Label))],
                         Get = () => library.SelectedOverwriteOption.Value,
@@ -113,7 +110,7 @@ namespace ChartPacker.Services
                         Category = packing,
                         Label = Strings.FlatPackLabel,
                         Description = Strings.FlatPackToolTip,
-                        Keywords = Words(Strings.FlatPackKeywords),
+                        Keywords = SettingKeywords.Split(Strings.FlatPackKeywords),
                         DefaultValue = false,
                         Get = () => library.FlatPackOutput,
                         Set = flat => library.FlatPackOutput = flat,
@@ -124,7 +121,7 @@ namespace ChartPacker.Services
                         Category = downloadsCategory,
                         Label = Strings.DownloadFolderLabel,
                         Description = Strings.DownloadFolderDescription,
-                        Keywords = Words(Strings.DownloadFolderKeywords),
+                        Keywords = SettingKeywords.Split(Strings.DownloadFolderKeywords),
                         DefaultValue = null,
                         EmptyLabel = Strings.DownloadFolderEmpty,
                         PickerTitle = Strings.BrowseDownloadDialogTitle,
@@ -137,7 +134,7 @@ namespace ChartPacker.Services
                         Category = downloadsCategory,
                         Label = Strings.AskDownloadLocationLabel,
                         Description = Strings.AskDownloadLocationDescription,
-                        Keywords = Words(Strings.AskDownloadLocationKeywords),
+                        Keywords = SettingKeywords.Split(Strings.AskDownloadLocationKeywords),
                         DefaultValue = false,
                         Get = () => downloads.AskEveryTime,
                         Set = ask => downloads.AskEveryTime = ask,
@@ -148,7 +145,7 @@ namespace ChartPacker.Services
                         Category = audio,
                         Label = Strings.VolumeName,
                         Description = Strings.VolumeDescription,
-                        Keywords = Words(Strings.VolumeKeywords),
+                        Keywords = SettingKeywords.Split(Strings.VolumeKeywords),
                         DefaultValue = AppSettings.DefaultMasterVolume,
                         Minimum = 0,
                         Maximum = 1,
@@ -163,7 +160,7 @@ namespace ChartPacker.Services
                         Category = audio,
                         Label = Strings.PitchCorrectionLabel,
                         Description = Strings.PitchCorrectionDescription,
-                        Keywords = Words(Strings.PitchCorrectionKeywords),
+                        Keywords = SettingKeywords.Split(Strings.PitchCorrectionKeywords),
                         DefaultValue = AppSettings.DefaultPitchCorrection,
                         Get = () => player.PitchCorrection,
                         Set = correct => player.PitchCorrection = correct,
@@ -174,7 +171,7 @@ namespace ChartPacker.Services
                         Category = visualizers,
                         Label = Strings.ShowWaveformsLabel,
                         Description = Strings.ShowWaveformsDescription,
-                        Keywords = Words(Strings.ShowWaveformsKeywords),
+                        Keywords = SettingKeywords.Split(Strings.ShowWaveformsKeywords),
                         DefaultValue = true,
                         Get = () => player.ShowWaveforms,
                         Set = show => player.ShowWaveforms = show,
@@ -185,7 +182,7 @@ namespace ChartPacker.Services
                         Category = visualizers,
                         Label = Strings.ShowLaneWaveformsLabel,
                         Description = Strings.ShowLaneWaveformsDescription,
-                        Keywords = Words(Strings.ShowLaneWaveformsKeywords),
+                        Keywords = SettingKeywords.Split(Strings.ShowLaneWaveformsKeywords),
                         RequiresId = "playback.showWaveforms",
                         DefaultValue = true,
                         Get = () => player.ShowLaneWaveforms,
@@ -197,7 +194,7 @@ namespace ChartPacker.Services
                         Category = visualizers,
                         Label = Strings.WaveformFidelityLabel,
                         Description = Strings.WaveformFidelityDescription,
-                        Keywords = Words(Strings.WaveformFidelityKeywords),
+                        Keywords = SettingKeywords.Split(Strings.WaveformFidelityKeywords),
                         RequiresId = "playback.showWaveforms",
                         DefaultValue = AppSettings.DefaultWaveformFidelity,
                         Choices =
@@ -216,7 +213,7 @@ namespace ChartPacker.Services
                         Category = visualizers,
                         Label = Strings.ShowSpectrumLabel,
                         Description = Strings.ShowSpectrumDescription,
-                        Keywords = Words(Strings.ShowSpectrumKeywords),
+                        Keywords = SettingKeywords.Split(Strings.ShowSpectrumKeywords),
                         DefaultValue = true,
                         Get = () => player.ShowSpectrum,
                         Set = show => player.ShowSpectrum = show,
@@ -227,7 +224,7 @@ namespace ChartPacker.Services
                         Category = visualizers,
                         Label = Strings.ShowHighwayLabel,
                         Description = Strings.ShowHighwayDescription,
-                        Keywords = Words(Strings.ShowHighwayKeywords),
+                        Keywords = SettingKeywords.Split(Strings.ShowHighwayKeywords),
                         DefaultValue = true,
                         Get = () => highway.IsEnabled,
                         Set = show => highway.IsEnabled = show,
@@ -238,7 +235,7 @@ namespace ChartPacker.Services
                         Category = visualizers,
                         Label = Strings.HighwayPlacementLabel,
                         Description = Strings.HighwayPlacementDescription,
-                        Keywords = Words(Strings.HighwayPlacementKeywords),
+                        Keywords = SettingKeywords.Split(Strings.HighwayPlacementKeywords),
                         RequiresId = "playback.showNoteHighway",
                         DefaultValue = AppSettings.DefaultHighwayPlacement,
                         Choices =
@@ -255,7 +252,7 @@ namespace ChartPacker.Services
                         Category = visualizers,
                         Label = Strings.HighwayNoteSpeedLabel,
                         Description = Strings.HighwayNoteSpeedDescription,
-                        Keywords = Words(Strings.HighwayNoteSpeedKeywords),
+                        Keywords = SettingKeywords.Split(Strings.HighwayNoteSpeedKeywords),
                         DefaultValue = AppSettings.DefaultHighwayNoteSpeed,
                         Minimum = AppSettings.MinHighwayNoteSpeed,
                         Maximum = AppSettings.MaxHighwayNoteSpeed,
@@ -270,7 +267,7 @@ namespace ChartPacker.Services
                         Category = scrubbing,
                         Label = Strings.ScrubStepLabel,
                         Description = Strings.ScrubStepDescription,
-                        Keywords = Words(Strings.ScrubStepKeywords),
+                        Keywords = SettingKeywords.Split(Strings.ScrubStepKeywords),
                         DefaultValue = AppSettings.DefaultScrubStep,
                         Choices = [.. Enum.GetValues<ScrubStep>().Select(step => new SettingChoice<ScrubStep>(step, ScrubSteps.NameOf(step)))],
                         Get = () => player.ScrubStep,
@@ -282,7 +279,7 @@ namespace ChartPacker.Services
                         Category = scrubbing,
                         Label = Strings.FineScrubSpeedLabel,
                         Description = Strings.FineScrubSpeedDescription,
-                        Keywords = Words(Strings.FineScrubSpeedKeywords),
+                        Keywords = SettingKeywords.Split(Strings.FineScrubSpeedKeywords),
                         DefaultValue = AppSettings.DefaultFineScrubMilliseconds,
                         Minimum = AppSettings.MinFineScrubMilliseconds,
                         Maximum = AppSettings.MaxFineScrubMilliseconds,
@@ -297,7 +294,7 @@ namespace ChartPacker.Services
                         Category = scrubbing,
                         Label = Strings.LaneFineScrubLabel,
                         Description = Strings.LaneFineScrubDescription,
-                        Keywords = Words(Strings.LaneFineScrubKeywords),
+                        Keywords = SettingKeywords.Split(Strings.LaneFineScrubKeywords),
                         DefaultValue = AppSettings.DefaultLaneFineScrubFactor,
                         Minimum = AppSettings.MinLaneFineScrubFactor,
                         Maximum = AppSettings.MaxLaneFineScrubFactor,
@@ -306,38 +303,7 @@ namespace ChartPacker.Services
                         Get = () => player.LaneFineScrubFactor,
                         Set = factor => player.LaneFineScrubFactor = factor,
                     },
-                    new TextSetting
-                    {
-                        Id = "charter.defaultCharterName",
-                        Category = newCharts,
-                        Label = Strings.DefaultCharterNameLabel,
-                        Description = Strings.DefaultCharterNameDescription,
-                        Keywords = Words(Strings.DefaultCharterNameKeywords),
-                        DefaultValue = "",
-                        Placeholder = Strings.DefaultCharterNamePlaceholder,
-                        ForbiddenCharacters = ";",
-                        Get = () => settings.Settings.DefaultCharterName,
-                        Set = name => settings.Settings.DefaultCharterName = name.Trim(),
-                    },
-                    new ChoiceSetting<int>
-                    {
-                        Id = "charter.defaultResolution",
-                        Category = newCharts,
-                        Label = Strings.DefaultChartResolutionLabel,
-                        Description = Strings.DefaultChartResolutionDescription,
-                        Keywords = Words(Strings.DefaultChartResolutionKeywords),
-                        DefaultValue = NewChartSettings.DefaultResolution,
-                        Choices = [.. NewChartSettings.Resolutions.Select(r => new SettingChoice<int>(r, ResolutionLabel(r)))],
-                        Get = () => settings.Settings.DefaultChartResolution,
-                        Set = resolution => settings.Settings.DefaultChartResolution = resolution,
-                    },
                 ]);
         }
-
-        /// <summary>A resolution as the new-chart wizard and Settings show it, e.g. "480 ticks per beat".</summary>
-        public static string ResolutionLabel(int resolution) =>
-            string.Format(CultureInfo.CurrentCulture, Strings.ChartResolutionFormat, resolution);
-
-        private static string[] Words(string text) => text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
     }
 }

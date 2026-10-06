@@ -28,9 +28,9 @@
         <Button HorizontalAlignment="Right"
                 MinWidth="80"
                 HorizontalContentAlignment="Center"
-                Content="{x:Static res:Strings.CancelButton}"
+                Content="{x:Static res:SharedStrings.CancelButton}"
                 IsCancel="True"
                 Click="OnCancel"
-                AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
     </StackPanel>
 </Window>

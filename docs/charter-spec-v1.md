@@ -1,41 +1,46 @@
-# Chart-Packer Charter — Specification v1
+# Chart Builder — Specification v1
 
 | | |
 | --- | --- |
 | **Status** | Draft |
-| **Scope** | Charter v1: creating, editing and exporting charts inside Chart-Packer |
-| **Companion docs** | [project-spec-v1.md](project-spec-v1.md) (the app this builds on) and [sng-spec.md](sng-spec.md) (the container charts are packed into) |
+| **Scope** | Chart Builder v1: a separate app, installed with Chart Packer, for creating, editing and exporting charts |
+| **Companion docs** | [project-spec-v1.md](project-spec-v1.md) (Chart Packer, whose code this shares) and [sng-spec.md](sng-spec.md) (the container charts are packed into) |
 | **Output format** | `notes.mid`, in the Rock Band / Clone Hero layout that YARG reads ([§7](#midi-layout)) |
 
 ---
 
 ## 1. Overview and goals
 
-The **Charter** is a chart editor built into Chart-Packer. It creates charts from scratch, edits
-the charts in a user's library, and saves them as `notes.mid`, ready for Clone Hero, YARG and other
-games that read the format. v1 covers guitar, bass and drums. The charter opens from the library
-and saves through the same draft and save path the metadata editor uses
-([project-spec F5](project-spec-v1.md#f5-metadata-editor)). A chart can go from an empty folder to
-a packed `.sng` without leaving the app.
+**Chart Builder** is a chart editor. It creates charts from scratch, edits the charts in a user's
+library, and saves them as `notes.mid`, ready for Clone Hero, YARG and other games that read the
+format. v1 covers guitar, bass and drums.
 
-Most of what the charter needs already exists in some form. Chart-Packer reads `.chart` and
+Chart Builder is a **separate application** from Chart Packer. The two share code (Core, Audio,
+Video and a shared UI library, [§4](#4-architecture)) but no process, and one installer installs
+both. Chart Packer's library opens a song in Chart Builder, and Chart Builder also runs on its own
+([§4.8](#48-launching-and-coordination)). Chart Builder saves through the same draft and save code
+the metadata editor uses ([project-spec F5](project-spec-v1.md#f5-metadata-editor)). A chart can go
+from an empty folder to a packed `.sng` without leaving Chart Builder.
+
+Most of what Chart Builder needs already exists in some form. Chart Packer's code reads `.chart` and
 `.mid` as YARG does, writes MIDI, converts `.chart` to MIDI and checks the result, plays stems
 sample-aligned at any speed with pitch correction, draws waveforms and a spectrum, and draws a
-read-only note highway. The charter adds an **editable** model on top of these, plus the tools
+read-only note highway. Chart Builder adds an **editable** model on top of these, plus the tools
 that make charting fast.
 
 Goals:
 
 1. **Correct.** A chart plays in YARG as it looks in the editor, and in Clone Hero wherever Clone
-   Hero reads the format the same way. Every save is read back twice: by the charter's own loader,
+   Hero reads the format the same way. Every save is read back twice: by Chart Builder's own loader,
    which must give back the same model, and by the app's YARG-compatible reader, which must give
    what the editor shows ([§4.3](#43-writing-midichartwriter)).
 2. **Fast to chart.** Keyboard first. Common work (placing notes, chords, sustains, changing the
    snap, moving around the song) never needs the mouse.
 3. **Audio-aware.** Waveforms, a spectrogram, onset markers and beat detection help place notes
-   and build the tempo map. They suggest; the charter decides.
-4. **Integrated.** Library → new chart or edit → save → pack, all in one place, with the same
-   drafts, findings panel and atomic writes as the rest of the app.
+   and build the tempo map. They suggest; the author decides.
+4. **Integrated.** Chart Packer's library → **Edit chart** → Chart Builder → save → Chart Packer
+   shows the change. Both apps use the same drafts, findings and atomic writes, and come in one
+   install ([§4.8](#48-launching-and-coordination)).
 5. **Lightweight.** Native AOT, the existing dependency budget, and **no new packages**.
 
 This spec **supersedes** the "editing charts" non-goal in
@@ -83,15 +88,25 @@ saved as `pro_drums` and `five_lane_drums` in `song.ini`, as the games read it
 
 ```txt
 Chart-Packer.slnx
-├── ChartPacker/                  App: + Charter screen, editor canvases, calibration tool, new-chart wizard
+├── ChartPacker/                  Chart Packer app: library, inspector, packing. Launches Chart Builder (§4.8)
+├── ChartBuilder/                 Chart Builder app (new): home screen, editor, canvases, calibration tool, new-chart wizard
+├── ChartPacker.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
+│                                 settings window, shared controls, and later the player and highway view models
 ├── ChartPacker.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synth/ (click, beep, hit sounds)
-├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions)
+├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions), + SongLock
 └── ChartPacker.Core.Tests/       + Charting/, Audio/Analysis/ tests
 ```
 
+Chart Packer and Chart Builder are two executables. They are built against the same package
+versions (central package management in `Directory.Packages.props`), so they can share one install
+folder and one copy of each native library (SDL3, Skia, HarfBuzz, ANGLE and FFmpeg). One installer
+installs both ([project-spec §4](project-spec-v1.md#4-architecture)).
+
 Core stays UI-free and Avalonia-free, as now
-([project-spec §4.1](project-spec-v1.md#41-chartpackercore)). The charter's model, commands, writer
-and lint all live in Core, so a later CLI could use them.
+([project-spec §4.1](project-spec-v1.md#41-chartpackercore)). Chart Builder's model, commands, writer
+and lint all live in Core, so Chart Packer (for lint in the library, [C16](#c16-chart-lint)) and a
+later CLI can use them. UI code that both apps need lives in `ChartPacker.UI`, and moves there only
+when the second app first needs it.
 
 <a id="editable-model"></a>
 
@@ -99,7 +114,7 @@ and lint all live in Core, so a later CLI could use them.
 
 The existing `ChartDocument` (`Charts/ChartModel.cs`) is **immutable and lossy by design**. It
 holds what the library, the highway and the merger need: resolved notes, with HOPOs worked out
-and forcing folded into a `Hopo` flag. The charter needs what the author wrote, so it gets its
+and forcing folded into a `Hopo` flag. Chart Builder needs what the author wrote, so it gets its
 own **mutable** model, kept separate:
 
 | Type | Holds |
@@ -172,12 +187,12 @@ command.
 
 ### 4.2 Lossless passthrough
 
-When a chart is loaded, every MIDI track the charter doesn't edit (vocals, harmonies, keys and pro
+When a chart is loaded, every MIDI track Chart Builder doesn't edit (vocals, harmonies, keys and pro
 keys, pro guitar, venue, unknown tracks) is kept as raw bytes, sliced from the file as
 `MidiMerger` already does. On save they are written back **byte for byte**, in their original
 order.
 
-The tracks the charter does edit are rebuilt from the model:
+The tracks Chart Builder does edit are rebuilt from the model:
 
 - **The tempo track** is rebuilt from the tempo map. Its other events (key signatures, markers,
   text) are kept as `RawEvent`s.
@@ -190,7 +205,7 @@ The tracks the charter does edit are rebuilt from the model:
 **When the tempo map changes in a way that keeps times.** Passthrough tracks hold ticks, so a tempo
 edit with *keep times* on ([C4](#c4-tempo-map-and-grid)), or a stretch
 ([C15](#c15-editing-ergonomics)), would leave vocals, venue and keys at their old ticks while the
-charted notes move. The charter therefore re-ticks the passthrough tracks too. It parses their
+charted notes move. Chart Builder therefore re-ticks the passthrough tracks too. It parses their
 events, moves each one to the tick that keeps its time, and writes them back with the same events
 in the same order. Byte-for-byte passthrough is promised only while the tempo map hasn't been
 changed in this way. Keeping ticks (the default) never touches passthrough tracks.
@@ -240,7 +255,7 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
 
 #### 4.4.1 Playback changes
 
-`StemPlayer` needs three changes for the charter's timing promises:
+`StemPlayer` needs three changes for Chart Builder's timing promises:
 
 - **Synthesized sounds after the stretcher.** `StemMixer` mixes the stems before `TimeStretcher`.
   Clicks and hit sounds mixed there would be stretched and smeared at any speed other than 100%.
@@ -264,8 +279,13 @@ audio (`Position`, anchors, onsets, waveforms, the spectrogram) is in **audio ti
 the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
 `audio = chart + delay`, applied in one place in the editor.
 
-### 4.5 App (`ChartPacker/`)
+### 4.5 App (`ChartBuilder/`)
 
+- **Its own composition root, `MainWindow` and `ViewLocator`**, wired by hand as Chart Packer's
+  are. Settings are Chart Builder's own ([§10](#10-settings)).
+- **Home screen**, shown when no song is given on the command line: **New chart**, **Open** (a
+  folder or `.sng`) and recent songs. Opening a song replaces it with the editor, which fills the
+  main window. Closing the song goes back to the home screen.
 - **`ChartEditorView` / `ChartEditorViewModel`**, added to the explicit mapping in `ViewLocator`
   (there is no reflection-based lookup).
 - **Two custom-drawn canvases over one model**: `HighwayEditorCanvas` (vertical) and
@@ -276,14 +296,16 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
 - **`CalibrationWindow`** ([C11](#c11-calibration-tool)) and **`NewChartWizard`**
   ([C1](#c1-new-chart-from-scratch)) are dialogs. They use the shared `WindowChrome` for the dark
   title bar and icon, as the other dialogs do.
-- **Drag and drop.** The app has no drop handler yet. The charter adds one to the main window for
-  audio files ([C1](#c1-new-chart-from-scratch)).
-- Strings go in `Strings.resx`. New icons come from game-icons.net and are credited in
-  `THIRD-PARTY-NOTICES.md`. Styling follows the main window and `Styles/Theme.axaml`.
+- **Drag and drop.** Chart Builder's main window takes dropped audio files, which open the wizard
+  with them ([C1](#c1-new-chart-from-scratch)), and a dropped song folder or `.sng`, which opens it
+  ([C2](#c2-open-and-import)). Chart Packer's main window takes no drops for Chart Builder.
+- Strings go in Chart Builder's own `Strings.resx`, and strings both apps use go in
+  `ChartPacker.UI`'s `SharedStrings.resx`. New icons come from game-icons.net and are credited in
+  `THIRD-PARTY-NOTICES.md`. Styling follows the shared theme in `ChartPacker.UI/Styles/`.
 
 ### 4.6 Saving
 
-The charter saves through the existing draft machinery. A save builds a `MetadataDraft` that holds:
+Chart Builder saves through the existing draft machinery. A save builds a `MetadataDraft` that holds:
 
 - the new `notes.mid` as a file change. `MetadataDraft.AddFile` takes a source path, so the bytes
   are first written to a temp file in the per-user cache, which is deleted once the draft is
@@ -291,15 +313,23 @@ The charter saves through the existing draft machinery. A save builds a `Metadat
 - the removal of an imported `notes.chart`, if there is one ([C2](#c2-open-and-import));
 - the `song.ini` key edits ([C17](#c17-save-and-export)).
 
-`DraftWriter` then writes the draft, so a `.sng` keeps its mask, and the library, inspector and
-packer see the result straight away with no new write path.
+`DraftWriter` then writes the draft, so a `.sng` keeps its mask, with no new write path. Chart
+Packer's library, inspector and packer see the result when Chart Packer next re-reads the song
+([§4.8](#48-launching-and-coordination)).
+
+**Drafts belong to one app.** Drafts live in memory, in the process that made them, so the two apps
+can't share them. Chart Builder keeps its own draft for the one song it has open. Its pending
+`song.ini` changes are listed in Chart Builder ([C17](#c17-save-and-export)), not in Chart Packer's
+metadata editor. Chart Packer's unsaved drafts for a song are never written by Chart Builder:
+**Edit chart** on a song with unsaved drafts first asks the user to save or discard them
+([C2](#c2-open-and-import)).
 
 **Atomicity.**
 
 - A `.sng` save is atomic, because `SngWriter.RewriteAsync` writes a temp file and renames it.
 - A song folder save is atomic **per file**: each file is written to a temp file and renamed.
-- `SongFolderFiles.ApplyAsync` today deletes removed files before it moves the new ones in. The
-  charter changes that order to **move in first, then delete**. Otherwise a crash during a
+- `SongFolderFiles.ApplyAsync` today deletes removed files before it moves the new ones in. Chart
+  Builder changes that order to **move in first, then delete**. Otherwise a crash during a
   `.chart` import's first save could leave the folder with neither `notes.chart` nor `notes.mid`.
   With the new order, the worst case is a folder holding both, and `ChartReader.Pick` then reads
   the new `notes.mid`.
@@ -314,6 +344,59 @@ apply unchanged: compiled bindings, source-generated MVVM and JSON, and no refle
 `THIRD-PARTY-NOTICES.md`'s GuitarGame_ChartFormats entry should be extended to say it is also the
 reference for the MIDI layout in [§7](#midi-layout), with no text copied.
 
+### 4.8 Launching and coordination
+
+Chart Packer and Chart Builder share no process and don't talk to each other while they run. Chart
+Packer starts Chart Builder with command-line arguments, a lock file keeps them from writing the
+same song at once, and Chart Packer re-reads the songs Chart Builder may have changed.
+
+**Command line.**
+
+| Arguments | Opens |
+| --------- | ----- |
+| *(none)* | The home screen ([§4.5](#45-app-chartbuilder)) |
+| `[--] <song path>` | That song folder or `.sng` in the editor ([C2](#c2-open-and-import)) |
+| `--new [--] [<audio file>…]` | The new-chart wizard, with the audio files. Its location starts on the last folder used ([C1](#c1-new-chart-from-scratch)). |
+| `--calibrate` | The calibration tool ([C11](#c11-calibration-tool)) |
+
+`--` ends the options, so a path that starts with `-` is still a path. Paths are made absolute against
+the current folder as they're read (`BuilderArgs.Parse`). Arguments that can't be used (an unknown
+option, a second song path, an empty argument, a missing path) open the home screen and say why.
+
+**Finding Chart Builder.** Chart Packer runs the `ChartBuilder` executable that sits next to its
+own (`Environment.ProcessPath`). If it isn't there, Chart Packer says Chart Builder isn't installed
+and goes on without it. In Debug builds each app keeps its own output folder. Building Chart Packer
+builds Chart Builder too, and records where its output folder is (an `AssemblyMetadata` attribute),
+which Chart Packer uses when Chart Builder isn't beside it. Release builds have no such fallback.
+
+**One song per Chart Builder process.** Each Chart Builder window has at most one song open, and
+several can run at once on different songs.
+
+**Song lock (`ChartPacker.Core/Scanning/SongLock`).**
+
+- While a song is open, Chart Builder holds a lock file for it in the per-user config folder
+  (`locks/<hash of the song's full path>`), opened with `FileShare.None`. .NET maps `FileShare` to
+  `flock` on Linux and macOS, so the lock works on every platform, and the OS releases it if the
+  process dies.
+- Opening a song that another Chart Builder has open says so, and doesn't open it a second time.
+- Before Chart Packer writes to a song (a metadata save, delete, dedup, merge into it, or replacing
+  it with a download), it checks the lock. When Chart Builder has the song open, it warns that
+  Chart Builder may overwrite the change, and the user can go ahead or cancel.
+- `SongFileGate` stays the gate between reads and writes within each process.
+
+**Refreshing Chart Packer.**
+
+Chart Packer doesn't keep the Chart Builder processes it starts. It checks for changes when its
+window is activated, as it is when the user comes back from Chart Builder.
+
+- Chart Packer remembers the songs it opened in Chart Builder, with each one's chart and
+  `song.ini` sizes and modified times. When its window is activated, it re-reads the songs that
+  changed, so the library, inspector and packer show them.
+- Chart Packer never starts the new-chart wizard, so a song Chart Builder creates appears in its
+  library on the next scan.
+- Chart Packer re-reads the shared latency file ([§10](#10-settings)) when its window is
+  activated.
+
 ---
 
 ## 5. Features
@@ -325,14 +408,18 @@ shown in the app's findings panel. Chart lint rules are listed in [§6](#lint-ru
 
 **Input:** nothing, or one or more audio files.
 **Output:** a new song folder containing `notes.mid`, `song.ini`, its stems and (optionally) album
-art. It is added to the library and opened in the editor.
+art. It is opened in the editor, and appears in Chart Packer's library
+([§4.8](#48-launching-and-coordination)).
 
-**Entry points:**
+**Entry points.** The wizard is part of Chart Builder. It opens from:
 
-- a **New chart** button on the toolbar;
-- dropping audio files on the main window, which opens the wizard with them (a new drop handler,
-  [§4.5](#45-app-chartpacker));
-- a **New chart** button in an empty library.
+- **New chart** on Chart Builder's home screen;
+- audio files dropped on Chart Builder's main window, which open the wizard with them
+  ([§4.5](#45-app-chartbuilder));
+- `ChartBuilder --new` on the command line ([§4.8](#48-launching-and-coordination)).
+
+Chart Packer has no **New chart**. Charts are created in Chart Builder, and Chart Packer's only way
+into it is **Edit chart** ([C2](#c2-open-and-import)).
 
 **Behaviour:** a four-step wizard. **Back** and **Next** keep every step's values.
 
@@ -385,7 +472,7 @@ art. It is added to the library and opened in the editor.
   - `notes.mid`, with the tempo map, an empty track for each chosen part, `EVENTS` holding
     `[music_start]` and `[end]`, and `BEAT`;
   - `song.ini`, with a `[song]` section holding the metadata, `diff_<part> = -1` for each part
-    (the keys are in [§7.5](#75-songini-keys-the-charter-writes)), `pro_drums`/`five_lane_drums` as
+    (the keys are in [§7.5](#75-songini-keys-chart-builder-writes)), `pro_drums`/`five_lane_drums` as
     the drum variant needs, `song_length` from the longest stem (or the length entered), and
     `delay` if one was set.
 - **How it is written.** Everything is written into a temp folder beside the target, which is then
@@ -408,13 +495,20 @@ Acceptance criteria:
 
 ### C2. Open and import
 
-**Input:** one song in the library, a folder or a `.sng`.
+**Input:** a song folder or a `.sng`.
 
 **Behaviour:**
 
-1. **Edit chart** in the library's context menu and on the detail panel opens the charter on the
-   selected song. The library is replaced by the editor in the main window, and **← Library**
-   returns to it. Only one chart is open at a time.
+1. **Opening a song.**
+   - In Chart Packer, the **Edit chart** button on the toolbar runs `ChartBuilder <song path>`
+     ([§4.8](#48-launching-and-coordination)). It is enabled only while exactly one song is
+     selected and no job (pack, unpack, merge, validate, deduplicate) is running. Until Chart
+     Builder can open songs (CM2), it stays disabled, and its tooltip says it comes with the
+     chart editor (`ChartBuilderLauncher.CanOpenSongs`).
+   - In Chart Builder, songs open from **Open** and the recent songs on the home screen, or by
+     dropping a song folder or `.sng` on the window.
+   - Each Chart Builder window has one chart open. A song that another Chart Builder already has
+     open isn't opened a second time ([§4.8](#48-launching-and-coordination)).
 2. **Which chart is opened.** `ChartReader.Pick` chooses: `notes.mid` if there is one, otherwise
    `notes.chart`. A song with neither is offered **New chart in this song**, which runs the
    wizard's Timing and Parts steps.
@@ -430,9 +524,11 @@ Acceptance criteria:
      way, removing `notes.chart` loses nothing.
    - On the first save, `notes.chart` is staged for removal after a confirmation, so the song
      doesn't carry two charts that the games might pick between differently.
-4. **Drafts.** A song with unsaved metadata drafts can be opened. The chart is saved into the same
-   draft ([§4.6](#46-saving)), so saving the chart also writes those pending metadata edits. The
-   save confirmation lists them.
+4. **Drafts.** Chart Packer's unsaved metadata drafts don't reach Chart Builder
+   ([§4.6](#46-saving)). **Edit chart** on a song with unsaved drafts first asks the user to
+   **Save** them, **Discard** them, or **Cancel**, and Chart Builder opens only after a save or a
+   discard. Chart Builder's own pending `song.ini` changes ([C17](#c17-save-and-export)) are saved
+   with the chart, and the save confirmation lists them.
 5. **Add part.** A menu adds any v1 part that isn't there yet. Adding drums asks for the variant if
    the song doesn't set one.
 6. **Remove part** removes a part's track, after a confirmation. It can be undone.
@@ -452,6 +548,12 @@ Acceptance criteria:
   file's bytes ([project-spec F5](project-spec-v1.md#f5-metadata-editor) item 5 and AC5.1).
 - **AC C2.4** Killing the app during the first save of an imported `.chart` song folder never
   leaves the folder with neither `notes.chart` nor `notes.mid`.
+- **AC C2.5** While one Chart Builder has a song open, a second Chart Builder won't open it, and
+  Chart Packer warns before writing to it. Once the first Chart Builder closes the song, or its
+  process is killed, both work as normal.
+- **AC C2.6** After Chart Builder saves a song that Chart Packer opened in it, activating Chart
+  Packer's window shows the saved chart and `song.ini` in the library and inspector, without a
+  rescan.
 
 ### C3. Editor layout
 
@@ -632,7 +734,7 @@ Acceptance criteria:
 8. **4-lane ↔ 5-lane conversion helper.**
    - Converts a whole drum part with the fixed mapping in [§7.6](#76-drum-layout-conversion).
      Clone Hero and YARG each convert in their own slightly different way when they play one
-     layout on the other. This mapping is the charter's own, chosen to round-trip.
+     layout on the other. This mapping is Chart Builder's own, chosen to round-trip.
    - It is one undoable command. Notes it can't place (a second note landing on a pad that
      already has one on that tick) are left out. They are listed, with their times, in a report
      when the command finishes. Undoing the command brings them back. Lint can't see notes that
@@ -682,7 +784,7 @@ Acceptance criteria:
    name from a menu of common ones (Intro, Verse 1, Chorus 1, Bridge, Solo, Outro…).
 4. **Big rock ending** (all five pitches 120–124 held together on a guitar or bass track) and
    `[coda]`. On drums, the same pitches are fills, and a big rock ending is the fill markers after
-   `[coda]`. The charter shows those as a big rock ending, not a fill, and the fill rules (CHR042,
+   `[coda]`. Chart Builder shows those as a big rock ending, not a fill, and the fill rules (CHR042,
    CHR043) skip them. No code reads big rock endings or `[coda]` today, so this is new.
 5. **Song events**: `[music_start]`, `[music_end]`, `[end]`. `[end]` is kept after the last note
    and moved on save if notes are added after it (CHR085).
@@ -776,9 +878,13 @@ the display.
 
 **Opening:**
 
-- from **Settings**;
-- from the charter's transport bar;
-- **automatically, once**, the first time the charter opens on a device that has no calibration.
+The tool is part of Chart Builder. It opens:
+
+- from Chart Builder's **Settings**;
+- from Chart Builder's transport bar;
+- from **Calibrate…** in Chart Packer's Settings, which runs `ChartBuilder --calibrate`
+  ([§4.8](#48-launching-and-coordination));
+- **automatically, once**, the first time Chart Builder opens on a device that has no calibration.
   This can be skipped.
 
 **Behaviour:**
@@ -850,19 +956,21 @@ the display.
    - **Which device.** The app has no device chooser. It always plays on the OS default device,
      and SDL moves the stream when the default changes, without telling the app.
      `SdlAudioOutput` therefore checks which device it is on when SDL reports an audio device
-     event and when playback starts, and raises `DeviceChanged` when it differs. The charter and
+     event and when playback starts, and raises `DeviceChanged` when it differs. Chart Builder and
      the tool then load that device's latency.
    - **Lookup order:** the stored value for the device's ID, then for its name, then a **global
      fallback**. When a device is found by name, its value is also saved under its ID if it has
      one, so a later rename doesn't lose it.
    - The tool always says which device it is calibrating.
 4. **Where it applies.**
-   - the charter ([C10](#c10-playback));
+   - Chart Builder ([C10](#c10-playback));
    - **record mode**, where key presses are shifted by the latency before they're quantised
      ([C15](#c15-editing-ergonomics));
-   - the existing inspector highway (`NoteHighwayView`), lyrics lane and waveform playhead, with
-     the same scaling by speed.
-5. **Saving.** **Save** stores the value. **Cancel** restores the previous value. **Reset** sets 0.
+   - Chart Packer's inspector highway (`NoteHighwayView`), lyrics lane and waveform playhead, with
+     the same scaling by speed. Chart Packer reads the value from the shared latency file
+     ([§10](#10-settings)).
+5. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
+   previous value. **Reset** sets 0.
 
 Acceptance criteria:
 
@@ -873,7 +981,7 @@ Acceptance criteria:
   with σ = 20 ms, and 2 outliers of ±150 ms per phase. Over 1,000 seeded trials, the median
   estimate is within ±2 ms of the offset, and 95% of estimates are within ±20 ms. (With 12 kept
   taps per phase, ±20 ms is about two standard deviations of the estimate.)
-- **AC C11.3** When the output moves to another device (`DeviceChanged`), the charter and the tool
+- **AC C11.3** When the output moves to another device (`DeviceChanged`), Chart Builder and the tool
   load that device's stored latency, or the fallback.
 - **AC C11.4** With a latency of 400 ms, each marked (2 kHz) beep is written 400 ms before the
   marked beat it belongs to, so it can only be lined up with a marked flash.
@@ -1034,7 +1142,7 @@ Acceptance criteria:
      offers it, but warns that the song has changed since.
    - Saving deletes it. Opening a song with a newer recovery file offers to restore it
      ([C2](#c2-open-and-import)).
-7. **Closing** the charter, or the app, with unsaved changes asks: Save, Discard or Cancel.
+7. **Closing** Chart Builder, or the app, with unsaved changes asks: Save, Discard or Cancel.
 8. **Keyboard shortcuts** are listed in [§9](#9-keyboard-shortcuts).
 
 Acceptance criteria:
@@ -1065,17 +1173,17 @@ Acceptance criteria:
    location (part, difficulty and tick range) for that, beside its existing byte offset and
    metadata key.
 3. **Quick fixes.** The existing `QuickFixRegistry` and `IQuickFixStrategy` only edit metadata
-   (`QuickFix.ApplyTo(MetadataItem)`). The charter adds a chart kind of fix, which proposes an
+   (`QuickFix.ApplyTo(MetadataItem)`). Chart Builder adds a chart kind of fix, which proposes an
    `IChartCommand` for a finding, and registers chart fixes with the same registry. Each fix is
    one undoable command (see the table for which rules have one).
 4. **Severity.**
    - Lint **never blocks saving**. A chart in progress must always be saveable.
    - **Errors** are things the author wrote that the games read differently, such as an open note
      in a chord (CHR022). The editor shows what the games read, so the read-back check
-     ([§4.3](#43-writing-midichartwriter)) passes. In the charter, Errors block **Save and pack**,
+     ([§4.3](#43-writing-midichartwriter)) passes. In Chart Builder, Errors block **Save and pack**,
      the same way SNG errors block packing.
-5. **In the library.**
-   - Validating a song from the library also runs chart lint, so charts made outside the charter
+5. **In Chart Packer's library.** The rules live in Core, so Chart Packer runs them too.
+   - Validating a song from the library also runs chart lint, so charts made outside Chart Builder
      get the same checks ([project-spec F3](project-spec-v1.md#f3-validate)).
    - **In the library, chart lint never blocks packing.** CHR findings of every severity are shown
      as findings, and packing goes ahead, so every song that packs today still packs.
@@ -1083,7 +1191,7 @@ Acceptance criteria:
      lints songs on the same worker threads as the rest of validation, and skips lint for songs
      whose chart is unchanged since it was last linted.
    - CHR004 uses only the common grids, never the editor's current snap, so it gives the same
-     result in the library and in the charter.
+     result in the library and in Chart Builder.
 
 Acceptance criteria:
 
@@ -1099,15 +1207,16 @@ Acceptance criteria:
    2. reads it back and compares it with the model. **A difference stops the save.**
    3. stages the bytes to a temp file and saves through `MetadataDraft`/`DraftWriter`
       ([§4.6](#46-saving)).
-2. **`song.ini` changes.** Every change the charter makes to `song.ini` is shown as a pending
-   change in the metadata editor, like any other edit, as soon as it is made, not only at save.
-   The full list:
+2. **`song.ini` changes.** Every change Chart Builder makes to `song.ini` is shown as a pending
+   change in Chart Builder's **Pending changes** list (beside the findings panel) as soon as it is
+   made, not only at save. Each change can be reverted there. Chart Packer's metadata editor
+   doesn't see these changes until they are saved ([§4.6](#46-saving)). The full list:
    - `song_length`, when it is unset or no longer matches the audio's length within 1 s. This
-     happens on save, so CHR084 only appears for charts linted outside the charter;
+     happens on save, so CHR084 only appears for charts linted outside Chart Builder;
    - `pro_drums` and `five_lane_drums`, for the drum variant: when the variant is chosen, switched
      ([C6](#c6-drums-4-lane-pro-and-5-lane)), or detected on load ([§4.1](#editable-model));
    - `charter`, if empty, from the **Default charter name** setting ([§10](#10-settings));
-   - `diff_<part> = -1` for new parts ([§7.5](#75-songini-keys-the-charter-writes)). The
+   - `diff_<part> = -1` for new parts ([§7.5](#75-songini-keys-chart-builder-writes)). The
      suggested rating ([C18](#c18-preview)) is offered, but is never written without the user's
      say-so;
    - `multiplier_note` removed, when the chart had star power on 103
@@ -1117,11 +1226,12 @@ Acceptance criteria:
      ([C14](#c14-onset-and-beat-assist));
    - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import)).
 
-   `sustain_cutoff_threshold` and the HOPO threshold are never changed by the charter. Its display
+   `sustain_cutoff_threshold` and the HOPO threshold are never changed by Chart Builder. Its display
    follows them.
 3. **Save and pack** saves, then packs the song to a `.sng`
-   ([project-spec F1](project-spec-v1.md#f1-pack-song-folder--sng)), using the usual output and
-   overwrite settings.
+   ([project-spec F1](project-spec-v1.md#f1-pack-song-folder--sng)) with Core's packing
+   (`PackPlanner`, `SongJob`). It uses Chart Packer's output folder and overwrite settings, which
+   Chart Builder reads from Chart Packer's settings file and never writes.
 4. **Export copy** writes the song with its draft applied to another folder, using the existing
    `SongExport`.
 
@@ -1167,7 +1277,7 @@ Acceptance criteria:
 Severity meanings:
 
 - **Error:** the author wrote something the games read differently. The editor shows what the games
-  read, so the chart still saves ([§4.3](#43-writing-midichartwriter)). In the charter, an Error
+  read, so the chart still saves ([§4.3](#43-writing-midichartwriter)). In Chart Builder, an Error
   blocks **Save and pack**, not Save. In the library, it blocks nothing
   ([C16](#c16-chart-lint)).
 - **Warning:** likely a mistake, or likely to play badly.
@@ -1283,7 +1393,7 @@ track with `[ENABLE_CHART_DYNAMICS]`.
 | 126 | Drums: roll (single lane) |
 | 127 | Drums: trill (two lanes) |
 
-These pitches on a part track are kept as `RawEvent`s ([§4.1](#editable-model)): the charter
+These pitches on a part track are kept as `RawEvent`s ([§4.1](#editable-model)): Chart Builder
 doesn't edit them, but writes them back unchanged.
 
 | Pitch | Meaning |
@@ -1293,7 +1403,7 @@ doesn't edit them, but writes them back unchanged.
 | Anything else | For example Rock Band animation notes. Kept as it is. |
 
 A song whose `multiplier_note` is 103 keeps its star power on 103 instead of 116, and has no solos
-(`ChartReadOptions.MultiplierNote`). The charter reads such charts as they are, and always writes
+(`ChartReadOptions.MultiplierNote`). Chart Builder reads such charts as they are, and always writes
 star power on 116 and solos on 103, clearing `multiplier_note` (shown as a pending change).
 
 A roll or trill reaches Expert only, unless its velocity extends it to lower difficulties: 21–30
@@ -1318,7 +1428,7 @@ The tempo track, each part (`PART GUITAR`, `PART BASS`, `PART RHYTHM`, `PART GUI
 `EVENTS` and `BEAT` (pitch 12 on each measure's downbeat and 13 on other beats). Everything else is
 passed through ([§4.2](#lossless-passthrough)), including:
 
-- `PART KEYS`, which `MidiChartReader` reads as a 5-fret part, but which the charter doesn't edit
+- `PART KEYS`, which `MidiChartReader` reads as a 5-fret part, but which Chart Builder doesn't edit
   in v1;
 - `PART DRUMS_2X`, which the app's reader doesn't recognise, and which doesn't follow edits to
   `PART DRUMS` (CHR048).
@@ -1327,7 +1437,7 @@ A legacy `T1 GEMS` or `PART REAL_DRUMS_PS` track is read as its part, and saved 
 name. If a file has two tracks for one part, the one `MidiChartReader` keeps is edited and the
 other is passed through.
 
-### 7.5 `song.ini` keys the charter writes
+### 7.5 `song.ini` keys Chart Builder writes
 
 Each part's difficulty rating, from the app's `MidiPartCatalog`. `-1` means "not rated", the same
 convention `MetadataDifficulty` already uses.
@@ -1339,7 +1449,7 @@ convention `MetadataDifficulty` already uses.
 | Drums (4-lane, 5-lane) | `diff_drums` |
 | Drums (Pro) | `diff_drums` and `diff_drums_real` |
 
-The other keys the charter writes are listed in [C17](#c17-save-and-export).
+The other keys Chart Builder writes are listed in [C17](#c17-save-and-export).
 
 ### 7.6 Drum layout conversion
 
@@ -1373,14 +1483,31 @@ are unchanged, and red stays red.
 
 ## 8. UI outline
 
-The charter replaces the library and detail panes in the main window. The toolbar stays, with the
-charter's own tools.
+Chart Builder has its own main window. It shows the home screen until a song is open, and then the
+editor, with the editor's tools in its toolbar.
+
+**Home screen:**
+
+```txt
+┌ Chart Builder ─────────────────────────────────────────────────────────┐
+│                                                                         │
+│   [+ New chart]    [Open folder…]    [Open .sng…]                       │
+│                                                                         │
+│   Recent                                                                │
+│   ┌───────────────────────────────────────────────────────────────────┐ │
+│   │ Artist – Title            D:\Songs\Artist - Title          today  │ │
+│   │ Other Artist – Song       D:\Songs\Other.sng           yesterday  │ │
+│   └───────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+│   Drop audio files to start a new chart, or a song to open it.          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 **Highway view:**
 
 ```txt
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
-│ ← Library   Artist – Title *    [Highway|Timeline]  Snap [1/16 ▾]  ⟲ ⟳   [Save ▾]    │
+│ ← Close     Artist – Title *    [Highway|Timeline]  Snap [1/16 ▾]  ⟲ ⟳   [Save ▾]    │
 ├──────────────┬────────────────────────────────────────────┬──────────────────────────┤
 │ PARTS        │ ▕▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▕ │ PROPERTIES               │
 │ ● Guitar     │   m42 ┼──┼──┼──┼──┼──┼  ·    [Chorus 2]  │ Note     m41 · beat 3    │
@@ -1494,30 +1621,51 @@ These are the defaults. Rebinding is future work.
 
 ## 10. Settings
 
-New settings, stored in `AppSettings`. `AppSettingsCatalog` can express Toggle, Integer, Range,
-Choice and Folder rows today. The charter adds a **Text** row kind (for the charter name). The
-latency map and the reduction rules aren't rows: they are edited in the calibration tool and the
-Reduce dialog, and Settings shows a button that opens each.
+Each app owns its settings file, and every file is in the per-user config folder
+(`UserConfigPaths.ConfigFolder`). Both apps read and write theirs through Core's
+`JsonSettingsFile<T>`. Several processes can share a file (several Chart Builders, say), so a save
+re-reads the file and replaces only the settings this process changed since it last loaded or saved.
+Other processes' changes to the other settings, and keys this version doesn't know, are kept. Each
+save writes its own temp file and renames it into place.
+
+| File | Owner | Holds |
+| ---- | ----- | ----- |
+| `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
+| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the wizard's last-used values (the last parent folder) and the recent songs |
+| `audio-latency.json` | Chart Builder's calibration tool | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when its window is activated ([§4.8](#48-launching-and-coordination)). |
+
+Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
+and the Core `SettingDefinition` catalog that Chart Packer's uses. The catalog can express Toggle,
+Integer, Range, Choice, Folder and Text rows. The latency map and the reduction rules aren't rows:
+they are edited in the calibration tool and the Reduce dialog, and Settings shows a button that
+opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
+`ChartBuilder --calibrate`.
 
 | Setting | Default |
 | ------- | ------- |
 | Default resolution for new charts | 480 |
 | Default snap | 1/16 |
 | Default editor view | Highway |
-| Editor highway speed | The same as the inspector's `HighwayNoteSpeed` |
+| Editor highway speed | The inspector's default `HighwayNoteSpeed` |
 | Notes keep ticks or times when the tempo changes | Keep ticks |
 | Waveform or spectrogram behind the lanes | Waveform |
 | Spectrogram memory budget | 256 MB |
 | Metronome volume / hit-sound volume | 50% / 50% |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
-| Prompt for calibration on first charter use | On |
+| Prompt for calibration on first editor use | On |
 | Autosave interval | 2 minutes |
 | Default charter name | Empty. Prefills `charter` in the wizard, and fills an empty `charter` on save |
 | Default difficulty reduction rules | As in [C9](#c9-difficulty-authoring). The Reduce dialog starts from them, and its changes apply to one run only. |
 
 There is no existing playback-offset setting in `AppSettings` to extend. The latency is new. It is
-stored as two maps, from device ID and from device name to milliseconds, plus the fallback, and is
-looked up in that order ([C11](#c11-calibration-tool)).
+stored in `audio-latency.json` as two maps, from device ID and from device name to milliseconds,
+plus the fallback, and is looked up in that order ([C11](#c11-calibration-tool)). The file is
+written to a temp file and renamed into place, as `settings.json` is, so a reader never sees half
+of it.
+
+The wizard's settings (default charter name, default resolution and last parent folder) moved
+from `AppSettings` to `BuilderSettings` when the wizard moved to Chart Builder, before any release
+included them, so nothing is migrated.
 
 ## 11. Non-functional requirements
 
@@ -1548,18 +1696,20 @@ looked up in that order ([C11](#c11-calibration-tool)).
 | Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the beep's position in the mixed output for a given latency (AC C11.1) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the wizard and calibration view models against fake services. There are no automated UI tests, as in v1. |
+| Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two `FileStream`s in one test process standing in for two processes, and released when the holder is disposed (AC C2.5); `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
 
 **Test isolation** is as in [project-spec §10](project-spec-v1.md#10-testing-strategy). Tests use
-temp folders only. The recovery folder, the latency settings and the new-chart wizard's last-used
-values take explicit paths, which keep tests away from the real config folder. `UserConfigGuard`
+temp folders only. The recovery folder, the lock folder, the latency file and Chart Builder's
+settings file take explicit paths, which keep tests away from the real config folder. `UserConfigGuard`
 fails the run if anything there changes anyway.
 
 ## 13. Milestones
 
 | Milestone | Contents | Exit criteria |
 | --------- | -------- | ------------- |
+| **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartPacker.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and the C1 wizard moved from Chart Packer as it is. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; the wizard opens from Chart Builder's home screen and from dropped audio files |
 | **CM1: Model, writer and lint engine** | `EditableChart` and friends, `MidiChartLoader`, `MidiChartWriter`, passthrough and re-ticking, the game-view projection and extended read-back check, `MidiChartReader` reading dynamics, commands and undo. The lint engine: rule scopes, `Finding`'s chart location, and chart quick fixes. The `SongFolderFiles` order change. And the tests. | Every round-trip and writer-vs-reader test passes, and AC C2.4; zero AOT warnings |
-| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration, C1 wizard (without **Detect from audio**), C2 open and import, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
+| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 wizard (without **Detect from audio**), C2 open and import, with **Edit chart** turned on (`ChartBuilderLauncher.CanOpenSongs`), `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), and the player and highway view models moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
 | **CM3: Drums and GHL** | C6 all three drum variants and conversion, C7 GHL, C8 phrases and events, and the drums and phrase lint rules | AC C6, C7 and C8 pass |
 | **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and the wizard's **Detect from audio** | AC C12, C13 and C14 pass |
 | **CM5: Authoring tools** | C9 reduction, C15 record mode, clipboard and transforms, C16 lint in the library, C18 preview and suggested difficulty | AC C9, C15, C16 and C18 pass |
@@ -1577,17 +1727,27 @@ fails the run if anything there changes anyway.
 - A MIDI drum kit or controller as the input for record mode.
 - Rebindable shortcuts.
 - Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
-  library and inspector as well as the charter.
+  library and inspector as well as Chart Builder.
 
 ## 15. Open questions
 
 Decisions already made for v1, recorded here so they aren't reopened by accident:
 
-- **Format:** the charter saves `notes.mid` only, and `.chart` is import only.
-- **Placement:** a screen in the main app, not a separate window or program.
+- **Format:** Chart Builder saves `notes.mid` only, and `.chart` is import only.
+- **Placement:** a separate app, Chart Builder, installed with Chart Packer by the same installer.
+  The two share code (`ChartPacker.Core`, `.Audio`, `.Video`, `.UI`) but no process. They
+  coordinate through command-line launches, a per-song lock file, and Chart Packer re-reading the
+  songs Chart Builder changed. There is no IPC ([§4.8](#48-launching-and-coordination)).
+- **Drafts:** each app keeps its own. Chart Packer asks to save or discard a song's drafts before
+  opening it in Chart Builder ([§4.6](#46-saving)).
+- **Settings:** each app writes only its own file. The latency is a shared file that only Chart
+  Builder writes ([§10](#10-settings)).
+- **New chart wizard:** part of Chart Builder only. It was moved from Chart Packer as it was, and
+  its design is still to be revisited. Chart Packer has no **New chart**. Its only way into Chart
+  Builder is **Edit chart**, for exactly one selected song.
 - **Views:** Highway and Timeline, both in v1.
 - **Spectrogram:** held in memory only, within a budget.
-- **4-lane ↔ 5-lane:** a fixed mapping of the charter's own ([§7.6](#76-drum-layout-conversion)),
+- **4-lane ↔ 5-lane:** a fixed mapping of Chart Builder's own ([§7.6](#76-drum-layout-conversion)),
   close to what the games do but chosen to round-trip, because Clone Hero and YARG don't share one
   mapping.
 - **Resolution:** 480 for new charts, and 192 or 960 by choice.
@@ -1604,7 +1764,7 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   the global fallback ([C11](#c11-calibration-tool)).
 - **`.chart` after import:** removed on the first save, after a confirmation. No backup is kept
   ([C2](#c2-open-and-import)).
-- **Suggested difficulty:** shown in the charter only, with fixed hand-set weights in v1. Tuning and
+- **Suggested difficulty:** shown in Chart Builder only, with fixed hand-set weights in v1. Tuning and
   showing it in the library are future work ([C18](#c18-preview)).
 - **Generated drum fills:** the author picks the spacing, length and ending note on each run
   ([C6](#c6-drums-4-lane-pro-and-5-lane)).

@@ -1,0 +1,19 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ChartBuilder.App"
+             RequestedThemeVariant="Dark">
+             <!-- Dark only, like Chart Packer and the rhythm games the charts are for. -->
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://ChartPacker.UI/Styles/Icons.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <!-- The palette, colours and common styles are shared with Chart Packer. -->
+    <Application.Styles>
+        <StyleInclude Source="avares://ChartPacker.UI/Styles/AppTheme.axaml" />
+    </Application.Styles>
+</Application>

@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="NewChartWindowTitle" xml:space="preserve">
+    <value>New chart</value>
+  </data>
+  <data name="NewChartStepSong" xml:space="preserve">
+    <value>① Song</value>
+    <comment>The wizard's first step, in its header.</comment>
+  </data>
+  <data name="NewChartStepAudio" xml:space="preserve">
+    <value>② Audio</value>
+  </data>
+  <data name="NewChartStepTiming" xml:space="preserve">
+    <value>③ Timing</value>
+  </data>
+  <data name="NewChartStepParts" xml:space="preserve">
+    <value>④ Parts</value>
+  </data>
+  <data name="NewChartSongHeading" xml:space="preserve">
+    <value>Song</value>
+  </data>
+  <data name="NewChartNameLabel" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="NewChartArtistLabel" xml:space="preserve">
+    <value>Artist</value>
+  </data>
+  <data name="NewChartAlbumLabel" xml:space="preserve">
+    <value>Album</value>
+  </data>
+  <data name="NewChartGenreLabel" xml:space="preserve">
+    <value>Genre</value>
+  </data>
+  <data name="NewChartYearLabel" xml:space="preserve">
+    <value>Year</value>
+  </data>
+  <data name="NewChartCharterLabel" xml:space="preserve">
+    <value>Charter</value>
+  </data>
+  <data name="NewChartSongHint" xml:space="preserve">
+    <value>Empty fields are filled in from the first audio file's tags. The charter comes from Settings.</value>
+  </data>
+  <data name="NewChartArtLabel" xml:space="preserve">
+    <value>Album art</value>
+  </data>
+  <data name="NewChartNoArt" xml:space="preserve">
+    <value>No album art</value>
+  </data>
+  <data name="NewChartChooseArtButton" xml:space="preserve">
+    <value>Choose…</value>
+  </data>
+  <data name="NewChartRemoveArtButton" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="NewChartPickArtTitle" xml:space="preserve">
+    <value>Choose album art</value>
+  </data>
+  <data name="NewChartFieldProblemFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>Why Next is disabled on the Song step. {0} is the field, e.g. Artist; {1} what's wrong with it.</comment>
+  </data>
+  <data name="NewChartAudioHeading" xml:space="preserve">
+    <value>Audio files</value>
+  </data>
+  <data name="NewChartAudioEmpty" xml:space="preserve">
+    <value>Drop audio files here, or choose Add files.</value>
+  </data>
+  <data name="NewChartAudioHint" xml:space="preserve">
+    <value>Each file is stored as the stem its name says, e.g. Drums.ogg as drums. A file whose name isn't a stem is the song if nothing else is.</value>
+  </data>
+  <data name="NewChartAddFilesButton" xml:space="preserve">
+    <value>Add files…</value>
+  </data>
+  <data name="NewChartPickAudioTitle" xml:space="preserve">
+    <value>Choose audio files</value>
+  </data>
+  <data name="NewChartNoAudioLabel" xml:space="preserve">
+    <value>No audio — length</value>
+  </data>
+  <data name="NewChartLengthLabel" xml:space="preserve">
+    <value>Length</value>
+  </data>
+  <data name="NewChartLengthToolTip" xml:space="preserve">
+    <value>How long the song is, as minutes and seconds, e.g. 3:30.</value>
+  </data>
+  <data name="NewChartStemLabel" xml:space="preserve">
+    <value>Stem</value>
+  </data>
+  <data name="NewChartStemPlaceholder" xml:space="preserve">
+    <value>Choose a stem</value>
+  </data>
+  <data name="NewChartRemoveFileToolTip" xml:space="preserve">
+    <value>Remove this file</value>
+  </data>
+  <data name="NewChartAudioFormatFormat" xml:space="preserve">
+    <value>{0} {1:0.#} kHz</value>
+    <comment>An audio file's format and sample rate, e.g. "OGG 44.1 kHz".</comment>
+  </data>
+  <data name="NewChartAudioUnusableFormat" xml:space="preserve">
+    <value>It can't be used: {0}</value>
+    <comment>{0} is why the file doesn't decode.</comment>
+  </data>
+  <data name="NewChartAudioChecking" xml:space="preserve">
+    <value>Checking the audio files…</value>
+  </data>
+  <data name="NewChartNoAudioChosen" xml:space="preserve">
+    <value>Add audio files, or tick No audio and enter a length.</value>
+  </data>
+  <data name="NewChartLengthInvalid" xml:space="preserve">
+    <value>Enter the length as minutes and seconds, e.g. 3:30.</value>
+  </data>
+  <data name="NewChartFileProblemFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is the file's name; {1} why it can't be used.</comment>
+  </data>
+  <data name="NewChartStemUnassignedFormat" xml:space="preserve">
+    <value>Choose a stem for {0}.</value>
+    <comment>{0} is the file's name.</comment>
+  </data>
+  <data name="NewChartStemSharedFormat" xml:space="preserve">
+    <value>{0} are both stored as {1}. A stem can have only one file.</value>
+    <comment>{0} lists the files' names; {1} is the stem.</comment>
+  </data>
+  <data name="NewChartTimingHeading" xml:space="preserve">
+    <value>Timing</value>
+  </data>
+  <data name="NewChartBpmLabel" xml:space="preserve">
+    <value>Starting BPM</value>
+  </data>
+  <data name="NewChartTimeSignatureLabel" xml:space="preserve">
+    <value>Time signature</value>
+  </data>
+  <data name="NewChartBeatsPerMeasureLabel" xml:space="preserve">
+    <value>Beats per measure</value>
+  </data>
+  <data name="NewChartBeatValueLabel" xml:space="preserve">
+    <value>Beat value</value>
+  </data>
+  <data name="NewChartResolutionLabel" xml:space="preserve">
+    <value>Resolution</value>
+  </data>
+  <data name="NewChartResolutionHint" xml:space="preserve">
+    <value>Ticks per beat. At 192, 480 and 960 every common snap lands on a whole tick.</value>
+  </data>
+  <data name="NewChartLeadInLabel" xml:space="preserve">
+    <value>Audio lead-in</value>
+  </data>
+  <data name="NewChartMillisecondsUnit" xml:space="preserve">
+    <value>ms</value>
+  </data>
+  <data name="NewChartLeadInHint" xml:space="preserve">
+    <value>How much later the chart plays against the audio. Saved as delay.</value>
+  </data>
+  <data name="NewChartBpmMissing" xml:space="preserve">
+    <value>Enter a starting BPM.</value>
+  </data>
+  <data name="NewChartTimeSignatureMissing" xml:space="preserve">
+    <value>Enter the time signature's beats per measure.</value>
+  </data>
+  <data name="NewChartLeadInMissing" xml:space="preserve">
+    <value>Enter a lead-in, or 0 for none.</value>
+  </data>
+  <data name="NewChartPartsHeading" xml:space="preserve">
+    <value>Parts</value>
+  </data>
+  <data name="NewChartFiveFretHeading" xml:space="preserve">
+    <value>5-fret</value>
+  </data>
+  <data name="NewChartGhlHeading" xml:space="preserve">
+    <value>6-fret (GHL)</value>
+  </data>
+  <data name="NewChartDrumsHeading" xml:space="preserve">
+    <value>Drums</value>
+  </data>
+  <data name="NewChartDrumsVariantLabel" xml:space="preserve">
+    <value>Drums layout</value>
+  </data>
+  <data name="NewChartDrumsFourLane" xml:space="preserve">
+    <value>4-lane</value>
+  </data>
+  <data name="NewChartDrumsPro" xml:space="preserve">
+    <value>Pro (4-lane with cymbals)</value>
+  </data>
+  <data name="NewChartDrumsFiveLane" xml:space="preserve">
+    <value>5-lane</value>
+  </data>
+  <data name="NewChartPartsHint" xml:space="preserve">
+    <value>Each part starts with all four difficulties empty.</value>
+  </data>
+  <data name="NewChartLocationHeading" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="NewChartParentLabel" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="NewChartFolderNameLabel" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="NewChartNoParentDisplay" xml:space="preserve">
+    <value>No folder chosen</value>
+  </data>
+  <data name="NewChartPickFolderTitle" xml:space="preserve">
+    <value>Choose where to create the song</value>
+  </data>
+  <data name="NewChartDefaultFolderName" xml:space="preserve">
+    <value>New chart</value>
+    <comment>The new song's folder name when it has no name yet.</comment>
+  </data>
+  <data name="NewChartNoParts" xml:space="preserve">
+    <value>Tick at least one part.</value>
+  </data>
+  <data name="NewChartNoParent" xml:space="preserve">
+    <value>Choose the folder to create the song in.</value>
+  </data>
+  <data name="NewChartParentMissing" xml:space="preserve">
+    <value>The folder to create the song in doesn't exist.</value>
+  </data>
+  <data name="NewChartFolderExistsFormat" xml:space="preserve">
+    <value>{0} already exists there. An existing folder is never used; choose another name.</value>
+    <comment>{0} is the folder name.</comment>
+  </data>
+  <data name="NewChartFolderInvalidFormat" xml:space="preserve">
+    <value>The folder name can't be used: {0}</value>
+    <comment>{0} is why, e.g. it has a reserved character.</comment>
+  </data>
+  <data name="NewChartBackButton" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="NewChartNextButton" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="NewChartCreateButton" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="NewChartCreating" xml:space="preserve">
+    <value>Creating the song…</value>
+  </data>
+  <data name="NewChartCanceled" xml:space="preserve">
+    <value>Cancelled. Nothing was created.</value>
+  </data>
+  <data name="NewChartFailedFormat" xml:space="preserve">
+    <value>The song couldn't be created: {0}</value>
+    <comment>{0} is the error.</comment>
+  </data>
+  <data name="SettingsCategoryCharter" xml:space="preserve">
+    <value>Charter</value>
+  </data>
+  <data name="SettingsCategoryNewCharts" xml:space="preserve">
+    <value>New charts</value>
+  </data>
+  <data name="DefaultCharterNameLabel" xml:space="preserve">
+    <value>Default charter name</value>
+  </data>
+  <data name="DefaultCharterNameDescription" xml:space="preserve">
+    <value>Filled in as the charter of a new chart.</value>
+  </data>
+  <data name="DefaultCharterNameKeywords" xml:space="preserve">
+    <value>charter author name new chart wizard</value>
+  </data>
+  <data name="DefaultCharterNamePlaceholder" xml:space="preserve">
+    <value>Your name</value>
+  </data>
+  <data name="DefaultChartResolutionLabel" xml:space="preserve">
+    <value>Default resolution</value>
+  </data>
+  <data name="DefaultChartResolutionDescription" xml:space="preserve">
+    <value>The resolution a new chart starts with, in ticks per beat. At 192, 480 and 960 every common snap lands on a whole tick.</value>
+  </data>
+  <data name="DefaultChartResolutionKeywords" xml:space="preserve">
+    <value>resolution ticks beat new chart wizard</value>
+  </data>
+  <data name="ChartResolutionFormat" xml:space="preserve">
+    <value>{0} ticks per beat</value>
+    <comment>A chart resolution, e.g. "480 ticks per beat".</comment>
+  </data>
+  <data name="AppName" xml:space="preserve">
+    <value>Chart Builder</value>
+    <comment>The app's name, shown as the main window's title and on the home screen.</comment>
+  </data>
+  <data name="HomeTagline" xml:space="preserve">
+    <value>Make charts for Clone Hero, YARG and the other games that read notes.mid.</value>
+  </data>
+  <data name="HomeNewChartButton" xml:space="preserve">
+    <value>New chart</value>
+  </data>
+  <data name="HomeNewChartToolTip" xml:space="preserve">
+    <value>Create a chart from scratch, with or without audio (Ctrl+N).</value>
+  </data>
+  <data name="HomeSettingsButton" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="HomeSettingsToolTip" xml:space="preserve">
+    <value>Chart Builder's settings (Ctrl+,).</value>
+  </data>
+  <data name="HomeHint" xml:space="preserve">
+    <value>Drop audio files here to start a new chart with them. Opening and editing charts comes with the chart editor.</value>
+  </data>
+  <data name="ChartCreatedFormat" xml:space="preserve">
+    <value>Created {0}</value>
+    <comment>Shown on the home screen after the New chart wizard. {0} is the song folder's path.</comment>
+  </data>
+  <data name="ArgsUnknownOptionFormat" xml:space="preserve">
+    <value>Chart Builder doesn't know the option {0}.</value>
+    <comment>Started with bad command-line arguments. {0} is the option.</comment>
+  </data>
+  <data name="ArgsUnexpectedArgumentFormat" xml:space="preserve">
+    <value>Chart Builder didn't expect {0} on its command line.</value>
+    <comment>Started with bad command-line arguments. {0} is the argument.</comment>
+  </data>
+  <data name="OpenSongUnavailableFormat" xml:space="preserve">
+    <value>Chart Builder can't open songs yet, so {0} wasn't opened.</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="CalibrateUnavailable" xml:space="preserve">
+    <value>The calibration tool isn't in Chart Builder yet.</value>
+  </data>
+  <data name="UnexpectedErrorFormat" xml:space="preserve">
+    <value>Something went wrong: {0}</value>
+    <comment>Shown on the home screen when the New chart wizard fails unexpectedly. {0} is the error message.</comment>
+  </data>
+</root>
