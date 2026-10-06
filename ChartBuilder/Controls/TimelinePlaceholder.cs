@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using ChartPacker.Core.Charting;
 
 namespace ChartBuilder.Controls
 {
@@ -12,10 +13,18 @@ namespace ChartBuilder.Controls
     /// Stands in for the editor's timeline: second marks, a made-up waveform where the full mix will be drawn, and a
     /// playhead that clicking or dragging moves (scrubbing). The notes come later.
     /// </summary>
+    /// <remarks>
+    /// The playhead is drawn by a layer of its own over the rest, so scrubbing redraws only the line, not the ruler and
+    /// waveform under it.
+    /// </remarks>
     public sealed class TimelinePlaceholder : Control
     {
         private const double RulerHeight = 18;
         private const double BarWidth = 3;
+        private const double MinLabelSpacing = 56;
+
+        private readonly PlayheadLayer _playhead;
+        private Pen? _tickPen;
 
         public static readonly StyledProperty<double> PositionProperty =
             AvaloniaProperty.Register<TimelinePlaceholder, double>(nameof(Position), defaultBindingMode: BindingMode.TwoWay);
@@ -34,8 +43,14 @@ namespace ChartBuilder.Controls
 
         static TimelinePlaceholder()
         {
-            AffectsRender<TimelinePlaceholder>(PositionProperty, LengthProperty, WaveformBrushProperty, TickBrushProperty, PlayheadBrushProperty);
+            AffectsRender<TimelinePlaceholder>(LengthProperty, WaveformBrushProperty, TickBrushProperty);
             ClipToBoundsProperty.OverrideDefaultValue<TimelinePlaceholder>(true);
+        }
+
+        public TimelinePlaceholder()
+        {
+            _playhead = new PlayheadLayer(this);
+            VisualChildren.Add(_playhead);
         }
 
         /// <summary>The playhead, in seconds.</summary>
@@ -71,6 +86,22 @@ namespace ChartBuilder.Controls
             set => SetValue(PlayheadBrushProperty, value);
         }
 
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+
+            if (change.Property == TickBrushProperty)
+                _tickPen = null;
+            if (change.Property == PositionProperty || change.Property == LengthProperty || change.Property == PlayheadBrushProperty)
+                _playhead.InvalidateVisual();
+        }
+
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            _playhead.Arrange(new Rect(finalSize));
+            return finalSize;
+        }
+
         public override void Render(DrawingContext context)
         {
             var bounds = new Rect(Bounds.Size);
@@ -80,12 +111,6 @@ namespace ChartBuilder.Controls
 
             DrawWaveform(context, bounds);
             DrawRuler(context, bounds);
-
-            if (PlayheadBrush is { } playhead)
-            {
-                double x = Math.Round(XOf(Position, bounds.Width)) + 0.5;
-                context.DrawLine(new Pen(playhead, 1.5), new Point(x, 0), new Point(x, bounds.Height));
-            }
         }
 
         private void DrawWaveform(DrawingContext context, Rect bounds)
@@ -114,7 +139,7 @@ namespace ChartBuilder.Controls
             if (TickBrush is not { } brush)
                 return;
 
-            var pen = new Pen(brush, 1);
+            var pen = _tickPen ??= new Pen(brush, 1);
             context.DrawLine(pen, new Point(0, RulerHeight - 0.5), new Point(bounds.Width, RulerHeight - 0.5));
 
             // A labelled mark at a round step that leaves room for its label, and a short mark between each.
@@ -128,23 +153,26 @@ namespace ChartBuilder.Controls
                 context.DrawLine(pen, new Point(between, RulerHeight - 4), new Point(between, RulerHeight));
 
                 var label = new FormattedText(
-                    TimeSpan.FromSeconds(t).ToString(@"m\:ss", CultureInfo.CurrentCulture),
+                    SongTime.Format(TimeSpan.FromSeconds(t)),
                     CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10, brush);
                 context.DrawText(label, new Point(x + 3, 1));
             }
         }
 
-        /// <summary>The smallest of 1, 2, 5, 10, 15, 30 or 60 seconds that keeps labels at least 56px apart.</summary>
+        /// <summary>
+        /// The smallest round step, from a second up to an hour, that keeps labels at least
+        /// <see cref="MinLabelSpacing"/> apart, or as many whole hours as that takes on a very long timeline.
+        /// </summary>
         private double LabelStep(double width)
         {
             double pixelsPerSecond = width / Length;
-            foreach (double step in (ReadOnlySpan<double>)[1, 2, 5, 10, 15, 30])
+            foreach (double step in (ReadOnlySpan<double>)[1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600])
             {
-                if (step * pixelsPerSecond >= 56)
+                if (step * pixelsPerSecond >= MinLabelSpacing)
                     return step;
             }
 
-            return 60;
+            return Math.Ceiling(MinLabelSpacing / pixelsPerSecond / 3600) * 3600;
         }
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -181,5 +209,28 @@ namespace ChartBuilder.Controls
         private double XOf(double seconds, double width) => seconds / Length * width;
 
         private double TimeOf(double x, double width) => x / width * Length;
+
+        /// <summary>The playhead's line, over the ruler and waveform, which its owner redraws only when it moves.</summary>
+        private sealed class PlayheadLayer(TimelinePlaceholder owner) : Control
+        {
+            private Pen? _pen;
+            private IBrush? _penBrush;
+
+            public override void Render(DrawingContext context)
+            {
+                double width = Bounds.Width;
+                if (owner.PlayheadBrush is not { } brush || owner.Length <= 0 || width <= 0)
+                    return;
+
+                if (!ReferenceEquals(_penBrush, brush))
+                {
+                    _pen = new Pen(brush, 1.5);
+                    _penBrush = brush;
+                }
+
+                double x = Math.Round(owner.XOf(owner.Position, width)) + 0.5;
+                context.DrawLine(_pen!, new Point(x, 0), new Point(x, Bounds.Height));
+            }
+        }
     }
 }

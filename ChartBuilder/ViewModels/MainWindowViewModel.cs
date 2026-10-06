@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
@@ -33,8 +36,7 @@ namespace ChartBuilder.ViewModels
                     ShowError(string.Format(CultureInfo.CurrentCulture, ProblemFormat(problem.Kind), problem.Argument));
                     break;
                 case { Start: BuilderStart.NewChart }:
-                    // The audio files given aren't used until the editor can set a chart up from them.
-                    NewChart();
+                    StartNewChart(args.AudioFiles);
                     break;
                 case { Start: BuilderStart.OpenSong }:
                     ShowError(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongUnavailableFormat, args.SongPath));
@@ -47,7 +49,26 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Closes the launcher and opens an empty Editor window.</summary>
         [RelayCommand]
-        public void NewChart() => editors.OpenEditor();
+        private void NewChart() => StartNewChart([]);
+
+        /// <summary>
+        /// Closes the launcher and opens an empty Editor window, which says <paramref name="audioFiles"/>, e.g. ones
+        /// dropped on the window, weren't added. Never throws: it's started from the command line, a drop or a
+        /// command, so a failure is shown on the home screen instead.
+        /// </summary>
+        public void StartNewChart(IReadOnlyList<string> audioFiles)
+        {
+            try
+            {
+                editors.OpenEditor(audioFiles);
+            }
+            catch (Exception ex)
+            {
+                // Nothing above this catches it, so anything not caught here would take the app down.
+                Trace.TraceError($"Opening the Editor failed: {ex}");
+                ShowError(string.Format(CultureInfo.CurrentCulture, Strings.UnexpectedErrorFormat, ex.Message));
+            }
+        }
 
         [RelayCommand]
         private Task OpenSettingsAsync() => settingsWindow.ShowAsync();

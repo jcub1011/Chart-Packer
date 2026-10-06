@@ -16,6 +16,9 @@ namespace ChartBuilder.Services
         /// <summary>The shortest the timeline can be dragged, and the least a saved height is restored as.</summary>
         public const double MinEditorTimelineHeight = 80;
 
+        /// <summary>The most a saved panel width or timeline height is restored as: wider than an 8K screen.</summary>
+        public const double MaxEditorPanelSize = 8192;
+
         /// <summary>The name a new chart's <c>charter</c> is filled in with. Empty for none.</summary>
         public string DefaultCharterName { get; set; } = "";
 

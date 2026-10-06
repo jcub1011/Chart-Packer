@@ -311,7 +311,8 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
 - **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
   `WindowChrome` for the dark title bar and icon, as the other dialogs do.
 - **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
-  with them ([C1](#c1-new-chart-from-scratch)), and a dropped song folder or `.sng`, which opens it
+  with them ([C1](#c1-new-chart-from-scratch), which says how they're treated until Chart settings
+  can take audio), and a dropped song folder or `.sng`, which opens it
   ([C2](#c2-open-and-import)). Chart Packer's main window takes no drops for Chart Builder.
 - Strings go in Chart Builder's own `Strings.resx`, and strings both apps use go in
   `ChartPacker.UI`'s `SharedStrings.resx`. New icons come from game-icons.net and are credited in
@@ -432,6 +433,8 @@ art. It is opened in the editor, and appears in Chart Packer's library
 - `ChartBuilder --new` on the command line ([§4.8](#48-launching-and-coordination)).
 
 Each closes the launcher and opens an empty **Editor window** ([§4.5](#45-app-chartbuilder)).
+Until Chart settings can take audio, audio files given by a drop or `--new` aren't added; the
+Editor says so in a notice under its toolbar, which the user can dismiss.
 
 Chart Packer has no **New chart**. Charts are created in Chart Builder, and Chart Packer's only way
 into it is **Edit chart** ([C2](#c2-open-and-import)).

@@ -5,6 +5,10 @@ using ChartPacker.Core.Scanning;
 namespace ChartPacker.Core.Charting;
 
 /// <summary>Makes a new chart's song folder (charter-spec C1, Create).</summary>
+/// <remarks>
+/// Nothing calls this, or the rest of the NewChart* pipeline, since the wizard was removed. It's kept for Chart
+/// settings, which will set a new chart's song up once it's designed.
+/// </remarks>
 public static class NewChartCreator
 {
     private const int BufferSize = 81920;

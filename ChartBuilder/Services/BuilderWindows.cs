@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -34,10 +35,10 @@ namespace ChartBuilder.Services
             }
         }
 
-        public void OpenEditor()
+        public void OpenEditor(IReadOnlyList<string> audioFiles)
         {
             var editor = new EditorWindow();
-            editor.DataContext = new EditorWindowViewModel(settings, SettingsWindowFor(editor));
+            editor.DataContext = new EditorWindowViewModel(settings, SettingsWindowFor(editor), audioFiles);
 
             // Back to the launcher when the user closes the editor, but not when the app or OS is shutting down. It
             // opens while the editor is still closing, so the app, which exits when its last window closes, stays up.

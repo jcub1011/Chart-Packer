@@ -116,6 +116,22 @@
   <data name="CalibrateUnavailable" xml:space="preserve">
     <value>The calibration tool isn't in Chart Builder yet.</value>
   </data>
+  <data name="UnexpectedErrorFormat" xml:space="preserve">
+    <value>Something went wrong: {0}</value>
+    <comment>Shown on the home screen when New chart fails unexpectedly. {0} is the error message.</comment>
+  </data>
+  <data name="EditorAudioFileNotAddedFormat" xml:space="preserve">
+    <value>{0} wasn't added: the Editor can't use audio yet. A song's audio will be set up from Chart settings.</value>
+    <comment>The editor's notice when New chart was given one audio file (dropped or on the command line). {0} is the file's name.</comment>
+  </data>
+  <data name="EditorAudioFilesNotAddedFormat" xml:space="preserve">
+    <value>{0} audio files weren't added: the Editor can't use audio yet. A song's audio will be set up from Chart settings.</value>
+    <comment>The editor's notice when New chart was given several audio files. {0} is how many.</comment>
+  </data>
+  <data name="DismissNoticeToolTip" xml:space="preserve">
+    <value>Dismiss</value>
+    <comment>Closes the editor's notice strip.</comment>
+  </data>
   <data name="EditorUntitledChart" xml:space="preserve">
     <value>Untitled chart</value>
     <comment>The editor's title before the chart has a name.</comment>

@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartPacker;
+using ChartPacker.Core.Charting;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -27,10 +30,14 @@ namespace ChartBuilder.ViewModels
         private readonly BuilderSettingsService _settings;
         private readonly ISettingsWindowService _settingsWindow;
 
-        public EditorWindowViewModel(BuilderSettingsService settings, ISettingsWindowService settingsWindow)
+        /// <param name="settings">Where the layout is saved.</param>
+        /// <param name="settingsWindow">Opens Program settings.</param>
+        /// <param name="audioFiles">The audio files New chart was given, which the Editor can't use yet.</param>
+        public EditorWindowViewModel(BuilderSettingsService settings, ISettingsWindowService settingsWindow, IReadOnlyList<string> audioFiles)
         {
             _settings = settings;
             _settingsWindow = settingsWindow;
+            Notice = AudioNotAddedNotice(audioFiles);
 
             var saved = settings.Settings;
             LeftPanelWidth = saved.EditorLeftPanelWidth;
@@ -44,12 +51,20 @@ namespace ChartBuilder.ViewModels
 
         public string VersionText { get; } = string.Format(CultureInfo.CurrentCulture, Strings.VersionFormat, AppVersion.Semantic);
 
-        /// <summary>The Chart Inspector panel's width while expanded.</summary>
+        /// <summary>Something to tell the user, in a strip under the toolbar until they dismiss it. Null for none.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasNotice))]
+        public partial string? Notice { get; set; }
+
+        public bool HasNotice => Notice is not null;
+
+        /// <summary>The Chart Inspector panel's width while expanded, as the user last set it.</summary>
         public double LeftPanelWidth { get; set; }
 
-        /// <summary>The Properties panel's width while expanded.</summary>
+        /// <summary>The Properties panel's width while expanded, as the user last set it.</summary>
         public double RightPanelWidth { get; set; }
 
+        /// <summary>The timeline's height, as the user last set it.</summary>
         public double TimelineHeight { get; set; }
 
         [ObservableProperty]
@@ -75,6 +90,9 @@ namespace ChartBuilder.ViewModels
 
         [RelayCommand]
         private void ToggleRightPanel() => IsRightPanelCollapsed = !IsRightPanelCollapsed;
+
+        [RelayCommand]
+        private void DismissNotice() => Notice = null;
 
         [RelayCommand]
         private Task OpenProgramSettingsAsync() => _settingsWindow.ShowAsync();
@@ -111,8 +129,16 @@ namespace ChartBuilder.ViewModels
 
         private static bool IsImplemented() => false;
 
-        /// <summary>A time as m:ss.f, e.g. 3:05.2.</summary>
+        /// <summary>That <paramref name="audioFiles"/> weren't added, or null when there are none.</summary>
+        private static string? AudioNotAddedNotice(IReadOnlyList<string> audioFiles) => audioFiles.Count switch
+        {
+            0 => null,
+            1 => string.Format(CultureInfo.CurrentCulture, Strings.EditorAudioFileNotAddedFormat, Path.GetFileName(audioFiles[0])),
+            _ => string.Format(CultureInfo.CurrentCulture, Strings.EditorAudioFilesNotAddedFormat, audioFiles.Count),
+        };
+
+        /// <summary>A time as m:ss.f, or h:mm:ss.f from an hour, e.g. 3:05.2.</summary>
         private static string FormatTime(double seconds) =>
-            TimeSpan.FromSeconds(Math.Max(0, seconds)).ToString(@"m\:ss\.f", CultureInfo.CurrentCulture);
+            SongTime.Format(TimeSpan.FromSeconds(Math.Max(0, seconds)), decimals: 1);
     }
 }

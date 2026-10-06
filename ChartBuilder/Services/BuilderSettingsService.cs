@@ -48,8 +48,11 @@ namespace ChartBuilder.Services
             settings.EditorTimelineHeight = Size(settings.EditorTimelineHeight, BuilderSettings.MinEditorTimelineHeight, BuilderSettings.DefaultEditorTimelineHeight);
         }
 
-        /// <summary>A saved panel size, at least <paramref name="min"/>; <paramref name="fallback"/> when it isn't a number.</summary>
+        /// <summary>
+        /// A saved panel size, from <paramref name="min"/> to <see cref="BuilderSettings.MaxEditorPanelSize"/>;
+        /// <paramref name="fallback"/> when it isn't a number.
+        /// </summary>
         private static double Size(double value, double min, double fallback) =>
-            double.IsFinite(value) ? Math.Max(value, min) : fallback;
+            double.IsFinite(value) ? Math.Clamp(value, min, BuilderSettings.MaxEditorPanelSize) : fallback;
     }
 }
