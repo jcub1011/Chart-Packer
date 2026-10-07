@@ -16,14 +16,14 @@ its exit criteria. This file owns only the order and the status.
 
 ## At a glance
 
-| Order | Milestone | Status | Depends on |
-| ----: | --------- | ------ | ---------- |
-| 1 | [CM0: Split](#cm0-split) | Done (cleanup left) | — |
-| 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | CM0 |
-| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | CM1 |
-| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Not started | CM2 |
-| 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | CM2 |
-| 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | CM3, CM4 |
+| Order | Milestone | Status | Progress | Depends on |
+| ----: | --------- | ------ | -------- | ---------- |
+| 1 | [CM0: Split](#cm0-split) | Done (cleanup left) | Exit criteria met; 4 cleanup items left | — |
+| 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
+| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | Steps: 3 of 6. Exit criteria: 9 of 33 pass, 15 in part ([tracker](#cm2-progress)) | CM1 |
+| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Not started | — | CM2 |
+| 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
+| 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
 
 ---
 
@@ -183,6 +183,68 @@ This is the first milestone with a working editor. Its steps, in order:
    - [C15](charter-spec-v1.md#c15-editing-ergonomics) autosave and recovery.
    - [C17](charter-spec-v1.md#c17-save-and-export) save.
    - The timing, 5-fret and song lint rules ([§6](charter-spec-v1.md#lint-rules)).
+
+### CM2 progress
+
+As of 2026-10-06. Update this as each step lands, a test is added, or a hand check is done.
+
+**Steps.** "Hand-checked" means the user has tried it in the running apps (see
+[Where CM2 stands](#where-cm2-stands) for the checks).
+
+| Step | Built | Tests | Hand-checked |
+| ---- | ----- | ----- | ------------ |
+| 1. Specify Chart settings | Done | — | — |
+| 2. Playback and calibration | Done | Pass | Not yet |
+| 3. Open and import | Done, but for C2 items 5 to 7 | Pass | Not yet |
+| 4. New chart and Chart settings | Back end only (`NewChartCreator`) | Back end only | — |
+| 5. The editor (C3, C4, C5, C10) | Shell, timeline and play only | Model only | — |
+| 6. Saving and lint (C15, C17, rules) | Lint engine only (CM1) | Engine only | — |
+
+**Exit criteria** ([§13](charter-spec-v1.md#13-milestones): AC C1, C2, C3, C4, C5, C10, C11,
+C15.2 and C17).
+
+- **Passes:** the AC's own test passes, as the spec states it.
+- **In part:** a test covers the back end or the model, but the editor or the save it also
+  needs isn't built, or the AC's app flow is built but not tested.
+- **Not yet:** nothing covers it.
+
+| AC | Status | Covered by, or what's missing |
+| -- | ------ | ----------------------------- |
+| C1.1 | In part | `NewChartCreatorTests`, as far as it goes before the editor exists; Create isn't wired (step 4) |
+| C1.2 | In part | `NewChartCreatorTests`; Create isn't wired (step 4) |
+| C1.3 | In part | `NewChartCreatorTests`, `NewChartFolderTests`; Create isn't wired (step 4) |
+| C1.4 | In part | `NewChartStemsTests`, `NewChartCreatorTests`; Chart settings isn't built (step 4) |
+| C1.5 | In part | `NewChartIniTests`; Chart settings isn't built (step 4) |
+| C1.6 | Not yet | The resolution change (step 4) |
+| C1.7 | Not yet | Chart settings on an open song (step 4) |
+| C2.1 | In part | `MidiChartLoaderTests`, `MidiChartLoaderPartTests`, `MidiChartWriterTests`; saving from the app comes with C17 (step 6) |
+| C2.2 | In part | `MidiChartLoaderTests`; saving from the app comes with C17 (step 6) |
+| C2.3 | Not yet | Saving a `.sng` (step 6) |
+| C2.4 | Passes | `SongFolderFilesTests` (CM1) |
+| C2.5 | In part | `SongLockTests`; the second Chart Builder's refusal is built, and waits on a hand check |
+| C2.6 | In part | Chart Packer's refresh is built, but Chart Builder can't save yet (step 6) |
+| C3.1 | Not yet | Both views (step 5) |
+| C3.2 | Not yet | Both views and the tools (step 5) |
+| C4.1 | Not yet | Anchor absorption, and refusing an edit into an anchor (step 5) |
+| C4.2 | In part | `RetickTests`; the editor's tempo tools (step 5) |
+| C4.3 | Passes | `EditableTempoMapTests` |
+| C4.4 | In part | `MidiChartWriterTests`; saving, packing and reopening from the app (step 6) |
+| C5.1 | In part | `MidiChartWriterTests`; the 5-fret tools (step 5) |
+| C5.2 | In part | `GameViewTests`, `MidiChartWriterTests`; showing natural HOPOs in the editor (step 5) |
+| C10.1 | Passes | `StemPlayerTests` (slow: about 30 s) |
+| C10.2 | Passes | `LatencyCompensationTests` |
+| C11.1 | Passes | `CalibrationScheduleTests` |
+| C11.2 | Passes | `TapTestTests` (the mean of the kept taps, not the median) |
+| C11.3 | Passes | `LatencyCalibrationTests` |
+| C11.4 | Passes | `CalibrationScheduleTests` |
+| C11.5 | Passes | `LatencyCalibrationTests` |
+| C15.2 | Not yet | Autosave and recovery (step 6) |
+| C17.1 | Not yet | Chart Builder's save (step 6) |
+| C17.2 | In part | `MidiChartWriterTests`; Chart Builder's save (step 6) |
+| C17.3 | Not yet | `song.ini` pending changes (step 6) |
+| C17.4 | In part | `MidiChartWriterTests`; Chart Builder's save (step 6) |
+
+**Totals:** 9 pass, 15 in part, 9 not yet.
 
 ### Where CM2 stands
 
@@ -346,3 +408,11 @@ It comes last because these tools build on the rest:
 ## Keeping this current
 
 When a milestone's exit criteria pass, update its status here and in the table at the top.
+
+While a milestone is in progress, keep its progress tracker current:
+
+- mark a step built when it lands, and hand-checked when the user has tried it;
+- move an AC to **Passes** when a test of it, as the spec states it, passes;
+- update the totals and the **Progress** column at the top to match.
+
+A milestone gets its tracker when its work starts.
