@@ -313,15 +313,16 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   Creating the chart there, or opening a song, closes the launcher and opens an **Editor window**
   in its place. Closing the Editor brings the launcher back.
 - **Editor window** ([§8](#8-ui-outline)):
-  - **Toolbar.** It shows the program's icon and version, a **Settings** menu with **Chart
-    settings** and **Program settings**, the editing tools, and **Undo** and **Redo**. Its groups
-    wrap onto more rows as the window narrows rather than scrolling.
+  - **Toolbar.** It shows the program's icon and version, a **Settings** button that opens
+    **Program settings**, the editing tools, and **Undo** and **Redo**. Its groups wrap onto more
+    rows as the window narrows rather than scrolling.
   - **Side panels, tabbed and docked like Visual Studio's tool windows.** The left one has the
     **Chart Inspector** tab: Chart Packer's inspector without the background video or image, the
-    note highway or the lyric lane, which the editor itself shows. The right one has the
-    **Properties** tab, which shows the selection ([C3](#c3-editor-layout)).
-  - Each panel can be resized, and collapsed to a strip along the window's edge that brings it back
-    when clicked. Their widths and whether each is collapsed are saved
+    note highway or the lyric lane, which the editor itself shows; and the **Chart settings** tab
+    ([C1](#c1-new-chart-and-chart-settings)). The right one has the **Properties** tab, which shows
+    the selection ([C3](#c3-editor-layout)).
+  - Each panel can be resized, and collapsed to a strip along the window's edge showing its tabs'
+    titles, each of which brings the panel back on that tab. Their widths and whether each is collapsed are saved
     ([§10](#10-settings)).
   - **Timeline**, along the bottom at the window's full width. It shows the chart's notes over the
     waveform of the whole mix. It can be resized (the height is saved) and scrubbed.
@@ -333,9 +334,8 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   (place, select, erase, sustain, phrase, tempo), so behaviour is the same in both. Drawing builds
   on `NoteHighwayView`/`HighwayScene` (note shapes, lane colours, beat lines) and
   `LaneWaveformPainter`.
-- **`ChartSettingsWindow`** ([C1](#c1-new-chart-and-chart-settings)) and **`CalibrationWindow`**
-  ([C11](#c11-calibration-tool)) are dialogs. They use the shared `WindowChrome` for the dark title
-  bar and icon, as the other dialogs do.
+- **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
+  `WindowChrome` for the dark title bar and icon, as the other dialogs do.
 - **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
   with them as its stems ([C1](#c1-new-chart-and-chart-settings)), and a dropped song folder or
   `.sng`, which opens it
@@ -458,8 +458,8 @@ shown in the app's findings panel. Chart lint rules are listed in [§6](#lint-ru
 **New chart** opens a new chart in the Editor straight away. There is no wizard or dialog before it:
 the chart starts on defaults, and everything about it is set in the Editor.
 
-- **Chart settings** is a dialog on the Editor's ⚙ menu that sets the chart's timing and parts. It is
-  the same for a new chart and a song that was opened.
+- **Chart settings** is a tab in the Editor's left panel, beside the Chart Inspector, that sets the
+  chart's timing and parts. It is the same for a new chart and a song that was opened.
 - Everything else about the song (name, artist, charter, album, genre, year, album art, stems,
   `delay`, the difficulty ratings and any other `song.ini` key) is edited in the **Chart
   Inspector**, as in Chart Packer's inspector ([§4.5](#45-app-chartbuilder)). Chart settings doesn't
@@ -479,7 +479,7 @@ its lock, it is on the recent songs, and it appears in Chart Packer's library
   ([§4.5](#45-app-chartbuilder)), and `ChartBuilder --new` on the command line
   ([§4.8](#48-launching-and-coordination)). Each closes the launcher and opens the Editor with a new
   chart (below).
-- **Chart settings** on the Editor's ⚙ menu, for whatever chart is open.
+- The **Chart settings** tab in the Editor's left panel, for whatever chart is open.
 - A song with neither chart file is offered **New chart in this song** when it is opened
   ([C2](#c2-open-and-import)). That opens the Editor with a new chart in that song, and its first
   save adds `notes.mid` and the `song.ini` keys to the song through its draft ([§4.6](#46-saving)).
@@ -508,9 +508,9 @@ In the Chart Inspector, a new chart's name and artist are filled from the first 
 has them (`AudioFileInfo.Read`), and its charter from the **Default charter name** setting
 ([§10](#10-settings)).
 
-**The dialog.** Chart settings is a modal dialog with the shared `WindowChrome`. Its sections,
-**Timing** and **Parts**, are listed on the left, and choosing one scrolls to it (mock-up in
-[§8](#8-ui-outline)).
+**The tab.** Chart settings is a tab in the Editor's left panel, beside the Chart Inspector. Its
+sections, **Timing** and **Parts**, are one under the other, with each field's label above it, as
+the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on the Chart Inspector.
 
 **Timing.**
 
@@ -536,15 +536,19 @@ has them (`AudioFileInfo.Read`), and its charter from the **Default charter name
   [C6](#c6-drums-4-lane-pro-and-5-lane) (CM3). Until then the variant can be changed only while the
   part has no notes.
 
-**OK.**
+**Applying.**
 
-- The chart edits (resolution, tempo, time signature, parts and drum variant) are applied as **one
-  undoable command**.
+- Each change is applied as it is made, so the starting BPM and time signature can be found by ear
+  while the song plays; playback goes on, and its beats follow. A BPM or beats per measure being
+  typed is applied once the typing (or the spinner) pauses for 0.6 s, so a burst of typing is one
+  step. A value out of range is said under the timing and applies nothing.
+- Each applied change (resolution, tempo, time signature, parts or drum variant) is **one undoable
+  command**. Undo and redo show in the tab.
 - Their `song.ini` effects are added to Chart Builder's pending changes
   ([C17](#c17-save-and-export)): `diff_<part> = -1` for each added part, and
   `pro_drums`/`five_lane_drums` for the drum variant. A new chart has no `song.ini` yet, so every
   part's `diff_<part> = -1` and the drum keys are pending until its first save writes them.
-- OK with nothing changed adds no undo step and no pending change. **Cancel** changes nothing.
+- A change that leaves the chart as it was adds no undo step and no pending change.
 
 **Changing the resolution.**
 
@@ -606,10 +610,12 @@ Acceptance criteria:
   drums are read with the same layout.
 - **AC C1.6** Changing a chart's resolution from 480 to 960 moves nothing in time and gives no
   warning. From 480 to 192, a chart with a note at tick 1 gives the warning, with the number of
-  items that would move and the largest move. **Cancel** leaves the chart unchanged. **Change
-  anyway** is one undo step, and undoing it gives a model equal to the one before.
-- **AC C1.7** OK with nothing changed adds no undo step and no pending change, and Cancel changes
-  nothing. Adding a part through Chart settings shows its `diff_<part> = -1` as a pending change.
+  items that would move and the largest move. **Cancel** leaves the chart unchanged and puts the
+  resolution back. **Change anyway** is one undo step, and undoing it gives a model equal to the one
+  before.
+- **AC C1.7** A change that leaves the chart as it was adds no undo step and no pending change, and
+  typing a BPM adds one undo step once the typing pauses. Adding a part through Chart settings shows
+  its `diff_<part> = -1` as a pending change.
 
 ### C2. Open and import
 
@@ -1657,7 +1663,7 @@ Editor straight away, with no dialog before it.
 ┌ Untitled chart - Chart Builder ───────────────────────────────────────────────────────┐
 │ [◎ Chart Builder v0.3.0] [⚙ ◉] [Select|Place|Erase|Sustain|Phrase|Tempo] [⟲ ⟳]        │
 ├─────────────────────┬────────────────────────────────────────────┬────────────────────┤
-│ Chart Inspector   « │ Guitar·X ▾ + ✕┃Bass·X ▾ + ✕┃Drums·X ▾ + ✕  │ Properties       » │
+│ Inspector│Settings «│ Guitar·X ▾ + ✕┃Bass·X ▾ + ✕┃Drums·X ▾ + ✕  │ Properties       » │
 │                     │              ┃             ┃               │                    │
 │ Artist – Title      │   highway    ┃   highway   ┃   highway     │ Note  m41 · beat 3 │
 │ [album art]         │              ┃             ┃               │ Tick  78,960       │
@@ -1673,8 +1679,9 @@ Editor straight away, with no dialog before it.
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- The ⚙ menu has **Chart settings** and **Program settings**. The ◉ (View) menu will choose which
-  lanes are shown; it is a placeholder so far. The toolbar's groups wrap onto more rows as the
+- ⚙ opens **Program settings** (Ctrl+,). The left panel's tabs are the **Chart Inspector** and
+  **Chart settings**. The ◉ (View) menu will choose which lanes are shown; it is a placeholder so
+  far. The toolbar's groups wrap onto more rows as the
   window narrows.
 - The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part. They are
   docked like Visual Studio's tool windows: dragging a lane's header shows guides on the lane under
@@ -1685,7 +1692,7 @@ Editor straight away, with no dialog before it.
   closes it. The lanes, where they are and their sizes are saved (`LaneDockLayout`, in
   `ChartPacker.Core/Charting/Layout/`).
 - « and » collapse a panel to a strip along that edge, with its tab titles turned on their side.
-  Clicking a title brings the panel back. The panel widths, whether each is collapsed, and the
+  Clicking a title brings the panel back on that tab. The panel widths, whether each is collapsed, and the
   timeline's height (the ═ splitter above it) are saved.
 - Dragging or clicking on the timeline scrubs the playhead.
 
@@ -1728,21 +1735,33 @@ layout, so their part picker, findings and transport bar have still to be placed
 │   Onsets     │ ·  ·  ·   ·  · · ·   ·  ·   ·                                          │
 ```
 
-**Chart settings** (the ⚙ menu, for a new chart or a song opened):
+**Chart settings** (the left panel's tab, for a new chart or a song opened; each change applies as
+it is made):
 
 ```txt
-┌ Chart settings ──────────────────────────────────────────────────────────────┐
-│                                                                              │
-│ Timing   │ Resolution       [ 480 ▾ ]                                        │
-│ Parts    │ Starting BPM     [ 120.000 ]                                      │
-│          │ Time signature   [ 4 ] / [ 4 ▾ ]                                  │
-│          │                                                                   │
-│          │ ☑ Lead        ☐ Bass        ☐ Rhythm        ☐ Co-op               │
-│          │ ☐ GHL Guitar  ☐ GHL Bass    ☐ GHL Rhythm    ☐ GHL Co-op           │
-│          │ ☑ Drums  [ Pro ▾ ]                                                │
-│          │                                                                   │
-│          │                                             [Cancel]  [OK]        │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│ Chart Inspector │ Chart settings    «│
+├──────────────────────────────────────┤
+│ Timing                               │
+│ ┌──────────────────────────────────┐ │
+│ │ Resolution                       │ │
+│ │ [ 480 ▾                      ]   │ │
+│ │ Starting BPM                     │ │
+│ │ [ 120.000 ]                      │ │
+│ │ Time signature                   │ │
+│ │ [ 4 ] / [ 4 ▾ ]                  │ │
+│ └──────────────────────────────────┘ │
+│ Parts                                │
+│ ┌──────────────────────────────────┐ │
+│ │ ☑ Lead        ☐ Bass             │ │
+│ │ ☐ Rhythm      ☐ Co-op            │ │
+│ │ ☐ GHL Guitar  ☐ GHL Bass         │ │
+│ │ ☐ GHL Rhythm  ☐ GHL Co-op        │ │
+│ │ ☑ Drums                          │ │
+│ │ Drums                            │ │
+│ │ [ Pro ▾ ]                        │ │
+│ └──────────────────────────────────┘ │
+└──────────────────────────────────────┘
 ```
 
 **Calibration tool:**
@@ -1935,8 +1954,9 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   Editor straight away, and its first save asks where the song folder goes
   ([C1](#c1-new-chart-and-chart-settings)). Chart Packer has no **New chart**. Its only way into
   Chart Builder is **Edit chart**, for exactly one selected song.
-- **Chart settings and the Chart Inspector:** Chart settings, on the Editor's ⚙ menu, holds only the
-  chart's timing and parts. The name, artist, charter, every other `song.ini` key, the album art, the
+- **Chart settings and the Chart Inspector:** Chart settings, a tab beside the Chart Inspector in
+  the Editor's left panel, holds only the chart's timing and parts, and applies each change as it is
+  made. The name, artist, charter, every other `song.ini` key, the album art, the
   stems and `delay` are edited in the Chart Inspector.
 - **Changing the resolution:** allowed at any time. It re-ticks the chart keeping times, and warns
   first when anything would move in time or be left out ([C1](#c1-new-chart-and-chart-settings)).

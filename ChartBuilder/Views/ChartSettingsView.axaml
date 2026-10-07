@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="600"
+             x:Class="ChartBuilder.Views.ChartSettingsView"
+             x:DataType="vm:ChartSettingsViewModel">
+
+    <!-- Chart settings (charter-spec C1): the chart's timing and parts, each change applied as it's made. Each field's
+         label is above it, as the panel can be narrow. -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.section-heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style Selector="Border.section">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
+        <Style Selector="StackPanel.field">
+            <Setter Property="Spacing" Value="4" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="16,14" Spacing="10">
+            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionTiming}" />
+            <Border Classes="section">
+                <StackPanel Spacing="10">
+                    <StackPanel Classes="field">
+                        <TextBlock Text="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
+                        <ComboBox HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding Resolutions}"
+                                  SelectedItem="{Binding SelectedResolution}"
+                                  AutomationProperties.Name="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
+                    </StackPanel>
+                    <StackPanel Classes="field">
+                        <TextBlock Text="{x:Static res:Strings.ChartSettingsBpmLabel}" />
+                        <NumericUpDown HorizontalAlignment="Left"
+                                       Width="140"
+                                       Value="{Binding Bpm}"
+                                       Minimum="{x:Static vm:ChartSettingsViewModel.MinBpm}"
+                                       Maximum="{x:Static vm:ChartSettingsViewModel.MaxBpm}"
+                                       Increment="1"
+                                       FormatString="0.000"
+                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsBpmLabel}" />
+                    </StackPanel>
+                    <StackPanel Classes="field">
+                        <TextBlock Text="{x:Static res:Strings.ChartSettingsTimeSignatureLabel}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <NumericUpDown Width="110"
+                                           Value="{Binding Numerator}"
+                                           Minimum="1"
+                                           Maximum="{x:Static vm:ChartSettingsViewModel.MaxNumerator}"
+                                           Increment="1"
+                                           FormatString="0"
+                                           ParsingNumberStyle="Integer"
+                                           AutomationProperties.Name="{x:Static res:Strings.ChartSettingsNumeratorName}" />
+                            <TextBlock VerticalAlignment="Center" Text="/" />
+                            <ComboBox MinWidth="70"
+                                      ItemsSource="{Binding Denominators}"
+                                      SelectedItem="{Binding Denominator}"
+                                      AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDenominatorName}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <!-- What stops a change being applied, such as a BPM out of range. -->
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{DynamicResource WarningTextBrush}"
+                       Text="{Binding Problem}"
+                       IsVisible="{Binding HasProblem}" />
+
+            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />
+            <Border Classes="section">
+                <StackPanel Spacing="8">
+                    <ItemsControl ItemsSource="{Binding Parts}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel ItemSpacing="16" LineSpacing="4" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ChartPartChoice">
+                                <CheckBox MinWidth="120" Content="{Binding Label}" IsChecked="{Binding IsChecked}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Classes="field" IsVisible="{Binding HasDrums}">
+                        <TextBlock Text="{x:Static res:Strings.ChartSettingsDrumsLabel}" />
+                        <ComboBox MinWidth="120"
+                                  ItemsSource="{Binding DrumsVariants}"
+                                  SelectedItem="{Binding SelectedDrums}"
+                                  IsEnabled="{Binding CanChangeDrums}"
+                                  ToolTip.Tip="{Binding DrumsToolTip}"
+                                  ToolTip.ShowOnDisabled="True"
+                                  AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDrumsLabel}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

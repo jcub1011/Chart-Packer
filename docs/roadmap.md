@@ -143,7 +143,7 @@ This is the first milestone with a working editor. Its steps, in order:
 1. **Specify Chart settings.** *Done.* It replaces the removed wizard
    ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), and restates C1's acceptance
    criteria. *Restated in step 4:* New chart opens the Editor straight away, with no dialog before
-   it. Chart settings, on the Editor's ⚙ menu, holds only the chart's timing and parts; everything
+   it. Chart settings, a tab in the Editor's left panel, holds only the chart's timing and parts; everything
    else about the song is edited in the Chart Inspector, and a new chart's folder is chosen at its
    first save.
 2. **Playback and calibration.** *Done.*
@@ -179,8 +179,10 @@ This is the first milestone with a working editor. Its steps, in order:
    - **New chart**, from the launcher's tile, dropped audio and `--new`, opens the Editor straight
      away with an untitled chart (`EditorSong.New`): the default resolution, 120 BPM, 4/4 and a
      Lead part, with the audio files as its stems, played from where they are.
-   - **Chart settings** on the Editor's ⚙ menu, for a new chart or a song opened: timing and parts
-     as one undoable command, with the resolution change and its warning.
+   - **Chart settings**, a tab in the Editor's left panel beside the Chart Inspector, for a new
+     chart or a song opened: timing and parts, each change applied as it's made as one undoable
+     command (typed numbers once the typing pauses), with the resolution change and its warning.
+     ⚙ opens Program settings.
    - Undo and redo in the Editor, and a read-only list of the pending `song.ini` changes.
 5. **The editor.**
    - [C3](charter-spec-v1.md#c3-editor-layout) both views. The player and highway view models
@@ -297,8 +299,10 @@ been tried by hand yet. The checks still to do:
     added and why;
   - no audio: a silent timeline, and no "no audio" notice;
   - **Pending song.ini changes** listing `diff_guitar = -1`;
-- **Chart settings** (⚙ menu), on a new chart and on an opened song:
-  - OK with nothing changed, and Cancel: no undo step, nothing pending;
+- **Chart settings** (the left panel's tab), on a new chart and on an opened song:
+  - a change put back as it was: no undo step, nothing pending; typing a BPM while the song
+    plays: one undo step once the typing pauses, and the beats follow;
+  - the collapsed left panel's strip showing both tabs, each opening the panel on its tab;
   - a starting BPM change with **When a tempo changes** (Settings, **Editing**) on each choice;
   - adding a part, which shows `diff_<part> = -1` under **Pending song.ini changes**, and
     unticking a part with notes, which asks first;
@@ -324,7 +328,7 @@ been tried by hand yet. The checks still to do:
 | Settings rows | `ChartPacker.Core/Settings/` (`ActionSetting`, `ActionSettingEdit`) |
 | New chart and Chart settings' Core | `ChartPacker.Core/Charting/` (`EditorSong`, `NewChartStems.TracksOf` and `NewChartAudio`, `ChartSettingsEdit` and `ChartSettingsValues`, `ResolutionChangeReport`, `PendingSongIniChanges`, `SongIniPartKeys`), `Commands/TempoMapCommands.cs` (`ChangeResolution`, `SetStartingTempo`, `ResolutionScaling`), `Commands/PartCommands.cs` (`SetDrumsVariant`), `EditablePart.HasNotes`; `ChartPacker.Audio` (`SongAudio.Open` and `StemPeaksCache.KeyOf` take no song for staged tracks) |
 | For the first save (step 6), built and tested but not used yet | `NewChartFolder.NameFor`, `Settings/ChartPackerSettingsFile.cs` (Chart Packer's library folder, read only), and the existing `NewChartCreator` |
-| New chart and Chart settings in Chart Builder | `BuilderWindows.OpenNewChart`, `EditorWindowViewModel` (`ForNewChart`, `ForSong`, the undo stack, `OpenChartSettingsAsync`, `PendingChanges`), `ViewModels/ChartSettingsViewModel.cs`, `Views/ChartSettingsWindow.axaml`, `Services/ChartSettingsWindowService.cs`, `PlaybackViewModel` (takes an `EditorSong`; `RefreshTempoMap`), `BuilderSettings.TempoEdits` |
+| New chart and Chart settings in Chart Builder | `BuilderWindows.OpenNewChart`, `EditorWindowViewModel` (`ForNewChart`, `ForSong`, the undo stack, `ApplyChartSettings`, `PendingChanges`), `ViewModels/ChartSettingsViewModel.cs`, `Views/ChartSettingsView.axaml`, `Controls/EditorSidePanel.cs` (the left panel's tabs), `PlaybackViewModel` (takes an `EditorSong`; `RefreshTempoMap`), `BuilderSettings.TempoEdits` |
 | Calibration in Chart Builder | `Services/AudioLatencyService.cs`, `ViewModels/CalibrationViewModel.cs`, `Controls/CalibrationView.cs`, `Views/CalibrationWindow.axaml`, `Services/BuilderWindows.cs` (`ShowCalibrationAsync`, the first-use prompt), `BuilderSettingsCatalog` (the **Audio** category), `BuilderSettings` (`PromptForCalibration`, `CalibrationPrompted`), `PlaybackViewModel.Clock` |
 | The latency in Chart Packer | `ViewModels/PlayerViewModel.cs` (`DrawnPosition`, `RefreshLatency`), which the highway, lyrics and background clocks use; `MainWindowViewModel.OnActivatedAsync`; `AppSettingsCatalog` (`playback.latency`); `App.axaml.cs` |
 | Tests | `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`, `CalibrationScheduleTests`, `LatencyCompensationTests`, `WindowsAudioEndpointTests`; the shared `FakeOutput` and `ManualClock`), `Settings/AudioLatencyFileTests.cs`, `Settings/ChartPackerSettingsFileTests.cs`, `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`, `Charting/NewChart*Tests.cs`; `ChartBuilder.Tests/Charting/` (`SongOpenerTests`, `ChartSettingsCommandTests`, `PendingSongIniChangesTests`), `ChartBuilder.Tests/Calibration/` (`TapTestTests`, `LatencyCalibrationTests`) |

@@ -68,19 +68,12 @@
 
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
+                            <!-- Program settings. Chart settings is a tab in the left panel. -->
                             <Button Classes="tool"
-                                    ToolTip.Tip="{x:Static res:Strings.SettingsMenuToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.SettingsMenuButton}">
+                                    Command="{Binding OpenProgramSettingsCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ProgramSettingsToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.ProgramSettingsButton}">
                                 <ctl:LineIcon Data="{StaticResource SettingsStroke}" />
-                                <Button.Flyout>
-                                    <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                                        <MenuItem Header="{x:Static res:Strings.ChartSettingsMenuItem}"
-                                                  Command="{Binding OpenChartSettingsCommand}" />
-                                        <MenuItem Header="{x:Static res:Strings.ProgramSettingsMenuItem}"
-                                                  Command="{Binding OpenProgramSettingsCommand}"
-                                                  InputGesture="Ctrl+OemComma" />
-                                    </MenuFlyout>
-                                </Button.Flyout>
                             </Button>
                             <!-- Which lanes are shown. A placeholder until its controls are built. -->
                             <Button Classes="tool"
@@ -170,12 +163,16 @@
                 <ColumnDefinition Width="280" MinWidth="180" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left panel: Chart Inspector. -->
+            <!-- Left panel: the Chart Inspector, and Chart settings. -->
             <bctl:EditorSidePanel Grid.Column="0"
-                                  Title="{x:Static res:Strings.ChartInspectorTab}"
                                   IsCollapsed="{Binding IsLeftPanelCollapsed}"
                                   ToggleCommand="{Binding ToggleLeftPanelCommand}">
-                <views:ChartInspectorView />
+                <TabItem Header="{x:Static res:Strings.ChartInspectorTab}">
+                    <views:ChartInspectorView />
+                </TabItem>
+                <TabItem Header="{x:Static res:Strings.ChartSettingsTab}">
+                    <views:ChartSettingsView DataContext="{Binding ChartSettings}" />
+                </TabItem>
             </bctl:EditorSidePanel>
 
             <GridSplitter Grid.Column="1"
@@ -222,44 +219,45 @@
             <!-- Right panel: Properties, which will show whatever is selected, and the song.ini changes waiting to be
                  saved (charter-spec C17 item 2). -->
             <bctl:EditorSidePanel Grid.Column="4"
-                                  Title="{x:Static res:Strings.PropertiesTab}"
                                   IsCollapsed="{Binding IsRightPanelCollapsed}"
                                   ToggleCommand="{Binding ToggleRightPanelCommand}"
                                   IsRightEdge="True">
-                <Grid RowDefinitions="*,Auto">
-                    <StackPanel Grid.Row="0" Classes="placeholder">
-                        <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
-                        <TextBlock Classes="muted centered"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
-                    </StackPanel>
-                    <Border Grid.Row="1"
-                            BorderBrush="{DynamicResource SubtleBorderBrush}"
-                            BorderThickness="0,1,0,0"
-                            Padding="12,8">
-                        <StackPanel Spacing="4">
-                            <TextBlock Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
-                            <TextBlock Classes="muted"
+                <TabItem Header="{x:Static res:Strings.PropertiesTab}">
+                    <Grid RowDefinitions="*,Auto">
+                        <StackPanel Grid.Row="0" Classes="placeholder">
+                            <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
+                            <TextBlock Classes="muted centered"
                                        FontSize="12"
                                        TextWrapping="Wrap"
-                                       Text="{x:Static res:Strings.PendingChangesNone}"
-                                       IsVisible="{Binding !HasPendingChanges}" />
-                            <ItemsControl ItemsSource="{Binding PendingChanges}" IsVisible="{Binding HasPendingChanges}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="x:String">
-                                        <SelectableTextBlock FontSize="12" Text="{Binding}" TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Classes="muted"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Text="{x:Static res:Strings.PendingChangesHint}"
-                                       IsVisible="{Binding HasPendingChanges}" />
+                                       Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
                         </StackPanel>
-                    </Border>
-                </Grid>
+                        <Border Grid.Row="1"
+                                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                BorderThickness="0,1,0,0"
+                                Padding="12,8">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
+                                <TextBlock Classes="muted"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Text="{x:Static res:Strings.PendingChangesNone}"
+                                           IsVisible="{Binding !HasPendingChanges}" />
+                                <ItemsControl ItemsSource="{Binding PendingChanges}" IsVisible="{Binding HasPendingChanges}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <SelectableTextBlock FontSize="12" Text="{Binding}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Classes="muted"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Text="{x:Static res:Strings.PendingChangesHint}"
+                                           IsVisible="{Binding HasPendingChanges}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
             </bctl:EditorSidePanel>
         </Grid>
 

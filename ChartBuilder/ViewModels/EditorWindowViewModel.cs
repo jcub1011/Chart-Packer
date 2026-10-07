@@ -23,8 +23,8 @@ namespace ChartBuilder.ViewModels
     /// <summary>
     /// The Editor window: a toolbar, the lanes in the middle with the Chart Inspector and Properties panels either side,
     /// and the timeline along the bottom, where the song plays. It has a song opened, or a new chart that has no folder
-    /// until it's first saved. Chart settings edits the chart, and undo and redo step through its edits; the tools and the
-    /// lanes' bodies are placeholders so far.
+    /// until it's first saved. Chart settings, a tab beside the Chart Inspector, edits the chart, and undo and redo step
+    /// through its edits; the tools and the lanes' bodies are placeholders so far.
     /// </summary>
     /// <remarks>
     /// The panels' sizes are view state, applied and captured by the window; they're kept here between the two so
@@ -34,14 +34,13 @@ namespace ChartBuilder.ViewModels
     {
         private readonly BuilderSettingsService _settings;
         private readonly ISettingsWindowService _settingsWindow;
-        private readonly IChartSettingsWindowService _chartSettings;
         private readonly SongLock? _songLock;
         private readonly ChartUndoStack _undo;
 
         private EditorWindowViewModel(
             BuilderSettingsService settings,
             ISettingsWindowService settingsWindow,
-            IChartSettingsWindowService chartSettings,
+            IConfirmationService confirmations,
             EditorSong song,
             SongLock? songLock,
             Func<int, IAudioOutput> openOutput,
@@ -49,12 +48,12 @@ namespace ChartBuilder.ViewModels
         {
             _settings = settings;
             _settingsWindow = settingsWindow;
-            _chartSettings = chartSettings;
             _songLock = songLock;
             Song = song;
             Playback = new PlaybackViewModel(song, openOutput, latency);
             _undo = new ChartUndoStack(song.Chart);
             _undo.Changed += OnChartChanged;
+            ChartSettings = new ChartSettingsViewModel(settings, confirmations, song.Chart, ApplyChartSettings);
             PendingChanges = PendingChangesOf();
             Title = string.Format(CultureInfo.CurrentCulture, Strings.EditorWindowTitleFormat, song.Title ?? Strings.EditorUntitledChart);
             Playback.PropertyChanged += (_, e) =>
@@ -76,19 +75,19 @@ namespace ChartBuilder.ViewModels
         /// <summary>A song opened from a folder or <c>.sng</c> (charter-spec C2).</summary>
         /// <param name="settings">Where the layout is saved.</param>
         /// <param name="settingsWindow">Opens Program settings.</param>
-        /// <param name="chartSettings">Opens Chart settings for the chart.</param>
+        /// <param name="confirmations">Asks before Chart settings makes a change that loses something.</param>
         /// <param name="songLock">The song's lock, held until the editor is disposed.</param>
         /// <param name="openOutput">Opens the audio output, for playback.</param>
         /// <param name="latency">The audio/visual latency, which what's drawn against the audio allows for.</param>
         public static EditorWindowViewModel ForSong(
             BuilderSettingsService settings,
             ISettingsWindowService settingsWindow,
-            IChartSettingsWindowService chartSettings,
+            IConfirmationService confirmations,
             OpenedSong song,
             SongLock songLock,
             Func<int, IAudioOutput> openOutput,
             AudioLatencyService latency) =>
-            new(settings, settingsWindow, chartSettings, EditorSong.Of(song), songLock, openOutput, latency)
+            new(settings, settingsWindow, confirmations, EditorSong.Of(song), songLock, openOutput, latency)
             {
                 Notice = LoadIssuesNotice(song.Load.Issues.Count),
             };
@@ -100,12 +99,12 @@ namespace ChartBuilder.ViewModels
         public static EditorWindowViewModel ForNewChart(
             BuilderSettingsService settings,
             ISettingsWindowService settingsWindow,
-            IChartSettingsWindowService chartSettings,
+            IConfirmationService confirmations,
             EditableChart chart,
             NewChartAudio audio,
             Func<int, IAudioOutput> openOutput,
             AudioLatencyService latency) =>
-            new(settings, settingsWindow, chartSettings, EditorSong.New(chart, audio.Tracks), null, openOutput, latency)
+            new(settings, settingsWindow, confirmations, EditorSong.New(chart, audio.Tracks), null, openOutput, latency)
             {
                 Notice = NotAddedNotice(audio),
             };
@@ -124,6 +123,9 @@ namespace ChartBuilder.ViewModels
         public partial IReadOnlyList<string> PendingChanges { get; private set; }
 
         public bool HasPendingChanges => PendingChanges.Count > 0;
+
+        /// <summary>The chart's timing and parts, in the Chart settings tab (charter-spec C1).</summary>
+        public ChartSettingsViewModel ChartSettings { get; }
 
         /// <summary>The song's audio, and the timeline's playhead, waveform and beats.</summary>
         public PlaybackViewModel Playback { get; }
@@ -168,24 +170,20 @@ namespace ChartBuilder.ViewModels
         private Task OpenProgramSettingsAsync() => _settingsWindow.ShowAsync();
 
         /// <summary>
-        /// Chart settings for the song (charter-spec C1): its timing and parts, changed as one undoable step. Playback
-        /// pauses meanwhile, as the beats it follows may change.
+        /// A change from Chart settings (charter-spec C1), as one undoable step. Playback goes on, so the tempo can be
+        /// found by ear; the beats follow the change.
         /// </summary>
-        [RelayCommand]
-        private async Task OpenChartSettingsAsync()
+        private void ApplyChartSettings(IChartCommand command)
         {
-            Playback.Pause();
-            if (await _chartSettings.EditAsync(Song.Chart) is not { } command)
-                return;
-
             try
             {
                 _undo.Execute(command);
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or ChartFormatException)
             {
-                // Refused before anything changed, as every command checks first.
+                // Refused before anything changed, as every command checks first, so Chart settings shows the chart again.
                 Notice = string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsNotAppliedFormat, ex.Message);
+                ChartSettings.Reload();
             }
         }
 
@@ -220,12 +218,15 @@ namespace ChartBuilder.ViewModels
             _songLock?.Dispose();
         }
 
-        /// <summary>Follows an edit, its undo or its redo: the beats when the tempo map changed, and what's pending.</summary>
+        /// <summary>
+        /// Follows an edit, its undo or its redo: the beats when the tempo map changed, what's pending, and Chart settings.
+        /// </summary>
         private void OnChartChanged(object? sender, ChartCommandEventArgs e)
         {
             if (e.Affected.TempoMapChanged)
                 Playback.RefreshTempoMap();
             PendingChanges = PendingChangesOf();
+            ChartSettings.Reload();
             UndoCommand.NotifyCanExecuteChanged();
             RedoCommand.NotifyCanExecuteChanged();
         }

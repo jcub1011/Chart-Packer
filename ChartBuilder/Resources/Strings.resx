@@ -121,11 +121,11 @@
     <value>v{0}</value>
     <comment>The program version in the editor's toolbar, e.g. "v0.3.0".</comment>
   </data>
-  <data name="SettingsMenuButton" xml:space="preserve">
-    <value>Settings</value>
+  <data name="ProgramSettingsButton" xml:space="preserve">
+    <value>Program settings</value>
   </data>
-  <data name="SettingsMenuToolTip" xml:space="preserve">
-    <value>Chart and program settings</value>
+  <data name="ProgramSettingsToolTip" xml:space="preserve">
+    <value>Program settings (Ctrl+,)</value>
   </data>
   <data name="ViewMenuButton" xml:space="preserve">
     <value>View</value>
@@ -135,12 +135,6 @@
   </data>
   <data name="ViewMenuPlaceholder" xml:space="preserve">
     <value>Lane controls are coming soon.</value>
-  </data>
-  <data name="ChartSettingsMenuItem" xml:space="preserve">
-    <value>Chart settings…</value>
-  </data>
-  <data name="ProgramSettingsMenuItem" xml:space="preserve">
-    <value>Program settings…</value>
   </data>
   <data name="ComingSoonToolTip" xml:space="preserve">
     <value>Coming soon.</value>
@@ -533,11 +527,8 @@ Open it anyway?</value>
   <data name="TempoEditsKeepTimes" xml:space="preserve">
     <value>Notes keep their times</value>
   </data>
-  <data name="ChartSettingsWindowTitle" xml:space="preserve">
-    <value>Chart settings</value>
-  </data>
-  <data name="ChartSettingsSectionsName" xml:space="preserve">
-    <value>Sections</value>
+  <data name="ChartSettingsTab" xml:space="preserve">
+    <value>Chart Settings</value>
   </data>
   <data name="ChartSettingsSectionTiming" xml:space="preserve">
     <value>Timing</value>

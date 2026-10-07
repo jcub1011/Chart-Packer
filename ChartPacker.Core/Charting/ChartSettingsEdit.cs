@@ -39,14 +39,14 @@ public sealed record ChartSettingsValues(
     }
 }
 
-/// <summary>Chart settings' OK on an open song (charter-spec C1, OK): every change it makes, as one undoable command.</summary>
+/// <summary>A change in Chart settings on an open song (charter-spec C1, Applying), as one undoable command.</summary>
 public static class ChartSettingsEdit
 {
     /// <summary>
     /// The command that gives <paramref name="chart"/> <paramref name="values"/>, or null when it has them already, so
-    /// OK with nothing changed adds no undo step. In order: the resolution, which keeps every time; the starting tempo
-    /// and time signature, keeping ticks or times as <paramref name="keepTimes"/> says; then the parts removed, the drum
-    /// variant and the parts added.
+    /// a change that leaves the chart as it was adds no undo step. In order: the resolution, which keeps every time; the
+    /// starting tempo and time signature, keeping ticks or times as <paramref name="keepTimes"/> says; then the parts
+    /// removed, the drum variant and the parts added.
     /// </summary>
     /// <remarks>
     /// The drum variant of drums with notes can't be changed until their conversion comes (CM3); the command throws

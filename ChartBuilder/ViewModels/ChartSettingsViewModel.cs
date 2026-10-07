@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartPacker.Core.Charting;
@@ -14,14 +16,9 @@ using ChartPacker.Core.Charts;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
 {
-    /// <summary>A section of Chart settings, listed on the left; choosing one scrolls to it.</summary>
-    /// <param name="Id">Names the section's heading in the view: <c>&lt;Id&gt;Section</c>.</param>
-    public sealed record ChartSettingsSection(string Id, string Title);
-
     /// <summary>A resolution Chart settings offers.</summary>
     public sealed record ResolutionChoice(int Value, string Label)
     {
@@ -48,61 +45,54 @@ namespace ChartBuilder.ViewModels
     }
 
     /// <summary>
-    /// Chart settings (charter-spec C1), opened from the Editor's ⚙ menu: the chart's timing and parts, which OK changes as
-    /// one undoable command. It works the same on a new chart and on a song opened.
+    /// Chart settings (charter-spec C1), a tab in the Editor's left panel: the chart's timing and parts. Each change is
+    /// applied as it's made, as one undoable command, so the tempo can be found by ear while the song plays; a number
+    /// being typed is applied once the typing pauses. It works the same on a new chart and on a song opened.
     /// </summary>
     public sealed partial class ChartSettingsViewModel : ViewModelBase
     {
+        // A BPM or beats per measure is applied this long after the last keystroke or spin, as one undo step.
+        private static readonly TimeSpan TypingDelay = TimeSpan.FromMilliseconds(600);
+
         private readonly BuilderSettingsService _settings;
         private readonly IConfirmationService _confirmations;
         private readonly EditableChart _chart;
-        private readonly long _startMicroseconds;
-        private readonly decimal _startBpm;
-        private bool _restoringPart;
+        private readonly Action<IChartCommand> _apply;
+        private readonly DispatcherTimer _typingTimer;
+        private long _chartMicroseconds;
+        private decimal _chartBpm;
+
+        // While the fields are being set from the chart, or a change put back, which applies nothing.
+        private bool _loading;
+
+        // While a change is being applied, which may be waiting on a confirmation; a change meanwhile is applied after.
+        private bool _applying;
+        private bool _applyAgain;
 
         /// <param name="settings">Whether a tempo change keeps ticks or times.</param>
         /// <param name="confirmations">Asks before a part with notes is removed, and before a resolution change that moves items.</param>
         /// <param name="chart">The chart open in the Editor.</param>
-        public ChartSettingsViewModel(BuilderSettingsService settings, IConfirmationService confirmations, EditableChart chart)
+        /// <param name="apply">Applies a change to <paramref name="chart"/>, as one undo step.</param>
+        public ChartSettingsViewModel(BuilderSettingsService settings, IConfirmationService confirmations, EditableChart chart, Action<IChartCommand> apply)
         {
             ArgumentNullException.ThrowIfNull(chart);
+            ArgumentNullException.ThrowIfNull(apply);
             _settings = settings;
             _confirmations = confirmations;
             _chart = chart;
+            _apply = apply;
+            _typingTimer = new DispatcherTimer(TypingDelay, DispatcherPriority.Background, (_, _) => ApplyNow());
+            _typingTimer.Stop();
 
+            // Only this changes the resolution and the time signature, so the chart's can only be these or what it had.
             var values = ChartSettingsValues.Of(chart);
             Resolutions = [.. NewChartSettings.Resolutions.Append(values.Resolution).Distinct().Order().Select(r => new ResolutionChoice(r, BuilderSettingsCatalog.ResolutionLabel(r)))];
-            SelectedResolution = Resolutions.First(r => r.Value == values.Resolution);
-
-            _startMicroseconds = values.MicrosecondsPerQuarter;
-            _startBpm = Math.Round((decimal)EditableTempoMap.BpmOf(_startMicroseconds), 3);
-            Bpm = _startBpm;
-            Numerator = values.Numerator;
             Denominators = [.. NewChartSettings.Denominators.Append(values.Denominator).Distinct().Order()];
-            Denominator = values.Denominator;
-
             Parts = [.. NewChartSettings.Instruments.Select(i => new ChartPartChoice(i, PartName(i), values.Parts.Contains(i)))];
             foreach (var part in Parts)
                 part.PropertyChanged += OnPartChanged;
-            SelectedDrums = DrumsVariants.First(d => d.Value == values.Drums);
-            CanChangeDrums = chart.PartOf(ChartInstrument.Drums)?.HasNotes != true;
-            Refresh();
+            Load();
         }
-
-        /// <summary>Asks the window to close, once OK or Cancel is done.</summary>
-        public event EventHandler? CloseRequested;
-
-        public IReadOnlyList<ChartSettingsSection> Sections { get; } =
-        [
-            new("Timing", Strings.ChartSettingsSectionTiming),
-            new("Parts", Strings.ChartSettingsSectionParts),
-        ];
-
-        [ObservableProperty]
-        public partial ChartSettingsSection? SelectedSection { get; set; }
-
-        /// <summary>The command OK made, once it has; null when nothing changed, or it was cancelled.</summary>
-        public IChartCommand? Command { get; private set; }
 
         // Timing.
 
@@ -146,55 +136,34 @@ namespace ChartBuilder.ViewModels
         public bool HasDrums => Parts.Any(p => p.IsDrums && p.IsChecked);
 
         /// <summary>Whether the drum variant can be changed: not while the drums have notes, until their conversion comes.</summary>
-        public bool CanChangeDrums { get; }
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(DrumsToolTip))]
+        public partial bool CanChangeDrums { get; private set; }
 
         public string? DrumsToolTip => CanChangeDrums ? null : Strings.ChartSettingsDrumsLockedToolTip;
 
-        // The footer.
-
-        /// <summary>What stops OK, or why it last failed; null when nothing does.</summary>
+        /// <summary>What stops a change being applied, or why the last one wasn't; null when nothing does.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasProblem))]
-        [NotifyCanExecuteChangedFor(nameof(OkCommand))]
         public partial string? Problem { get; private set; }
 
         public bool HasProblem => Problem is not null;
 
-        [RelayCommand(CanExecute = nameof(CanOk))]
-        private async Task OkAsync()
-        {
-            var values = Values();
-            if (values.Resolution != _chart.Resolution)
-            {
-                ResolutionChangeReport report;
-                try
-                {
-                    report = ResolutionChangeReport.Analyze(_chart, values.Resolution);
-                }
-                catch (ChartFormatException ex)
-                {
-                    Problem = string.Format(CultureInfo.CurrentCulture, Strings.ResolutionChangeFailedFormat, ex.Message);
-                    return;
-                }
+        /// <summary>
+        /// Shows what the chart has, after it changed: by this, or by an undo or redo. A number still being typed is
+        /// dropped.
+        /// </summary>
+        public void Reload() => Load();
 
-                // Worked out before anything changes, and said, so the user can go back (charter-spec C1).
-                if (report.HasWarning && !await _confirmations.ConfirmAsync(
-                        Strings.ResolutionWarningTitle, WarningText(report), Strings.ResolutionWarningConfirm))
-                    return;
-            }
+        partial void OnSelectedResolutionChanged(ResolutionChoice value) => ApplyNow();
 
-            Command = ChartSettingsEdit.CommandFor(_chart, values, _settings.Settings.TempoEdits == TempoEditMode.KeepTimes);
-            CloseRequested?.Invoke(this, EventArgs.Empty);
-        }
+        partial void OnBpmChanged(decimal? value) => ApplySoon();
 
-        private bool CanOk() => Problem is null;
+        partial void OnNumeratorChanged(decimal? value) => ApplySoon();
 
-        [RelayCommand]
-        private void Cancel() => CloseRequested?.Invoke(this, EventArgs.Empty);
+        partial void OnDenominatorChanged(int value) => ApplyNow();
 
-        partial void OnBpmChanged(decimal? value) => Refresh();
-
-        partial void OnNumeratorChanged(decimal? value) => Refresh();
+        partial void OnSelectedDrumsChanged(DrumsVariantChoice value) => ApplyNow();
 
         private async void OnPartChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -203,35 +172,161 @@ namespace ChartBuilder.ViewModels
 
             if (part.IsDrums)
                 OnPropertyChanged(nameof(HasDrums));
-
-            // Unticking a part that has notes asks first, as Remove part does (charter-spec C1, Parts).
-            if (_restoringPart || part.IsChecked || _chart.PartOf(part.Instrument) is not { HasNotes: true })
+            if (_loading)
                 return;
 
             try
             {
-                bool remove = await _confirmations.ConfirmAsync(
-                    Strings.RemovePartTitle,
-                    string.Format(CultureInfo.CurrentCulture, Strings.RemovePartMessageFormat, part.Label),
-                    Strings.RemovePartConfirm);
-                if (!remove)
+                // Unticking a part that has notes asks first, as Remove part does (charter-spec C1, Parts).
+                if (!part.IsChecked && _chart.PartOf(part.Instrument) is { HasNotes: true } && !await _confirmations.ConfirmAsync(
+                        Strings.RemovePartTitle,
+                        string.Format(CultureInfo.CurrentCulture, Strings.RemovePartMessageFormat, part.Label),
+                        Strings.RemovePartConfirm))
                 {
-                    _restoringPart = true;
-                    part.IsChecked = true;
-                    _restoringPart = false;
+                    Restore(() => part.IsChecked = true);
+                    return;
                 }
             }
             catch (Exception ex)
             {
                 // Nothing awaits this, so anything not caught here would take the app down.
                 Trace.TraceError($"Asking to remove a part failed: {ex}");
+                Restore(() => part.IsChecked = true);
+                return;
+            }
+
+            ApplyNow();
+        }
+
+        /// <summary>Shows the problem with what's being typed at once, and applies it once the typing pauses.</summary>
+        private void ApplySoon()
+        {
+            if (_loading)
+                return;
+
+            Refresh();
+            _typingTimer.Stop();
+            _typingTimer.Start();
+        }
+
+        /// <summary>
+        /// Applies every field that differs from the chart, as one undo step, unless one is out of range. A resolution
+        /// change that would move items asks first, and is put back if the user doesn't go ahead.
+        /// </summary>
+        private async void ApplyNow()
+        {
+            if (_loading)
+                return;
+
+            _typingTimer.Stop();
+            if (_applying)
+            {
+                _applyAgain = true;
+                return;
+            }
+
+            Refresh();
+            if (Problem is not null)
+                return;
+
+            _applying = true;
+            try
+            {
+                var values = Values();
+                if (values.Resolution != _chart.Resolution && !await ConfirmResolutionAsync(values.Resolution))
+                {
+                    Restore(() => SelectedResolution = Resolutions.First(r => r.Value == _chart.Resolution));
+                    values = values with { Resolution = _chart.Resolution };
+                }
+
+                if (ChartSettingsEdit.CommandFor(_chart, values, _settings.Settings.TempoEdits == TempoEditMode.KeepTimes) is { } command)
+                    _apply(command);
+            }
+            catch (Exception ex)
+            {
+                // Nothing awaits this, so anything not caught here would take the app down.
+                Trace.TraceError($"Applying Chart settings failed: {ex}");
+            }
+            finally
+            {
+                _applying = false;
+            }
+
+            if (_applyAgain)
+            {
+                _applyAgain = false;
+                ApplyNow();
+            }
+        }
+
+        /// <summary>
+        /// Works out what changing to <paramref name="resolution"/> would move, and says it, so the user can go back
+        /// (charter-spec C1).
+        /// </summary>
+        /// <returns>Whether to go ahead.</returns>
+        private async Task<bool> ConfirmResolutionAsync(int resolution)
+        {
+            ResolutionChangeReport report;
+            try
+            {
+                report = ResolutionChangeReport.Analyze(_chart, resolution);
+            }
+            catch (ChartFormatException ex)
+            {
+                Problem = string.Format(CultureInfo.CurrentCulture, Strings.ResolutionChangeFailedFormat, ex.Message);
+                return false;
+            }
+
+            return !report.HasWarning || await _confirmations.ConfirmAsync(
+                Strings.ResolutionWarningTitle, WarningText(report), Strings.ResolutionWarningConfirm);
+        }
+
+        /// <summary>Sets the fields from the chart.</summary>
+        [MemberNotNull(nameof(SelectedResolution), nameof(SelectedDrums))]
+        private void Load()
+        {
+            _typingTimer.Stop();
+            var values = ChartSettingsValues.Of(_chart);
+            _loading = true;
+            try
+            {
+                SelectedResolution = Resolutions.First(r => r.Value == values.Resolution);
+                _chartMicroseconds = values.MicrosecondsPerQuarter;
+                _chartBpm = Math.Round((decimal)EditableTempoMap.BpmOf(_chartMicroseconds), 3);
+                Bpm = _chartBpm;
+                Numerator = values.Numerator;
+                Denominator = values.Denominator;
+                foreach (var part in Parts)
+                    part.IsChecked = values.Parts.Contains(part.Instrument);
+                SelectedDrums = DrumsVariants.First(d => d.Value == values.Drums);
+                CanChangeDrums = _chart.PartOf(ChartInstrument.Drums)?.HasNotes != true;
+            }
+            finally
+            {
+                _loading = false;
+            }
+
+            Refresh();
+        }
+
+        /// <summary>Puts a field back as it was, applying nothing.</summary>
+        private void Restore(Action restore)
+        {
+            _loading = true;
+            try
+            {
+                restore();
+            }
+            finally
+            {
+                _loading = false;
             }
         }
 
         private ChartSettingsValues Values()
         {
             // The BPM shown is rounded, so one left as it was keeps the tempo the chart has.
-            long microseconds = Bpm == _startBpm ? _startMicroseconds : EditableTempoMap.MicrosecondsPerQuarterOf((double)Bpm!.Value);
+            long microseconds = Bpm == _chartBpm ? _chartMicroseconds : EditableTempoMap.MicrosecondsPerQuarterOf((double)Bpm!.Value);
             return ChartSettingsValues.Of(_chart) with
             {
                 Resolution = SelectedResolution.Value,
@@ -244,7 +339,7 @@ namespace ChartBuilder.ViewModels
             };
         }
 
-        /// <summary>Works out what stops OK: a BPM or time signature out of range.</summary>
+        /// <summary>Works out what stops a change being applied: a BPM or time signature out of range.</summary>
         private void Refresh()
         {
             if (Bpm is not { } bpm || bpm < MinBpm || bpm > MaxBpm)

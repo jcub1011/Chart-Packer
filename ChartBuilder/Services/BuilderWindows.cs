@@ -58,20 +58,20 @@ namespace ChartBuilder.Services
 
         public void OpenNewChart(IReadOnlyList<string> audioFiles)
         {
-            // The chart starts on the default resolution, 120 BPM and 4/4 with a Lead part, all of which Chart settings
-            // changes (charter-spec C1).
+            // The chart starts on the default resolution, 120 BPM and 4/4 with a Lead part, all of which the Chart
+            // settings tab changes (charter-spec C1).
             var chart = EditableChart.CreateNew(new NewChartSettings(
                 "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
             var audio = NewChartStems.TracksOf(audioFiles);
             var editor = new EditorWindow();
-            var viewModel = EditorWindowViewModel.ForNewChart(settings, SettingsWindowFor(editor), ChartSettingsFor(editor), chart, audio, openOutput, latency);
+            var viewModel = EditorWindowViewModel.ForNewChart(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), chart, audio, openOutput, latency);
             OpenEditor(editor, viewModel);
         }
 
         public void OpenSong(OpenedSong song, SongLock songLock)
         {
             var editor = new EditorWindow();
-            var viewModel = EditorWindowViewModel.ForSong(settings, SettingsWindowFor(editor), ChartSettingsFor(editor), song, songLock, openOutput, latency);
+            var viewModel = EditorWindowViewModel.ForSong(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), song, songLock, openOutput, latency);
             OpenEditor(editor, viewModel);
         }
 
@@ -199,8 +199,6 @@ namespace ChartBuilder.Services
             window.Show();
             desktop.MainWindow = window;
         }
-
-        private ChartSettingsWindowService ChartSettingsFor(Window owner) => new(() => owner, settings);
 
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,
