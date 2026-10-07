@@ -49,8 +49,8 @@ public static class ChartSettingsEdit
     /// removed, the drum variant and the parts added.
     /// </summary>
     /// <remarks>
-    /// The drum variant of drums with notes can't be changed until their conversion comes (CM3); the command throws
-    /// when it's applied. Parts that aren't Chart Builder's are left as they are.
+    /// Drums with notes are converted to or from 5-lane (<see cref="ConvertDrums"/>), and switched between 4-lane and Pro
+    /// (charter-spec C6 items 8 and 9). Parts that aren't Chart Builder's are left as they are.
     /// </remarks>
     public static IChartCommand? CommandFor(EditableChart chart, ChartSettingsValues values, bool keepTimes)
     {
@@ -79,7 +79,7 @@ public static class ChartSettingsEdit
 
         // Drums added take the variant from AddPart when the song has none; one the song has is changed first.
         if (values.Parts.Contains(ChartInstrument.Drums) && chart.DrumsVariant is { } variant && variant != values.Drums)
-            commands.Add(new SetDrumsVariant(values.Drums));
+            commands.Add(DrumVariantChange.For(chart, values.Drums));
 
         foreach (var instrument in values.Parts.Where(p => !now.Parts.Contains(p)).Order())
             commands.Add(instrument == ChartInstrument.Drums ? new AddPart(instrument, values.Drums) : new AddPart(instrument));

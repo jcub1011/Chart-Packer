@@ -108,7 +108,8 @@ public static class MidiChartWriter
     /// 124, taking the first's kind. A roll or trill merged reaches down to the easiest difficulty any of them reached,
     /// so no difficulty loses a lane it had. Two that start on one tick overlap, however long they are; one that
     /// starts where another ends doesn't.</item>
-    /// <item>Overlapping tom markers on one pad merge the same way.</item>
+    /// <item>Overlapping tom markers on one pad merge the same way. 4-lane drums' tom markers are left out, as the games
+    /// would read any as Pro drums (charter-spec C6 item 9).</item>
     /// <item>A chord marking on a tick without a note of its difficulty, which marks nothing, is left out.</item>
     /// <item><c>[ENABLE_CHART_DYNAMICS]</c> is on while a drum note is an accent or a ghost, and off when none is
     /// (charter-spec C6). <c>[ENHANCED_OPENS]</c> is on for five-fret parts that had it or have an open note, which needs
@@ -127,8 +128,7 @@ public static class MidiChartWriter
     /// or chord marking on an instrument with no place for it; a drum fill at or after <c>EVENTS</c>' first
     /// <c>[coda]</c>, or a drums big rock ending before it, which read back as each other; an anchor at a tick without a
     /// tempo marker; a raw event that would read back as something else (a text event, a note the model reads); a time
-    /// signature the games can't read; 4-lane drums with tom markers, which read back as pro drums; drums without a
-    /// variant; and a passthrough track the reader takes for a part the chart doesn't have.
+    /// signature the games can't read; drums without a variant; and a passthrough track the reader takes for a part the chart doesn't have.
     /// </para>
     /// </remarks>
     public static EditableChart Normalize(EditableChart chart)
@@ -141,7 +141,7 @@ public static class MidiChartWriter
             saved.DrumsVariant = null;
         changes.Texts += RawTexts(saved.Events, saved.EventsRaw);
         foreach (var part in saved.Parts)
-            NormalizePart(part, changes);
+            NormalizePart(part, saved.DrumsVariant, changes);
         changes.Passthrough = OrderPassthrough(saved);
 
         if (changes.Any)
@@ -506,7 +506,7 @@ public static class MidiChartWriter
 
     // Normalizing.
 
-    private static void NormalizePart(EditablePart part, Changes changes)
+    private static void NormalizePart(EditablePart part, DrumsVariant? variant, Changes changes)
     {
         var kind = part.Kind;
         bool drums = kind == ChartInstrumentKind.Drums;
@@ -534,6 +534,13 @@ public static class MidiChartWriter
         }
 
         changes.Phrases += MergePhrases(part);
+        if (drums && variant == DrumsVariant.FourLane)
+        {
+            // The games would read any tom marker as Pro drums (charter-spec C6 item 9).
+            changes.TomMarkers += part.TomMarkers.Count;
+            part.TomMarkers.Clear();
+        }
+
         changes.TomMarkers += MergeTomMarkers(part);
         part.ChartDynamics = drums && dynamics;
         part.EnhancedOpens = fiveFret && (part.EnhancedOpens || opens);

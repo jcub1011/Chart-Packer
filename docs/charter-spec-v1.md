@@ -888,6 +888,11 @@ Acceptance criteria:
      there, the status bar says so. The author never manages the markers by hand.
    - Red is always a snare. 5-lane has no markers: yellow and orange are cymbals, and blue and
      green are toms.
+   - *Settled in CM3:* a toggle makes the fewest marker changes that flip only the notes toggled. A
+     marker grows only across ticks with no note on its pad, so neighbouring notes keep what they
+     were. Toggling a selection makes every note a tom, or every note a cymbal when all of them are
+     toms already. A note that is moved takes the cymbal or tom of the tick it lands on, as the
+     markers stay where they are.
 4. **Accents and ghosts.**
    - Per note, on any pad.
    - Saved as velocity 127 (accent) or 1 (ghost), with `[ENABLE_CHART_DYNAMICS]` added to the
@@ -908,6 +913,13 @@ Acceptance criteria:
      fits at a spot, the fill is left out. The proposals are shown as ghosts, and the author keeps
      or drops each one. Fills are never added silently, and the accepted ones are added as one
      undoable command.
+   - *Settled in CM3:* a fill covers the notes from its start up to, but not including, its end
+     (only its start, if it has no length), as the games read markers. Its last such note on a
+     difficulty is where star power is activated there.
+   - *Settled in CM3:* whether a drums phrase on pitches 120–124 is a fill or a big rock ending
+     follows `[coda]` ([C8](#c8-phrases-and-events) item 4). Adding, moving or removing `[coda]`
+     changes the phrases it decides in the same undoable step, and a fill can't be added after
+     `[coda]`, nor a big rock ending before it.
 6. **Rolls and trills.**
    - Single-lane roll and two-lane trill phrases.
    - New ones reach Expert only, as the games default to. Each can be extended down to Hard,
@@ -917,6 +929,11 @@ Acceptance criteria:
    ranges per difficulty ([§4.1](#editable-model)). Notes are always stored on the pads the file
    uses, so moving or resizing a range never changes the file's notes. Inside a range they are
    drawn on the pads the player hits.
+   - *Settled in CM3:* the model keeps the mix events, and a range is read from them: it starts at
+     a `d` mix and ends at the next mix without one. A new range writes a `d` mix at its start and
+     a plain mix at its end, each with the stem configuration in force there, and turns plain mixes
+     inside it into `d` ones. Removing a range turns its mixes back, and leaves out any that then
+     change nothing. A range can't overlap another, or cover a mix with another setting.
 8. **4-lane ↔ 5-lane conversion helper.**
    - Converts a whole drum part with the fixed mapping in [§7.6](#76-drum-layout-conversion).
      Clone Hero and YARG each convert in their own slightly different way when they play one
@@ -925,9 +942,17 @@ Acceptance criteria:
      already has one on that tick) are left out. They are listed, with their times, in a report
      when the command finishes. Undoing the command brings them back. Lint can't see notes that
      are no longer in the chart, so the report is the only place they are listed.
+   - *Settled in CM3:* of two notes landing on one pad, the one that maps back to where it came
+     from is kept (the blue tom on 5-lane blue, the green cymbal on 5-lane orange). Converting
+     5-lane to Pro, a tick where one difficulty's note becomes a cymbal and another's a tom on the
+     same pad takes the hardest difficulty's, as `ChartToMidi` does, and the other note is listed
+     too. A fifth-pad note in a 4-lane or Pro chart converts as a green tom.
 9. **Drum variant.**
    - Switching between 4-lane and Pro is a song setting (`pro_drums`), not a conversion: a 4-lane
-     chart's tom markers are kept, and are ignored while `pro_drums` is `False`.
+     chart's tom markers are kept, so switching back to Pro brings them back.
+   - *Settled in CM3:* the games read any tom marker as Pro drums, whatever `pro_drums` says
+     (`DrumsLayouts`). So the markers of 4-lane drums are kept only while the chart is open: saving
+     leaves them out, and CHR045 says so until then.
    - Switching to or from 5-lane runs the conversion helper. Converting from plain 4-lane uses the
      cymbal/tom flags as they stand, which the player never saw; the helper says so.
 
@@ -1584,9 +1609,9 @@ never reused.
 | CHR042 | Warning | A drum fill overlaps a star power phrase (not counting a big rock ending) | — |
 | CHR043 | Warning | A drum fill whose last tick has no note on some difficulty, so there is nothing to activate on there (not counting a big rock ending) | Move end to last note |
 | CHR044 | Warning | A roll or trill phrase with fewer than two notes, or a trill covering only one pad | — |
-| CHR045 | Warning | Tom markers on a song whose `pro_drums` is `False`, so they will be ignored | Set `pro_drums = True` |
-| CHR046 | Warning | Orange notes on a 4-lane or Pro song | — |
-| CHR047 | Info | An accent or ghost on a kick, which some games ignore | — |
+| CHR045 | Warning | Tom markers on 4-lane drums. The games would read them as Pro, so saving leaves them out ([C6](#c6-drums-4-lane-pro-and-5-lane) item 9). | Switch to Pro |
+| CHR046 | Warning | A fifth-pad note (5-lane green) on a 4-lane or Pro song | — |
+| CHR047 | — | *Retired in CM3.* An accent or ghost on a kick. The games never read one, so the loader doesn't keep one, and the editor can't place one. | — |
 | CHR048 | Warning | The chart has a `PART DRUMS_2X` track. It is kept as it is and doesn't follow edits to `PART DRUMS`. | — |
 
 ### Phrases and events
@@ -1597,7 +1622,7 @@ never reused.
 | CHR061 | Warning | A solo with no notes in it | Delete phrase |
 | CHR062 | Warning | Two star power phrases, or two solos, overlap | Merge |
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
-| CHR064 | Info | A disco flip section that starts or ends between notes of a chord | — |
+| CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
 
 ### Song
 

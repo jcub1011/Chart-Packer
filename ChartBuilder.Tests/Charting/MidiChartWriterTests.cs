@@ -1,5 +1,6 @@
 using System.Globalization;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charts;
 using Serilog;
 using Serilog.Core;
@@ -247,7 +248,7 @@ public sealed class MidiChartWriterTests
         var drums = chart.PartOf(ChartInstrument.Drums)!;
         Assert.IsFalse(drums.ChartDynamics);
 
-        drums[Expert].Notes.Add(new EditableNote(1440, 1, 3, NoteDynamics.Ghost));
+        new AddNotes(ChartInstrument.Drums, Expert, [new EditableNote(1440, 1, 3, NoteDynamics.Ghost)]).Apply(chart);
         var result = MidiChartWriter.WriteChecked(chart, MidiChartWriter.SettingsAfterSave(chart, ChartReadOptions.Default));
 
         Assert.IsTrue(result.IsValid, DescribeModel(result.ModelDifferences));

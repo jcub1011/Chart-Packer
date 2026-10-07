@@ -255,11 +255,29 @@ public sealed class ChartSettingsCommandTests
     }
 
     [TestMethod]
-    public void TheDrumVariantOfDrumsWithNotesIsRefused()
+    public void DrumsWithNotesSwitchBetweenFourLaneAndProKeepingTheirNotesAndMarkers()
+    {
+        // Charter-spec C6 item 9: a song setting, not a conversion.
+        var chart = EditableChartSamples.Full();
+        var drums = chart.PartOf(Drums)!;
+        var notes = drums.Tracks.Select(t => t.Notes.ToList()).ToList();
+        var markers = drums.TomMarkers.ToList();
+
+        var after = AppliesRevertsAndRedoes(chart, new SetDrumsVariant(DrumsVariant.FourLane));
+
+        Assert.AreEqual(DrumsVariant.FourLane, after.DrumsVariant);
+        var afterDrums = after.PartOf(Drums)!;
+        for (int i = 0; i < notes.Count; i++)
+            Assert.AreSequenceEqual(notes[i], afterDrums.Tracks[i].Notes.ToList());
+        Assert.AreSequenceEqual(markers, afterDrums.TomMarkers.ToList());
+    }
+
+    [TestMethod]
+    public void DrumsWithNotesAreConvertedToFiveLaneNotSwitched()
     {
         var chart = EditableChartSamples.Full();
 
-        Refuses<InvalidOperationException>(chart, new SetDrumsVariant(DrumsVariant.FourLane));
+        Refuses<InvalidOperationException>(chart, new SetDrumsVariant(DrumsVariant.FiveLane));
     }
 
     // OK's command.
@@ -332,12 +350,31 @@ public sealed class ChartSettingsCommandTests
     }
 
     [TestMethod]
-    public void ChangingTheVariantOfDrumsWithNotesIsRefusedWhole()
+    public void ChartSettingsConvertsDrumsWithNotesToFiveLaneAsPartOfItsOneStep()
     {
         var chart = EditableChartSamples.Full();
-        var values = ChartSettingsValues.Of(chart) with { Resolution = 960, Drums = DrumsVariant.FourLane };
+        var values = ChartSettingsValues.Of(chart) with { Resolution = 960, Drums = DrumsVariant.FiveLane };
+        var command = ChartSettingsEdit.CommandFor(chart, values, keepTimes: false)!;
 
-        Refuses<InvalidOperationException>(chart, ChartSettingsEdit.CommandFor(chart, values, keepTimes: false)!);
+        var after = AppliesRevertsAndRedoes(chart, command);
+
+        Assert.AreEqual(960, after.Resolution);
+        Assert.AreEqual(DrumsVariant.FiveLane, after.DrumsVariant);
+        Assert.IsEmpty(after.PartOf(Drums)!.TomMarkers);
+        Assert.IsInstanceOfType<ConvertDrums>(((CompositeCommand)command).Commands[^1]);
+    }
+
+    [TestMethod]
+    public void ChartSettingsSwitchesDrumsWithNotesBetweenFourLaneAndPro()
+    {
+        var chart = EditableChartSamples.Full();
+        var values = ChartSettingsValues.Of(chart) with { Drums = DrumsVariant.FourLane };
+        var command = ChartSettingsEdit.CommandFor(chart, values, keepTimes: false)!;
+
+        var after = AppliesRevertsAndRedoes(chart, command);
+
+        Assert.AreEqual(DrumsVariant.FourLane, after.DrumsVariant);
+        Assert.IsInstanceOfType<SetDrumsVariant>(((CompositeCommand)command).Commands.Single());
     }
 
     internal static EditableChart NewChart(params ChartInstrument[] parts) =>

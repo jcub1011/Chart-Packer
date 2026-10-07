@@ -392,7 +392,7 @@ public sealed class ChangeTempoMap : ChartCommand
     }
 }
 
-//// <summary>
+/// <summary>
 /// Changes the chart's resolution (charter-spec C1, Changing the resolution), keeping every item's time. The tempo and
 /// time-signature markers' ticks are scaled by the new resolution over the old, to the nearest tick, with their tempos
 /// unchanged, and each anchor moves with its marker; everything else is re-ticked as a tempo change that keeps times is

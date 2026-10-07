@@ -14,6 +14,8 @@ namespace ChartPacker.Core.Charting.Editing;
 /// </remarks>
 public sealed class EditorTools
 {
+    private const string DoubleKickOffExpert = "A 2x kick is on Expert only.";
+
     private readonly EditorSession _session;
     private Gesture? _gesture;
 
@@ -193,6 +195,123 @@ public sealed class EditorTools
         }
 
         _session.Execute(commands.Count == 1 ? commands[0] : new CompositeCommand(commands));
+    }
+
+    /// <summary>
+    /// Makes the selected yellow, blue and green Pro drum notes toms, or cymbals when every one is a tom already
+    /// (charter-spec §9: C). Cymbal or tom is the whole part's, so the same pads at those ticks change on every
+    /// difficulty, and the status says which others have a note there (C6 item 3).
+    /// </summary>
+    public void ToggleCymbal()
+    {
+        if (SelectedDrums() is not { } selected)
+            return;
+        var (key, drums, notes) = selected;
+        var places = notes
+            .Where(static n => n.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad)
+            .Select(static n => (n.Lane, n.Tick))
+            .ToList();
+        if (places.Count == 0)
+        {
+            _session.Status = "Only yellow, blue and green notes are cymbals or toms.";
+            return;
+        }
+
+        bool tom = !places.All(p => DrumCymbals.IsTom(drums, p.Lane, p.Tick));
+        var command = new SetToms(places, tom, key.Difficulty);
+        if (_session.Execute(command) && command.SharedWith.Count > 0)
+        {
+            string what = tom ? "toms" : "cymbals";
+            _session.Status = $"Made {what} on every difficulty: {Names(command.SharedWith)} changed too.";
+        }
+    }
+
+    /// <summary>
+    /// Makes the selected drum pad notes accents, or ghosts, or normal hits when every one already is
+    /// <paramref name="dynamics"/> (charter-spec §9: A and Shift+A). Kicks are left as they are.
+    /// </summary>
+    public void ToggleDynamics(NoteDynamics dynamics)
+    {
+        if (SelectedDrums() is not { } selected)
+            return;
+        var (key, _, notes) = selected;
+        var pads = notes.Where(static n => n.Lane > 0).ToList();
+        if (pads.Count == 0)
+        {
+            _session.Status = "A kick can't be an accent or a ghost.";
+            return;
+        }
+
+        var set = pads.All(n => n.Dynamics == dynamics) ? NoteDynamics.None : dynamics;
+        var changing = pads.Where(n => n.Dynamics != set).ToList();
+        _session.Execute(new SetDynamics(key.Instrument, key.Difficulty, changing, set));
+    }
+
+    /// <summary>
+    /// Makes the selected Expert kicks 2× kicks, or plain kicks when every one is a 2× kick already (charter-spec C6
+    /// item 2).
+    /// </summary>
+    public void ToggleDoubleKick()
+    {
+        if (SelectedDrums() is not { } selected)
+            return;
+        var (key, _, notes) = selected;
+        var kicks = notes.Where(static n => n.Lane == 0).ToList();
+        if (kicks.Count == 0)
+            return;
+        if (key.Difficulty != ChartDifficulty.Expert)
+        {
+            _session.Status = DoubleKickOffExpert;
+            return;
+        }
+
+        bool on = !kicks.All(static k => k.DoubleKick);
+        var changing = kicks.Where(k => k.DoubleKick != on).ToList();
+        if (_session.Execute(new SetDoubleKick(changing, on)))
+            _session.Selection.Select(key, [.. notes.Where(static n => n.Lane != 0), .. kicks.Select(k => k with { DoubleKick = on })]);
+    }
+
+    /// <summary>
+    /// Places a 2× kick at the cursor of the focused Expert drums lane, or removes the one there (charter-spec §9:
+    /// Shift+0).
+    /// </summary>
+    public void ToggleDoubleKickAtCursor()
+    {
+        if (_session.Focused is not { } key || _session.TrackOf(key) is not { Kind: ChartInstrumentKind.Drums } track)
+            return;
+        if (key.Difficulty != ChartDifficulty.Expert)
+        {
+            _session.Status = DoubleKickOffExpert;
+            return;
+        }
+
+        long tick = _session.CursorTick;
+        if (track.TryGetNote(tick, 0, doubleKick: true, out var note))
+        {
+            _session.Execute(new RemoveNotes(key.Instrument, key.Difficulty, [note]));
+            return;
+        }
+
+        var placed = new EditableNote(tick, EditableNote.PlainLength, 0, DoubleKick: true);
+        if (_session.Execute(new AddNotes(key.Instrument, key.Difficulty, [placed])))
+            _session.Selection.Select(key, [placed]);
+    }
+
+    /// <summary>The selected notes, when they're drum notes: their track, the drums part and the notes.</summary>
+    private (ChartTrackKey Key, EditablePart Drums, IReadOnlyList<EditableNote> Notes)? SelectedDrums()
+    {
+        var selection = _session.Selection;
+        if (selection.Track is not { } key || Chart.PartOf(key.Instrument) is not { Kind: ChartInstrumentKind.Drums } drums)
+            return null;
+        var notes = selection.Notes;
+        return notes.Count == 0 ? null : (key, drums, notes);
+    }
+
+    /// <summary>Difficulties in words, for the status: "Hard", "Hard and Easy", "Hard, Medium and Easy".</summary>
+    private static string Names(IReadOnlyList<ChartDifficulty> difficulties)
+    {
+        var names = difficulties.OrderDescending().Select(static d => d.ToString()).ToList();
+        return names.Count == 1 ? names[0] : $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}";
     }
 
     /// <summary>

@@ -99,18 +99,11 @@ public sealed class NoSectionsRule : IChartLintRule
 
     public int Reach => 0;
 
-    /// <summary>Whether <paramref name="text"/> is a section event, as the games read one.</summary>
-    public static bool IsSection(string text)
-    {
-        string trimmed = text.Trim().TrimStart('[').TrimEnd(']');
-        return trimmed.StartsWith("section ", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("prc_", StringComparison.OrdinalIgnoreCase);
-    }
-
     public IEnumerable<Finding> Check(ChartLintContext context)
     {
         foreach (var e in context.Chart.Events.AsSpan())
         {
-            if (IsSection(e.Text))
+            if (SectionEvents.IsSection(e.Text))
                 return [];
         }
 

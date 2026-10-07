@@ -10,14 +10,26 @@ internal static class EditorSessions
 {
     public static readonly ChartTrackKey GuitarExpert = new(ChartInstrument.Guitar, ChartDifficulty.Expert);
 
+    public static readonly ChartTrackKey DrumsExpert = new(ChartInstrument.Drums, ChartDifficulty.Expert);
+
+    public static readonly ChartTrackKey GhlExpert = new(ChartInstrument.GhlGuitar, ChartDifficulty.Expert);
+
+    /// <summary>An empty drums chart of <paramref name="variant"/> at 480 ticks per beat, 120 BPM in 4/4.</summary>
+    public static EditableChart Drums(DrumsVariant variant = DrumsVariant.Pro) =>
+        EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Drums }, variant));
+
+    /// <summary>An empty GHL guitar chart at 480 ticks per beat, 120 BPM in 4/4.</summary>
+    public static EditableChart Ghl() =>
+        EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.GhlGuitar }, DrumsVariant.Pro));
+
     /// <summary>An empty Lead guitar chart at 480 ticks per beat, 120 BPM in 4/4.</summary>
     public static EditableChart Guitar() =>
         EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
 
-    public static EditorSession Of(EditableChart chart, TimeSpan delay = default, IReadOnlyList<KeyValuePair<string, string>>? songIni = null)
+    public static EditorSession Of(EditableChart chart, TimeSpan delay = default, IReadOnlyList<KeyValuePair<string, string>>? songIni = null, ChartTrackKey? focused = null)
     {
         var session = new EditorSession(new ChartUndoStack(chart), delay, songIni ?? []);
-        session.Focused = GuitarExpert;
+        session.Focused = focused ?? GuitarExpert;
         return session;
     }
 

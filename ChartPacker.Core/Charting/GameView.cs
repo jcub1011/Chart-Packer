@@ -54,9 +54,10 @@ public static class GameView
             var starPower = GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
             if (part.Kind == ChartInstrumentKind.Drums)
             {
-                var layout = DrumsLayoutOf(part, options);
+                var markers = SavedTomMarkers(chart, part);
+                var layout = DrumsLayoutOf(part, markers, options);
                 drumsLayout = layout;
-                parts.Add((part.Instrument, Drums(part, layout, starPower), starPower));
+                parts.Add((part.Instrument, Drums(part, markers, layout, starPower), starPower));
                 continue;
             }
 
@@ -87,7 +88,10 @@ public static class GameView
         var starPower = GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
         List<ChartNote>? notes;
         if (part.Kind == ChartInstrumentKind.Drums)
-            Drums(part, DrumsLayoutOf(part, options), starPower).TryGetValue(key.Difficulty, out notes);
+        {
+            var markers = SavedTomMarkers(chart, part);
+            Drums(part, markers, DrumsLayoutOf(part, markers, options), starPower).TryGetValue(key.Difficulty, out notes);
+        }
         else
             notes = Frets(part[key.Difficulty], chart.Resolution, options, starPower);
         notes ??= [];
@@ -100,15 +104,28 @@ public static class GameView
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(options);
         var drums = chart.Parts.FirstOrDefault(p => p.Kind == ChartInstrumentKind.Drums);
-        return drums is not null && DrumsLayoutOf(drums, options) == DrumsLayout.FiveLane;
+        return drums is not null && DrumsLayoutOf(drums, SavedTomMarkers(chart, drums), options) == DrumsLayout.FiveLane;
     }
+
+    /// <summary>
+    /// The drums' tom markers as the saved file has them: none for 4-lane drums, whose markers the writer leaves out, as
+    /// the games would read any as Pro drums (charter-spec C6 item 9).
+    /// </summary>
+    internal static IReadOnlyList<TomMarker> SavedTomMarkers(EditableChart chart, EditablePart drums) =>
+        chart.DrumsVariant == DrumsVariant.FourLane ? [] : drums.TomMarkers;
 
     /// <summary>
     /// The drums' layout, as <see cref="MidiChartReader.DrumsLayoutOf"/> works it out from the track the writer writes:
     /// song.ini's settings, then its fifth-pad note-ons and tom-marker note events in the order
     /// <see cref="PartEventOrder"/> puts them.
     /// </summary>
-    internal static DrumsLayout DrumsLayoutOf(EditablePart drums, ChartReadOptions options)
+    internal static DrumsLayout DrumsLayoutOf(EditablePart drums, ChartReadOptions options) => DrumsLayoutOf(drums, drums.TomMarkers, options);
+
+    /// <summary>
+    /// The drums' layout, as <see cref="DrumsLayoutOf(EditablePart, ChartReadOptions)"/> works it out, with
+    /// <paramref name="markers"/> as their tom markers.
+    /// </summary>
+    private static DrumsLayout DrumsLayoutOf(EditablePart drums, IReadOnlyList<TomMarker> markers, ChartReadOptions options)
     {
         // Each event as (tick, place among the tick's events, pitch, a note-off after its note-on), and whether it's a
         // fifth-pad note-on rather than a tom-marker event.
@@ -123,7 +140,7 @@ public static class GameView
             }
         }
 
-        foreach (var marker in drums.TomMarkers)
+        foreach (var marker in markers)
         {
             int pitch = MidiLayout.FirstTomPitch + marker.Pad - TomMarker.FirstPad;
             events.Add(((marker.Tick, PartEventOrder.NoteOn, pitch, 0), false));
@@ -177,7 +194,7 @@ public static class GameView
     }
 
     /// <summary>Each difficulty's drum notes, as <see cref="MidiChartReader"/> reads them from the written track.</summary>
-    private static Dictionary<ChartDifficulty, List<ChartNote>> Drums(EditablePart part, DrumsLayout layout, IReadOnlyList<StarPowerPhrase> starPower)
+    private static Dictionary<ChartDifficulty, List<ChartNote>> Drums(EditablePart part, IReadOnlyList<TomMarker> markers, DrumsLayout layout, IReadOnlyList<StarPowerPhrase> starPower)
     {
         var hits = new Dictionary<ChartDifficulty, List<DrumHit>>();
         foreach (var track in part.Tracks)
@@ -198,7 +215,7 @@ public static class GameView
         IReadOnlyList<TickSpan>[] toms =
         [
             .. Enumerable.Range(TomMarker.FirstPad, TomMarker.LastPad - TomMarker.FirstPad + 1)
-                .Select(pad => part.TomMarkers.Where(m => m.Pad == pad).Select(m => new TickSpan(m.Tick, m.Tick + m.Length)).ToList()),
+                .Select(pad => markers.Where(m => m.Pad == pad).Select(m => new TickSpan(m.Tick, m.Tick + m.Length)).ToList()),
         ];
         return GameNotes.Drums(hits, toms, TextsOf(part), starPower, layout);
     }
