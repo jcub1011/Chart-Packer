@@ -19,6 +19,7 @@
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenProgramSettingsCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
         <KeyBinding Gesture="Space" Command="{Binding Playback.PlayPauseCommand}" />
         <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
@@ -36,6 +37,24 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="16" />
             <Setter Property="Spacing" Value="4" />
+        </Style>
+        <!-- A finding's row: a bar on its left coloured by how serious it is. -->
+        <Style Selector="Border.finding">
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style Selector="Border.finding.warning">
+            <Setter Property="BorderBrush" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="Border.finding.error">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+        <!-- A pending song.ini change the user reverted: listed, struck through, until it's restored. -->
+        <Style Selector="SelectableTextBlock.reverted">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Opacity" Value="0.55" />
         </Style>
     </Window.Styles>
 
@@ -64,6 +83,32 @@
                                    AutomationProperties.Name="{x:Static res:Strings.AppName}" />
                             <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{x:Static res:Strings.AppName}" />
                             <TextBlock Classes="muted" VerticalAlignment="Center" FontSize="12" Text="{Binding VersionText}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Saving (charter-spec C17): Save, Save and pack to a .sng, and a copy written elsewhere. -->
+                    <Border Classes="toolbar-group">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <Button Classes="tool"
+                                    Command="{Binding SaveCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.SaveToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.SaveButton}">
+                                <ctl:LineIcon Data="{StaticResource SaveStroke}" />
+                            </Button>
+                            <Button Classes="tool"
+                                    Command="{Binding SaveAndPackCommand}"
+                                    ToolTip.Tip="{Binding SaveAndPackToolTip}"
+                                    ToolTip.ShowOnDisabled="True"
+                                    AutomationProperties.Name="{x:Static res:Strings.SaveAndPackButton}">
+                                <ctl:LineIcon Data="{StaticResource PackStroke}" />
+                            </Button>
+                            <Button Classes="tool"
+                                    Command="{Binding ExportCopyCommand}"
+                                    ToolTip.Tip="{Binding ExportCopyToolTip}"
+                                    ToolTip.ShowOnDisabled="True"
+                                    AutomationProperties.Name="{x:Static res:Strings.ExportCopyButton}">
+                                <ctl:LineIcon Data="{StaticResource OutputFolderStroke}" />
+                            </Button>
                         </StackPanel>
                     </Border>
 
@@ -271,49 +316,122 @@
                           IsVisible="{Binding !IsRightPanelCollapsed}" />
 
             <!-- Right panel: Properties, which shows what's selected (charter-spec C3 item 4), and the song.ini changes
-                 waiting to be saved (C17 item 2). -->
+                 waiting to be saved (C17 item 2), each of which can be reverted. -->
             <bctl:EditorSidePanel Grid.Column="4"
                                   IsCollapsed="{Binding IsRightPanelCollapsed}"
                                   ToggleCommand="{Binding ToggleRightPanelCommand}"
                                   IsRightEdge="True">
                 <TabItem Header="{x:Static res:Strings.PropertiesTab}">
-                    <Grid RowDefinitions="*,Auto">
-                        <StackPanel Grid.Row="0" Classes="placeholder" IsVisible="{Binding Editor.Properties.IsEmpty}">
+                    <Panel>
+                        <StackPanel Classes="placeholder" IsVisible="{Binding Editor.Properties.IsEmpty}">
                             <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
                             <TextBlock Classes="muted centered"
                                        FontSize="12"
                                        TextWrapping="Wrap"
                                        Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
                         </StackPanel>
-                        <ScrollViewer Grid.Row="0" IsVisible="{Binding !Editor.Properties.IsEmpty}">
+                        <ScrollViewer IsVisible="{Binding !Editor.Properties.IsEmpty}">
                             <views:PropertiesView DataContext="{Binding Editor.Properties}" />
                         </ScrollViewer>
-                        <Border Grid.Row="1"
-                                BorderBrush="{DynamicResource SubtleBorderBrush}"
-                                BorderThickness="0,1,0,0"
-                                Padding="12,8">
-                            <StackPanel Spacing="4">
-                                <TextBlock Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
-                                <TextBlock Classes="muted"
-                                           FontSize="12"
-                                           TextWrapping="Wrap"
-                                           Text="{x:Static res:Strings.PendingChangesNone}"
-                                           IsVisible="{Binding !HasPendingChanges}" />
-                                <ItemsControl ItemsSource="{Binding PendingChanges}" IsVisible="{Binding HasPendingChanges}">
+                    </Panel>
+                </TabItem>
+                <TabItem Header="{x:Static res:Strings.FindingsTab}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top"
+                                   Classes="muted"
+                                   FontSize="12"
+                                   Margin="12,8,12,4"
+                                   Text="{Binding Findings.Summary}" />
+                        <Panel>
+                            <TextBlock Classes="muted centered"
+                                       FontSize="12"
+                                       Margin="12"
+                                       TextWrapping="Wrap"
+                                       Text="{x:Static res:Strings.FindingsNone}"
+                                       IsVisible="{Binding !Findings.HasFindings}" />
+                            <ScrollViewer IsVisible="{Binding Findings.HasFindings}">
+                                <ItemsControl Margin="8,0,8,8" ItemsSource="{Binding Findings.Items}">
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="x:String">
-                                            <SelectableTextBlock FontSize="12" Text="{Binding}" TextWrapping="Wrap" />
+                                        <DataTemplate x:DataType="vm:FindingItem">
+                                            <Border Classes="finding" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+                                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12" TextWrapping="Wrap" Text="{Binding Message}" />
+                                                    <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Classes="muted" FontSize="11" Text="{Binding RuleId}" />
+                                                        <TextBlock Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Text="{Binding Where}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                        <Button Classes="labelled"
+                                                                FontSize="12"
+                                                                Content="{x:Static res:Strings.FindingFixButton}"
+                                                                Command="{Binding FixCommand}"
+                                                                IsVisible="{Binding CanFix}"
+                                                                ToolTip.Tip="{x:Static res:Strings.FindingFixToolTip}" />
+                                                        <Button Classes="labelled"
+                                                                FontSize="12"
+                                                                Content="{x:Static res:Strings.FindingGoToButton}"
+                                                                Command="{Binding GoToCommand}"
+                                                                ToolTip.Tip="{x:Static res:Strings.FindingGoToToolTip}"
+                                                                AutomationProperties.Name="{x:Static res:Strings.FindingGoToToolTip}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock Classes="muted"
-                                           FontSize="12"
-                                           TextWrapping="Wrap"
-                                           Text="{x:Static res:Strings.PendingChangesHint}"
-                                           IsVisible="{Binding HasPendingChanges}" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
+                            </ScrollViewer>
+                        </Panel>
+                    </DockPanel>
+                </TabItem>
+                <TabItem Header="{x:Static res:Strings.PendingChangesTab}">
+                    <ScrollViewer>
+                        <StackPanel Margin="12,8" Spacing="6">
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
+                            <TextBlock Classes="muted"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="{x:Static res:Strings.PendingChangesNone}"
+                                       IsVisible="{Binding !HasPendingChanges}" />
+                            <ItemsControl ItemsSource="{Binding PendingChanges}" IsVisible="{Binding HasPendingChanges}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:PendingChangeItem">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" ToolTip.Tip="{Binding Reason}">
+                                            <SelectableTextBlock Grid.Column="0"
+                                                                 FontSize="12"
+                                                                 VerticalAlignment="Center"
+                                                                 Text="{Binding Text}"
+                                                                 TextWrapping="Wrap"
+                                                                 Classes.reverted="{Binding IsReverted}" />
+                                            <Button Grid.Column="1"
+                                                    Classes="labelled"
+                                                    FontSize="12"
+                                                    Content="{x:Static res:Strings.PendingChangeRevertButton}"
+                                                    Command="{Binding RevertCommand}"
+                                                    IsVisible="{Binding IsApplied}"
+                                                    ToolTip.Tip="{Binding NotRevertableReason}"
+                                                    ToolTip.ShowOnDisabled="True" />
+                                            <Button Grid.Column="1"
+                                                    Classes="labelled"
+                                                    FontSize="12"
+                                                    Content="{x:Static res:Strings.PendingChangeRestoreButton}"
+                                                    Command="{Binding RestoreCommand}"
+                                                    IsVisible="{Binding IsReverted}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Classes="muted"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="{x:Static res:Strings.PendingChangesHint}"
+                                       IsVisible="{Binding HasPendingChanges}" />
+                        </StackPanel>
+                    </ScrollViewer>
                 </TabItem>
             </bctl:EditorSidePanel>
         </Grid>
@@ -425,6 +543,7 @@
                                Waveform="{Binding Playback.Waveform}"
                                Beats="{Binding Playback.Beats}"
                                Overview="{Binding Editor.Overview}"
+                               FindingMarks="{Binding Findings.Marks}"
                                VisibleStart="{Binding Editor.VisibleStart}"
                                VisibleEnd="{Binding Editor.VisibleEnd}"
                                SpanBrush="{DynamicResource AccentTintBrush}"

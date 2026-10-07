@@ -27,6 +27,11 @@ public sealed class ChartCommandEventArgs(IChartCommand command, ChartCommandAct
     public ChartChange Affected => Command.Affected;
 }
 
+/// <summary>The state of a <see cref="ChartUndoStack"/> a save was taken at (<see cref="ChartUndoStack.Mark"/>).</summary>
+/// <param name="Count">How many commands were done.</param>
+/// <param name="Top">The last of them, or null when none were.</param>
+public readonly record struct SavePoint(int Count, IChartCommand? Top);
+
 /// <summary>
 /// The chart's undo and redo (charter-spec C15 item 1): every change goes through <see cref="Execute"/>, and is undone
 /// and redone in order. It keeps every step of the session, as commands store changes rather than copies of the chart
@@ -44,11 +49,16 @@ public sealed class ChartUndoStack
     // How many commands were done when the chart was last saved, or -1 when that state can't be reached again.
     private int _saved;
 
-    /// <param name="chart">The chart, as it was opened or created, which counts as saved.</param>
-    public ChartUndoStack(EditableChart chart)
+    /// <param name="chart">The chart, as it was opened or created.</param>
+    /// <param name="startsSaved">
+    /// Whether the chart as given counts as saved: false for a chart recovered from an autosave, which differs from the
+    /// one on disk until it's saved.
+    /// </param>
+    public ChartUndoStack(EditableChart chart, bool startsSaved = true)
     {
         ArgumentNullException.ThrowIfNull(chart);
         Chart = chart;
+        _saved = startsSaved ? 0 : -1;
     }
 
     private static ILogger Logger => Log.ForContext(typeof(ChartUndoStack));
@@ -125,6 +135,30 @@ public sealed class ChartUndoStack
 
     /// <summary>Marks the chart as it is now as saved, so it isn't <see cref="IsDirty"/>.</summary>
     public void MarkSaved() => _saved = _done.Count;
+
+    /// <summary>
+    /// Where the chart is now, for a save that takes its snapshot here and finishes later: <see cref="MarkSaved(SavePoint)"/>
+    /// then marks this state as saved, whatever was done in the meantime.
+    /// </summary>
+    public SavePoint Mark() => new(_done.Count, NextUndo);
+
+    /// <summary>
+    /// Marks the chart as it was at <paramref name="point"/> as saved. The chart is then <see cref="IsDirty"/> if it's
+    /// been changed since, and comes back to saved when undoing or redoing reaches that point again. If a new command
+    /// has since dropped that point from the redo steps, it can't be reached, and the chart stays dirty.
+    /// </summary>
+    public void MarkSaved(SavePoint point) => _saved = CommandAt(point.Count - 1) == point.Top ? point.Count : -1;
+
+    // The command that brings the chart to index + 1 commands done: from those done, then those undone in redo order.
+    private IChartCommand? CommandAt(int index)
+    {
+        if (index < 0)
+            return null;
+        if (index < _done.Count)
+            return _done[index];
+        int redo = _undone.Count - 1 - (index - _done.Count);
+        return redo >= 0 ? _undone[redo] : null;
+    }
 
     private void Raise(IChartCommand command, ChartCommandAction action)
     {

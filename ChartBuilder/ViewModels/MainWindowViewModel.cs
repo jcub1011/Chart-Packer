@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Recovery;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Merging;
@@ -44,18 +46,35 @@ namespace ChartBuilder.ViewModels
         public string ToolTip => string.Format(CultureInfo.CurrentCulture, Strings.RecentOpenToolTipFormat, song.Path);
     }
 
+    /// <summary>
+    /// A new chart that was autosaved but never saved, on the home screen until it's recovered or discarded (charter-spec
+    /// C15 item 6).
+    /// </summary>
+    public sealed class UnsavedChartItem(RecoveryFile file)
+    {
+        public RecoveryFile File => file;
+
+        public string Title => file.Manifest.Title;
+
+        /// <summary>When it was autosaved.</summary>
+        public string SavedText => string.Format(
+            CultureInfo.CurrentCulture, Strings.UnsavedChartSavedFormat, file.Manifest.SavedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture));
+    }
+
     /// <summary>Chart Builder's launcher: the home screen, which hands over to the Editor window (charter-spec §4.5).</summary>
     /// <param name="picker">Picks a song to open.</param>
     /// <param name="confirmations">Asks before a <c>.chart</c> whose conversion changes it is opened.</param>
     /// <param name="settings">Where the recent songs are kept.</param>
     /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
+    /// <param name="recovery">Where the Editor's autosaves are, offered when their song opens.</param>
     public sealed partial class MainWindowViewModel(
         IEditorWindowService editors,
         ISettingsWindowService settingsWindow,
         IFilePickerService picker,
         IConfirmationService confirmations,
         BuilderSettingsService settings,
-        string lockFolder) : ViewModelBase
+        string lockFolder,
+        RecoveryStore recovery) : ViewModelBase
     {
         // How many of a conversion warning's places it lists before saying how many more there are.
         private const int WarningTimesShown = 5;
@@ -72,7 +91,7 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether a song is being opened, so nothing else can be started meanwhile.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsIdle))]
-        [NotifyCanExecuteChangedFor(nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand))]
+        [NotifyCanExecuteChangedFor(nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand), nameof(RecoverUnsavedCommand), nameof(DiscardUnsavedCommand))]
         public partial bool IsOpening { get; private set; }
 
         public bool IsIdle => !IsOpening;
@@ -83,6 +102,41 @@ namespace ChartBuilder.ViewModels
         public ObservableCollection<RecentSongItem> Recent { get; } = [.. settings.Settings.RecentSongs.Select(s => new RecentSongItem(s))];
 
         public bool HasRecent => Recent.Count > 0;
+
+        /// <summary>New charts that were autosaved but never saved, as a crash left them, the latest first.</summary>
+        public ObservableCollection<UnsavedChartItem> UnsavedCharts { get; } = [.. recovery.NewCharts().Select(f => new UnsavedChartItem(f))];
+
+        public bool HasUnsavedCharts => UnsavedCharts.Count > 0;
+
+        /// <summary>Opens an unsaved new chart from its autosave, unsaved until it's saved.</summary>
+        [RelayCommand(CanExecute = nameof(IsIdle))]
+        private void RecoverUnsaved(UnsavedChartItem? item)
+        {
+            if (item is null)
+                return;
+            try
+            {
+                editors.OpenRecovered(Autosave.RecoverNew(item.File), null, item.File.Key);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ShowError(string.Format(CultureInfo.CurrentCulture, Strings.RecoverFailedFormat, ex.Message));
+            }
+        }
+
+        /// <summary>Deletes an unsaved new chart's autosave, after asking.</summary>
+        [RelayCommand(CanExecute = nameof(IsIdle))]
+        private async Task DiscardUnsavedAsync(UnsavedChartItem? item)
+        {
+            if (item is null || !await confirmations.ConfirmAsync(
+                    Strings.DiscardUnsavedTitle,
+                    string.Format(CultureInfo.CurrentCulture, Strings.DiscardUnsavedMessageFormat, item.Title),
+                    Strings.DiscardUnsavedButton))
+                return;
+            recovery.Delete(item.File.Key);
+            UnsavedCharts.Remove(item);
+            OnPropertyChanged(nameof(HasUnsavedCharts));
+        }
 
         /// <summary>Opens what the command line asks for. Called once, when the window is first shown.</summary>
         public void Start(BuilderArgs args)
@@ -172,6 +226,36 @@ namespace ChartBuilder.ViewModels
 
                 ShowInfo(string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, entry.DisplayName));
                 var result = await SongOpener.OpenAsync(entry);
+
+                // An autosave of edits a crash or a shutdown left unsaved is offered first (charter-spec C2 item 7).
+                RecoveryFile? recovered = null;
+                if (result.Song is not null || result.Empty is not null)
+                {
+                    var (goOn, file) = await OfferRecoveryAsync(entry);
+                    if (!goOn)
+                    {
+                        Message = null;
+                        return;
+                    }
+
+                    recovered = file;
+                }
+
+                if (result.Empty is { } empty)
+                {
+                    // A song with neither chart file can be given one (charter-spec C1, New chart in this song).
+                    if (recovered is null && !await confirmations.ConfirmAsync(
+                            Strings.NewChartInSongTitle,
+                            string.Format(CultureInfo.CurrentCulture, Strings.NewChartInSongMessageFormat, entry.DisplayName),
+                            Strings.NewChartInSongButton))
+                    {
+                        Message = null;
+                        return;
+                    }
+
+                    result = result with { Song = SongOpener.NewChartIn(empty, EmptyChart()) };
+                }
+
                 if (result.Song is not { } song)
                 {
                     if (result.Problem is { Kind: SongOpenProblemKind.Missing })
@@ -191,7 +275,10 @@ namespace ChartBuilder.ViewModels
                 }
 
                 RememberRecent(song);
-                editors.OpenSong(song, songLock);
+                if (recovered is not null)
+                    editors.OpenRecovered(Autosave.Recover(song, recovered), songLock, recovered.Key);
+                else
+                    editors.OpenSong(song, songLock);
                 songLock = null;
             }
             catch (Exception ex)
@@ -205,6 +292,42 @@ namespace ChartBuilder.ViewModels
                 // Still held only if the editor didn't take it.
                 songLock?.Dispose();
                 IsOpening = false;
+            }
+        }
+
+        /// <summary>
+        /// Offers the song's autosave, if it has one worth offering: Recover or Discard, warning when the song's chart has
+        /// changed since. One that's the song's chart already is deleted without asking.
+        /// </summary>
+        /// <returns>
+        /// Whether to go on opening the song, false when the user cancelled; and the autosave to recover, or null to open
+        /// the song as it is, as when there's none or it was discarded.
+        /// </returns>
+        private async Task<(bool GoOn, RecoveryFile? File)> OfferRecoveryAsync(SongEntry entry)
+        {
+            if (recovery.Find(entry.FullPath) is not { } file)
+                return (true, null);
+
+            var offer = await RecoveryStore.AssessAsync(file, entry);
+            if (offer == RecoveryOffer.Stale)
+            {
+                recovery.Delete(file.Key);
+                return (true, null);
+            }
+
+            string when = file.Manifest.SavedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+            string message = string.Format(CultureInfo.CurrentCulture, Strings.RecoverMessageFormat, entry.DisplayName, when);
+            if (offer == RecoveryOffer.OfferChanged)
+                message += Environment.NewLine + Environment.NewLine + Strings.RecoverChangedWarning;
+            switch (await confirmations.ChooseAsync(Strings.RecoverTitle, message, Strings.RecoverButton, Strings.RecoverDiscardButton))
+            {
+                case ConfirmChoice.First:
+                    return (true, file);
+                case ConfirmChoice.Second:
+                    recovery.Delete(file.Key);
+                    return (true, null);
+                default:
+                    return (false, null);
             }
         }
 
@@ -243,6 +366,10 @@ namespace ChartBuilder.ViewModels
             IsError = false;
             Message = message;
         }
+
+        /// <summary>A new chart as New chart starts one: the default resolution, 120 BPM and 4/4, with a Lead part.</summary>
+        private EditableChart EmptyChart() => EditableChart.CreateNew(new NewChartSettings(
+            "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
 
         private static string ProblemText(SongOpenProblem problem, string path) => problem.Kind switch
         {

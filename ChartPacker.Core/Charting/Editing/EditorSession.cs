@@ -57,7 +57,7 @@ public sealed class EditorChartChangedEventArgs(ChartChange affected, bool isPre
 public sealed class EditorSession
 {
     private readonly Dictionary<ChartTrackKey, NoteTrack> _game = [];
-    private readonly IReadOnlyList<KeyValuePair<string, string>> _songIni;
+    private IReadOnlyList<KeyValuePair<string, string>> _songIni;
     private IChartCommand? _preview;
     private ChartReadOptions? _readOptions;
 
@@ -83,12 +83,37 @@ public sealed class EditorSession
     /// <summary>Raised when the snap, the tool, the focused lane or the status changes.</summary>
     public event EventHandler? StateChanged;
 
+    /// <summary>Raised when the song's delay or <c>song.ini</c> changes (<see cref="SetSongSettings"/>), which moves or rereads every track.</summary>
+    public event EventHandler? SongSettingsChanged;
+
     public EditableChart Chart => UndoStack.Chart;
 
     public ChartUndoStack UndoStack { get; }
 
     /// <summary>The song's delay: audio time is chart time plus this.</summary>
-    public TimeSpan Delay { get; }
+    public TimeSpan Delay { get; private set; }
+
+    /// <summary>
+    /// Takes up the song's <c>song.ini</c> and delay as they now are: after a save, or a pending change reverted or
+    /// restored. Every track's game view is read again.
+    /// </summary>
+    public void SetSongSettings(IReadOnlyList<KeyValuePair<string, string>> songIni, TimeSpan delay)
+    {
+        ArgumentNullException.ThrowIfNull(songIni);
+        var options = ChartReadOptions.From(songIni);
+        if (delay == Delay && options == ChartReadOptions.From(_songIni))
+        {
+            _songIni = songIni;
+            return;
+        }
+
+        _songIni = songIni;
+        Delay = delay;
+        _readOptions = null;
+        _game.Clear();
+        SongSettingsChanged?.Invoke(this, EventArgs.Empty);
+        RaiseState();
+    }
 
     public EditorViewport Viewport { get; }
 

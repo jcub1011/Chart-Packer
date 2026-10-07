@@ -19,6 +19,13 @@ namespace ChartBuilder.Services
         /// </summary>
         void OpenSong(OpenedSong song, SongLock songLock);
 
+        /// <summary>
+        /// Opens <paramref name="song"/>, recovered from the autosave <paramref name="recoveryKey"/> (charter-spec C2 item 7),
+        /// in a new Editor window in place of the launcher. It's unsaved until it's saved. The Editor holds
+        /// <paramref name="songLock"/>, if there is one, until it closes.
+        /// </summary>
+        void OpenRecovered(EditorSong song, SongLock? songLock, string recoveryKey);
+
         /// <summary>Opens the calibration tool (charter-spec C11) over the window in front, finishing when it closes.</summary>
         Task ShowCalibrationAsync();
     }

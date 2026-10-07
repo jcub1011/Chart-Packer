@@ -38,6 +38,12 @@ public static class UserConfigPaths
     public static string LockFolder => Path.Combine(ConfigFolder, "locks");
 
     /// <summary>
+    /// Where Chart Builder autosaves the chart open, for recovery after a crash (charter-spec C15 item 6,
+    /// <c>RecoveryStore</c>). Never inside a song.
+    /// </summary>
+    public static string RecoveryFolder => Path.Combine(ConfigFolder, "Recovery");
+
+    /// <summary>
     /// Where both apps write their logs: <c>%LOCALAPPDATA%\ChartPacker\Logs</c>,
     /// <c>~/Library/Logs/ChartPacker</c>, or <c>$XDG_STATE_HOME/ChartPacker/logs</c>
     /// (<c>~/.local/state</c> when unset). It is outside <see cref="ConfigFolder"/>, so a running app

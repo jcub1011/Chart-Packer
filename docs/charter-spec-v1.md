@@ -374,11 +374,19 @@ metadata editor. Chart Packer's unsaved drafts for a song are never written by C
 
 - A `.sng` save is atomic, because `SngWriter.RewriteAsync` writes a temp file and renames it.
 - A song folder save is atomic **per file**: each file is written to a temp file and renamed.
-- `SongFolderFiles.ApplyAsync` today deletes removed files before it moves the new ones in. Chart
-  Builder changes that order to **move in first, then delete**. Otherwise a crash during a
-  `.chart` import's first save could leave the folder with neither `notes.chart` nor `notes.mid`.
-  With the new order, the worst case is a folder holding both, and `ChartReader.Pick` then reads
-  the new `notes.mid`.
+- **A folder save's order** (`DraftWriter.SaveFolderAsync`, `SongFolderFiles.ApplyAsync`):
+  1. every added file is copied to a temp file beside its target, so nothing has changed yet;
+  2. the temp files are moved into place;
+  3. `song.ini` is written;
+  4. the removed files are deleted.
+
+  A copy that fails leaves the folder, `song.ini` included, as it was (AC C17.3). The removals come
+  last, so a crash during a `.chart` import's first save can't leave the folder with neither
+  `notes.chart` nor `notes.mid` (AC C2.4); the worst case is a folder holding both, and
+  `ChartReader.Pick` then reads the new `notes.mid`. A removed `notes.chart` goes only once
+  `song.ini` holds what was taken from it. A crash between steps 2 and 3 leaves the new `notes.mid`
+  with the old `song.ini`, which matters only for the drum layout keys and `multiplier_note`; the
+  recovery file written at the start of the save ([C15](#c15-editing-ergonomics)) covers it.
 
 ### 4.7 Dependencies
 
@@ -579,6 +587,8 @@ the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on th
 
 **The first save** of a new chart ([C17](#c17-save-and-export)).
 
+- It asks for the song's **name and artist**, filled from the first stem's title and artist tags,
+  as there's no Chart Inspector to set them in yet. They're written to `song.ini`.
 - It asks where the song folder goes: a parent folder and a folder name.
   - The parent folder is by default the last one used for a new chart, otherwise Chart Packer's
     library root (read from Chart Packer's settings, never written).
@@ -590,9 +600,10 @@ the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on th
 - **What is written** (`NewChartCreator`):
   - each stem, copied as `<stem>.<ext>` in lowercase;
   - `notes.mid`, written from the chart as any save is ([§4.3](#43-writing-midichartwriter));
-  - `song.ini`, with a `[song]` section holding the name, artist and charter, `diff_<part> = -1` for
-    each part (the keys are in [§7.5](#75-songini-keys-chart-builder-writes)),
-    `pro_drums`/`five_lane_drums` as the drum variant needs, and `song_length` from the longest stem.
+  - `song.ini`, holding the chart's pending changes ([C17](#c17-save-and-export)) that weren't
+    reverted: the name, artist and charter, `diff_<part> = -1` for each part (the keys are in
+    [§7.5](#75-songini-keys-chart-builder-writes)), `pro_drums`/`five_lane_drums` as the drum
+    variant needs, and `song_length` from the longest stem.
 - **How it is written.** Everything is written into a temp folder beside the target, which is then
   renamed into place. A failure or cancel leaves nothing behind.
 - The song is then locked and added to the recent songs, and the Editor goes on with it as a song
@@ -647,10 +658,14 @@ Acceptance criteria:
    - `ChartToMidi` returns the `.chart`'s `Offset` but doesn't write it anywhere. When `song.ini`
      sets no `delay`, the import adds the Offset as a pending `delay` change, as `SongMerger`
      already does through `SongChartSettings.DelayOf`.
-   - **The `.chart`'s `[Song]` metadata** (`Name`, `Artist`, `Album`, `Genre`, `Year`, `Charter`,
-     `PreviewStart` and the like) isn't read anywhere in the app today. The import reads it and adds
-     each value as a pending `song.ini` change wherever `song.ini` has no value for that key. That
-     way, removing `notes.chart` loses nothing.
+   - **The `.chart`'s `[Song]` metadata** is read by `ChartSongSection`, and each value is added as
+     a pending `song.ini` change wherever `song.ini` has no value for that key. That way, removing
+     `notes.chart` loses nothing. `Name`, `Artist`, `Album`, `Genre` and `Charter` become their own
+     keys; `Year` becomes `year`, without the `", "` Moonscraper writes before it; `PreviewStart`, in
+     seconds, becomes `preview_start_time` in milliseconds; and `Difficulty` becomes `diff_band`. The
+     resolution, the audio streams and `MediaType` belong to the `.chart` alone.
+   - When the conversion needs a `sustain_cutoff_threshold` to keep the `.chart`'s sustains
+     sustains (`ChartConversion.SustainCutoff`), that's a pending change too, which can't be reverted.
    - On the first save, `notes.chart` is staged for removal after a confirmation, so the song
      doesn't carry two charts that the games might pick between differently.
 4. **Drafts.** Chart Packer's unsaved metadata drafts don't reach Chart Builder
@@ -662,8 +677,10 @@ Acceptance criteria:
    there yet ([C1](#c1-new-chart-and-chart-settings)). Adding drums asks for the variant if the song
    doesn't set one.
 6. **Remove part** removes a part's track, after a confirmation. It can be undone.
-7. **Recovery.** If an autosave exists that is newer than the chart on disk
-   ([C15](#c15-editing-ergonomics)), the user is offered **Recover** or **Discard**.
+7. **Recovery.** If the song has an autosave ([C15](#c15-editing-ergonomics)), the user is offered
+   **Recover** or **Discard**, or can cancel the open. The offer warns when the song's chart has
+   changed on disk since the autosave. An autosave that is the song's chart byte for byte (a save
+   that went through, then a crash before its autosave was deleted) is deleted without asking.
 
 Acceptance criteria:
 
@@ -928,7 +945,9 @@ Acceptance criteria:
    `[coda]`. Chart Builder shows those as a big rock ending, not a fill, and the fill rules (CHR042,
    CHR043) skip them. No code reads big rock endings or `[coda]` today, so this is new.
 5. **Song events**: `[music_start]`, `[music_end]`, `[end]`. `[end]` is kept after the last note
-   and moved on save if notes are added after it (CHR085).
+   and moved on save if notes are added after it (CHR085): to the first measure line after the last
+   note's end, a sustain's included. The move is an undo step of its own, made once the save is going
+   ahead, so the model the editor holds is the one saved (AC C17.4).
 6. **Free text events**, in `EVENTS` or on a part track, for anything else. Events the model
    doesn't know are shown and kept, not deleted.
 
@@ -1309,8 +1328,21 @@ Acceptance criteria:
    - **Which song it belongs to.** A recovery file is matched to a song by its full path. If the
      chart on disk has changed since the recovery file's manifest recorded it, recovery still
      offers it, but warns that the song has changed since.
-   - Saving deletes it. Opening a song with a newer recovery file offers to restore it
+   - Saving deletes it. Opening a song with a recovery file offers to restore it
      ([C2](#c2-open-and-import)).
+   - **How it is written** (`RecoveryStore`). The chart, then a JSON manifest, each to a temp file
+     renamed into place. The manifest holds the chart's length and SHA-256, so a chart without a
+     manifest that matches it, as a crash between the two would leave, is ignored. A song's files are
+     named by a hash of its full path, as its lock is. The manifest also holds the song's `song.ini`
+     as the next save would leave it, which the chart is read back with, and the keys of the pending
+     changes the user reverted, which stay reverted.
+   - **A save** writes the recovery file from the bytes it's about to save, before it touches the
+     song, and deletes it once the save has gone through. A crash mid-save always leaves one.
+   - **A new chart never saved** is autosaved too, under an ID of its own, with its name, artist and
+     the paths of its audio. The home screen lists these under **Unsaved new charts**, with
+     **Recover** and **Discard**. Once it's first saved, its autosave moves to its song's.
+   - **Closing** with Discard deletes it. When the OS shuts down, which won't wait for the close
+     prompt, the chart is autosaved there and then.
 7. **Closing** Chart Builder, or the app, with unsaved changes asks: Save, Discard or Cancel.
 8. **Keyboard shortcuts** are listed in [§9](#9-keyboard-shortcuts).
 
@@ -1340,11 +1372,15 @@ Acceptance criteria:
    and messages in `FindingMessages.resx`. They appear in the findings panel and as marks on the
    overview strip, and each one links to its place in the chart. `Finding` gains an optional chart
    location (part, difficulty and tick range) for that, beside its existing byte offset and
-   metadata key.
+   metadata key. A finding about the song as a whole rather than a part, such as a tempo marker
+   (CHR001, CHR002, CHR005, CHR082, CHR085), has a tick instead (`Finding.Tick`).
 3. **Quick fixes.** The existing `QuickFixRegistry` and `IQuickFixStrategy` only edit metadata
    (`QuickFix.ApplyTo(MetadataItem)`). Chart Builder adds a chart kind of fix, which proposes an
    `IChartCommand` for a finding, and registers chart fixes with the same registry. Each fix is
-   one undoable command (see the table for which rules have one).
+   one undoable command (see the table for which rules have one). It's given the read options lint
+   used, for fixes that depend on them, such as CHR021's sustain cutoff. A fix that changes
+   `song.ini` instead (CHR084's) restores the pending change the user reverted; it isn't an undo
+   step, as reverting isn't.
 4. **Severity.**
    - Lint **never blocks saving**. A chart in progress must always be saveable.
    - **Errors** are things the author wrote that the games read differently, such as an open note
@@ -1383,8 +1419,9 @@ Acceptance criteria:
    change in Chart Builder's **Pending changes** list (beside the findings panel) as soon as it is
    made, not only at save. Each change can be reverted there. Chart Packer's metadata editor
    doesn't see these changes until they are saved ([§4.6](#46-saving)). The full list:
-   - `song_length`, when it is unset or no longer matches the audio's length within 1 s. This
-     happens on save, so CHR084 only appears for charts linted outside Chart Builder;
+   - `song_length`, when it is unset or no longer matches the audio's length within 1 s, worked out
+     once the audio has been measured. Chart Builder lints the `song.ini` its save would write, so
+     CHR084 appears there only when this change has been reverted;
    - `pro_drums` and `five_lane_drums`, for the drum variant: when the variant is chosen in Chart
      settings ([C1](#c1-new-chart-and-chart-settings)), switched
      ([C6](#c6-drums-4-lane-pro-and-5-lane)), or detected on load ([§4.1](#editable-model));
@@ -1396,10 +1433,21 @@ Acceptance criteria:
      ([§7.2](#72-shared-markers-every-difficulty));
    - `delay`, from a `.chart` import's Offset ([C2](#c2-open-and-import)), or **Find first downbeat**
      ([C14](#c14-onset-and-beat-assist));
-   - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import)).
+   - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import));
+   - a new chart's name and artist, from its first save ([C1](#c1-new-chart-and-chart-settings));
+   - `sustain_cutoff_threshold`, on an import whose sustains need it to stay sustains once they're
+     MIDI ([C2](#c2-open-and-import)).
 
-   `sustain_cutoff_threshold` and the HOPO threshold are never changed by Chart Builder. Its display
-   follows them.
+   Changes the chart is read by can't be reverted, as leaving one out would save a chart that plays
+   differently from what the editor shows: the drum layout keys, an import's
+   `sustain_cutoff_threshold` and `multiplier_note`. The rest can, and a reverted change stays
+   listed, struck through, until it's restored. Reverting isn't an undo step, and stays across saves.
+
+   Otherwise, `sustain_cutoff_threshold` and the HOPO threshold are never changed by Chart Builder.
+   Its display follows them.
+
+   **Save asks first** only when it changes `song.ini` or removes a file, listing what it changes.
+   An import's first save always asks, with **Remove notes.chart** and **Keep notes.chart**.
 3. **Save and pack** saves, then packs the song to a `.sng`
    ([project-spec F1](project-spec-v1.md#f1-pack-song-folder--sng)) with Core's packing
    (`PackPlanner`, `SongJob`). It uses Chart Packer's output folder and overwrite settings, which
@@ -1473,7 +1521,7 @@ never reused.
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
 | CHR020 | Warning | A sustain runs into the next note on its lane, so the games will cut it short | Trim sustain |
-| CHR021 | Info | A sustain is shorter than the sustain cutoff, so the games read it as a plain note | Remove sustain |
+| CHR021 | Info | A sustain is shorter than the sustain cutoff, so the games read it as a plain note. Only lengths of at least a sixteenth note count, as many charts hold every plain note a sixteenth. | Remove sustain |
 | CHR022 | Error | An open note in a chord with frets | Remove open |
 | CHR023 | Info | A force HOPO or force strum that doesn't change the chord | Remove force |
 | CHR024 | Warning | A forced HOPO on a chord that repeats the previous note or chord exactly. The games play it as a HOPO, but the same frets can't be hammered on again. | Remove force |

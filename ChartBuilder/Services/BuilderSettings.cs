@@ -92,6 +92,18 @@ namespace ChartBuilder.Services
         /// <summary>The songs opened lately, the latest first, as the home screen lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
         public List<RecentSong> RecentSongs { get; set; } = [];
 
+        /// <summary>The fewest minutes between autosaves.</summary>
+        public const int MinAutosaveMinutes = 1;
+
+        /// <summary>The most minutes between autosaves.</summary>
+        public const int MaxAutosaveMinutes = 60;
+
+        /// <summary>How many minutes apart the chart open is autosaved for recovery (charter-spec C15 item 6, §10).</summary>
+        public int AutosaveMinutes { get; set; } = 2;
+
+        /// <summary>The parent folder a new chart's first save last made its song folder in (charter-spec C1, §10). Null for none yet.</summary>
+        public string? LastNewChartFolder { get; set; }
+
         /// <summary>Whether the first song played on an output device that has no calibrated latency offers the calibration tool (charter-spec C11).</summary>
         public bool PromptForCalibration { get; set; } = true;
 

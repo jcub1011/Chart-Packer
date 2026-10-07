@@ -42,6 +42,12 @@ public sealed class ChartLintContext
     /// <summary>How long the song's audio is, or null when it isn't known.</summary>
     public TimeSpan? AudioLength => _run.Input.AudioLength;
 
+    /// <summary>How much later than its ticks say the chart plays against the audio.</summary>
+    public TimeSpan Delay => _run.Input.Delay;
+
+    /// <summary>The chart's tempo map, for times and the grid, made once in a run.</summary>
+    public TempoMap TempoMap => _run.TempoMap;
+
     /// <summary>
     /// What the games read from the chart (<see cref="Charting.GameView.Project"/>, with <see cref="Options"/>). It's
     /// worked out the first time a rule asks for it, and at most once in a run, as it's costly on a big chart.

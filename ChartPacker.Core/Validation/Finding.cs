@@ -7,5 +7,9 @@ namespace ChartPacker.Core.Validation;
 /// <param name="Offset">Byte offset in the <c>.sng</c> of the structure at fault, when there is one.</param>
 /// <param name="Key">The metadata key at fault, for a finding about one key's pair.</param>
 /// <param name="Location">The place in a chart at fault, for a finding about the chart's contents.</param>
+/// <param name="Tick">
+/// For a chart finding about the song as a whole rather than a part, such as a tempo marker, the tick at fault; null
+/// otherwise.
+/// </param>
 public sealed record Finding(
-    string RuleId, Severity Severity, string Message, long? Offset = null, string? Key = null, ChartLocation? Location = null);
+    string RuleId, Severity Severity, string Message, long? Offset = null, string? Key = null, ChartLocation? Location = null, long? Tick = null);

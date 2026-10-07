@@ -135,6 +135,39 @@
                 <SelectableTextBlock TextWrapping="Wrap" Text="{Binding Message}" />
             </Border>
 
+            <!-- New charts a crash or a shutdown left autosaved but never saved (charter-spec C15 item 6). -->
+            <StackPanel Margin="0,12,0,0" Spacing="4" IsVisible="{Binding HasUnsavedCharts}">
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.UnsavedChartsHeading}" />
+                <Border BorderThickness="1"
+                        BorderBrush="{DynamicResource SubtleBorderBrush}"
+                        Background="{DynamicResource ToolbarGroupBrush}"
+                        CornerRadius="6"
+                        Padding="8,4">
+                    <ItemsControl ItemsSource="{Binding UnsavedCharts}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UnsavedChartItem">
+                                <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" Margin="0,2">
+                                    <TextBlock Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="muted" FontSize="11" Text="{Binding SavedText}" />
+                                    <Button Grid.Column="1"
+                                            Grid.RowSpan="2"
+                                            VerticalAlignment="Center"
+                                            Content="{x:Static res:Strings.RecoverButton}"
+                                            Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).RecoverUnsavedCommand}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Grid.Column="2"
+                                            Grid.RowSpan="2"
+                                            VerticalAlignment="Center"
+                                            Content="{x:Static res:Strings.RecoverDiscardButton}"
+                                            Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).DiscardUnsavedCommand}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+
             <!-- The songs opened lately, the latest first. -->
             <StackPanel Margin="0,12,0,0" Spacing="4" IsVisible="{Binding HasRecent}">
                 <TextBlock Classes="caption" Text="{x:Static res:Strings.RecentHeading}" />

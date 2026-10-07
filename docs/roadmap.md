@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Current as of 2026-10-07 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), step 6: saving and lint. See [Where CM2 stands](#where-cm2-stands). |
+| **Next up** | [CM2](#cm2-calibration-chart-settings-and-5-fret-editing)'s hand checks, then [CM3: Drums and GHL](#cm3-drums-and-ghl). See [Where CM2 stands](#where-cm2-stands). |
 
 ---
 
@@ -20,7 +20,7 @@ its exit criteria. This file owns only the order and the status.
 | ----: | --------- | ------ | -------- | ---------- |
 | 1 | [CM0: Split](#cm0-split) | Done (cleanup left) | Exit criteria met; 4 cleanup items left | — |
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
-| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | Steps: 5 of 6. Exit criteria: 19 of 33 pass, 10 in part ([tracker](#cm2-progress)) | CM1 |
+| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | Steps: 6 of 6 built. Exit criteria: 31 of 33 pass, 2 in part, waiting on hand checks ([tracker](#cm2-progress)) | CM1 |
 | 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Not started | — | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
@@ -50,8 +50,10 @@ panel and the tools came with CM2 step 5. The Chart Inspector is still a placeho
 
 - **The wizard's back end** (`ChartPacker.Core/Charting/NewChart*.cs`, with its tests). New chart
   now opens the Editor straight away, and uses its stem naming (`NewChartStems.TracksOf`). A new
-  chart's first save will write its folder with `NewChartCreator`
-  ([CM2](#cm2-calibration-chart-settings-and-5-fret-editing) step 6), so it stays.
+  chart's first save writes its folder with `NewChartCreator.CreateAsync(NewSongFolder)`, from the
+  chart and `song.ini` as any save writes them. The wizard's own overload, taking a
+  `NewChartRequest`, and `NewChartMidi`, `NewChartIni` and `NewChartLength` behind it, are now used
+  only by their tests, and can go.
 - **Shared dialogs.** `ConfirmDialog` and `MessageDialog` are still in `ChartPacker/Views`. They
   move to `ChartPacker.UI` when Chart Builder first needs them.
 - **`ViewLocator`.** Chart Builder still has none. Its lanes and canvases are built in code, so
@@ -90,13 +92,9 @@ Most of it is in `ChartPacker.Core/Charting/`, with its tests in the new `ChartB
 
 **Left for later:**
 
-- **The CHR lint rules.** The timing, 5-fret and song rules come with CM2, the drums and phrase
-  rules with CM3.
-- **`song.ini` pending changes from chart quick fixes** (CM2).
-- **Anchor absorption** when a tempo marker is removed or moved (CM2).
+- **The CHR lint rules.** The timing, 5-fret and song rules came with CM2; the drums and phrase
+  rules come with CM3.
 - **Cymbal/tom toggling and drum conversion** (CM3).
-- **The folder save's order.** `DraftWriter.SaveFolderAsync` still writes `song.ini` before the
-  files. This is part of CM2's save work.
 - **Two re-save cases.** A mix kept as text before a standard mix on the same tick, and a tom
   marker before a fifth-pad note on the same tick. The game view reads both as the games do, but
   re-saving changes how such a file plays. Each is a candidate for a load issue or a lint rule.
@@ -129,7 +127,8 @@ before any canvas depends on it.
 
 ## CM2: Calibration, chart settings and 5-fret editing
 
-**Status: in progress.** Steps 1 to 5 are done. It builds on CM1's model, writer and lint engine.
+**Status: in progress.** Steps 1 to 6 are built and their tests pass; what's left is the hand
+checks. It builds on CM1's model, writer and lint engine.
 
 **Built out of order.** Step 3 came before the rest of step 2, so that calibration can be checked
 against a real song: Chart Builder opens a song and plays it, with a metronome over the stems and a
@@ -211,15 +210,22 @@ This is the first milestone with a working editor. Its steps, in order:
      - playing from the cursor, and Shift+Space for the selection;
      - the loop region, in `StemPlayer`;
      - following.
-6. **Saving and lint.**
-   - A new chart's **first save** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), which
-     asks where the song folder goes and writes it with `NewChartCreator`, then locks the song and
-     adds it to the recent songs.
-   - **New chart in this song**, for a song with neither chart file, which adds `notes.mid` and the
-     `song.ini` keys through its draft.
-   - [C15](charter-spec-v1.md#c15-editing-ergonomics) autosave and recovery.
-   - [C17](charter-spec-v1.md#c17-save-and-export) save.
-   - The timing, 5-fret and song lint rules ([§6](charter-spec-v1.md#lint-rules)).
+6. **Saving and lint.** *Done*, in three slices: saving, then recovery, then lint.
+   - **Save** ([C17](charter-spec-v1.md#c17-save-and-export)), Ctrl+S and the toolbar: the chart is
+     written in memory and read back both ways (a difference stops it), then saved through the
+     song's draft with its pending `song.ini` changes. Save and pack, gated on Error findings, and
+     Export copy.
+   - The **pending changes** are their own tab in the right panel, each with Revert and Restore, but
+     for those the chart is read by.
+   - A new chart's **first save** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)): a
+     dialog with its name and artist and where its folder goes, written with `NewChartCreator`,
+     then the song locked and on the recent songs.
+   - **New chart in this song**, for a song with neither chart file.
+   - The title's `*` for unsaved edits, and **Save, Discard or Cancel** on closing.
+   - [C15](charter-spec-v1.md#c15-editing-ergonomics) **autosave and recovery**, with the offer on
+     open and the home screen's **Unsaved new charts**.
+   - The timing, 5-fret and song **lint rules** ([§6](charter-spec-v1.md#lint-rules)) with their
+     fixes, the **Findings** tab, and lint marks on the bottom timeline.
 
 ### CM2 progress
 
@@ -235,7 +241,7 @@ As of 2026-10-07. Update this as each step lands, a test is added, or a hand che
 | 3. Open and import | Done, but for C2 items 5 to 7 | Pass | Not yet |
 | 4. New chart and Chart settings | Done, but for the first save and New chart in this song (step 6) | Pass | Not yet |
 | 5. The editor (C3, C4, C5, C10) | Done, but for phrases and drum flags (CM3) | Pass | Not yet |
-| 6. Saving and lint (C15, C17, rules) | Lint engine and the pending-changes model only | Engine and model only | — |
+| 6. Saving and lint (C15, C17, rules) | Done | Pass | Not yet |
 
 **Exit criteria** ([§13](charter-spec-v1.md#13-milestones): AC C1, C2, C3, C4, C5, C10, C11,
 C15.2 and C17).
@@ -247,25 +253,25 @@ C15.2 and C17).
 
 | AC | Status | Covered by, or what's missing |
 | -- | ------ | ----------------------------- |
-| C1.1 | In part | `NewChartCreatorTests` (validates and packs; reopens through `SongOpener` with the same tempo map, parts and metadata); the first save from the Editor (step 6) |
-| C1.2 | In part | `NewChartCreatorTests` (cancel, a stem that can't be copied); the first save from the Editor (step 6) |
-| C1.3 | In part | `NewChartFolderTests`, `NewChartCreatorTests`; the first save from the Editor (step 6) |
+| C1.1 | Passes | `ChartSaveTests` (a new chart's first save, through `ChartSaver`, validates, packs and reopens with the same tempo map, parts and metadata) |
+| C1.2 | Passes | `ChartSaveTests` (cancelled, and a stem that can't be copied: no folder or temp folder left) |
+| C1.3 | Passes | `ChartSaveTests`, `NewChartFolderTests` |
 | C1.4 | Passes | `NewChartStemsTests` (`TracksOf`), `NewChartCreatorTests` |
 | C1.5 | Passes | `NewChartIniTests`, `NewChartCreatorTests` (reopened with the same layout), `PendingSongIniChangesTests` |
 | C1.6 | Passes | `ChartSettingsCommandTests` |
 | C1.7 | Passes | `ChartSettingsCommandTests`, `PendingSongIniChangesTests`; the Editor's list waits on a hand check |
-| C2.1 | In part | `MidiChartLoaderTests`, `MidiChartLoaderPartTests`, `MidiChartWriterTests`; saving from the app comes with C17 (step 6) |
-| C2.2 | In part | `MidiChartLoaderTests`; saving from the app comes with C17 (step 6) |
-| C2.3 | Not yet | Saving a `.sng` (step 6) |
+| C2.1 | Passes | `ChartSaveTests` (every fixture opened and saved to disk without edits), `MidiChartWriterTests` |
+| C2.2 | Passes | `ChartSaveTests` (the `[Song]` values and `Offset` reach `song.ini`, and `notes.chart` is replaced) |
+| C2.3 | Passes | `ChartSaveTests` (the mask and every other file kept) |
 | C2.4 | Passes | `SongFolderFilesTests` (CM1) |
 | C2.5 | In part | `SongLockTests`; the second Chart Builder's refusal is built, and waits on a hand check |
-| C2.6 | In part | Chart Packer's refresh is built, but Chart Builder can't save yet (step 6) |
+| C2.6 | In part | `ChartSaveTests` (a save changes the song's stamp, and its summary reads the saved chart); Chart Packer's refresh on activation waits on a hand check |
 | C3.1 | Passes | `EditorViewportTests` (the session's cursor, span and selection, projected into both views) |
 | C3.2 | Passes | `EditorToolsTests`, each tool run through `EditorTools` in both views |
 | C4.1 | Passes | `TempoMapEditsTests` |
 | C4.2 | Passes | `RetickTests`, `TempoMapEditsTests` (through the Tempo tool) |
 | C4.3 | Passes | `EditableTempoMapTests` |
-| C4.4 | In part | `MidiChartWriterTests`; saving, packing and reopening from the app (step 6) |
+| C4.4 | Passes | `ChartSaveTests` (anchors through a save, a pack and a reopen), `MidiChartWriterTests` |
 | C5.1 | Passes | `MidiChartWriterTests`, `FiveFretEditingTests` (made with the tools, in both views) |
 | C5.2 | Passes | `NaturalHopoDisplayTests` (the session's game view against `ChartReader`, for every HOPO setting) |
 | C10.1 | Passes | `StemPlayerTests` (slow: about 30 s) |
@@ -275,19 +281,20 @@ C15.2 and C17).
 | C11.3 | Passes | `LatencyCalibrationTests` |
 | C11.4 | Passes | `CalibrationScheduleTests` |
 | C11.5 | Passes | `LatencyCalibrationTests` |
-| C15.2 | Not yet | Autosave and recovery (step 6) |
-| C17.1 | Not yet | Chart Builder's save (step 6) |
-| C17.2 | In part | `MidiChartWriterTests`; Chart Builder's save (step 6) |
-| C17.3 | Not yet | `song.ini` pending changes (step 6) |
-| C17.4 | In part | `MidiChartWriterTests`; Chart Builder's save (step 6) |
+| C15.2 | Passes | `RecoveryTests` (the chart as of the last autosave, with its reverts; the song untouched) |
+| C17.1 | Passes | `ChartSaveTests` (what a kill at each step of a folder save leaves; a failed copy leaves `song.ini` as it was) |
+| C17.2 | Passes | `ChartSaveTests` (randomly edited fixtures saved to disk read as the editor's game view), `MidiChartWriterTests` |
+| C17.3 | Passes | `ChartSaveTests` (only the pending keys change, in a folder's `song.ini` and a `.sng`'s metadata) |
+| C17.4 | Passes | `ChartSaveTests`, `MidiChartWriterTests` |
 
-**Totals:** 19 pass, 10 in part, 4 not yet.
+**Totals:** 31 pass, 2 in part (C2.5 and C2.6, which wait on hand checks), 0 not yet. AC C16.1 and
+C16.2, CM5's, pass too (`ChartRuleTests`, `ChartLinterTests`).
 
 ### Where CM2 stands
 
 As of 2026-10-07, for picking the work up again.
 
-**Waiting on the user.** Steps 2 to 5 have been built and their tests pass, but the apps haven't
+**Waiting on the user.** Steps 2 to 6 have been built and their tests pass, but the apps haven't
 been tried by hand yet. The checks still to do:
 
 - open a song folder and a `.sng` from **Open chart**, by drop and from **Recent**;
@@ -391,6 +398,39 @@ been tried by hand yet. The checks still to do:
   and a box round the span the lanes show. Clicking it moves the cursor and the view there.
 - **Settings › Charter › Editing**: Default snap, Default view and Highway speed, each taken up by
   the next Editor window. Highway speed is the look-ahead of lanes whose own hasn't been set.
+- **Saving (step 6)**:
+  - Save (Ctrl+S, the toolbar) on a song folder, a `.sng` and an imported `notes.chart`: the prompt
+    listing the `song.ini` changes only when there are some, **Remove notes.chart** and **Keep
+    notes.chart** on the import, the chart and `song.ini` as saved, and the status line's Saved.
+  - `[end]` moved after the last note as an undo step of its own when the chart has notes past it.
+  - A new chart's first save: the dialog's Name and Artist (from the first stem's tags), the folder
+    name following them until edited, Browse, the problem shown for a folder that's there, Save and
+    Cancel; afterwards the title is the song's, it's on **Recent**, and a second Chart Builder
+    won't open it.
+  - **New chart in this song**, opening a folder with audio and `song.ini` but no chart.
+  - The title's `*` while there are unsaved edits, gone after Save and after undoing back to it.
+  - Closing with unsaved edits: Save, Discard, Cancel; and with none, no prompt.
+  - **Pending changes**: Revert and Restore, reverted rows struck through, no Revert on the drum
+    keys (tooltip); reverting an import's `delay` moves the beats and the notes against the audio.
+  - **Save and pack**: the `.sng` in Chart Packer's output folder, Skip with one already there,
+    and the button disabled with an Error finding (tooltip) or on a `.sng`.
+  - **Export copy**: a folder picked, the copy in it, the song itself unchanged.
+  - Chart Packer, activated after a save, showing the saved chart and `song.ini`.
+- **Recovery (step 6)**:
+  - Edit, wait two minutes or stop playback, then end Chart Builder from Task Manager. Reopening the
+    song offers **Recover** or **Discard**; Recover opens it unsaved, with the notice, and the edits
+    up to the autosave.
+  - The same with the song's chart changed on disk meanwhile: the warning in the offer.
+  - A new chart, never saved, killed the same way: **Unsaved new charts** on the home screen, with
+    Recover and Discard (which asks).
+  - **Autosave every** in Settings › Charter › Editing.
+  - Nothing left in the recovery folder (`%APPDATA%\ChartPacker\Recovery`) after a save, or after
+    closing with Discard.
+- **Lint (step 6)**:
+  - The **Findings** tab: the summary, rows coloured by severity, → going to the finding (its lane
+    in focus, the cursor there, its notes selected), and Fix as one undo step.
+  - Findings following edits within a moment, and not during a drag.
+  - The marks on the bottom timeline's ruler for the lane in focus, changing with the focus.
 
 **Where the code is.**
 
@@ -407,7 +447,10 @@ been tried by hand yet. The checks still to do:
 | Calibration logic | `ChartPacker.Core/Calibration/` (`TapTest`, `LatencyCalibration`), `ChartPacker.Audio/Synthesis/` (`CalibrationBeats`, `CalibrationSchedule`, `CalibrationBeepsGiven`, `Synth.CalibrationBeep`), `Playback/LatencyCompensation.cs` |
 | Settings rows | `ChartPacker.Core/Settings/` (`ActionSetting`, `ActionSettingEdit`) |
 | New chart and Chart settings' Core | `ChartPacker.Core/Charting/` (`EditorSong`, `NewChartStems.TracksOf` and `NewChartAudio`, `ChartSettingsEdit` and `ChartSettingsValues`, `ResolutionChangeReport`, `PendingSongIniChanges`, `SongIniPartKeys`), `Commands/TempoMapCommands.cs` (`ChangeResolution`, `SetStartingTempo`, `ResolutionScaling`), `Commands/PartCommands.cs` (`SetDrumsVariant`), `EditablePart.HasNotes`; `ChartPacker.Audio` (`SongAudio.Open` and `StemPeaksCache.KeyOf` take no song for staged tracks) |
-| For the first save (step 6), built and tested but not used yet | `NewChartFolder.NameFor`, `Settings/ChartPackerSettingsFile.cs` (Chart Packer's library folder, read only), and the existing `NewChartCreator` |
+| Saving (Core) | `ChartPacker.Core/Charting/Saving/` (`ChartSaver`: `RequestFor`, `Check`, `SaveAsync`, `SaveNewAsync`, `ExportAsync`, `SavedSong`; `ChartSaveFixups.MoveEnd`), `Metadata/DraftWriter.cs` (`SaveAsync`, the folder save's order), `Scanning/SongFolderFiles.cs` (`afterMoves`, `StepReached`), `Charting/NewChartCreator.cs` (`NewSongFolder`), `Charting/EditorSong.cs` (mutable: `Saved`, `Revert`, `Restore`, `PendingChanges`, `EffectivePairs`, a live `Delay`), `Charting/PendingSongIniChanges.cs` (`PendingSongIniChange`, `PendingChangeReason`, `PendingSongIniInputs`, `Apply`), `Charts/ChartSongSection.cs`, `Metadata/SongAudioLength.cs`, `Charting/SongOpener.cs` (`ChartFileStamp`, `NoChartSong`, `NewChartIn`), `Commands/ChartUndoStack.cs` (`SavePoint`, `Mark`, `MarkSaved(SavePoint)`, `startsSaved`), `Editing/EditorSession.cs` (`SetSongSettings`, `SongSettingsChanged`), `Settings/ChartPackerSettingsFile.cs` (`PackSettings`, `ChartPackerPackSettings.PackOf`) |
+| Saving (Chart Builder) | `ViewModels/EditorWindowViewModel.Saving.cs` (Save, the first save, Save and pack, Export copy, `ConfirmCloseAsync`), `ViewModels/FirstSaveViewModel.cs`, `Views/FirstSaveWindow.axaml`, `Services/IFirstSaveDialogService.cs`, `Services/EditorServices.cs`, `ViewModels/PendingChangeItem.cs`, `Services/BuilderWindows.cs` (the close prompt), `MainWindowViewModel` (New chart in this song), `BuilderSettings.LastNewChartFolder` |
+| Autosave and recovery | `ChartPacker.Core/Charting/Recovery/` (`RecoveryStore`, `RecoveryManifest`, `RecoveryOffer`, `Autosave`), `UserConfigPaths.RecoveryFolder`; `ViewModels/EditorWindowViewModel.Autosave.cs`, `MainWindowViewModel` (`OfferRecoveryAsync`, `UnsavedCharts`), `IEditorWindowService.OpenRecovered`, `BuilderSettings.AutosaveMinutes` |
+| Lint | `ChartPacker.Core/Charting/Lint/Rules/` (`TimingRules`, `FiveFretRules`, `SongRules`), `ChartLintRules.All`, `ChartFixes`, `PendingSongIniFixes`, `ChartLintScheduler`; `Validation/ChrRules.cs`, `Finding.Tick`, `ChartLintInput.Delay`, `IChartQuickFixStrategy.Propose(…, options)`, `Resources/FindingMessages.resx`; `ViewModels/FindingsViewModel.cs`, `TimelineView.FindingMarks` |
 | New chart and Chart settings in Chart Builder | `BuilderWindows.OpenNewChart`, `EditorWindowViewModel` (`ForNewChart`, `ForSong`, the undo stack, `ApplyChartSettings`, `PendingChanges`), `ViewModels/ChartSettingsViewModel.cs`, `Views/ChartSettingsView.axaml`, `Controls/EditorSidePanel.cs` (the left panel's tabs), `PlaybackViewModel` (takes an `EditorSong`; `RefreshTempoMap`), `BuilderSettings.TempoEdits` |
 | Calibration in Chart Builder | `Services/AudioLatencyService.cs`, `ViewModels/CalibrationViewModel.cs`, `Controls/CalibrationView.cs`, `Views/CalibrationWindow.axaml`, `Services/BuilderWindows.cs` (`ShowCalibrationAsync`, the first-use prompt), `BuilderSettingsCatalog` (the **Audio** category), `BuilderSettings` (`PromptForCalibration`, `CalibrationPrompted`), `PlaybackViewModel.Clock` |
 | The latency in Chart Packer | `ViewModels/PlayerViewModel.cs` (`DrawnPosition`, `RefreshLatency`), which the highway, lyrics and background clocks use; `MainWindowViewModel.OnActivatedAsync`; `AppSettingsCatalog` (`playback.latency`); `App.axaml.cs` |
@@ -415,6 +458,7 @@ been tried by hand yet. The checks still to do:
 | The editor (Chart Builder) | `ViewModels/ChartEditorViewModel.cs` (the session joined to playback, the tools and snap, hit sounds, the overview, tempo edits that ask about anchors), `PropertiesViewModel.cs`, `EditorLaneViewModel.cs` (the view, the letters, the ghost and the look-ahead, kept by `LaneDockLayout.SetLookAhead`), `StemRowViewModel.cs`; `Controls/Editing/` (`EditorCanvas`, `HighwayEditorCanvas`, `TimelineEditorCanvas`, `EditorKeys`); `Views/PropertiesView.axaml`; `Controls/TimelineView.cs` (the overview); `EditorWindow.axaml` (the toolbar's tools and snap, the status line, the transport bar) |
 | Shared drawing | `ChartPacker.UI/Controls/Highway/` (`GemPainter`, `HighwayPalette`), `ChartPacker.UI/Controls/LaneWaveformPainter.cs` and `WaveformLevels.cs` (moved from Chart Packer); `ChartPacker.UI` now references `ChartPacker.Audio` |
 | Regions, loop and hit sounds | `StemPlayer.PlayRegion`, `ClearRegion`, `Region`; `ChartPacker.Audio/Synthesis/HitSoundSchedule.cs` (`HitSoundSchedule`, `NoteHit`, `CombinedSchedule`); `PlaybackViewModel` (`PlayRegion`, `SetLoop`, `SetHits`, `Stems`, `LatencyText`, `SeekTo`, `Scrubbed`) |
+| Step 6's tests | `ChartBuilder.Tests/Charting/Saving/` (`ChartSaveTests`, `SavePiecesTests`; the shared `SaveFolders`), `Charting/Recovery/RecoveryTests.cs`, `Charting/LintRules/` (`ChartRuleTests`, `ChartLintSchedulerTests`), `Charting/Lint/ChartLinterTests.cs` (the random edits and AC C16.2 with the CHR rules), `ChartPacker.Core.Tests/Settings/ChartPackerSettingsFileTests.cs` |
 | Tests | `ChartBuilder.Tests/Editing/` (`SnapGridTests`, `EditorViewportTests`, `EditorToolsTests`, `TempoMapEditsTests`, `FiveFretEditingTests`, `NaturalHopoDisplayTests`; the shared `EditorSessions`); `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`, `CalibrationScheduleTests`, `LatencyCompensationTests`, `WindowsAudioEndpointTests`; the shared `FakeOutput` and `ManualClock`), `Settings/AudioLatencyFileTests.cs`, `Settings/ChartPackerSettingsFileTests.cs`, `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`, `Charting/NewChart*Tests.cs`; `ChartBuilder.Tests/Charting/` (`SongOpenerTests`, `ChartSettingsCommandTests`, `PendingSongIniChangesTests`), `ChartBuilder.Tests/Calibration/` (`TapTestTests`, `LatencyCalibrationTests`) |
 
 **Decided along the way.**
@@ -474,10 +518,10 @@ been tried by hand yet. The checks still to do:
   add stems, so playback and the waveform need no song folder.
 - **A new chart's files with no stem are left out**, with a notice, rather than kept unassigned, so
   every track has a stem. Choosing stems comes with the Chart Inspector.
-- **A new chart's pending changes** are every part's rating and the drum keys, the same as its first
-  save writes (`NewChartIni`).
-- **The pending changes are listed under Properties**, in the right panel, as the side panels have
-  no tabs yet. The findings panel and the list's Revert come with step 6.
+- **A new chart's pending changes** are every part's rating and the drum keys, with its name,
+  artist, charter and `song_length` once known; its first save writes them as its `song.ini`.
+- **The pending changes were listed under Properties** until step 6, which gave them, and the
+  findings, tabs of their own in the right panel.
 - `NewChartSettings.MaxNumerator` is now 64, as C4 allows, rather than 32.
 - **The editor's state is in Core** (`Charting/Editing/`): the session, the tools, the selection,
   the viewport, the snap and the tempo edits. So the tool tests (AC C3.2) run without a canvas, and
@@ -529,6 +573,46 @@ been tried by hand yet. The checks still to do:
   pad for drums.
 - **What's drawn while paused** is at the audio's position. `PlaybackViewModel.Clock` takes off the
   latency only while playing, as Chart Packer's `DrawnPosition` does.
+- **The editor isn't reopened after a save.** `EditorSong` moves on to the saved song
+  (`EditorSong.Saved`), so the undo stack, the cursor, the lanes and playback carry on. A new chart
+  becomes a song opened from its folder; its audio keeps playing from the files it was given until
+  it's next opened.
+- **The folder save's order** is stage, move in, `song.ini`, delete (charter-spec §4.6, restated).
+  It changes Chart Packer's saves too, but only in order.
+- **Pending changes are still worked out, not kept.** Only the reverts are kept, in `EditorSong`:
+  they aren't undo steps, and they stay across saves. Those the chart is read by (the drum keys, an
+  import's sustain cutoff and `multiplier_note`) can't be reverted. The list is its own tab beside
+  Properties.
+- **An import's sustain cutoff is a pending change.** A `.chart` whose sustains would read as
+  notes under MIDI's default cutoff needs `sustain_cutoff_threshold`, as `ChartConversion` says, or
+  its first save would play differently. The spec's "never changed by Chart Builder" is restated.
+- **Save points.** A save marks the undo stack where its snapshot was taken (`Mark`,
+  `MarkSaved(SavePoint)`), so edits made while it runs stay unsaved.
+- **Save asks only when needed**: when it changes `song.ini` or removes a file. An import's first
+  save always asks, Remove or Keep `notes.chart`.
+- **`[end]` is moved by an undo step** once the save is going ahead; Export copy moves it in its own
+  snapshot only.
+- **Lint reads what the save would write**: the chart with `EffectivePairs` and the session's read
+  options, so pending changes count. CHR083 therefore shows for every new part until it's rated,
+  which needs the Chart Inspector or C18; CHR084 shows only when the `song_length` change is
+  reverted, and its Fix restores it.
+- **CHR021 counts lengths from a sixteenth** up to the cutoff, as Rock Band-style charts hold every
+  plain note a sixteenth (spec restated).
+- **CHR023** flags a force only when it changes nothing at every threshold a MIDI chart is read
+  with. **CHR003** leaves `[end]` out. **CHR081** compares chords per second between adjacent
+  difficulties. **CHR082** takes `[section …]` and `[prc_…]` as sections.
+- **Song-wide findings have a tick** (`Finding.Tick`), as `ChartLocation` needs a part.
+- **Chart fixes are given the read options**, for CHR021's cutoff and CHR023's thresholds.
+- **Lint runs a moment after the edits stop** (150 ms), one run at a time, never during a drag;
+  edits made while it runs are linted against its result next (`ChartLintScheduler`).
+- **The Findings tab's header doesn't count**: the side panel's strip reads headers once. The
+  counts are at the top of the panel.
+- **Autosave**: every *n* minutes (Settings, 1 to 60) and when playback stops, only when something
+  changed since; deleted once nothing is unsaved. A save writes it first, and deletes it once it has
+  gone through. The OS shutting down autosaves without asking. A recovered chart opens unsaved.
+- **Recovery offers unless the chart on disk is the autosave's, byte for byte**, warning when the
+  chart has changed since (spec C2 item 7 and C15 restated). Untitled charts are listed on the home
+  screen.
 
 **Loose ends.**
 
@@ -547,25 +631,20 @@ been tried by hand yet. The checks still to do:
   - the Phrase tool, solos and the `S` key;
   - cymbal and tom (`C`), accents and ghosts (`A`), and the 2× kick (Shift+0);
   - GHL's stacked columns. GHL lanes are six columns for now.
-- **Lint marks on the overview**, with the findings panel (step 6).
 - **Record mode** shifts key presses by the latency ([C15](charter-spec-v1.md#c15-editing-ergonomics)),
   with CM5.
-- **A new chart can't be kept yet.** Its first save comes with step 6, as does **New chart in this
-  song**; a song with neither chart file still says it has none.
-- **A new chart's name and artist** aren't filled from its first stem's tags yet. That comes with
-  the Chart Inspector.
-- **Closing the Editor with edits** loses them without asking, as there's no save yet (step 6).
-- **The Editor's title** doesn't mark unsaved edits yet.
+- **A new chart's name and artist** are asked for at its first save, from its first stem's tags;
+  the Chart Inspector edits them later.
+- **Ratings.** CHR083 can't be cleared in the editor until a part can be rated (the Chart Inspector,
+  or C18's suggested rating); CHR080 has no fix until C9's reduction.
+- **The chart's load issues** are still only counted in the Editor's notice, not listed as findings.
+- **A new chart's audio** plays from the files it was given until the song is reopened from its
+  folder.
+- **The wizard's leftovers** (CM0's cleanup): `NewChartRequest`, `NewChartMidi`, `NewChartIni` and
+  `NewChartLength` are used only by their tests now.
 
-**Next: step 6, saving and lint:**
-
-- A new chart's **first save**, and **New chart in this song**
-  ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)).
-- [C15](charter-spec-v1.md#c15-editing-ergonomics) autosave and recovery, and asking before closing
-  with unsaved edits.
-- [C17](charter-spec-v1.md#c17-save-and-export) save, with the pending `song.ini` changes.
-- The timing, 5-fret and song lint rules ([§6](charter-spec-v1.md#lint-rules)), the findings panel,
-  and lint marks on the overview.
+**Next:** the hand checks above. Then [CM3](#cm3-drums-and-ghl): drums, GHL, phrases and their lint
+rules.
 
 ## CM3: Drums and GHL
 

@@ -25,7 +25,7 @@ public sealed class ChartQuickFixTests
         var before = linter.LintAll(Input(chart));
         var finding = before.FindingsOf(LongSustainRule.Id).Single();
 
-        var fix = QuickFixRegistry.ProposeChartFix(finding, chart, [new ShortenSustainFix()]);
+        var fix = QuickFixRegistry.ProposeChartFix(finding, chart, ChartReadOptions.Default, [new ShortenSustainFix()]);
         Assert.IsNotNull(fix);
         stack.Execute(fix);
         var fixedNote = expert.Notes[5];
@@ -45,15 +45,17 @@ public sealed class ChartQuickFixTests
         var finding = new Finding(LongSustainRule.Id, Severity.Info, "Held.",
             Location: new ChartLocation(ChartInstrument.Guitar, ChartDifficulty.Expert, 0, 0));
 
-        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding, chart));
-        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding, chart, []));
-        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding with { RuleId = CloseRepeatRule.Id }, chart, [new ShortenSustainFix()]));
+        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding, chart, ChartReadOptions.Default));
+        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding, chart, ChartReadOptions.Default, []));
+        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding with { RuleId = CloseRepeatRule.Id }, chart, ChartReadOptions.Default, [new ShortenSustainFix()]));
     }
 
     [TestMethod]
     public void ChartFixesAreKeptApartFromMetadataFixes()
     {
-        Assert.IsEmpty(QuickFixRegistry.ChartStrategies);
+        Assert.IsTrue(QuickFixRegistry.ChartStrategies.All(s => s.RuleId.StartsWith("CHR", StringComparison.Ordinal)));
+        Assert.AreEqual(QuickFixRegistry.ChartStrategies.Count, QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Distinct().Count(), "At most one per rule.");
+        Assert.IsFalse(QuickFixRegistry.ChartStrategies.Any(s => QuickFixRegistry.IsSupported(s.RuleId)));
         Assert.IsFalse(QuickFixRegistry.IsSupported(LongSustainRule.Id));
         Assert.IsTrue(QuickFixRegistry.Strategies.All(s => s.RuleId.StartsWith("SNG", StringComparison.Ordinal)));
     }
@@ -63,7 +65,7 @@ public sealed class ChartQuickFixTests
     {
         public string RuleId => LongSustainRule.Id;
 
-        public IChartCommand? Propose(Finding finding, EditableChart chart)
+        public IChartCommand? Propose(Finding finding, EditableChart chart, ChartReadOptions options)
         {
             if (finding.Location is not { Difficulty: { } difficulty } location || chart.PartOf(location.Part) is not { } part)
                 return null;

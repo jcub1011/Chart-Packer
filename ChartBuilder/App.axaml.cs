@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using ChartBuilder.Services;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core;
+using ChartPacker.Core.Charting.Recovery;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Settings;
 
@@ -28,7 +29,8 @@ namespace ChartBuilder
                 // song is played.
                 var audio = new SdlAudio();
                 var latency = new AudioLatencyService(new AudioLatencyFile(UserConfigPaths.AudioLatencyFile));
-                var windows = new BuilderWindows(desktop, settings, audio.Open, latency, UserConfigPaths.LockFolder);
+                var windows = new BuilderWindows(
+                    desktop, settings, audio.Open, latency, UserConfigPaths.LockFolder, UserConfigPaths.SettingsFile, new RecoveryStore(UserConfigPaths.RecoveryFolder));
                 windows.StartWith(BuilderArgs.Parse(desktop.Args ?? []));
 
                 // Settings are saved as they change (the Settings window saves them, and the Editor saves its layout

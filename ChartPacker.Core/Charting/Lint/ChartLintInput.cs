@@ -15,17 +15,23 @@ public sealed class ChartLintInput
     /// <param name="songIni">The song's metadata as drafted; none when null.</param>
     /// <param name="options">The settings the chart is read with; when null, those <paramref name="songIni"/> sets.</param>
     /// <param name="audioLength">How long the song's audio is, when it's known.</param>
+    /// <param name="delay">
+    /// How much later than its ticks say the chart plays against the audio; when null, what <paramref name="songIni"/>
+    /// sets.
+    /// </param>
     public ChartLintInput(
         EditableChart chart,
         IReadOnlyList<KeyValuePair<string, string>>? songIni = null,
         ChartReadOptions? options = null,
-        TimeSpan? audioLength = null)
+        TimeSpan? audioLength = null,
+        TimeSpan? delay = null)
     {
         ArgumentNullException.ThrowIfNull(chart);
         Chart = chart;
         SongIni = songIni is null ? [] : [.. songIni];
         Options = options ?? ChartReadOptions.From(SongIni);
         AudioLength = audioLength;
+        Delay = delay ?? SongChartSettings.DelayOf(SongIni, (TimeSpan?)null);
     }
 
     /// <summary>The snapshot of the chart.</summary>
@@ -39,4 +45,7 @@ public sealed class ChartLintInput
 
     /// <summary>How long the song's audio is, or null when it isn't known (for rules such as CHR003).</summary>
     public TimeSpan? AudioLength { get; }
+
+    /// <summary>How much later than its ticks say the chart plays against the audio: audio time is chart time plus this.</summary>
+    public TimeSpan Delay { get; }
 }

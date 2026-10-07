@@ -282,4 +282,82 @@
     <value>The subfolder "{0}" was left out because subfolders aren't included.</value>
     <comment>{0} is a folder path.</comment>
   </data>
+  <data name="ChrNoTimeSignatureAtStart" xml:space="preserve">
+    <value>There's no time signature at the start; the games assume 4/4.</value>
+  </data>
+  <data name="ChrTempoOutOfRangeFormat" xml:space="preserve">
+    <value>A tempo of {0} BPM is outside 20 to 400, which is probably a typo or a half- or double-time mistake.</value>
+    <comment>{0} is the tempo.</comment>
+  </data>
+  <data name="ChrNotesAfterAudioFormat" xml:space="preserve">
+    <value>Notes after the end of the audio: {0}.</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="ChrPhrasesAfterAudioFormat" xml:space="preserve">
+    <value>Phrases after the end of the audio: {0}.</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="ChrEventAfterAudioFormat" xml:space="preserve">
+    <value>The event "{0}" is after the end of the audio.</value>
+    <comment>{0} is the event's text.</comment>
+  </data>
+  <data name="ChrOffGrid" xml:space="preserve">
+    <value>The note isn't on any common grid (1/1 to 1/192, or a triplet).</value>
+  </data>
+  <data name="ChrDuplicateTempo" xml:space="preserve">
+    <value>Two tempo markers are on the same tick; the games read only the last.</value>
+  </data>
+  <data name="ChrDuplicateTimeSignature" xml:space="preserve">
+    <value>Two time signatures are on the same tick; the games read only the last.</value>
+  </data>
+  <data name="ChrSustainIntoNext" xml:space="preserve">
+    <value>The sustain runs into the next note on its lane, so the games cut it short.</value>
+  </data>
+  <data name="ChrSustainUnderCutoffFormat" xml:space="preserve">
+    <value>The sustain is shorter than the sustain cutoff ({0} ticks), so the games read it as a plain note.</value>
+    <comment>{0} is the cutoff in ticks.</comment>
+  </data>
+  <data name="ChrOpenInChord" xml:space="preserve">
+    <value>An open note is in a chord with frets; the games read it differently.</value>
+  </data>
+  <data name="ChrRedundantForceHopo" xml:space="preserve">
+    <value>The chord is forced HOPO, but it's a HOPO anyway.</value>
+  </data>
+  <data name="ChrRedundantForceStrum" xml:space="preserve">
+    <value>The chord is forced strum, but it's a strum anyway.</value>
+  </data>
+  <data name="ChrForcedRepeat" xml:space="preserve">
+    <value>A forced HOPO repeats the note or chord before it exactly, so it can't be hammered on.</value>
+  </data>
+  <data name="ChrFirstNoteHopo" xml:space="preserve">
+    <value>The part's first note is a HOPO; there's nothing to hammer on from.</value>
+  </data>
+  <data name="ChrCloseNotes" xml:space="preserve">
+    <value>Two notes on the same lane are closer than 1/64 of a whole note; the later is probably a stray duplicate.</value>
+  </data>
+  <data name="ChrMissingDifficultyFormat" xml:space="preserve">
+    <value>The part has notes on some difficulties but none on {0}.</value>
+    <comment>{0} is the difficulty, e.g. Easy.</comment>
+  </data>
+  <data name="ChrLowerDifficultyDenserFormat" xml:space="preserve">
+    <value>{0} has more notes per second ({1:0.0}) than {2} ({3:0.0}).</value>
+    <comment>{0} and {2} are difficulties, the lower first; {1} and {3} are their chords per second.</comment>
+  </data>
+  <data name="ChrNoSections" xml:space="preserve">
+    <value>The chart has no sections.</value>
+  </data>
+  <data name="ChrUnratedFormat" xml:space="preserve">
+    <value>The part has notes but {0} is unset or -1.</value>
+    <comment>{0} is the song.ini key, e.g. diff_guitar.</comment>
+  </data>
+  <data name="ChrSongLengthFormat" xml:space="preserve">
+    <value>song_length ({0} ms) doesn't match the audio's length ({1} ms).</value>
+    <comment>{0} is song.ini's value; {1} is the audio's length.</comment>
+  </data>
+  <data name="ChrEndMissing" xml:space="preserve">
+    <value>There's no [end] event; saving adds one after the last note.</value>
+  </data>
+  <data name="ChrEndEarly" xml:space="preserve">
+    <value>[end] is before the last note; saving moves it after it.</value>
+  </data>
 </root>

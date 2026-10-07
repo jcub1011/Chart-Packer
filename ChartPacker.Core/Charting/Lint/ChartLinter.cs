@@ -270,6 +270,7 @@ public sealed class ChartLinter
 internal sealed class LintRun(ChartLintInput input, Func<EditableChart, ChartReadOptions, ChartDocument> project)
 {
     private ChartDocument? _gameView;
+    private TempoMap? _tempoMap;
 
     public ChartLintInput Input { get; } = input;
 
@@ -281,4 +282,7 @@ internal sealed class LintRun(ChartLintInput input, Func<EditableChart, ChartRea
 
     /// <summary>The game view, worked out the first time it's asked for.</summary>
     public ChartDocument GameView => _gameView ??= project(Input.Chart, Input.Options);
+
+    /// <summary>The chart's tempo map, made the first time it's asked for.</summary>
+    public TempoMap TempoMap => _tempoMap ??= Input.Chart.TempoMap.ToTempoMap();
 }

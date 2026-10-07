@@ -45,6 +45,28 @@ public sealed class ChartLinterTests
         CheckRandomEdits(Generated(random, notes: 120), ChartReadOptions.Default, random);
     }
 
+    [TestMethod]
+    [DynamicData(nameof(FixturesAndSeeds))]
+    public void RelintingAfterEachRandomEditWithTheRuleCatalogueFindsWhatLintingItAllFinds(string name, int seed)
+    {
+        // Each CHR rule keeps to its scope's contract: a range rule's findings depend only on what's within their
+        // location and its reach, and a part rule's only on their part.
+        var fixture = MidiFixtures.Named(name);
+        var chart = MidiChartLoader.Load(fixture.Midi, fixture.Options).Chart;
+
+        CheckRandomEdits(chart, fixture.Options, new Random((MidiFixtures.All.ToList().FindIndex(f => f.Name == name) * 100) + seed + 500), ChartLintRules.All);
+    }
+
+    [TestMethod]
+    [DataRow(1)]
+    [DataRow(2)]
+    public void RelintingAfterEachRandomEditOfAGeneratedChartWithTheRuleCatalogueFindsWhatLintingItAllFinds(int seed)
+    {
+        var random = new Random(seed + 50);
+
+        CheckRandomEdits(Generated(random, notes: 120), ChartReadOptions.Default, random, ChartLintRules.All);
+    }
+
     // Scopes.
 
     [TestMethod]
@@ -304,13 +326,13 @@ public sealed class ChartLinterTests
     }
 
     [TestMethod]
-    public void TheDefaultLinterRunsTheRuleCatalogueWhichHasNoRulesYet()
+    public void TheDefaultLinterRunsTheRuleCatalogue()
     {
         var linter = new ChartLinter();
 
-        Assert.IsEmpty(ChartLintRules.All);
-        Assert.IsEmpty(linter.Rules);
-        Assert.IsEmpty(linter.LintAll(Input(Generated(new Random(10), notes: 50))).Findings);
+        Assert.IsNotEmpty(ChartLintRules.All);
+        Assert.AreSequenceEqual(ChartLintRules.All.Select(r => r.RuleId).ToList(), linter.Rules.Select(r => r.RuleId).ToList());
+        Assert.IsTrue(linter.Rules.All(r => r.RuleId.StartsWith("CHR", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -361,17 +383,51 @@ public sealed class ChartLinterTests
         AssertSameFindings(linter.LintAll(Input(chart)), result, "after the timed edits");
     }
 
+    [TestMethod]
+    public void LintWithTheRuleCatalogueAfterASingleNoteEditOnA20000NoteChartTakesUnder50Milliseconds()
+    {
+        // AC C16.2, with the CHR rules.
+        var chart = Big();
+        var linter = new ChartLinter();
+        var stack = new ChartUndoStack(chart);
+        var input = CatalogueInput(chart, ChartReadOptions.Default);
+        long start = Stopwatch.GetTimestamp();
+        var result = linter.LintAll(input);
+        var whole = Stopwatch.GetElapsedTime(start);
+
+        var best = TimeSpan.MaxValue;
+        for (int i = 0; i < 6; i++)
+        {
+            stack.Execute(new AddNotes(Guitar, Expert, [new EditableNote(1_200_060 + (i * 120L), 1, i % 5)]));
+            var change = stack.NextUndo!.Affected;
+            start = Stopwatch.GetTimestamp();
+            result = linter.Relint(result, CatalogueInput(chart, ChartReadOptions.Default), change);
+            _ = result.Findings.Count;
+            var elapsed = Stopwatch.GetElapsedTime(start);
+            if (i > 0 && elapsed < best)
+                best = elapsed;
+
+            stack.Undo();
+            result = linter.Relint(result, CatalogueInput(chart, ChartReadOptions.Default), stack.NextRedo!.Affected);
+        }
+
+        TestContext.WriteLine($"AC C16.2, CHR rules: whole {whole.TotalMilliseconds:F1} ms; after a single-note edit, best {best.TotalMilliseconds:F2} ms, {result.Findings.Count} findings.");
+        Assert.IsLessThan(TimeSpan.FromMilliseconds(50), best);
+        AssertSameFindings(linter.LintAll(CatalogueInput(chart, ChartReadOptions.Default)), result, "after the timed edits");
+    }
+
     /// <summary>
     /// Runs <see cref="Steps"/> random steps on <paramref name="chart"/> through the undo stack (commands of every kind,
     /// undo, redo, and now and then a few commands relinted as one change), relinting after each, and checks each result
     /// against linting the whole chart.
     /// </summary>
-    private static void CheckRandomEdits(EditableChart chart, ChartReadOptions options, Random random)
+    private static void CheckRandomEdits(EditableChart chart, ChartReadOptions options, Random random, IReadOnlyList<IChartLintRule>? rules = null)
     {
-        var linter = new ChartLinter(TestLintRules.All);
+        var linter = new ChartLinter(rules ?? TestLintRules.All);
+        Func<EditableChart, ChartReadOptions, ChartLintInput> inputOf = rules is null ? (c, o) => Input(c, o) : CatalogueInput;
         var stack = new ChartUndoStack(chart);
         var commands = new CommandSequenceTests.RandomCommands(random);
-        var result = linter.LintAll(Input(chart, options));
+        var result = linter.LintAll(inputOf(chart, options));
         var actions = new HashSet<string>();
         int relinted = 0;
         for (int step = 0; step < Steps; step++)
@@ -417,7 +473,7 @@ public sealed class ChartLinterTests
             }
 
             actions.Add(what.Split(' ')[0]);
-            var input = Input(chart, options);
+            var input = inputOf(chart, options);
             result = linter.Relint(result, input, change);
             AssertSameFindings(linter.LintAll(input), result, $"at step {step}, after {what} touching {change}");
             if (!change.TempoMapChanged && (change.Song & SongChanges.Events) == 0)
@@ -427,4 +483,8 @@ public sealed class ChartLinterTests
         Assert.IsGreaterThan(Steps / 2, relinted, "Most steps should be incremental runs.");
         Assert.IsTrue(actions.Contains("undoing") && actions.Contains("redoing"), string.Join(", ", actions));
     }
+
+    /// <summary>A snapshot for the CHR rules, with an audio length and a song.ini for the ones that read them.</summary>
+    private static ChartLintInput CatalogueInput(EditableChart chart, ChartReadOptions options) =>
+        new(chart.Clone(), [KeyValuePair.Create("song_length", "60000"), KeyValuePair.Create("diff_guitar", "3")], options, TimeSpan.FromSeconds(100), TimeSpan.FromMilliseconds(30));
 }

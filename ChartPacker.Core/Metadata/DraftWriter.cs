@@ -11,6 +11,22 @@ namespace ChartPacker.Core.Metadata;
 public static class DraftWriter
 {
     /// <summary>
+    /// Writes the draft to <paramref name="entry"/>: a <c>.sng</c> through <see cref="SaveSngAsync"/>, or a song folder
+    /// through <see cref="SaveFolderAsync"/>, with the folder's own <c>song.ini</c>, or a new one if it has none.
+    /// </summary>
+    /// <returns>The findings that stopped a <c>.sng</c>'s write, or the rewritten file's; none for a folder.</returns>
+    public static async Task<IReadOnlyList<Finding>> SaveAsync(SongEntry entry, MetadataDraft draft, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (entry.Kind == SongEntryKind.SngFile)
+            return await SaveSngAsync(entry.FullPath, draft, cancellationToken).ConfigureAwait(false);
+
+        string songIni = SongIni.FindIn(entry.FullPath) ?? Path.Combine(entry.FullPath, SongIni.FileName);
+        await SaveFolderAsync(entry.FullPath, songIni, draft, cancellationToken).ConfigureAwait(false);
+        return [];
+    }
+
+    /// <summary>
     /// Re-reads the <c>.sng</c> at <paramref name="sngPath"/> and rewrites it with the draft
     /// applied. Every key and file the draft doesn't touch is carried over as stored.
     /// </summary>
@@ -79,10 +95,13 @@ public static class DraftWriter
     }
 
     /// <summary>
-    /// Applies the draft to the song folder <paramref name="folder"/>: its metadata to
-    /// <paramref name="songIniPath"/>, then its album art and backgrounds, then its file changes.
+    /// Applies the draft to the song folder <paramref name="folder"/>: its album art and backgrounds, then its
+    /// added files, then its metadata to <paramref name="songIniPath"/>, then its removed files.
     /// </summary>
-    /// <remarks>A draft without metadata changes never creates a <c>song.ini</c>.</remarks>
+    /// <remarks>
+    /// A draft without metadata changes never creates a <c>song.ini</c>. Every added file is copied before
+    /// <c>song.ini</c> is touched, so a copy that fails leaves it as it was (charter-spec §4.6).
+    /// </remarks>
     /// <exception cref="ArgumentException">A file change names the <c>song.ini</c> or a path outside the folder.</exception>
     /// <exception cref="IOException">
     /// A file can't be read, written or deleted; or, as a <see cref="ChartFormatException"/>, the
@@ -110,8 +129,6 @@ public static class DraftWriter
         var (adds, shiftedChart) = await AddsWithShiftedChartAsync(draft, pairs, stored, entry, cancellationToken).ConfigureAwait(false);
         try
         {
-            if (draft.HasMetadataChanges)
-                await SongIni.ApplyEditsAsync(songIniPath, draft, cancellationToken).ConfigureAwait(false);
             if (draft.AlbumArt is { } art)
                 await AlbumArt.ApplyToFolderAsync(folder, art, cancellationToken).ConfigureAwait(false);
             foreach (var kind in SongBackgrounds.Kinds)
@@ -123,8 +140,13 @@ public static class DraftWriter
                 await FileSlot.ApplyToFolderAsync(folder, n => SongBackgrounds.IsName(n, kind), name, background.SourcePath, cancellationToken).ConfigureAwait(false);
             }
 
+            // song.ini is written once the new files are in place, and before the removed ones go: a copy that fails
+            // leaves it as it was, and a removed chart is only deleted once song.ini holds what was taken from it.
+            Func<CancellationToken, Task>? writeSongIni = draft.HasMetadataChanges ? ct => SongIni.ApplyEditsAsync(songIniPath, draft, ct) : null;
             if (draft.RemovedFiles.Count > 0 || adds.Count > 0)
-                await SongFolderFiles.ApplyAsync(folder, draft.RemovedFiles, adds, cancellationToken).ConfigureAwait(false);
+                await SongFolderFiles.ApplyAsync(folder, draft.RemovedFiles, adds, cancellationToken, writeSongIni).ConfigureAwait(false);
+            else if (writeSongIni is not null)
+                await writeSongIni(cancellationToken).ConfigureAwait(false);
         }
         finally
         {

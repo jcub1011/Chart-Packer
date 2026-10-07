@@ -119,6 +119,19 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.DefaultEditorView,
                         Set = view => settings.Settings.DefaultEditorView = view,
                     },
+                    new IntegerSetting
+                    {
+                        Id = "charter.autosaveMinutes",
+                        Category = editing,
+                        Label = Strings.AutosaveMinutesLabel,
+                        Description = Strings.AutosaveMinutesDescription,
+                        Keywords = SettingKeywords.Split(Strings.AutosaveMinutesKeywords),
+                        DefaultValue = 2,
+                        Minimum = BuilderSettings.MinAutosaveMinutes,
+                        Maximum = BuilderSettings.MaxAutosaveMinutes,
+                        Get = () => settings.Settings.AutosaveMinutes,
+                        Set = minutes => settings.Settings.AutosaveMinutes = minutes,
+                    },
                     new RangeSetting
                     {
                         Id = "charter.highwaySpeed",

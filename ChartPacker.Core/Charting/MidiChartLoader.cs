@@ -106,7 +106,7 @@ public static class MidiChartLoader
         ArgumentNullException.ThrowIfNull(chartBytes);
         ArgumentNullException.ThrowIfNull(options);
         var conversion = ChartToMidi.Convert(chartBytes, options);
-        return new ChartImportResult(Load(conversion.Midi, conversion.Options), conversion.Offset, conversion.Options, conversion.Warnings);
+        return new ChartImportResult(Load(conversion.Midi, conversion.Options), conversion.Offset, conversion.Options, conversion.Warnings, ChartSongSection.Read(chartBytes));
     }
 
     /// <summary>

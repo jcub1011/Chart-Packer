@@ -11,6 +11,7 @@ using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Recovery;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Scanning;
@@ -28,12 +29,16 @@ namespace ChartBuilder.Services
     /// <param name="openOutput">Opens the audio output at a rate, for the Editor's playback and the calibration tool.</param>
     /// <param name="latency">The audio/visual latency, which the calibration tool measures.</param>
     /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
+    /// <param name="chartPackerSettingsFile">Chart Packer's settings, which a save reads for the library and packing, never writes.</param>
+    /// <param name="recovery">Where the Editor autosaves the chart open, and the launcher finds what's left to recover.</param>
     public sealed class BuilderWindows(
         IClassicDesktopStyleApplicationLifetime desktop,
         BuilderSettingsService settings,
         Func<int, IAudioOutput> openOutput,
         AudioLatencyService latency,
-        string lockFolder) : IEditorWindowService
+        string lockFolder,
+        string chartPackerSettingsFile,
+        RecoveryStore recovery) : IEditorWindowService
     {
         // The calibration tool, while it's open.
         private CalibrationWindow? _calibration;
@@ -64,16 +69,34 @@ namespace ChartBuilder.Services
                 "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
             var audio = NewChartStems.TracksOf(audioFiles);
             var editor = new EditorWindow();
-            var viewModel = EditorWindowViewModel.ForNewChart(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), chart, audio, openOutput, latency, () => _ = ShowCalibrationAsync());
-            OpenEditor(editor, viewModel);
+            OpenEditor(editor, EditorWindowViewModel.ForNewChart(ServicesFor(editor), chart, audio));
         }
 
         public void OpenSong(OpenedSong song, SongLock songLock)
         {
             var editor = new EditorWindow();
-            var viewModel = EditorWindowViewModel.ForSong(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), song, songLock, openOutput, latency, () => _ = ShowCalibrationAsync());
-            OpenEditor(editor, viewModel);
+            OpenEditor(editor, EditorWindowViewModel.ForSong(ServicesFor(editor), song, songLock));
         }
+
+        public void OpenRecovered(EditorSong song, SongLock? songLock, string recoveryKey)
+        {
+            var editor = new EditorWindow();
+            OpenEditor(editor, EditorWindowViewModel.ForRecovered(ServicesFor(editor), song, songLock, recoveryKey));
+        }
+
+        /// <summary>What the Editor in <paramref name="editor"/> works with, its prompts and pickers shown over it.</summary>
+        private EditorServices ServicesFor(EditorWindow editor) => new(
+            settings,
+            SettingsWindowFor(editor),
+            new AvaloniaConfirmationService(() => editor),
+            new AvaloniaFolderPickerService(() => editor),
+            new AvaloniaFirstSaveDialogService(() => editor),
+            openOutput,
+            latency,
+            () => _ = ShowCalibrationAsync(),
+            lockFolder,
+            chartPackerSettingsFile,
+            recovery);
 
         /// <summary>Shows the Editor in place of the launcher, and starts its audio.</summary>
         private void OpenEditor(EditorWindow editor, EditorWindowViewModel viewModel)
@@ -166,6 +189,33 @@ namespace ChartBuilder.Services
             // The song's audio and lock go with the window.
             editor.Closed += (_, _) => viewModel.Dispose();
 
+            // Unsaved edits are asked about first: Save, Discard or Cancel (charter-spec C15 item 7). The close is held
+            // while the user answers, and made again once they've chosen to go ahead. Registered before the handler
+            // that brings the launcher back, so that one sees the close cancelled.
+            bool closeAllowed = false;
+            editor.Closing += (_, e) =>
+            {
+                if (closeAllowed || e.Cancel || !viewModel.HasUnsavedChanges && !viewModel.IsSaving)
+                    return;
+
+                // The OS won't wait for an answer, so the edits are autosaved, to be offered when the song is next opened.
+                if (e.CloseReason == WindowCloseReason.OSShutdown)
+                {
+                    viewModel.AutosaveNow();
+                    return;
+                }
+
+                e.Cancel = true;
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    if (await viewModel.ConfirmCloseAsync())
+                    {
+                        closeAllowed = true;
+                        editor.Close();
+                    }
+                });
+            };
+
             // Back to the launcher when the user closes the editor, but not when the app or OS is shutting down. It
             // opens while the editor is still closing, so the app, which exits when its last window closes, stays up.
             editor.Closing += (_, e) =>
@@ -189,7 +239,8 @@ namespace ChartBuilder.Services
                 new AvaloniaFilePickerService(() => launcher),
                 new AvaloniaConfirmationService(() => launcher),
                 settings,
-                lockFolder);
+                lockFolder,
+                recovery);
             launcher.DataContext = viewModel;
             return (launcher, viewModel);
         }

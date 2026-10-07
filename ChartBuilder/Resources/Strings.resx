@@ -645,7 +645,7 @@ Open it anyway?</value>
     <value>None.</value>
   </data>
   <data name="PendingChangesHint" xml:space="preserve">
-    <value>They are written when the chart is saved, which comes in a later version.</value>
+    <value>Save writes them with the chart. Revert leaves one out until it is restored.</value>
   </data>
   <data name="PendingChangeFormat" xml:space="preserve">
     <value>{0} = {1}</value>
@@ -1033,5 +1033,299 @@ Open it anyway?</value>
   <data name="LaneLookAheadLabel" xml:space="preserve">
     <value>Look-ahead</value>
     <comment>The lane header's look-ahead slider's label.</comment>
+  </data>
+  <data name="EditorWindowTitleUnsavedFormat" xml:space="preserve">
+    <value>*{0} - Chart Builder</value>
+    <comment>The editor window's title while the chart has unsaved edits. {0} is the chart's name.</comment>
+  </data>
+  <data name="SaveButton" xml:space="preserve">
+    <value>Save</value>
+    <comment>Saves the chart: the toolbar's Save, and the action in the save and close prompts.</comment>
+  </data>
+  <data name="DiscardButton" xml:space="preserve">
+    <value>Discard</value>
+    <comment>Closes without saving, in the prompt when the Editor closes with unsaved edits.</comment>
+  </data>
+  <data name="SaveToolTip" xml:space="preserve">
+    <value>Save the chart and its song.ini changes (Ctrl+S)</value>
+  </data>
+  <data name="SaveAndPackButton" xml:space="preserve">
+    <value>Save and pack</value>
+  </data>
+  <data name="SaveAndPackToolTip" xml:space="preserve">
+    <value>Save, then pack the song to a .sng with Chart Packer's output folder and overwrite settings</value>
+  </data>
+  <data name="SaveAndPackSngToolTip" xml:space="preserve">
+    <value>The song is already a .sng; Save writes to it</value>
+    <comment>Save and pack's tooltip, disabled, when the song open is a .sng.</comment>
+  </data>
+  <data name="ExportCopyButton" xml:space="preserve">
+    <value>Export copy</value>
+  </data>
+  <data name="ExportCopyToolTip" xml:space="preserve">
+    <value>Write a copy of the song, with the chart and its song.ini changes, to another folder</value>
+  </data>
+  <data name="ExportCopyNewChartToolTip" xml:space="preserve">
+    <value>Save the new chart first; its copy is made from its song folder</value>
+    <comment>Export copy's tooltip, disabled, for a new chart that hasn't been saved yet.</comment>
+  </data>
+  <data name="ExportCopyPickerTitle" xml:space="preserve">
+    <value>Export a copy into</value>
+    <comment>The folder picker's title for Export copy; the copy is made in a new folder inside the one picked.</comment>
+  </data>
+  <data name="ExportedFormat" xml:space="preserve">
+    <value>Copy written to {0}.</value>
+    <comment>{0} is the copy's folder.</comment>
+  </data>
+  <data name="ExportFailedFormat" xml:space="preserve">
+    <value>The copy couldn't be written: {0}</value>
+  </data>
+  <data name="PackedFormat" xml:space="preserve">
+    <value>Saved and packed to {0}.</value>
+    <comment>{0} is the .sng written.</comment>
+  </data>
+  <data name="PackSkippedExistsFormat" xml:space="preserve">
+    <value>Saved, but not packed: {0} is already there, and Chart Packer's overwrite setting is to skip it.</value>
+    <comment>{0} is the .sng that exists.</comment>
+  </data>
+  <data name="PackFailedFormat" xml:space="preserve">
+    <value>Saved, but packing failed: {0}</value>
+  </data>
+  <data name="PackNoResult" xml:space="preserve">
+    <value>Saved, but packing didn't say what it did.</value>
+  </data>
+  <data name="CloseUnsavedTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="CloseUnsavedMessageFormat" xml:space="preserve">
+    <value>"{0}" has changes that aren't saved. Save them before closing?</value>
+    <comment>{0} is the song's title, or Untitled chart.</comment>
+  </data>
+  <data name="SaveConfirmTitle" xml:space="preserve">
+    <value>Save</value>
+    <comment>The title of the prompt that lists the song.ini changes a save makes.</comment>
+  </data>
+  <data name="SaveConfirmMessageFormat" xml:space="preserve">
+    <value>Saving also makes these changes to song.ini:
+
+{0}</value>
+    <comment>{0} is the changes, one per line.</comment>
+  </data>
+  <data name="SaveImportTitle" xml:space="preserve">
+    <value>Save as notes.mid</value>
+  </data>
+  <data name="SaveImportMessageFormat" xml:space="preserve">
+    <value>The chart is saved as notes.mid. {0} can be removed, so the games don't choose between two charts; no copy of it is kept.
+
+Saving also makes these changes to song.ini:
+
+{1}</value>
+    <comment>{0} is the imported chart's file name (notes.chart); {1} is the song.ini changes, one per line.</comment>
+  </data>
+  <data name="SaveImportRemoveButton" xml:space="preserve">
+    <value>Remove notes.chart</value>
+  </data>
+  <data name="SaveImportKeepButton" xml:space="preserve">
+    <value>Keep notes.chart</value>
+  </data>
+  <data name="SaveFailedFormat" xml:space="preserve">
+    <value>The chart wasn't saved: {0}</value>
+  </data>
+  <data name="SaveReadBackFailedFormat" xml:space="preserve">
+    <value>The chart wasn't saved: it didn't read back as it was written ({0}). Nothing on disk was changed; this is a bug, which the log has the details of.</value>
+    <comment>{0} is where the written chart differs from the one in the editor.</comment>
+  </data>
+  <data name="SavedStatus" xml:space="preserve">
+    <value>Saved.</value>
+  </data>
+  <data name="FirstSavedStatusFormat" xml:space="preserve">
+    <value>Saved as {0}.</value>
+    <comment>{0} is the new song folder.</comment>
+  </data>
+  <data name="FirstSaveTitle" xml:space="preserve">
+    <value>Save new chart</value>
+  </data>
+  <data name="FirstSaveIntro" xml:space="preserve">
+    <value>A new chart is saved as a song folder, holding notes.mid, song.ini and its audio. Its folder can't be one that's already there.</value>
+  </data>
+  <data name="FirstSaveNameLabel" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="FirstSaveArtistLabel" xml:space="preserve">
+    <value>Artist</value>
+  </data>
+  <data name="FirstSaveParentLabel" xml:space="preserve">
+    <value>Save in</value>
+    <comment>The label of the folder the new song folder is made in.</comment>
+  </data>
+  <data name="FirstSaveFolderLabel" xml:space="preserve">
+    <value>Folder name</value>
+  </data>
+  <data name="FirstSaveBrowseButton" xml:space="preserve">
+    <value>Browse…</value>
+  </data>
+  <data name="FirstSaveBrowseTitle" xml:space="preserve">
+    <value>Save the new chart in</value>
+  </data>
+  <data name="FirstSaveNoParent" xml:space="preserve">
+    <value>Choose a folder to save it in.</value>
+  </data>
+  <data name="FirstSaveParentMissing" xml:space="preserve">
+    <value>That folder doesn't exist.</value>
+  </data>
+  <data name="FirstSaveExists" xml:space="preserve">
+    <value>A file or folder already has that name. Choose another; an existing folder is never used.</value>
+  </data>
+  <data name="FirstSaveInvalidName" xml:space="preserve">
+    <value>That can't be a folder's name.</value>
+  </data>
+  <data name="FirstSaveLockedFormat" xml:space="preserve">
+    <value>{0} is open in another Chart Builder.</value>
+  </data>
+  <data name="NewChartInSongTitle" xml:space="preserve">
+    <value>New chart in this song</value>
+  </data>
+  <data name="NewChartInSongMessageFormat" xml:space="preserve">
+    <value>"{0}" has neither notes.mid nor notes.chart. Start a new chart in it? Its first save adds notes.mid and the song.ini keys.</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="NewChartInSongButton" xml:space="preserve">
+    <value>New chart</value>
+  </data>
+  <data name="PendingChangesTab" xml:space="preserve">
+    <value>Pending changes</value>
+    <comment>The right panel's tab listing the song.ini changes a save makes.</comment>
+  </data>
+  <data name="PendingChangeRemovedFormat" xml:space="preserve">
+    <value>{0} removed</value>
+    <comment>A pending song.ini change that removes a key. {0} is the key.</comment>
+  </data>
+  <data name="PendingChangeRevertButton" xml:space="preserve">
+    <value>Revert</value>
+  </data>
+  <data name="PendingChangeRestoreButton" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="PendingChangeNotRevertableToolTip" xml:space="preserve">
+    <value>The chart is read by this setting, so leaving it out would save a chart that plays differently. Change the drums in Chart settings instead.</value>
+  </data>
+  <data name="PendingReasonImportedValue" xml:space="preserve">
+    <value>From the imported chart or the new chart's details, as song.ini has no value for it.</value>
+  </data>
+  <data name="PendingReasonCharter" xml:space="preserve">
+    <value>song.ini has no charter, so it's taken from the Default charter name setting.</value>
+  </data>
+  <data name="PendingReasonDelay" xml:space="preserve">
+    <value>The imported .chart's Offset, which notes.mid can't hold.</value>
+  </data>
+  <data name="PendingReasonSongLength" xml:space="preserve">
+    <value>song_length doesn't match the audio's length.</value>
+  </data>
+  <data name="PendingReasonPartRating" xml:space="preserve">
+    <value>A part added since the song was opened, which isn't rated yet.</value>
+  </data>
+  <data name="PendingReasonDrumLayout" xml:space="preserve">
+    <value>How the drums are read: the drum variant the chart has.</value>
+  </data>
+  <data name="PendingReasonImportSettings" xml:space="preserve">
+    <value>The sustain cutoff the imported .chart's sustains need to stay sustains once it's notes.mid.</value>
+  </data>
+  <data name="PendingReasonMultiplierNote" xml:space="preserve">
+    <value>The chart's star power is saved on note 116, so multiplier_note no longer applies.</value>
+  </data>
+  <data name="AutosaveMinutesLabel" xml:space="preserve">
+    <value>Autosave every</value>
+    <comment>The Settings row for how often the chart is autosaved.</comment>
+  </data>
+  <data name="AutosaveMinutesDescription" xml:space="preserve">
+    <value>Minutes between autosaves of the chart open, for recovery after a crash. It's also autosaved when playback stops. Autosaves are kept in Chart Builder's settings folder, never in the song.</value>
+  </data>
+  <data name="AutosaveMinutesKeywords" xml:space="preserve">
+    <value>autosave recovery crash backup minutes interval</value>
+  </data>
+  <data name="RecoveredNotice" xml:space="preserve">
+    <value>Recovered from an autosave. It isn't saved yet: save it to keep it.</value>
+    <comment>The Editor's notice when it opens a chart recovered from an autosave.</comment>
+  </data>
+  <data name="RecoverTitle" xml:space="preserve">
+    <value>Recover unsaved changes</value>
+  </data>
+  <data name="RecoverMessageFormat" xml:space="preserve">
+    <value>"{0}" has changes that weren't saved, autosaved at {1}. Recover them, or discard them and open the song as it is on disk?</value>
+    <comment>{0} is the song's name; {1} is when it was autosaved.</comment>
+  </data>
+  <data name="RecoverChangedWarning" xml:space="preserve">
+    <value>The song's chart has changed on disk since then. Recovering puts the autosaved chart in its place once you save.</value>
+  </data>
+  <data name="RecoverButton" xml:space="preserve">
+    <value>Recover</value>
+  </data>
+  <data name="RecoverDiscardButton" xml:space="preserve">
+    <value>Discard</value>
+  </data>
+  <data name="RecoverFailedFormat" xml:space="preserve">
+    <value>The autosave couldn't be read: {0}</value>
+  </data>
+  <data name="UnsavedChartsHeading" xml:space="preserve">
+    <value>Unsaved new charts</value>
+    <comment>The home screen's list of new charts that were autosaved but never saved.</comment>
+  </data>
+  <data name="UnsavedChartSavedFormat" xml:space="preserve">
+    <value>Autosaved {0}</value>
+    <comment>{0} is when.</comment>
+  </data>
+  <data name="DiscardUnsavedTitle" xml:space="preserve">
+    <value>Discard unsaved chart</value>
+  </data>
+  <data name="DiscardUnsavedMessageFormat" xml:space="preserve">
+    <value>Delete the autosave of "{0}"? It can't be recovered afterwards.</value>
+  </data>
+  <data name="DiscardUnsavedButton" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="FindingsTab" xml:space="preserve">
+    <value>Findings</value>
+    <comment>The right panel's tab listing the chart's lint findings.</comment>
+  </data>
+  <data name="FindingsSummaryFormat" xml:space="preserve">
+    <value>{0} errors · {1} warnings · {2} info</value>
+    <comment>The findings panel's summary: how many of each severity.</comment>
+  </data>
+  <data name="FindingsNone" xml:space="preserve">
+    <value>No findings: nothing the rules check for.</value>
+  </data>
+  <data name="FindingGoToButton" xml:space="preserve">
+    <value>→</value>
+    <comment>A finding row's button that goes to where it is.</comment>
+  </data>
+  <data name="FindingGoToToolTip" xml:space="preserve">
+    <value>Go to it in the chart</value>
+  </data>
+  <data name="FindingFixButton" xml:space="preserve">
+    <value>Fix</value>
+  </data>
+  <data name="FindingFixToolTip" xml:space="preserve">
+    <value>Apply the quick fix, as one step to undo</value>
+  </data>
+  <data name="FindingNoFixStatus" xml:space="preserve">
+    <value>That finding has no single right fix here.</value>
+  </data>
+  <data name="FindingPartDifficultyFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>A finding's part and difficulty, e.g. "Lead Guitar Expert". {0} is the part; {1} the difficulty.</comment>
+  </data>
+  <data name="FindingWhereFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment>Where a finding is: {0} is its part and difficulty; {1} its measure and beat.</comment>
+  </data>
+  <data name="FindingWhereSong" xml:space="preserve">
+    <value>Song</value>
+    <comment>Where a finding about the song as a whole is.</comment>
+  </data>
+  <data name="SaveAndPackErrorsToolTipFormat" xml:space="preserve">
+    <value>The chart has {0} errors, things the games read differently from what's written. Fix them before packing; Save still works.</value>
+  </data>
+  <data name="SaveAndPackErrorsFormat" xml:space="preserve">
+    <value>Saved, but not packed: the chart has {0} errors. See Findings.</value>
   </data>
 </root>

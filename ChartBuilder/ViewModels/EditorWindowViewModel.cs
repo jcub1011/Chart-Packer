@@ -3,15 +3,16 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartPacker;
-using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
@@ -28,35 +29,35 @@ namespace ChartBuilder.ViewModels
     /// </summary>
     /// <remarks>
     /// The panels' sizes are view state, applied and captured by the window; they're kept here between the two so
-    /// <see cref="SaveLayout"/> can persist them. So are the lanes' sizes, which the lane dock captures.
+    /// <see cref="SaveLayout"/> can persist them. So are the lanes' sizes, which the lane dock captures. Saving is in
+    /// the other part of the class.
     /// </remarks>
     public sealed partial class EditorWindowViewModel : ViewModelBase, IDisposable
     {
+        private readonly EditorServices _services;
         private readonly BuilderSettingsService _settings;
         private readonly ISettingsWindowService _settingsWindow;
-        private readonly SongLock? _songLock;
+        private readonly IConfirmationService _confirmations;
         private readonly ChartUndoStack _undo;
+        private readonly CancellationTokenSource _closing = new();
+        private SongLock? _songLock;
 
-        private EditorWindowViewModel(
-            BuilderSettingsService settings,
-            ISettingsWindowService settingsWindow,
-            IConfirmationService confirmations,
-            EditorSong song,
-            SongLock? songLock,
-            Func<int, IAudioOutput> openOutput,
-            AudioLatencyService latency,
-            Action calibrate)
+        private EditorWindowViewModel(EditorServices services, EditorSong song, SongLock? songLock, bool startsSaved = true)
         {
-            _settings = settings;
-            _settingsWindow = settingsWindow;
+            _services = services;
+            _settings = services.Settings;
+            _settingsWindow = services.SettingsWindow;
+            _confirmations = services.Confirmations;
             _songLock = songLock;
+            var settings = services.Settings;
             Song = song;
-            Playback = new PlaybackViewModel(song, openOutput, latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), calibrate);
-            _undo = new ChartUndoStack(song.Chart);
+            Song.DefaultCharter = settings.Settings.DefaultCharterName;
+            Playback = new PlaybackViewModel(song, services.OpenOutput, services.Latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), services.Calibrate);
+            _undo = new ChartUndoStack(song.Chart, startsSaved);
             _undo.Changed += OnChartChanged;
-            ChartSettings = new ChartSettingsViewModel(settings, confirmations, song.Chart, ApplyChartSettings);
+            ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song.Chart, ApplyChartSettings);
             PendingChanges = PendingChangesOf();
-            Title = string.Format(CultureInfo.CurrentCulture, Strings.EditorWindowTitleFormat, song.Title ?? Strings.EditorUntitledChart);
+            Title = TitleOf();
             Playback.PropertyChanged += (_, e) =>
             {
                 // Audio that can't be played is said in the notice, as nothing else would say it.
@@ -70,27 +71,18 @@ namespace ChartBuilder.ViewModels
             TimelineHeight = saved.EditorTimelineHeight;
             IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
-            Editor = new ChartEditorViewModel(song, _undo, Playback, settings, confirmations, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
+            Editor = new ChartEditorViewModel(song, _undo, Playback, settings, services.Confirmations, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
+            Findings = new FindingsViewModel(song, _undo, Editor);
+            Findings.Changed += (_, _) => RefreshSaveState();
+            Song.Changed += OnSongChanged;
+            _ = MeasureAudioAsync();
+            StartAutosave();
         }
 
         /// <summary>A song opened from a folder or <c>.sng</c> (charter-spec C2).</summary>
-        /// <param name="settings">Where the layout is saved.</param>
-        /// <param name="settingsWindow">Opens Program settings.</param>
-        /// <param name="confirmations">Asks before Chart settings makes a change that loses something.</param>
         /// <param name="songLock">The song's lock, held until the editor is disposed.</param>
-        /// <param name="openOutput">Opens the audio output, for playback.</param>
-        /// <param name="latency">The audio/visual latency, which what's drawn against the audio allows for.</param>
-        /// <param name="calibrate">Opens the calibration tool, from the transport bar.</param>
-        public static EditorWindowViewModel ForSong(
-            BuilderSettingsService settings,
-            ISettingsWindowService settingsWindow,
-            IConfirmationService confirmations,
-            OpenedSong song,
-            SongLock songLock,
-            Func<int, IAudioOutput> openOutput,
-            AudioLatencyService latency,
-            Action calibrate) =>
-            new(settings, settingsWindow, confirmations, EditorSong.Of(song), songLock, openOutput, latency, calibrate)
+        public static EditorWindowViewModel ForSong(EditorServices services, OpenedSong song, SongLock songLock) =>
+            new(services, EditorSong.Of(song), songLock)
             {
                 Notice = LoadIssuesNotice(song.Load.Issues.Count),
             };
@@ -99,32 +91,26 @@ namespace ChartBuilder.ViewModels
         /// A new chart (charter-spec C1), with <paramref name="audio"/>'s tracks as its stems. It has no folder, and so no
         /// lock, until it's first saved.
         /// </summary>
-        public static EditorWindowViewModel ForNewChart(
-            BuilderSettingsService settings,
-            ISettingsWindowService settingsWindow,
-            IConfirmationService confirmations,
-            EditableChart chart,
-            NewChartAudio audio,
-            Func<int, IAudioOutput> openOutput,
-            AudioLatencyService latency,
-            Action calibrate) =>
-            new(settings, settingsWindow, confirmations, EditorSong.New(chart, audio.Tracks), null, openOutput, latency, calibrate)
+        public static EditorWindowViewModel ForNewChart(EditorServices services, EditableChart chart, NewChartAudio audio) =>
+            new(services, EditorSong.New(chart, audio.Tracks), null)
             {
                 Notice = NotAddedNotice(audio),
             };
 
-        public string Title { get; }
+        /// <summary>The window's title: the song's, or Untitled chart, marked while there are unsaved edits.</summary>
+        [ObservableProperty]
+        public partial string Title { get; private set; }
 
         /// <summary>The song or new chart open.</summary>
         public EditorSong Song { get; }
 
         /// <summary>
-        /// The <c>song.ini</c> changes the chart calls for, as <c>key = value</c>, shown until they're saved
-        /// (charter-spec C17 item 2). Saving them comes with Chart Builder's save.
+        /// The <c>song.ini</c> changes the chart and the song call for, shown from as soon as they're called for until
+        /// they're saved, the reverted ones among them (charter-spec C17 item 2).
         /// </summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasPendingChanges))]
-        public partial IReadOnlyList<string> PendingChanges { get; private set; }
+        public partial IReadOnlyList<PendingChangeItem> PendingChanges { get; private set; }
 
         public bool HasPendingChanges => PendingChanges.Count > 0;
 
@@ -145,6 +131,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The chart's editor: the lanes and their canvases, the tools and the snap, and Properties.</summary>
         public ChartEditorViewModel Editor { get; }
+
+        /// <summary>The findings panel: the chart's lint findings as it's edited.</summary>
+        public FindingsViewModel Findings { get; }
 
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
         public LaneDockViewModel Lanes => Editor.Lanes;
@@ -178,6 +167,9 @@ namespace ChartBuilder.ViewModels
         {
             await _settingsWindow.ShowAsync();
             Editor.ReloadSettings();
+            Song.DefaultCharter = _settings.Settings.DefaultCharterName;
+            if (_autosave is { } autosave)
+                autosave.Interval = TimeSpan.FromMinutes(_settings.Settings.AutosaveMinutes);
         }
 
         /// <summary>
@@ -224,14 +216,24 @@ namespace ChartBuilder.ViewModels
         /// <summary>Stops the song and lets go of its lock, as the window closes.</summary>
         public void Dispose()
         {
+            StopAutosave();
+
+            // Closed with nothing unsaved, or with its edits discarded: there's nothing left to recover.
+            if (!HasUnsavedChanges)
+                DeleteRecovery();
+            _closing.Cancel();
             _undo.Changed -= OnChartChanged;
+            Song.Changed -= OnSongChanged;
+            Findings.Dispose();
             Editor.Dispose();
             Playback.Dispose();
             _songLock?.Dispose();
+            _songLock = null;
         }
 
         /// <summary>
-        /// Follows an edit, its undo or its redo: the beats when the tempo map changed, what's pending, and Chart settings.
+        /// Follows an edit, its undo or its redo: the beats when the tempo map changed, what's pending, Chart settings,
+        /// and the title's unsaved mark.
         /// </summary>
         private void OnChartChanged(object? sender, ChartCommandEventArgs e)
         {
@@ -241,10 +243,81 @@ namespace ChartBuilder.ViewModels
             ChartSettings.Reload();
             UndoCommand.NotifyCanExecuteChanged();
             RedoCommand.NotifyCanExecuteChanged();
+            CountChange();
+            RefreshSaveState();
         }
 
-        private IReadOnlyList<string> PendingChangesOf() =>
-            [.. PendingSongIniChanges.Of(Song.Chart, Song.LoadedParts, Song.Pairs).Select(c => string.Format(CultureInfo.CurrentCulture, Strings.PendingChangeFormat, c.Key, c.Value))];
+        /// <summary>
+        /// Follows a change to the song other than the chart: a save, a pending change reverted or restored, the default
+        /// charter or the audio's length. The delay and the song's settings may have moved, which the editor and the
+        /// beats follow.
+        /// </summary>
+        private void OnSongChanged(object? sender, EventArgs e)
+        {
+            PendingChanges = PendingChangesOf();
+            Editor.Session.SetSongSettings(Song.EffectivePairs(), Song.Delay);
+            Playback.RefreshTempoMap();
+            CountChange();
+            RefreshSaveState();
+        }
+
+        private IReadOnlyList<PendingChangeItem> PendingChangesOf() =>
+            [.. Song.AllPendingChanges().Select(c => new PendingChangeItem(c, c.CanRevert && Song.Reverted.Contains(c.Key), Song.Revert, Song.Restore))];
+
+        private string TitleOf() => string.Format(
+            CultureInfo.CurrentCulture,
+            HasUnsavedChanges ? Strings.EditorWindowTitleUnsavedFormat : Strings.EditorWindowTitleFormat,
+            Song.Title ?? Strings.EditorUntitledChart);
+
+        /// <summary>
+        /// Measures the song's audio for <c>song_length</c>, off the UI thread, and for a new chart reads its first stem's
+        /// title and artist, which its first save starts from (charter-spec C1).
+        /// </summary>
+        private async Task MeasureAudioAsync()
+        {
+            var entry = Song.Entry;
+            var tracks = Song.Tracks;
+            bool isNew = Song.IsNew;
+            var token = _closing.Token;
+            try
+            {
+                var (length, tags) = await Task.Run(() => (SongAudioLength.LongestMs(entry, tracks, token), isNew ? TagsOf(tracks) : []), token);
+                if (token.IsCancellationRequested)
+                    return;
+                if (tags.Count > 0 && Song.IsNew && Song.Values.Count == 0)
+                    Song.Values = tags;
+                Song.AudioLengthMs = length;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        // The first stem's title and artist tags, as song.ini's name and artist.
+        private static IReadOnlyList<KeyValuePair<string, string>> TagsOf(IReadOnlyList<SongTrack> tracks)
+        {
+            foreach (var track in tracks)
+            {
+                if (track.StagedSourcePath is not { } path)
+                    continue;
+                try
+                {
+                    if (AudioFileInfo.Read(path) is not { } info)
+                        continue;
+                    var tags = new List<KeyValuePair<string, string>>();
+                    if (!string.IsNullOrWhiteSpace(info.Title))
+                        tags.Add(KeyValuePair.Create("name", info.Title.Trim()));
+                    if (!string.IsNullOrWhiteSpace(info.Artist))
+                        tags.Add(KeyValuePair.Create("artist", info.Artist.Trim()));
+                    return tags;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                }
+            }
+
+            return [];
+        }
 
         /// <summary>Which of a new chart's audio files weren't used, and why, or null when all were.</summary>
         private static string? NotAddedNotice(NewChartAudio audio)

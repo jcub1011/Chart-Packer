@@ -10,6 +10,7 @@ using Avalonia.Media.Immutable;
 using ChartBuilder.ViewModels;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Validation;
 
 namespace ChartBuilder.Controls
 {
@@ -41,6 +42,12 @@ namespace ChartBuilder.Controls
         private static readonly IBrush SoloBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xC0, 0x84, 0xFC));
         private static readonly IBrush DensityBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xB0, 0x40));
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
+
+        // The lint marks: a short tick up from the ruler's foot, coloured by severity, errors drawn last so they show.
+        private const double MarkHeight = 6;
+        private static readonly IBrush ErrorMarkBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xF8, 0x71, 0x71));
+        private static readonly IBrush WarningMarkBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24));
+        private static readonly IBrush InfoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x93, 0xC5, 0xFD));
 
         private readonly PlayheadLayer _playhead;
         private Pen? _tickPen;
@@ -94,10 +101,14 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<IBrush?> SpanBrushProperty =
             AvaloniaProperty.Register<TimelineView, IBrush?>(nameof(SpanBrush));
 
+        public static readonly StyledProperty<IReadOnlyList<FindingMark>?> FindingMarksProperty =
+            AvaloniaProperty.Register<TimelineView, IReadOnlyList<FindingMark>?>(nameof(FindingMarks));
+
         static TimelineView()
         {
             AffectsRender<TimelineView>(
-                LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty, OverviewProperty);
+                LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty, OverviewProperty,
+                FindingMarksProperty);
             ClipToBoundsProperty.OverrideDefaultValue<TimelineView>(true);
         }
 
@@ -254,6 +265,41 @@ namespace ChartBuilder.Controls
             DrawOverview(context, bounds);
             DrawBeats(context, bounds);
             DrawRuler(context, bounds);
+            DrawFindingMarks(context, bounds);
+        }
+
+        /// <summary>The lint findings of the lane in focus, and the song-wide ones (charter-spec C3 item 2), as marks on the ruler.</summary>
+        public IReadOnlyList<FindingMark>? FindingMarks
+        {
+            get => GetValue(FindingMarksProperty);
+            set => SetValue(FindingMarksProperty, value);
+        }
+
+        private void DrawFindingMarks(DrawingContext context, Rect bounds)
+        {
+            if (FindingMarks is not { Count: > 0 } marks)
+                return;
+
+            foreach (var severity in new[] { Severity.Info, Severity.Warning, Severity.Error })
+            {
+                var brush = severity switch
+                {
+                    Severity.Error => ErrorMarkBrush,
+                    Severity.Warning => WarningMarkBrush,
+                    _ => InfoMarkBrush,
+                };
+                double lastX = double.MinValue;
+                foreach (var mark in marks)
+                {
+                    if (mark.Severity != severity)
+                        continue;
+                    double x = Math.Round(XOf(mark.Seconds, bounds.Width));
+                    if (x == lastX)
+                        continue;
+                    context.FillRectangle(brush, new Rect(x - 1, RulerHeight - MarkHeight, 2, MarkHeight));
+                    lastX = x;
+                }
+            }
         }
 
         /// <summary>The lane in focus over the whole song: its note density, star power and solos, and the song's sections.</summary>

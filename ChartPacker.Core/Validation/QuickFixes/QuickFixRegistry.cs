@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 
 namespace ChartPacker.Core.Validation.QuickFixes;
@@ -31,9 +32,9 @@ public static class QuickFixRegistry
     /// <summary>
     /// Every chart fix strategy, for chart lint findings, at most one per rule (charter-spec C16 item 3). They're kept
     /// apart from <see cref="Strategies"/>, so the metadata fixes (<see cref="IsSupported"/>, <see cref="FixKey"/>) don't
-    /// see them. None are written yet: CM2 and CM3 add them here with their rules.
+    /// see them. CM2 adds the timing and 5-fret rules' fixes; CM3 adds the drums and phrase rules'.
     /// </summary>
-    public static IReadOnlyList<IChartQuickFixStrategy> ChartStrategies { get; } = [];
+    public static IReadOnlyList<IChartQuickFixStrategy> ChartStrategies { get; } = Charting.Lint.ChartFixes.All;
 
     /// <summary>Whether findings of <paramref name="ruleId"/> can have a quick fix.</summary>
     public static bool IsSupported(string ruleId)
@@ -75,26 +76,29 @@ public static class QuickFixRegistry
     /// <summary>The fix for the chart lint finding <paramref name="finding"/>, from <see cref="ChartStrategies"/>.</summary>
     /// <param name="finding">A chart lint finding.</param>
     /// <param name="chart">The chart it was found in, as it is now.</param>
+    /// <param name="options">The settings the chart is read with, as lint read it.</param>
     /// <returns>
     /// One undoable command to run through the chart's undo stack, or <see langword="null"/> when the rule has no fix or
     /// this finding has no single right one.
     /// </returns>
-    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart) => ProposeChartFix(finding, chart, ChartStrategies);
+    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart, ChartReadOptions options) => ProposeChartFix(finding, chart, options, ChartStrategies);
 
     /// <summary>The fix for the chart lint finding <paramref name="finding"/>, from the first of <paramref name="strategies"/> for its rule.</summary>
     /// <param name="finding">A chart lint finding.</param>
     /// <param name="chart">The chart it was found in, as it is now.</param>
+    /// <param name="options">The settings the chart is read with, as lint read it.</param>
     /// <param name="strategies">The strategies to look in, such as <see cref="ChartStrategies"/>.</param>
     /// <returns>One undoable command, or <see langword="null"/> when none is for the rule, or its strategy has no single right fix.</returns>
-    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart, IEnumerable<IChartQuickFixStrategy> strategies)
+    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart, ChartReadOptions options, IEnumerable<IChartQuickFixStrategy> strategies)
     {
         ArgumentNullException.ThrowIfNull(finding);
         ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(strategies);
         foreach (var strategy in strategies)
         {
             if (string.Equals(strategy.RuleId, finding.RuleId, StringComparison.Ordinal))
-                return strategy.Propose(finding, chart);
+                return strategy.Propose(finding, chart, options);
         }
 
         return null;

@@ -32,6 +32,7 @@ public sealed record SongOpenProblem(SongOpenProblemKind Kind, string? Detail = 
 /// <param name="Options">The settings the chart is read with: the song's, or for a <c>.chart</c>, the conversion's.</param>
 /// <param name="Delay">How much later than its ticks say the chart plays against the audio (<see cref="SongChartSettings.DelayOf(IReadOnlyList{KeyValuePair{string, string}}, TimeSpan?)"/>).</param>
 /// <param name="Import">For a <c>notes.chart</c>, what converting it gave: its <c>Offset</c> and warnings.</param>
+/// <param name="ChartFile">The chart file on disk as it was read, or null for a new chart in a song that had none.</param>
 public sealed record OpenedSong(
     SongEntry Entry,
     IReadOnlyList<KeyValuePair<string, string>> Pairs,
@@ -40,8 +41,12 @@ public sealed record OpenedSong(
     ChartLoadResult Load,
     ChartReadOptions Options,
     TimeSpan Delay,
-    ChartImportResult? Import)
+    ChartImportResult? Import,
+    ChartFileStamp? ChartFile = null)
 {
+    /// <summary>Whether the song has a chart file on disk: false for a new chart in a song that had neither.</summary>
+    public bool HasChartFile => ChartFile is not null;
+
     /// <summary>The chart, in the editable model.</summary>
     public EditableChart Chart => Load.Chart;
 
@@ -71,8 +76,40 @@ public sealed record OpenedSong(
     };
 }
 
+/// <summary>
+/// The file a song's chart was read from, as it was then, for telling whether it's changed since (charter-spec C15 item
+/// 6): the chart file in a folder, or the <c>.sng</c> itself, as the files in a <c>.sng</c> have no times of their own.
+/// </summary>
+/// <param name="Name">The chart file's stored name.</param>
+/// <param name="Length">The size of the file on disk, in bytes.</param>
+/// <param name="LastWriteTimeUtc">When the file on disk was last written.</param>
+public sealed record ChartFileStamp(string Name, long Length, DateTime LastWriteTimeUtc)
+{
+    /// <summary>The stamp of <paramref name="chartName"/> in <paramref name="entry"/> as it is now, or null when it isn't there.</summary>
+    public static ChartFileStamp? Of(SongEntry entry, string chartName)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentException.ThrowIfNullOrEmpty(chartName);
+        try
+        {
+            var file = new FileInfo(entry.Kind == SongEntryKind.SngFile ? entry.FullPath : Path.Combine(entry.FullPath, chartName));
+            return file.Exists ? new ChartFileStamp(chartName, file.Length, file.LastWriteTimeUtc) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+}
+
+/// <summary>A song with neither chart file, which can be given a new chart (charter-spec C1, New chart in this song).</summary>
+/// <param name="Pairs">The song's stored metadata, in order.</param>
+/// <param name="StoredNames">The names of the files directly in the song.</param>
+public sealed record NoChartSong(SongEntry Entry, IReadOnlyList<KeyValuePair<string, string>> Pairs, IReadOnlyList<string> StoredNames);
+
 /// <summary>The song <see cref="SongOpener.OpenAsync"/> read, or why it couldn't.</summary>
-public sealed record SongOpenResult(OpenedSong? Song, SongOpenProblem? Problem)
+/// <param name="Empty">For <see cref="SongOpenProblemKind.NoChart"/>, the song as read, for a new chart to be made in it.</param>
+public sealed record SongOpenResult(OpenedSong? Song, SongOpenProblem? Problem, NoChartSong? Empty = null)
 {
     public static SongOpenResult Failed(SongOpenProblemKind kind, string? detail = null) => new(null, new SongOpenProblem(kind, detail));
 }
@@ -110,6 +147,25 @@ public static class SongOpener
         return Task.Run(() => OpenCoreAsync(entry, cancellationToken), cancellationToken);
     }
 
+    /// <summary>
+    /// <paramref name="song"/>, which has neither chart file, opened with <paramref name="chart"/> as a new chart in it
+    /// (charter-spec C1, New chart in this song): its first save adds <c>notes.mid</c> and the <c>song.ini</c> keys.
+    /// </summary>
+    public static OpenedSong NewChartIn(NoChartSong song, EditableChart chart)
+    {
+        ArgumentNullException.ThrowIfNull(song);
+        ArgumentNullException.ThrowIfNull(chart);
+        return new OpenedSong(
+            song.Entry,
+            song.Pairs,
+            song.StoredNames,
+            ChartFiles.MidiName,
+            new ChartLoadResult(chart, []),
+            ChartReadOptions.From(song.Pairs),
+            SongChartSettings.DelayOf(song.Pairs, (TimeSpan?)null),
+            null);
+    }
+
     private static async Task<SongOpenResult> OpenCoreAsync(SongEntry entry, CancellationToken cancellationToken)
     {
         bool exists = entry.Kind == SongEntryKind.SngFile ? File.Exists(entry.FullPath) : Directory.Exists(entry.FullPath);
@@ -121,8 +177,10 @@ public static class SongOpener
             IReadOnlyList<string> stored = [.. SongFile.ListTopLevel(entry, cancellationToken).Select(f => f.Name)];
             var pairs = await ReadPairsAsync(entry, stored, cancellationToken).ConfigureAwait(false);
             if (ChartReader.Pick(stored) is not { } chartName)
-                return SongOpenResult.Failed(SongOpenProblemKind.NoChart);
+                return new SongOpenResult(null, new SongOpenProblem(SongOpenProblemKind.NoChart), new NoChartSong(entry, pairs, stored));
 
+            // Stamped before it's read, so a change made while it's read shows as a change.
+            var stamp = ChartFileStamp.Of(entry, chartName);
             byte[]? bytes = await SongFile.ReadAsync(entry, chartName, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false);
             if (bytes is null)
                 return SongOpenResult.Failed(SongOpenProblemKind.ChartTooLarge);
@@ -131,11 +189,11 @@ public static class SongOpener
             if (chartName.Equals(ChartFiles.MidiName, StringComparison.OrdinalIgnoreCase))
             {
                 var load = MidiChartLoader.Load(bytes, options);
-                return new SongOpenResult(new OpenedSong(entry, pairs, stored, chartName, load, options, SongChartSettings.DelayOf(pairs, (TimeSpan?)null), null), null);
+                return new SongOpenResult(new OpenedSong(entry, pairs, stored, chartName, load, options, SongChartSettings.DelayOf(pairs, (TimeSpan?)null), null, stamp), null);
             }
 
             var import = MidiChartLoader.LoadChart(bytes, options);
-            var song = new OpenedSong(entry, pairs, stored, chartName, import.Load, import.Options, SongChartSettings.DelayOf(pairs, import.Offset), import);
+            var song = new OpenedSong(entry, pairs, stored, chartName, import.Load, import.Options, SongChartSettings.DelayOf(pairs, import.Offset), import, stamp);
             return new SongOpenResult(song, null);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)

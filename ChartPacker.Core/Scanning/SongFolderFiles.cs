@@ -24,6 +24,9 @@ public static class SongFolderFiles
     /// file with the same name as an added one is left for the add to replace.</para>
     /// <para>A removed file that no longer exists is skipped. A delete that fails doesn't stop the
     /// others. Folders a removal empties are kept.</para>
+    /// <para><paramref name="afterMoves"/>, when given, runs once every add is in place and before
+    /// anything is deleted: a save writes <c>song.ini</c> there, so a removed chart is only deleted once
+    /// <c>song.ini</c> holds what was taken from it. If it throws, nothing is deleted.</para>
     /// </remarks>
     /// <exception cref="ArgumentException">A name is the folder's <c>song.ini</c>, which is edited as metadata, or points outside the folder.</exception>
     /// <exception cref="IOException">A file can't be read, written or deleted. The first failed delete is thrown once every delete has been tried.</exception>
@@ -33,7 +36,8 @@ public static class SongFolderFiles
         string folder,
         IReadOnlyCollection<string> removes,
         IReadOnlyList<AddedFile> adds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<CancellationToken, Task>? afterMoves = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folder);
         ArgumentNullException.ThrowIfNull(removes);
@@ -70,6 +74,7 @@ public static class SongFolderFiles
                 await input.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
             }
 
+            Step("staged");
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var file in toSetAside)
             {
@@ -80,7 +85,10 @@ public static class SongFolderFiles
             }
 
             for (; moved < temps.Count; moved++)
+            {
                 File.Move(temps[moved], targets[moved], overwrite: true);
+                Step("moved:" + adds[moved].StoredName);
+            }
         }
         catch
         {
@@ -100,6 +108,22 @@ public static class SongFolderFiles
             throw;
         }
 
+        if (afterMoves is not null)
+        {
+            try
+            {
+                await afterMoves(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                // The adds are in place, so what was set aside for them goes; the removals are kept.
+                foreach (var file in setAside)
+                    TryDelete(file.Aside);
+                throw;
+            }
+        }
+
+        Step("before-deletes");
         Exception? firstFailure = null;
         foreach (string path in deleteLast.Concat(setAside.Select(f => f.Aside)))
         {
@@ -117,6 +141,14 @@ public static class SongFolderFiles
         if (firstFailure is not null)
             ExceptionDispatchInfo.Throw(firstFailure);
     }
+
+    /// <summary>
+    /// Called with each step as it's reached (<c>staged</c>, <c>moved:&lt;name&gt;</c>, <c>before-deletes</c>), so a
+    /// test can see what a crash at that point would leave in the folder.
+    /// </summary>
+    internal static AsyncLocal<Action<string>?> StepReached { get; } = new();
+
+    private static void Step(string step) => StepReached.Value?.Invoke(step);
 
     /// <summary>The full path of <paramref name="name"/> in the folder at <paramref name="root"/>.</summary>
     private static string Resolve(string root, string name)

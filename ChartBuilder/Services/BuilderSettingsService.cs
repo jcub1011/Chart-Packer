@@ -59,6 +59,7 @@ namespace ChartBuilder.Services
             settings.EditorHighwaySpeed = double.IsFinite(settings.EditorHighwaySpeed)
                 ? Math.Clamp(settings.EditorHighwaySpeed, BuilderSettings.MinEditorHighwaySpeed, BuilderSettings.MaxEditorHighwaySpeed)
                 : 1;
+            settings.AutosaveMinutes = Math.Clamp(settings.AutosaveMinutes, BuilderSettings.MinAutosaveMinutes, BuilderSettings.MaxAutosaveMinutes);
             settings.MetronomeVolume = Math.Clamp(settings.MetronomeVolume, 0, 100);
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
 

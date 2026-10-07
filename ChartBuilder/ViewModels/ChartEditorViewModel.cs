@@ -52,7 +52,7 @@ namespace ChartBuilder.ViewModels
             Song = song;
             Playback = playback;
             var saved = settings.Settings;
-            Session = new EditorSession(undo, song.Delay, song.Pairs)
+            Session = new EditorSession(undo, song.Delay, song.EffectivePairs())
             {
                 Snap = SnapGrid.Of(saved.DefaultSnapDivision),
                 KeepTimes = saved.TempoEdits == TempoEditMode.KeepTimes,
@@ -68,6 +68,7 @@ namespace ChartBuilder.ViewModels
 
             Session.StateChanged += OnSessionState;
             Session.ChartChanged += OnChartChanged;
+            Session.SongSettingsChanged += OnSongSettingsChanged;
             Session.Viewport.Changed += OnViewportChanged;
             Session.Viewport.Moved += OnCursorMoved;
             Session.Selection.Changed += OnSelectionChanged;
@@ -293,6 +294,7 @@ namespace ChartBuilder.ViewModels
             _tapEnd.Stop();
             Session.StateChanged -= OnSessionState;
             Session.ChartChanged -= OnChartChanged;
+            Session.SongSettingsChanged -= OnSongSettingsChanged;
             Session.Viewport.Changed -= OnViewportChanged;
             Session.Viewport.Moved -= OnCursorMoved;
             Session.Selection.Changed -= OnSelectionChanged;
@@ -337,6 +339,13 @@ namespace ChartBuilder.ViewModels
         }
 
         private void OnSelectionChanged(object? sender, EventArgs e) => Properties.Refresh();
+
+        // The delay or the song's settings moved every note against the audio, or changed how they're read.
+        private void OnSongSettingsChanged(object? sender, EventArgs e)
+        {
+            ScheduleRefresh();
+            Properties.Refresh();
+        }
 
         private void OnLayoutChanged(object? sender, EventArgs e) => ScheduleRefresh();
 
