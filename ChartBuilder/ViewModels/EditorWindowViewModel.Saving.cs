@@ -101,7 +101,7 @@ namespace ChartBuilder.ViewModels
             await Findings.SettleAsync();
             if (Findings.ErrorCount > 0)
             {
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.SaveAndPackErrorsFormat, Findings.ErrorCount);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveAndPackErrorsFormat, Findings.ErrorCount));
                 return;
             }
 
@@ -112,11 +112,12 @@ namespace ChartBuilder.ViewModels
             {
                 JobItemResult? result = null;
                 await Task.Run(() => SongJob.RunAsync(JobKind.Pack, [entry], scanRoot, destination, settings.Policy, new Reporter(r => result = r), layout));
-                Notice = PackNotice(result);
+                var (severity, message) = PackNotice(result);
+                Messages.Post(severity, message);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.PackFailedFormat, ex.Message);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.PackFailedFormat, ex.Message));
             }
             finally
             {
@@ -147,18 +148,19 @@ namespace ChartBuilder.ViewModels
                 var written = await Task.Run(() => ChartSaver.Check(request));
                 if (!written.IsValid)
                 {
-                    Notice = ReadBackFailedNotice(written);
+                    Messages.Error(ReadBackFailedNotice(written));
                     return;
                 }
 
                 var result = await Task.Run(() => ChartSaver.ExportAsync(entry, request, written, target));
-                Notice = result.Extracted
-                    ? string.Format(CultureInfo.CurrentCulture, Strings.ExportedFormat, target)
-                    : string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, FirstError(result.Findings) ?? "");
+                if (result.Extracted)
+                    Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.ExportedFormat, target));
+                else
+                    Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, FirstError(result.Findings) ?? ""));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, ex.Message);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, ex.Message));
             }
             finally
             {
@@ -172,7 +174,7 @@ namespace ChartBuilder.ViewModels
         /// Saves the chart and its pending <c>song.ini</c> changes (charter-spec C17 item 1): to the song through its draft,
         /// or for a new chart, as its song folder, asking where first.
         /// </summary>
-        /// <returns>Whether it was saved; why not is in the notice, or the user cancelled.</returns>
+        /// <returns>Whether it was saved; why not is on the message bar, or the user cancelled.</returns>
         private async Task<bool> SaveCoreAsync()
         {
             if (IsSaving)
@@ -219,7 +221,7 @@ namespace ChartBuilder.ViewModels
                 var written = await Task.Run(() => ChartSaver.Check(request));
                 if (!written.IsValid)
                 {
-                    Notice = ReadBackFailedNotice(written);
+                    Messages.Error(ReadBackFailedNotice(written));
                     return false;
                 }
 
@@ -227,21 +229,20 @@ namespace ChartBuilder.ViewModels
                 var findings = await Task.Run(() => ChartSaver.SaveAsync(entry, request, written));
                 if (FirstError(findings) is { } error)
                 {
-                    Notice = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, error);
+                    Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, error));
                     return false;
                 }
 
                 _undo.MarkSaved(point);
                 Song.Saved(ChartSaver.SavedSong(Song, entry, request), PartsOf(request.Snapshot));
                 AfterSaved(null);
-                Notice = null;
-                Editor.Session.Status = Strings.SavedStatus;
+                Messages.Info(Strings.SavedStatus);
                 return true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 Logger.Error(ex, "Saving {Song} failed", entry.FullPath);
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message));
                 return false;
             }
             finally
@@ -274,13 +275,13 @@ namespace ChartBuilder.ViewModels
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message));
                 return false;
             }
 
             if (songLock is null)
             {
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.FirstSaveLockedFormat, target.FullPath);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.FirstSaveLockedFormat, target.FullPath));
                 return false;
             }
 
@@ -296,7 +297,7 @@ namespace ChartBuilder.ViewModels
                 var written = await Task.Run(() => ChartSaver.Check(request));
                 if (!written.IsValid)
                 {
-                    Notice = ReadBackFailedNotice(written);
+                    Messages.Error(ReadBackFailedNotice(written));
                     return false;
                 }
 
@@ -313,14 +314,13 @@ namespace ChartBuilder.ViewModels
                 settings.LastNewChartFolder = target.ParentFolder;
                 settings.RecentSongs = RecentSongs.Add(settings.RecentSongs, new RecentSong { Path = entry.FullPath, Title = Song.Title ?? "", OpenedAt = DateTimeOffset.Now });
                 _settings.Save();
-                Notice = null;
-                Editor.Session.Status = string.Format(CultureInfo.CurrentCulture, Strings.FirstSavedStatusFormat, folder);
+                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.FirstSavedStatusFormat, folder));
                 return true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 Logger.Error(ex, "Saving the new chart to {Folder} failed", target.FullPath);
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message));
                 return false;
             }
             finally
@@ -377,12 +377,12 @@ namespace ChartBuilder.ViewModels
 
         private static string? FirstError(IEnumerable<Finding> findings) => findings.FirstOrDefault(f => f.Severity == Severity.Error)?.Message;
 
-        private static string PackNotice(JobItemResult? result) => result switch
+        private static (Severity Severity, string Message) PackNotice(JobItemResult? result) => result switch
         {
-            null => Strings.PackNoResult,
-            { Status: JobItemStatus.Succeeded or JobItemStatus.SucceededWithWarnings } => string.Format(CultureInfo.CurrentCulture, Strings.PackedFormat, result.OutputPath),
-            { Status: JobItemStatus.Skipped, SkipReason: SkipReason.OutputExists } => string.Format(CultureInfo.CurrentCulture, Strings.PackSkippedExistsFormat, result.OutputPath),
-            _ => string.Format(CultureInfo.CurrentCulture, Strings.PackFailedFormat, result.ErrorMessage ?? FirstError(result.Findings) ?? result.Status.ToString()),
+            null => (Severity.Warning, Strings.PackNoResult),
+            { Status: JobItemStatus.Succeeded or JobItemStatus.SucceededWithWarnings } => (Severity.Info, string.Format(CultureInfo.CurrentCulture, Strings.PackedFormat, result.OutputPath)),
+            { Status: JobItemStatus.Skipped, SkipReason: SkipReason.OutputExists } => (Severity.Warning, string.Format(CultureInfo.CurrentCulture, Strings.PackSkippedExistsFormat, result.OutputPath)),
+            _ => (Severity.Error, string.Format(CultureInfo.CurrentCulture, Strings.PackFailedFormat, result.ErrorMessage ?? FirstError(result.Findings) ?? result.Status.ToString())),
         };
 
         /// <summary>Takes a job's results as they come, on the job's thread.</summary>

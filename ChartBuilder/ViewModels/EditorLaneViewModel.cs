@@ -137,7 +137,7 @@ namespace ChartBuilder.ViewModels
             if (Track is not { } track || track.Difficulty == difficulty)
                 return;
             if (!_dock.Layout.SetPart(Lane, LanePart.Highway(track.Instrument, difficulty)) && Editor is { } editor)
-                editor.Session.Status = string.Format(CultureInfo.CurrentCulture, Strings.LaneDifficultyShownFormat, ChartLabels.DifficultyName(difficulty));
+                editor.Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.LaneDifficultyShownFormat, ChartLabels.DifficultyName(difficulty)));
         }
 
         /// <summary>Takes in the lane's part, and what the other lanes show, after the layout changes.</summary>

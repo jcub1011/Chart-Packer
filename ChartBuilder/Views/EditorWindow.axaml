@@ -38,18 +38,32 @@
             <Setter Property="Margin" Value="16" />
             <Setter Property="Spacing" Value="4" />
         </Style>
-        <!-- A finding's row: a bar on its left coloured by how serious it is. -->
+        <!-- A finding's row, with a bar on its left coloured by how serious it is (Styles/Severity.axaml). -->
         <Style Selector="Border.finding">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
             <Setter Property="Padding" Value="8,4" />
             <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
-        <Style Selector="Border.finding.warning">
-            <Setter Property="BorderBrush" Value="{DynamicResource WarningTextBrush}" />
+        <!-- The message bar: flat, one line, and clickable anywhere to open Messages, like Chart Packer's job summary
+             line. -->
+        <Style Selector="Button.message-bar">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
-        <Style Selector="Border.finding.error">
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        <Style Selector="Button.message-bar:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+        <Style Selector="Button.message-bar:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
         </Style>
         <!-- A pending song.ini change the user reverted: listed, struck through, until it's restored. -->
         <Style Selector="SelectableTextBlock.reverted">
@@ -60,15 +74,15 @@
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <!-- Toolbar (0), panels (1), splitter (2), timeline (3). EditorWindow.axaml.cs indexes these. -->
+            <!-- Toolbar (0), panels (1), splitter (2), timeline (3), message bar (4). EditorWindow.axaml.cs indexes these. -->
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="160" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="160" MinHeight="80" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- The toolbar, and a notice under it while there is one. The code-behind refits the panels as this
-             changes height. -->
+        <!-- The toolbar. The code-behind refits the panels as it changes height, wrapping as the window narrows. -->
         <StackPanel x:Name="TopBand" Grid.Row="0">
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
@@ -203,52 +217,6 @@
                     </Border>
                 </WrapPanel>
             </Border>
-
-            <!-- What the editor has to say: why an edit was refused, or what a key did. -->
-            <Border IsVisible="{Binding Editor.HasStatus}"
-                    BorderThickness="0,0,0,1"
-                    Background="{DynamicResource ToolbarBrush}"
-                    BorderBrush="{DynamicResource SubtleBorderBrush}"
-                    Padding="12,2">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                    <TextBlock Grid.Column="0"
-                               Classes="muted"
-                               FontSize="12"
-                               Text="{Binding Editor.Status}"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip.Tip="{Binding Editor.Status}"
-                               VerticalAlignment="Center" />
-                    <Button Grid.Column="1"
-                            Classes="tool"
-                            Command="{Binding Editor.DismissStatusCommand}"
-                            ToolTip.Tip="{x:Static res:Strings.DismissNoticeToolTip}"
-                            AutomationProperties.Name="{x:Static res:Strings.DismissNoticeToolTip}">
-                        <ctl:LineIcon Data="{StaticResource ClearStroke}" />
-                    </Button>
-                </Grid>
-            </Border>
-
-            <!-- Something to tell the user, like Chart Packer's notice bar, until they dismiss it. -->
-            <Border IsVisible="{Binding HasNotice}"
-                    BorderThickness="0,0,0,1"
-                    Background="{DynamicResource ToolbarBrush}"
-                    BorderBrush="{DynamicResource SubtleBorderBrush}"
-                    Padding="12,4">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                    <SelectableTextBlock Grid.Column="0"
-                                         Text="{Binding Notice}"
-                                         TextTrimming="CharacterEllipsis"
-                                         ToolTip.Tip="{Binding Notice}"
-                                         VerticalAlignment="Center" />
-                    <Button Grid.Column="1"
-                            Classes="tool"
-                            Command="{Binding DismissNoticeCommand}"
-                            ToolTip.Tip="{x:Static res:Strings.DismissNoticeToolTip}"
-                            AutomationProperties.Name="{x:Static res:Strings.DismissNoticeToolTip}">
-                        <ctl:LineIcon Data="{StaticResource ClearStroke}" />
-                    </Button>
-                </Grid>
-            </Border>
         </StackPanel>
 
         <Grid x:Name="PanelsGrid" Grid.Row="1">
@@ -353,7 +321,7 @@
                                 <ItemsControl Margin="8,0,8,8" ItemsSource="{Binding Findings.Items}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:FindingItem">
-                                            <Border Classes="finding" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+                                            <Border Classes="finding severity" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
                                                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
                                                     <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12" TextWrapping="Wrap" Text="{Binding Message}" />
                                                     <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
@@ -555,5 +523,49 @@
                                ToolTip.Tip="{x:Static res:Strings.TimelineToolTip}"
                                AutomationProperties.Name="{x:Static res:Strings.TimelineHeading}" />
         </DockPanel>
+
+        <!-- The latest thing the editor said, on one line that's always there, so nothing above it moves when a message
+             comes or goes: why an edit was refused, what a key did, or how a save went. Clicking it shows them all. -->
+        <Button x:Name="MessageBar"
+                Grid.Row="4"
+                Classes="message-bar"
+                Command="{Binding ShowMessagesCommand}"
+                ToolTip.Tip="{x:Static res:Strings.MessageBarToolTip}"
+                AutomationProperties.Name="{x:Static res:Strings.MessageBarToolTip}">
+            <!-- Margins rather than column spacing, so the placeholder lines up with a message's time. -->
+            <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,0,12,0">
+                <Border Grid.Column="0"
+                        Classes="severity"
+                        Classes.warning="{Binding Messages.Latest.IsWarning, FallbackValue=False}"
+                        Classes.error="{Binding Messages.Latest.IsError, FallbackValue=False}"
+                        IsVisible="{Binding Messages.HasLatest}"
+                        Margin="9,5,0,5"
+                        Width="3" />
+                <TextBlock Grid.Column="1"
+                           Classes="muted"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0"
+                           Text="{Binding Messages.Latest.TimeText, FallbackValue=''}"
+                           IsVisible="{Binding Messages.HasLatest}" />
+                <TextBlock Grid.Column="2"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="10,0,0,0"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           MaxLines="1"
+                           Text="{Binding Messages.Latest.Summary, FallbackValue=''}"
+                           IsVisible="{Binding Messages.HasLatest}" />
+                <TextBlock Grid.Column="0"
+                           Grid.ColumnSpan="3"
+                           Classes="muted"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="20,0,0,0"
+                           Text="{x:Static res:Strings.MessageBarEmpty}"
+                           IsVisible="{Binding !Messages.HasLatest}" />
+            </Grid>
+        </Button>
     </Grid>
 </Window>

@@ -109,9 +109,45 @@
     <value>Something went wrong: {0}</value>
     <comment>Shown on the home screen when New chart fails unexpectedly. {0} is the error message.</comment>
   </data>
-  <data name="DismissNoticeToolTip" xml:space="preserve">
-    <value>Dismiss</value>
-    <comment>Closes the editor's notice strip.</comment>
+  <data name="MessageBarToolTip" xml:space="preserve">
+    <value>Show this message and the earlier ones</value>
+    <comment>The message bar along the bottom of the editor, which opens the Messages dialog.</comment>
+  </data>
+  <data name="MessageBarEmpty" xml:space="preserve">
+    <value>No messages</value>
+    <comment>The message bar before the editor has said anything.</comment>
+  </data>
+  <data name="MessagesTitle" xml:space="preserve">
+    <value>Messages</value>
+    <comment>The Messages dialog's title: everything the editor has said this session.</comment>
+  </data>
+  <data name="MessagesNone" xml:space="preserve">
+    <value>Nothing has been said yet.</value>
+    <comment>The Messages dialog when there are no messages.</comment>
+  </data>
+  <data name="MessagesCopyButton" xml:space="preserve">
+    <value>Copy</value>
+    <comment>Copies the message picked in the Messages dialog.</comment>
+  </data>
+  <data name="MessagesCopyToolTip" xml:space="preserve">
+    <value>Copy this message, with its time and severity</value>
+    <comment>The Messages dialog's Copy button.</comment>
+  </data>
+  <data name="MessagesCloseButton" xml:space="preserve">
+    <value>Close</value>
+    <comment>Closes the Messages dialog.</comment>
+  </data>
+  <data name="MessageSeverityError" xml:space="preserve">
+    <value>Error</value>
+    <comment>A message saying something failed.</comment>
+  </data>
+  <data name="MessageSeverityWarning" xml:space="preserve">
+    <value>Warning</value>
+    <comment>A message saying something was refused or needs looking at.</comment>
+  </data>
+  <data name="MessageSeverityInfo" xml:space="preserve">
+    <value>Info</value>
+    <comment>A message saying what the editor did.</comment>
   </data>
   <data name="EditorWindowTitleFormat" xml:space="preserve">
     <value>{0} - Chart Builder</value>

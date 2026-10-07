@@ -11,6 +11,7 @@ namespace ChartBuilder.Services
     /// <param name="Confirmations">Asks before a change that loses something, and Save, Discard or Cancel on closing.</param>
     /// <param name="FolderPicker">Picks the folder Export copy writes to, and a new chart's parent folder.</param>
     /// <param name="FirstSave">Asks where a new chart's first save makes its folder.</param>
+    /// <param name="MessagesDialog">Shows what the Editor has said this session, from its message bar.</param>
     /// <param name="OpenOutput">Opens the audio output, for playback.</param>
     /// <param name="Latency">The audio/visual latency, which what's drawn against the audio allows for.</param>
     /// <param name="Calibrate">Opens the calibration tool, from the transport bar.</param>
@@ -23,6 +24,7 @@ namespace ChartBuilder.Services
         IConfirmationService Confirmations,
         IFolderPickerService FolderPicker,
         IFirstSaveDialogService FirstSave,
+        IMessagesDialogService MessagesDialog,
         Func<int, IAudioOutput> OpenOutput,
         AudioLatencyService Latency,
         Action Calibrate,

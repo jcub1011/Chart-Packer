@@ -1,0 +1,141 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="460"
+        x:Class="ChartBuilder.Views.MessagesWindow"
+        x:DataType="vm:MessagesDialogViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{x:Static res:Strings.MessagesTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="640" Height="460"
+        MinWidth="420" MinHeight="300"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <!-- The list sits in a framed panel, like Chart Packer's job results. -->
+        <Style Selector="Border.frame">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <Style Selector="ListBox.messages">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.messages ListBoxItem">
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <Style Selector="ListBox.messages ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox.messages ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        </Style>
+
+        <!-- The picked message's severity, in its colour. -->
+        <Style Selector="TextBlock.severity-label">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.severity-label.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.severity-label.error">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <!-- Every message, newest first; the picked one in full below, to select and copy. -->
+    <Grid RowDefinitions="*,Auto,*,Auto">
+        <Border Grid.Row="0" Classes="frame" Margin="12,12,12,8">
+            <Panel>
+                <ListBox Classes="messages"
+                         ItemsSource="{Binding Entries}"
+                         SelectedItem="{Binding Selected}"
+                         AutomationProperties.Name="{x:Static res:Strings.MessagesTitle}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:EditorMessage">
+                            <Grid ColumnDefinitions="Auto,Auto,*" Height="26">
+                                <Border Grid.Column="0"
+                                        Classes="severity"
+                                        Classes.warning="{Binding IsWarning}"
+                                        Classes.error="{Binding IsError}"
+                                        Margin="0,5"
+                                        Width="3" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="muted"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0"
+                                           Text="{Binding TimeText}" />
+                                <TextBlock Grid.Column="2"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="10,0,0,0"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxLines="1"
+                                           Text="{Binding Summary}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Classes="muted centered"
+                           VerticalAlignment="Center"
+                           Margin="16"
+                           IsHitTestVisible="False"
+                           Text="{x:Static res:Strings.MessagesNone}"
+                           IsVisible="{Binding !HasEntries}" />
+            </Panel>
+        </Border>
+
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    Margin="12,0,12,6"
+                    IsVisible="{Binding HasSelected}">
+            <TextBlock Classes="severity-label"
+                       Classes.warning="{Binding Selected.IsWarning, FallbackValue=False}"
+                       Classes.error="{Binding Selected.IsError, FallbackValue=False}"
+                       Text="{Binding Selected.SeverityText, FallbackValue=''}" />
+            <TextBlock Classes="muted" Text="{Binding Selected.TimeText, FallbackValue=''}" />
+        </StackPanel>
+
+        <!-- Read-only, but selectable, with Ctrl+C and the right-click menu to copy. -->
+        <TextBox Grid.Row="2"
+                 Margin="12,0,12,12"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalContentAlignment="Top"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 Text="{Binding Selected.Text, Mode=OneWay, FallbackValue=''}"
+                 AutomationProperties.Name="{x:Static res:Strings.MessagesTitle}" />
+
+        <Border Grid.Row="3" Classes="toolbar" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Content="{x:Static res:Strings.MessagesCopyButton}"
+                        IsEnabled="{Binding HasSelected}"
+                        Click="OnCopy"
+                        ToolTip.Tip="{x:Static res:Strings.MessagesCopyToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.MessagesCopyToolTip}" />
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Classes="accent"
+                        Content="{x:Static res:Strings.MessagesCloseButton}"
+                        IsDefault="True"
+                        IsCancel="True"
+                        Click="OnClose"
+                        AutomationProperties.Name="{x:Static res:Strings.MessagesCloseButton}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

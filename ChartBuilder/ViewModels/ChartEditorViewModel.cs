@@ -37,6 +37,9 @@ namespace ChartBuilder.ViewModels
         // How many columns the overview's note density has across the song.
         private const int DensityColumns = 600;
 
+        // Tap tempo's message, which each tap updates.
+        private const string TapTempoMessageKey = "tap-tempo";
+
         private readonly BuilderSettingsService _settings;
         private readonly IConfirmationService _confirmations;
         private readonly DispatcherTimer _refresh;
@@ -45,12 +48,14 @@ namespace ChartBuilder.ViewModels
         private double _firstTap;
         private bool _syncing;
 
-        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, BuilderSettingsService settings, IConfirmationService confirmations, LaneDockLayout layout)
+        /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
+        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout)
         {
             _settings = settings;
             _confirmations = confirmations;
             Song = song;
             Playback = playback;
+            Messages = messages;
             var saved = settings.Settings;
             Session = new EditorSession(undo, song.Delay, song.EffectivePairs())
             {
@@ -67,6 +72,7 @@ namespace ChartBuilder.ViewModels
             _tapEnd.Tick += (_, _) => _ = ApplyTapsAsync();
 
             Session.StateChanged += OnSessionState;
+            Session.StatusPosted += OnStatusPosted;
             Session.ChartChanged += OnChartChanged;
             Session.SongSettingsChanged += OnSongSettingsChanged;
             Session.Viewport.Changed += OnViewportChanged;
@@ -85,6 +91,9 @@ namespace ChartBuilder.ViewModels
         public EditorSession Session { get; }
 
         public PlaybackViewModel Playback { get; }
+
+        /// <summary>What the editor has had to say: why an edit was refused, or what a key did.</summary>
+        public EditorMessages Messages { get; }
 
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
         public LaneDockViewModel Lanes { get; }
@@ -161,11 +170,6 @@ namespace ChartBuilder.ViewModels
             set => SetTool(EditorTool.Tempo, value);
         }
 
-        /// <summary>What the editor has to say: why an edit was refused, or what a key did.</summary>
-        public string? Status => Session.Status;
-
-        public bool HasStatus => Session.Status is not null;
-
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
         [ObservableProperty]
         public partial OverviewData? Overview { get; private set; }
@@ -234,9 +238,12 @@ namespace ChartBuilder.ViewModels
             double now = Playback.Clock().TotalSeconds;
             if (_taps.Tap(now))
                 _firstTap = now;
-            Session.Status = _taps.Bpm is { } bpm
-                ? string.Format(CultureInfo.CurrentCulture, Strings.TapTempoStatusFormat, bpm, _taps.Count)
-                : string.Format(CultureInfo.CurrentCulture, Strings.TapTempoStartedStatusFormat, _taps.Count);
+            // One message, updated with each tap, rather than one a tap.
+            Messages.Info(
+                _taps.Bpm is { } bpm
+                    ? string.Format(CultureInfo.CurrentCulture, Strings.TapTempoStatusFormat, bpm, _taps.Count)
+                    : string.Format(CultureInfo.CurrentCulture, Strings.TapTempoStartedStatusFormat, _taps.Count),
+                TapTempoMessageKey);
             _tapEnd.Stop();
             _tapEnd.Start();
         }
@@ -285,14 +292,12 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         private void FinerSnap() => Session.Snap = Session.Snap.Finer();
 
-        [RelayCommand]
-        private void DismissStatus() => Session.Status = null;
-
         public void Dispose()
         {
             _refresh.Stop();
             _tapEnd.Stop();
             Session.StateChanged -= OnSessionState;
+            Session.StatusPosted -= OnStatusPosted;
             Session.ChartChanged -= OnChartChanged;
             Session.SongSettingsChanged -= OnSongSettingsChanged;
             Session.Viewport.Changed -= OnViewportChanged;
@@ -322,11 +327,12 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsEraseTool));
             OnPropertyChanged(nameof(IsSustainTool));
             OnPropertyChanged(nameof(IsTempoTool));
-            OnPropertyChanged(nameof(Status));
-            OnPropertyChanged(nameof(HasStatus));
             RefreshVisibleSpan();
             ScheduleRefresh();
         }
+
+        // What the session says is why something was refused.
+        private void OnStatusPosted(object? sender, string status) => Messages.Warning(status);
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {

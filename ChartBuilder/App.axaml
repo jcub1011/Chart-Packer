@@ -16,5 +16,6 @@
     <!-- The palette, colours and common styles are shared with Chart Packer. -->
     <Application.Styles>
         <StyleInclude Source="avares://ChartPacker.UI/Styles/AppTheme.axaml" />
+        <StyleInclude Source="avares://ChartBuilder/Styles/Severity.axaml" />
     </Application.Styles>
 </Application>

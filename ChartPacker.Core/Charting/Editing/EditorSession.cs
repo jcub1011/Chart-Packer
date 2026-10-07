@@ -83,6 +83,9 @@ public sealed class EditorSession
     /// <summary>Raised when the snap, the tool, the focused lane or the status changes.</summary>
     public event EventHandler? StateChanged;
 
+    /// <summary>Raised each time a status is said, even one the same as the last, so a refusal repeated is said again.</summary>
+    public event EventHandler<string>? StatusPosted;
+
     /// <summary>Raised when the song's delay or <c>song.ini</c> changes (<see cref="SetSongSettings"/>), which moves or rereads every track.</summary>
     public event EventHandler? SongSettingsChanged;
 
@@ -172,6 +175,9 @@ public sealed class EditorSession
         get;
         set
         {
+            // Said again even when it's the same: a refusal repeated is news, though the status hasn't changed.
+            if (value is not null)
+                StatusPosted?.Invoke(this, value);
             if (field == value)
                 return;
             field = value;

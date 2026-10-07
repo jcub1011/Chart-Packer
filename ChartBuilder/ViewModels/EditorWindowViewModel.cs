@@ -60,9 +60,9 @@ namespace ChartBuilder.ViewModels
             Title = TitleOf();
             Playback.PropertyChanged += (_, e) =>
             {
-                // Audio that can't be played is said in the notice, as nothing else would say it.
+                // Audio that can't be played is said on the message bar, as nothing else would say it.
                 if (e.PropertyName == nameof(PlaybackViewModel.Message) && Playback.Message is { } message)
-                    Notice = message;
+                    Messages.Error(message);
             };
 
             var saved = settings.Settings;
@@ -71,7 +71,7 @@ namespace ChartBuilder.ViewModels
             TimelineHeight = saved.EditorTimelineHeight;
             IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
-            Editor = new ChartEditorViewModel(song, _undo, Playback, settings, services.Confirmations, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
+            Editor = new ChartEditorViewModel(song, _undo, Playback, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
             Findings = new FindingsViewModel(song, _undo, Editor);
             Findings.Changed += (_, _) => RefreshSaveState();
             Song.Changed += OnSongChanged;
@@ -81,21 +81,25 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>A song opened from a folder or <c>.sng</c> (charter-spec C2).</summary>
         /// <param name="songLock">The song's lock, held until the editor is disposed.</param>
-        public static EditorWindowViewModel ForSong(EditorServices services, OpenedSong song, SongLock songLock) =>
-            new(services, EditorSong.Of(song), songLock)
-            {
-                Notice = LoadIssuesNotice(song.Load.Issues.Count),
-            };
+        public static EditorWindowViewModel ForSong(EditorServices services, OpenedSong song, SongLock songLock)
+        {
+            var viewModel = new EditorWindowViewModel(services, EditorSong.Of(song), songLock);
+            if (LoadIssuesNotice(song.Load.Issues.Count) is { } issues)
+                viewModel.Messages.Warning(issues);
+            return viewModel;
+        }
 
         /// <summary>
         /// A new chart (charter-spec C1), with <paramref name="audio"/>'s tracks as its stems. It has no folder, and so no
         /// lock, until it's first saved.
         /// </summary>
-        public static EditorWindowViewModel ForNewChart(EditorServices services, EditableChart chart, NewChartAudio audio) =>
-            new(services, EditorSong.New(chart, audio.Tracks), null)
-            {
-                Notice = NotAddedNotice(audio),
-            };
+        public static EditorWindowViewModel ForNewChart(EditorServices services, EditableChart chart, NewChartAudio audio)
+        {
+            var viewModel = new EditorWindowViewModel(services, EditorSong.New(chart, audio.Tracks), null);
+            if (NotAddedNotice(audio) is { } notAdded)
+                viewModel.Messages.Warning(notAdded);
+            return viewModel;
+        }
 
         /// <summary>The window's title: the song's, or Untitled chart, marked while there are unsaved edits.</summary>
         [ObservableProperty]
@@ -122,12 +126,8 @@ namespace ChartBuilder.ViewModels
 
         public string VersionText { get; } = string.Format(CultureInfo.CurrentCulture, Strings.VersionFormat, AppVersion.Semantic);
 
-        /// <summary>Something to tell the user, in a strip under the toolbar until they dismiss it. Null for none.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasNotice))]
-        public partial string? Notice { get; set; }
-
-        public bool HasNotice => Notice is not null;
+        /// <summary>What the Editor has had to say, the latest on the message bar along the bottom of the window.</summary>
+        public EditorMessages Messages { get; } = new();
 
         /// <summary>The chart's editor: the lanes and their canvases, the tools and the snap, and Properties.</summary>
         public ChartEditorViewModel Editor { get; }
@@ -159,8 +159,9 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         private void ToggleRightPanel() => IsRightPanelCollapsed = !IsRightPanelCollapsed;
 
+        /// <summary>Shows every message said this session, from the message bar.</summary>
         [RelayCommand]
-        private void DismissNotice() => Notice = null;
+        private Task ShowMessagesAsync() => _services.MessagesDialog.ShowAsync(new MessagesDialogViewModel(Messages));
 
         [RelayCommand]
         private async Task OpenProgramSettingsAsync()
@@ -185,7 +186,7 @@ namespace ChartBuilder.ViewModels
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or ChartFormatException)
             {
                 // Refused before anything changed, as every command checks first, so Chart settings shows the chart again.
-                Notice = string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsNotAppliedFormat, ex.Message);
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsNotAppliedFormat, ex.Message));
                 ChartSettings.Reload();
             }
         }

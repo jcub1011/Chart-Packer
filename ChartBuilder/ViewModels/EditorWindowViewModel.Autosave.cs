@@ -46,7 +46,8 @@ namespace ChartBuilder.ViewModels
         /// <param name="recoveryKey">The recovery file it came from.</param>
         public static EditorWindowViewModel ForRecovered(Services.EditorServices services, EditorSong song, SongLock? songLock, string recoveryKey)
         {
-            var viewModel = new EditorWindowViewModel(services, song, songLock, startsSaved: false) { Notice = Strings.RecoveredNotice };
+            var viewModel = new EditorWindowViewModel(services, song, songLock, startsSaved: false);
+            viewModel.Messages.Info(Strings.RecoveredNotice);
             if (song.IsNew)
                 viewModel._newChartKey = recoveryKey;
             viewModel._hasRecoveryFile = true;

@@ -1,0 +1,15 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- How serious something is, as a bar on its left: a finding's row, a message on the message bar and in the
+         Messages dialog. Info is the accent, a warning amber, an error red. -->
+    <Style Selector="Border.severity">
+        <Setter Property="BorderThickness" Value="3,0,0,0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Border.severity.warning">
+        <Setter Property="BorderBrush" Value="{DynamicResource WarningTextBrush}" />
+    </Style>
+    <Style Selector="Border.severity.error">
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+    </Style>
+</Styles>

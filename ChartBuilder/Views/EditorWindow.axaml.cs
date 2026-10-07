@@ -38,7 +38,7 @@ namespace ChartBuilder.Views
 
             // The panel sizes are view state, so they're applied and captured here rather than bound. The view model
             // holds the sizes the user chose; the grid shows as much of each as fits, and refits as the window, or the
-            // toolbar and notice above the panels, change size. Fitting never changes the sizes the user chose.
+            // toolbar above the panels, change size. Fitting never changes the sizes the user chose.
             Opened += (_, _) =>
             {
                 WindowChrome.UseDarkTitleBar(this);
@@ -86,7 +86,7 @@ namespace ChartBuilder.Views
             _leftApplied = SizeSidePanel(LeftColumn, vm.IsLeftPanelCollapsed, vm.LeftPanelWidth, room - LeastWidth(vm.IsRightPanelCollapsed));
             _rightApplied = SizeSidePanel(RightColumn, vm.IsRightPanelCollapsed, vm.RightPanelWidth, room - WidthTaken(_leftApplied));
 
-            double maxHeight = Math.Floor(ClientSize.Height - TopBand.Bounds.Height - PanelsRow.MinHeight - SplitterSize);
+            double maxHeight = Math.Floor(ClientSize.Height - TopBand.Bounds.Height - MessageBar.Bounds.Height - PanelsRow.MinHeight - SplitterSize);
             _timelineApplied = Math.Clamp(vm.TimelineHeight, TimelineRow.MinHeight, Math.Max(TimelineRow.MinHeight, maxHeight));
             TimelineRow.Height = new GridLength(_timelineApplied, GridUnitType.Pixel);
         }
