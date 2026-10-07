@@ -7,7 +7,7 @@ using ChartPacker.Core.Validation.QuickFixes;
 namespace ChartPacker.Core.Charting.Lint;
 
 /// <summary>
-/// The quick fixes of the timing and 5-fret rules (charter-spec §6, C16 item 3), each one undoable command worked out from
+/// The quick fixes of the chart lint rules (charter-spec §6, C16 item 3), each one undoable command worked out from
 /// the chart as it is when it's asked for. A fix that has no single right answer, such as a note snapped onto another,
 /// proposes nothing.
 /// </summary>
@@ -26,6 +26,12 @@ public static class ChartFixes
         new Fix(ChrRules.Chr024, RemoveForceHopo),
         new Fix(ChrRules.Chr025, RemoveFirstForce),
         new Fix(ChrRules.Chr026, DeleteTheLaterNote),
+        new Fix(ChrRules.Chr040, RemoveTomMarker),
+        new Fix(ChrRules.Chr043, EndFillOnSharedNote),
+        new Fix(ChrRules.Chr045, SwitchToPro),
+        new Fix(ChrRules.Chr060, DeleteEmptyStarPower),
+        new Fix(ChrRules.Chr061, DeleteEmptySolo),
+        new Fix(ChrRules.Chr062, MergePhrases),
     ];
 
     // CHR001: 4/4 at 0, which the games assume without one.
@@ -139,6 +145,79 @@ public static class ChartFixes
         {
             if (CloseNotesRule.TooCloseAfter(track, i, tooClose) is { } later && later.Tick == location.EndTick)
                 return new RemoveNotes(part.Instrument, track.Difficulty, [later]);
+        }
+
+        return null;
+    }
+
+    // CHR040: the marker that covers nothing removed.
+    private static IChartCommand? RemoveTomMarker(Finding finding, EditableChart chart, ChartReadOptions options)
+    {
+        if (finding.Location is not { } location || chart.PartOf(location.Part) is not { Kind: ChartInstrumentKind.Drums } drums)
+            return null;
+        var markers = drums.TomMarkers
+            .Where(m => m.Tick == location.Tick && DrumCymbals.CoverEnd(m) - 1 == location.EndTick && TomMarkerCoversNothingRule.CoversNothing(drums, m))
+            .ToList();
+        return markers.Count > 0 ? new RemoveTomMarkers(markers) : null;
+    }
+
+    // CHR043: the fill ended on its last note that every difficulty with notes has.
+    private static IChartCommand? EndFillOnSharedNote(Finding finding, EditableChart chart, ChartReadOptions options)
+    {
+        if (finding.Location is not { } location || chart.PartOf(location.Part) is not { Kind: ChartInstrumentKind.Drums } drums)
+            return null;
+        foreach (var fill in drums.Phrases.Where(p => p.Kind == PhraseKind.DrumFill && p.Tick == location.Tick && p.CoverEnd - 1 == location.EndTick))
+        {
+            if (FillEndsWithoutNoteRule.LastSharedNote(drums, fill) is { } last && last + 1 - fill.Tick != fill.Length)
+                return new ChangePhrase(drums.Instrument, fill, fill with { Length = last + 1 - fill.Tick });
+        }
+
+        return null;
+    }
+
+    // CHR045: the drums made Pro, whose tom markers are saved.
+    private static IChartCommand? SwitchToPro(Finding finding, EditableChart chart, ChartReadOptions options) =>
+        chart.DrumsVariant == DrumsVariant.FourLane ? new SetDrumsVariant(DrumsVariant.Pro) : null;
+
+    // CHR060: the star power phrase with no notes deleted.
+    private static IChartCommand? DeleteEmptyStarPower(Finding finding, EditableChart chart, ChartReadOptions options) =>
+        DeleteEmpty(finding, chart, PhraseKind.StarPower);
+
+    // CHR061: the solo with no notes deleted.
+    private static IChartCommand? DeleteEmptySolo(Finding finding, EditableChart chart, ChartReadOptions options) =>
+        DeleteEmpty(finding, chart, PhraseKind.Solo);
+
+    private static RemovePhrase? DeleteEmpty(Finding finding, EditableChart chart, PhraseKind kind)
+    {
+        if (finding.Location is not { } location || chart.PartOf(location.Part) is not { } part)
+            return null;
+        foreach (var phrase in part.Phrases.Where(p => p.Kind == kind && p.Tick == location.Tick && p.CoverEnd - 1 == location.EndTick))
+        {
+            if (EmptyStarPowerRule.IsEmpty(part, phrase))
+                return new RemovePhrase(part.Instrument, phrase);
+        }
+
+        return null;
+    }
+
+    // CHR062: the overlapping phrases merged into the first, from its start to the last end, as saving would merge them.
+    private static IChartCommand? MergePhrases(Finding finding, EditableChart chart, ChartReadOptions options)
+    {
+        if (finding.Location is not { } location || chart.PartOf(location.Part) is not { } part)
+            return null;
+        foreach (var kind in (PhraseKind[])[PhraseKind.StarPower, PhraseKind.Solo])
+        {
+            foreach (var group in OverlappingPhrasesRule.Groups(part, kind))
+            {
+                if (OverlappingPhrasesRule.SpanOf(part, group) != location)
+                    continue;
+                var first = group[0];
+                var commands = group.Skip(1).Select(p => (IChartCommand)new RemovePhrase(part.Instrument, p)).ToList();
+                long end = group.Max(static p => p.Tick + p.Length);
+                if (end - first.Tick != first.Length)
+                    commands.Add(new ChangePhrase(part.Instrument, first, first with { Length = end - first.Tick }));
+                return new CompositeCommand(commands);
+            }
         }
 
         return null;

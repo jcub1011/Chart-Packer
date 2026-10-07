@@ -19,6 +19,7 @@ public sealed class ChartRuleTests
     private const int Beat = 480;
     private const int Notes = 16;
     private const ChartInstrument Guitar = ChartInstrument.Guitar;
+    private const ChartInstrument Drums = ChartInstrument.Drums;
     private const ChartDifficulty Expert = ChartDifficulty.Expert;
 
     private static readonly TimeSpan AudioLength = TimeSpan.FromSeconds(60);
@@ -38,6 +39,18 @@ public sealed class ChartRuleTests
         [ChrRules.Chr024, 1],
         [ChrRules.Chr025, 1],
         [ChrRules.Chr026, 1],
+        [ChrRules.Chr040, 1],
+        [ChrRules.Chr041, 1],
+        [ChrRules.Chr042, 1],
+        [ChrRules.Chr043, 3],
+        [ChrRules.Chr044, 1],
+        [ChrRules.Chr045, 1],
+        [ChrRules.Chr046, 1],
+        [ChrRules.Chr048, 1],
+        [ChrRules.Chr060, 1],
+        [ChrRules.Chr061, 1],
+        [ChrRules.Chr062, 1],
+        [ChrRules.Chr063, 4],
         [ChrRules.Chr080, 3],
         [ChrRules.Chr081, 1],
         [ChrRules.Chr082, 1],
@@ -53,6 +66,14 @@ public sealed class ChartRuleTests
     public void ACleanChartTriggersNoRule()
     {
         var findings = new ChartLinter().LintAll(Clean().Input).Findings;
+
+        Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+    }
+
+    [TestMethod]
+    public void ACleanChartWithDrumsTriggersNoRule()
+    {
+        var findings = new ChartLinter().LintAll(Clean([], drums: true).Input).Findings;
 
         Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
     }
@@ -155,30 +176,38 @@ public sealed class ChartRuleTests
 
     /// <summary>
     /// A chart that triggers no rule: Lead guitar at 120 BPM in 4/4, each difficulty sparser than the one above it, a
-    /// section, <c>[end]</c> after the last note, rated, and its <c>song_length</c> the audio's.
+    /// section, <c>[end]</c> after the last note, rated, and its <c>song_length</c> the audio's. With
+    /// <paramref name="drums"/>, Pro drums too: red notes spaced as the guitar's, rated.
     /// </summary>
     private static (EditableChart Chart, ChartLintInput Input) Clean() => Clean([]);
 
-    private static (EditableChart Chart, ChartLintInput Input) Clean(IReadOnlyList<KeyValuePair<string, string>> extraIni, TimeSpan? audio = null)
+    private static (EditableChart Chart, ChartLintInput Input) Clean(IReadOnlyList<KeyValuePair<string, string>> extraIni, TimeSpan? audio = null, bool drums = false)
     {
-        var chart = EditableChart.CreateNew(new NewChartSettings("", Beat, 120, 4, 4, new HashSet<ChartInstrument> { Guitar }, DrumsVariant.Pro));
-        var part = chart.PartOf(Guitar)!;
-        foreach (var track in part.Tracks)
+        var parts = new HashSet<ChartInstrument> { Guitar };
+        if (drums)
+            parts.Add(Drums);
+        var chart = EditableChart.CreateNew(new NewChartSettings("", Beat, 120, 4, 4, parts, DrumsVariant.Pro));
+        foreach (var part in chart.Parts)
         {
-            // Expert a note a beat, Hard every two, Medium every four, Easy every eight.
-            int every = 1 << (3 - (int)track.Difficulty);
-            var notes = Enumerable.Range(0, Notes / every).Select(i => new EditableNote((long)i * every * Beat, 1, i % 5)).ToList();
-            new AddNotes(Guitar, track.Difficulty, notes).Apply(chart);
+            foreach (var track in part.Tracks)
+            {
+                // Expert a note a beat, Hard every two, Medium every four, Easy every eight.
+                int every = 1 << (3 - (int)track.Difficulty);
+                var notes = Enumerable.Range(0, Notes / every).Select(i => new EditableNote((long)i * every * Beat, 1, part.Kind == ChartInstrumentKind.Drums ? 1 : i % 5)).ToList();
+                new AddNotes(part.Instrument, track.Difficulty, notes).Apply(chart);
+            }
         }
 
         new AddTextEvent(null, TextEvent.Of(0, "[section Intro]")).Apply(chart);
         ChartSaveFixups.MoveEnd(chart)!.Apply(chart);
-        return (chart, Snapshot(chart, IniWith(extraIni), audio ?? AudioLength));
+        return (chart, Snapshot(chart, IniWith(extraIni, drums), audio ?? AudioLength));
     }
 
-    private static IReadOnlyList<KeyValuePair<string, string>> IniWith(IReadOnlyList<KeyValuePair<string, string>> extra)
+    private static IReadOnlyList<KeyValuePair<string, string>> IniWith(IReadOnlyList<KeyValuePair<string, string>> extra, bool drums = false)
     {
         var pairs = new List<KeyValuePair<string, string>> { KeyValuePair.Create("diff_guitar", "3"), KeyValuePair.Create("song_length", "60000") };
+        if (drums)
+            pairs.AddRange([KeyValuePair.Create("diff_drums", "3"), KeyValuePair.Create("diff_drums_real", "3"), KeyValuePair.Create("pro_drums", "True"), KeyValuePair.Create("five_lane_drums", "False")]);
         foreach (var pair in extra)
         {
             pairs.RemoveAll(p => p.Key == pair.Key);
@@ -198,6 +227,8 @@ public sealed class ChartRuleTests
             ChrRules.Chr080 => Clean([KeyValuePair.Create("diff_bass", "2")]),
             ChrRules.Chr083 => Clean([KeyValuePair.Create("diff_guitar", "-1")]),
             ChrRules.Chr084 => Clean([KeyValuePair.Create("song_length", "58000")]),
+            ChrRules.Chr040 or ChrRules.Chr041 or ChrRules.Chr042 or ChrRules.Chr043 or ChrRules.Chr044 or ChrRules.Chr045 or ChrRules.Chr046 or ChrRules.Chr048
+                => Clean([], drums: true),
             _ => Clean(),
         };
         var map = chart.TempoMap;
@@ -237,6 +268,47 @@ public sealed class ChartRuleTests
                 break;
             case ChrRules.Chr026:
                 new AddNotes(Guitar, Expert, [new EditableNote(10, 1, 0)]).Apply(chart);
+                break;
+            case ChrRules.Chr040:
+                chart.PartOf(Drums)!.TomMarkers.Add(new TomMarker(2, 3 * Beat, 1));
+                break;
+            case ChrRules.Chr041:
+                new AddNotes(Drums, Expert, [new EditableNote(Beat, 1, 2), new EditableNote(Beat, 1, 3)]).Apply(chart);
+                break;
+            case ChrRules.Chr042:
+                new AddPhrase(Drums, new Phrase(PhraseKind.StarPower, 8 * Beat, Beat)).Apply(chart);
+                new AddPhrase(Drums, new Phrase(PhraseKind.DrumFill, 8 * Beat, 1)).Apply(chart);
+                break;
+            case ChrRules.Chr043:
+                // Only Expert has a note on the fill's last beat.
+                new AddPhrase(Drums, new Phrase(PhraseKind.DrumFill, 8 * Beat, Beat + 1)).Apply(chart);
+                break;
+            case ChrRules.Chr044:
+                new AddPhrase(Drums, new Phrase(PhraseKind.Roll, Beat, Beat / 2, Expert)).Apply(chart);
+                break;
+            case ChrRules.Chr045:
+                new AddNotes(Drums, Expert, [new EditableNote(0, 1, 3)]).Apply(chart);
+                new SetToms([(3, 0L)], tom: true).Apply(chart);
+                new SetDrumsVariant(DrumsVariant.FourLane).Apply(chart);
+                break;
+            case ChrRules.Chr046:
+                new AddNotes(Drums, Expert, [new EditableNote(Beat / 2, 1, 5)]).Apply(chart);
+                break;
+            case ChrRules.Chr048:
+                chart.AddPassthrough(new PassthroughTrack(EditableChartSamples.VocalsChunk, "PART DRUMS_2X"));
+                break;
+            case ChrRules.Chr060:
+                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, Beat / 2, 10)).Apply(chart);
+                break;
+            case ChrRules.Chr061:
+                new AddPhrase(Guitar, new Phrase(PhraseKind.Solo, Beat / 2, 10)).Apply(chart);
+                break;
+            case ChrRules.Chr062:
+                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 0, 2 * Beat)).Apply(chart);
+                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, Beat, 2 * Beat)).Apply(chart);
+                break;
+            case ChrRules.Chr063:
+                new AddPhrase(Guitar, new Phrase(PhraseKind.BigRockEnding, 0, 8 * Beat)).Apply(chart);
                 break;
             case ChrRules.Chr080:
                 new AddPart(ChartInstrument.Bass).Apply(chart);

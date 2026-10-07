@@ -32,7 +32,7 @@ public static class QuickFixRegistry
     /// <summary>
     /// Every chart fix strategy, for chart lint findings, at most one per rule (charter-spec C16 item 3). They're kept
     /// apart from <see cref="Strategies"/>, so the metadata fixes (<see cref="IsSupported"/>, <see cref="FixKey"/>) don't
-    /// see them. CM2 adds the timing and 5-fret rules' fixes; CM3 adds the drums and phrase rules'.
+    /// see them.
     /// </summary>
     public static IReadOnlyList<IChartQuickFixStrategy> ChartStrategies { get; } = Charting.Lint.ChartFixes.All;
 

@@ -335,6 +335,52 @@
   <data name="ChrCloseNotes" xml:space="preserve">
     <value>Two notes on the same lane are closer than 1/64 of a whole note; the later is probably a stray duplicate.</value>
   </data>
+  <data name="ChrTomMarkerCoversNothing" xml:space="preserve">
+    <value>The tom marker covers no note on its pad, so it does nothing.</value>
+  </data>
+  <data name="ChrTooManyPads" xml:space="preserve">
+    <value>More than two pads are hit at once, not counting the kick: more hands than a drummer has.</value>
+  </data>
+  <data name="ChrFillInStarPower" xml:space="preserve">
+    <value>The drum fill overlaps a star power phrase.</value>
+  </data>
+  <data name="ChrFillEndsWithoutNoteFormat" xml:space="preserve">
+    <value>The drum fill's last note isn't on {0}, so there's nothing to activate star power on there.</value>
+    <comment>{0} is the difficulty, e.g. Hard.</comment>
+  </data>
+  <data name="ChrRollTooFew" xml:space="preserve">
+    <value>The roll has fewer than two notes in it.</value>
+  </data>
+  <data name="ChrTrillTooFew" xml:space="preserve">
+    <value>The trill has fewer than two notes in it.</value>
+  </data>
+  <data name="ChrTrillOnePad" xml:space="preserve">
+    <value>The trill covers only one pad; a trill goes between two.</value>
+  </data>
+  <data name="ChrTomMarkersOnFourLane" xml:space="preserve">
+    <value>4-lane drums have tom markers. The games would read them as Pro drums, so saving leaves them out.</value>
+  </data>
+  <data name="ChrFifthPadNotFiveLane" xml:space="preserve">
+    <value>A fifth-pad note (5-lane green) on drums that aren't 5-lane.</value>
+  </data>
+  <data name="ChrDrums2xTrack" xml:space="preserve">
+    <value>The chart has a PART DRUMS_2X track. It's kept as it is, and doesn't follow edits to PART DRUMS.</value>
+  </data>
+  <data name="ChrEmptyStarPower" xml:space="preserve">
+    <value>The star power phrase has no notes in it.</value>
+  </data>
+  <data name="ChrEmptySolo" xml:space="preserve">
+    <value>The solo has no notes in it.</value>
+  </data>
+  <data name="ChrOverlappingStarPower" xml:space="preserve">
+    <value>Two star power phrases overlap; saving merges them.</value>
+  </data>
+  <data name="ChrOverlappingSolos" xml:space="preserve">
+    <value>Two solos overlap; saving merges them.</value>
+  </data>
+  <data name="ChrNotesInBigRockEnding" xml:space="preserve">
+    <value>Notes are inside a big rock ending, which the games skip.</value>
+  </data>
   <data name="ChrMissingDifficultyFormat" xml:space="preserve">
     <value>The part has notes on some difficulties but none on {0}.</value>
     <comment>{0} is the difficulty, e.g. Easy.</comment>

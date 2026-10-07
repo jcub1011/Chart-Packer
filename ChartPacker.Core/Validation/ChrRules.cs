@@ -4,7 +4,7 @@ namespace ChartPacker.Core.Validation;
 /// Rule IDs from the chart lint rule catalogue (charter-spec §6), for <see cref="Charting.Lint.IChartLintRule"/>. IDs are
 /// stable: a rule may be retired, but its ID is never reused.
 /// </summary>
-/// <remarks>The timing, 5-fret and song rules came with CM2; the drums and phrase rules come with CM3.</remarks>
+/// <remarks>The timing, 5-fret and song rules came with CM2, and the drums and phrase rules with CM3.</remarks>
 public static class ChrRules
 {
     /// <summary>No time signature at tick 0; the games assume 4/4.</summary>
@@ -42,6 +42,47 @@ public static class ChrRules
 
     /// <summary>Two notes on the same lane closer than 1/64 of a whole note.</summary>
     public const string Chr026 = "CHR026";
+
+    /// <summary>A tom marker that covers no note.</summary>
+    public const string Chr040 = "CHR040";
+
+    /// <summary>More than two pads at once, not counting the kick.</summary>
+    public const string Chr041 = "CHR041";
+
+    /// <summary>A drum fill overlaps a star power phrase.</summary>
+    public const string Chr042 = "CHR042";
+
+    /// <summary>A drum fill's last note isn't on every difficulty, so there's nothing to activate on there.</summary>
+    public const string Chr043 = "CHR043";
+
+    /// <summary>A roll or trill with fewer than two notes, or a trill covering only one pad.</summary>
+    public const string Chr044 = "CHR044";
+
+    /// <summary>Tom markers on 4-lane drums, which saving leaves out.</summary>
+    public const string Chr045 = "CHR045";
+
+    /// <summary>A fifth-pad note on drums that aren't 5-lane.</summary>
+    public const string Chr046 = "CHR046";
+
+    // CHR047, an accent or ghost on a kick, was retired in CM3: the games never read one, so the model can't hold one.
+
+    /// <summary>The chart has a <c>PART DRUMS_2X</c> track, which doesn't follow edits to <c>PART DRUMS</c>.</summary>
+    public const string Chr048 = "CHR048";
+
+    /// <summary>A star power phrase with no notes in it.</summary>
+    public const string Chr060 = "CHR060";
+
+    /// <summary>A solo with no notes in it.</summary>
+    public const string Chr061 = "CHR061";
+
+    /// <summary>Two star power phrases, or two solos, overlap.</summary>
+    public const string Chr062 = "CHR062";
+
+    /// <summary>Notes inside a big rock ending, which the games skip.</summary>
+    public const string Chr063 = "CHR063";
+
+    // CHR064, a disco flip section starting or ending between notes of a chord, was retired in CM3: a mix event applies
+    // to every note on its tick, so it can't.
 
     /// <summary>A part has notes on some difficulties and none on others.</summary>
     public const string Chr080 = "CHR080";

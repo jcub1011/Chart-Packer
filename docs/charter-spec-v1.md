@@ -1614,6 +1614,11 @@ never reused.
 | CHR047 | — | *Retired in CM3.* An accent or ghost on a kick. The games never read one, so the loader doesn't keep one, and the editor can't place one. | — |
 | CHR048 | Warning | The chart has a `PART DRUMS_2X` track. It is kept as it is and doesn't follow edits to `PART DRUMS`. | — |
 
+*Settled in CM3:* a phrase covers the notes from its start up to, but not including, its end, as the games read
+markers. CHR043's fill ends on the last note it covers on any difficulty, and its fix ends the fill on the last such
+note every difficulty with notes has. CHR044 checks Expert, and each lower difficulty a roll or trill reaches where it
+covers a note.
+
 ### Phrases and events
 
 | ID | Sev. | Rule | Fix |
@@ -1623,6 +1628,9 @@ never reused.
 | CHR062 | Warning | Two star power phrases, or two solos, overlap | Merge |
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
 | CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
+
+*Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
+merges the group into its first phrase.
 
 ### Song
 

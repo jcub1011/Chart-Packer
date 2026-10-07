@@ -21,7 +21,7 @@ its exit criteria. This file owns only the order and the status.
 | 1 | [CM0: Split](#cm0-split) | Done | Exit criteria met | — |
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
 | 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | Done | Exit criteria met | CM1 |
-| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | In progress | Core commands | CM2 |
+| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | In progress | Core commands, lint | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
 
