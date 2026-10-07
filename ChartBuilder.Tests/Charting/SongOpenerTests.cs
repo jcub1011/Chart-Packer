@@ -148,5 +148,5 @@ public sealed class SongOpenerTests
     private static byte[] Ini(params string[] lines) => Encoding.UTF8.GetBytes(string.Join("\n", ["[song]", .. lines]));
 
     private static byte[] Midi() =>
-        NewChartMidi.Build(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+        MidiChartWriter.Write(EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro)));
 }

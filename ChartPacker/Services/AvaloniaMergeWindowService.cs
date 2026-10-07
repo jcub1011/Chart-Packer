@@ -21,6 +21,7 @@ namespace ChartPacker.Services
     /// <param name="mainHighway">The main window's highway, which takes up the settings the preview's changed.</param>
     /// <param name="video">Reads background video lengths, for the merged song's <c>song_length</c>.</param>
     /// <param name="latency">The calibrated audio latency, which the preview's highway allows for.</param>
+    /// <param name="isOpenInChartBuilder">Whether Chart Builder has the song at a path open, asked before a merge overwrites it.</param>
     public sealed class AvaloniaMergeWindowService(
         Func<Window?> owner,
         MetadataDraftStore drafts,
@@ -31,7 +32,8 @@ namespace ChartPacker.Services
         IImagePickerService imagePicker,
         IFilePickerService filePicker,
         IVideoDurationProbe video,
-        AudioLatencyFile? latency = null) : IMergeWindowService
+        AudioLatencyFile? latency = null,
+        Func<string, bool>? isOpenInChartBuilder = null) : IMergeWindowService
     {
         public async Task<string?> ShowAsync(IReadOnlyList<SongEntry> entries, string outputFolder, OverwritePolicy policy)
         {
@@ -51,8 +53,12 @@ namespace ChartPacker.Services
                 PreviewNote = Strings.MergePreviewNote,
             };
 
-            var viewModel = new MergeWindowViewModel(entries, [.. entries.Select(e => drafts.HasDrafts(e.FullPath))], outputFolder, policy, video, preview, previewDrafts, settings);
-            var dialog = new MergeWindow { DataContext = viewModel };
+            // Its prompt belongs to this window, so it comes up over it.
+            var dialog = new MergeWindow();
+            var viewModel = new MergeWindowViewModel(
+                entries, [.. entries.Select(e => drafts.HasDrafts(e.FullPath))], outputFolder, policy, video, preview, previewDrafts, settings,
+                new AvaloniaConfirmationService(() => dialog), isOpenInChartBuilder);
+            dialog.DataContext = viewModel;
             _ = viewModel.LoadAsync();
             WindowChrome.UseOwnerIcon(dialog, window);
             await dialog.ShowDialog(window);

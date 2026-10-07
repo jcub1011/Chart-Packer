@@ -97,15 +97,19 @@ public sealed class PendingSongIniChangesTests
     [DataRow(DrumsVariant.FiveLane)]
     public void ANewChartCallsForThePartKeysItsFirstSaveWrites(DrumsVariant variant)
     {
-        // A new chart has no song.ini yet, so every part's rating and the drum keys are pending, as NewChartIni writes them.
+        // A new chart has no song.ini yet, so every part's rating, unrated, and the drum keys are pending.
         var settings = new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { Guitar, Drums }, variant);
         var song = EditorSong.New(EditableChart.CreateNew(settings), []);
-        var request = new NewChartRequest { ParentFolder = "C:\\", FolderName = "Song", Chart = settings };
 
         var changes = PendingSongIniChanges.Of(song.Chart, song.LoadedParts, song.Pairs);
 
-        var written = NewChartIni.Pairs(request, null).Where(p => p.Key.StartsWith("diff_", StringComparison.Ordinal) || p.Key.Contains("drums", StringComparison.Ordinal));
-        CollectionAssert.AreEquivalent(written.Select(p => new MetadataChange(p.Key, p.Value)).ToList(), changes.ToList());
+        var drums = SongIniPartKeys.NewChartDrumsPair(variant);
+        List<MetadataChange> expected =
+        [
+            .. new[] { Guitar, Drums }.SelectMany(p => SongIniPartKeys.DifficultyKeysOf(p, variant)).Select(k => new MetadataChange(k, MetadataDifficulty.UnsetValue)),
+            new MetadataChange(drums.Key, drums.Value),
+        ];
+        CollectionAssert.AreEquivalent(expected, changes.ToList());
     }
 
     [TestMethod]

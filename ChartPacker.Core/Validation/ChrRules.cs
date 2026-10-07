@@ -60,4 +60,11 @@ public static class ChrRules
 
     /// <summary><c>[end]</c> is missing or before the last note.</summary>
     public const string Chr085 = "CHR085";
+
+    /// <summary>
+    /// Something in the chart file couldn't be loaded as written and was left out, as the games leave it out
+    /// (<see cref="Charting.ChartLoadIssue"/>). Not a lint rule: the findings come from the load
+    /// (<see cref="Charting.Lint.ChartLoadFindings"/>).
+    /// </summary>
+    public const string Chr086 = "CHR086";
 }

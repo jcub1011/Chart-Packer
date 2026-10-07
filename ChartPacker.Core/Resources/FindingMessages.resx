@@ -360,4 +360,44 @@
   <data name="ChrEndEarly" xml:space="preserve">
     <value>[end] is before the last note; saving moves it after it.</value>
   </data>
+  <data name="ChrLoadUnholdableTempo" xml:space="preserve">
+    <value>A tempo marker of 0 microseconds per beat was left out, as the games skip it.</value>
+  </data>
+  <data name="ChrLoadUnholdableTimeSignature" xml:space="preserve">
+    <value>A time signature of 0 beats was left out, as the games skip it.</value>
+  </data>
+  <data name="ChrLoadStrayAnchor" xml:space="preserve">
+    <value>An anchor that isn't on a tempo marker, or a second one on it, was left out, as it anchors nothing.</value>
+  </data>
+  <data name="ChrLoadFirstEventDropped" xml:space="preserve">
+    <value>The track's first event, which the games never read, wasn't its name, and was left out.</value>
+  </data>
+  <data name="ChrLoadDuplicateNote" xml:space="preserve">
+    <value>A second note on a lane at one tick was left out, as the games leave it out.</value>
+  </data>
+  <data name="ChrLoadDuplicateOpen" xml:space="preserve">
+    <value>A note made open by a Phase Shift open phrase, in a chord that already has an open note, was left out.</value>
+  </data>
+  <data name="ChrLoadOpenBeforeEnhancedOpens" xml:space="preserve">
+    <value>A note below green before [ENHANCED_OPENS], which the games don't read, was left out.</value>
+  </data>
+  <data name="ChrLoadUnpairedNoteEvent" xml:space="preserve">
+    <value>A note-on or note-off that the games pair with nothing was left out.</value>
+  </data>
+  <data name="ChrLoadUnpairedSysexEvent" xml:space="preserve">
+    <value>A Phase Shift open or tap event that the games pair with nothing was left out.</value>
+  </data>
+  <data name="ChrLoadUnusedMarker" xml:space="preserve">
+    <value>A force HOPO, force strum, tap or open marker that covers no note was left out.</value>
+  </data>
+  <data name="ChrLoadUnreadStarPower" xml:space="preserve">
+    <value>A star power phrase on pitch 116 was left out, as multiplier_note puts star power on 103 and the games don't read it.</value>
+  </data>
+  <data name="ChrLoadDuplicateStarPower" xml:space="preserve">
+    <value>A second star power phrase starting at one tick was left out, as the games leave it out.</value>
+  </data>
+  <data name="ChrLoadWithPitchFormat" xml:space="preserve">
+    <value>{0} (MIDI note {1})</value>
+    <comment>{0} is what was left out; {1} is its MIDI note number.</comment>
+  </data>
 </root>

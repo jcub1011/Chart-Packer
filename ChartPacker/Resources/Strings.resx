@@ -2389,6 +2389,13 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="DeleteAnywayButton" xml:space="preserve">
     <value>Delete anyway</value>
   </data>
+  <data name="ChartBuilderOpenOverwriteFormat" xml:space="preserve">
+    <value>Chart Builder has {0} open. It may overwrite the merged song when it saves. Overwrite anyway?</value>
+    <comment>{0} is the .sng's file name.</comment>
+  </data>
+  <data name="OverwriteAnywayButton" xml:space="preserve">
+    <value>Overwrite anyway</value>
+  </data>
   <data name="AudioLatencyLabel" xml:space="preserve">
     <value>Audio/visual latency</value>
   </data>

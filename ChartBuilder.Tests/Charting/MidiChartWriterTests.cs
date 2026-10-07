@@ -334,7 +334,7 @@ public sealed class MidiChartWriterTests
         var result = MidiChartWriter.WriteChecked(chart, MidiChartWriter.SettingsAfterSave(chart, ChartReadOptions.Default));
 
         Assert.IsTrue(result.IsValid, DescribeModel(result.ModelDifferences));
-        Assert.AreSequenceEqual(result.Bytes, NewChartMidi.Build(settings));
+        Assert.AreSequenceEqual(result.Bytes, MidiChartWriter.Write(EditableChart.CreateNew(settings)));
         Assert.AreSequenceEqual(
             ["New Song", .. NewChartSettings.Instruments.Order().Select(i => ChartToMidi.TrackNames[i]), "EVENTS", "BEAT"],
             TrackNames(result.Bytes));

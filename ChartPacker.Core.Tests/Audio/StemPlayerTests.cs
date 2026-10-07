@@ -109,24 +109,24 @@ public sealed class StemPlayerTests
     {
         using var output = new FakeOutput();
         using var player = Player(output, seconds: 0.1);
-        int stops = 0;
-        player.Stopped += (_, _) => Interlocked.Increment(ref stops);
+        var stops = new StopCounter(player);
 
         player.Play();
-        WaitUntil(() => player.Mixer.IsEnded);
-        output.Drain(output.QueuedFrames);
-        WaitUntil(() => player.IsEnded);
+        stops.WaitForStop(output);
 
-        Thread.Sleep(30);
-        Assert.AreEqual(1, stops);
+        Assert.IsTrue(player.IsEnded);
         Assert.IsFalse(player.IsPlaying);
         Assert.IsNull(player.Error);
         Assert.AreEqual(0.1, player.Length.TotalSeconds, 0.001);
 
+        // The song fits in the queue, which isn't drained, so it can't end again.
         player.Play();
         WaitUntil(() => output.QueuedFrames > 0);
         Assert.AreEqual(0f, output.FirstSampleAfterLastClear ?? float.NaN, 1e-6f);
         Assert.IsFalse(player.IsEnded);
+
+        player.Dispose();
+        Assert.AreEqual(1, stops.Count);
     }
 
     [TestMethod]
@@ -154,15 +154,16 @@ public sealed class StemPlayerTests
     {
         using var output = new FakeOutput { FailWrites = true };
         using var player = Player(output, seconds: 10);
-        int stops = 0;
-        player.Stopped += (_, _) => Interlocked.Increment(ref stops);
+        var stops = new StopCounter(player);
 
         player.Play();
-        WaitUntil(() => Volatile.Read(ref stops) == 1);
+        stops.WaitForStop();
 
         Assert.AreEqual("The device went away.", player.Error);
         Assert.IsFalse(player.IsPlaying);
-        Assert.AreEqual(1, stops);
+
+        player.Dispose();
+        Assert.AreEqual(1, stops.Count);
     }
 
     [TestMethod]
@@ -598,21 +599,19 @@ public sealed class StemPlayerTests
     {
         using var output = new FakeOutput();
         using var player = Player(output, seconds: 10);
-        int stops = 0;
-        player.Stopped += (_, _) => Interlocked.Increment(ref stops);
+        var stops = new StopCounter(player);
 
         player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.2), loops: false);
-        WaitUntil(() =>
-        {
-            output.Drain(output.QueuedFrames);
-            return !player.IsPlaying;
-        });
+        stops.WaitForStop(output);
 
-        Assert.AreEqual(1, stops);
+        Assert.IsFalse(player.IsPlaying);
         Assert.IsFalse(player.IsEnded);
         Assert.IsNull(player.Region);
         Assert.AreEqual(Rate / 5, output.WrittenFrames, 1);
         Assert.AreEqual(1.2, player.Position.TotalSeconds, 0.001);
+
+        player.Dispose();
+        Assert.AreEqual(1, stops.Count);
     }
 
     [TestMethod]

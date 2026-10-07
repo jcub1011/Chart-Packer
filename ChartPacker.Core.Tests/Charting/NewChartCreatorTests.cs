@@ -28,15 +28,27 @@ public sealed class NewChartCreatorTests
     [TestCleanup]
     public void DeleteRoot() => _root.Delete(recursive: true);
 
-    private NewChartRequest Request(params NewChartStem[] stems) => new()
+    private static readonly NewChartSettings Settings =
+        new("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro);
+
+    private NewSongFolder Request(params NewChartStem[] stems) => Request(Settings, "", stems);
+
+    /// <summary>A new chart's folder as its first save gives it: the new chart, and the song.ini its pending changes make.</summary>
+    private NewSongFolder Request(NewChartSettings settings, string charter, params NewChartStem[] stems)
     {
-        ParentFolder = _library,
-        FolderName = "Artist - Song",
-        Name = "Song",
-        Artist = "Artist",
-        Stems = stems,
-        Chart = new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro),
-    };
+        var song = EditorSong.New(EditableChart.CreateNew(settings), []);
+        song.Values = [KeyValuePair.Create("name", "Song"), KeyValuePair.Create("artist", "Artist")];
+        song.DefaultCharter = charter;
+        song.AudioLengthMs = 1000;
+        return new NewSongFolder
+        {
+            ParentFolder = _library,
+            FolderName = "Artist - Song",
+            NotesMid = MidiChartWriter.Write(song.Chart),
+            SongIni = song.EffectivePairs(),
+            Stems = stems,
+        };
+    }
 
     [TestMethod]
     public async Task TheFolderHoldsTheStemsArtChartAndMetadata()
@@ -74,7 +86,7 @@ public sealed class NewChartCreatorTests
     {
         // AC C1.1 and C1.5: it reopens in the editor as it was created, the drums read with their layout.
         var settings = new NewChartSettings("Song", 960, 145.5, 7, 8, new HashSet<ChartInstrument> { ChartInstrument.Bass, ChartInstrument.GhlGuitar, ChartInstrument.Drums }, drums);
-        var request = Request(new NewChartStem(Wav("mix.wav", seconds: 1), "song")) with { Charter = "Me", Chart = settings };
+        var request = Request(settings, "Me", new NewChartStem(Wav("mix.wav", seconds: 1), "song"));
 
         string folder = await NewChartCreator.CreateAsync(request, TestContext.CancellationToken);
         var opened = await SongOpener.OpenAsync(SongOpener.EntryOf(folder)!, TestContext.CancellationToken);
@@ -98,23 +110,9 @@ public sealed class NewChartCreatorTests
     }
 
     [TestMethod]
-    public async Task TheSongIsAsLongAsItsLongestStemButNotThePreview()
-    {
-        var request = Request(
-            new NewChartStem(Wav("a.wav", seconds: 1), "song"),
-            new NewChartStem(Wav("b.wav", seconds: 2), "guitar"),
-            new NewChartStem(Wav("c.wav", seconds: 3), "preview"));
-
-        string folder = await NewChartCreator.CreateAsync(request, TestContext.CancellationToken);
-
-        var ini = await SongIni.ReadAsync(Path.Combine(folder, SongIni.FileName), TestContext.CancellationToken);
-        Assert.AreEqual("2000", ini.Pairs.Single(p => p.Key == "song_length").Value);
-    }
-
-    [TestMethod]
     public async Task ASongWithOneStemValidatesAndPacks()
     {
-        // AC C1.1, as far as it can go before the editor exists.
+        // AC C1.1.
         string folder = await NewChartCreator.CreateAsync(Request(new NewChartStem(Wav("mix.wav", seconds: 1), "song")), TestContext.CancellationToken);
 
         var plan = await PackPlanner.PlanAsync(folder, cancellationToken: TestContext.CancellationToken);
@@ -126,19 +124,6 @@ public sealed class NewChartCreatorTests
         var findings = await Packer.PackAsync(plan, sng, overwrite: false, cancellationToken: TestContext.CancellationToken);
         Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
         Assert.IsTrue(SngReader.Read(sng, TestContext.CancellationToken).Files.Any(f => f.Name == "notes.mid"));
-    }
-
-    [TestMethod]
-    public async Task ASongWithoutAudioTakesTheEnteredLengthAndWarnsOfIt()
-    {
-        string folder = await NewChartCreator.CreateAsync(Request() with { Length = TimeSpan.FromMinutes(3) }, TestContext.CancellationToken);
-
-        var ini = await SongIni.ReadAsync(Path.Combine(folder, SongIni.FileName), TestContext.CancellationToken);
-        Assert.AreEqual("180000", ini.Pairs.Single(p => p.Key == "song_length").Value);
-
-        var plan = await PackPlanner.PlanAsync(folder, cancellationToken: TestContext.CancellationToken);
-        Assert.IsFalse(plan.HasErrors);
-        Assert.AreEqual(Severity.Warning, plan.Findings.Single(f => f.RuleId == SngRules.Sng052).Severity);
     }
 
     [TestMethod]

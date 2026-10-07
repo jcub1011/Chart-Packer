@@ -322,6 +322,8 @@ namespace ChartPacker.ViewModels
     /// </param>
     /// <param name="previewDrafts">The preview's drafts: the offsets set on it, which the merge applies.</param>
     /// <param name="settings">Persisted window state: whether the window was maximized and the split ratio.</param>
+    /// <param name="confirmation">Asks before overwriting a <c>.sng</c> that Chart Builder has open.</param>
+    /// <param name="isOpenInChartBuilder">Whether Chart Builder has the song at a path open (charter-spec §4.8).</param>
     public sealed partial class MergeWindowViewModel(
         IReadOnlyList<SongEntry> entries,
         IReadOnlyList<bool> hasDrafts,
@@ -330,7 +332,9 @@ namespace ChartPacker.ViewModels
         IVideoDurationProbe video,
         SongDetailViewModel preview,
         MetadataDraftStore previewDrafts,
-        SettingsService settings) : ViewModelBase
+        SettingsService settings,
+        IConfirmationService? confirmation = null,
+        Func<string, bool>? isOpenInChartBuilder = null) : ViewModelBase
     {
         private readonly SettingsService _settings = settings;
 
@@ -813,6 +817,15 @@ namespace ChartPacker.ViewModels
         {
             if (Plan() is not { } plan)
                 return;
+
+            // Chart Builder would save over the merge with the song it has open.
+            if (SongMerger.TargetFor(plan, outputFolder, policy) is { } target && File.Exists(target)
+                && !await ChartBuilderSongs.ConfirmWriteAsync(
+                    confirmation, isOpenInChartBuilder, target, Path.GetFileName(target),
+                    Strings.ChartBuilderOpenOverwriteFormat, Strings.OverwriteAnywayButton))
+            {
+                return;
+            }
 
             _cts?.Dispose();
             _cts = new CancellationTokenSource();

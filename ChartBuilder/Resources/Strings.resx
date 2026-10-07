@@ -400,10 +400,10 @@ Open it anyway?</value>
     <comment>{0} is the first few times, {1} how many more there are.</comment>
   </data>
   <data name="LoadIssueNotice" xml:space="preserve">
-    <value>One thing in the chart couldn't be read as written, and was left out, as the games leave it out.</value>
+    <value>One thing in the chart couldn't be read as written, and was left out, as the games leave it out. It's listed under Findings (CHR086).</value>
   </data>
   <data name="LoadIssuesNoticeFormat" xml:space="preserve">
-    <value>{0} things in the chart couldn't be read as written, and were left out, as the games leave them out.</value>
+    <value>{0} things in the chart couldn't be read as written, and were left out, as the games leave them out. They're listed under Findings (CHR086).</value>
     <comment>{0} is how many.</comment>
   </data>
   <data name="PlayToolTip" xml:space="preserve">

@@ -58,7 +58,7 @@ namespace ChartPacker
 
                 // A Merge window belongs to whichever window opens it: the main window, or the Deduplicate window.
                 Func<Func<Window?>, IMergeWindowService> mergeWindowFor = owner =>
-                    new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe, latency);
+                    new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe, latency, isOpenInChartBuilder);
                 var dedupWindow = new AvaloniaDedupWindowService(
                     () => window,
                     drafts,

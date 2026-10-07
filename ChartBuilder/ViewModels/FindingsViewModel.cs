@@ -249,7 +249,10 @@ namespace ChartBuilder.ViewModels
         {
             var map = _song.Chart.TempoMap.ToTempoMap();
             var fixable = QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Append(ChrRules.Chr084).ToHashSet(StringComparer.Ordinal);
-            Items = [.. result.Findings.Select(f => new FindingItem(f, WhereOf(f, map), fixable.Contains(f.RuleId), GoTo, Fix))];
+
+            // What the load left out of the chart file is listed too, until a save writes the file without it.
+            var findings = ChartLoadFindings.Merge(result.Findings, ChartLoadFindings.Of(_song.Opened?.Load.Issues ?? []));
+            Items = [.. findings.Select(f => new FindingItem(f, WhereOf(f, map), fixable.Contains(f.RuleId), GoTo, Fix))];
             RefreshMarks();
             Changed?.Invoke(this, EventArgs.Empty);
         }
