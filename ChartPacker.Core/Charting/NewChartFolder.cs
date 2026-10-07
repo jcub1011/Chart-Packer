@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using ChartPacker.Core.Resources;
 using ChartPacker.Core.Sng;
 
@@ -54,5 +55,29 @@ public static class NewChartFolder
             return new NewChartFolderProblem(NewChartFolderProblemKind.Exists);
 
         return null;
+    }
+
+    /// <summary>
+    /// The folder name a new chart starts with: <c>&lt;artist&gt; - &lt;name&gt;</c>, or whichever of the two isn't
+    /// empty, with each character a path can't hold replaced by <c>_</c>, runs of dots made one and the trailing dots
+    /// and spaces taken off. Empty when both are.
+    /// </summary>
+    public static string NameFor(string artist, string name)
+    {
+        ArgumentNullException.ThrowIfNull(artist);
+        ArgumentNullException.ThrowIfNull(name);
+        string[] parts = [.. new[] { artist.Trim(), name.Trim() }.Where(static p => p.Length > 0)];
+        var folder = new StringBuilder(string.Join(" - ", parts));
+        for (int i = 0; i < folder.Length; i++)
+        {
+            char c = folder[i];
+            if (c < 0x20 || c == 0x7F || FilenameRules.ReservedChars.Contains(c))
+                folder[i] = '_';
+        }
+
+        string text = folder.ToString();
+        while (text.Contains("..", StringComparison.Ordinal))
+            text = text.Replace("..", ".", StringComparison.Ordinal);
+        return text.TrimEnd('.', ' ');
     }
 }

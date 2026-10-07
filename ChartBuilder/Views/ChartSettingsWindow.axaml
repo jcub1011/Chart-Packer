@@ -1,0 +1,153 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartPacker.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="720" d:DesignHeight="440"
+        x:Class="ChartBuilder.Views.ChartSettingsWindow"
+        x:DataType="vm:ChartSettingsViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{x:Static res:Strings.ChartSettingsWindowTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="720" Height="440"
+        MinWidth="560" MinHeight="360"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section-heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style Selector="Border.section">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
+        <Style Selector="TextBlock.field-label">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="*,Auto">
+        <Grid Grid.Row="0" ColumnDefinitions="160,*">
+            <!-- The sections; choosing one scrolls to it (charter-spec §8). -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <ListBox ItemsSource="{Binding Sections}"
+                         SelectedItem="{Binding SelectedSection}"
+                         Background="Transparent"
+                         Margin="4,8"
+                         AutomationProperties.Name="{x:Static res:Strings.ChartSettingsSectionsName}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ChartSettingsSection">
+                            <TextBlock Text="{Binding Title}" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+
+            <ScrollViewer Grid.Column="1" x:Name="PageScroller" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="20,16" Spacing="10">
+                    <TextBlock x:Name="TimingSection" Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionTiming}" />
+                    <Border Classes="section">
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                            <TextBlock Grid.Row="0" Classes="field-label" Text="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
+                            <ComboBox Grid.Row="0" Grid.Column="1"
+                                      MinWidth="200"
+                                      ItemsSource="{Binding Resolutions}"
+                                      SelectedItem="{Binding SelectedResolution}"
+                                      AutomationProperties.Name="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
+                            <TextBlock Grid.Row="1" Classes="field-label" Text="{x:Static res:Strings.ChartSettingsBpmLabel}" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                           HorizontalAlignment="Left"
+                                           Width="140"
+                                           Value="{Binding Bpm}"
+                                           Minimum="{x:Static vm:ChartSettingsViewModel.MinBpm}"
+                                           Maximum="{x:Static vm:ChartSettingsViewModel.MaxBpm}"
+                                           Increment="1"
+                                           FormatString="0.000"
+                                           AutomationProperties.Name="{x:Static res:Strings.ChartSettingsBpmLabel}" />
+                            <TextBlock Grid.Row="2" Classes="field-label" Text="{x:Static res:Strings.ChartSettingsTimeSignatureLabel}" />
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <NumericUpDown Width="110"
+                                               Value="{Binding Numerator}"
+                                               Minimum="1"
+                                               Maximum="{x:Static vm:ChartSettingsViewModel.MaxNumerator}"
+                                               Increment="1"
+                                               FormatString="0"
+                                               ParsingNumberStyle="Integer"
+                                               AutomationProperties.Name="{x:Static res:Strings.ChartSettingsNumeratorName}" />
+                                <TextBlock Classes="field-label" Text="/" />
+                                <ComboBox MinWidth="70"
+                                          ItemsSource="{Binding Denominators}"
+                                          SelectedItem="{Binding Denominator}"
+                                          AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDenominatorName}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock x:Name="PartsSection" Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />
+                    <Border Classes="section">
+                        <StackPanel Spacing="8">
+                            <ItemsControl ItemsSource="{Binding Parts}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel ItemSpacing="16" LineSpacing="4" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ChartPartChoice">
+                                        <CheckBox MinWidth="120" Content="{Binding Label}" IsChecked="{Binding IsChecked}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasDrums}">
+                                <TextBlock Classes="field-label" Text="{x:Static res:Strings.ChartSettingsDrumsLabel}" />
+                                <ComboBox MinWidth="120"
+                                          ItemsSource="{Binding DrumsVariants}"
+                                          SelectedItem="{Binding SelectedDrums}"
+                                          IsEnabled="{Binding CanChangeDrums}"
+                                          ToolTip.Tip="{Binding DrumsToolTip}"
+                                          ToolTip.ShowOnDisabled="True"
+                                          AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDrumsLabel}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- No default button: Enter in a number box shouldn't close the dialog. -->
+        <Border Grid.Row="1" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Grid.Column="0"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           Text="{Binding Problem}"
+                           IsVisible="{Binding HasProblem}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static sres:SharedStrings.CancelButton}"
+                            IsCancel="True"
+                            Command="{Binding CancelCommand}" />
+                    <Button Classes="accent"
+                            MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static sres:SharedStrings.OkButton}"
+                            Command="{Binding OkCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

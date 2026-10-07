@@ -45,6 +45,9 @@ namespace ChartBuilder.Services
             foreach (var song in settings.RecentSongs)
                 song.Title ??= "";
 
+            if (!Enum.IsDefined(settings.TempoEdits))
+                settings.TempoEdits = TempoEditMode.KeepTicks;
+
             if (!NewChartSettings.Resolutions.Contains(settings.DefaultChartResolution))
                 settings.DefaultChartResolution = NewChartSettings.DefaultResolution;
 

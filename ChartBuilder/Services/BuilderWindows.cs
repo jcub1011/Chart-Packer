@@ -11,6 +11,7 @@ using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
@@ -55,16 +56,28 @@ namespace ChartBuilder.Services
             }
         }
 
-        public void OpenEditor(IReadOnlyList<string> audioFiles)
+        public void OpenNewChart(IReadOnlyList<string> audioFiles)
         {
+            // The chart starts on the default resolution, 120 BPM and 4/4 with a Lead part, all of which Chart settings
+            // changes (charter-spec C1).
+            var chart = EditableChart.CreateNew(new NewChartSettings(
+                "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+            var audio = NewChartStems.TracksOf(audioFiles);
             var editor = new EditorWindow();
-            Open(editor, new EditorWindowViewModel(settings, SettingsWindowFor(editor), audioFiles));
+            var viewModel = EditorWindowViewModel.ForNewChart(settings, SettingsWindowFor(editor), ChartSettingsFor(editor), chart, audio, openOutput, latency);
+            OpenEditor(editor, viewModel);
         }
 
         public void OpenSong(OpenedSong song, SongLock songLock)
         {
             var editor = new EditorWindow();
-            var viewModel = new EditorWindowViewModel(settings, SettingsWindowFor(editor), song, songLock, openOutput, latency);
+            var viewModel = EditorWindowViewModel.ForSong(settings, SettingsWindowFor(editor), ChartSettingsFor(editor), song, songLock, openOutput, latency);
+            OpenEditor(editor, viewModel);
+        }
+
+        /// <summary>Shows the Editor in place of the launcher, and starts its audio.</summary>
+        private void OpenEditor(EditorWindow editor, EditorWindowViewModel viewModel)
+        {
             Open(editor, viewModel);
 
             // The song's output says which device it's on, which may never have been calibrated.
@@ -172,7 +185,7 @@ namespace ChartBuilder.Services
             var launcher = new MainWindow();
             var viewModel = new MainWindowViewModel(
                 this,
-                SettingsWindowFor(launcher),
+                    SettingsWindowFor(launcher),
                 new AvaloniaFilePickerService(() => launcher),
                 new AvaloniaConfirmationService(() => launcher),
                 settings,
@@ -186,6 +199,8 @@ namespace ChartBuilder.Services
             window.Show();
             desktop.MainWindow = window;
         }
+
+        private ChartSettingsWindowService ChartSettingsFor(Window owner) => new(() => owner, settings);
 
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,

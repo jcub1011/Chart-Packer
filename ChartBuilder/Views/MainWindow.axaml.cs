@@ -13,8 +13,8 @@ namespace ChartBuilder.Views
             InitializeComponent();
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
 
-            // Audio files dropped anywhere on the window start a new chart (charter-spec C1); the Editor can't use
-            // them yet, and says so. A song folder or .sng opens it (C2).
+            // Audio files dropped anywhere on the window start a new chart with them as its stems (charter-spec C1). A
+            // song folder or .sng opens it (C2).
             DragDrop.SetAllowDrop(this, true);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);

@@ -45,7 +45,7 @@ namespace ChartBuilder.ViewModels
 
         private static readonly WaveformResolution PeaksResolution = WaveformResolution.Medium;
 
-        private readonly OpenedSong? _song;
+        private readonly EditorSong? _song;
         private readonly Func<int, IAudioOutput>? _openOutput;
         private readonly AudioLatencyService? _latency;
         private readonly IReadOnlyList<SongTrack> _tracks;
@@ -69,15 +69,15 @@ namespace ChartBuilder.ViewModels
         {
         }
 
-        /// <param name="song">The song to play; none for an empty timeline.</param>
+        /// <param name="song">The song or new chart to play; none for an empty timeline.</param>
         /// <param name="openOutput">Opens the audio output at a rate.</param>
         /// <param name="latency">The audio/visual latency, which follows the output's device.</param>
-        public PlaybackViewModel(OpenedSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency)
+        public PlaybackViewModel(EditorSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency)
         {
             _song = song;
             _openOutput = openOutput;
             _latency = latency;
-            _tracks = song is null ? [] : SongTracks.Resolve(song.StoredNames, null);
+            _tracks = song?.Tracks ?? [];
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = PositionInterval };
             _timer.Tick += (_, _) => RefreshPosition();
             LengthSeconds = PlaceholderLengthSeconds;
@@ -152,6 +152,21 @@ namespace ChartBuilder.ViewModels
             }
         }
 
+        /// <summary>Redraws the beats, and moves the metronome onto them, once the chart's tempo map has changed.</summary>
+        public void RefreshTempoMap()
+        {
+            if (_song is null)
+                return;
+
+            Beats = BeatsOf(_song, LengthSeconds);
+            if (_player is { } player)
+            {
+                _metronome = new MetronomeSchedule(_song.Chart.TempoMap.ToTempoMap(), _song.Delay, TimeSpan.FromSeconds(LengthSeconds), player.Mixer.OutputRate);
+                if (IsMetronomeOn)
+                    player.Sounds = _metronome;
+            }
+        }
+
         /// <summary>
         /// Opens the song's audio, then reads its waveform in the background. Never throws: what can't be played is said
         /// in <see cref="Message"/>.
@@ -164,7 +179,9 @@ namespace ChartBuilder.ViewModels
             Beats = BeatsOf(_song, LengthOf(_song, null));
             if (_tracks.Count == 0)
             {
-                Message = Strings.AudioNoStems;
+                // A new chart may start with no audio, against a silent timeline (charter-spec C1).
+                if (!_song.IsNew)
+                    Message = Strings.AudioNoStems;
                 return;
             }
 
@@ -306,7 +323,7 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>Opens the tracks and a player for them, the preview muted, as in Chart Packer's inspector.</summary>
-        private static (SongAudio Audio, StemPlayer Player, IAudioOutput Output) Open(SongEntry entry, IReadOnlyList<SongTrack> tracks, Func<int, IAudioOutput> openOutput, CancellationToken cancellationToken)
+        private static (SongAudio Audio, StemPlayer Player, IAudioOutput Output) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, Func<int, IAudioOutput> openOutput, CancellationToken cancellationToken)
         {
             var audio = SongAudio.Open(entry, tracks, cancellationToken);
             try
@@ -329,7 +346,7 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>The audio's length; without audio, song.ini's <c>song_length</c>, or else a placeholder.</summary>
-        private static double LengthOf(OpenedSong song, StemPlayer? player)
+        private static double LengthOf(EditorSong song, StemPlayer? player)
         {
             if (player is { Length.TotalSeconds: > 0 } )
                 return player.Length.TotalSeconds;
@@ -339,7 +356,7 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>The chart's beat lines from 0 to <paramref name="length"/> seconds of audio.</summary>
-        private static IReadOnlyList<TimelineBeat> BeatsOf(OpenedSong song, double length)
+        private static IReadOnlyList<TimelineBeat> BeatsOf(EditorSong song, double length)
         {
             var tempoMap = song.Chart.TempoMap.ToTempoMap();
             double delay = song.Delay.TotalSeconds;
@@ -359,10 +376,10 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>Reads the tracks' peaks in the background, from the cache where it has them, and draws the mix as they come.</summary>
-        private void StartPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken) =>
+        private void StartPeaks(SongEntry? entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken) =>
             _ = Task.Run(() => ReadPeaks(entry, tracks, cancellationToken), cancellationToken);
 
-        private void ReadPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken)
+        private void ReadPeaks(SongEntry? entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken)
         {
             try
             {

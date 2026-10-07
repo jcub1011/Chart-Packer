@@ -20,12 +20,13 @@ namespace ChartBuilder.Services
         {
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
+            var editing = new SettingCategory("charter.editing", Strings.SettingsCategoryEditing, charter);
             var audio = new SettingCategory("audio", Strings.SettingsCategoryAudio);
             var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [charter, newCharts, audio, general, logging],
+                [charter, newCharts, editing, audio, general, logging],
                 [
                     // The latency is per device, so it's edited in the calibration tool rather than here (charter-spec §10).
                     new ActionSetting
@@ -72,6 +73,22 @@ namespace ChartBuilder.Services
                         Choices = [.. NewChartSettings.Resolutions.Select(r => new SettingChoice<int>(r, ResolutionLabel(r)))],
                         Get = () => settings.Settings.DefaultChartResolution,
                         Set = resolution => settings.Settings.DefaultChartResolution = resolution,
+                    },
+                    new ChoiceSetting<TempoEditMode>
+                    {
+                        Id = "charter.tempoEdits",
+                        Category = editing,
+                        Label = Strings.TempoEditsLabel,
+                        Description = Strings.TempoEditsDescription,
+                        Keywords = SettingKeywords.Split(Strings.TempoEditsKeywords),
+                        DefaultValue = TempoEditMode.KeepTicks,
+                        Choices =
+                        [
+                            new SettingChoice<TempoEditMode>(TempoEditMode.KeepTicks, Strings.TempoEditsKeepTicks),
+                            new SettingChoice<TempoEditMode>(TempoEditMode.KeepTimes, Strings.TempoEditsKeepTimes),
+                        ],
+                        Get = () => settings.Settings.TempoEdits,
+                        Set = mode => settings.Settings.TempoEdits = mode,
                     },
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
                 ]);

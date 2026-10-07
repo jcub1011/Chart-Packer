@@ -2,9 +2,9 @@
 
 | | |
 | --- | --- |
-| **Status** | Current as of 2026-10-06 |
+| **Status** | Current as of 2026-10-07 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), step 4: New chart and Chart settings. See [Where CM2 stands](#where-cm2-stands). |
+| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), step 5: the editor. See [Where CM2 stands](#where-cm2-stands). |
 
 ---
 
@@ -20,7 +20,7 @@ its exit criteria. This file owns only the order and the status.
 | ----: | --------- | ------ | -------- | ---------- |
 | 1 | [CM0: Split](#cm0-split) | Done (cleanup left) | Exit criteria met; 4 cleanup items left | — |
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
-| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | Steps: 3 of 6. Exit criteria: 9 of 33 pass, 15 in part ([tracker](#cm2-progress)) | CM1 |
+| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | Steps: 4 of 6. Exit criteria: 13 of 33 pass, 13 in part ([tracker](#cm2-progress)) | CM1 |
 | 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Not started | — | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
@@ -48,9 +48,10 @@ the Properties panel and the tools are still placeholders.
 
 **Cleanup:**
 
-- **The wizard's back end** (`ChartPacker.Core/Charting/NewChart*.cs`, with its tests) is used
-  only by tests now. Chart settings' **Create** reuses it
-  ([CM2](#cm2-calibration-chart-settings-and-5-fret-editing) step 4), so it stays.
+- **The wizard's back end** (`ChartPacker.Core/Charting/NewChart*.cs`, with its tests). New chart
+  now opens the Editor straight away, and uses its stem naming (`NewChartStems.TracksOf`). A new
+  chart's first save will write its folder with `NewChartCreator`
+  ([CM2](#cm2-calibration-chart-settings-and-5-fret-editing) step 6), so it stays.
 - **Shared dialogs.** `ConfirmDialog` and `MessageDialog` are still in `ChartPacker/Views`. They
   move to `ChartPacker.UI` when Chart Builder first needs them.
 - **`ViewLocator`.** Chart Builder doesn't have one yet. It arrives with `ChartEditorViewModel`
@@ -128,7 +129,7 @@ before any canvas depends on it.
 
 ## CM2: Calibration, chart settings and 5-fret editing
 
-**Status: in progress.** Steps 1 to 3 are done. It builds on CM1's model, writer and lint engine.
+**Status: in progress.** Steps 1 to 4 are done. It builds on CM1's model, writer and lint engine.
 
 **Built out of order.** Step 3 came before the rest of step 2, so that calibration can be checked
 against a real song: Chart Builder opens a song and plays it, with a metronome over the stems and a
@@ -141,8 +142,10 @@ This is the first milestone with a working editor. Its steps, in order:
 
 1. **Specify Chart settings.** *Done.* It replaces the removed wizard
    ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), and restates C1's acceptance
-   criteria. Chart settings is a dialog for the chart's timing and parts, plus what a new song
-   folder needs; everything else about the song is edited in the Chart Inspector.
+   criteria. *Restated in step 4:* New chart opens the Editor straight away, with no dialog before
+   it. Chart settings, on the Editor's ⚙ menu, holds only the chart's timing and parts; everything
+   else about the song is edited in the Chart Inspector, and a new chart's folder is chosen at its
+   first save.
 2. **Playback and calibration.** *Done.*
    - The playback changes ([§4.4.1](charter-spec-v1.md#441-playback-changes)): the post-stretch
      mix, the true source position and `SmoothPosition`, with AC C10.1's test. `StemPlayer` lays
@@ -171,8 +174,14 @@ This is the first milestone with a working editor. Its steps, in order:
    - The launcher's **Open chart**, recent songs and dropped songs, and `.chart` import with its
      warnings shown first (`SongOpener`).
 4. **New chart and Chart settings** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)),
-   without **Detect from audio**: New chart's **Create** (through `NewChartCreator`), and Chart
-   settings on an open song, with the resolution change and its warning.
+   without **Detect from audio**. *Done*, but for the first save and **New chart in this song**,
+   which come with step 6's save.
+   - **New chart**, from the launcher's tile, dropped audio and `--new`, opens the Editor straight
+     away with an untitled chart (`EditorSong.New`): the default resolution, 120 BPM, 4/4 and a
+     Lead part, with the audio files as its stems, played from where they are.
+   - **Chart settings** on the Editor's ⚙ menu, for a new chart or a song opened: timing and parts
+     as one undoable command, with the resolution change and its warning.
+   - Undo and redo in the Editor, and a read-only list of the pending `song.ini` changes.
 5. **The editor.**
    - [C3](charter-spec-v1.md#c3-editor-layout) both views. The player and highway view models
      move to `ChartPacker.UI` here.
@@ -180,13 +189,18 @@ This is the first milestone with a working editor. Its steps, in order:
    - [C5](charter-spec-v1.md#c5-5-fret-notes) 5-fret notes.
    - [C10](charter-spec-v1.md#c10-playback) playback.
 6. **Saving and lint.**
+   - A new chart's **first save** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), which
+     asks where the song folder goes and writes it with `NewChartCreator`, then locks the song and
+     adds it to the recent songs.
+   - **New chart in this song**, for a song with neither chart file, which adds `notes.mid` and the
+     `song.ini` keys through its draft.
    - [C15](charter-spec-v1.md#c15-editing-ergonomics) autosave and recovery.
    - [C17](charter-spec-v1.md#c17-save-and-export) save.
    - The timing, 5-fret and song lint rules ([§6](charter-spec-v1.md#lint-rules)).
 
 ### CM2 progress
 
-As of 2026-10-06. Update this as each step lands, a test is added, or a hand check is done.
+As of 2026-10-07. Update this as each step lands, a test is added, or a hand check is done.
 
 **Steps.** "Hand-checked" means the user has tried it in the running apps (see
 [Where CM2 stands](#where-cm2-stands) for the checks).
@@ -196,9 +210,9 @@ As of 2026-10-06. Update this as each step lands, a test is added, or a hand che
 | 1. Specify Chart settings | Done | — | — |
 | 2. Playback and calibration | Done | Pass | Not yet |
 | 3. Open and import | Done, but for C2 items 5 to 7 | Pass | Not yet |
-| 4. New chart and Chart settings | Back end only (`NewChartCreator`) | Back end only | — |
-| 5. The editor (C3, C4, C5, C10) | Shell, timeline and play only | Model only | — |
-| 6. Saving and lint (C15, C17, rules) | Lint engine only (CM1) | Engine only | — |
+| 4. New chart and Chart settings | Done, but for the first save and New chart in this song (step 6) | Pass | Not yet |
+| 5. The editor (C3, C4, C5, C10) | Shell, timeline, play, undo and redo only | Model only | — |
+| 6. Saving and lint (C15, C17, rules) | Lint engine and the pending-changes model only | Engine and model only | — |
 
 **Exit criteria** ([§13](charter-spec-v1.md#13-milestones): AC C1, C2, C3, C4, C5, C10, C11,
 C15.2 and C17).
@@ -210,13 +224,13 @@ C15.2 and C17).
 
 | AC | Status | Covered by, or what's missing |
 | -- | ------ | ----------------------------- |
-| C1.1 | In part | `NewChartCreatorTests`, as far as it goes before the editor exists; Create isn't wired (step 4) |
-| C1.2 | In part | `NewChartCreatorTests`; Create isn't wired (step 4) |
-| C1.3 | In part | `NewChartCreatorTests`, `NewChartFolderTests`; Create isn't wired (step 4) |
-| C1.4 | In part | `NewChartStemsTests`, `NewChartCreatorTests`; Chart settings isn't built (step 4) |
-| C1.5 | In part | `NewChartIniTests`; Chart settings isn't built (step 4) |
-| C1.6 | Not yet | The resolution change (step 4) |
-| C1.7 | Not yet | Chart settings on an open song (step 4) |
+| C1.1 | In part | `NewChartCreatorTests` (validates and packs; reopens through `SongOpener` with the same tempo map, parts and metadata); the first save from the Editor (step 6) |
+| C1.2 | In part | `NewChartCreatorTests` (cancel, a stem that can't be copied); the first save from the Editor (step 6) |
+| C1.3 | In part | `NewChartFolderTests`, `NewChartCreatorTests`; the first save from the Editor (step 6) |
+| C1.4 | Passes | `NewChartStemsTests` (`TracksOf`), `NewChartCreatorTests` |
+| C1.5 | Passes | `NewChartIniTests`, `NewChartCreatorTests` (reopened with the same layout), `PendingSongIniChangesTests` |
+| C1.6 | Passes | `ChartSettingsCommandTests` |
+| C1.7 | Passes | `ChartSettingsCommandTests`, `PendingSongIniChangesTests`; the Editor's list waits on a hand check |
 | C2.1 | In part | `MidiChartLoaderTests`, `MidiChartLoaderPartTests`, `MidiChartWriterTests`; saving from the app comes with C17 (step 6) |
 | C2.2 | In part | `MidiChartLoaderTests`; saving from the app comes with C17 (step 6) |
 | C2.3 | Not yet | Saving a `.sng` (step 6) |
@@ -244,14 +258,14 @@ C15.2 and C17).
 | C17.3 | Not yet | `song.ini` pending changes (step 6) |
 | C17.4 | In part | `MidiChartWriterTests`; Chart Builder's save (step 6) |
 
-**Totals:** 9 pass, 15 in part, 9 not yet.
+**Totals:** 13 pass, 13 in part, 7 not yet.
 
 ### Where CM2 stands
 
-As of 2026-10-06, for picking the work up again.
+As of 2026-10-07, for picking the work up again.
 
-**Waiting on the user.** The open and playback slice and calibration have been built and their
-tests pass, but the apps haven't been tried by hand yet. The checks still to do:
+**Waiting on the user.** Steps 2 to 4 have been built and their tests pass, but the apps haven't
+been tried by hand yet. The checks still to do:
 
 - open a song folder and a `.sng` from **Open chart**, by drop and from **Recent**;
 - play, pause and seek, change the speed with **Keep pitch** on and off, and see the metronome's
@@ -274,7 +288,25 @@ tests pass, but the apps haven't been tried by hand yet. The checks still to do:
 - the first-use prompt, which comes once per device when a song opens in the Editor;
 - the Editor's playhead drawn earlier by the latency, at 50% and 100%;
 - Chart Packer's highway, lyrics and background moved by the latency after its window is
-  activated.
+  activated;
+- **New chart** (step 4), from the launcher's tile, from audio files dropped on the launcher, and
+  from `ChartBuilder --new <files>`:
+  - the Editor opening straight away, titled **Untitled chart**, with no dialog first;
+  - `Guitar.OGG`, `Drums.ogg` and `mix.mp3` played together, with their waveform on the timeline;
+  - `mix.mp3` and `other.mp3`, and a file that isn't audio, with the notice saying which weren't
+    added and why;
+  - no audio: a silent timeline, and no "no audio" notice;
+  - **Pending song.ini changes** listing `diff_guitar = -1`;
+- **Chart settings** (⚙ menu), on a new chart and on an opened song:
+  - OK with nothing changed, and Cancel: no undo step, nothing pending;
+  - a starting BPM change with **When a tempo changes** (Settings, **Editing**) on each choice;
+  - adding a part, which shows `diff_<part> = -1` under **Pending song.ini changes**, and
+    unticking a part with notes, which asks first;
+  - the drum variant locked while the drums have notes;
+  - 480 → 960 with no warning, and 480 → 192 on a chart with off-grid notes, with the warning,
+    **Change anyway** and Cancel;
+  - Undo and Redo (Ctrl+Z, Ctrl+Y) of each, with the timeline's beat lines and the metronome
+    following the tempo map.
 
 **Where the code is.**
 
@@ -290,9 +322,12 @@ tests pass, but the apps haven't been tried by hand yet. The checks still to do:
 | The latency file | `ChartPacker.Core/Settings/AudioLatencyFile.cs` (`Find`, `FindAndRemember`, `Save`, `RememberUnderId`), `Settings/JsonFiles.cs` (the temp-and-rename write, shared with `JsonSettingsFile`), `UserConfigPaths.AudioLatencyFile` |
 | Calibration logic | `ChartPacker.Core/Calibration/` (`TapTest`, `LatencyCalibration`), `ChartPacker.Audio/Synthesis/` (`CalibrationBeats`, `CalibrationSchedule`, `CalibrationBeepsGiven`, `Synth.CalibrationBeep`), `Playback/LatencyCompensation.cs` |
 | Settings rows | `ChartPacker.Core/Settings/` (`ActionSetting`, `ActionSettingEdit`) |
+| New chart and Chart settings' Core | `ChartPacker.Core/Charting/` (`EditorSong`, `NewChartStems.TracksOf` and `NewChartAudio`, `ChartSettingsEdit` and `ChartSettingsValues`, `ResolutionChangeReport`, `PendingSongIniChanges`, `SongIniPartKeys`), `Commands/TempoMapCommands.cs` (`ChangeResolution`, `SetStartingTempo`, `ResolutionScaling`), `Commands/PartCommands.cs` (`SetDrumsVariant`), `EditablePart.HasNotes`; `ChartPacker.Audio` (`SongAudio.Open` and `StemPeaksCache.KeyOf` take no song for staged tracks) |
+| For the first save (step 6), built and tested but not used yet | `NewChartFolder.NameFor`, `Settings/ChartPackerSettingsFile.cs` (Chart Packer's library folder, read only), and the existing `NewChartCreator` |
+| New chart and Chart settings in Chart Builder | `BuilderWindows.OpenNewChart`, `EditorWindowViewModel` (`ForNewChart`, `ForSong`, the undo stack, `OpenChartSettingsAsync`, `PendingChanges`), `ViewModels/ChartSettingsViewModel.cs`, `Views/ChartSettingsWindow.axaml`, `Services/ChartSettingsWindowService.cs`, `PlaybackViewModel` (takes an `EditorSong`; `RefreshTempoMap`), `BuilderSettings.TempoEdits` |
 | Calibration in Chart Builder | `Services/AudioLatencyService.cs`, `ViewModels/CalibrationViewModel.cs`, `Controls/CalibrationView.cs`, `Views/CalibrationWindow.axaml`, `Services/BuilderWindows.cs` (`ShowCalibrationAsync`, the first-use prompt), `BuilderSettingsCatalog` (the **Audio** category), `BuilderSettings` (`PromptForCalibration`, `CalibrationPrompted`), `PlaybackViewModel.Clock` |
 | The latency in Chart Packer | `ViewModels/PlayerViewModel.cs` (`DrawnPosition`, `RefreshLatency`), which the highway, lyrics and background clocks use; `MainWindowViewModel.OnActivatedAsync`; `AppSettingsCatalog` (`playback.latency`); `App.axaml.cs` |
-| Tests | `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`, `CalibrationScheduleTests`, `LatencyCompensationTests`, `WindowsAudioEndpointTests`; the shared `FakeOutput` and `ManualClock`), `Settings/AudioLatencyFileTests.cs`, `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`; `ChartBuilder.Tests/Charting/SongOpenerTests.cs`, `ChartBuilder.Tests/Calibration/` (`TapTestTests`, `LatencyCalibrationTests`) |
+| Tests | `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`, `CalibrationScheduleTests`, `LatencyCompensationTests`, `WindowsAudioEndpointTests`; the shared `FakeOutput` and `ManualClock`), `Settings/AudioLatencyFileTests.cs`, `Settings/ChartPackerSettingsFileTests.cs`, `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`, `Charting/NewChart*Tests.cs`; `ChartBuilder.Tests/Charting/` (`SongOpenerTests`, `ChartSettingsCommandTests`, `PendingSongIniChangesTests`), `ChartBuilder.Tests/Calibration/` (`TapTestTests`, `LatencyCalibrationTests`) |
 
 **Decided along the way.**
 
@@ -330,6 +365,32 @@ tests pass, but the apps haven't been tried by hand yet. The checks still to do:
   `Position` less the latency times the speed, while playing.
   - The seek bar isn't moved, as its position is the seek position.
   - The merge window's resume point still uses the audio's own `CurrentPosition`.
+- **Pending `song.ini` changes are worked out, not kept** (`PendingSongIniChanges`). They come from
+  the chart as it is against `song.ini` as it was opened, so undoing an edit takes its change away,
+  and a drum variant detected on load ([§4.1](charter-spec-v1.md#editable-model)) is listed too. A
+  part's rating is listed only for parts added since the song was opened.
+- **Changing the resolution.**
+  - The tempo and time signature markers' ticks are scaled to the nearest tick, halves up.
+  - Markers that land on one tick are all kept, and the warning says the games read only the last.
+    An anchor that lands on another's tick is left out, and listed.
+  - The warning's dry run applies `ChangeResolution` to a copy, and compares each item's time
+    under the old and the new tempo map.
+- **The starting tempo, keeping times,** re-ticks everything, but leaves the other tempo markers on
+  their ticks, as any tempo edit does until anchor absorption comes with C4 (step 5).
+- **When a tempo changes** is a Settings row (**Charter › Editing**), as §10 lists it. It's the
+  first thing to use it.
+- **No wizard.** New chart opens the Editor straight away, on defaults. The dialog-first flow built
+  at first was taken out, and the spec's C1 restated: a new chart is untitled until its first save,
+  which asks where its folder goes.
+- **A new chart's audio** is staged tracks (`SongTrack.StagedSourcePath`), as Chart Packer's drafts
+  add stems, so playback and the waveform need no song folder.
+- **A new chart's files with no stem are left out**, with a notice, rather than kept unassigned, so
+  every track has a stem. Choosing stems comes with the Chart Inspector.
+- **A new chart's pending changes** are every part's rating and the drum keys, the same as its first
+  save writes (`NewChartIni`).
+- **The pending changes are listed under Properties**, in the right panel, as the side panels have
+  no tabs yet. The findings panel and the list's Revert come with step 6.
+- `NewChartSettings.MaxNumerator` is now 64, as C4 allows, rather than 32.
 
 **Loose ends.**
 
@@ -348,13 +409,20 @@ tests pass, but the apps haven't been tried by hand yet. The checks still to do:
 - **Opening calibration from the transport bar**, which comes with C3.
 - **Record mode** shifts key presses by the latency ([C15](charter-spec-v1.md#c15-editing-ergonomics)),
   with CM5.
+- **A new chart can't be kept yet.** Its first save comes with step 6, as does **New chart in this
+  song**; a song with neither chart file still says it has none.
+- **A new chart's name and artist** aren't filled from its first stem's tags yet. That comes with
+  the Chart Inspector (step 5).
+- **Closing the Editor with edits** loses them without asking, as there's no save yet (step 6).
+- **The Editor's title** doesn't mark unsaved edits yet.
 
-**Next: step 4, New chart and Chart settings** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)),
-without **Detect from audio**:
+**Next: step 5, the editor:**
 
-- New chart's **Create**, through `NewChartCreator`. The wizard's old back end
-  (`ChartPacker.Core/Charting/NewChart*.cs`) is reused, as CM0's cleanup notes.
-- Chart settings on an open song, with the resolution change and its warning.
+- [C3](charter-spec-v1.md#c3-editor-layout) both views. The player and highway view models move to
+  `ChartPacker.UI` here.
+- [C4](charter-spec-v1.md#c4-tempo-map-and-grid) tempo map and grid, with anchor absorption.
+- [C5](charter-spec-v1.md#c5-5-fret-notes) 5-fret notes.
+- [C10](charter-spec-v1.md#c10-playback) playback, with the transport bar.
 
 ## CM3: Drums and GHL
 

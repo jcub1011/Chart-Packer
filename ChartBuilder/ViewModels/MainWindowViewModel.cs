@@ -104,14 +104,14 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        /// <summary>Closes the launcher and opens an empty Editor window.</summary>
+        /// <summary>Closes the launcher and opens a new chart in the Editor, with no audio.</summary>
         [RelayCommand(CanExecute = nameof(IsIdle))]
         private void NewChart() => StartNewChart([]);
 
         /// <summary>
-        /// Closes the launcher and opens an empty Editor window, which says <paramref name="audioFiles"/>, e.g. ones
-        /// dropped on the window, weren't added. Never throws: it's started from the command line, a drop or a
-        /// command, so a failure is shown on the home screen instead.
+        /// Closes the launcher and opens a new chart in the Editor (charter-spec C1), with <paramref name="audioFiles"/>,
+        /// e.g. ones dropped on the window, as its stems. It has no folder until it's first saved. Never throws: it's
+        /// started from the command line, a drop or a command, so a failure is shown on the home screen instead.
         /// </summary>
         public void StartNewChart(IReadOnlyList<string> audioFiles)
         {
@@ -120,12 +120,12 @@ namespace ChartBuilder.ViewModels
 
             try
             {
-                editors.OpenEditor(audioFiles);
+                editors.OpenNewChart(audioFiles);
             }
             catch (Exception ex)
             {
                 // Nothing above this catches it, so anything not caught here would take the app down.
-                Trace.TraceError($"Opening the Editor failed: {ex}");
+                Trace.TraceError($"Opening a new chart failed: {ex}");
                 ShowError(string.Format(CultureInfo.CurrentCulture, Strings.UnexpectedErrorFormat, ex.Message));
             }
         }

@@ -110,7 +110,41 @@ public sealed class RemovePart(ChartInstrument instrument) : ChartCommand
     }
 }
 
-/// <summary>What the part commands share.</summary>
+//// <summary>
+/// Changes how the song's drums are charted (charter-spec C1, Parts) while its drums part has no notes, or it has none.
+/// A drums part with notes is converted instead (C6), which comes with CM3. Undoing puts back the variant it had.
+/// </summary>
+public sealed class SetDrumsVariant : ChartCommand
+{
+    private DrumsVariant? _previous;
+
+    public SetDrumsVariant(DrumsVariant variant)
+    {
+        if (!Enum.IsDefined(variant))
+            throw new ArgumentException("Drums are 4-lane, Pro or 5-lane.", nameof(variant));
+        Variant = variant;
+    }
+
+    public DrumsVariant Variant { get; }
+
+    private protected override ChartChange Do(EditableChart chart)
+    {
+        var drums = chart.PartOf(ChartInstrument.Drums);
+        if (drums is not null && drums.HasNotes && chart.DrumsVariant != Variant)
+            throw new InvalidOperationException("Drums with notes are converted to another variant, not switched.");
+        _previous = chart.DrumsVariant;
+        if (_previous == Variant)
+            return ChartChange.None;
+        chart.DrumsVariant = Variant;
+        return drums is null
+            ? ChartChange.Of(SongChanges.DrumsVariant)
+            : ChartChange.Of([PartEdits.Whole(ChartInstrument.Drums)], SongChanges.DrumsVariant);
+    }
+
+    private protected override void Undo(EditableChart chart) => chart.DrumsVariant = _previous;
+}
+
+// <summary>What the part commands share.</summary>
 internal static class PartEdits
 {
     /// <summary>The whole of a part, on every difficulty.</summary>

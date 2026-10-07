@@ -309,7 +309,7 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   are. Settings are Chart Builder's own ([§10](#10-settings)).
 - **Launcher** (the home screen), shown when no song is given on the command line: icon tiles for
   **New chart**, **Open chart** (a folder or `.sng`) and **Settings**, and recent songs. It is a
-  window of its own. **New chart** opens **Chart settings** over it ([C1](#c1-new-chart-and-chart-settings)).
+  window of its own. **New chart** opens a new chart in the Editor ([C1](#c1-new-chart-and-chart-settings)).
   Creating the chart there, or opening a song, closes the launcher and opens an **Editor window**
   in its place. Closing the Editor brings the launcher back.
 - **Editor window** ([§8](#8-ui-outline)):
@@ -337,7 +337,7 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   ([C11](#c11-calibration-tool)) are dialogs. They use the shared `WindowChrome` for the dark title
   bar and icon, as the other dialogs do.
 - **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
-  with them in Chart settings ([C1](#c1-new-chart-and-chart-settings)), and a dropped song folder or
+  with them as its stems ([C1](#c1-new-chart-and-chart-settings)), and a dropped song folder or
   `.sng`, which opens it
   ([C2](#c2-open-and-import)). Chart Packer's main window takes no drops for Chart Builder.
 - Strings go in Chart Builder's own `Strings.resx`, and strings both apps use go in
@@ -405,7 +405,7 @@ same song at once, and Chart Packer re-reads the songs Chart Builder may have ch
 | --------- | ----- |
 | *(none)* | The home screen ([§4.5](#45-app-chartbuilder)) |
 | `[--] <song path>` | That song folder or `.sng` in the editor ([C2](#c2-open-and-import)) |
-| `--new [--] [<audio file>…]` | Chart settings for a new chart, with the audio files ([C1](#c1-new-chart-and-chart-settings)) |
+| `--new [--] [<audio file>…]` | A new chart in the editor, with the audio files as its stems ([C1](#c1-new-chart-and-chart-settings)) |
 | `--calibrate` | The calibration tool ([C11](#c11-calibration-tool)) |
 
 `--` ends the options, so a path that starts with `-` is still a path. Paths are made absolute against
@@ -455,118 +455,98 @@ shown in the app's findings panel. Chart lint rules are listed in [§6](#lint-ru
 
 ### C1. New chart and Chart settings
 
-**Chart settings** is the dialog that sets up a chart: its timing and its parts. For a new chart it
-also asks for what the song folder needs before it can be written: the song's name, its audio and
-where it goes. Everything else about the song (album, genre, year, album art, more stems, `delay`,
-the difficulty ratings and any other `song.ini` key) is edited in the **Chart Inspector**, as in
-Chart Packer's inspector ([§4.5](#45-app-chartbuilder)), and Chart settings doesn't repeat it.
+**New chart** opens a new chart in the Editor straight away. There is no wizard or dialog before it:
+the chart starts on defaults, and everything about it is set in the Editor.
+
+- **Chart settings** is a dialog on the Editor's ⚙ menu that sets the chart's timing and parts. It is
+  the same for a new chart and a song that was opened.
+- Everything else about the song (name, artist, charter, album, genre, year, album art, stems,
+  `delay`, the difficulty ratings and any other `song.ini` key) is edited in the **Chart
+  Inspector**, as in Chart Packer's inspector ([§4.5](#45-app-chartbuilder)). Chart settings doesn't
+  repeat it.
+- A new chart has no song folder until it is first saved. The first save asks where it goes
+  ([C17](#c17-save-and-export)).
 
 **Input:** nothing, or one or more audio files.
-**Output:** a new song folder containing `notes.mid`, `song.ini` and its stems. It is opened in the
-editor, and appears in Chart Packer's library ([§4.8](#48-launching-and-coordination)).
+**Output:** a new chart in the Editor. Its first save writes a new song folder containing
+`notes.mid`, `song.ini` and its stems. From then on it is a song like any other: Chart Builder holds
+its lock, it is on the recent songs, and it appears in Chart Packer's library
+([§4.8](#48-launching-and-coordination)).
 
 **Entry points.**
 
-- A new chart is started from **New chart** on Chart Builder's launcher, from audio files dropped on
-  the launcher ([§4.5](#45-app-chartbuilder)), or from `ChartBuilder --new` on the command line
-  ([§4.8](#48-launching-and-coordination)). Each opens Chart settings in **New chart** mode, over
-  the launcher, with the audio files it was given.
-  - **Create** writes the song folder, closes the launcher and opens the song in the Editor window,
-    as opening a song does ([C2](#c2-open-and-import)): it takes the song lock and is added to the
-    recent songs.
-  - **Cancel** leaves the launcher as it was. Nothing is written.
-- On an open song, **Chart settings** on the Editor's ⚙ menu opens it in **Song** mode.
+- **New chart** on Chart Builder's launcher, audio files dropped on the launcher
+  ([§4.5](#45-app-chartbuilder)), and `ChartBuilder --new` on the command line
+  ([§4.8](#48-launching-and-coordination)). Each closes the launcher and opens the Editor with a new
+  chart (below).
+- **Chart settings** on the Editor's ⚙ menu, for whatever chart is open.
 - A song with neither chart file is offered **New chart in this song** when it is opened
-  ([C2](#c2-open-and-import)). That opens New chart mode without the Song, Audio and Location
-  sections, and Create adds `notes.mid` and the `song.ini` keys to the song through its draft
-  ([§4.6](#46-saving)).
+  ([C2](#c2-open-and-import)). That opens the Editor with a new chart in that song, and its first
+  save adds `notes.mid` and the `song.ini` keys to the song through its draft ([§4.6](#46-saving)).
 
 Chart Packer has no **New chart**. Charts are created in Chart Builder, and Chart Packer's only way
 into it is **Edit chart** ([C2](#c2-open-and-import)).
 
-**The dialog.** A modal dialog with the shared `WindowChrome`. Its sections are listed on the left,
-and the chosen one is shown on the right (mock-up in [§8](#8-ui-outline)).
+**A new chart** starts with:
 
-| Section | New chart | Song | Contents |
-| ------- | :-------: | :--: | -------- |
-| **Song** | ✓ | — | Name, artist and charter. They are prefilled from the first audio file's tags where it has them (`AudioFileInfo.Read`), and the charter from the **Default charter name** setting ([§10](#10-settings)). |
-| **Audio** | ✓ | — | The audio files given, plus **Add files…** and a remove button per file (below). |
-| **Timing** | ✓ | ✓ | Resolution, starting BPM and starting time signature (below). |
-| **Parts** | ✓ | ✓ | The parts and the drum variant (below). |
-| **Location** | ✓ | — | Where the song folder is created (below). |
+- the **Default resolution** setting ([§10](#10-settings)), 120 BPM and 4/4 at tick 0;
+- a Lead (5-fret guitar) part, with no notes;
+- `EVENTS` holding `[music_start]` and `[end]`;
+- the audio files it was given, as its stems:
+  - Files can be `.ogg`, `.opus`, `.mp3` or `.wav`. Each is given a stem from its file name using
+    `AudioStems`, e.g. `Drums.ogg` → `drums`, `song.mp3` → `song`.
+  - `AudioStems` gives no stem for a name it doesn't recognise. The first such file is then given
+    `song` if no other file has it (`NewChartStems`).
+  - A file that isn't audio, has no stem, or would share a stem is left out, and the Editor's notice
+    says which and why.
+  - Until the first save, each stem is played from where it is. A file that doesn't decode is said
+    by playback, as for any song ([C10](#c10-playback)).
+- **No audio is allowed.** The chart is made against a silent timeline. The song then has finding
+  SNG052 (no audio stem) until a stem is added in the Chart Inspector.
 
-**Audio** (New chart).
+In the Chart Inspector, a new chart's name and artist are filled from the first stem's tags where it
+has them (`AudioFileInfo.Read`), and its charter from the **Default charter name** setting
+([§10](#10-settings)).
 
-- Files can be `.ogg`, `.opus`, `.mp3` or `.wav`. Each is assigned a stem from its file name using
-  `AudioStems`, e.g. `Drums.ogg` → `drums`, `song.mp3` → `song`. `AudioStems` gives no stem for a
-  name it doesn't recognise. The first such file is then assigned `song` if no other file has it,
-  and any other is left unassigned (`NewChartStems`).
-- The stem can be changed from a dropdown. Two files can't share a stem, and **Create** stays
-  disabled, saying why, while a file is unassigned or two files clash.
-- Each file is decoded briefly to check it is what its extension says, as in
-  [F7](project-spec-v1.md#f7-audio-playback).
-- **No audio is allowed.** The user enters a length (`NewChartLength`, 3:00 by default) and charts
-  against a silent timeline. The song then has finding SNG052 (no audio stem) until a stem is added
-  in the Chart Inspector.
+**The dialog.** Chart settings is a modal dialog with the shared `WindowChrome`. Its sections,
+**Timing** and **Parts**, are listed on the left, and choosing one scrolls to it (mock-up in
+[§8](#8-ui-outline)).
 
-**Timing** (both modes).
+**Timing.**
 
-- **Resolution**: 192, 480 or 960, the values at which every common snap lands on a whole tick. A new
-  chart starts on the **Default resolution** setting ([§10](#10-settings)). On an open song it shows
-  the chart's own resolution, which may be another value, and changing it re-ticks the chart (below).
-- **Starting BPM**: 10 to 1000, with up to three decimals (default 120).
-- **Starting time signature**: any that [C4](#c4-tempo-map-and-grid) allows (default 4/4).
-- On an open song, the starting BPM and time signature are the tempo and time signature markers at
-  tick 0. Changing them is a tempo edit ([C4](#c4-tempo-map-and-grid)): it follows the *keep ticks*
-  or *keep times* setting, and keeps anchors where they are.
+- **Resolution**: 192, 480 or 960, the values at which every common snap lands on a whole tick. A
+  chart opened at another resolution shows that value too. Changing it re-ticks the chart (below).
+- **Starting BPM**: 10 to 1000, with up to three decimals.
+- **Starting time signature**: any that [C4](#c4-tempo-map-and-grid) allows.
+- The starting BPM and time signature are the tempo and time signature markers at tick 0. Changing
+  them is a tempo edit ([C4](#c4-tempo-map-and-grid)): it follows the *keep ticks* or *keep times*
+  setting, and keeps anchors where they are.
 - **Detect from audio** comes with [C14](#c14-onset-and-beat-assist) (CM4). It runs the tempo
   estimate on the mix, fills in the starting BPM, and proposes a tempo map to review in the editor.
 
-**Parts** (both modes).
+**Parts.**
 
 - A tick box for each v1 part: 5-fret Lead, Bass, Rhythm and Co-op; GHL Guitar, Bass, Rhythm and
   Co-op; Drums, with a choice of 4-lane, Pro or 5-lane.
 - MIDI has no empty difficulties, so a new part starts with all four difficulties empty. Each one
   exists as soon as it has a note.
-- On an open song, unticking a part that has notes asks for confirmation, as **Remove part** does
+- Unticking a part that has notes asks for confirmation, as **Remove part** does
   ([C2](#c2-open-and-import)).
-- On an open song, the drum variant of a drums part that has notes is changed with the conversion in
+- The drum variant of a drums part that has notes is changed with the conversion in
   [C6](#c6-drums-4-lane-pro-and-5-lane) (CM3). Until then the variant can be changed only while the
   part has no notes.
 
-**Location** (New chart).
-
-- A parent folder, by default the last one used for a new chart, otherwise Chart Packer's library
-  root (read from Chart Packer's settings, never written), plus a folder name.
-- The folder name follows `<artist> - <name>` until it is edited, with characters that aren't
-  allowed in a path replaced. It is checked against the `.sng` filename rules
-  (`NewChartFolder.ProblemOf`).
-- An **existing folder is never used or overwritten**. If the name is taken, Create is disabled and
-  says why.
-
-**Create** (New chart).
-
-- **What is written** (`NewChartCreator`):
-  - each stem, copied as `<stem>.<ext>` in lowercase;
-  - `notes.mid`, with the tempo map, an empty track for each chosen part, `EVENTS` holding
-    `[music_start]` and `[end]`, and `BEAT`;
-  - `song.ini`, with a `[song]` section holding the name, artist and charter, `diff_<part> = -1` for
-    each part (the keys are in [§7.5](#75-songini-keys-chart-builder-writes)),
-    `pro_drums`/`five_lane_drums` as the drum variant needs, and `song_length` from the longest stem
-    (or the length entered).
-- **How it is written.** Everything is written into a temp folder beside the target, which is then
-  renamed into place. A failure or cancel leaves nothing behind.
-
-**OK** (Song mode).
+**OK.**
 
 - The chart edits (resolution, tempo, time signature, parts and drum variant) are applied as **one
   undoable command**.
 - Their `song.ini` effects are added to Chart Builder's pending changes
   ([C17](#c17-save-and-export)): `diff_<part> = -1` for each added part, and
-  `pro_drums`/`five_lane_drums` for the drum variant.
+  `pro_drums`/`five_lane_drums` for the drum variant. A new chart has no `song.ini` yet, so every
+  part's `diff_<part> = -1` and the drum keys are pending until its first save writes them.
 - OK with nothing changed adds no undo step and no pending change. **Cancel** changes nothing.
 
-**Changing the resolution** (Song mode).
+**Changing the resolution.**
 
 - The chart is re-ticked so that everything keeps its time (`ChartRetick` with
   `TickMaps.KeepTimes`). The tempo and time signature markers' ticks are scaled by the new resolution
@@ -588,27 +568,48 @@ and the chosen one is shown on the right (mock-up in [§8](#8-ui-outline)).
 - The change is one undoable step, and undoing it puts every tick back as it was.
 - Byte-for-byte passthrough no longer holds for the next save, as after any *keep times* edit.
 
+**The first save** of a new chart ([C17](#c17-save-and-export)).
+
+- It asks where the song folder goes: a parent folder and a folder name.
+  - The parent folder is by default the last one used for a new chart, otherwise Chart Packer's
+    library root (read from Chart Packer's settings, never written).
+  - The folder name follows `<artist> - <name>` until it is edited, with characters that aren't
+    allowed in a path replaced (`NewChartFolder.NameFor`). It is checked against the `.sng` filename
+    rules (`NewChartFolder.ProblemOf`).
+  - An **existing folder is never used or overwritten**. If the name is taken, the save can't go
+    ahead, and the dialog says why.
+- **What is written** (`NewChartCreator`):
+  - each stem, copied as `<stem>.<ext>` in lowercase;
+  - `notes.mid`, written from the chart as any save is ([§4.3](#43-writing-midichartwriter));
+  - `song.ini`, with a `[song]` section holding the name, artist and charter, `diff_<part> = -1` for
+    each part (the keys are in [§7.5](#75-songini-keys-chart-builder-writes)),
+    `pro_drums`/`five_lane_drums` as the drum variant needs, and `song_length` from the longest stem.
+- **How it is written.** Everything is written into a temp folder beside the target, which is then
+  renamed into place. A failure or cancel leaves nothing behind.
+- The song is then locked and added to the recent songs, and the Editor goes on with it as a song
+  opened from that folder.
+
 Acceptance criteria:
 
-- **AC C1.1** A chart created with one stem and no notes validates with no errors
+- **AC C1.1** A new chart with one stem and no notes, once saved, validates with no errors
   ([project-spec F3](project-spec-v1.md#f3-validate)), packs to a `.sng`, and reopens in the editor
   with the same tempo map, parts and metadata.
-- **AC C1.2** Cancelling New chart, or failing to copy a stem during Create, leaves no folder or temp
-  folder behind.
-- **AC C1.3** Create is unavailable while the target folder exists, and an existing folder's
+- **AC C1.2** Cancelling a new chart's first save, or failing to copy a stem during it, leaves no
+  folder or temp folder behind.
+- **AC C1.3** A new chart's first save can't use an existing folder, and an existing folder's
   contents are never touched.
-- **AC C1.4** Giving `Guitar.OGG`, `Drums.ogg` and `mix.mp3` assigns `guitar`, `drums` and `song`,
-  and the folder contains `guitar.ogg`, `drums.ogg` and `song.mp3`. Giving `mix.mp3` and
-  `other.mp3` assigns `song` to one and leaves the other unassigned, with Create disabled.
-- **AC C1.5** Choosing Pro drums writes `pro_drums = True` and choosing 5-lane writes
-  `five_lane_drums = True`. The reopened chart's drums are read with the same layout.
+- **AC C1.4** Giving `Guitar.OGG`, `Drums.ogg` and `mix.mp3` makes them the stems `guitar`, `drums`
+  and `song`, and the saved folder contains `guitar.ogg`, `drums.ogg` and `song.mp3`. Giving
+  `mix.mp3` and `other.mp3` makes one `song` and leaves the other out, saying so.
+- **AC C1.5** Choosing Pro drums gives `pro_drums = True`, and choosing 5-lane gives
+  `five_lane_drums = True`, as pending changes and in the saved `song.ini`. The reopened chart's
+  drums are read with the same layout.
 - **AC C1.6** Changing a chart's resolution from 480 to 960 moves nothing in time and gives no
   warning. From 480 to 192, a chart with a note at tick 1 gives the warning, with the number of
   items that would move and the largest move. **Cancel** leaves the chart unchanged. **Change
   anyway** is one undo step, and undoing it gives a model equal to the one before.
-- **AC C1.7** On an open song, OK with nothing changed adds no undo step and no pending change, and
-  Cancel changes nothing. Adding a part through Chart settings shows its `diff_<part> = -1` as a
-  pending change.
+- **AC C1.7** OK with nothing changed adds no undo step and no pending change, and Cancel changes
+  nothing. Adding a part through Chart settings shows its `diff_<part> = -1` as a pending change.
 
 ### C2. Open and import
 
@@ -627,8 +628,8 @@ Acceptance criteria:
    - Each Chart Builder window has one chart open. A song that another Chart Builder already has
      open isn't opened a second time ([§4.8](#48-launching-and-coordination)).
 2. **Which chart is opened.** `ChartReader.Pick` chooses: `notes.mid` if there is one, otherwise
-   `notes.chart`. A song with neither is offered **New chart in this song**, which sets up its
-   timing and parts in Chart settings, as a new chart does ([C1](#c1-new-chart-and-chart-settings)).
+   `notes.chart`. A song with neither is offered **New chart in this song**, which opens it in the
+   editor with a new chart, as New chart does ([C1](#c1-new-chart-and-chart-settings)).
 3. **`.chart` import.**
    - The chart is converted with `ChartToMidi`. Any `ChartMergeWarning`s are shown before the
      editor opens, with the times they happen at, and the user can go ahead or cancel.
@@ -1346,6 +1347,9 @@ Acceptance criteria:
    2. reads it back and compares it with the model. **A difference stops the save.**
    3. stages the bytes to a temp file and saves through `MetadataDraft`/`DraftWriter`
       ([§4.6](#46-saving)).
+
+   A new chart's first save asks where its song folder goes instead, and writes it with
+   `NewChartCreator` ([C1](#c1-new-chart-and-chart-settings), The first save).
 2. **`song.ini` changes.** Every change Chart Builder makes to `song.ini` is shown as a pending
    change in Chart Builder's **Pending changes** list (beside the findings panel) as soon as it is
    made, not only at save. Each change can be reverted there. Chart Packer's metadata editor
@@ -1623,9 +1627,9 @@ are unchanged, and red stays red.
 ## 8. UI outline
 
 Chart Builder has two top-level windows, and only one is open at a time. The launcher (the home
-screen) shows until a chart is created or opened. Then the Editor window takes its place, with the
-editor's tools in its toolbar, and closing the Editor brings the launcher back. New chart's Chart
-settings is a dialog over the launcher, so the launcher stays until Create.
+screen) shows until a chart is started or opened. Then the Editor window takes its place, with the
+editor's tools in its toolbar, and closing the Editor brings the launcher back. New chart opens the
+Editor straight away, with no dialog before it.
 
 **Launcher (home screen):**
 
@@ -1724,32 +1728,7 @@ layout, so their part picker, findings and transport bar have still to be placed
 │   Onsets     │ ·  ·  ·   ·  · · ·   ·  ·   ·                                          │
 ```
 
-**Chart settings, New chart mode** (drawn as one page; the list on the left jumps to each
-section):
-
-```txt
-┌ New chart ───────────────────────────────────────────────────────────────────┐
-│                                                                              │
-│ Song     │ Name         [ Through the Fire                ]                  │
-│ Audio    │ Artist       [ Example Band                    ]                  │
-│ Timing   │ Charter      [ Me                              ]                  │
-│ Parts    │                                                                   │
-│ Location │ Guitar.ogg   [ guitar ▾ ]  ✕                                      │
-│          │ mix.mp3      [ song   ▾ ]  ✕                                      │
-│          │ [Add files…]                                                      │
-│          │                                                                   │
-│          │ Resolution [ 480 ▾ ]   BPM [ 120.000 ]   Time sig. [ 4 ]/[ 4 ▾ ]  │
-│          │                                                                   │
-│          │ ☑ Lead  ☐ Bass  ☐ Rhythm  ☐ Co-op  ☐ GHL …  ☑ Drums [ Pro ▾ ]     │
-│          │                                                                   │
-│          │ Location     D:\Songs   [Browse…]                                 │
-│          │ Folder name  [ Example Band - Through the Fire ]                  │
-│          │                                                                   │
-│          │                                         [Cancel]  [Create]        │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-**Chart settings on an open song:**
+**Chart settings** (the ⚙ menu, for a new chart or a song opened):
 
 ```txt
 ┌ Chart settings ──────────────────────────────────────────────────────────────┐
@@ -1873,8 +1852,8 @@ of it.
 
 The new-chart settings (default charter name and default resolution) moved from `AppSettings` to
 `BuilderSettings` when new charts moved to Chart Builder, before any release included them, so
-nothing is migrated. The last parent folder used for a new chart, which Chart settings starts from
-([C1](#c1-new-chart-and-chart-settings)), is kept in `builder-settings.json` beside the window
+nothing is migrated. The last parent folder used for a new chart, which a new chart's first save starts
+from ([C1](#c1-new-chart-and-chart-settings)), is kept in `builder-settings.json` beside the window
 layout. It isn't a row in Settings.
 
 ## 11. Non-functional requirements
@@ -1952,13 +1931,13 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   opening it in Chart Builder ([§4.6](#46-saving)).
 - **Settings:** each app writes only its own file. The latency is a shared file that only Chart
   Builder writes ([§10](#10-settings)).
-- **New chart:** part of Chart Builder only. The wizard that moved from Chart Packer has been
-  removed. New chart opens **Chart settings** over the launcher, and **Create** writes the song
-  folder before the Editor opens it ([C1](#c1-new-chart-and-chart-settings)). Chart Packer has no
-  **New chart**. Its only way into Chart Builder is **Edit chart**, for exactly one selected song.
-- **Chart settings and the Chart Inspector:** Chart settings holds only the chart's timing and
-  parts, plus, for a new chart, the name, artist, charter, audio and location the folder needs. Every
-  other `song.ini` key, the album art, the stems and `delay` are edited in the Chart Inspector.
+- **New chart:** part of Chart Builder only, with no wizard. New chart opens a new chart in the
+  Editor straight away, and its first save asks where the song folder goes
+  ([C1](#c1-new-chart-and-chart-settings)). Chart Packer has no **New chart**. Its only way into
+  Chart Builder is **Edit chart**, for exactly one selected song.
+- **Chart settings and the Chart Inspector:** Chart settings, on the Editor's ⚙ menu, holds only the
+  chart's timing and parts. The name, artist, charter, every other `song.ini` key, the album art, the
+  stems and `delay` are edited in the Chart Inspector.
 - **Changing the resolution:** allowed at any time. It re-ticks the chart keeping times, and warns
   first when anything would move in time or be left out ([C1](#c1-new-chart-and-chart-settings)).
 - **Windows:** the launcher and the Editor are separate windows, and only one is open at a time

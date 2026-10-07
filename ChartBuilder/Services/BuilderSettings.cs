@@ -5,6 +5,16 @@ using ChartPacker.Core.Launching;
 
 namespace ChartBuilder.Services
 {
+    /// <summary>What notes do when a tempo marker changes (charter-spec C4 item 3).</summary>
+    public enum TempoEditMode
+    {
+        /// <summary>Notes keep their ticks, so they move in time with the grid.</summary>
+        KeepTicks,
+
+        /// <summary>Notes keep their times, so they're re-ticked to stay where they were in the audio.</summary>
+        KeepTimes,
+    }
+
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
     /// <remarks>Chart Packer's are in its own file, so neither app overwrites the other's.</remarks>
     public sealed class BuilderSettings
@@ -30,6 +40,9 @@ namespace ChartBuilder.Services
 
         /// <summary>The resolution, in ticks per beat, a new chart starts on: one of <see cref="NewChartSettings.Resolutions"/>.</summary>
         public int DefaultChartResolution { get; set; } = NewChartSettings.DefaultResolution;
+
+        /// <summary>Whether notes keep their ticks or their times when a tempo changes.</summary>
+        public TempoEditMode TempoEdits { get; set; } = TempoEditMode.KeepTicks;
 
         /// <summary>The editor's left panel (Chart Inspector) width, while expanded.</summary>
         public double EditorLeftPanelWidth { get; set; } = DefaultEditorLeftPanelWidth;

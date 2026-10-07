@@ -383,7 +383,8 @@ public sealed class ChangeTempoMap : ChartCommand
         Refill(chart.TempoMap, _oldTempos, _oldSignatures, _oldAnchors);
     }
 
-    private static void Refill(EditableTempoMap map, TempoChange[] tempos, TimeSignatureMarker[] signatures, TempoAnchor[] anchors)
+    /// <summary>Empties the tempo map's lists and fills them with these, in their order.</summary>
+    internal static void Refill(EditableTempoMap map, TempoChange[] tempos, TimeSignatureMarker[] signatures, TempoAnchor[] anchors)
     {
         ChartTickSnapshot.Refill(map.Tempos, tempos);
         ChartTickSnapshot.Refill(map.TimeSignatures, signatures);
@@ -391,7 +392,252 @@ public sealed class ChangeTempoMap : ChartCommand
     }
 }
 
-/// <summary>What the time-signature commands share.</summary>
+//// <summary>
+/// Changes the chart's resolution (charter-spec C1, Changing the resolution), keeping every item's time. The tempo and
+/// time-signature markers' ticks are scaled by the new resolution over the old, to the nearest tick, with their tempos
+/// unchanged, and each anchor moves with its marker; everything else is re-ticked as a tempo change that keeps times is
+/// (<see cref="ChangeTempoMap"/>), the passthrough tracks included.
+/// </summary>
+/// <remarks>
+/// <para>Undoing puts every tick back as it was, from what the command keeps, as re-ticking rounds.</para>
+/// <para>Items left out because another lands on their place are listed in <see cref="Collisions"/> and
+/// <see cref="LeftOut"/>. <see cref="ResolutionChangeReport.Analyze"/> works out beforehand what the change would move.</para>
+/// <para>The same resolution changes nothing.</para>
+/// </remarks>
+public sealed class ChangeResolution : ChartCommand
+{
+    private int _oldResolution;
+    private TempoChange[] _oldTempos = [];
+    private TimeSignatureMarker[] _oldSignatures = [];
+    private TempoAnchor[] _oldAnchors = [];
+    private ChartTickSnapshot? _retick;
+
+    /// <param name="resolution">The new ticks per beat.</param>
+    public ChangeResolution(int resolution)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(resolution);
+        if (resolution > short.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(resolution), resolution, "The resolution is too fine for a MIDI file.");
+        Resolution = resolution;
+    }
+
+    /// <summary>The new ticks per beat.</summary>
+    public int Resolution { get; }
+
+    /// <summary>What re-ticking did, when the last apply changed the resolution; null otherwise.</summary>
+    public RetickReport? Report { get; private set; }
+
+    /// <summary>The items the last apply's re-ticking left out, each having moved onto another's place.</summary>
+    public IReadOnlyList<RetickCollision> Collisions => Report?.Collisions ?? [];
+
+    /// <summary>
+    /// What the last apply left out or made the games read differently, in words: the markers and anchors that landed on
+    /// another's tick, then <see cref="Collisions"/>.
+    /// </summary>
+    public IReadOnlyList<string> LeftOut { get; private set; } = [];
+
+    private protected override ChartChange Do(EditableChart chart)
+    {
+        var map = chart.TempoMap;
+        _oldResolution = map.Resolution;
+        _retick = null;
+        if (map.Resolution == Resolution)
+        {
+            (Report, LeftOut) = (null, []);
+            return ChartChange.None;
+        }
+
+        var oldTempos = map.Tempos.AsSpan().ToArray();
+        var oldSignatures = map.TimeSignatures.AsSpan().ToArray();
+        var oldAnchors = map.Anchors.AsSpan().ToArray();
+        var scaled = ResolutionScaling.Markers(map, Resolution);
+        var from = map.ToTempoMap();
+
+        map.Resolution = Resolution;
+        ChangeTempoMap.Refill(map, scaled.Tempos, scaled.Signatures, scaled.Anchors);
+        RetickReport report;
+        ChartTickSnapshot retick;
+        try
+        {
+            (report, retick) = ChartRetick.Apply(chart, TickMaps.KeepTimes(from, map.ToTempoMap()));
+        }
+        catch
+        {
+            map.Resolution = _oldResolution;
+            ChangeTempoMap.Refill(map, oldTempos, oldSignatures, oldAnchors);
+            throw;
+        }
+
+        (_oldTempos, _oldSignatures, _oldAnchors) = (oldTempos, oldSignatures, oldAnchors);
+        (Report, _retick) = (report, retick);
+        LeftOut = [.. scaled.LeftOut, .. report.Collisions.Select(static c => c.Description)];
+        return ChartChange.Of(SongChanges.TempoMap);
+    }
+
+    private protected override void Undo(EditableChart chart)
+    {
+        if (_retick is null)
+            return;
+        _retick.Restore();
+        var map = chart.TempoMap;
+        map.Resolution = _oldResolution;
+        ChangeTempoMap.Refill(map, _oldTempos, _oldSignatures, _oldAnchors);
+        _retick = null;
+    }
+}
+
+/// <summary>
+/// Sets the tempo and time signature the song starts with, the markers at tick 0 (charter-spec C1, Timing), keeping
+/// either every item's tick or its time, as any tempo edit does (C4). A tick 0 with no marker gets one; one with several
+/// has the last changed, as that's the one the games read. Anchors stay where they are.
+/// </summary>
+public sealed class SetStartingTempo : ChartCommand
+{
+    private CompositeCommand? _applied;
+
+    /// <param name="microsecondsPerQuarter">The starting tempo, in whole microseconds per quarter note, or null to leave it.</param>
+    /// <param name="numerator">The starting time signature's beats, or null to leave it (with <paramref name="denominator"/>).</param>
+    /// <param name="denominator">The starting time signature's note value, or null to leave it.</param>
+    /// <param name="keepTimes">Whether everything keeps its time, rather than its tick, when the tempo changes.</param>
+    public SetStartingTempo(long? microsecondsPerQuarter, int? numerator, int? denominator, bool keepTimes)
+    {
+        if (numerator.HasValue != denominator.HasValue)
+            throw new ArgumentException("A time signature needs both its numerator and its denominator.", nameof(numerator));
+        MicrosecondsPerQuarter = microsecondsPerQuarter;
+        Numerator = numerator;
+        Denominator = denominator;
+        KeepTimes = keepTimes;
+    }
+
+    /// <summary>The starting tempo, or null to leave it.</summary>
+    public long? MicrosecondsPerQuarter { get; }
+
+    /// <summary>The starting time signature's beats, or null to leave it.</summary>
+    public int? Numerator { get; }
+
+    /// <summary>The starting time signature's note value, or null to leave it.</summary>
+    public int? Denominator { get; }
+
+    /// <summary>Whether everything keeps its time, rather than its tick, when the tempo changes.</summary>
+    public bool KeepTimes { get; }
+
+    /// <summary>The items the last apply's re-ticking left out, when it kept times.</summary>
+    public IReadOnlyList<RetickCollision> Collisions =>
+        _applied?.Commands.OfType<ChangeTempoMap>().FirstOrDefault()?.Collisions ?? [];
+
+    private protected override ChartChange Do(EditableChart chart)
+    {
+        var map = chart.TempoMap;
+        var commands = new List<IChartCommand>();
+        if (MicrosecondsPerQuarter is { } tempo)
+        {
+            var atZero = map.Tempos.At(0);
+            if (atZero.IsEmpty)
+            {
+                commands.Add(KeepTimes
+                    ? KeepingTimes(map, [new TempoChange(0, tempo), .. map.Tempos])
+                    : new AddTempo(new TempoChange(0, tempo)));
+            }
+            else if (atZero[^1].MicrosecondsPerQuarter != tempo)
+            {
+                var last = atZero[^1];
+                if (KeepTimes)
+                {
+                    TempoChange[] tempos = [.. map.Tempos];
+                    tempos[atZero.Length - 1] = last with { MicrosecondsPerQuarter = tempo };
+                    commands.Add(KeepingTimes(map, tempos));
+                }
+                else
+                {
+                    commands.Add(new SetTempo(last, tempo));
+                }
+            }
+        }
+
+        if (Numerator is { } numerator && Denominator is { } denominator)
+        {
+            // A time signature moves nothing in time, so it keeps ticks either way.
+            var atZero = map.TimeSignatures.At(0);
+            if (atZero.IsEmpty)
+                commands.Add(new AddTimeSignature(new TimeSignatureMarker(0, numerator, denominator)));
+            else if (atZero[^1].Numerator != numerator || atZero[^1].Denominator != denominator)
+                commands.Add(new SetTimeSignature(atZero[^1], numerator, denominator));
+        }
+
+        _applied = null;
+        if (commands.Count == 0)
+            return ChartChange.None;
+
+        var command = new CompositeCommand(commands);
+        command.Apply(chart);
+        _applied = command;
+        return command.Affected;
+    }
+
+    private protected override void Undo(EditableChart chart)
+    {
+        _applied?.Revert(chart);
+        _applied = null;
+    }
+
+    private static ChangeTempoMap KeepingTimes(EditableTempoMap map, IEnumerable<TempoChange> tempos) =>
+        new(tempos, map.TimeSignatures, map.Anchors, keepTimes: true);
+}
+
+/// <summary>Moves a tempo map's markers and anchors to a new resolution, for <see cref="ChangeResolution"/>.</summary>
+internal static class ResolutionScaling
+{
+    /// <summary><paramref name="tick"/> at <paramref name="to"/> ticks per beat rather than <paramref name="from"/>, to the nearest tick, halves up.</summary>
+    public static long Scale(long tick, int from, int to) => (tick * to * 2 + from) / (2L * from);
+
+    /// <summary>
+    /// The markers and anchors of <paramref name="map"/> at <paramref name="resolution"/>, in their order, and what landing
+    /// on one tick does to them, in words. Markers that land on one tick are all kept, and the games read the last; an
+    /// anchor that lands on another's tick is left out.
+    /// </summary>
+    public static (TempoChange[] Tempos, TimeSignatureMarker[] Signatures, TempoAnchor[] Anchors, IReadOnlyList<string> LeftOut) Markers(EditableTempoMap map, int resolution)
+    {
+        int from = map.Resolution;
+        var leftOut = new List<string>();
+
+        var tempos = map.Tempos.AsSpan().ToArray();
+        for (int i = 0; i < tempos.Length; i++)
+            tempos[i] = tempos[i] with { Tick = Scale(tempos[i].Tick, from, resolution) };
+        for (int i = 1; i < tempos.Length; i++)
+        {
+            if (tempos[i].Tick == tempos[i - 1].Tick && map.Tempos[i].Tick != map.Tempos[i - 1].Tick)
+                leftOut.Add(Invariant($"The tempo marker at tick {map.Tempos[i - 1].Tick} would land on tick {tempos[i].Tick} with the one at tick {map.Tempos[i].Tick}, and the games read only the last."));
+        }
+
+        var signatures = map.TimeSignatures.AsSpan().ToArray();
+        for (int i = 0; i < signatures.Length; i++)
+            signatures[i] = signatures[i] with { Tick = Scale(signatures[i].Tick, from, resolution) };
+        for (int i = 1; i < signatures.Length; i++)
+        {
+            if (signatures[i].Tick == signatures[i - 1].Tick && map.TimeSignatures[i].Tick != map.TimeSignatures[i - 1].Tick)
+                leftOut.Add(Invariant($"The time signature at tick {map.TimeSignatures[i - 1].Tick} would land on tick {signatures[i].Tick} with the one at tick {map.TimeSignatures[i].Tick}, and the games read only the last."));
+        }
+
+        var anchors = new List<TempoAnchor>(map.Anchors.Count);
+        foreach (var anchor in map.Anchors)
+        {
+            long tick = Scale(anchor.Tick, from, resolution);
+            if (anchors.Count > 0 && anchors[^1].Tick == tick)
+            {
+                leftOut.Add(Invariant($"The anchor of the tempo marker at tick {anchor.Tick} would land on another's, at tick {tick}, so it would be left out."));
+                continue;
+            }
+
+            anchors.Add(anchor with { Tick = tick });
+        }
+
+        return (tempos, signatures, [.. anchors], leftOut);
+    }
+
+    private static string Invariant(FormattableString text) => FormattableString.Invariant(text);
+}
+
+// <summary>What the time-signature commands share.</summary>
 internal static class SignatureEdits
 {
     /// <summary>Throws when <paramref name="marker"/> isn't a time signature the editor places.</summary>

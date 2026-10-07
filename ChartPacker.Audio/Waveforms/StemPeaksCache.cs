@@ -48,13 +48,14 @@ public sealed class StemPeaksCache
     /// The key for <paramref name="track"/> of <paramref name="entry"/> as its file is now, or <see langword="null"/>
     /// when the file can't be found. Take it before reading the track, so what's read is at least as new.
     /// </summary>
-    public static StemPeaksKey? KeyOf(SongEntry entry, SongTrack track)
+    public static StemPeaksKey? KeyOf(SongEntry? entry, SongTrack track)
     {
-        ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(track);
 
-        string path = track.StagedSourcePath
-            ?? (entry.Kind == SongEntryKind.SngFile ? entry.FullPath : Path.Combine(entry.FullPath, track.StoredName));
+        string? path = track.StagedSourcePath
+            ?? (entry is null ? null : entry.Kind == SongEntryKind.SngFile ? entry.FullPath : Path.Combine(entry.FullPath, track.StoredName));
+        if (path is null)
+            return null;
         try
         {
             var file = new FileInfo(path);

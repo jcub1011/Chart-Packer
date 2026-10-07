@@ -67,6 +67,37 @@ public sealed class NewChartCreatorTests
     }
 
     [TestMethod]
+    [DataRow(DrumsVariant.FourLane)]
+    [DataRow(DrumsVariant.Pro)]
+    [DataRow(DrumsVariant.FiveLane)]
+    public async Task ACreatedChartReopensWithItsTempoMapPartsAndMetadata(DrumsVariant drums)
+    {
+        // AC C1.1 and C1.5: it reopens in the editor as it was created, the drums read with their layout.
+        var settings = new NewChartSettings("Song", 960, 145.5, 7, 8, new HashSet<ChartInstrument> { ChartInstrument.Bass, ChartInstrument.GhlGuitar, ChartInstrument.Drums }, drums);
+        var request = Request(new NewChartStem(Wav("mix.wav", seconds: 1), "song")) with { Charter = "Me", Chart = settings };
+
+        string folder = await NewChartCreator.CreateAsync(request, TestContext.CancellationToken);
+        var opened = await SongOpener.OpenAsync(SongOpener.EntryOf(folder)!, TestContext.CancellationToken);
+
+        Assert.IsNull(opened.Problem);
+        var song = opened.Song!;
+        var chart = song.Chart;
+        Assert.AreEqual(960, chart.Resolution);
+        Assert.AreSequenceEqual([new TempoChange(0, EditableTempoMap.MicrosecondsPerQuarterOf(145.5))], chart.TempoMap.Tempos.ToList());
+        Assert.AreSequenceEqual([(0L, 7, 8)], chart.TempoMap.TimeSignatures.Select(s => (s.Tick, s.Numerator, s.Denominator)).ToList());
+        Assert.AreSequenceEqual([ChartInstrument.Bass, ChartInstrument.Drums, ChartInstrument.GhlGuitar], chart.Parts.Select(p => p.Instrument).ToList());
+        Assert.AreEqual(drums, chart.DrumsVariant);
+        Assert.AreEqual("Song", song.Value("name"));
+        Assert.AreEqual("Artist", song.Value("artist"));
+        Assert.AreEqual("Me", song.Value("charter"));
+        Assert.AreEqual("-1", song.Value("diff_bass"));
+        Assert.IsEmpty(PendingSongIniChanges.Of(chart, chart.Parts.Select(p => p.Instrument).ToHashSet(), song.Pairs), "Nothing is left to write.");
+        Assert.AreEqual(
+            drums switch { DrumsVariant.FourLane => DrumsLayout.FourLane, DrumsVariant.FiveLane => DrumsLayout.FiveLane, _ => DrumsLayout.Pro },
+            new DrumsLayouts(song.Options, midi: true).Layout);
+    }
+
+    [TestMethod]
     public async Task TheSongIsAsLongAsItsLongestStemButNotThePreview()
     {
         var request = Request(

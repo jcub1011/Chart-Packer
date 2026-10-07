@@ -12,7 +12,8 @@ public sealed record OpenedTrack(SongTrack Track, IPcmSource? Source, string? Er
 
 /// <summary>
 /// A song's audio tracks, open for decoding: stored stems are read straight out of the
-/// <c>.sng</c> or the folder, and tracks a draft adds from the files they'll be copied from.
+/// <c>.sng</c> or the folder, and tracks a draft adds from the files they'll be copied from. A
+/// new chart, which has no song yet, has only the latter.
 /// </summary>
 /// <remarks>
 /// Every file is opened for reading only, sharing reads, so nothing can replace or delete it
@@ -24,13 +25,13 @@ public sealed class SongAudio : IDisposable
 {
     private const int BufferSize = 64 * 1024;
 
-    private readonly SongEntry _entry;
+    private readonly SongEntry? _entry;
     private readonly SafeFileHandle? _sngHandle;
     private readonly Dictionary<string, SngFileEntry>? _stored;
     private readonly ReadOnlyMemory<byte> _mask;
     private readonly List<OpenedTrack> _tracks;
 
-    private SongAudio(SongEntry entry, SafeFileHandle? sngHandle, Dictionary<string, SngFileEntry>? stored, ReadOnlyMemory<byte> mask, List<OpenedTrack> tracks)
+    private SongAudio(SongEntry? entry, SafeFileHandle? sngHandle, Dictionary<string, SngFileEntry>? stored, ReadOnlyMemory<byte> mask, List<OpenedTrack> tracks)
     {
         _entry = entry;
         _sngHandle = sngHandle;
@@ -46,12 +47,15 @@ public sealed class SongAudio : IDisposable
         [.. _tracks.Where(t => t.Source is not null).Select(t => KeyValuePair.Create(t.Track.StoredName, t.Source!))];
 
     /// <summary>Opens <paramref name="tracks"/> of <paramref name="entry"/>. A track that can't be opened is kept, with the reason.</summary>
+    /// <param name="entry">The song, or null for a new chart's, whose tracks are all staged.</param>
+    /// <exception cref="ArgumentException">There's no song, and a track isn't staged.</exception>
     /// <exception cref="IOException">The <c>.sng</c> can't be read.</exception>
     /// <exception cref="UnauthorizedAccessException">The <c>.sng</c> can't be read.</exception>
-    public static SongAudio Open(SongEntry entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken = default)
+    public static SongAudio Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(tracks);
+        if (entry is null && tracks.Any(t => !t.IsStaged))
+            throw new ArgumentException("Only staged tracks can be opened without a song.", nameof(tracks));
 
         SafeFileHandle? handle = null;
         Dictionary<string, SngFileEntry>? stored = null;
@@ -59,7 +63,7 @@ public sealed class SongAudio : IDisposable
         var opened = new List<OpenedTrack>(tracks.Count);
         try
         {
-            if (entry.Kind == SongEntryKind.SngFile && tracks.Any(t => !t.IsStaged))
+            if (entry?.Kind == SongEntryKind.SngFile && tracks.Any(t => !t.IsStaged))
             {
                 // The handle is opened first, so the index read is of the file it reads.
                 handle = File.OpenHandle(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -111,7 +115,7 @@ public sealed class SongAudio : IDisposable
         _sngHandle?.Dispose();
     }
 
-    private static OpenedTrack OpenTrack(SongEntry entry, SongTrack track, SafeFileHandle? handle, Dictionary<string, SngFileEntry>? stored, ReadOnlySpan<byte> mask)
+    private static OpenedTrack OpenTrack(SongEntry? entry, SongTrack track, SafeFileHandle? handle, Dictionary<string, SngFileEntry>? stored, ReadOnlySpan<byte> mask)
     {
         try
         {
@@ -123,12 +127,16 @@ public sealed class SongAudio : IDisposable
         }
     }
 
-    private static IPcmSource OpenDecoder(SongEntry entry, SongTrack track, SafeFileHandle? handle, Dictionary<string, SngFileEntry>? stored, ReadOnlySpan<byte> mask)
+    private static IPcmSource OpenDecoder(SongEntry? entry, SongTrack track, SafeFileHandle? handle, Dictionary<string, SngFileEntry>? stored, ReadOnlySpan<byte> mask)
     {
         Stream stream;
         if (track.StagedSourcePath is { } source)
         {
             stream = OpenFile(source);
+        }
+        else if (entry is null)
+        {
+            throw new FileNotFoundException("The track isn't staged, and there's no song to read it from.");
         }
         else if (entry.Kind == SongEntryKind.SngFile)
         {

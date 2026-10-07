@@ -75,9 +75,7 @@
                                 <Button.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedLeft">
                                         <MenuItem Header="{x:Static res:Strings.ChartSettingsMenuItem}"
-                                                  Command="{Binding OpenChartSettingsCommand}"
-                                                  ToolTip.Tip="{x:Static res:Strings.ComingSoonToolTip}"
-                                                  ToolTip.ShowOnDisabled="True" />
+                                                  Command="{Binding OpenChartSettingsCommand}" />
                                         <MenuItem Header="{x:Static res:Strings.ProgramSettingsMenuItem}"
                                                   Command="{Binding OpenProgramSettingsCommand}"
                                                   InputGesture="Ctrl+OemComma" />
@@ -221,19 +219,47 @@
                           Background="{DynamicResource SubtleBorderBrush}"
                           IsVisible="{Binding !IsRightPanelCollapsed}" />
 
-            <!-- Right panel: Properties, which will show whatever is selected. -->
+            <!-- Right panel: Properties, which will show whatever is selected, and the song.ini changes waiting to be
+                 saved (charter-spec C17 item 2). -->
             <bctl:EditorSidePanel Grid.Column="4"
                                   Title="{x:Static res:Strings.PropertiesTab}"
                                   IsCollapsed="{Binding IsRightPanelCollapsed}"
                                   ToggleCommand="{Binding ToggleRightPanelCommand}"
                                   IsRightEdge="True">
-                <StackPanel Classes="placeholder">
-                    <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
-                    <TextBlock Classes="muted centered"
-                               FontSize="12"
-                               TextWrapping="Wrap"
-                               Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
-                </StackPanel>
+                <Grid RowDefinitions="*,Auto">
+                    <StackPanel Grid.Row="0" Classes="placeholder">
+                        <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
+                        <TextBlock Classes="muted centered"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
+                    </StackPanel>
+                    <Border Grid.Row="1"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}"
+                            BorderThickness="0,1,0,0"
+                            Padding="12,8">
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
+                            <TextBlock Classes="muted"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="{x:Static res:Strings.PendingChangesNone}"
+                                       IsVisible="{Binding !HasPendingChanges}" />
+                            <ItemsControl ItemsSource="{Binding PendingChanges}" IsVisible="{Binding HasPendingChanges}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <SelectableTextBlock FontSize="12" Text="{Binding}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Classes="muted"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="{x:Static res:Strings.PendingChangesHint}"
+                                       IsVisible="{Binding HasPendingChanges}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </bctl:EditorSidePanel>
         </Grid>
 

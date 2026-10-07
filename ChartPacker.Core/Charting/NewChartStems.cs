@@ -18,6 +18,15 @@ public enum NewChartStemProblemKind
 /// <param name="Stem">The shared stem; <see langword="null"/> for an unassigned file.</param>
 public sealed record NewChartStemProblem(NewChartStemProblemKind Kind, IReadOnlyList<int> Indexes, string? Stem);
 
+/// <summary>
+/// A new chart's audio, from the files it was given: the tracks it plays, each from its own file until the chart is first
+/// saved, and the files left out.
+/// </summary>
+/// <param name="Tracks">The files used, each as the stem its name gives, stored as <c>&lt;stem&gt;.&lt;ext&gt;</c> in lowercase.</param>
+/// <param name="NotAudio">The files that aren't audio, by extension.</param>
+/// <param name="NoStem">The files whose names give no stem, once one has taken <see cref="NewChartStems.Fallback"/>, or whose stem another already has.</param>
+public sealed record NewChartAudio(IReadOnlyList<SongTrack> Tracks, IReadOnlyList<string> NotAudio, IReadOnlyList<string> NoStem);
+
 /// <summary>Assigns a new chart's audio files their stems (charter-spec C1, Audio).</summary>
 public static class NewChartStems
 {
@@ -44,6 +53,41 @@ public static class NewChartStems
         if (!fallbackTaken && unnamed >= 0)
             stems[unnamed] = Fallback;
         return stems;
+    }
+
+    /// <summary>
+    /// The audio a new chart starts with, from <paramref name="paths"/>, e.g. files dropped on the launcher: each audio file
+    /// as the stem <see cref="Assign"/> gives it, played from where it is. A file given twice is used once.
+    /// </summary>
+    public static NewChartAudio TracksOf(IReadOnlyList<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        var notAudio = new List<string>();
+        var audio = new List<string>();
+        foreach (string path in paths.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (AudioStems.IsAudioExtension(Path.GetExtension(path)))
+                audio.Add(path);
+            else
+                notAudio.Add(path);
+        }
+
+        var stems = Assign([], audio);
+        var tracks = new List<SongTrack>();
+        var noStem = new List<string>();
+        for (int i = 0; i < audio.Count; i++)
+        {
+            if (stems[i] is not { } stem || tracks.Any(t => t.Stem == stem))
+            {
+                noStem.Add(audio[i]);
+                continue;
+            }
+
+            tracks.Add(new SongTrack(stem + Path.GetExtension(audio[i]).ToLowerInvariant(), stem, audio[i]));
+        }
+
+        return new NewChartAudio([.. tracks.OrderBy(t => AudioStems.OrderOf(t.Stem))], notAudio, noStem);
     }
 
     /// <summary>What's wrong with <paramref name="stems"/>, a new chart's files' stems in order: unassigned files first, then shared stems.</summary>

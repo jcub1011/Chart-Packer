@@ -109,21 +109,9 @@
     <value>Something went wrong: {0}</value>
     <comment>Shown on the home screen when New chart fails unexpectedly. {0} is the error message.</comment>
   </data>
-  <data name="EditorAudioFileNotAddedFormat" xml:space="preserve">
-    <value>{0} wasn't added: the Editor can't use audio yet. A song's audio will be set up from Chart settings.</value>
-    <comment>The editor's notice when New chart was given one audio file (dropped or on the command line). {0} is the file's name.</comment>
-  </data>
-  <data name="EditorAudioFilesNotAddedFormat" xml:space="preserve">
-    <value>{0} audio files weren't added: the Editor can't use audio yet. A song's audio will be set up from Chart settings.</value>
-    <comment>The editor's notice when New chart was given several audio files. {0} is how many.</comment>
-  </data>
   <data name="DismissNoticeToolTip" xml:space="preserve">
     <value>Dismiss</value>
     <comment>Closes the editor's notice strip.</comment>
-  </data>
-  <data name="EditorUntitledChart" xml:space="preserve">
-    <value>Untitled chart</value>
-    <comment>The editor's title before the chart has a name.</comment>
   </data>
   <data name="EditorWindowTitleFormat" xml:space="preserve">
     <value>{0} - Chart Builder</value>
@@ -526,5 +514,161 @@ Open it anyway?</value>
   </data>
   <data name="PromptForCalibrationKeywords" xml:space="preserve">
     <value>latency calibrate calibration prompt ask device first</value>
+  </data>
+  <data name="SettingsCategoryEditing" xml:space="preserve">
+    <value>Editing</value>
+  </data>
+  <data name="TempoEditsLabel" xml:space="preserve">
+    <value>When a tempo changes</value>
+  </data>
+  <data name="TempoEditsDescription" xml:space="preserve">
+    <value>Whether notes keep their ticks, so they move in time with the grid, or keep their times, so they stay where they are in the audio. Keeping ticks is right while the tempo map is still being built.</value>
+  </data>
+  <data name="TempoEditsKeywords" xml:space="preserve">
+    <value>tempo bpm keep ticks times retick grid</value>
+  </data>
+  <data name="TempoEditsKeepTicks" xml:space="preserve">
+    <value>Notes keep their ticks</value>
+  </data>
+  <data name="TempoEditsKeepTimes" xml:space="preserve">
+    <value>Notes keep their times</value>
+  </data>
+  <data name="ChartSettingsWindowTitle" xml:space="preserve">
+    <value>Chart settings</value>
+  </data>
+  <data name="ChartSettingsSectionsName" xml:space="preserve">
+    <value>Sections</value>
+  </data>
+  <data name="ChartSettingsSectionTiming" xml:space="preserve">
+    <value>Timing</value>
+  </data>
+  <data name="ChartSettingsSectionParts" xml:space="preserve">
+    <value>Parts</value>
+  </data>
+  <data name="ChartSettingsResolutionLabel" xml:space="preserve">
+    <value>Resolution</value>
+  </data>
+  <data name="ChartSettingsBpmLabel" xml:space="preserve">
+    <value>Starting BPM</value>
+  </data>
+  <data name="ChartSettingsTimeSignatureLabel" xml:space="preserve">
+    <value>Time signature</value>
+  </data>
+  <data name="ChartSettingsNumeratorName" xml:space="preserve">
+    <value>Beats per measure</value>
+  </data>
+  <data name="ChartSettingsDenominatorName" xml:space="preserve">
+    <value>Note value of a beat</value>
+  </data>
+  <data name="ChartSettingsDrumsLabel" xml:space="preserve">
+    <value>Drums</value>
+  </data>
+  <data name="ChartSettingsDrumsLockedToolTip" xml:space="preserve">
+    <value>The drums have notes, so their variant can't be changed yet. Converting them comes in a later version.</value>
+  </data>
+  <data name="DrumsFourLane" xml:space="preserve">
+    <value>4-lane</value>
+  </data>
+  <data name="DrumsPro" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="DrumsFiveLane" xml:space="preserve">
+    <value>5-lane</value>
+  </data>
+  <data name="PartLead" xml:space="preserve">
+    <value>Lead</value>
+  </data>
+  <data name="PartBass" xml:space="preserve">
+    <value>Bass</value>
+  </data>
+  <data name="PartRhythm" xml:space="preserve">
+    <value>Rhythm</value>
+  </data>
+  <data name="PartCoop" xml:space="preserve">
+    <value>Co-op</value>
+  </data>
+  <data name="PartGhlGuitar" xml:space="preserve">
+    <value>GHL Guitar</value>
+  </data>
+  <data name="PartGhlBass" xml:space="preserve">
+    <value>GHL Bass</value>
+  </data>
+  <data name="PartGhlRhythm" xml:space="preserve">
+    <value>GHL Rhythm</value>
+  </data>
+  <data name="PartGhlCoop" xml:space="preserve">
+    <value>GHL Co-op</value>
+  </data>
+  <data name="PartDrums" xml:space="preserve">
+    <value>Drums</value>
+  </data>
+  <data name="ChartSettingsBadBpmFormat" xml:space="preserve">
+    <value>The starting BPM is {0} to {1}.</value>
+  </data>
+  <data name="ChartSettingsBadNumeratorFormat" xml:space="preserve">
+    <value>A time signature has 1 to {0} beats.</value>
+  </data>
+  <data name="RemovePartTitle" xml:space="preserve">
+    <value>Remove part</value>
+  </data>
+  <data name="RemovePartMessageFormat" xml:space="preserve">
+    <value>{0} has notes. Remove it, with its notes, phrases and events? It can be undone.</value>
+  </data>
+  <data name="RemovePartConfirm" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="ResolutionWarningTitle" xml:space="preserve">
+    <value>Change the resolution?</value>
+  </data>
+  <data name="ResolutionWarningMovesFormat" xml:space="preserve">
+    <value>Changing the resolution from {0} to {1} would move {2} items in time, as their ticks don't scale to whole ticks, by up to {3:0.###} ms:</value>
+  </data>
+  <data name="ResolutionWarningGroupFormat" xml:space="preserve">
+    <value>• {0}: {1}</value>
+  </data>
+  <data name="ResolutionWarningLeftOut" xml:space="preserve">
+    <value>These would be left out, as another item lands on their place:</value>
+  </data>
+  <data name="ResolutionWarningConfirm" xml:space="preserve">
+    <value>Change anyway</value>
+  </data>
+  <data name="ResolutionGroupTempoMap" xml:space="preserve">
+    <value>Tempo map</value>
+  </data>
+  <data name="ResolutionGroupEvents" xml:space="preserve">
+    <value>Events</value>
+  </data>
+  <data name="ResolutionGroupPassthrough" xml:space="preserve">
+    <value>Other tracks (vocals, venue and the like)</value>
+  </data>
+  <data name="ResolutionChangeFailedFormat" xml:space="preserve">
+    <value>The resolution can't be changed: {0}</value>
+  </data>
+  <data name="ChartSettingsNotAppliedFormat" xml:space="preserve">
+    <value>Chart settings couldn't be applied, so nothing was changed: {0}</value>
+  </data>
+  <data name="PendingChangesHeading" xml:space="preserve">
+    <value>Pending song.ini changes</value>
+  </data>
+  <data name="PendingChangesNone" xml:space="preserve">
+    <value>None.</value>
+  </data>
+  <data name="PendingChangesHint" xml:space="preserve">
+    <value>They are written when the chart is saved, which comes in a later version.</value>
+  </data>
+  <data name="PendingChangeFormat" xml:space="preserve">
+    <value>{0} = {1}</value>
+  </data>
+  <data name="EditorUntitledChart" xml:space="preserve">
+    <value>Untitled chart</value>
+  </data>
+  <data name="NewChartFilesNotAddedFormat" xml:space="preserve">
+    <value>Some audio files weren't added: {0}.</value>
+  </data>
+  <data name="NewChartFileNotAudioFormat" xml:space="preserve">
+    <value>{0} isn't an .ogg, .opus, .mp3 or .wav file</value>
+  </data>
+  <data name="NewChartFileNoStemFormat" xml:space="preserve">
+    <value>{0}'s name doesn't say which stem it is, or another file is already that stem</value>
   </data>
 </root>

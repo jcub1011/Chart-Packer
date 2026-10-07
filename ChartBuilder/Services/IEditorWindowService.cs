@@ -8,10 +8,10 @@ namespace ChartBuilder.Services
     public interface IEditorWindowService
     {
         /// <summary>
-        /// Opens a new Editor window in place of the launcher, which closes. <paramref name="audioFiles"/> are the
-        /// ones New chart was given; the Editor can't use them yet, so it says they weren't added.
+        /// Opens a new chart in a new Editor window in place of the launcher, which closes (charter-spec C1). The chart
+        /// has <paramref name="audioFiles"/> as its stems, and no folder until it's first saved.
         /// </summary>
-        void OpenEditor(IReadOnlyList<string> audioFiles);
+        void OpenNewChart(IReadOnlyList<string> audioFiles);
 
         /// <summary>
         /// Opens <paramref name="song"/> in a new Editor window in place of the launcher, which closes. The Editor holds
