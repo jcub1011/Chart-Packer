@@ -4,6 +4,7 @@
              xmlns:res="using:ChartBuilder.Resources"
              xmlns:ctl="using:ChartPacker.Controls"
              xmlns:bctl="using:ChartBuilder.Controls"
+             xmlns:edit="using:ChartBuilder.Controls.Editing"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="480"
@@ -11,8 +12,9 @@
              x:DataType="vm:EditorLaneViewModel"
              Background="{DynamicResource SurfaceBrush}">
 
-    <!-- One of the Editor's lanes: a header like a docked tool window's, which picks the part, adds and closes lanes,
-         and is dragged to dock the lane elsewhere (LaneDockHost); and the lane's body, a placeholder so far. -->
+    <!-- One of the Editor's lanes: a header like a docked tool window's, which picks the part and the difficulty, a
+         ghost difficulty and the view, adds and closes lanes, and is dragged to dock the lane elsewhere (LaneDockHost);
+         and the lane's body, its editor canvas as a highway or a timeline (charter-spec C3). -->
     <UserControl.Resources>
         <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
     </UserControl.Resources>
@@ -32,6 +34,40 @@
         </Style>
         <Style Selector="Button.lane-part:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+
+        <!-- The difficulty letters: in the detail panel's difficulty colours where the difficulty has notes, grey where
+             it's empty (charter-spec C3 item 3), and the lane's own marked. -->
+        <Style Selector="Button.difficulty">
+            <Setter Property="MinWidth" Value="20" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyUnsetBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.difficulty.has.easy">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyEasyBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.has.medium">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyMediumBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.has.hard">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyHardBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.has.expert">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyExpertBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.current">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
         </Style>
 
         <!-- The lane being dragged, while it is. -->
@@ -69,7 +105,75 @@
                     </Button.Flyout>
                 </Button>
 
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="1" Margin="6,0,0,0" VerticalAlignment="Center">
+                    <ItemsControl ItemsSource="{Binding Difficulties}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="1" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DifficultyLetter">
+                                <Button Classes="difficulty"
+                                        Classes.has="{Binding HasNotes}"
+                                        Classes.current="{Binding IsCurrent}"
+                                        Classes.easy="{Binding IsEasy}"
+                                        Classes.medium="{Binding IsMedium}"
+                                        Classes.hard="{Binding IsHard}"
+                                        Classes.expert="{Binding IsExpert}"
+                                        Content="{Binding Letter}"
+                                        Command="{Binding Show}"
+                                        ToolTip.Tip="{Binding Name, StringFormat={x:Static res:Strings.LaneDifficultyToolTipFormat}}"
+                                        AutomationProperties.Name="{Binding Name}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <!-- The lane's look-ahead: how far beyond the strike line it shows. -->
+                    <Button Classes="lane-part"
+                            IsVisible="{Binding !IsVocal}"
+                            ToolTip.Tip="{x:Static res:Strings.LaneLookAheadToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}">
+                        <TextBlock FontSize="12" VerticalAlignment="Center" Text="{Binding LookAheadText}" />
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <StackPanel Spacing="4" Width="220">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneLookAheadLabel}" />
+                                        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding LookAheadText}" />
+                                    </Grid>
+                                    <Slider Minimum="{x:Static vm:EditorLaneViewModel.MinLookAheadScale}"
+                                            Maximum="{x:Static vm:EditorLaneViewModel.MaxLookAheadScale}"
+                                            SmallChange="0.1"
+                                            LargeChange="0.5"
+                                            Value="{Binding LookAheadScale}"
+                                            AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}" />
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Classes="tool"
+                            IsVisible="{Binding !IsVocal}"
+                            ToolTip.Tip="{x:Static res:Strings.LaneGhostToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneGhostToolTip}">
+                        <ctl:LineIcon Data="{StaticResource ViewStroke}" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                        ItemsSource="{Binding GhostMenu, Converter={StaticResource LaneMenu}}" />
+                        </Button.Flyout>
+                    </Button>
+                    <Button Classes="tool"
+                            IsVisible="{Binding !IsVocal}"
+                            Command="{Binding ToggleViewCommand}"
+                            ToolTip.Tip="{Binding ViewToolTip}"
+                            AutomationProperties.Name="{Binding ViewToolTip}">
+                        <Panel>
+                            <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />
+                            <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" IsVisible="{Binding IsTimeline}" />
+                        </Panel>
+                    </Button>
                     <Button Classes="tool"
                             ToolTip.Tip="{x:Static res:Strings.LaneAddToolTip}"
                             AutomationProperties.Name="{x:Static res:Strings.LaneAddToolTip}">
@@ -89,8 +193,16 @@
             </Grid>
         </Border>
 
-        <StackPanel Classes="placeholder">
-            <TextBlock Classes="muted centered" Text="{Binding Placeholder}" />
-        </StackPanel>
+        <Panel>
+            <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
+                                      AccentBrush="{DynamicResource AccentTextBrush}"
+                                      LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <edit:TimelineEditorCanvas IsVisible="{Binding ShowsTimeline}"
+                                       AccentBrush="{DynamicResource AccentTextBrush}"
+                                       LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <StackPanel Classes="placeholder" IsVisible="{Binding HasPlaceholder}">
+                <TextBlock Classes="muted centered" TextWrapping="Wrap" Text="{Binding Placeholder}" />
+            </StackPanel>
+        </Panel>
     </DockPanel>
 </UserControl>

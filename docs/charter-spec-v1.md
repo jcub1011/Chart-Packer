@@ -92,7 +92,7 @@ Chart-Packer.slnx
 ├── ChartPacker/                  Chart Packer app: library, inspector, packing. Launches Chart Builder (§4.8)
 ├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases, calibration tool
 ├── ChartPacker.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
-│                                 settings window, shared controls, and later the player and highway view models
+│                                 settings window, shared controls, and the drawing of notes and waveforms
 ├── ChartPacker.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synthesis/ (`Synth`: click, beep, hit sounds)
 ├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions), + SongLock
 └── ChartPacker.Core.Tests/       + Charting/, Audio/Analysis/ tests
@@ -327,13 +327,18 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   - **Timeline**, along the bottom at the window's full width. It shows the chart's notes over the
     waveform of the whole mix. It can be resized (the height is saved) and scrubbed.
   - The chart's canvas (below) fills the middle.
-- **`ChartEditorView` / `ChartEditorViewModel`**, added to the explicit mapping in `ViewLocator`
-  (there is no reflection-based lookup).
+- **`ChartEditorViewModel`**, which joins the editor's state to playback. *Settled in CM2:* the
+  lanes are built in code, so nothing needs a `ViewLocator` yet.
 - **Two custom-drawn canvases over one model**: `HighwayEditorCanvas` (vertical) and
   `TimelineEditorCanvas` (horizontal). They share one tool and hit-testing layer, `EditorTools`
-  (place, select, erase, sustain, phrase, tempo), so behaviour is the same in both. Drawing builds
-  on `NoteHighwayView`/`HighwayScene` (note shapes, lane colours, beat lines) and
-  `LaneWaveformPainter`.
+  (place, select, erase, sustain, phrase, tempo), so behaviour is the same in both.
+  - *Settled in CM2:* `EditorTools` lives in Core (`Charting/Editing/`) with the rest of the
+    editor's state, UI-free, so its tests need no canvas. The canvases only map the pointer to a
+    tick and a lane, through `LaneProjection`.
+  - Drawing uses `GemPainter`, `HighwayPalette` and `LaneWaveformPainter`, which moved from
+    Chart Packer's `NoteHighwayView` into `ChartPacker.UI`.
+  - Chart Packer's player and highway view models stay in Chart Packer. They're built round the
+    inspector's song, drafts and offsets, which the editor doesn't have.
 - **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
   `WindowChrome` for the dark title bar and icon, as the other dialogs do.
 - **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
@@ -692,8 +697,13 @@ Acceptance criteria:
      and lining notes up with the audio.
 
    The selection, the cursor, zoom (as seconds on screen) and the tool all carry across a switch.
+   *Settled in CM2:* each docked lane has its own view, and `V` switches the lane in focus. Every
+   lane shares the cursor, selection and tool. Zoom is each lane's own look-ahead (C10 item 6), which
+   a switch keeps.
 2. **Overview strip** along the edge. It shows the whole song: sections, note density, star power,
-   solos, lint marks and the current view, and clicking or dragging it jumps there.
+   solos, lint marks and the current view, and clicking or dragging it jumps there. *Settled in
+   CM2:* it's the timeline along the Editor's bottom, which already spans the song. It shows the
+   lane in focus.
 3. **Part and difficulty picker.** Every part with its four difficulties. The letters use the
    detail panel's difficulty colours from `Theme.axaml` (green, yellow, red, purple) where the
    difficulty has notes, and grey where it is empty. The detail panel shows only charted
@@ -742,6 +752,12 @@ Acceptance criteria:
      offers to unanchor it, or to add a marker one beat before it.
    - Dragging an anchored marker in time changes the BPMs on both sides of it. This is how a
      tempo map is fitted to a live recording, beat by beat.
+   - *Settled in CM2:*
+     - The segment that absorbs a change is the last one before the anchor that starts after the
+       edited marker. Only the first anchor after an edit can move.
+     - Removing or moving a marker is absorbed in the same way.
+     - A marker can't be moved past an anchor.
+     - Every tempo edit is one `ChangeTempoMap` (`TempoMapEdits`), so it undoes exactly.
 3. **When a tempo changes, notes keep their ticks (the default) or their times.**
    - Keeping ticks means the notes move in time with the grid, which is right while the tempo map
      is still being built.
@@ -981,7 +997,14 @@ Acceptance criteria:
      own latency, which the app can't see.
    - The latency is in real time, so it is scaled by the playback speed to give song time.
 6. **Following.** While playing, the view keeps the cursor at a fixed place, a quarter of the way
-   from the strike end. Scrolling pauses following until playback is restarted.
+   from the strike end. Scrolling pauses following until playback is restarted. *Restated in
+   CM2:*
+   - The cursor is always at that place: it's the lane's strike line.
+   - Scrolling moves the song past it a grid step a notch, through the tempo map, so the strike
+     line stays on the grid across tempo and time-signature changes. The cursor moves with it,
+     and the audio seeks there, playing or paused.
+   - Each lane's look-ahead, the seconds it shows beyond the strike line, is its own. It's set
+     from the lane's header, or with Ctrl+wheel, `+` and `−`, and saved with the lane layout.
 
 Acceptance criteria:
 
@@ -1917,7 +1940,7 @@ fails the run if anything there changes anyway.
 | --------- | -------- | ------------- |
 | **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartPacker.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and the C1 wizard moved from Chart Packer as it is. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; the wizard opens from Chart Builder's home screen and from dropped audio files |
 | **CM1: Model, writer and lint engine** | `EditableChart` and friends, `MidiChartLoader`, `MidiChartWriter`, passthrough and re-ticking, the game-view projection and extended read-back check, `MidiChartReader` reading dynamics, commands and undo. The lint engine: rule scopes, `Finding`'s chart location, and chart quick fixes. The `SongFolderFiles` order change. And the tests. | Every round-trip and writer-vs-reader test passes, and AC C2.4; zero AOT warnings |
-| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart and Chart settings (without **Detect from audio**), C2 open and import, with **Edit chart** turned on, `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), and the player and highway view models moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
+| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart and Chart settings (without **Detect from audio**), C2 open and import, with **Edit chart** turned on, `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), the highway's drawing moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
 | **CM3: Drums and GHL** | C6 all three drum variants and conversion, C7 GHL, C8 phrases and events, and the drums and phrase lint rules | AC C6, C7 and C8 pass |
 | **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and new chart's **Detect from audio** | AC C12, C13 and C14 pass |
 | **CM5: Authoring tools** | C9 reduction, C15 record mode, clipboard and transforms, C16 lint in the library, C18 preview and suggested difficulty | AC C9, C15, C16 and C18 pass |

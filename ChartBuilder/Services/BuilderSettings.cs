@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Launching;
 
@@ -43,6 +44,32 @@ namespace ChartBuilder.Services
 
         /// <summary>Whether notes keep their ticks or their times when a tempo changes.</summary>
         public TempoEditMode TempoEdits { get; set; } = TempoEditMode.KeepTicks;
+
+        /// <summary>The fastest and slowest the editor's highway can scroll, as the inspector's highway allows.</summary>
+        public const double MinEditorHighwaySpeed = 0.5;
+
+        public const double MaxEditorHighwaySpeed = 3;
+
+        /// <summary>
+        /// How many seconds a lane shows beyond its strike line at a highway speed of 1: the more, the slower the notes go
+        /// by. Each lane's own look-ahead, once set, takes its place.
+        /// </summary>
+        public const double LookAheadAtSpeedOne = 2;
+
+        /// <summary>The snap the editor starts on, as steps in a whole note: one of <see cref="SnapGrid.CommonDivisions"/>.</summary>
+        public int DefaultSnapDivision { get; set; } = SnapGrid.Default.Division;
+
+        /// <summary>The view a lane opens in: a vertical highway or a horizontal timeline.</summary>
+        public LaneView DefaultEditorView { get; set; } = LaneView.Highway;
+
+        /// <summary>How fast notes go by in a lane whose look-ahead hasn't been set: 1 shows <see cref="LookAheadAtSpeedOne"/> seconds beyond the strike line.</summary>
+        public double EditorHighwaySpeed { get; set; } = 1;
+
+        /// <summary>The metronome's volume, in percent of full.</summary>
+        public int MetronomeVolume { get; set; } = 50;
+
+        /// <summary>The hit sounds' volume, in percent of full.</summary>
+        public int HitSoundVolume { get; set; } = 50;
 
         /// <summary>The editor's left panel (Chart Inspector) width, while expanded.</summary>
         public double EditorLeftPanelWidth { get; set; } = DefaultEditorLeftPanelWidth;

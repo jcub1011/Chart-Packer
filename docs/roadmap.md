@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Current as of 2026-10-07 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), step 5: the editor. See [Where CM2 stands](#where-cm2-stands). |
+| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), step 6: saving and lint. See [Where CM2 stands](#where-cm2-stands). |
 
 ---
 
@@ -20,7 +20,7 @@ its exit criteria. This file owns only the order and the status.
 | ----: | --------- | ------ | -------- | ---------- |
 | 1 | [CM0: Split](#cm0-split) | Done (cleanup left) | Exit criteria met; 4 cleanup items left | — |
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
-| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | Steps: 4 of 6. Exit criteria: 13 of 33 pass, 13 in part ([tracker](#cm2-progress)) | CM1 |
+| 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | **In progress** | Steps: 5 of 6. Exit criteria: 19 of 33 pass, 10 in part ([tracker](#cm2-progress)) | CM1 |
 | 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Not started | — | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
@@ -43,8 +43,8 @@ Packer's **Edit chart** is in place, and was turned on in CM2 step 3.
 - lane docking (`ChartPacker.Core/Charting/Layout/LaneDockLayout`);
 - a placeholder timeline.
 
-This counts towards [C3](charter-spec-v1.md#c3-editor-layout). The canvases, the Chart Inspector,
-the Properties panel and the tools are still placeholders.
+This counts towards [C3](charter-spec-v1.md#c3-editor-layout). The canvases, the Properties
+panel and the tools came with CM2 step 5. The Chart Inspector is still a placeholder.
 
 **Cleanup:**
 
@@ -54,8 +54,8 @@ the Properties panel and the tools are still placeholders.
   ([CM2](#cm2-calibration-chart-settings-and-5-fret-editing) step 6), so it stays.
 - **Shared dialogs.** `ConfirmDialog` and `MessageDialog` are still in `ChartPacker/Views`. They
   move to `ChartPacker.UI` when Chart Builder first needs them.
-- **`ViewLocator`.** Chart Builder doesn't have one yet. It arrives with `ChartEditorViewModel`
-  ([§4.5](charter-spec-v1.md#45-app-chartbuilder)).
+- **`ViewLocator`.** Chart Builder still has none. Its lanes and canvases are built in code, so
+  nothing needs one yet ([§4.5](charter-spec-v1.md#45-app-chartbuilder)).
 - **The spec's CM0 row** still names the wizard, and should be restated.
 
 ## CM1: Model, writer and lint engine
@@ -129,14 +129,14 @@ before any canvas depends on it.
 
 ## CM2: Calibration, chart settings and 5-fret editing
 
-**Status: in progress.** Steps 1 to 4 are done. It builds on CM1's model, writer and lint engine.
+**Status: in progress.** Steps 1 to 5 are done. It builds on CM1's model, writer and lint engine.
 
 **Built out of order.** Step 3 came before the rest of step 2, so that calibration can be checked
 against a real song: Chart Builder opens a song and plays it, with a metronome over the stems and a
 timeline that draws the mix's waveform and the chart's beat lines under a playhead driven by
-`SmoothPosition`. That much of [C10](charter-spec-v1.md#c10-playback) (play and pause, speed, pitch
-correction, the metronome) is in the timeline's header for now. Latency compensation came with
-calibration; the transport bar, hit sounds and following come with step 5.
+`SmoothPosition`. Latency compensation came with calibration. The rest of
+[C10](charter-spec-v1.md#c10-playback) came with step 5: the transport bar, regions and the loop,
+hit sounds and following.
 
 This is the first milestone with a working editor. Its steps, in order:
 
@@ -184,12 +184,33 @@ This is the first milestone with a working editor. Its steps, in order:
      command (typed numbers once the typing pauses), with the resolution change and its warning.
      ⚙ opens Program settings.
    - Undo and redo in the Editor, and a read-only list of the pending `song.ini` changes.
-5. **The editor.**
-   - [C3](charter-spec-v1.md#c3-editor-layout) both views. The player and highway view models
-     move to `ChartPacker.UI` here.
-   - [C4](charter-spec-v1.md#c4-tempo-map-and-grid) tempo map and grid.
-   - [C5](charter-spec-v1.md#c5-5-fret-notes) 5-fret notes.
-   - [C10](charter-spec-v1.md#c10-playback) playback.
+5. **The editor.** *Done*, but for what needs phrases or drums (CM3): the Phrase tool, cymbal
+   and tom, accents and ghosts, and the 2× kick. Lint marks on the overview come with step 6.
+   - [C3](charter-spec-v1.md#c3-editor-layout) both views.
+     - Each lane's canvas is a highway or a timeline, and `V` switches the lane in focus.
+     - Both views pass the pointer and the keys to Core's `EditorTools`, through `LaneProjection`.
+     - Other C3 pieces: the difficulty letters and a ghost difficulty in each lane's header, and
+       Properties for notes, tempo markers and a span.
+     - The overview is the bottom timeline.
+     - The highway's drawing (`GemPainter`, `HighwayPalette`, `LaneWaveformPainter`) moved to
+       `ChartPacker.UI`. Chart Packer's player and highway view models stay where they are.
+   - [C4](charter-spec-v1.md#c4-tempo-map-and-grid) tempo map and grid:
+     - the snap;
+     - the Tempo tool, and dragging anchored markers;
+     - anchor absorption, with the offers to unanchor or to add a marker;
+     - tap tempo;
+     - Set BPM from the selected span;
+     - measure numbers.
+   - [C5](charter-spec-v1.md#c5-5-fret-notes) 5-fret notes:
+     - placing, moving, erasing and sustaining notes;
+     - the open note rule;
+     - H, G and T on chords;
+     - natural HOPOs, sustain cutoffs and star power, drawn from the game view.
+   - [C10](charter-spec-v1.md#c10-playback) playback:
+     - the transport bar: loop, hit sounds, stems and the latency;
+     - playing from the cursor, and Shift+Space for the selection;
+     - the loop region, in `StemPlayer`;
+     - following.
 6. **Saving and lint.**
    - A new chart's **first save** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), which
      asks where the song folder goes and writes it with `NewChartCreator`, then locks the song and
@@ -213,7 +234,7 @@ As of 2026-10-07. Update this as each step lands, a test is added, or a hand che
 | 2. Playback and calibration | Done | Pass | Not yet |
 | 3. Open and import | Done, but for C2 items 5 to 7 | Pass | Not yet |
 | 4. New chart and Chart settings | Done, but for the first save and New chart in this song (step 6) | Pass | Not yet |
-| 5. The editor (C3, C4, C5, C10) | Shell, timeline, play, undo and redo only | Model only | — |
+| 5. The editor (C3, C4, C5, C10) | Done, but for phrases and drum flags (CM3) | Pass | Not yet |
 | 6. Saving and lint (C15, C17, rules) | Lint engine and the pending-changes model only | Engine and model only | — |
 
 **Exit criteria** ([§13](charter-spec-v1.md#13-milestones): AC C1, C2, C3, C4, C5, C10, C11,
@@ -239,14 +260,14 @@ C15.2 and C17).
 | C2.4 | Passes | `SongFolderFilesTests` (CM1) |
 | C2.5 | In part | `SongLockTests`; the second Chart Builder's refusal is built, and waits on a hand check |
 | C2.6 | In part | Chart Packer's refresh is built, but Chart Builder can't save yet (step 6) |
-| C3.1 | Not yet | Both views (step 5) |
-| C3.2 | Not yet | Both views and the tools (step 5) |
-| C4.1 | Not yet | Anchor absorption, and refusing an edit into an anchor (step 5) |
-| C4.2 | In part | `RetickTests`; the editor's tempo tools (step 5) |
+| C3.1 | Passes | `EditorViewportTests` (the session's cursor, span and selection, projected into both views) |
+| C3.2 | Passes | `EditorToolsTests`, each tool run through `EditorTools` in both views |
+| C4.1 | Passes | `TempoMapEditsTests` |
+| C4.2 | Passes | `RetickTests`, `TempoMapEditsTests` (through the Tempo tool) |
 | C4.3 | Passes | `EditableTempoMapTests` |
 | C4.4 | In part | `MidiChartWriterTests`; saving, packing and reopening from the app (step 6) |
-| C5.1 | In part | `MidiChartWriterTests`; the 5-fret tools (step 5) |
-| C5.2 | In part | `GameViewTests`, `MidiChartWriterTests`; showing natural HOPOs in the editor (step 5) |
+| C5.1 | Passes | `MidiChartWriterTests`, `FiveFretEditingTests` (made with the tools, in both views) |
+| C5.2 | Passes | `NaturalHopoDisplayTests` (the session's game view against `ChartReader`, for every HOPO setting) |
 | C10.1 | Passes | `StemPlayerTests` (slow: about 30 s) |
 | C10.2 | Passes | `LatencyCompensationTests` |
 | C11.1 | Passes | `CalibrationScheduleTests` |
@@ -260,13 +281,13 @@ C15.2 and C17).
 | C17.3 | Not yet | `song.ini` pending changes (step 6) |
 | C17.4 | In part | `MidiChartWriterTests`; Chart Builder's save (step 6) |
 
-**Totals:** 13 pass, 13 in part, 7 not yet.
+**Totals:** 19 pass, 10 in part, 4 not yet.
 
 ### Where CM2 stands
 
 As of 2026-10-07, for picking the work up again.
 
-**Waiting on the user.** Steps 2 to 4 have been built and their tests pass, but the apps haven't
+**Waiting on the user.** Steps 2 to 5 have been built and their tests pass, but the apps haven't
 been tried by hand yet. The checks still to do:
 
 - open a song folder and a `.sng` from **Open chart**, by drop and from **Recent**;
@@ -311,6 +332,65 @@ been tried by hand yet. The checks still to do:
     **Change anyway** and Cancel;
   - Undo and Redo (Ctrl+Z, Ctrl+Y) of each, with the timeline's beat lines and the metronome
     following the tempo map.
+- **Chart Packer's highway**, whose drawing moved to `ChartPacker.UI`: the notes, HOPOs, taps,
+  cymbals, opens, kicks, sustains and the lane waveforms look as they did, outlined too.
+- **The editor (step 5)**, in a highway lane and again after `V` (or the lane's view button) in a
+  timeline lane:
+  - **Place**:
+    - a click puts a note on the grid, and a drag draws out its sustain;
+    - Shift-click puts an open note;
+    - an open in a chord with frets, or a fret on an open, is refused, with the status line saying
+      why;
+    - the hover ghost shows where the note would go.
+  - **Select**:
+    - a click selects, and Shift-click adds;
+    - dragging notes moves them on the grid and across lanes, and an open moves only in time;
+    - dragging a tail sets a sustain;
+    - a drag in an empty place boxes notes and shades the span;
+    - a click in an empty place moves the cursor.
+  - **Erase** and **Sustain** by click and drag; Escape mid-drag puts everything back.
+  - The keys:
+    - 1–5 and 0 at the cursor;
+    - ↑/↓ (←/→ in a timeline) and PgUp/PgDn;
+    - Alt+arrows on the selection;
+    - `[` `]`, Ctrl+A, Delete, H, G and T;
+    - Ctrl+1–4, and the header's E M H X letters, coloured where the difficulty has notes;
+    - Ctrl+Shift+Z.
+  - The **ghost difficulty** menu, drawn faintly behind.
+  - What's drawn:
+    - natural HOPOs, star power, and a dashed tail under the sustain cutoff;
+    - H, S and T marks by forced chords;
+    - measure numbers, tempo labels with ⚓ for anchored markers, and the snap's grid lines.
+  - **Tempo**:
+    - a click adds a marker, and dragging one moves it;
+    - dragging an anchored one refits the tempos either side;
+    - BPM, time signature and Anchored in Properties;
+    - a BPM edit that would move an anchor offers Unanchor and Add marker before;
+    - **When a tempo changes** on Keep times leaves the notes where they were heard.
+  - **Tap tempo**: B in time with the song, while it plays, sets the tempo once the taps stop.
+  - **Set BPM from span**: select a span with a box, give its beats in Properties.
+  - **Properties** for one note, several (`<<multiple>>`), and markers: typed values apply when the
+    field loses focus.
+  - **Scrolling and look-ahead**:
+    - The wheel moves the song past the strike line, which stays a quarter of the way in, a grid
+      step a notch. The cursor moves with it, and the audio seeks there, playing or paused.
+    - Past a tempo change and a time signature that starts off the grid, the strike line still
+      lands on the grid lines and in time with the track.
+    - Each lane's look-ahead (its header's button and slider; Ctrl+wheel, + and −) sets how far it
+      shows beyond the strike line.
+    - The look-ahead comes back with the lane in the next Editor window.
+    - While playing, the strike line stays on the playhead.
+- **The transport bar**:
+  - Space plays from the cursor and pausing leaves the cursor there;
+  - Shift+Space plays the selection and stops at its end;
+  - L sets the loop region from the selection, and Loop repeats it at 50%;
+  - Hit sounds on the notes shown, with the volume in Settings (**Audio**);
+  - Stems mute, solo and volume;
+  - the latency button opens calibration and shows the new value after Save.
+- **The bottom timeline** shows the sections, the focused lane's note density, star power and solos,
+  and a box round the span the lanes show. Clicking it moves the cursor and the view there.
+- **Settings › Charter › Editing**: Default snap, Default view and Highway speed, each taken up by
+  the next Editor window. Highway speed is the look-ahead of lanes whose own hasn't been set.
 
 **Where the code is.**
 
@@ -331,7 +411,11 @@ been tried by hand yet. The checks still to do:
 | New chart and Chart settings in Chart Builder | `BuilderWindows.OpenNewChart`, `EditorWindowViewModel` (`ForNewChart`, `ForSong`, the undo stack, `ApplyChartSettings`, `PendingChanges`), `ViewModels/ChartSettingsViewModel.cs`, `Views/ChartSettingsView.axaml`, `Controls/EditorSidePanel.cs` (the left panel's tabs), `PlaybackViewModel` (takes an `EditorSong`; `RefreshTempoMap`), `BuilderSettings.TempoEdits` |
 | Calibration in Chart Builder | `Services/AudioLatencyService.cs`, `ViewModels/CalibrationViewModel.cs`, `Controls/CalibrationView.cs`, `Views/CalibrationWindow.axaml`, `Services/BuilderWindows.cs` (`ShowCalibrationAsync`, the first-use prompt), `BuilderSettingsCatalog` (the **Audio** category), `BuilderSettings` (`PromptForCalibration`, `CalibrationPrompted`), `PlaybackViewModel.Clock` |
 | The latency in Chart Packer | `ViewModels/PlayerViewModel.cs` (`DrawnPosition`, `RefreshLatency`), which the highway, lyrics and background clocks use; `MainWindowViewModel.OnActivatedAsync`; `AppSettingsCatalog` (`playback.latency`); `App.axaml.cs` |
-| Tests | `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`, `CalibrationScheduleTests`, `LatencyCompensationTests`, `WindowsAudioEndpointTests`; the shared `FakeOutput` and `ManualClock`), `Settings/AudioLatencyFileTests.cs`, `Settings/ChartPackerSettingsFileTests.cs`, `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`, `Charting/NewChart*Tests.cs`; `ChartBuilder.Tests/Charting/` (`SongOpenerTests`, `ChartSettingsCommandTests`, `PendingSongIniChangesTests`), `ChartBuilder.Tests/Calibration/` (`TapTestTests`, `LatencyCalibrationTests`) |
+| The editor's state and tools (Core) | `ChartPacker.Core/Charting/Editing/`: `EditorSession` (the undo stack, the delay, the game view per track, previews and `ExecuteAsOne`), `EditorTools` (the gestures and the keys' actions, `HitTest`, `PlacementRefusal`, `ApartLane`), `EditorSelection`, `EditorViewport` (the cursor, which is the strike line, and each lane's span from its look-ahead), `LaneProjection` and `LaneSlots`, `SnapGrid`, `TempoMapEdits` (anchor absorption), `TapTempo`; `GameView.Project(chart, key, options)` and `GameView.IsFiveLaneDrums` |
+| The editor (Chart Builder) | `ViewModels/ChartEditorViewModel.cs` (the session joined to playback, the tools and snap, hit sounds, the overview, tempo edits that ask about anchors), `PropertiesViewModel.cs`, `EditorLaneViewModel.cs` (the view, the letters, the ghost and the look-ahead, kept by `LaneDockLayout.SetLookAhead`), `StemRowViewModel.cs`; `Controls/Editing/` (`EditorCanvas`, `HighwayEditorCanvas`, `TimelineEditorCanvas`, `EditorKeys`); `Views/PropertiesView.axaml`; `Controls/TimelineView.cs` (the overview); `EditorWindow.axaml` (the toolbar's tools and snap, the status line, the transport bar) |
+| Shared drawing | `ChartPacker.UI/Controls/Highway/` (`GemPainter`, `HighwayPalette`), `ChartPacker.UI/Controls/LaneWaveformPainter.cs` and `WaveformLevels.cs` (moved from Chart Packer); `ChartPacker.UI` now references `ChartPacker.Audio` |
+| Regions, loop and hit sounds | `StemPlayer.PlayRegion`, `ClearRegion`, `Region`; `ChartPacker.Audio/Synthesis/HitSoundSchedule.cs` (`HitSoundSchedule`, `NoteHit`, `CombinedSchedule`); `PlaybackViewModel` (`PlayRegion`, `SetLoop`, `SetHits`, `Stems`, `LatencyText`, `SeekTo`, `Scrubbed`) |
+| Tests | `ChartBuilder.Tests/Editing/` (`SnapGridTests`, `EditorViewportTests`, `EditorToolsTests`, `TempoMapEditsTests`, `FiveFretEditingTests`, `NaturalHopoDisplayTests`; the shared `EditorSessions`); `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`, `CalibrationScheduleTests`, `LatencyCompensationTests`, `WindowsAudioEndpointTests`; the shared `FakeOutput` and `ManualClock`), `Settings/AudioLatencyFileTests.cs`, `Settings/ChartPackerSettingsFileTests.cs`, `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`, `Charting/NewChart*Tests.cs`; `ChartBuilder.Tests/Charting/` (`SongOpenerTests`, `ChartSettingsCommandTests`, `PendingSongIniChangesTests`), `ChartBuilder.Tests/Calibration/` (`TapTestTests`, `LatencyCalibrationTests`) |
 
 **Decided along the way.**
 
@@ -395,6 +479,56 @@ been tried by hand yet. The checks still to do:
 - **The pending changes are listed under Properties**, in the right panel, as the side panels have
   no tabs yet. The findings panel and the list's Revert come with step 6.
 - `NewChartSettings.MaxNumerator` is now 64, as C4 allows, rather than 32.
+- **The editor's state is in Core** (`Charting/Editing/`): the session, the tools, the selection,
+  the viewport, the snap and the tempo edits. So the tool tests (AC C3.2) run without a canvas, and
+  `ChartBuilder.Tests` still references only Core. There are no view-model tests of the app's own
+  classes yet.
+- **Only the drawing moved to `ChartPacker.UI`.** Chart Packer's player and highway view models stay
+  in Chart Packer, as they're built round the inspector's song, drafts and offsets. The spec's §4
+  and CM2 row are restated.
+- **Views per lane.** Each docked lane is a highway or a timeline. `V` switches the lane in focus,
+  and the cursor, the selection and the tool are the session's, shared by all of them. Each lane
+  keeps its own look-ahead across a switch (AC C3.1).
+- **The overview is the bottom timeline**, which already spans the song: the focused lane's density,
+  star power and solos, the sections, and the span on screen.
+- **The cursor is the strike line and the playhead.**
+  - Every lane draws its strike line on the cursor, a quarter of the way from its strike end.
+  - Scrolling moves the song past it, so the cursor moves through the song with the scroll. The
+    audio seeks there, playing or paused. This replaces the spec's "scrolling pauses following".
+  - A notch of the wheel is a grid step, as an arrow key is, worked out through the tempo map from
+    the time signature in force. A step a fixed number of seconds long drifted off the grid once
+    the tempo or time signature changed. A touchpad's part-notches add up to steps.
+  - Pausing leaves the cursor where playback stopped, and Space plays from it.
+  - Clicking the bottom timeline moves the cursor there.
+- **Each lane has its own look-ahead**: how many seconds it shows beyond the strike line. It's set
+  from the lane's header, or with Ctrl+wheel, + and −, and is saved with the lane layout
+  (`DockLane.LookAhead`). A lane that hasn't had one set uses the highway speed setting's: 2 s at
+  1×.
+- **Gestures preview.** A drag applies its command to the chart as it goes, and is put on the undo
+  stack once, when it ends (`EditorSession.Preview`, `CommitPreview`). Undo during a drag takes the
+  drag back first.
+- **The snap counts from the time signature in force**, and ends at the next one. It rounds to the
+  nearest tick. Switched off, notes go to the nearest tick, but the cursor keys still step by it.
+- **Anchor absorption** is by the last segment before the first anchor after the edit, and only
+  segments after the edited marker count (AC C4.1). Removing and moving markers are absorbed the
+  same way, and a marker can't be moved past an anchor. Every tempo edit is one `ChangeTempoMap`.
+- **Forcing keys**:
+  - H, G and T set the flag on every selected chord, or clear it when all of them have it.
+  - Force HOPO and force strum exclude each other; tap goes with either.
+- **Open notes**: a highway draws them across the lanes and places one with Shift-click or 0; a
+  timeline gives them a row.
+- **Tap tempo** needs three taps. It sets the segment the first tap was in, once the taps have
+  stopped for 2 s, as one step, with the anchor prompt if it needs one.
+- **Loops and played spans are in `StemPlayer`**:
+  - The mix carries on from the region's start without dropping the queue.
+  - Played as mixed, it turns on the region's end frame; stretched, within a chunk (20 ms) of it.
+  - A seek drops a region played once, but not a loop.
+- **The metronome's and hit sounds' volumes** are settings (Audio), applied when playback starts. 50%
+  plays each sound at the level `Synth` makes it.
+- **Hit sounds** are from the game view of the lanes shown: a fret sound for 5-fret and GHL, and per
+  pad for drums.
+- **What's drawn while paused** is at the audio's position. `PlaybackViewModel.Clock` takes off the
+  latency only while playing, as Chart Packer's `DrawnPosition` does.
 
 **Loose ends.**
 
@@ -405,28 +539,33 @@ been tried by hand yet. The checks still to do:
 - The chart's load issues are only counted in the Editor's notice. They become findings with the
   findings panel.
 - The Chart Inspector is still a placeholder; the Editor's title is the only sign of the song.
-- The timeline's transport is a stopgap in its header; the spec's transport bar comes with C3.
 - The spec's CM0 row still names the wizard (CM0's cleanup).
 - **Device IDs on macOS and Linux.** A Core Audio device UID and a PulseAudio or PipeWire sink
   name would make those platforms' keys survive renames. They need testing on those platforms.
 - **Space as a tap**, should a later Avalonia make raw input timestamps public.
-- **Opening calibration from the transport bar**, which comes with C3.
+- **Phrases and drums in the editor** (CM3):
+  - the Phrase tool, solos and the `S` key;
+  - cymbal and tom (`C`), accents and ghosts (`A`), and the 2× kick (Shift+0);
+  - GHL's stacked columns. GHL lanes are six columns for now.
+- **Lint marks on the overview**, with the findings panel (step 6).
 - **Record mode** shifts key presses by the latency ([C15](charter-spec-v1.md#c15-editing-ergonomics)),
   with CM5.
 - **A new chart can't be kept yet.** Its first save comes with step 6, as does **New chart in this
   song**; a song with neither chart file still says it has none.
 - **A new chart's name and artist** aren't filled from its first stem's tags yet. That comes with
-  the Chart Inspector (step 5).
+  the Chart Inspector.
 - **Closing the Editor with edits** loses them without asking, as there's no save yet (step 6).
 - **The Editor's title** doesn't mark unsaved edits yet.
 
-**Next: step 5, the editor:**
+**Next: step 6, saving and lint:**
 
-- [C3](charter-spec-v1.md#c3-editor-layout) both views. The player and highway view models move to
-  `ChartPacker.UI` here.
-- [C4](charter-spec-v1.md#c4-tempo-map-and-grid) tempo map and grid, with anchor absorption.
-- [C5](charter-spec-v1.md#c5-5-fret-notes) 5-fret notes.
-- [C10](charter-spec-v1.md#c10-playback) playback, with the transport bar.
+- A new chart's **first save**, and **New chart in this song**
+  ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)).
+- [C15](charter-spec-v1.md#c15-editing-ergonomics) autosave and recovery, and asking before closing
+  with unsaved edits.
+- [C17](charter-spec-v1.md#c17-save-and-export) save, with the pending `song.ini` changes.
+- The timing, 5-fret and song lint rules ([§6](charter-spec-v1.md#lint-rules)), the findings panel,
+  and lint marks on the overview.
 
 ## CM3: Drums and GHL
 

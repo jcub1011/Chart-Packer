@@ -1,0 +1,48 @@
+using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Commands;
+using ChartPacker.Core.Charting.Editing;
+using ChartPacker.Core.Charts;
+
+namespace ChartBuilder.Tests.Editing;
+
+/// <summary>Editor sessions over test charts, and points in their lanes.</summary>
+internal static class EditorSessions
+{
+    public static readonly ChartTrackKey GuitarExpert = new(ChartInstrument.Guitar, ChartDifficulty.Expert);
+
+    /// <summary>An empty Lead guitar chart at 480 ticks per beat, 120 BPM in 4/4.</summary>
+    public static EditableChart Guitar() =>
+        EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+
+    public static EditorSession Of(EditableChart chart, TimeSpan delay = default, IReadOnlyList<KeyValuePair<string, string>>? songIni = null)
+    {
+        var session = new EditorSession(new ChartUndoStack(chart), delay, songIni ?? []);
+        session.Focused = GuitarExpert;
+        return session;
+    }
+
+    /// <summary>The point at <paramref name="tick"/> in <paramref name="lane"/> of <paramref name="key"/>'s lane, in <paramref name="view"/>.</summary>
+    public static ChartPoint At(EditorSession session, double tick, int? lane, LaneView view = LaneView.Highway, ChartTrackKey? key = null, double tolerance = 10)
+    {
+        var track = key ?? GuitarExpert;
+        return new ChartPoint(track, tick, lane, tolerance, session.SlotsOf(track.Instrument, view));
+    }
+
+    /// <summary>Clicks at a point: a press and a release in one place.</summary>
+    public static void Click(EditorSession session, ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        session.Tools.Press(point, modifiers);
+        session.Tools.Release(point);
+    }
+
+    /// <summary>Drags from one point to another through a point between them.</summary>
+    public static void DragFromTo(EditorSession session, ChartPoint start, ChartPoint end, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        session.Tools.Press(start, modifiers);
+        session.Tools.Drag(start with { Tick = (start.Tick + end.Tick) / 2 });
+        session.Tools.Drag(end);
+        session.Tools.Release(end);
+    }
+
+    public static EditableTrack Expert(EditorSession session) => session.Chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert];
+}

@@ -1,0 +1,111 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="600"
+             x:Class="ChartBuilder.Views.PropertiesView"
+             x:DataType="vm:PropertiesViewModel">
+
+    <!-- Properties (charter-spec C3 item 4): the selected notes, tempo markers and span. A field shows <<multiple>> when
+         the items differ, and a value typed there is applied to every item once the field loses focus. -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.section-heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style Selector="Border.section">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10" />
+        </Style>
+        <Style Selector="Grid.fields > TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Margin="12,10" Spacing="8">
+        <!-- Notes. -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasNotes}">
+            <TextBlock Classes="section-heading" Text="{Binding NotesHeading}" />
+            <Border Classes="section">
+                <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
+                    <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesTickLabel}" />
+                    <TextBox Grid.Row="0" Grid.Column="1"
+                             Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesTickLabel}" />
+                    <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesTimeLabel}" />
+                    <SelectableTextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding TimeText}" />
+                    <TextBlock Grid.Row="2" Classes="muted" Text="{x:Static res:Strings.PropertiesMeasureLabel}" />
+                    <SelectableTextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding MeasureBeatText}" />
+                    <TextBlock Grid.Row="3" Classes="muted" Text="{x:Static res:Strings.PropertiesLaneLabel}" />
+                    <SelectableTextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding LaneText}" />
+                    <TextBlock Grid.Row="4" Classes="muted" Text="{x:Static res:Strings.PropertiesLengthLabel}" />
+                    <TextBox Grid.Row="4" Grid.Column="1"
+                             Text="{Binding LengthText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesLengthLabel}" />
+                    <TextBlock Grid.Row="5" Classes="muted" Text="{x:Static res:Strings.PropertiesForcingLabel}" IsVisible="{Binding CanForce}" />
+                    <WrapPanel Grid.Row="5" Grid.Column="1" ItemSpacing="8" IsVisible="{Binding CanForce}">
+                        <CheckBox Content="{x:Static res:Strings.PropertiesForceHopo}" IsChecked="{Binding IsForcedHopo}" />
+                        <CheckBox Content="{x:Static res:Strings.PropertiesForceStrum}" IsChecked="{Binding IsForcedStrum}" />
+                        <CheckBox Content="{x:Static res:Strings.PropertiesTap}" IsChecked="{Binding IsTap}" />
+                    </WrapPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Tempo markers. -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasTempos}">
+            <TextBlock Classes="section-heading" Text="{Binding TemposHeading}" />
+            <Border Classes="section">
+                <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
+                    <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesBpmLabel}" />
+                    <TextBox Grid.Row="0" Grid.Column="1"
+                             Text="{Binding BpmText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesBpmLabel}" />
+                    <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesSignatureLabel}" />
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                        <TextBox Width="56"
+                                 Text="{Binding NumeratorText, UpdateSourceTrigger=LostFocus}"
+                                 AutomationProperties.Name="{x:Static res:Strings.ChartSettingsNumeratorName}" />
+                        <TextBlock VerticalAlignment="Center" Text="/" />
+                        <TextBox Width="56"
+                                 Text="{Binding DenominatorText, UpdateSourceTrigger=LostFocus}"
+                                 AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDenominatorName}" />
+                    </StackPanel>
+                    <CheckBox Grid.Row="2" Grid.ColumnSpan="2"
+                              Content="{x:Static res:Strings.PropertiesAnchoredLabel}"
+                              IsChecked="{Binding IsAnchored}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- The span selected, which a tempo can be fitted to (charter-spec C4 item 6). -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasSpan}">
+            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.PropertiesSpanHeading}" />
+            <Border Classes="section">
+                <StackPanel Spacing="8">
+                    <SelectableTextBlock FontSize="12" Text="{Binding SpanText}" />
+                    <Grid Classes="fields" ColumnDefinitions="Auto,64,*" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Classes="muted" Text="{x:Static res:Strings.PropertiesBeatsLabel}" />
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding BeatsText}"
+                                 AutomationProperties.Name="{x:Static res:Strings.PropertiesBeatsLabel}" />
+                        <Button Grid.Column="2"
+                                Classes="labelled"
+                                HorizontalAlignment="Left"
+                                Content="{x:Static res:Strings.PropertiesSetBpmButton}"
+                                Command="{Binding SetBpmFromSpanCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.PropertiesSetBpmToolTip}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

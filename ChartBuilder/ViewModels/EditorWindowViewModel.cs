@@ -22,9 +22,9 @@ namespace ChartBuilder.ViewModels
 {
     /// <summary>
     /// The Editor window: a toolbar, the lanes in the middle with the Chart Inspector and Properties panels either side,
-    /// and the timeline along the bottom, where the song plays. It has a song opened, or a new chart that has no folder
-    /// until it's first saved. Chart settings, a tab beside the Chart Inspector, edits the chart, and undo and redo step
-    /// through its edits; the tools and the lanes' bodies are placeholders so far.
+    /// and the transport bar and the timeline along the bottom, where the song plays. It has a song opened, or a new chart
+    /// that has no folder until it's first saved. The lanes' canvases and Chart settings, a tab beside the Chart Inspector,
+    /// edit the chart, and undo and redo step through its edits.
     /// </summary>
     /// <remarks>
     /// The panels' sizes are view state, applied and captured by the window; they're kept here between the two so
@@ -44,13 +44,14 @@ namespace ChartBuilder.ViewModels
             EditorSong song,
             SongLock? songLock,
             Func<int, IAudioOutput> openOutput,
-            AudioLatencyService latency)
+            AudioLatencyService latency,
+            Action calibrate)
         {
             _settings = settings;
             _settingsWindow = settingsWindow;
             _songLock = songLock;
             Song = song;
-            Playback = new PlaybackViewModel(song, openOutput, latency);
+            Playback = new PlaybackViewModel(song, openOutput, latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), calibrate);
             _undo = new ChartUndoStack(song.Chart);
             _undo.Changed += OnChartChanged;
             ChartSettings = new ChartSettingsViewModel(settings, confirmations, song.Chart, ApplyChartSettings);
@@ -69,7 +70,7 @@ namespace ChartBuilder.ViewModels
             TimelineHeight = saved.EditorTimelineHeight;
             IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
-            Lanes = new LaneDockViewModel(LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
+            Editor = new ChartEditorViewModel(song, _undo, Playback, settings, confirmations, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
         }
 
         /// <summary>A song opened from a folder or <c>.sng</c> (charter-spec C2).</summary>
@@ -79,6 +80,7 @@ namespace ChartBuilder.ViewModels
         /// <param name="songLock">The song's lock, held until the editor is disposed.</param>
         /// <param name="openOutput">Opens the audio output, for playback.</param>
         /// <param name="latency">The audio/visual latency, which what's drawn against the audio allows for.</param>
+        /// <param name="calibrate">Opens the calibration tool, from the transport bar.</param>
         public static EditorWindowViewModel ForSong(
             BuilderSettingsService settings,
             ISettingsWindowService settingsWindow,
@@ -86,8 +88,9 @@ namespace ChartBuilder.ViewModels
             OpenedSong song,
             SongLock songLock,
             Func<int, IAudioOutput> openOutput,
-            AudioLatencyService latency) =>
-            new(settings, settingsWindow, confirmations, EditorSong.Of(song), songLock, openOutput, latency)
+            AudioLatencyService latency,
+            Action calibrate) =>
+            new(settings, settingsWindow, confirmations, EditorSong.Of(song), songLock, openOutput, latency, calibrate)
             {
                 Notice = LoadIssuesNotice(song.Load.Issues.Count),
             };
@@ -103,8 +106,9 @@ namespace ChartBuilder.ViewModels
             EditableChart chart,
             NewChartAudio audio,
             Func<int, IAudioOutput> openOutput,
-            AudioLatencyService latency) =>
-            new(settings, settingsWindow, confirmations, EditorSong.New(chart, audio.Tracks), null, openOutput, latency)
+            AudioLatencyService latency,
+            Action calibrate) =>
+            new(settings, settingsWindow, confirmations, EditorSong.New(chart, audio.Tracks), null, openOutput, latency, calibrate)
             {
                 Notice = NotAddedNotice(audio),
             };
@@ -139,8 +143,11 @@ namespace ChartBuilder.ViewModels
 
         public bool HasNotice => Notice is not null;
 
+        /// <summary>The chart's editor: the lanes and their canvases, the tools and the snap, and Properties.</summary>
+        public ChartEditorViewModel Editor { get; }
+
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
-        public LaneDockViewModel Lanes { get; }
+        public LaneDockViewModel Lanes => Editor.Lanes;
 
         /// <summary>The Chart Inspector panel's width while expanded, as the user last set it.</summary>
         public double LeftPanelWidth { get; set; }
@@ -167,7 +174,11 @@ namespace ChartBuilder.ViewModels
         private void DismissNotice() => Notice = null;
 
         [RelayCommand]
-        private Task OpenProgramSettingsAsync() => _settingsWindow.ShowAsync();
+        private async Task OpenProgramSettingsAsync()
+        {
+            await _settingsWindow.ShowAsync();
+            Editor.ReloadSettings();
+        }
 
         /// <summary>
         /// A change from Chart settings (charter-spec C1), as one undoable step. Playback goes on, so the tempo can be
@@ -188,10 +199,10 @@ namespace ChartBuilder.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanUndo))]
-        private void Undo() => _undo.Undo();
+        private void Undo() => Editor.Session.Undo();
 
         [RelayCommand(CanExecute = nameof(CanRedo))]
-        private void Redo() => _undo.Redo();
+        private void Redo() => Editor.Session.Redo();
 
         private bool CanUndo() => _undo.CanUndo;
 
@@ -214,6 +225,7 @@ namespace ChartBuilder.ViewModels
         public void Dispose()
         {
             _undo.Changed -= OnChartChanged;
+            Editor.Dispose();
             Playback.Dispose();
             _songLock?.Dispose();
         }

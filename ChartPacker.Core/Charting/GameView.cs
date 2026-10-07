@@ -70,6 +70,40 @@ public static class GameView
     }
 
     /// <summary>
+    /// One track of <see cref="Project(EditableChart, ChartReadOptions)"/>, worked out alone, for the editor to redraw a
+    /// track after an edit without projecting the whole chart. Drums are worked out for the whole part, as the layout
+    /// and the tom markers are the part's.
+    /// </summary>
+    /// <returns>The track as the games read it; empty when the chart hasn't the part or the track has no notes.</returns>
+    public static NoteTrack Project(EditableChart chart, ChartTrackKey key, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var part = chart.PartOf(key.Instrument);
+        if (part is null || part.Instrument == ChartInstrument.Keys)
+            return new NoteTrack([], []);
+
+        var starPower = GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
+        List<ChartNote>? notes;
+        if (part.Kind == ChartInstrumentKind.Drums)
+            Drums(part, DrumsLayoutOf(part, options), starPower).TryGetValue(key.Difficulty, out notes);
+        else
+            notes = Frets(part[key.Difficulty], chart.Resolution, options, starPower);
+        notes ??= [];
+        return new NoteTrack(notes, starPower);
+    }
+
+    /// <summary>Whether the games read <paramref name="chart"/>'s drums as five-lane, given <paramref name="options"/>.</summary>
+    public static bool IsFiveLaneDrums(EditableChart chart, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        var drums = chart.Parts.FirstOrDefault(p => p.Kind == ChartInstrumentKind.Drums);
+        return drums is not null && DrumsLayoutOf(drums, options) == DrumsLayout.FiveLane;
+    }
+
+    /// <summary>
     /// The drums' layout, as <see cref="MidiChartReader.DrumsLayoutOf"/> works it out from the track the writer writes:
     /// song.ini's settings, then its fifth-pad note-ons and tom-marker note events in the order
     /// <see cref="PartEventOrder"/> puts them.

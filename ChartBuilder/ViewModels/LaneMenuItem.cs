@@ -59,6 +59,10 @@ namespace ChartBuilder.ViewModels
             return groups;
         }
 
+        /// <summary>An item that runs <paramref name="run"/>, checked when <paramref name="isChecked"/>.</summary>
+        public static LaneMenuItem Choice(string header, bool isChecked, Action run) =>
+            new(header, null, new RelayCommand(run), isEnabled: true, isChecked);
+
         /// <summary>What a lane showing <paramref name="part"/> is headed, e.g. "Guitar · Expert" or "Harmony 2".</summary>
         public static string TitleOf(LanePart part) => part.Track is { } track
             ? string.Format(CultureInfo.CurrentCulture, Strings.LaneTitleFormat, ChartLabels.InstrumentName(track.Instrument), ChartLabels.DifficultyName(track.Difficulty))

@@ -573,6 +573,69 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void ALoopTurnsBackAtItsEndWithoutDroppingTheQueue()
+    {
+        // Charter-spec C10 item 2: the loop region.
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.5), loops: true);
+        PlayFor(output, Rate * 3 / 4);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The ramp's value is the time over 10 s: from 1 s to 1.5 s, then from 1 s again.
+        float[] written = output.WrittenLeft();
+        Assert.AreEqual(0.1f, written[0], 1e-4f);
+        Assert.AreEqual(0.15f, written[(Rate / 2) - 1], 1e-4f);
+        Assert.AreEqual(0.1f, written[Rate / 2], 1e-4f);
+        Assert.AreEqual(1, output.Clears, "Only the start of the region dropped the queue.");
+        Assert.AreEqual(1.25, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual((TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.5), true), player.Region);
+    }
+
+    [TestMethod]
+    public void ARegionPlayedOncePausesAtItsEnd()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        int stops = 0;
+        player.Stopped += (_, _) => Interlocked.Increment(ref stops);
+
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.2), loops: false);
+        WaitUntil(() =>
+        {
+            output.Drain(output.QueuedFrames);
+            return !player.IsPlaying;
+        });
+
+        Assert.AreEqual(1, stops);
+        Assert.IsFalse(player.IsEnded);
+        Assert.IsNull(player.Region);
+        Assert.AreEqual(Rate / 5, output.WrittenFrames, 1);
+        Assert.AreEqual(1.2, player.Position.TotalSeconds, 0.001);
+    }
+
+    [TestMethod]
+    public void SoundsInALoopPlayEachTimeRound()
+    {
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10);
+        player.Sounds = new Schedule(new ScheduledSound(Rate + (Rate / 10), Constant(0.25f, Rate / 100)));
+
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.2), loops: true);
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        foreach (int round in new[] { 0, 1, 2 })
+        {
+            int at = (round * Rate / 5) + (Rate / 10);
+            Assert.AreEqual(0f, written[at - 1], $"Round {round}.");
+            Assert.AreEqual(0.25f, written[at], 1e-6f, $"Round {round}.");
+        }
+    }
+
+    [TestMethod]
     public void SoundsAreLaidOverTheMixButNotKeptAsHeard()
     {
         using var output = new FakeOutput();

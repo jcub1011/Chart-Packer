@@ -60,6 +60,12 @@ public sealed class StemPlayer : IDisposable
     // A new Speed or PitchCorrection for the playback thread to take up without dropping the queue.
     private bool _retune;
 
+    // The region played (charter-spec C10 item 2), in frames of the mix: looped, or played once to its end; none when
+    // _regionEnd is negative.
+    private long _regionStart;
+    private long _regionEnd = -1;
+    private bool _regionLoops;
+
     // Frames written to the output since it was opened: what's been played is this less what's still queued.
     private long _writtenFrames;
 
@@ -360,6 +366,55 @@ public sealed class StemPlayer : IDisposable
         }
     }
 
+    /// <summary>
+    /// The region being played (charter-spec C10 item 2): <see cref="PlayRegion"/>'s span, or null for the whole song.
+    /// </summary>
+    public (TimeSpan Start, TimeSpan End, bool Loops)? Region
+    {
+        get
+        {
+            lock (_lock)
+                return _regionEnd < 0 ? null : (FramesToTime(_regionStart), FramesToTime(_regionEnd), _regionLoops);
+        }
+    }
+
+    /// <summary>
+    /// Plays from <paramref name="start"/> to <paramref name="end"/>: over and over when <paramref name="loops"/>, as a
+    /// loop region for practising a passage, otherwise once, pausing at the end (charter-spec C10 item 2).
+    /// </summary>
+    /// <remarks>
+    /// The mix goes on from the region's start where it reaches the end, without dropping what's queued, and the sounds
+    /// start again from there. Played as mixed, it turns at the end's very frame; stretched, at most a chunk past it.
+    /// </remarks>
+    public void PlayRegion(TimeSpan start, TimeSpan end, bool loops)
+    {
+        long from = Math.Max(0, (long)(start.TotalSeconds * _mixer.OutputRate));
+        long to = (long)(end.TotalSeconds * _mixer.OutputRate);
+        if (to <= from)
+            throw new ArgumentOutOfRangeException(nameof(end), end, "A region ends after it starts.");
+
+        lock (_lock)
+        {
+            if (_disposed || _error is not null)
+                return;
+
+            (_regionStart, _regionEnd, _regionLoops) = (from, to, loops);
+            _pendingSeek = from;
+            _ended = false;
+            _playing = true;
+            _smoothValid = false;
+            _output.Resume();
+            Monitor.PulseAll(_lock);
+        }
+    }
+
+    /// <summary>Goes back to playing the whole song, from where it is.</summary>
+    public void ClearRegion()
+    {
+        lock (_lock)
+            _regionEnd = -1;
+    }
+
     /// <summary>Starts or resumes playing; after the end, from the start.</summary>
     public void Play()
     {
@@ -395,7 +450,9 @@ public sealed class StemPlayer : IDisposable
         }
     }
 
-    /// <summary>Moves playback to <paramref name="position"/>, playing or not.</summary>
+    /// <summary>
+    /// Moves playback to <paramref name="position"/>, playing or not. A region played once is dropped; a loop goes on.
+    /// </summary>
     public void Seek(TimeSpan position)
     {
         long frame = Math.Max(0, (long)(position.TotalSeconds * _mixer.OutputRate));
@@ -404,6 +461,8 @@ public sealed class StemPlayer : IDisposable
             if (_disposed || _error is not null)
                 return;
 
+            if (!_regionLoops)
+                _regionEnd = -1;
             _pendingSeek = frame;
             _ended = false;
             Monitor.PulseAll(_lock);
@@ -568,6 +627,26 @@ public sealed class StemPlayer : IDisposable
                 }
 
                 var chunk = _chunk.AsSpan(0, Math.Min(_chunk.Length, target * 2));
+                switch (AtRegionEnd(ref chunk))
+                {
+                    case RegionEnd.Wrapped:
+                        continue;
+                    case RegionEnd.Played:
+                        // Once what's queued has played, playback pauses there, and goes back to the whole song.
+                        if (_output.QueuedFrames == 0)
+                        {
+                            lock (_lock)
+                                _regionEnd = -1;
+                            Stop(ended: false, error: null);
+                        }
+                        else
+                        {
+                            Wait();
+                        }
+
+                        continue;
+                }
+
                 _pieces.Clear();
                 int frames = _stretching ? ReadStretched(chunk) : ReadMixed(chunk);
                 if (frames > 0)
@@ -603,6 +682,40 @@ public sealed class StemPlayer : IDisposable
                 Stop(ended: false, error: ex.Message);
             }
         }
+    }
+
+    /// <summary>
+    /// Where the mix is against the region's end: short of it, with <paramref name="chunk"/> cut so it ends there when
+    /// played as mixed; turned back to the region's start, for a loop; or there, for a region played once. On the
+    /// playback thread.
+    /// </summary>
+    private RegionEnd AtRegionEnd(ref Span<float> chunk)
+    {
+        long start, end;
+        bool loops;
+        lock (_lock)
+            (start, end, loops) = (_regionStart, _regionEnd, _regionLoops);
+        if (end < 0)
+            return RegionEnd.Before;
+
+        double at = _stretching ? _stretcher.PlayedPosition : _mixer.PositionFrames;
+        if (at < end)
+        {
+            if (!_stretching)
+                chunk = chunk[..(int)Math.Min(chunk.Length, Math.Max(2, (end - (long)at) * 2))];
+            return RegionEnd.Before;
+        }
+
+        if (!loops)
+            return RegionEnd.Played;
+
+        // On from the start, without dropping the queue: the map takes the jump as the next piece, and the sounds
+        // playing play out.
+        _mixer.Seek(start);
+        if (_stretching)
+            _stretcher.Reset(_mixer.PositionFrames);
+        _soundsFrom = start;
+        return RegionEnd.Wrapped;
     }
 
     /// <summary>Mixes the next frames into <paramref name="chunk"/> as they are, as one piece. On the playback thread.</summary>
@@ -767,6 +880,13 @@ public sealed class StemPlayer : IDisposable
         }
 
         Stopped?.Invoke(this, EventArgs.Empty);
+    }
+
+    private enum RegionEnd
+    {
+        Before,
+        Wrapped,
+        Played,
     }
 
     /// <summary><paramref name="Frames"/> frames from <paramref name="Offset"/> into a chunk, playing the mix evenly from <paramref name="From"/> to <paramref name="To"/>.</summary>

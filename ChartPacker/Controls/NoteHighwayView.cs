@@ -158,37 +158,14 @@ namespace ChartPacker.Controls
         private static readonly IPen MeasurePen = new ImmutablePen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF).ToUInt32(), 2);
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IPen OutlinePen = new ImmutablePen(Color.FromArgb(0xA0, 0x00, 0x00, 0x00).ToUInt32(), 1);
-        private static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
-        private static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
         private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
 
         // The track's waveform behind the notes: faint, so the gems stand out in front of it.
         private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
 
-        private static readonly Color StarPowerColor = Color.FromRgb(0x7F, 0xE9, 0xFF);
-        private static readonly Color OpenColor = Color.FromRgb(0xB0, 0x4C, 0xE0);
-        private static readonly Color KickColor = Color.FromRgb(0xFB, 0x8C, 0x00);
-        private static readonly Color WhiteFretColor = Color.FromRgb(0xF2, 0xF2, 0xF4);
-        private static readonly Color BlackFretColor = Color.FromRgb(0x2A, 0x2A, 0x32);
-
-        // A black fret's tail, and its edge when outlined, which its own colour would leave unseen on the dark highway.
-        private static readonly Color BlackFretEdgeColor = Color.FromRgb(0x8A, 0x8A, 0x96);
-
-        private static readonly Color Green = Color.FromRgb(0x2E, 0xC4, 0x4E);
-        private static readonly Color Red = Color.FromRgb(0xEE, 0x3B, 0x3B);
-        private static readonly Color Yellow = Color.FromRgb(0xFF, 0xD8, 0x2E);
-        private static readonly Color Blue = Color.FromRgb(0x25, 0x8C, 0xF0);
-        private static readonly Color Orange = Color.FromRgb(0xFF, 0x8A, 0x10);
-
-        private static readonly Color[] FretColors = [Green, Red, Yellow, Blue, Orange];
-        private static readonly Color[] FourPadColors = [Red, Yellow, Blue, Green];
-        private static readonly Color[] FivePadColors = [Red, Yellow, Blue, Orange, Green];
-
-        private readonly Dictionary<Color, IBrush> _brushes = [];
+        private readonly GemPainter _gems = new();
         private readonly Dictionary<Color, IBrush> _beams = [];
-        private readonly Dictionary<(Color, double), IPen> _pens = [];
         private readonly Dictionary<string, FormattedText> _labels = [];
         private bool _isFrameRequested;
         private Rect? _viewport;
@@ -196,9 +173,6 @@ namespace ChartPacker.Controls
 
         // How brightly each column of the highway being drawn is lit; one for them all, as they're drawn one at a time.
         private double[] _hits = [];
-
-        // A cymbal's shape for each size of gem, at the origin, moved to each gem drawn.
-        private readonly Dictionary<Size, StreamGeometry> _cymbals = [];
 
         // The highway the pointer is over, drawn as its whole chart while Shift is held, and how far down it the pointer is;
         // -1 and NaN for none. While scrubbing it stays the highway the press was on.
@@ -528,11 +502,11 @@ namespace ChartPacker.Controls
                 int column = note.Lane == ChartNote.OpenLane ? -1 : Column(lane, note.Lane);
 
                 // A black fret's own colour would be lost on the dark highway.
-                var color = IsBlackFret(lane, note) ? BlackFretEdgeColor : NoteColor(lane, note);
+                var color = IsBlackFret(lane, note) ? HighwayPalette.BlackFretEdge : NoteColor(lane, note);
                 double bottom = Y(lane.Starts[i]);
                 Add(gemRuns, column < 0 ? bars : gems, GemMark, column, bottom - GemHeight, bottom, color);
                 if (column >= 0 && lane.Ends[i] > lane.Starts[i])
-                    Add(tailRuns, tails, TailMark, column, Y(lane.Ends[i]), bottom, WithAlpha(color, 0xA0));
+                    Add(tailRuns, tails, TailMark, column, Y(lane.Ends[i]), bottom, HighwayPalette.WithAlpha(color, 0xA0));
             }
 
             foreach (var (column, run) in tailRuns)
@@ -765,12 +739,12 @@ namespace ChartPacker.Controls
             {
                 var color = TargetColor(lane, column);
                 var rect = GemRect(bounds, laneWidth, column, strike, gem);
-                double radius = CornerOf(rect);
+                double radius = GemPainter.CornerOf(rect);
                 double hit = hits[column];
 
                 // Hollow until struck, then filled in the lane's colour.
-                var fill = hit > 0 ? WithAlpha(color, (byte)(0x50 + (hit * 0xAF))) : WithAlpha(Darken(color, 0.72), 0xC8);
-                context.DrawRectangle(Brush(fill), Pen(hit > 0 ? Lighten(color, 0.4) : color, 2), rect.Deflate(1), radius, radius);
+                var fill = hit > 0 ? HighwayPalette.WithAlpha(color, (byte)(0x50 + (hit * 0xAF))) : HighwayPalette.WithAlpha(HighwayPalette.Darken(color, 0.72), 0xC8);
+                context.DrawRectangle(Brush(fill), Pen(hit > 0 ? HighwayPalette.Lighten(color, 0.4) : color, 2), rect.Deflate(1), radius, radius);
             }
         }
 
@@ -811,12 +785,7 @@ namespace ChartPacker.Controls
 
             double center = bounds.X + ((Column(lane, note.Lane) + 0.5) * laneWidth);
             double width = Math.Max(3, laneWidth * 0.2);
-            var tailColor = IsBlackFret(lane, note) ? BlackFretEdgeColor : color;
-            var tail = new Rect(center - (width / 2), top, width, bottom - top);
-            if (outlined)
-                context.DrawRectangle(null, Pen(tailColor, 1), tail.Deflate(0.5), 1, 1);
-            else
-                context.DrawRectangle(Brush(WithAlpha(tailColor, 0xCC)), OutlinePen, tail, 1, 1);
+            _gems.DrawTail(context, lane.Kind, note, color, new Rect(center - (width / 2), top, width, bottom - top), outlined);
         }
 
         private void DrawGem(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double at, double gem, bool outlined)
@@ -825,10 +794,7 @@ namespace ChartPacker.Controls
             {
                 // An open note or a kick: a flat bar across the highway.
                 double barHeight = Math.Max(4, gem * 0.45);
-                var bar = new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight);
-                DrawFlat(context, bar, color, outlined: outlined);
-                if ((note.Flags & NoteFlags.DoubleKick) != 0)
-                    context.DrawRectangle(null, Pen(WhiteFretColor, 1), bar.Deflate(1.5), 1, 1);
+                _gems.DrawBar(context, note, color, new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight), outlined);
                 return;
             }
 
@@ -838,112 +804,8 @@ namespace ChartPacker.Controls
             if (IsBlackFret(lane, note) && lane.SharesColumn.Contains((note.Tick, note.Lane % 3)))
                 rect = rect.WithHeight(rect.Height / 2);
 
-            // Outlined, a black fret's own colour would be lost on the dark highway, so it's drawn in grey.
-            var edge = outlined && IsBlackFret(lane, note) ? BlackFretEdgeColor : color;
-
-            if ((note.Flags & NoteFlags.Cymbal) != 0)
-            {
-                DrawCymbal(context, rect, edge, outlined);
-                return;
-            }
-
-            if ((note.Flags & NoteFlags.Tap) != 0)
-            {
-                // A tap: dark, with the lane's colour as its border and a mark in the middle.
-                double radius = CornerOf(rect);
-                context.DrawRectangle(outlined ? null : TapBodyBrush, Pen(edge, 2), rect.Deflate(1), radius, radius);
-                if (outlined)
-                    context.DrawRectangle(null, Pen(edge, 1), Mark(rect).Deflate(0.5), 1, 1);
-                else
-                    context.FillRectangle(Brush(color), Mark(rect), 1f);
-                return;
-            }
-
-            DrawFlat(context, rect, edge, IsBlackFret(lane, note) ? Color.FromRgb(0xC8, 0xC8, 0xD0) : null, outlined);
-
-            // A hammer-on: a white mark across the face.
-            if ((note.Flags & NoteFlags.Hopo) != 0)
-            {
-                if (outlined)
-                    context.DrawRectangle(null, Pen(WhiteFretColor, 1), Mark(rect).Deflate(0.5), 1, 1);
-                else
-                    context.FillRectangle(HopoMarkBrush, Mark(rect), 1f);
-            }
+            _gems.DrawGem(context, lane.Kind, note, color, rect, outlined);
         }
-
-        /// <summary>
-        /// A flat gem: its face in the colour over a darker lower edge, like a key seen from the front,
-        /// with a thin dark outline so it reads over any background. Outlined, only its edge is drawn, in the colour.
-        /// </summary>
-        private void DrawFlat(DrawingContext context, Rect rect, Color color, Color? outline = null, bool outlined = false)
-        {
-            double radius = CornerOf(rect);
-            if (outlined)
-            {
-                context.DrawRectangle(null, Pen(color, 1.5), rect.Deflate(0.75), radius, radius);
-                return;
-            }
-
-            context.DrawRectangle(Brush(Darken(color, 0.38)), null, rect, radius, radius);
-            context.DrawRectangle(Brush(color), null, rect.WithHeight(rect.Height * 0.72), radius, radius);
-            context.DrawRectangle(null, outline is { } light ? Pen(light, 1) : OutlinePen, rect, radius, radius);
-        }
-
-        /// <summary>A cymbal: a flat hexagon, pointed at the sides, in two tones like a gem; outlined, only its edge in the colour.</summary>
-        private void DrawCymbal(DrawingContext context, Rect rect, Color color, bool outlined)
-        {
-            var hexagon = Cymbal(rect.Size);
-            using (context.PushTransform(Matrix.CreateTranslation(rect.X, rect.Y)))
-            {
-                if (outlined)
-                {
-                    context.DrawGeometry(null, Pen(color, 1.5), hexagon);
-                    return;
-                }
-
-                var face = new Rect(rect.Size);
-                using (context.PushGeometryClip(hexagon))
-                {
-                    context.FillRectangle(Brush(Darken(color, 0.38)), face);
-                    context.FillRectangle(Brush(color), face.WithHeight(face.Height * 0.62));
-                }
-
-                context.DrawGeometry(null, OutlinePen, hexagon);
-            }
-        }
-
-        /// <summary>A cymbal's hexagon filling <paramref name="size"/> from the origin, made once for each size.</summary>
-        private StreamGeometry Cymbal(Size size)
-        {
-            if (_cymbals.TryGetValue(size, out var hexagon))
-                return hexagon;
-
-            // Resized often (a window being dragged larger), the sizes no longer drawn go.
-            if (_cymbals.Count > 16)
-                _cymbals.Clear();
-
-            double point = Math.Min(size.Height * 0.6, size.Width * 0.25);
-            hexagon = new StreamGeometry();
-            using (var g = hexagon.Open())
-            {
-                g.BeginFigure(new Point(0, size.Height / 2), true);
-                g.LineTo(new Point(point, 0));
-                g.LineTo(new Point(size.Width - point, 0));
-                g.LineTo(new Point(size.Width, size.Height / 2));
-                g.LineTo(new Point(size.Width - point, size.Height));
-                g.LineTo(new Point(point, size.Height));
-                g.EndFigure(true);
-            }
-
-            _cymbals[size] = hexagon;
-            return hexagon;
-        }
-
-        /// <summary>The mark across the face of a HOPO or tap gem.</summary>
-        private static Rect Mark(Rect rect) =>
-            new(rect.X + (rect.Width * 0.28), rect.Y + (rect.Height * 0.24), rect.Width * 0.44, Math.Max(1.5, rect.Height * 0.24));
-
-        private static double CornerOf(Rect rect) => Math.Min(3, rect.Height * 0.25);
 
         private void DrawLabel(DrawingContext context, string label, Rect bounds, double top)
         {
@@ -976,69 +838,32 @@ namespace ChartPacker.Controls
         }
 
         /// <summary>The column a lane is drawn in: six-fret's black and white frets share three.</summary>
-        internal static int Column(HighwayLane lane, int noteLane) =>
-            lane.Kind == ChartInstrumentKind.SixFret ? noteLane % 3 : Math.Min(noteLane, lane.LaneCount - 1);
+        private static int Column(HighwayLane lane, int noteLane) => HighwayPalette.Column(lane.Kind, lane.LaneCount, noteLane);
 
-        private static bool IsBlackFret(HighwayLane lane, ChartNote note) => lane.Kind == ChartInstrumentKind.SixFret && note.Lane >= 3;
+        private static bool IsBlackFret(HighwayLane lane, ChartNote note) => HighwayPalette.IsBlackFret(lane.Kind, note.Lane);
 
-        private static Color TargetColor(HighwayLane lane, int column) => lane.Kind switch
-        {
-            ChartInstrumentKind.FiveFret => FretColors[column],
-            ChartInstrumentKind.Drums => (lane.LaneCount == 5 ? FivePadColors : FourPadColors)[column],
-            _ => Color.FromRgb(0xB8, 0xB8, 0xC4),
-        };
+        private static Color TargetColor(HighwayLane lane, int column) => HighwayPalette.TargetColor(lane.Kind, lane.LaneCount, column);
 
-        private static Color HitColor(HighwayLane lane, int column) =>
-            lane.Kind == ChartInstrumentKind.SixFret ? WhiteFretColor : TargetColor(lane, column);
+        private static Color HitColor(HighwayLane lane, int column) => HighwayPalette.HitColor(lane.Kind, lane.LaneCount, column);
 
-        internal static Color NoteColor(HighwayLane lane, ChartNote note)
-        {
-            if ((note.Flags & NoteFlags.StarPower) != 0)
-                return StarPowerColor;
-            if (note.Lane == ChartNote.OpenLane)
-                return lane.Kind == ChartInstrumentKind.Drums ? KickColor : OpenColor;
-            if (lane.Kind == ChartInstrumentKind.SixFret)
-                return note.Lane >= 3 ? BlackFretColor : WhiteFretColor;
-            return TargetColor(lane, Column(lane, note.Lane));
-        }
-
-        private static Color WithAlpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
-
-        private static Color Lighten(Color color, double amount) => Color.FromArgb(
-            color.A,
-            (byte)(color.R + ((255 - color.R) * amount)),
-            (byte)(color.G + ((255 - color.G) * amount)),
-            (byte)(color.B + ((255 - color.B) * amount)));
-
-        private static Color Darken(Color color, double amount) => Color.FromArgb(
-            color.A, (byte)(color.R * (1 - amount)), (byte)(color.G * (1 - amount)), (byte)(color.B * (1 - amount)));
+        private static Color NoteColor(HighwayLane lane, ChartNote note) => HighwayPalette.NoteColor(lane.Kind, lane.LaneCount, note);
 
         private static IBrush VerticalGradient(params (double Offset, Color Color)[] stops) => new ImmutableLinearGradientBrush(
             [.. stops.Select(s => new ImmutableGradientStop(s.Offset, s.Color))],
             startPoint: new RelativePoint(0.5, 0, RelativeUnit.Relative),
             endPoint: new RelativePoint(0.5, 1, RelativeUnit.Relative));
 
-        private IBrush Brush(Color color)
-        {
-            if (!_brushes.TryGetValue(color, out var brush))
-                _brushes[color] = brush = new ImmutableSolidColorBrush(color);
-            return brush;
-        }
+        private IBrush Brush(Color color) => _gems.Brush(color);
 
         /// <summary>A struck lane's beam: clear at the top, the lane's colour at the strike line.</summary>
         private IBrush Beam(Color color)
         {
             if (!_beams.TryGetValue(color, out var brush))
-                _beams[color] = brush = VerticalGradient((0, WithAlpha(color, 0)), (1, WithAlpha(color, 0x70)));
+                _beams[color] = brush = VerticalGradient((0, HighwayPalette.WithAlpha(color, 0)), (1, HighwayPalette.WithAlpha(color, 0x70)));
             return brush;
         }
 
-        private IPen Pen(Color color, double thickness)
-        {
-            if (!_pens.TryGetValue((color, thickness), out var pen))
-                _pens[(color, thickness)] = pen = new ImmutablePen(color.ToUInt32(), thickness);
-            return pen;
-        }
+        private IPen Pen(Color color, double thickness) => _gems.Pen(color, thickness);
 
         /// <summary>The index of the first of <paramref name="times"/>, which are in order, at or after <paramref name="time"/>.</summary>
         private static int LowerBound(double[] times, double time)

@@ -7,7 +7,7 @@ namespace ChartPacker.Controls
     /// A waveform's levels over a stretch of time, and how loud to draw them, for each control that draws one.
     /// Only what's been read counts: the buckets past <see cref="Waveform.ReadCount"/> are silent for now, not quiet.
     /// </summary>
-    internal static class WaveformLevels
+    public static class WaveformLevels
     {
         /// <summary>How loud a stretch must be to fill the height: a full-scale sine, at -3 dBFS.</summary>
         public const double RmsGain = 1.41;

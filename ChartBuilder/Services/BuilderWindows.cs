@@ -64,14 +64,14 @@ namespace ChartBuilder.Services
                 "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
             var audio = NewChartStems.TracksOf(audioFiles);
             var editor = new EditorWindow();
-            var viewModel = EditorWindowViewModel.ForNewChart(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), chart, audio, openOutput, latency);
+            var viewModel = EditorWindowViewModel.ForNewChart(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), chart, audio, openOutput, latency, () => _ = ShowCalibrationAsync());
             OpenEditor(editor, viewModel);
         }
 
         public void OpenSong(OpenedSong song, SongLock songLock)
         {
             var editor = new EditorWindow();
-            var viewModel = EditorWindowViewModel.ForSong(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), song, songLock, openOutput, latency);
+            var viewModel = EditorWindowViewModel.ForSong(settings, SettingsWindowFor(editor), new AvaloniaConfirmationService(() => editor), song, songLock, openOutput, latency, () => _ = ShowCalibrationAsync());
             OpenEditor(editor, viewModel);
         }
 

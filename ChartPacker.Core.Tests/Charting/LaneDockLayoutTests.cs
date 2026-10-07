@@ -297,6 +297,24 @@ public sealed class LaneDockLayoutTests
     }
 
     [TestMethod]
+    public void ALanesLookAheadIsKeptWithoutChangingTheLayout()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+
+        layout.SetLookAhead(Lane(layout, Bass), 3.5);
+        layout.SetLookAhead(Lane(layout, Drums), -1);
+        string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
+
+        Assert.AreEqual(0, changes, "A look-ahead isn't a change to the layout's shape.");
+        Assert.AreEqual(3.5, Lane(read, Bass).LookAhead);
+        Assert.IsNull(Lane(read, Drums).LookAhead, "A look-ahead that isn't a positive number is the default.");
+        Assert.IsNull(Lane(read, Guitar).LookAhead);
+    }
+
+    [TestMethod]
     public void TheStateSurvivesJson()
     {
         var layout = LaneDockLayout.CreateDefault();

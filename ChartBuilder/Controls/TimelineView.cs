@@ -6,6 +6,8 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
+using ChartBuilder.ViewModels;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charting;
 
@@ -16,7 +18,8 @@ namespace ChartBuilder.Controls
 
     /// <summary>
     /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, and a playhead
-    /// that clicking or dragging moves (scrubbing). The notes come later.
+    /// that clicking or dragging moves (scrubbing). It's also the overview strip (charter-spec C3 item 2): the sections,
+    /// the note density, star power and solos of the lane in focus, and a box round the span the lanes show.
     /// </summary>
     /// <remarks>
     /// <para>The playhead is drawn by a layer of its own over the rest, so it moves without the ruler, waveform and beat
@@ -30,6 +33,14 @@ namespace ChartBuilder.Controls
         private const double MinLabelSpacing = 56;
         private const double MinBeatSpacing = 6;
         private const double MinMeasureSpacing = 3;
+
+        // The overview's marks: star power and solo bands under the ruler, and the note density along the bottom.
+        private const double BandHeight = 3;
+        private const double DensityFraction = 0.3;
+        private static readonly IBrush StarPowerBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x7F, 0xE9, 0xFF));
+        private static readonly IBrush SoloBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xC0, 0x84, 0xFC));
+        private static readonly IBrush DensityBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xB0, 0x40));
+        private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
         private readonly PlayheadLayer _playhead;
         private Pen? _tickPen;
@@ -71,10 +82,22 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<IBrush?> PlayheadBrushProperty =
             AvaloniaProperty.Register<TimelineView, IBrush?>(nameof(PlayheadBrush));
 
+        public static readonly StyledProperty<OverviewData?> OverviewProperty =
+            AvaloniaProperty.Register<TimelineView, OverviewData?>(nameof(Overview));
+
+        public static readonly StyledProperty<double> VisibleStartProperty =
+            AvaloniaProperty.Register<TimelineView, double>(nameof(VisibleStart));
+
+        public static readonly StyledProperty<double> VisibleEndProperty =
+            AvaloniaProperty.Register<TimelineView, double>(nameof(VisibleEnd));
+
+        public static readonly StyledProperty<IBrush?> SpanBrushProperty =
+            AvaloniaProperty.Register<TimelineView, IBrush?>(nameof(SpanBrush));
+
         static TimelineView()
         {
             AffectsRender<TimelineView>(
-                LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty);
+                LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty, OverviewProperty);
             ClipToBoundsProperty.OverrideDefaultValue<TimelineView>(true);
         }
 
@@ -157,6 +180,34 @@ namespace ChartBuilder.Controls
             set => SetValue(PlayheadBrushProperty, value);
         }
 
+        /// <summary>What's drawn of the lane in focus over the whole song; none for nothing.</summary>
+        public OverviewData? Overview
+        {
+            get => GetValue(OverviewProperty);
+            set => SetValue(OverviewProperty, value);
+        }
+
+        /// <summary>Where the span the lanes show starts, in seconds of audio.</summary>
+        public double VisibleStart
+        {
+            get => GetValue(VisibleStartProperty);
+            set => SetValue(VisibleStartProperty, value);
+        }
+
+        /// <summary>Where the span the lanes show ends, in seconds of audio; no later than its start draws no box.</summary>
+        public double VisibleEnd
+        {
+            get => GetValue(VisibleEndProperty);
+            set => SetValue(VisibleEndProperty, value);
+        }
+
+        /// <summary>The box round the span the lanes show.</summary>
+        public IBrush? SpanBrush
+        {
+            get => GetValue(SpanBrushProperty);
+            set => SetValue(SpanBrushProperty, value);
+        }
+
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
@@ -170,7 +221,8 @@ namespace ChartBuilder.Controls
             else if (change.Property == WaveformBrushProperty)
                 _waveformPen = null;
 
-            if (change.Property == PositionProperty || change.Property == LengthProperty || change.Property == PlayheadBrushProperty)
+            if (change.Property == PositionProperty || change.Property == LengthProperty || change.Property == PlayheadBrushProperty
+                || change.Property == VisibleStartProperty || change.Property == VisibleEndProperty || change.Property == SpanBrushProperty)
                 _playhead.InvalidateVisual();
             if (change.Property == IsPlayingProperty)
             {
@@ -199,8 +251,48 @@ namespace ChartBuilder.Controls
                 return;
 
             DrawWaveform(context, bounds);
+            DrawOverview(context, bounds);
             DrawBeats(context, bounds);
             DrawRuler(context, bounds);
+        }
+
+        /// <summary>The lane in focus over the whole song: its note density, star power and solos, and the song's sections.</summary>
+        private void DrawOverview(DrawingContext context, Rect bounds)
+        {
+            if (Overview is not { } overview)
+                return;
+
+            double width = bounds.Width;
+            double top = RulerHeight;
+            double densityHeight = (bounds.Height - top) * DensityFraction;
+            int columns = overview.Density.Count;
+            for (int i = 0; i < columns; i++)
+            {
+                float density = overview.Density[i];
+                if (density <= 0)
+                    continue;
+                double x = (double)i / columns * width;
+                double height = Math.Max(1, density * densityHeight);
+                context.FillRectangle(DensityBrush, new Rect(x, bounds.Bottom - height, Math.Max(1, width / columns), height));
+            }
+
+            foreach (var (start, end) in overview.StarPower)
+                context.FillRectangle(StarPowerBrush, new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), BandHeight));
+            foreach (var (start, end) in overview.Solos)
+                context.FillRectangle(SoloBrush, new Rect(XOf(start, width), top + BandHeight + 1, Math.Max(1, XOf(end, width) - XOf(start, width)), BandHeight));
+
+            var labelBrush = TickBrush ?? Brushes.Gray;
+            double lastLabelEnd = double.MinValue;
+            foreach (var section in overview.Sections)
+            {
+                double x = Math.Round(XOf(section.Seconds, width)) + 0.5;
+                context.DrawLine(SectionPen, new Point(x, top), new Point(x, bounds.Bottom));
+                if (x < lastLabelEnd)
+                    continue;
+                var text = new FormattedText(section.Name, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10, labelBrush);
+                context.DrawText(text, new Point(x + 3, top + (2 * BandHeight) + 2));
+                lastLabelEnd = x + text.Width + 6;
+            }
         }
 
         /// <summary>Each pixel column's lowest and highest level, and how loud it is, scaled so the loudest fills the height.</summary>
@@ -389,6 +481,14 @@ namespace ChartBuilder.Controls
                 {
                     _pen = new Pen(brush, 1.5);
                     _penBrush = brush;
+                }
+
+                // The span the lanes show, boxed, so the overview says where in the song the editor is.
+                if (owner.SpanBrush is { } span && owner.VisibleEnd > owner.VisibleStart)
+                {
+                    double left = owner.XOf(Math.Clamp(owner.VisibleStart, 0, owner.Length), width);
+                    double right = owner.XOf(Math.Clamp(owner.VisibleEnd, 0, owner.Length), width);
+                    context.FillRectangle(span, new Rect(left, 0, Math.Max(2, right - left), Bounds.Height));
                 }
 
                 double x = Math.Round(owner.XOf(Math.Clamp(owner.PlayheadSeconds, 0, owner.Length), width)) + 0.5;

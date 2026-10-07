@@ -662,4 +662,376 @@ Open it anyway?</value>
   <data name="NewChartFileNoStemFormat" xml:space="preserve">
     <value>{0}'s name doesn't say which stem it is, or another file is already that stem</value>
   </data>
+  <data name="DefaultSnapLabel" xml:space="preserve">
+    <value>Default snap</value>
+    <comment>A setting: the grid notes snap to when the editor opens.</comment>
+  </data>
+  <data name="DefaultSnapDescription" xml:space="preserve">
+    <value>The grid notes snap to when a chart is opened. [ and ] change it while editing.</value>
+    <comment>The default snap setting's description.</comment>
+  </data>
+  <data name="DefaultSnapKeywords" xml:space="preserve">
+    <value>snap grid quantize division beat</value>
+    <comment>Search words for the default snap setting, separated by spaces.</comment>
+  </data>
+  <data name="SnapFormat" xml:space="preserve">
+    <value>1/{0}</value>
+    <comment>A snap, as a fraction of a whole note, e.g. "1/16".</comment>
+  </data>
+  <data name="DefaultEditorViewLabel" xml:space="preserve">
+    <value>Default view</value>
+    <comment>A setting: how a lane shows the chart when it's opened.</comment>
+  </data>
+  <data name="DefaultEditorViewDescription" xml:space="preserve">
+    <value>How a lane shows the chart when it's opened: a vertical highway, as in the games, or a horizontal timeline. V switches the lane in focus.</value>
+    <comment>The default view setting's description.</comment>
+  </data>
+  <data name="DefaultEditorViewKeywords" xml:space="preserve">
+    <value>view highway timeline horizontal vertical lane</value>
+    <comment>Search words for the default view setting, separated by spaces.</comment>
+  </data>
+  <data name="EditorViewHighway" xml:space="preserve">
+    <value>Highway</value>
+    <comment>A lane's view: vertical, time running upwards.</comment>
+  </data>
+  <data name="EditorViewTimeline" xml:space="preserve">
+    <value>Timeline</value>
+    <comment>A lane's view: horizontal, time running left to right.</comment>
+  </data>
+  <data name="EditorHighwaySpeedLabel" xml:space="preserve">
+    <value>Highway speed</value>
+    <comment>A setting: how fast notes go by in the editor.</comment>
+  </data>
+  <data name="EditorHighwaySpeedDescription" xml:space="preserve">
+    <value>How fast notes go by in a lane whose look-ahead you haven't set. Set a lane's own from its header, or with Ctrl+wheel, + and −.</value>
+    <comment>The highway speed setting's description.</comment>
+  </data>
+  <data name="EditorHighwaySpeedKeywords" xml:space="preserve">
+    <value>speed zoom hyperspeed scroll note</value>
+    <comment>Search words for the highway speed setting, separated by spaces.</comment>
+  </data>
+  <data name="MetronomeVolumeLabel" xml:space="preserve">
+    <value>Metronome volume</value>
+    <comment>A setting: how loud the metronome is.</comment>
+  </data>
+  <data name="MetronomeVolumeDescription" xml:space="preserve">
+    <value>How loud the metronome's clicks are over the song.</value>
+    <comment>The metronome volume setting's description.</comment>
+  </data>
+  <data name="MetronomeVolumeKeywords" xml:space="preserve">
+    <value>metronome click volume loud</value>
+    <comment>Search words for the metronome volume setting, separated by spaces.</comment>
+  </data>
+  <data name="HitSoundVolumeLabel" xml:space="preserve">
+    <value>Hit sound volume</value>
+    <comment>A setting: how loud the hit sounds are.</comment>
+  </data>
+  <data name="HitSoundVolumeDescription" xml:space="preserve">
+    <value>How loud the sound on each note is, as it reaches the strike line.</value>
+    <comment>The hit sound volume setting's description.</comment>
+  </data>
+  <data name="HitSoundVolumeKeywords" xml:space="preserve">
+    <value>hit sound note volume loud clap</value>
+    <comment>Search words for the hit sound volume setting, separated by spaces.</comment>
+  </data>
+  <data name="LoopToolTipFormat" xml:space="preserve">
+    <value>Loop the region from {0} to {1}. L sets it from the selection.</value>
+    <comment>The loop button's tooltip, with the loop region's start and end times.</comment>
+  </data>
+  <data name="LoopNoneToolTip" xml:space="preserve">
+    <value>Loop a region. Select a span of the song, then press L to set the region.</value>
+    <comment>The loop button's tooltip when there's no loop region yet.</comment>
+  </data>
+  <data name="LatencyFormat" xml:space="preserve">
+    <value>{0} ms</value>
+    <comment>The calibrated audio/visual latency, in the transport bar, e.g. "42 ms".</comment>
+  </data>
+  <data name="NothingToPlayStatus" xml:space="preserve">
+    <value>Select notes or a span of the song to play it.</value>
+    <comment>Said when Shift+Space is pressed with nothing selected.</comment>
+  </data>
+  <data name="NothingToLoopStatus" xml:space="preserve">
+    <value>Select notes or a span of the song to loop it.</value>
+    <comment>Said when L is pressed with nothing selected.</comment>
+  </data>
+  <data name="TapTempoNotPlayingStatus" xml:space="preserve">
+    <value>Play the song, then tap B in time with it.</value>
+    <comment>Said when B (tap tempo) is pressed while the song isn't playing.</comment>
+  </data>
+  <data name="TapTempoStartedStatusFormat" xml:space="preserve">
+    <value>Tap tempo: {0} taps so far. Keep tapping B in time.</value>
+    <comment>Tap tempo's status before it has a tempo, with the number of taps.</comment>
+  </data>
+  <data name="TapTempoStatusFormat" xml:space="preserve">
+    <value>Tap tempo: {0:0.0} BPM from {1} taps. Stop tapping to set it.</value>
+    <comment>Tap tempo's status, with the tempo and the number of taps.</comment>
+  </data>
+  <data name="TapTempoOutOfRangeStatus" xml:space="preserve">
+    <value>The taps give a tempo too fast or too slow for MIDI to hold.</value>
+    <comment>Said when tap tempo's result can't be stored.</comment>
+  </data>
+  <data name="AnchorBlockedTitle" xml:space="preserve">
+    <value>Keep the anchor?</value>
+    <comment>The title of the prompt when a tempo edit can't keep an anchored marker where it is.</comment>
+  </data>
+  <data name="AnchorBlockedMessageFormat" xml:space="preserve">
+    <value>{0} Unanchor it, or add a tempo marker a beat before it to take up the change?</value>
+    <comment>The prompt when a tempo edit can't keep an anchor, with why.</comment>
+  </data>
+  <data name="AnchorUnanchorButton" xml:space="preserve">
+    <value>Unanchor</value>
+    <comment>A button: unanchor the tempo marker so the edit can be made.</comment>
+  </data>
+  <data name="AnchorAddMarkerButton" xml:space="preserve">
+    <value>Add marker before</value>
+    <comment>A button: add a tempo marker one beat before the anchor so the edit can be made.</comment>
+  </data>
+  <data name="LaneShowHighwayToolTip" xml:space="preserve">
+    <value>Show as a highway (V)</value>
+    <comment>A lane's button tooltip: switch the lane to the vertical highway view.</comment>
+  </data>
+  <data name="LaneShowTimelineToolTip" xml:space="preserve">
+    <value>Show as a timeline (V)</value>
+    <comment>A lane's button tooltip: switch the lane to the horizontal timeline view.</comment>
+  </data>
+  <data name="LaneNoPartFormat" xml:space="preserve">
+    <value>The chart has no {0} part. Add it in Chart settings.</value>
+    <comment>A lane's placeholder when the chart hasn't the part it shows, with the part's name.</comment>
+  </data>
+  <data name="LaneDifficultyShownFormat" xml:space="preserve">
+    <value>{0} is already shown in another lane.</value>
+    <comment>Said when a lane can't switch to a difficulty another lane shows, with the difficulty's name.</comment>
+  </data>
+  <data name="LaneGhostNone" xml:space="preserve">
+    <value>None</value>
+    <comment>The ghost difficulty menu's item for showing no ghost.</comment>
+  </data>
+  <data name="LaneGhostToolTip" xml:space="preserve">
+    <value>Ghost difficulty: another difficulty drawn faintly behind this one, to check a reduction against it</value>
+    <comment>The ghost difficulty button's tooltip.</comment>
+  </data>
+  <data name="LaneDifficultyToolTipFormat" xml:space="preserve">
+    <value>{0} (Ctrl+1–4)</value>
+    <comment>A difficulty letter's tooltip in a lane's header, with the difficulty's name.</comment>
+  </data>
+  <data name="PropertiesBadBeats" xml:space="preserve">
+    <value>Enter how many beats the span lasts, such as 4.</value>
+    <comment>Said when Set BPM from selection's beats aren't a positive number.</comment>
+  </data>
+  <data name="PropertiesBadBpm" xml:space="preserve">
+    <value>That tempo is too fast or too slow for MIDI to hold.</value>
+    <comment>Said when a BPM typed in Properties can't be stored.</comment>
+  </data>
+  <data name="PropertiesNoteHeading" xml:space="preserve">
+    <value>Note</value>
+    <comment>Properties' heading for one selected note.</comment>
+  </data>
+  <data name="PropertiesNotesHeadingFormat" xml:space="preserve">
+    <value>{0} notes</value>
+    <comment>Properties' heading for several selected notes, with how many.</comment>
+  </data>
+  <data name="PropertiesTempoHeading" xml:space="preserve">
+    <value>Tempo marker</value>
+    <comment>Properties' heading for one selected tempo marker.</comment>
+  </data>
+  <data name="PropertiesTemposHeadingFormat" xml:space="preserve">
+    <value>{0} tempo markers</value>
+    <comment>Properties' heading for several selected tempo markers, with how many.</comment>
+  </data>
+  <data name="PropertiesSpanHeading" xml:space="preserve">
+    <value>Span</value>
+    <comment>Properties' heading for the selected span of the song.</comment>
+  </data>
+  <data name="PropertiesSpanFormat" xml:space="preserve">
+    <value>{0} to {1}</value>
+    <comment>The selected span's start and end times, in Properties.</comment>
+  </data>
+  <data name="PropertiesMeasureBeatFormat" xml:space="preserve">
+    <value>m{0} · beat {1}</value>
+    <comment>Where a note is: its measure and beat, e.g. "m41 · beat 3".</comment>
+  </data>
+  <data name="PropertiesTickLabel" xml:space="preserve">
+    <value>Tick</value>
+    <comment>A Properties field: where the note is, in ticks.</comment>
+  </data>
+  <data name="PropertiesTimeLabel" xml:space="preserve">
+    <value>Time</value>
+    <comment>A Properties field: where the note is, in the audio.</comment>
+  </data>
+  <data name="PropertiesMeasureLabel" xml:space="preserve">
+    <value>Measure</value>
+    <comment>A Properties field: the note's measure and beat.</comment>
+  </data>
+  <data name="PropertiesLaneLabel" xml:space="preserve">
+    <value>Lane</value>
+    <comment>A Properties field: the note's lane.</comment>
+  </data>
+  <data name="PropertiesLengthLabel" xml:space="preserve">
+    <value>Length</value>
+    <comment>A Properties field: how long the note is held, in ticks.</comment>
+  </data>
+  <data name="PropertiesForcingLabel" xml:space="preserve">
+    <value>Chord</value>
+    <comment>A Properties field: how the note's chord is forced.</comment>
+  </data>
+  <data name="PropertiesForceHopo" xml:space="preserve">
+    <value>HOPO</value>
+    <comment>A checkbox: the chord is forced to a hammer-on (H).</comment>
+  </data>
+  <data name="PropertiesForceStrum" xml:space="preserve">
+    <value>Strum</value>
+    <comment>A checkbox: the chord is forced to a strum (G).</comment>
+  </data>
+  <data name="PropertiesTap" xml:space="preserve">
+    <value>Tap</value>
+    <comment>A checkbox: the chord is a tap chord (T).</comment>
+  </data>
+  <data name="PropertiesBpmLabel" xml:space="preserve">
+    <value>BPM</value>
+    <comment>A Properties field: the tempo marker's beats per minute.</comment>
+  </data>
+  <data name="PropertiesSignatureLabel" xml:space="preserve">
+    <value>Time signature</value>
+    <comment>A Properties field: the time signature at the tempo marker.</comment>
+  </data>
+  <data name="PropertiesAnchoredLabel" xml:space="preserve">
+    <value>Anchored to the audio</value>
+    <comment>A checkbox: the tempo marker stays where it is in the audio when other tempos change.</comment>
+  </data>
+  <data name="PropertiesBeatsLabel" xml:space="preserve">
+    <value>Beats</value>
+    <comment>A Properties field: how many beats the selected span lasts.</comment>
+  </data>
+  <data name="PropertiesSetBpmButton" xml:space="preserve">
+    <value>Set BPM from span</value>
+    <comment>A button: work out the tempo from the span's length and its beats.</comment>
+  </data>
+  <data name="PropertiesSetBpmToolTip" xml:space="preserve">
+    <value>Sets the tempo from the span's start so that its beats fit the span exactly.</value>
+    <comment>The Set BPM from span button's tooltip.</comment>
+  </data>
+  <data name="LaneNameGreen" xml:space="preserve">
+    <value>Green</value>
+    <comment>A note's lane.</comment>
+  </data>
+  <data name="LaneNameRed" xml:space="preserve">
+    <value>Red</value>
+    <comment>A note's lane.</comment>
+  </data>
+  <data name="LaneNameYellow" xml:space="preserve">
+    <value>Yellow</value>
+    <comment>A note's lane.</comment>
+  </data>
+  <data name="LaneNameBlue" xml:space="preserve">
+    <value>Blue</value>
+    <comment>A note's lane.</comment>
+  </data>
+  <data name="LaneNameOrange" xml:space="preserve">
+    <value>Orange</value>
+    <comment>A note's lane.</comment>
+  </data>
+  <data name="LaneNameOpen" xml:space="preserve">
+    <value>Open</value>
+    <comment>A note's lane: an open note.</comment>
+  </data>
+  <data name="LaneNameKick" xml:space="preserve">
+    <value>Kick</value>
+    <comment>A drum note's lane: the kick.</comment>
+  </data>
+  <data name="LaneNameDoubleKick" xml:space="preserve">
+    <value>2× kick</value>
+    <comment>A drum note's lane: the Expert+ second kick.</comment>
+  </data>
+  <data name="LaneNameWhiteFormat" xml:space="preserve">
+    <value>White {0}</value>
+    <comment>A six-fret note's lane, with its column.</comment>
+  </data>
+  <data name="LaneNameBlackFormat" xml:space="preserve">
+    <value>Black {0}</value>
+    <comment>A six-fret note's lane, with its column.</comment>
+  </data>
+  <data name="PhraseToolComingToolTip" xml:space="preserve">
+    <value>Star power, solos and other phrases come with drums and GHL.</value>
+    <comment>The Phrase tool's tooltip while it's not built yet.</comment>
+  </data>
+  <data name="ToolSelectToolTip" xml:space="preserve">
+    <value>Select notes and drag them in time or across lanes; drag a tail to set a sustain; drag in an empty place to select a span. Click an empty place to move the cursor.</value>
+    <comment>The Select tool's tooltip.</comment>
+  </data>
+  <data name="ToolPlaceToolTip" xml:space="preserve">
+    <value>Click to place a note on the grid, and drag to draw out its sustain. Shift-click places an open note (the kick on drums).</value>
+    <comment>The Place tool's tooltip.</comment>
+  </data>
+  <data name="ToolEraseToolTip" xml:space="preserve">
+    <value>Click or drag over notes to remove them.</value>
+    <comment>The Erase tool's tooltip.</comment>
+  </data>
+  <data name="ToolSustainToolTip" xml:space="preserve">
+    <value>Drag from a note to set how long it's held; with notes selected, sets them all.</value>
+    <comment>The Sustain tool's tooltip.</comment>
+  </data>
+  <data name="ToolTempoToolTip" xml:space="preserve">
+    <value>Click to add a tempo marker; drag one to move it, or, when it's anchored, to fit the tempo to the audio. Edit its tempo in Properties.</value>
+    <comment>The Tempo tool's tooltip.</comment>
+  </data>
+  <data name="SnapLabel" xml:space="preserve">
+    <value>Snap</value>
+    <comment>The snap checkbox and picker: notes snap to the grid.</comment>
+  </data>
+  <data name="SnapToolTip" xml:space="preserve">
+    <value>The grid notes snap to, as a fraction of a whole note. [ and ] change it.</value>
+    <comment>The snap controls' tooltip.</comment>
+  </data>
+  <data name="LoopLabel" xml:space="preserve">
+    <value>Loop</value>
+    <comment>The transport bar's checkbox: repeat the loop region.</comment>
+  </data>
+  <data name="HitSoundsLabel" xml:space="preserve">
+    <value>Hit sounds</value>
+    <comment>The transport bar's checkbox: a sound on each note.</comment>
+  </data>
+  <data name="HitSoundsToolTip" xml:space="preserve">
+    <value>Play a sound on each note of the lanes shown as it reaches the strike line.</value>
+    <comment>The hit sounds checkbox's tooltip.</comment>
+  </data>
+  <data name="StemsButton" xml:space="preserve">
+    <value>Stems</value>
+    <comment>The transport bar's button: each stem's mute, solo and volume.</comment>
+  </data>
+  <data name="StemsToolTip" xml:space="preserve">
+    <value>Mute, solo or turn down each stem.</value>
+    <comment>The Stems button's tooltip.</comment>
+  </data>
+  <data name="StemMuteLabel" xml:space="preserve">
+    <value>Mute</value>
+    <comment>A checkbox in the Stems menu: the stem isn't heard.</comment>
+  </data>
+  <data name="StemSoloLabel" xml:space="preserve">
+    <value>Solo</value>
+    <comment>A checkbox in the Stems menu: only soloed stems are heard.</comment>
+  </data>
+  <data name="StemVolumeToolTip" xml:space="preserve">
+    <value>Volume</value>
+    <comment>The Stems menu's volume slider.</comment>
+  </data>
+  <data name="LatencyLabel" xml:space="preserve">
+    <value>Latency</value>
+    <comment>The transport bar's latency button's label, before the value.</comment>
+  </data>
+  <data name="LatencyToolTip" xml:space="preserve">
+    <value>The calibrated audio/visual latency for this output. Click to calibrate.</value>
+    <comment>The transport bar's latency button's tooltip.</comment>
+  </data>
+  <data name="LaneLookAheadFormat" xml:space="preserve">
+    <value>{0:0.0} s</value>
+    <comment>A lane's look-ahead, in its header: how many seconds it shows beyond the strike line, e.g. "2.0 s".</comment>
+  </data>
+  <data name="LaneLookAheadToolTip" xml:space="preserve">
+    <value>Look-ahead: how many seconds the lane shows beyond the strike line. Ctrl+wheel, + and − change it too.</value>
+    <comment>The lane header's look-ahead button's tooltip.</comment>
+  </data>
+  <data name="LaneLookAheadLabel" xml:space="preserve">
+    <value>Look-ahead</value>
+    <comment>The lane header's look-ahead slider's label.</comment>
+  </data>
 </root>

@@ -31,4 +31,7 @@ public sealed class LaneDockNodeState
 
     /// <summary>A vocal lane's <see cref="VocalTrack"/>.</summary>
     public string? Vocal { get; set; }
+
+    /// <summary>How many seconds a lane shows beyond its strike line; null for the editor's default.</summary>
+    public double? LookAhead { get; set; }
 }

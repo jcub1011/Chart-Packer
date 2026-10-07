@@ -16,7 +16,7 @@ namespace ChartPacker.Controls
     /// lane as it's drawn: a lane scrolling every frame only draws a picture or two, rather than every bar, which is
     /// as cheap as drawing gets. Shapes of many bars would be drawn again, point by point, every frame.
     /// </remarks>
-    internal static class LaneWaveformPainter
+    public static class LaneWaveformPainter
     {
         // A track whose loudest peak is below this (-60 dBFS) is silent: scaling it up would only draw its noise.
         private const double SilentPeak = 0.001;

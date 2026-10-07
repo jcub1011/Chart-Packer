@@ -23,9 +23,10 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartBuilder.ViewModels
 {
     /// <summary>
-    /// Plays the open song's stems (charter-spec C10): play and pause, speed with pitch correction, and a metronome laid
-    /// over the stems after the time-stretcher. Gives the timeline the song's length, the mix's waveform, the chart's
-    /// beat lines and a smooth clock.
+    /// Plays the open song's stems (charter-spec C10): play and pause, speed with pitch correction, a region played once
+    /// or looped, each stem's mute, solo and volume, and a metronome and hit sounds laid over the stems after the
+    /// time-stretcher. Gives the timeline the song's length, the mix's waveform, the chart's beat lines and a smooth
+    /// clock.
     /// </summary>
     /// <remarks>
     /// Everything is in audio time: the beats are the chart's, moved by the song's delay (charter-spec §4.4.1). What's
@@ -48,6 +49,8 @@ namespace ChartBuilder.ViewModels
         private readonly EditorSong? _song;
         private readonly Func<int, IAudioOutput>? _openOutput;
         private readonly AudioLatencyService? _latency;
+        private readonly Func<(int Metronome, int Hits)> _volumes;
+        private readonly Action? _calibrate;
         private readonly IReadOnlyList<SongTrack> _tracks;
         private readonly DispatcherTimer _timer;
         private readonly CancellationTokenSource _cancel = new();
@@ -59,8 +62,11 @@ namespace ChartBuilder.ViewModels
         private SongAudio? _audio;
         private StemPlayer? _player;
         private MetronomeSchedule? _metronome;
+        private HitSoundSchedule? _hits;
+        private IReadOnlyList<NoteHit> _noteHits = [];
         private IDisposable? _followingDevice;
         private bool _settingPosition;
+        private bool _seeking;
         private bool _disposed;
 
         /// <summary>No song: an empty timeline, with nothing to play.</summary>
@@ -72,16 +78,25 @@ namespace ChartBuilder.ViewModels
         /// <param name="song">The song or new chart to play; none for an empty timeline.</param>
         /// <param name="openOutput">Opens the audio output at a rate.</param>
         /// <param name="latency">The audio/visual latency, which follows the output's device.</param>
-        public PlaybackViewModel(EditorSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency)
+        /// <param name="volumes">The metronome's and the hit sounds' volumes, in percent, as Settings has them now.</param>
+        /// <param name="calibrate">Opens the calibration tool, from the transport bar's latency (charter-spec C11).</param>
+        public PlaybackViewModel(EditorSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency, Func<(int Metronome, int Hits)>? volumes = null, Action? calibrate = null)
         {
             _song = song;
             _openOutput = openOutput;
             _latency = latency;
+            _volumes = volumes ?? (() => (50, 50));
+            _calibrate = calibrate;
             _tracks = song?.Tracks ?? [];
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = PositionInterval };
             _timer.Tick += (_, _) => RefreshPosition();
             LengthSeconds = PlaceholderLengthSeconds;
+            if (latency is not null)
+                latency.Changed += OnLatencyChanged;
         }
+
+        /// <summary>Raised when the playhead is moved by hand, on the timeline, rather than by playing or by <see cref="SeekTo"/>.</summary>
+        public event EventHandler? Scrubbed;
 
         public static IReadOnlyList<int> SpeedPercents { get; } = [25, 50, 75, 100, 125, 150, 200];
 
@@ -124,6 +139,33 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial bool IsMetronomeOn { get; set; }
 
+        /// <summary>Whether each note shown sounds as it reaches the strike line (charter-spec C10 item 4).</summary>
+        [ObservableProperty]
+        public partial bool IsHitSoundsOn { get; set; }
+
+        /// <summary>Whether playing repeats the loop region (charter-spec C10 item 2).</summary>
+        [ObservableProperty]
+        public partial bool IsLooping { get; set; }
+
+        /// <summary>The loop region, in seconds of audio, or null for none.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasLoop), nameof(LoopToolTip))]
+        public partial LoopRegion? Loop { get; private set; }
+
+        public bool HasLoop => Loop is not null;
+
+        /// <summary>The loop region, in words, for the loop button.</summary>
+        public string LoopToolTip => Loop is { } loop
+            ? string.Format(CultureInfo.CurrentCulture, Strings.LoopToolTipFormat, FormatTime(loop.Start), FormatTime(loop.End))
+            : Strings.LoopNoneToolTip;
+
+        /// <summary>Each stem, with its mute, solo and volume.</summary>
+        [ObservableProperty]
+        public partial IReadOnlyList<StemRowViewModel> Stems { get; private set; } = [];
+
+        /// <summary>The calibrated latency, as the transport bar shows it, e.g. "42 ms".</summary>
+        public string LatencyText => string.Format(CultureInfo.CurrentCulture, Strings.LatencyFormat, _latency?.Milliseconds ?? 0);
+
         /// <summary>Why the audio can't be played, or what of it can't; null when it all can.</summary>
         [ObservableProperty]
         public partial string? Message { get; private set; }
@@ -138,9 +180,53 @@ namespace ChartBuilder.ViewModels
         /// Where to draw what's drawn against the audio now, moving smoothly, for drawing every frame: where the audio
         /// is, less the calibrated latency times the speed (charter-spec C10 item 5).
         /// </summary>
+        /// <remarks>While paused, nothing heard lags behind, so it's the audio's position.</remarks>
         public Func<TimeSpan> Clock => () => _player is { } player
-            ? LatencyCompensation.Drawn(player.SmoothPosition, _latency?.Milliseconds ?? 0, player.Speed)
+            ? player.IsPlaying ? LatencyCompensation.Drawn(player.SmoothPosition, _latency?.Milliseconds ?? 0, player.Speed) : player.Position
             : TimeSpan.FromSeconds(PositionSeconds);
+
+        /// <summary>Moves the playhead to <paramref name="seconds"/> as the editor's cursor moves, without raising <see cref="Scrubbed"/>.</summary>
+        public void SeekTo(double seconds)
+        {
+            _seeking = true;
+            try
+            {
+                PositionSeconds = Math.Max(0, seconds);
+            }
+            finally
+            {
+                _seeking = false;
+            }
+        }
+
+        /// <summary>Plays from <paramref name="start"/> to <paramref name="end"/>, in seconds of audio, then pauses (Shift+Space).</summary>
+        public void PlayRegion(double start, double end)
+        {
+            if (_player is not { } player || end <= start)
+                return;
+            UpdateSounds();
+            player.PlayRegion(TimeSpan.FromSeconds(Math.Max(0, start)), TimeSpan.FromSeconds(end), loops: false);
+            SetPlaying(true);
+        }
+
+        /// <summary>Sets the loop region, in seconds of audio, and turns looping on (L).</summary>
+        public void SetLoop(double start, double end)
+        {
+            if (end <= start)
+                return;
+            Loop = new LoopRegion(Math.Max(0, start), end);
+            if (IsLooping && _player is { IsPlaying: true } player)
+                player.PlayRegion(TimeSpan.FromSeconds(Loop.Start), TimeSpan.FromSeconds(Loop.End), loops: true);
+            IsLooping = true;
+        }
+
+        /// <summary>Takes the notes' hit sounds, in audio time, which play while <see cref="IsHitSoundsOn"/>.</summary>
+        public void SetHits(IReadOnlyList<NoteHit> hits)
+        {
+            _noteHits = hits;
+            _hits = _player is { } player ? new HitSoundSchedule(hits, player.Mixer.OutputRate) : null;
+            UpdateSounds();
+        }
 
         /// <summary>Pauses playback, as when the calibration tool opens over the Editor.</summary>
         public void Pause()
@@ -162,8 +248,7 @@ namespace ChartBuilder.ViewModels
             if (_player is { } player)
             {
                 _metronome = new MetronomeSchedule(_song.Chart.TempoMap.ToTempoMap(), _song.Delay, TimeSpan.FromSeconds(LengthSeconds), player.Mixer.OutputRate);
-                if (IsMetronomeOn)
-                    player.Sounds = _metronome;
+                UpdateSounds();
             }
         }
 
@@ -206,7 +291,9 @@ namespace ChartBuilder.ViewModels
                 LengthSeconds = LengthOf(_song, player);
                 Beats = BeatsOf(_song, LengthSeconds);
                 _metronome = new MetronomeSchedule(_song.Chart.TempoMap.ToTempoMap(), _song.Delay, TimeSpan.FromSeconds(LengthSeconds), player.Mixer.OutputRate);
-                player.Sounds = IsMetronomeOn ? _metronome : null;
+                _hits = new HitSoundSchedule(_noteHits, player.Mixer.OutputRate);
+                UpdateSounds();
+                Stems = [.. player.Mixer.Stems.Select(stem => new StemRowViewModel(stem))];
                 IsReady = true;
 
                 if (audio.Tracks.FirstOrDefault(t => t.Error is not null) is { } failed)
@@ -236,20 +323,42 @@ namespace ChartBuilder.ViewModels
             {
                 player.Pause();
                 SetPlaying(false);
+                return;
             }
+
+            // The volumes may have changed in Settings since.
+            UpdateSounds();
+            if (IsLooping && Loop is { } loop)
+                player.PlayRegion(TimeSpan.FromSeconds(loop.Start), TimeSpan.FromSeconds(loop.End), loops: true);
             else
-            {
                 player.Play();
-                SetPlaying(true);
-            }
+            SetPlaying(true);
         }
+
+        [RelayCommand]
+        private void OpenCalibration() => _calibrate?.Invoke();
 
         partial void OnPositionSecondsChanged(double value)
         {
             // Scrubbing moves the song; following it as it plays doesn't.
-            if (!_settingPosition && _player is { } player)
-                player.Seek(TimeSpan.FromSeconds(Math.Max(0, value)));
+            if (_settingPosition)
+                return;
+            _player?.Seek(TimeSpan.FromSeconds(Math.Max(0, value)));
+            if (!_seeking)
+                Scrubbed?.Invoke(this, EventArgs.Empty);
         }
+
+        partial void OnIsLoopingChanged(bool value)
+        {
+            if (_player is not { IsPlaying: true } player)
+                return;
+            if (!value)
+                player.ClearRegion();
+            else if (Loop is { } loop)
+                player.PlayRegion(TimeSpan.FromSeconds(loop.Start), TimeSpan.FromSeconds(loop.End), loops: true);
+        }
+
+        partial void OnIsHitSoundsOnChanged(bool value) => UpdateSounds();
 
         partial void OnSpeedPercentChanged(int value)
         {
@@ -263,11 +372,27 @@ namespace ChartBuilder.ViewModels
                 player.PitchCorrection = value;
         }
 
-        partial void OnIsMetronomeOnChanged(bool value)
+        partial void OnIsMetronomeOnChanged(bool value) => UpdateSounds();
+
+        /// <summary>Lays the metronome and the hit sounds that are on over the stems, each at its volume.</summary>
+        private void UpdateSounds()
         {
-            if (_player is { } player)
-                player.Sounds = value ? _metronome : null;
+            if (_player is not { } player)
+                return;
+
+            // At 50% each is at the level it's made at, which leaves room above it.
+            var (metronome, hits) = _volumes();
+            var parts = new List<(ISoundSchedule, float)>();
+            if (IsMetronomeOn && _metronome is not null)
+                parts.Add((_metronome, Math.Clamp(metronome, 0, 100) / 50f));
+            if (IsHitSoundsOn && _hits is not null)
+                parts.Add((_hits, Math.Clamp(hits, 0, 100) / 50f));
+            var combined = new CombinedSchedule([.. parts]);
+            player.Sounds = combined.IsEmpty ? null : combined;
         }
+
+        private void OnLatencyChanged(object? sender, EventArgs e) =>
+            Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(LatencyText)));
 
         public void Dispose()
         {
@@ -277,6 +402,8 @@ namespace ChartBuilder.ViewModels
             _disposed = true;
             _timer.Stop();
             _cancel.Cancel();
+            if (_latency is not null)
+                _latency.Changed -= OnLatencyChanged;
 
             // The player before the sources it reads.
             _followingDevice?.Dispose();

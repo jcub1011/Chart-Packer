@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Settings;
 
@@ -50,6 +51,16 @@ namespace ChartBuilder.Services
 
             if (!NewChartSettings.Resolutions.Contains(settings.DefaultChartResolution))
                 settings.DefaultChartResolution = NewChartSettings.DefaultResolution;
+
+            if (!SnapGrid.CommonDivisions.Contains(settings.DefaultSnapDivision))
+                settings.DefaultSnapDivision = SnapGrid.Default.Division;
+            if (!Enum.IsDefined(settings.DefaultEditorView))
+                settings.DefaultEditorView = LaneView.Highway;
+            settings.EditorHighwaySpeed = double.IsFinite(settings.EditorHighwaySpeed)
+                ? Math.Clamp(settings.EditorHighwaySpeed, BuilderSettings.MinEditorHighwaySpeed, BuilderSettings.MaxEditorHighwaySpeed)
+                : 1;
+            settings.MetronomeVolume = Math.Clamp(settings.MetronomeVolume, 0, 100);
+            settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
 
             settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);

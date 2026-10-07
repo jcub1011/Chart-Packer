@@ -15,14 +15,22 @@ namespace ChartBuilder.ViewModels
     {
         private readonly Dictionary<int, EditorLaneViewModel> _lanes = [];
 
-        public LaneDockViewModel(LaneDockLayout layout)
+        /// <param name="editor">The editor the lanes' canvases edit; none for lanes with only their headers.</param>
+        public LaneDockViewModel(LaneDockLayout layout, ChartEditorViewModel? editor = null)
         {
             Layout = layout;
+            Editor = editor;
             layout.Changed += (_, _) => Refresh();
             Refresh();
         }
 
         public LaneDockLayout Layout { get; }
+
+        /// <summary>The editor the lanes' canvases edit.</summary>
+        public ChartEditorViewModel? Editor { get; }
+
+        /// <summary>Every open lane's view model.</summary>
+        public IEnumerable<EditorLaneViewModel> All => _lanes.Values;
 
         /// <summary>Raised after lanes are added, moved, closed or change part, once the lanes' view models are up to date.</summary>
         public event EventHandler? LayoutChanged;
