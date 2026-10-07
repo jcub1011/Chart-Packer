@@ -2389,4 +2389,16 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="DeleteAnywayButton" xml:space="preserve">
     <value>Delete anyway</value>
   </data>
+  <data name="AudioLatencyLabel" xml:space="preserve">
+    <value>Audio/visual latency</value>
+  </data>
+  <data name="AudioLatencyDescription" xml:space="preserve">
+    <value>How much later the audio is heard than the screen shows it, measured for each output device by Chart Builder's calibration tool. The highway, lyrics and background are drawn that much earlier.</value>
+  </data>
+  <data name="AudioLatencyKeywords" xml:space="preserve">
+    <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
+  </data>
+  <data name="CalibrateButton" xml:space="preserve">
+    <value>Calibrate…</value>
+  </data>
 </root>

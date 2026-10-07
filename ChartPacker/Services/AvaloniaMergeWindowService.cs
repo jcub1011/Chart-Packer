@@ -7,6 +7,7 @@ using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
@@ -19,6 +20,7 @@ namespace ChartPacker.Services
     /// <param name="mainPlayer">The main window's player, stopped while the preview can play, which takes up the settings the preview's changed.</param>
     /// <param name="mainHighway">The main window's highway, which takes up the settings the preview's changed.</param>
     /// <param name="video">Reads background video lengths, for the merged song's <c>song_length</c>.</param>
+    /// <param name="latency">The calibrated audio latency, which the preview's highway allows for.</param>
     public sealed class AvaloniaMergeWindowService(
         Func<Window?> owner,
         MetadataDraftStore drafts,
@@ -28,7 +30,8 @@ namespace ChartPacker.Services
         HighwayViewModel mainHighway,
         IImagePickerService imagePicker,
         IFilePickerService filePicker,
-        IVideoDurationProbe video) : IMergeWindowService
+        IVideoDurationProbe video,
+        AudioLatencyFile? latency = null) : IMergeWindowService
     {
         public async Task<string?> ShowAsync(IReadOnlyList<SongEntry> entries, string outputFolder, OverwritePolicy policy)
         {
@@ -40,7 +43,7 @@ namespace ChartPacker.Services
 
             // The preview is the inspector, read-only but for its highway's offsets, with a player, highway,
             // drafts and job of its own. The offsets it keeps in its draft are what the merge applies.
-            var player = new PlayerViewModel(settings, openOutput);
+            var player = new PlayerViewModel(settings, openOutput, latency);
             var highway = new HighwayViewModel(settings, player);
             var previewDrafts = new MetadataDraftStore();
             var preview = new SongDetailViewModel(previewDrafts, new JobViewModel(new NoProgressWindow()), imagePicker, filePicker, player, highway, video)

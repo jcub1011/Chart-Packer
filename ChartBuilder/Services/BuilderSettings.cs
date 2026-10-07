@@ -51,5 +51,14 @@ namespace ChartBuilder.Services
 
         /// <summary>The songs opened lately, the latest first, as the home screen lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
         public List<RecentSong> RecentSongs { get; set; } = [];
+
+        /// <summary>Whether the first song played on an output device that has no calibrated latency offers the calibration tool (charter-spec C11).</summary>
+        public bool PromptForCalibration { get; set; } = true;
+
+        /// <summary>
+        /// The output devices already offered the calibration tool, by ID, or by name where they have none, so each is
+        /// offered it once.
+        /// </summary>
+        public List<string> CalibrationPrompted { get; set; } = [];
     }
 }

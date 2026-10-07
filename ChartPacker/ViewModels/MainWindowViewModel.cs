@@ -44,10 +44,14 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Called as the window is activated, as when the user comes back from Chart Builder: re-reads the songs opened
-        /// in it that have changed, and the inspector's, if it's showing one of them (charter-spec §4.8). Never throws.
+        /// in it that have changed, and the inspector's, if it's showing one of them, and the audio latency its
+        /// calibration tool measures (charter-spec §4.8). Never throws.
         /// </summary>
         public async Task OnActivatedAsync()
         {
+            // Chart Builder's calibration tool may have changed the latency since (charter-spec §4.8).
+            Detail.Player.RefreshLatency();
+
             try
             {
                 var changed = await Library.RefreshEditedSongsAsync();

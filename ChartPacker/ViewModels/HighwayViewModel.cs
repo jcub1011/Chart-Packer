@@ -112,7 +112,7 @@ namespace ChartPacker.ViewModels
         {
             _settings = settings;
             _player = player;
-            Clock = () => player.CurrentPosition;
+            Clock = () => player.DrawnPosition;
             IsEnabled = settings.Settings.ShowNoteHighway;
             Placement = settings.Settings.HighwayPlacement;
             NoteSpeed = settings.Settings.HighwayNoteSpeed;

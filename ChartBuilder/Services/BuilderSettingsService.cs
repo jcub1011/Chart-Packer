@@ -40,6 +40,7 @@ namespace ChartBuilder.Services
         private static void Sanitize(BuilderSettings settings)
         {
             settings.DefaultCharterName ??= "";
+            settings.CalibrationPrompted = [.. (settings.CalibrationPrompted ?? []).Where(d => !string.IsNullOrEmpty(d)).Distinct()];
             settings.RecentSongs = [.. (settings.RecentSongs ?? []).Where(s => s is not null && !string.IsNullOrWhiteSpace(s.Path)).Take(RecentSongs.Max)];
             foreach (var song in settings.RecentSongs)
                 song.Title ??= "";

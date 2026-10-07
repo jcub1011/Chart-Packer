@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Controls;
 using ChartBuilder.Resources;
+using ChartBuilder.Services;
 using ChartPacker.Audio.Mixing;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Audio.Synthesis;
@@ -28,7 +29,8 @@ namespace ChartBuilder.ViewModels
     /// </summary>
     /// <remarks>
     /// Everything is in audio time: the beats are the chart's, moved by the song's delay (charter-spec §4.4.1). What's
-    /// drawn isn't moved by the audio/visual latency yet; that comes with calibration (C11).
+    /// drawn against the audio while it plays is drawn the calibrated latency earlier, times the speed (C10 item 5),
+    /// for the device the audio is on (C11).
     /// </remarks>
     public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
     {
@@ -45,6 +47,7 @@ namespace ChartBuilder.ViewModels
 
         private readonly OpenedSong? _song;
         private readonly Func<int, IAudioOutput>? _openOutput;
+        private readonly AudioLatencyService? _latency;
         private readonly IReadOnlyList<SongTrack> _tracks;
         private readonly DispatcherTimer _timer;
         private readonly CancellationTokenSource _cancel = new();
@@ -56,21 +59,24 @@ namespace ChartBuilder.ViewModels
         private SongAudio? _audio;
         private StemPlayer? _player;
         private MetronomeSchedule? _metronome;
+        private IDisposable? _followingDevice;
         private bool _settingPosition;
         private bool _disposed;
 
         /// <summary>No song: an empty timeline, with nothing to play.</summary>
         public PlaybackViewModel()
-            : this(null, null)
+            : this(null, null, null)
         {
         }
 
         /// <param name="song">The song to play; none for an empty timeline.</param>
         /// <param name="openOutput">Opens the audio output at a rate.</param>
-        public PlaybackViewModel(OpenedSong? song, Func<int, IAudioOutput>? openOutput)
+        /// <param name="latency">The audio/visual latency, which follows the output's device.</param>
+        public PlaybackViewModel(OpenedSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency)
         {
             _song = song;
             _openOutput = openOutput;
+            _latency = latency;
             _tracks = song is null ? [] : SongTracks.Resolve(song.StoredNames, null);
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = PositionInterval };
             _timer.Tick += (_, _) => RefreshPosition();
@@ -128,8 +134,23 @@ namespace ChartBuilder.ViewModels
 
         public string PlayPauseToolTip => IsPlaying ? Strings.PauseToolTip : Strings.PlayToolTip;
 
-        /// <summary>Where the audio is heard to be now, moving smoothly, for drawing against it every frame.</summary>
-        public Func<TimeSpan> Clock => () => _player?.SmoothPosition ?? TimeSpan.FromSeconds(PositionSeconds);
+        /// <summary>
+        /// Where to draw what's drawn against the audio now, moving smoothly, for drawing every frame: where the audio
+        /// is, less the calibrated latency times the speed (charter-spec C10 item 5).
+        /// </summary>
+        public Func<TimeSpan> Clock => () => _player is { } player
+            ? LatencyCompensation.Drawn(player.SmoothPosition, _latency?.Milliseconds ?? 0, player.Speed)
+            : TimeSpan.FromSeconds(PositionSeconds);
+
+        /// <summary>Pauses playback, as when the calibration tool opens over the Editor.</summary>
+        public void Pause()
+        {
+            if (_player is { IsPlaying: true } player)
+            {
+                player.Pause();
+                SetPlaying(false);
+            }
+        }
 
         /// <summary>
         /// Opens the song's audio, then reads its waveform in the background. Never throws: what can't be played is said
@@ -150,7 +171,7 @@ namespace ChartBuilder.ViewModels
             try
             {
                 var token = _cancel.Token;
-                var (audio, player) = await Task.Run(() => Open(_song.Entry, _tracks, _openOutput, token), token);
+                var (audio, player, output) = await Task.Run(() => Open(_song.Entry, _tracks, _openOutput, token), token);
                 if (_disposed)
                 {
                     player.Dispose();
@@ -160,6 +181,7 @@ namespace ChartBuilder.ViewModels
 
                 _audio = audio;
                 _player = player;
+                _followingDevice = _latency?.Follow(output);
                 player.PitchCorrection = PitchCorrection;
                 player.Speed = SpeedPercent / 100f;
                 player.Stopped += (_, _) => Dispatcher.UIThread.Post(OnStopped);
@@ -240,6 +262,7 @@ namespace ChartBuilder.ViewModels
             _cancel.Cancel();
 
             // The player before the sources it reads.
+            _followingDevice?.Dispose();
             _player?.Dispose();
             _audio?.Dispose();
             _player = null;
@@ -283,7 +306,7 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>Opens the tracks and a player for them, the preview muted, as in Chart Packer's inspector.</summary>
-        private static (SongAudio Audio, StemPlayer Player) Open(SongEntry entry, IReadOnlyList<SongTrack> tracks, Func<int, IAudioOutput> openOutput, CancellationToken cancellationToken)
+        private static (SongAudio Audio, StemPlayer Player, IAudioOutput Output) Open(SongEntry entry, IReadOnlyList<SongTrack> tracks, Func<int, IAudioOutput> openOutput, CancellationToken cancellationToken)
         {
             var audio = SongAudio.Open(entry, tracks, cancellationToken);
             try
@@ -295,7 +318,8 @@ namespace ChartBuilder.ViewModels
                 foreach (var stem in mixer.Stems)
                     stem.IsMuted = tracks.Any(t => t.StoredName == stem.Name && t.Stem == AudioStems.Preview);
 
-                return (audio, new StemPlayer(mixer, openOutput(mixer.OutputRate)));
+                var output = openOutput(mixer.OutputRate);
+                return (audio, new StemPlayer(mixer, output), output);
             }
             catch
             {

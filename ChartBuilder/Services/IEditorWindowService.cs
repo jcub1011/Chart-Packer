@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Scanning;
 
@@ -17,5 +18,8 @@ namespace ChartBuilder.Services
         /// <paramref name="songLock"/> until it closes (charter-spec §4.8).
         /// </summary>
         void OpenSong(OpenedSong song, SongLock songLock);
+
+        /// <summary>Opens the calibration tool (charter-spec C11) over the window in front, finishing when it closes.</summary>
+        Task ShowCalibrationAsync();
     }
 }

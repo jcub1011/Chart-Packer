@@ -99,7 +99,7 @@ namespace ChartBuilder.ViewModels
                     _ = OpenSongAsync(path);
                     break;
                 case { Start: BuilderStart.Calibrate }:
-                    ShowError(Strings.CalibrateUnavailable);
+                    _ = editors.ShowCalibrationAsync();
                     break;
             }
         }

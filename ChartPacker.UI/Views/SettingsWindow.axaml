@@ -106,6 +106,10 @@
                         AutomationProperties.Name="{Binding Label}" />
             </StackPanel>
         </DataTemplate>
+        <!-- No editor: the row is its label and its buttons. -->
+        <DataTemplate DataType="svm:ActionSettingViewModel">
+            <Panel />
+        </DataTemplate>
     </Window.DataTemplates>
 
     <Grid RowDefinitions="Auto,*,Auto">

@@ -7,7 +7,9 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core;
+using ChartPacker.Core.Launching;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Core.Settings;
 using ChartPacker.Ffmpeg;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
@@ -42,7 +44,9 @@ namespace ChartPacker
                 var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window));
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
                 var audio = new SdlAudio();
-                var player = new PlayerViewModel(settings, audio.Open);
+                // Measured by Chart Builder's calibration tool, which writes it; read here (charter-spec C11 item 4).
+                var latency = new AudioLatencyFile(UserConfigPaths.AudioLatencyFile);
+                var player = new PlayerViewModel(settings, audio.Open, latency);
                 var highway = new HighwayViewModel(settings, player);
 
                 // FFmpeg is looked for now, off the UI thread, so the first video shown doesn't wait for it to load.
@@ -54,7 +58,7 @@ namespace ChartPacker
 
                 // A Merge window belongs to whichever window opens it: the main window, or the Deduplicate window.
                 Func<Func<Window?>, IMergeWindowService> mergeWindowFor = owner =>
-                    new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe);
+                    new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe, latency);
                 var dedupWindow = new AvaloniaDedupWindowService(
                     () => window,
                     drafts,
@@ -66,12 +70,23 @@ namespace ChartPacker
                 var detail = new SongDetailViewModel(
                     drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, isOpenInChartBuilder: isOpenInChartBuilder);
                 var validatorWindow = new AvaloniaValidatorWindowService(
-                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, isOpenInChartBuilder);
+                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, isOpenInChartBuilder, latency);
+                var chartBuilder = new ChartBuilderLauncher();
                 var library = new LibraryViewModel(
-                    folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, new ChartBuilderLauncher(), notice);
+                    folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice);
+
+                // Settings' Calibrate… runs Chart Builder's calibration tool (charter-spec §4.8); the latency it saves is
+                // read again when this window is next activated.
+                void Calibrate()
+                {
+                    if (chartBuilder.Start(BuilderArgs.ForCalibrate()) is { } problem)
+                        notice.ShowError(problem);
+                }
+
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
-                    settingsPicker => new SettingsWindowViewModel(AppSettingsCatalog.Create(library, player, highway, downloads, settings), settingsPicker, settings.Save));
+                    settingsPicker => new SettingsWindowViewModel(
+                        AppSettingsCatalog.Create(library, player, highway, downloads, settings, Calibrate), settingsPicker, settings.Save));
 
                 window.DataContext = new MainWindowViewModel(
                     library,

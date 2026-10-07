@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Current as of 2026-10-06 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), the rest of step 2: calibration. See [Where CM2 stands](#where-cm2-stands). |
+| **Next up** | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing), step 4: New chart and Chart settings. See [Where CM2 stands](#where-cm2-stands). |
 
 ---
 
@@ -128,15 +128,14 @@ before any canvas depends on it.
 
 ## CM2: Calibration, chart settings and 5-fret editing
 
-**Status: in progress.** Steps 1 and 3 are done, and step 2 has started. It builds on CM1's model,
-writer and lint engine.
+**Status: in progress.** Steps 1 to 3 are done. It builds on CM1's model, writer and lint engine.
 
 **Built out of order.** Step 3 came before the rest of step 2, so that calibration can be checked
 against a real song: Chart Builder opens a song and plays it, with a metronome over the stems and a
 timeline that draws the mix's waveform and the chart's beat lines under a playhead driven by
 `SmoothPosition`. That much of [C10](charter-spec-v1.md#c10-playback) (play and pause, speed, pitch
-correction, the metronome) is in the timeline's header for now; the transport bar, hit sounds,
-following and latency compensation come with step 5.
+correction, the metronome) is in the timeline's header for now. Latency compensation came with
+calibration; the transport bar, hit sounds and following come with step 5.
 
 This is the first milestone with a working editor. Its steps, in order:
 
@@ -144,15 +143,21 @@ This is the first milestone with a working editor. Its steps, in order:
    ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), and restates C1's acceptance
    criteria. Chart settings is a dialog for the chart's timing and parts, plus what a new song
    folder needs; everything else about the song is edited in the Chart Inspector.
-2. **Playback and calibration.**
+2. **Playback and calibration.** *Done.*
    - The playback changes ([§4.4.1](charter-spec-v1.md#441-playback-changes)): the post-stretch
-     mix, the true source position and `SmoothPosition`. *Built*, with AC C10.1's test: `StemPlayer`
-     lays `Sounds` over the stretched mix, maps the grains played (`TimeStretcher.PlayedPosition`),
-     and has `SmoothPosition`.
-   - `Synth`. *Built*, in `ChartPacker.Audio/Synthesis/`, with `MetronomeSchedule`.
-   - [C11](charter-spec-v1.md#c11-calibration-tool) calibration, with the shared latency file. Still
-     to do: the output's device name, ID and `DeviceChanged`, `audio-latency.json`, the tap-test
-     estimator and `CalibrationWindow`.
+     mix, the true source position and `SmoothPosition`, with AC C10.1's test. `StemPlayer` lays
+     `Sounds` over the stretched mix, maps the grains played (`TimeStretcher.PlayedPosition`), and
+     has `SmoothPosition`.
+   - `Synth`, in `ChartPacker.Audio/Synthesis/`, with `MetronomeSchedule`.
+   - [C11](charter-spec-v1.md#c11-calibration-tool) calibration, with the shared latency file:
+     - the output's device;
+     - `audio-latency.json`;
+     - the tap-test estimator;
+     - `CalibrationWindow`;
+     - the latency applied in both apps ([C10](charter-spec-v1.md#c10-playback) item 5).
+
+     It opens from `--calibrate`, either app's Settings and the first-use prompt. The transport
+     bar's button comes with the transport bar (step 5).
 
    Calibration comes first because every timing judgement after it depends on it.
 3. **Open and import** ([C2](charter-spec-v1.md#c2-open-and-import)). *Done*, but for the parts
@@ -183,8 +188,8 @@ This is the first milestone with a working editor. Its steps, in order:
 
 As of 2026-10-06, for picking the work up again.
 
-**Waiting on the user.** The open and playback slice has been built and its tests pass, but the
-apps haven't been tried by hand yet. The checks still to do:
+**Waiting on the user.** The open and playback slice and calibration have been built and their
+tests pass, but the apps haven't been tried by hand yet. The checks still to do:
 
 - open a song folder and a `.sng` from **Open chart**, by drop and from **Recent**;
 - play, pause and seek, change the speed with **Keep pitch** on and off, and see the metronome's
@@ -193,7 +198,21 @@ apps haven't been tried by hand yet. The checks still to do:
 - in Chart Packer, **Edit chart** on a song with unsaved drafts (Save, Discard, Cancel), and the
   refresh when its window is activated after the song changed on disk;
 - Chart Packer's inspector playback at 50%, 100% and 150%, with pitch correction on and off: a
-  stretched `Position` now follows the grains played, so it can be up to about 12 ms from before.
+  stretched `Position` now follows the grains played, so it can be up to about 12 ms from before;
+- `ChartBuilder --calibrate`, and the tool from Chart Builder's and Chart Packer's Settings
+  (**Audio/visual latency**, **Calibrate…**):
+  - the light, the note and the beep line up at 0 ms on wired output, and each bar's first beat
+    is marked;
+  - the slider, the steps, the number box and the arrow keys (Shift for 5) move the beep and
+    never the light;
+  - the tap test, its result and **Use this value**;
+  - Save, Cancel (closing the window too) and Reset, seen in `audio-latency.json`;
+- switching the default output device (headphones in or out) while the tool is open: the device
+  shown changes, and so does its value;
+- the first-use prompt, which comes once per device when a song opens in the Editor;
+- the Editor's playhead drawn earlier by the latency, at 50% and 100%;
+- Chart Packer's highway, lyrics and background moved by the latency after its window is
+  activated.
 
 **Where the code is.**
 
@@ -204,8 +223,14 @@ apps haven't been tried by hand yet. The checks still to do:
 | Opening a song | `ChartPacker.Core/Charting/SongOpener.cs` (`EntryOf`, `OpenAsync`, `OpenedSong`), `Scanning/SongLock.cs`, `Launching/RecentSongs.cs`, `UserConfigPaths.LockFolder` |
 | Chart Builder | `ViewModels/MainWindowViewModel.cs` (open flow, import prompt, Recent), `ViewModels/PlaybackViewModel.cs` (player, peaks, beats, metronome), `Controls/TimelineView.cs` (replaced `TimelinePlaceholder`), `Services/BuilderWindows.cs` (`OpenSong`), `App.axaml.cs` (`SdlAudio`) |
 | Chart Packer | `ViewModels/LibraryViewModel.cs` (`EditChartAsync`, `PrepareEditChart`, `RefreshEditedSongsAsync`), `ViewModels/MainWindowViewModel.cs` (`PrepareEditChartAsync`, `OnActivatedAsync`), `Services/ChartBuilderSongs.cs` (the lock prompt), `Views/MainWindow.axaml.cs` (`Activated`) |
-| Shared UI | `ConfirmDialog`, `IConfirmationService` and its `ChooseAsync` (two actions and Cancel) moved to `ChartPacker.UI`; `IFilePickerService.PickSongAsync` |
-| Tests | `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`), `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`; `ChartBuilder.Tests/Charting/SongOpenerTests.cs` |
+| Shared UI | `ConfirmDialog`, `IConfirmationService` and its `ChooseAsync` (two actions and Cancel) moved to `ChartPacker.UI`; `IFilePickerService.PickSongAsync`; `ActionSettingViewModel` and its template in `SettingsWindow.axaml` |
+| The output's device | `ChartPacker.Audio/Playback/AudioDevice.cs`, `IAudioOutput` (`Device`, `DeviceChanged`), `SdlAudioOutput.cs` (checked on `Resume` and once a second), `WindowsAudioEndpoint.cs` (the endpoint ID, by hand-made COM calls) |
+| The latency file | `ChartPacker.Core/Settings/AudioLatencyFile.cs` (`Find`, `FindAndRemember`, `Save`, `RememberUnderId`), `Settings/JsonFiles.cs` (the temp-and-rename write, shared with `JsonSettingsFile`), `UserConfigPaths.AudioLatencyFile` |
+| Calibration logic | `ChartPacker.Core/Calibration/` (`TapTest`, `LatencyCalibration`), `ChartPacker.Audio/Synthesis/` (`CalibrationBeats`, `CalibrationSchedule`, `CalibrationBeepsGiven`, `Synth.CalibrationBeep`), `Playback/LatencyCompensation.cs` |
+| Settings rows | `ChartPacker.Core/Settings/` (`ActionSetting`, `ActionSettingEdit`) |
+| Calibration in Chart Builder | `Services/AudioLatencyService.cs`, `ViewModels/CalibrationViewModel.cs`, `Controls/CalibrationView.cs`, `Views/CalibrationWindow.axaml`, `Services/BuilderWindows.cs` (`ShowCalibrationAsync`, the first-use prompt), `BuilderSettingsCatalog` (the **Audio** category), `BuilderSettings` (`PromptForCalibration`, `CalibrationPrompted`), `PlaybackViewModel.Clock` |
+| The latency in Chart Packer | `ViewModels/PlayerViewModel.cs` (`DrawnPosition`, `RefreshLatency`), which the highway, lyrics and background clocks use; `MainWindowViewModel.OnActivatedAsync`; `AppSettingsCatalog` (`playback.latency`); `App.axaml.cs` |
+| Tests | `ChartPacker.Core.Tests/Audio/` (`TimeStretcherTests`, `PositionMapTests`, `StemPlayerTests`, `SynthTests`, `CalibrationScheduleTests`, `LatencyCompensationTests`, `WindowsAudioEndpointTests`; the shared `FakeOutput` and `ManualClock`), `Settings/AudioLatencyFileTests.cs`, `Scanning/SongLockTests.cs`, `Launching/RecentSongsTests.cs`; `ChartBuilder.Tests/Charting/SongOpenerTests.cs`, `ChartBuilder.Tests/Calibration/` (`TapTestTests`, `LatencyCalibrationTests`) |
 
 **Decided along the way.**
 
@@ -223,6 +248,26 @@ apps haven't been tried by hand yet. The checks still to do:
   twice, 50 ms apart, as `IsHeld` holds the file for a moment.
 - Chart Packer re-reads a song opened in Chart Builder by `EntryStamps` (every file in the
   folder), for every song opened since it started.
+- **The device is polled.** `SdlAudioOutput` checks its device when playback starts and once a
+  second. SDL's device events need an SDL event loop the app doesn't run, and SDL's silent move to
+  a new default raises none.
+- **Only Windows has a device ID** (`WindowsAudioEndpoint`). Other platforms are keyed by SDL's
+  name.
+- **The tap test averages the kept taps.** The spec's median missed AC C11.2 (92% within ±20 ms);
+  the mean passes (96.5%). Its spread is the larger of the two phases' IQRs.
+- **The tap test takes clicks only.** Avalonia 12.1 keeps the raw input events internal, and key
+  events have no timestamp of their own.
+- **The latency is stored in whole milliseconds**, within ±500, and `audio-latency.json` is edited
+  as JSON nodes, so a save changes only its own device.
+- **The beeps are re-anchored once a second** (`CalibrationSchedule`), with a shared
+  `CalibrationBeepsGiven` so no beep plays twice. A latency raised past what's queued skips one
+  beep.
+- **The latency rows.** Both apps' Settings show it as an `ActionSetting`: a row with a
+  **Calibrate…** button and no value.
+- **What Chart Packer moves.** Its highway, lyrics and background are drawn at `DrawnPosition`:
+  `Position` less the latency times the speed, while playing.
+  - The seek bar isn't moved, as its position is the seek position.
+  - The merge window's resume point still uses the audio's own `CurrentPosition`.
 
 **Loose ends.**
 
@@ -235,26 +280,19 @@ apps haven't been tried by hand yet. The checks still to do:
 - The Chart Inspector is still a placeholder; the Editor's title is the only sign of the song.
 - The timeline's transport is a stopgap in its header; the spec's transport bar comes with C3.
 - The spec's CM0 row still names the wizard (CM0's cleanup).
+- **Device IDs on macOS and Linux.** A Core Audio device UID and a PulseAudio or PipeWire sink
+  name would make those platforms' keys survive renames. They need testing on those platforms.
+- **Space as a tap**, should a later Avalonia make raw input timestamps public.
+- **Opening calibration from the transport bar**, which comes with C3.
+- **Record mode** shifts key presses by the latency ([C15](charter-spec-v1.md#c15-editing-ergonomics)),
+  with CM5.
 
-**Next: calibration (the rest of step 2).** In order:
+**Next: step 4, New chart and Chart settings** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)),
+without **Detect from audio**:
 
-1. **The output device.** `IAudioOutput` gains `DeviceName`, an optional `DeviceId` and
-   `DeviceChanged`. `SdlAudioOutput` checks the device on SDL's audio device events and when
-   playback starts ([C11](charter-spec-v1.md#c11-calibration-tool) item 3). Getting a stable ID
-   may need a platform call beside SDL; without one, the name is used.
-2. **`audio-latency.json`.** Two maps (device ID → ms, device name → ms) and a fallback, looked up
-   in that order, with a name hit also saved under the ID
-   ([§10](charter-spec-v1.md#10-settings)). In Core, with an explicit path and tests; written by
-   temp file and rename. `UserConfigPaths` gets its path.
-3. **The tap-test estimator**, in Core or Audio, with AC C11.2's seeded test (1,000 trials).
-4. **`CalibrationWindow`** in Chart Builder, opened by `--calibrate`, Settings and (later) the
-   transport. The beep is a `Synth.Beep` scheduled through `StemPlayer.Sounds` on a silent mix; the
-   flash and note follow the monotonic clock; `PositionMap.OutputAt` and `SmoothPosition` place each
-   beep (C11 item 1, ACs C11.1, C11.4 and C11.5).
-5. **Applying it.** `PlaybackViewModel.Clock` becomes `SmoothPosition − latency × speed`
-   ([C10](charter-spec-v1.md#c10-playback) item 5, AC C10.2). Chart Packer reads the file for its
-   inspector and on activation, and its Settings gets a **Calibrate…** action
-   (`SettingAction` in `AppSettingsCatalog`, running `BuilderArgs.ForCalibrate()`).
+- New chart's **Create**, through `NewChartCreator`. The wizard's old back end
+  (`ChartPacker.Core/Charting/NewChart*.cs`) is reused, as CM0's cleanup notes.
+- Chart settings on an open song, with the resolution change and its warning.
 
 ## CM3: Drums and GHL
 

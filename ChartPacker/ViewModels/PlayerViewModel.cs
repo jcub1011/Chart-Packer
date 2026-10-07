@@ -13,6 +13,7 @@ using ChartPacker.Audio.Spectrum;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using ChartPacker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -185,6 +186,11 @@ namespace ChartPacker.ViewModels
 
         private readonly SettingsService _settings;
 
+        // The latency of the device the song plays on, in milliseconds, from the shared file; read, never written.
+        private readonly AudioLatencyFile? _latencyFile;
+        private IAudioOutput? _output;
+        private int _latencyMilliseconds;
+
         // For TryReadSpectrum, made when it's first asked for.
         private SpectrumAnalyzer? _analyzer;
         private readonly float[] _heard = new float[SpectrumAnalyzer.FftSize];
@@ -193,9 +199,14 @@ namespace ChartPacker.ViewModels
         /// Where the master volume and which visualisers are shown are kept between runs, and the playback speed for this run.
         /// </param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
-        public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput)
+        /// <param name="latency">
+        /// The audio/visual latency Chart Builder's calibration tool measured for each device, which what's drawn against
+        /// the audio allows for (charter-spec C11 item 4); none to allow for none.
+        /// </param>
+        public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput, AudioLatencyFile? latency = null)
         {
             _settings = settings;
+            _latencyFile = latency;
             Volume = settings.Settings.MasterVolume;
             PlaybackSpeed = settings.PlaybackSpeed;
             PitchCorrection = settings.Settings.PitchCorrection;
@@ -486,6 +497,27 @@ namespace ChartPacker.ViewModels
         /// only moves on a timer; or, while scrubbing or before the first play, where the seek bar is.
         /// </summary>
         public TimeSpan CurrentPosition => _player is { } player && !IsScrubbing ? player.Position : TimeSpan.FromSeconds(Math.Max(0, PositionSeconds));
+
+        /// <summary>
+        /// Where to draw what's drawn against the audio (the highway, the lyrics, the background): while playing,
+        /// <see cref="CurrentPosition"/> less the calibrated latency times the speed, so it's seen as it's heard
+        /// (charter-spec C10 item 5, C11 item 4); otherwise <see cref="CurrentPosition"/>.
+        /// </summary>
+        public TimeSpan DrawnPosition => _player is { IsPlaying: true } player && !IsScrubbing
+            ? TimeSpan.FromTicks(Math.Max(0, LatencyCompensation.Drawn(player.Position, _latencyMilliseconds, player.Speed).Ticks))
+            : CurrentPosition;
+
+        /// <summary>
+        /// Reads the latency of the device the song plays on again, as when the window is activated after Chart Builder's
+        /// calibration tool may have changed it (charter-spec §4.8).
+        /// </summary>
+        public void RefreshLatency()
+        {
+            if (_latencyFile is null || _output?.Device is not { } device)
+                return;
+
+            _latencyMilliseconds = _latencyFile.Find(device.Name, device.Id).Milliseconds;
+        }
 
         public string TracksHeader => string.Format(CultureInfo.CurrentCulture, Strings.TracksHeaderFormat, Tracks.Count);
 
@@ -1158,7 +1190,7 @@ namespace ChartPacker.ViewModels
             Error = null;
             try
             {
-                var (audio, player, error) = await Task.Run(() => Open(entry, tracks));
+                var (audio, player, output, error) = await Task.Run(() => Open(entry, tracks));
                 if (generation != _generation)
                 {
                     // The song changed while it was opening.
@@ -1180,6 +1212,10 @@ namespace ChartPacker.ViewModels
 
                 _audio = audio;
                 _player = player;
+                _output = output;
+                if (output is not null)
+                    output.DeviceChanged += OnOutputDeviceChanged;
+                RefreshLatency();
                 player.Volume = (float)Volume;
                 player.PitchCorrection = PitchCorrection;
                 player.Speed = (float)PlaybackSpeed;
@@ -1215,7 +1251,7 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Opens the tracks and the device; off the UI thread, since it reads every file's headers.</summary>
-        private (SongAudio? Audio, StemPlayer? Player, string? Error) Open(SongEntry entry, IReadOnlyList<SongTrack> tracks)
+        private (SongAudio? Audio, StemPlayer? Player, IAudioOutput? Output, string? Error) Open(SongEntry entry, IReadOnlyList<SongTrack> tracks)
         {
             SongAudio audio;
             try
@@ -1224,14 +1260,14 @@ namespace ChartPacker.ViewModels
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
             {
-                return (null, null, string.Format(CultureInfo.CurrentCulture, Strings.SongAudioUnreadableFormat, ex.Message));
+                return (null, null, null, string.Format(CultureInfo.CurrentCulture, Strings.SongAudioUnreadableFormat, ex.Message));
             }
 
             try
             {
                 var sources = audio.Sources;
                 if (sources.Count == 0)
-                    return (audio, null, Strings.NoPlayableTracks);
+                    return (audio, null, null, Strings.NoPlayableTracks);
 
                 var mixer = new StemMixer(sources);
                 IAudioOutput output;
@@ -1241,12 +1277,12 @@ namespace ChartPacker.ViewModels
                 }
                 catch (AudioDeviceException ex)
                 {
-                    return (audio, null, string.Format(CultureInfo.CurrentCulture, Strings.AudioDeviceFailedFormat, ex.Message));
+                    return (audio, null, null, string.Format(CultureInfo.CurrentCulture, Strings.AudioDeviceFailedFormat, ex.Message));
                 }
 
                 try
                 {
-                    return (audio, new StemPlayer(mixer, output), null);
+                    return (audio, new StemPlayer(mixer, output), output, null);
                 }
                 catch
                 {
@@ -1261,6 +1297,10 @@ namespace ChartPacker.ViewModels
                 throw;
             }
         }
+
+        /// <summary>The song moved to another device, which has a latency of its own (AC C11.3).</summary>
+        private void OnOutputDeviceChanged(AudioDevice device) =>
+            Dispatcher.UIThread.Post(RefreshLatency);
 
         private void OnPlayerStopped(object? sender, EventArgs e) =>
             Dispatcher.UIThread.Post(() =>
@@ -1284,6 +1324,12 @@ namespace ChartPacker.ViewModels
         {
             _generation++;
             SetPlaying(false);
+            if (_output is not null)
+            {
+                _output.DeviceChanged -= OnOutputDeviceChanged;
+                _output = null;
+            }
+
             if (_player is not null)
             {
                 _player.Stopped -= OnPlayerStopped;

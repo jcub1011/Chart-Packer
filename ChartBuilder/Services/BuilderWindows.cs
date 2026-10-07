@@ -1,16 +1,22 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Core.Settings;
 using ChartPacker.Services;
 using ChartPacker.ViewModels.Settings;
+using ChartPacker.Views;
 
 namespace ChartBuilder.Services
 {
@@ -18,14 +24,19 @@ namespace ChartBuilder.Services
     /// Chart Builder's top-level windows: the launcher (home screen) and the Editor. Only one is open at a time,
     /// and closing the Editor brings the launcher back.
     /// </summary>
-    /// <param name="openOutput">Opens the audio output at a rate, for the Editor's playback.</param>
+    /// <param name="openOutput">Opens the audio output at a rate, for the Editor's playback and the calibration tool.</param>
+    /// <param name="latency">The audio/visual latency, which the calibration tool measures.</param>
     /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
     public sealed class BuilderWindows(
         IClassicDesktopStyleApplicationLifetime desktop,
         BuilderSettingsService settings,
         Func<int, IAudioOutput> openOutput,
+        AudioLatencyService latency,
         string lockFolder) : IEditorWindowService
     {
+        // The calibration tool, while it's open.
+        private CalibrationWindow? _calibration;
+
         /// <summary>Makes the launcher the app's main window, opening <paramref name="args"/> over it once it's showing.</summary>
         /// <remarks>Called before the app has started, so the lifetime shows it.</remarks>
         public void StartWith(BuilderArgs args)
@@ -53,9 +64,86 @@ namespace ChartBuilder.Services
         public void OpenSong(OpenedSong song, SongLock songLock)
         {
             var editor = new EditorWindow();
-            var viewModel = new EditorWindowViewModel(settings, SettingsWindowFor(editor), song, songLock, openOutput);
+            var viewModel = new EditorWindowViewModel(settings, SettingsWindowFor(editor), song, songLock, openOutput, latency);
             Open(editor, viewModel);
+
+            // The song's output says which device it's on, which may never have been calibrated.
+            void OnLatencyChanged(object? sender, EventArgs e) => OfferCalibration(editor);
+            latency.Changed += OnLatencyChanged;
+            editor.Closed += (_, _) => latency.Changed -= OnLatencyChanged;
             _ = viewModel.Playback.OpenAsync();
+        }
+
+        /// <summary>
+        /// Opens the calibration tool (charter-spec C11) over the window in front, pausing the Editor's playback. Only
+        /// one is open at a time; opening it again brings that one to the front.
+        /// </summary>
+        public async Task ShowCalibrationAsync()
+        {
+            if (_calibration is { } open)
+            {
+                open.Activate();
+                return;
+            }
+
+            if (desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
+                editor.Playback.Pause();
+
+            var window = new CalibrationWindow { DataContext = new CalibrationViewModel(openOutput, latency) };
+            var owner = desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow;
+            _calibration = window;
+            try
+            {
+                if (owner is null)
+                {
+                    var closed = new TaskCompletionSource();
+                    window.Closed += (_, _) => closed.TrySetResult();
+                    window.Show();
+                    await closed.Task;
+                }
+                else
+                {
+                    WindowChrome.UseOwnerIcon(window, owner);
+                    await window.ShowDialog(owner);
+                }
+            }
+            finally
+            {
+                _calibration = null;
+            }
+        }
+
+        /// <summary>
+        /// Offers the calibration tool the first time a song plays on a device that has no calibrated latency, once for
+        /// each device, unless the user turned that off.
+        /// </summary>
+        private void OfferCalibration(EditorWindow editor)
+        {
+            if (!settings.Settings.PromptForCalibration
+                || _calibration is not null
+                || latency.Source != LatencySource.Fallback
+                || latency.Device is not { } device)
+                return;
+
+            string key = string.IsNullOrEmpty(device.Id) ? device.Name : device.Id;
+            if (string.IsNullOrEmpty(key) || settings.Settings.CalibrationPrompted.Contains(key))
+                return;
+
+            // Remembered before asking, so the answer, or closing the prompt, skips it from now on.
+            settings.Settings.CalibrationPrompted.Add(key);
+            settings.Save();
+            _ = OfferCalibrationAsync(editor, device);
+        }
+
+        private async Task OfferCalibrationAsync(EditorWindow editor, AudioDevice device)
+        {
+            var confirmations = new AvaloniaConfirmationService(() => editor);
+            string name = string.IsNullOrEmpty(device.Name) ? Strings.CalibrationUnknownDevice : device.Name;
+            if (await confirmations.ConfirmAsync(
+                    Strings.CalibrationPromptTitle,
+                    string.Format(CultureInfo.CurrentCulture, Strings.CalibrationPromptFormat, name),
+                    Strings.CalibrationPromptConfirm))
+                await ShowCalibrationAsync();
         }
 
         private void Open(EditorWindow editor, EditorWindowViewModel viewModel)
@@ -101,6 +189,7 @@ namespace ChartBuilder.Services
 
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,
-            settingsPicker => new SettingsWindowViewModel(BuilderSettingsCatalog.Create(settings), settingsPicker, settings.Save));
+            settingsPicker => new SettingsWindowViewModel(
+                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync()), settingsPicker, settings.Save));
     }
 }

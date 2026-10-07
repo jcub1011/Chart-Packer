@@ -28,6 +28,12 @@ public static class UserConfigPaths
     /// <summary>Chart Builder's settings file. Each app writes only its own (charter-spec §10).</summary>
     public static string BuilderSettingsFile => Path.Combine(ConfigFolder, "builder-settings.json");
 
+    /// <summary>
+    /// The audio/visual latency per output device, written by Chart Builder's calibration tool and read
+    /// by both apps (charter-spec C11, §10).
+    /// </summary>
+    public static string AudioLatencyFile => Path.Combine(ConfigFolder, "audio-latency.json");
+
     /// <summary>Where Chart Builder holds a lock file for each song it has open (charter-spec §4.8, <c>SongLock</c>).</summary>
     public static string LockFolder => Path.Combine(ConfigFolder, "locks");
 

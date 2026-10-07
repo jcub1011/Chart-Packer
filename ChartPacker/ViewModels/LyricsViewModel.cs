@@ -82,7 +82,7 @@ namespace ChartPacker.ViewModels
         public LyricsViewModel(PlayerViewModel player)
         {
             _player = player;
-            Clock = () => player.CurrentPosition;
+            Clock = () => player.DrawnPosition;
             WaveformPicker = new LaneWaveformPickerViewModel(OnWaveformPicked);
             player.TrackWaveformsChanged += (_, e) =>
             {

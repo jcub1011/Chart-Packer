@@ -210,7 +210,7 @@ namespace ChartPacker.ViewModels
             _filePicker = filePicker;
             _videoProbe = videoProbe;
             Player = player;
-            Background = new BackgroundViewModel(() => Player.CurrentPosition);
+            Background = new BackgroundViewModel(() => Player.DrawnPosition);
             Background.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(BackgroundViewModel.ShownKind))

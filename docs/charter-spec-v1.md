@@ -1042,21 +1042,21 @@ The tool is part of Chart Builder. It opens:
      ±500 ms range.
    - **Visual phase.** The user taps in time with 16 flashes, with no sound.
    - **Audio phase.** The user taps in time with 16 beeps, with the screen blank.
-   - Taps are mouse clicks or touches on the tile, or presses of the Space key.
+   - Taps are mouse clicks or touches on the tile. (Not the Space key: see the timestamps below.)
    - The first 4 taps of each phase are warm-up and are ignored.
    - Each tap's error is measured against its nearest beat. Taps more than 1.5 interquartile
      ranges from the median are dropped.
-   - **Latency = median audio error − median visual error.** The user's reaction time and the
-     keyboard's latency are the same in both phases, so they cancel out. What's left is how much
-     later the audio arrives than the display.
-   - The result shows the estimate, its spread (the interquartile range), and how many taps were
-     kept. **Use this value** puts it into the manual test to be checked. A spread over 30 ms
-     suggests trying again.
+   - **Latency = mean audio error − mean visual error**, over the taps kept. The user's reaction
+     time and the mouse's latency are the same in both phases, so they cancel out. What's left is
+     how much later the audio arrives than the display.
+   - The result shows the estimate, its spread (the larger of the two phases' interquartile
+     ranges), and how many taps were kept. **Use this value** puts it into the manual test to be
+     checked. A spread over 30 ms suggests trying again.
    - **Tap times** come from the input events' own timestamps, not from when the UI thread handles
      them.
      - In Avalonia 12, pointer events carry a timestamp (`PointerEventArgs.Timestamp`) but key
-       events don't. Key taps need the raw input events, which do have one
-       (`RawInputEventArgs.Timestamp`). If those can't be reached from app code in Avalonia 12, the
+       events don't. The raw input events that do (`RawInputEventArgs.Timestamp`) can't be reached
+       from app code (`InputManager` and `RawKeyEventArgs`' members aren't public in 12.1), so the
        tap test takes pointer taps only.
      - A timestamp is on the OS input clock. It is moved onto the app's clock by subtracting, at
        handling time, how long the event waited: the input clock's current time minus the event's
@@ -1068,14 +1068,16 @@ The tool is part of Chart Builder. It opens:
      (for example, a Windows endpoint ID or a Core Audio device UID), and otherwise by its name.
      SDL's device names may change across reboots or docks, and its device handles only last for
      one session, so the ID is preferred when there is one.
-   - `IAudioOutput` gains a `DeviceName`, an optional `DeviceId` and a `DeviceChanged` event,
-     which `SdlAudioOutput` fills in. Getting a stable ID may need a small platform call beside
-     SDL. A platform without one uses the name alone.
+   - `IAudioOutput` gains a `Device` (an `AudioDevice`: a name and an optional ID) and a
+     `DeviceChanged` event, which `SdlAudioOutput` fills in. The name is SDL's. The ID needs a
+     small platform call beside SDL: on Windows it is the default render endpoint's ID, from the
+     MMDevice API (`WindowsAudioEndpoint`). Other platforms use the name alone for now.
    - **Which device.** The app has no device chooser. It always plays on the OS default device,
-     and SDL moves the stream when the default changes, without telling the app.
-     `SdlAudioOutput` therefore checks which device it is on when SDL reports an audio device
-     event and when playback starts, and raises `DeviceChanged` when it differs. Chart Builder and
-     the tool then load that device's latency.
+     and SDL moves the stream when the default changes, without telling the app. SDL's own device
+     events only reach an SDL event loop, which the app doesn't run, and a silent move raises
+     none. `SdlAudioOutput` therefore checks which device it is on when playback starts and once a
+     second, and raises `DeviceChanged` when it differs. Chart Builder, the tool and Chart Packer
+     then load that device's latency.
    - **Lookup order:** the stored value for the device's ID, then for its name, then a **global
      fallback**. When a device is found by name, its value is also saved under its ID if it has
      one, so a later rename doesn't lose it.
@@ -1084,11 +1086,30 @@ The tool is part of Chart Builder. It opens:
    - Chart Builder ([C10](#c10-playback));
    - **record mode**, where key presses are shifted by the latency before they're quantised
      ([C15](#c15-editing-ergonomics));
-   - Chart Packer's inspector highway (`NoteHighwayView`), lyrics lane and waveform playhead, with
-     the same scaling by speed. Chart Packer reads the value from the shared latency file
-     ([§10](#10-settings)).
+   - Chart Packer's inspector highway (`NoteHighwayView`) with its lane waveforms, lyrics lane and
+     background, with the same scaling by speed. Chart Packer reads the value from the shared
+     latency file ([§10](#10-settings)). The seek bar's waveform isn't moved: it marks what has
+     played a column at a time, where tens of milliseconds don't show, and its position is the
+     seek position.
 5. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
    previous value. **Reset** sets 0.
+
+*Settled in CM2:*
+
+- **The tap test's estimate is a mean, not a median.** Once the outliers are dropped, about ten
+  taps are left in each phase. With so few, the median's spread is too wide for AC C11.2: 92% of
+  estimates fell within ±20 ms in its test. The mean gives 96.5%.
+- **One schedule, re-anchored.** The beeps are a `CalibrationSchedule` over a silent mix. It ties
+  the monotonic clock to `SmoothPosition` at an anchor, and is replaced when the latency changes
+  and once a second, so the device's clock can't drift from the system's.
+  - The schedules share a record of the beats already given (`CalibrationBeepsGiven`), so a
+    re-anchor never plays a beep twice.
+  - A latency raised past what's already queued skips one beep.
+- **The first-use prompt** comes the first time a song plays in the Editor on a device with only
+  the fallback. Each device is offered it once (`BuilderSettings.CalibrationPrompted`), whatever
+  the answer.
+- **The Settings rows.** The latency is an action-only row (`ActionSetting`), with a
+  **Calibrate…** button, in both apps' Settings.
 
 Acceptance criteria:
 
@@ -1843,8 +1864,10 @@ opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
 | Default difficulty reduction rules | As in [C9](#c9-difficulty-authoring). The Reduce dialog starts from them, and its changes apply to one run only. |
 
 There is no existing playback-offset setting in `AppSettings` to extend. The latency is new. It is
-stored in `audio-latency.json` as two maps, from device ID and from device name to milliseconds,
-plus the fallback, and is looked up in that order ([C11](#c11-calibration-tool)). The file is
+stored in `audio-latency.json` as two maps, from device ID and from device name to whole
+milliseconds, plus the fallback (`{ "byId": { … }, "byName": { … }, "fallback": 0 }`). It is
+looked up in that order ([C11](#c11-calibration-tool)). Values are kept within ±500 ms, and a save
+changes only the device saved, keeping the rest of the file (`AudioLatencyFile`). The file is
 written to a temp file and renamed into place, as `settings.json` is, so a reader never sees half
 of it.
 

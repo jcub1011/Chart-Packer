@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
@@ -14,16 +15,39 @@ namespace ChartBuilder.Services
     /// </summary>
     public static class BuilderSettingsCatalog
     {
-        public static SettingsCatalog Create(BuilderSettingsService settings)
+        /// <param name="calibrate">Opens the calibration tool, which edits the audio latency (charter-spec C11).</param>
+        public static SettingsCatalog Create(BuilderSettingsService settings, Action calibrate)
         {
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
+            var audio = new SettingCategory("audio", Strings.SettingsCategoryAudio);
             var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [charter, newCharts, general, logging],
+                [charter, newCharts, audio, general, logging],
                 [
+                    // The latency is per device, so it's edited in the calibration tool rather than here (charter-spec §10).
+                    new ActionSetting
+                    {
+                        Id = "audio.latency",
+                        Category = audio,
+                        Label = Strings.AudioLatencyLabel,
+                        Description = Strings.AudioLatencyDescription,
+                        Keywords = SettingKeywords.Split(Strings.AudioLatencyKeywords),
+                        Actions = [new SettingAction(Strings.CalibrateButton, calibrate)],
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "audio.promptForCalibration",
+                        Category = audio,
+                        Label = Strings.PromptForCalibrationLabel,
+                        Description = Strings.PromptForCalibrationDescription,
+                        Keywords = SettingKeywords.Split(Strings.PromptForCalibrationKeywords),
+                        DefaultValue = true,
+                        Get = () => settings.Settings.PromptForCalibration,
+                        Set = prompt => settings.Settings.PromptForCalibration = prompt,
+                    },
                     new TextSetting
                     {
                         Id = "charter.defaultCharterName",

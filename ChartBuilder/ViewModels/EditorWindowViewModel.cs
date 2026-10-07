@@ -45,8 +45,15 @@ namespace ChartBuilder.ViewModels
         /// <summary>A song opened from a folder or <c>.sng</c> (charter-spec C2).</summary>
         /// <param name="songLock">The song's lock, held until the editor is disposed.</param>
         /// <param name="openOutput">Opens the audio output, for playback.</param>
-        public EditorWindowViewModel(BuilderSettingsService settings, ISettingsWindowService settingsWindow, OpenedSong song, SongLock songLock, Func<int, IAudioOutput> openOutput)
-            : this(settings, settingsWindow, song, songLock, new PlaybackViewModel(song, openOutput))
+        /// <param name="latency">The audio/visual latency, which what's drawn against the audio allows for.</param>
+        public EditorWindowViewModel(
+            BuilderSettingsService settings,
+            ISettingsWindowService settingsWindow,
+            OpenedSong song,
+            SongLock songLock,
+            Func<int, IAudioOutput> openOutput,
+            AudioLatencyService latency)
+            : this(settings, settingsWindow, song, songLock, new PlaybackViewModel(song, openOutput, latency))
         {
             Notice = LoadIssuesNotice(song.Load.Issues.Count);
         }

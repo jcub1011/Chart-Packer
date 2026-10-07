@@ -43,8 +43,11 @@ public static class Synth
         return new SynthSound(samples, sampleRate);
     }
 
+    /// <summary>The calibration tool's beep (C11): 1 kHz for 30 ms with 2 ms fades, or 2 kHz on a bar's first beat.</summary>
+    public static SynthSound CalibrationBeep(bool marked, int sampleRate) => Beep(marked ? 2000 : 1000, 30, 2, sampleRate);
+
     /// <summary>
-    /// A metronome click: a high sine that dies away within 30 ms. The click on a measure's first beat is higher and at
+    /// A metronome click:a high sine that dies away within 30 ms. The click on a measure's first beat is higher and at
     /// <see cref="Peak"/>; the others are softer.
     /// </summary>
     public static SynthSound Click(bool accented, int sampleRate)
