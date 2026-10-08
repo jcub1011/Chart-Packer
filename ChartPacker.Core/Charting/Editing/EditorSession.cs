@@ -85,6 +85,7 @@ public sealed class EditorSession
         Selection = new EditorSelection(Chart);
         Tools = new EditorTools(this);
         Fills = new FillProposals(this);
+        TempoProposal = new TempoProposals(this);
         undo.Changed += OnUndoChanged;
     }
 
@@ -141,6 +142,9 @@ public sealed class EditorSession
     /// <summary>The run of Generate fills going on, if there's one (charter-spec C6 item 5).</summary>
     public FillProposals Fills { get; }
 
+    /// <summary>The proposed tempo map being looked at, if there's one (charter-spec C14 item 4).</summary>
+    public TempoProposals TempoProposal { get; }
+
     /// <summary>The tempo map the chart's ticks are timed by.</summary>
     public TempoMap TempoMap => Chart.TempoMap.ToTempoMap();
 
@@ -188,6 +192,25 @@ public sealed class EditorSession
 
     /// <summary>Whether notes keep their times rather than their ticks when the tempo changes (charter-spec C4 item 3).</summary>
     public bool KeepTimes { get; set; }
+
+    /// <summary>The onsets found in the lanes' audio, for snapping and nudging to them; null without audio (charter-spec C14).</summary>
+    public IOnsetSource? Onsets { get; set; }
+
+    /// <summary>
+    /// Whether a note placed or moved goes to the nearest onset within half a grid step, rather than to the grid
+    /// (charter-spec C14 item 2, <c>O</c>). The grid still wins where no onset is that near.
+    /// </summary>
+    public bool SnapToOnset
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+            field = value;
+            RaiseState();
+        }
+    }
 
     /// <summary>The lane the keys act on: the part and difficulty last clicked, or chosen.</summary>
     public ChartTrackKey? Focused

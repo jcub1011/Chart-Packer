@@ -161,6 +161,20 @@ public sealed class RecoveryTests
         Assert.AreEqual(expected, Autosave.Next(dirty, hasFile, version, autosaved, busy));
     }
 
+    [TestMethod]
+    public async Task TheDelayFindFirstDownbeatSetIsRecovered()
+    {
+        string folder = _folders.Song("Song", ("notes.mid", MidiFixtures.LeadGuitar()), ("song.ini", Ini("name = Song", "delay = 300")));
+        var song = EditorSong.Of(await OpenAsync(folder, Token));
+        song.DelayMs = 1250;
+        await AutosaveAsync(song);
+
+        var recovered = Autosave.Recover(await OpenAsync(folder, Token), _store.Find(folder)!);
+
+        Assert.AreEqual(1250, recovered.DelayMs);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(1250), recovered.Delay);
+    }
+
     private Task AutosaveAsync(EditorSong song) =>
         _store.WriteAsync(RecoveryStore.KeyOf(song.Entry!.FullPath), MidiChartWriter.Write(song.Chart), Autosave.ManifestFor(song, song.Title ?? "", DateTimeOffset.Now), Token);
 }

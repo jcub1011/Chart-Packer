@@ -315,6 +315,35 @@ public sealed class LaneDockLayoutTests
     }
 
     [TestMethod]
+    public void ALanesAudioOptionsAreKeptWithoutChangingTheLayout()
+    {
+        var layout = LaneDockLayout.CreateDefault();
+        int changes = 0;
+        layout.Changed += (_, _) => changes++;
+        var options = new LaneAudioOptions("drums_1", LaneBackdrop.Spectrogram, LaneAudioPlacement.Beside, LaneChannels.Stereo, 6, SpectrogramBand.Kick, -90, -10, false, 0.8);
+
+        layout.SetAudio(Lane(layout, Drums), options);
+        layout.SetAudio(Lane(layout, Bass), LaneAudioOptions.Default with { GainDb = 99 });
+        string json = JsonSerializer.Serialize(layout.ToState(), LaneDockTestJsonContext.Default.LaneDockState);
+        var read = LaneDockLayout.FromState(JsonSerializer.Deserialize(json, LaneDockTestJsonContext.Default.LaneDockState))!;
+
+        Assert.AreEqual(0, changes, "Audio options aren't a change to the layout's shape.");
+        Assert.AreEqual(options, Lane(read, Drums).Audio);
+        Assert.AreEqual(LaneAudioOptions.MaxGainDb, Lane(read, Bass).Audio.GainDb, "Options are kept within their ranges.");
+        Assert.AreEqual(LaneAudioOptions.Default, Lane(read, Guitar).Audio);
+    }
+
+    [TestMethod]
+    public void AudioOptionsThisVersionDoesntKnowAreTheDefaults()
+    {
+        var state = new LaneAudioState { Source = "*mix", Backdrop = "Hologram", Placement = "Under", Channels = "7", Band = "Tuba", GainDb = 3 };
+
+        var options = state.ToOptions();
+
+        Assert.AreEqual(LaneAudioOptions.Default with { Source = LaneAudioOptions.MixSource, GainDb = 3 }, options);
+    }
+
+    [TestMethod]
     public void TheStateSurvivesJson()
     {
         var layout = LaneDockLayout.CreateDefault();

@@ -30,6 +30,9 @@ public enum PendingChangeReason
 
     /// <summary><c>multiplier_note</c> removed, as the chart's star power is saved on 116.</summary>
     MultiplierNote,
+
+    /// <summary>The delay Find first downbeat set, so the chart starts on the downbeat (charter-spec C14 item 5).</summary>
+    DelayFromDownbeat,
 }
 
 /// <summary>A change to <c>song.ini</c> that saving makes, and why.</summary>
@@ -63,6 +66,12 @@ public sealed record PendingSongIniInputs(IReadOnlySet<ChartInstrument> LoadedPa
 
     /// <summary>Values the song has nowhere else, such as a new chart's name and artist, written where <c>song.ini</c> has none.</summary>
     public IReadOnlyList<KeyValuePair<string, string>> Values { get; init; } = [];
+
+    /// <summary>
+    /// The <c>delay</c> Find first downbeat set, in milliseconds (charter-spec C14 item 5), in place of the one the song
+    /// has; null for none.
+    /// </summary>
+    public long? DelayMs { get; init; }
 }
 
 /// <summary>
@@ -111,8 +120,21 @@ public static class PendingSongIniChanges
         if (!Has("charter") && !Has("frets") && !changes.Any(c => c.Key == "charter") && inputs.DefaultCharter.Trim() is { Length: > 0 } charter)
             changes.Add(new PendingSongIniChange("charter", charter, PendingChangeReason.Charter));
 
-        if (inputs.Import?.Offset is { } offset && DelayChange(offset, pairs) is { } delay)
+        if (inputs.DelayMs is { } set)
+        {
+            // In place of whatever delay the song reads now; a delay of 0 is passed over for delay_seconds, so that goes too.
+            long now = (long)Math.Round(SongChartSettings.DelayOf(pairs, inputs.Import?.Offset).TotalMilliseconds, MidpointRounding.AwayFromZero);
+            if (set != now)
+            {
+                changes.Add(new PendingSongIniChange("delay", set.ToString(CultureInfo.InvariantCulture), PendingChangeReason.DelayFromDownbeat));
+                if (set == 0 && Has("delay_seconds"))
+                    changes.Add(new PendingSongIniChange("delay_seconds", null, PendingChangeReason.DelayFromDownbeat));
+            }
+        }
+        else if (inputs.Import?.Offset is { } offset && DelayChange(offset, pairs) is { } delay)
+        {
             changes.Add(new PendingSongIniChange("delay", delay, PendingChangeReason.Delay));
+        }
 
         if (inputs.AudioLengthMs is { } length && length > 0)
         {

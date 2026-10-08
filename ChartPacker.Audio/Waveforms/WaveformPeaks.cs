@@ -78,6 +78,9 @@ public readonly record struct WaveformResolution
 /// </summary>
 public sealed class StemPeaks
 {
+    private StemPeaks? _left;
+    private StemPeaks? _right;
+
     // The arrays may be longer than what has been read, and a progress snapshot's are still being filled past
     // it: only the first readBuckets and readTicks are ever looked at, and the reader never writes those again.
     internal StemPeaks(string name, WaveformResolution resolution, float[] min, float[] max, float[] rms, Half[] signal, int count, int readBuckets, int readTicks)
@@ -98,6 +101,18 @@ public sealed class StemPeaks
     }
 
     public string Name { get; }
+
+    /// <summary>
+    /// The stem was read by channel (<see cref="StemPeaksReader"/>'s <c>channels</c>), so <see cref="Left"/> and
+    /// <see cref="Right"/> are its channels' own; a mono stem's are its own peaks.
+    /// </summary>
+    public bool HasChannels { get; private set; }
+
+    /// <summary>The left channel's peaks when <see cref="HasChannels"/>; otherwise, and for a mono stem, these.</summary>
+    public StemPeaks Left => _left ?? this;
+
+    /// <summary>The right channel's peaks when <see cref="HasChannels"/>; otherwise, and for a mono stem, these.</summary>
+    public StemPeaks Right => _right ?? this;
 
     /// <summary>How long a bucket is, and how often the stem is sampled for mixing.</summary>
     public WaveformResolution Resolution { get; }
@@ -125,8 +140,10 @@ public sealed class StemPeaks
     /// <summary>How far the loudest sample read so far reaches, from 0 to 1, either side of silence.</summary>
     public float Peak { get; }
 
-    /// <summary>Roughly how much memory the peaks take.</summary>
-    public long SizeBytes => ((long)(MinBuckets.Length + MaxBuckets.Length + RmsBuckets.Length) * sizeof(float)) + ((long)Signal.Length * 2);
+    /// <summary>Roughly how much memory the peaks take, each channel's included.</summary>
+    public long SizeBytes => OwnSizeBytes + (_left?.OwnSizeBytes ?? 0) + (_right?.OwnSizeBytes ?? 0);
+
+    private long OwnSizeBytes => ((long)(MinBuckets.Length + MaxBuckets.Length + RmsBuckets.Length) * sizeof(float)) + ((long)Signal.Length * 2);
 
     // The same buckets as arrays, so that mixing indexes them directly; those from ReadBuckets on are silent.
     internal float[] MinBuckets { get; }
@@ -143,6 +160,15 @@ public sealed class StemPeaks
     internal Half[] Signal { get; }
 
     internal int ReadTicks { get; }
+
+    /// <summary>These peaks, read by channel: with <paramref name="left"/> and <paramref name="right"/>, or both null for a mono stem.</summary>
+    internal StemPeaks WithChannels(StemPeaks? left, StemPeaks? right)
+    {
+        _left = left;
+        _right = right;
+        HasChannels = true;
+        return this;
+    }
 
     /// <summary>How far the first <paramref name="read"/> buckets of <paramref name="min"/> and <paramref name="max"/> reach.</summary>
     internal static float PeakOf(float[] min, float[] max, int read)
@@ -297,10 +323,11 @@ public static class WaveformPeaks
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     /// <param name="resolution">How finely to read it; <see cref="WaveformResolution.Low"/> unless given.</param>
-    public static StemPeaks Compute(string name, IPcmSource source, Action<StemPeaks>? progress, TimeSpan progressInterval, CancellationToken cancellationToken = default, WaveformResolution? resolution = null)
+    /// <param name="channels">Read the left and right channels' peaks too (<see cref="StemPeaks.HasChannels"/>).</param>
+    public static StemPeaks Compute(string name, IPcmSource source, Action<StemPeaks>? progress, TimeSpan progressInterval, CancellationToken cancellationToken = default, WaveformResolution? resolution = null, bool channels = false)
     {
         // One chunk, as long as the stem.
-        var reader = new StemPeaksReader(name, source, progress, progressInterval, int.MaxValue, resolution);
+        var reader = new StemPeaksReader(name, source, progress, progressInterval, int.MaxValue, resolution, channels);
         reader.ReadChunk(0, source, cancellationToken);
         return reader.Finish();
     }
@@ -395,6 +422,19 @@ public static class WaveformPeaks
 
         readCount = Math.Min(readCount, count);
         return new Waveform(resolution, min, max, rms, min, max, rms, readCount, StemPeaks.PeakOf(min, max, readCount));
+    }
+
+    /// <summary>
+    /// <see cref="Mix"/> of each channel: the stems' left channels mixed, and their right. A mono stem is in both.
+    /// </summary>
+    /// <exception cref="ArgumentException">A stem wasn't read by channel, or they weren't all read at the same resolution.</exception>
+    public static (Waveform Left, Waveform Right) MixChannels(IReadOnlyList<AudibleStem> stems)
+    {
+        ArgumentNullException.ThrowIfNull(stems);
+        if (stems.Any(s => !s.Peaks.HasChannels))
+            throw new ArgumentException("Every stem must be read by channel.", nameof(stems));
+
+        return (Mix([.. stems.Select(s => s with { Peaks = s.Peaks.Left })]), Mix([.. stems.Select(s => s with { Peaks = s.Peaks.Right })]));
     }
 
     /// <summary>

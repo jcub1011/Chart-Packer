@@ -126,4 +126,58 @@ public sealed class PendingSongIniChangesTests
         stack.Undo();
         Assert.IsEmpty(PendingSongIniChanges.Of(chart, JustGuitar, []));
     }
+
+    [TestMethod]
+    public void TheDelayFromTheDownbeatReplacesTheSongs()
+    {
+        // charter-spec C14 item 5, Delay.
+        var chart = NewChart(Guitar);
+        var inputs = new PendingSongIniInputs(JustGuitar, [KeyValuePair.Create("delay", "300")]) { DelayMs = 1250 };
+
+        var changes = PendingSongIniChanges.Of(chart, inputs);
+
+        Assert.AreSequenceEqual([new PendingSongIniChange("delay", "1250", PendingChangeReason.DelayFromDownbeat)], changes.ToList());
+        Assert.IsTrue(changes[0].CanRevert, "Revert is how it's taken back.");
+    }
+
+    [TestMethod]
+    public void TheDelayTheSongHasAlreadyCallsForNothing()
+    {
+        var chart = NewChart(Guitar);
+        var inputs = new PendingSongIniInputs(JustGuitar, [KeyValuePair.Create("delay", "1250")]) { DelayMs = 1250 };
+
+        Assert.IsEmpty(PendingSongIniChanges.Of(chart, inputs));
+    }
+
+    [TestMethod]
+    public void ADelayOfNothingRemovesDelaySecondsToo()
+    {
+        // delay = 0 is passed over for delay_seconds, so starting the chart on the audio's start removes that too.
+        var chart = NewChart(Guitar);
+        var inputs = new PendingSongIniInputs(JustGuitar, [KeyValuePair.Create("delay_seconds", "0.5")]) { DelayMs = 0 };
+
+        var changes = PendingSongIniChanges.Of(chart, inputs);
+
+        Assert.AreSequenceEqual(
+            [new PendingSongIniChange("delay", "0", PendingChangeReason.DelayFromDownbeat), new PendingSongIniChange("delay_seconds", null, PendingChangeReason.DelayFromDownbeat)],
+            changes.ToList());
+        Assert.AreEqual(TimeSpan.Zero, ChartPacker.Core.Charts.SongChartSettings.DelayOf(PendingSongIniChanges.Apply(inputs.Pairs, changes), (TimeSpan?)null));
+    }
+
+    [TestMethod]
+    public void TheSongsDelayFollowsTheDownbeatsUntilItsRevertedOrSaved()
+    {
+        var song = EditorSong.New(NewChart(Guitar), []);
+        int changed = 0;
+        song.Changed += (_, _) => changed++;
+
+        song.DelayMs = 800;
+        Assert.AreEqual(TimeSpan.FromMilliseconds(800), song.Delay);
+        Assert.AreEqual(1, changed);
+
+        song.Revert("delay");
+        Assert.AreEqual(TimeSpan.Zero, song.Delay);
+        song.Restore("delay");
+        Assert.AreEqual(TimeSpan.FromMilliseconds(800), song.Delay);
+    }
 }

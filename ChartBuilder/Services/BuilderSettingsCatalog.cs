@@ -4,6 +4,7 @@ using System.Linq;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using ChartPacker.UI;
@@ -22,12 +23,13 @@ namespace ChartBuilder.Services
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
             var editing = new SettingCategory("charter.editing", Strings.SettingsCategoryEditing, charter);
+            var audioAssist = new SettingCategory("charter.audioAssist", Strings.SettingsCategoryAudioAssist, charter);
             var audio = new SettingCategory("audio", Strings.SettingsCategoryAudio);
             var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [charter, newCharts, editing, audio, general, logging],
+                [charter, newCharts, editing, audioAssist, audio, general, logging],
                 [
                     // The latency is per device, so it's edited in the calibration tool rather than here (charter-spec §10).
                     new ActionSetting
@@ -146,6 +148,35 @@ namespace ChartBuilder.Services
                         Format = speed => speed.ToString("0.0x", CultureInfo.CurrentCulture),
                         Get = () => settings.Settings.EditorHighwaySpeed,
                         Set = speed => settings.Settings.EditorHighwaySpeed = speed,
+                    },
+                    new ChoiceSetting<LaneBackdrop>
+                    {
+                        Id = "charter.laneBackdrop",
+                        Category = audioAssist,
+                        Label = Strings.LaneBackdropLabel,
+                        Description = Strings.LaneBackdropDescription,
+                        Keywords = SettingKeywords.Split(Strings.LaneBackdropKeywords),
+                        DefaultValue = LaneBackdrop.Waveform,
+                        Choices =
+                        [
+                            new SettingChoice<LaneBackdrop>(LaneBackdrop.Waveform, Strings.LaneShowWaveform),
+                            new SettingChoice<LaneBackdrop>(LaneBackdrop.Spectrogram, Strings.LaneShowSpectrogram),
+                        ],
+                        Get = () => settings.Settings.DefaultLaneBackdrop,
+                        Set = backdrop => settings.Settings.DefaultLaneBackdrop = backdrop,
+                    },
+                    new IntegerSetting
+                    {
+                        Id = "charter.spectrogramBudget",
+                        Category = audioAssist,
+                        Label = Strings.SpectrogramBudgetLabel,
+                        Description = Strings.SpectrogramBudgetDescription,
+                        Keywords = SettingKeywords.Split(Strings.SpectrogramBudgetKeywords),
+                        DefaultValue = 256,
+                        Minimum = BuilderSettings.MinSpectrogramBudgetMb,
+                        Maximum = BuilderSettings.MaxSpectrogramBudgetMb,
+                        Get = () => settings.Settings.SpectrogramBudgetMb,
+                        Set = megabytes => settings.Settings.SpectrogramBudgetMb = megabytes,
                     },
                     Volume("audio.metronomeVolume", audio, Strings.MetronomeVolumeLabel, Strings.MetronomeVolumeDescription, Strings.MetronomeVolumeKeywords,
                         () => settings.Settings.MetronomeVolume, volume => settings.Settings.MetronomeVolume = volume),

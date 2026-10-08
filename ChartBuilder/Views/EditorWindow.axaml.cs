@@ -80,6 +80,8 @@ namespace ChartBuilder.Views
         /// <summary>Generate fills' options close once the fills are proposed, so the ghosts can be seen.</summary>
         private void OnGenerateFillsClick(object? sender, RoutedEventArgs e) => GenerateFillsButton.Flyout?.Hide();
 
+        private void OnProposeTempoMapClick(object? sender, RoutedEventArgs e) => ProposeTempoMapButton.Flyout?.Hide();
+
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             // The panel's width is kept while it's collapsed, so expanding it brings it back as it was.

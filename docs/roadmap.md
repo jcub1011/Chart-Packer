@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Current as of 2026-10-08 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM4: Audio assist](#cm4-audio-assist) |
+| **Next up** | [CM5: Authoring tools](#cm5-authoring-tools) |
 
 ---
 
@@ -22,7 +22,7 @@ its exit criteria. This file owns only the order and the status.
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
 | 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | Done | Exit criteria met | CM1 |
 | 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Done | Exit criteria met | CM2 |
-| 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
+| 5 | [CM4: Audio assist](#cm4-audio-assist) | Done | Exit criteria met | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
 
 ---
@@ -209,18 +209,47 @@ phases, each reviewed before the next, and its design decisions are recorded in 
 
 ## CM4: Audio assist
 
-**Status: not started.**
+**Status: done.**
 
-It covers:
+AC C12.1 was checked by hand; AC C13.1, C13.2 and C14.1 to C14.3 have automated tests. Its design
+decisions are recorded in the spec, as *Settled in CM4*.
 
-- [C12](charter-spec-v1.md#c12-waveform), the waveform;
-- [C13](charter-spec-v1.md#c13-spectrogram), the spectrogram;
-- [C14](charter-spec-v1.md#c14-onset-and-beat-assist), onsets and tempo estimation;
-- **Detect from audio**.
+**What was built:**
 
-It needs CM2's views to draw on and its tempo map to propose against. It doesn't need CM3, so the
-two could be built in either order. **Detect from audio** now belongs in Chart settings rather
-than the wizard.
+- **Analysis** (`ChartPacker.Audio/Analysis/`). Audio read at its full rate, a stem or several
+  mixed (`AnalysisInput`), on threads below normal priority that take the most wanted chunk next
+  (`AnalysisWorkers`), with two frames to an FFT (`RealFftPair`). The plain data and beat arithmetic
+  the editor uses are in Core (`Charting/Analysis/`: `BeatProposal`, `DetectedOnset`, `BeatMath`).
+- **Waveform** ([C12](charter-spec-v1.md#c12-waveform)). Each lane's audio (the part's own stems,
+  the mix or any stem), behind or beside, in mono or stereo, with a gain; read once at 5 ms and
+  drawn at any zoom (`StemWaveforms`), within a frame budget (`PaintBudget`). Peaks by channel
+  (`StemPeaksReader`'s `channels`). The options are in a flyout in each lane's header, kept with the
+  lane layout (`LaneAudioOptions`).
+- **Spectrogram** ([C13](charter-spec-v1.md#c13-spectrogram)). `SpectrogramBuilder` computes it
+  from the view outwards; `SpectrogramCache` holds it within the memory budget; `SpectrogramPainter`
+  draws it, with the band presets and contrast. `W` switches a lane; Settings has **Lanes show** and
+  the budget.
+- **Onsets** ([C14](charter-spec-v1.md#c14-onset-and-beat-assist) items 1–3). `OnsetDetector`, by
+  band for drums, with a live sensitivity; ticks beside the lanes; snap to onset (`O`) and Nudge to
+  onsets (`Shift`+`O`, `OnsetNudge`, `MoveNotes` by each note's own ticks).
+- **Proposed tempo map** (C14 item 4). `TempoEstimator`: a tempogram, beats tracked along it, each
+  moved onto its onset, and stretches of steady tempo with a confidence. The editor shows it as a
+  ghost to adjust, double, halve and accept as one step (`TempoProposals`, `ProposedTempoMap`).
+- **First downbeat** (C14 item 5). `TempoEstimator.FindFirstDownbeat`, applied as a lead-in
+  (`TempoMapEdits.LeadIn`) or as a delay, a pending change (`EditorSong.DelayMs`) kept by autosave.
+- **Detect from audio** ([C1](charter-spec-v1.md#c1-new-chart-and-chart-settings)), in Chart
+  settings: the starting BPM from the mix, tidied (`BpmTidy`), and the proposal to review.
+
+**Left for later:**
+
+- **One STFT.** Onsets and the spectrogram each run their own, as they need different windows;
+  sharing work between them, or a vectorised FFT, would make the first analysis of a song quicker.
+- **A proposal's beats** are re-spaced evenly when one is dragged, rather than estimated again
+  round it.
+- **Snap to onset** applies to the mouse only; record mode (CM5) will use it for key presses.
+- **The bottom timeline** shows the mix's waveform, not the lane's audio, and not the proposal.
+- **Tests of the view models** that draw and analyse (`StemWaveforms`, `AudioAnalysis`), which need
+  the UI thread.
 
 ## CM5: Authoring tools
 

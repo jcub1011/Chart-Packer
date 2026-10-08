@@ -10,9 +10,13 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
+using ChartPacker.Audio.Analysis;
+using ChartPacker.Core.Charting.Analysis;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
 using ChartPacker.UI.Controls;
 using ChartPacker.UI.Controls.Highway;
@@ -64,6 +68,43 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IPen BoxPen = new ImmutablePen(Color.FromArgb(0xC0, 0x6E, 0x9C, 0xFF).ToUInt32(), 1);
         private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
+        private static readonly IBrush FullWaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x70, 0xC8, 0xD2, 0xFF));
+        private static readonly IBrush FullWaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xC8, 0xD2, 0xFF));
+        private static readonly IPen ChannelPen = new ImmutablePen(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
+
+        // How strongly a spectrogram behind the lanes shows through, so the notes stay clear over it.
+        private const double SpectrogramBehindOpacity = 0.45;
+
+        // The onsets' ticks, by band (charter-spec C14 item 1): the whole spectrum's, then the kick's, snare's and cymbals'
+        // in the colours of the pads they likely belong to; each faint, middling or strong by how far it stands out.
+        private static readonly IBrush[][] OnsetBrushes =
+        [
+            OnsetShades(Color.FromRgb(0x9C, 0xE0, 0xD4)),
+            OnsetShades(HighwayPalette.Kick),
+            OnsetShades(HighwayPalette.Red),
+            OnsetShades(HighwayPalette.Yellow),
+        ];
+
+        // A proposed tempo map's ghost (charter-spec C14 item 4): dashed beats, measure starts solid, a handle for each beat
+        // in the margin (filled once dragged into place), and the stretches too unsure to trust shaded. Find first
+        // downbeat's guess is a line of its own (C14 item 5).
+        private static readonly Color ProposalColor = Color.FromRgb(0x7F, 0xD4, 0xFF);
+        private static readonly IPen ProposalBeatPen = new ImmutablePen(HighwayPalette.WithAlpha(ProposalColor, 0x90).ToUInt32(), 1, new ImmutableDashStyle([4, 3], 0));
+        private static readonly IPen ProposalMeasurePen = new ImmutablePen(HighwayPalette.WithAlpha(ProposalColor, 0xD8).ToUInt32(), 2);
+        private static readonly IPen ProposalHandlePen = new ImmutablePen(ProposalColor.ToUInt32(), 1.2);
+        private static readonly IBrush ProposalHandleBrush = new ImmutableSolidColorBrush(ProposalColor);
+        private static readonly IBrush ProposalLabelBrush = new ImmutableSolidColorBrush(ProposalColor);
+        private static readonly IBrush UnsureBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x1C, 0xFF, 0x6E, 0x7A));
+        private static readonly IBrush UnsureLabelBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0x8A, 0x94));
+        private static readonly IPen DownbeatPen = new ImmutablePen(HighwayPalette.WithAlpha(HighwayPalette.Yellow, 0xE0).ToUInt32(), 2, new ImmutableDashStyle([6, 3], 0));
+        private static readonly IBrush DownbeatLabelBrush = new ImmutableSolidColorBrush(HighwayPalette.Yellow);
+        private static readonly Geometry Diamond = new PolylineGeometry([new Point(0, -5), new Point(5, 0), new Point(0, 5), new Point(-5, 0)], true);
+
+        // How near a proposed beat's handle the pointer must be to grab it, in pixels.
+        private const double HandlePixels = 6;
+
+        private static IBrush[] OnsetShades(Color color) =>
+            [.. new byte[] { 0x60, 0xA0, 0xE8 }.Select(alpha => (IBrush)new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(color, alpha)))];
         private static readonly IBrush BadgeBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xE0, 0x20, 0x22, 0x2E));
         private static readonly IBrush DefaultLabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF));
         private static readonly IBrush DefaultAccentBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x7C, 0xB4, 0xFF));
@@ -97,7 +138,11 @@ namespace ChartBuilder.Controls.Editing
         private EditorLaneViewModel? _lane;
         private ChartEditorViewModel? _editor;
         private bool _isFrameRequested;
+        private bool _isRedrawPosted;
         private bool _isPressed;
+
+        // The proposed beat being dragged by its handle, if one is.
+        private int? _proposalDrag;
         private Point? _hover;
 
         // The wheel's turn not yet taken as a step, as a touchpad turns it a fraction of a notch at a time.
@@ -157,8 +202,32 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>Where the margin is that measure numbers, tempo markers and section names are drawn in: the left rail of a highway, the ruler along a timeline's top.</summary>
         protected abstract Rect LabelsArea(Size size, LaneProjection projection);
 
-        /// <summary>Where the waveform is drawn: behind a highway's lanes, or in a strip over a timeline's.</summary>
-        protected abstract Rect WaveformArea(Size size, LaneProjection projection);
+        /// <summary>The room the lane's audio takes beside the lanes, and how many bands of onsets it shows (charter-spec C12–C14).</summary>
+        protected readonly record struct LaneExtras(double BesideSize, int OnsetBands);
+
+        /// <summary>How thick each band of onsets is across the view, in pixels.</summary>
+        protected const double OnsetBandSize = 6;
+
+        /// <summary>The lane's extras, as the layout being worked out now has them.</summary>
+        protected LaneExtras Extras { get; private set; }
+
+        /// <summary>How thick the strip of onsets is across the view, in pixels.</summary>
+        protected double OnsetStripSize => Extras.OnsetBands * OnsetBandSize;
+
+        /// <summary>How wide the lane's audio is when it's drawn beside the lanes, for a canvas of <paramref name="size"/>.</summary>
+        protected abstract double BesideSizeFor(Size size);
+
+        /// <summary>Where the lane's audio is drawn faintly behind the notes: a highway's lanes, a timeline's rows.</summary>
+        protected abstract Rect BehindArea(Size size, LaneProjection projection);
+
+        /// <summary>Where a timeline's strip of the audio is, always drawn at full strength; nothing for a highway.</summary>
+        protected abstract Rect StripArea(Size size, LaneProjection projection);
+
+        /// <summary>Where the lane's audio is drawn at full strength beside the lanes: a highway's column, a timeline's strip.</summary>
+        protected abstract Rect BesideArea(Size size, LaneProjection projection, int phraseRows);
+
+        /// <summary>Where the onsets are drawn: beside a highway's lanes, under a timeline's rows (charter-spec C14 item 1).</summary>
+        protected abstract Rect OnsetArea(Size size, LaneProjection projection);
 
         /// <summary>
         /// Where the phrase rail of <paramref name="phraseRows"/> rows starts across the view, in pixels (charter-spec C8):
@@ -223,6 +292,7 @@ namespace ChartBuilder.Controls.Editing
             var slots = session.SlotsOf(key.Instrument, View);
             var part = session.Chart.PartOf(key.Instrument)!;
             var rows = PhraseRail.RowsOf(part.Kind);
+            Extras = ExtrasOf(bounds.Size, key);
             var projection = Project(bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
             var lanes = Box(projection.TimeFrom, projection.TimeFrom + projection.TimeLength, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count));
             var map = session.TempoMap;
@@ -231,13 +301,15 @@ namespace ChartBuilder.Controls.Editing
 
             context.FillRectangle(LanesBrush, lanes);
             DrawLaneDividers(context, projection, slots);
-            DrawWaveform(context, bounds.Size, projection);
+            DrawBackdrop(context, bounds.Size, projection, rows.Count);
             FindPhrasesShown(part, fromTick, toTick);
             DrawPhraseTints(context, session, projection);
             DrawFillBands(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawBeats(context, session, map, projection, fromTick, toTick, bounds.Size);
+            DrawOnsets(context, bounds.Size, projection, key);
             DrawTempoMarkers(context, session, projection, fromTick, toTick, bounds.Size);
+            DrawTempoProposal(context, session, projection, bounds.Size);
             DrawSections(context, session, projection, fromTick, toTick, bounds.Size);
             DrawStrikeBand(context, session, projection);
             DrawPhraseRail(context, session, part, rows, projection);
@@ -294,6 +366,15 @@ namespace ChartBuilder.Controls.Editing
 
             Focus();
             e.Pointer.Capture(this);
+
+            // A proposed beat's handle, while a proposed tempo map is reviewed, comes before the tools.
+            if (ProposalHandleAt(current.Position) is { } beat)
+            {
+                _proposalDrag = beat;
+                e.Handled = true;
+                return;
+            }
+
             _isPressed = true;
             _lastPoint = point;
 
@@ -312,6 +393,12 @@ namespace ChartBuilder.Controls.Editing
             base.OnPointerMoved(e);
             var position = e.GetPosition(this);
             _hover = position;
+            if (_proposalDrag is { } beat)
+            {
+                DragProposedBeat(beat, position);
+                return;
+            }
+
             if (_isPressed && Session is { } session && PointAt(position) is { } point)
             {
                 _lastPoint = point;
@@ -329,6 +416,13 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
+            if (_proposalDrag is not null)
+            {
+                _proposalDrag = null;
+                e.Pointer.Capture(null);
+                return;
+            }
+
             if (!_isPressed)
                 return;
             _isPressed = false;
@@ -342,6 +436,7 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
         {
             base.OnPointerCaptureLost(e);
+            _proposalDrag = null;
             if (!_isPressed)
                 return;
             _isPressed = false;
@@ -420,6 +515,7 @@ namespace ChartBuilder.Controls.Editing
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);
             var rows = PhraseRail.RowsOf(ChartInstruments.KindOf(key.Instrument));
+            Extras = ExtrasOf(Bounds.Size, key);
             var projection = Project(Bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
             double seconds = projection.SecondsAt(AlongOf(position));
             double tick = session.TickAt(seconds);
@@ -514,6 +610,8 @@ namespace ChartBuilder.Controls.Editing
                 editor.Session.Selection.Changed += OnRedraw;
                 editor.Session.Viewport.Changed += OnRedraw;
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
+                editor.Audio.Changed += OnRedraw;
+                editor.AudioAssist.PropertyChanged += OnAudioAssistChanged;
             }
 
             InvalidateVisual();
@@ -531,6 +629,8 @@ namespace ChartBuilder.Controls.Editing
                 editor.Session.Selection.Changed -= OnRedraw;
                 editor.Session.Viewport.Changed -= OnRedraw;
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;
+                editor.Audio.Changed -= OnRedraw;
+                editor.AudioAssist.PropertyChanged -= OnAudioAssistChanged;
             }
 
             _lane = null;
@@ -552,6 +652,13 @@ namespace ChartBuilder.Controls.Editing
         }
 
         private void OnRedraw(object? sender, EventArgs e) => InvalidateVisual();
+
+        // Find first downbeat's guess is drawn over the lanes.
+        private void OnAudioAssistChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(AudioAssistViewModel.Downbeat))
+                InvalidateVisual();
+        }
 
         private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -609,21 +716,249 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        private void DrawWaveform(DrawingContext context, Size size, LaneProjection projection)
+        /// <summary>
+        /// The room the lane's audio and onsets take: a column beside a highway's lanes when its audio is drawn there, and
+        /// a band of onsets for each band shown, three for drums (charter-spec C14 item 1).
+        /// </summary>
+        private LaneExtras ExtrasOf(Size size, ChartTrackKey key)
         {
-            if (_editor?.Playback.Waveform is not { } waveform)
+            if (_lane is not { Audio: { HasAudio: true } audio })
+                return default;
+            double beside = audio.Options.Placement == LaneAudioPlacement.Beside ? BesideSizeFor(size) : 0;
+            int bands = audio.Options.ShowOnsets ? (ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums ? 3 : 1) : 0;
+            return new LaneExtras(beside, bands);
+        }
+
+        /// <summary>
+        /// The lane's audio, as a waveform or a spectrogram (charter-spec C12, C13): faintly behind the lanes, or at full
+        /// strength beside them, and always in a timeline's strip. Pictures there was no time to draw this frame are drawn
+        /// once it's out.
+        /// </summary>
+        private void DrawBackdrop(DrawingContext context, Size size, LaneProjection projection, int phraseRows)
+        {
+            if (_lane?.Audio is not { Source: { } source } audio || _editor is not { } editor)
                 return;
-            var area = WaveformArea(size, projection);
-            if (area.Width <= 0 || area.Height <= 0)
-                return;
+
+            var full = audio.Options.Placement == LaneAudioPlacement.Beside ? BesideArea(size, projection, phraseRows) : StripArea(size, projection);
+            bool complete = true;
+            if (audio.IsSpectrogram)
+            {
+                // Its chunks near the middle of the view are computed first.
+                var spectrogram = editor.Audio.Analysis.SpectrogramFor(source, (projection.Start + projection.End) / 2);
+                if (spectrogram is not null)
+                {
+                    if (audio.Options.Placement == LaneAudioPlacement.Behind)
+                    {
+                        using (context.PushOpacity(SpectrogramBehindOpacity))
+                            complete &= DrawSpectrogram(context, audio, spectrogram, BehindArea(size, projection), projection);
+                    }
+
+                    complete &= DrawSpectrogram(context, audio, spectrogram, full, projection);
+                }
+            }
+            else
+            {
+                if (audio.Options.Placement == LaneAudioPlacement.Behind)
+                    complete &= DrawWaveform(context, editor, audio, source, BehindArea(size, projection), projection, full: false);
+                complete &= DrawWaveform(context, editor, audio, source, full, projection, full: true);
+            }
+
+            if (!complete)
+                PostRedraw();
+        }
+
+        /// <returns>Whether all of it was drawn as it is now.</returns>
+        private bool DrawSpectrogram(DrawingContext context, LaneAudioViewModel audio, Spectrogram spectrogram, Rect area, LaneProjection projection)
+        {
+            if (area.Width <= 1 || area.Height <= 1)
+                return true;
+            double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+            return SpectrogramPainter.Draw(context, spectrogram, area, View == LaneView.Highway, projection.Start, projection.End, projection.AlongOf,
+                audio.Options.FloorDb, audio.Options.CeilingDb, audio.Options.Band, scaling);
+        }
+
+        /// <returns>Whether all of it was drawn.</returns>
+        private bool DrawWaveform(DrawingContext context, ChartEditorViewModel editor, LaneAudioViewModel audio, AudioSource source, Rect area, LaneProjection projection, bool full)
+        {
+            if (area.Width <= 1 || area.Height <= 1)
+                return true;
+
+            var peak = full ? FullWaveformPeakBrush : WaveformPeakBrush;
+            var loud = full ? FullWaveformLoudBrush : WaveformLoudBrush;
+            double boost = Math.Pow(10, audio.Options.GainDb / 20);
+            bool vertical = View == LaneView.Highway;
 
             // The painter's position is evaluated at two times and must be linear, as the projection is.
             double scaling = 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
             using (context.PushClip(area))
             {
-                LaneWaveformPainter.Draw(context, waveform, area, isVertical: View == LaneView.Highway, projection.Start, projection.End, projection.AlongOf,
-                    WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), scaling);
+                if (audio.IsStereo && editor.Audio.Waveforms.Stereo(source) is var (left, right))
+                {
+                    // Left beside right across a highway; left above right along a timeline. Both at one gain, so they compare.
+                    double gain = LaneWaveformPainter.FullScaleGain(left.Peak >= right.Peak ? left : right) * boost;
+                    var first = vertical ? new Rect(area.X, area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y, area.Width, area.Height / 2);
+                    var second = vertical ? new Rect(area.X + (area.Width / 2), area.Y, area.Width / 2, area.Height) : new Rect(area.X, area.Y + (area.Height / 2), area.Width, area.Height / 2);
+                    bool done = LaneWaveformPainter.Draw(context, left, first, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true);
+                    done &= LaneWaveformPainter.Draw(context, right, second, vertical, projection.Start, projection.End, projection.AlongOf, peak, loud, gain, scaling, budgeted: true);
+                    context.DrawLine(ChannelPen, vertical ? first.TopRight : first.BottomLeft, vertical ? first.BottomRight : first.BottomRight);
+                    return done;
+                }
+
+                if (editor.Audio.Waveforms.Mono(source) is not { } waveform)
+                    return true;
+                return LaneWaveformPainter.Draw(context, waveform, area, vertical, projection.Start, projection.End, projection.AlongOf,
+                    peak, loud, LaneWaveformPainter.FullScaleGain(waveform) * boost, scaling, budgeted: true);
             }
+        }
+
+        /// <summary>
+        /// The onsets of the lane's audio, as ticks in a strip beside the lanes (charter-spec C14 item 1): one band for
+        /// guitar and bass, three for drums, kick nearest the lanes on a highway and at the top on a timeline.
+        /// </summary>
+        private void DrawOnsets(DrawingContext context, Size size, LaneProjection projection, ChartTrackKey key)
+        {
+            if (Extras.OnsetBands == 0 || _lane?.Audio is not { Source: { } source } audio || _editor is not { } editor)
+                return;
+
+            bool drums = Extras.OnsetBands > 1;
+            var onsets = editor.Audio.Analysis.OnsetsAt(source, drums, audio.Options.OnsetSensitivity);
+            if (onsets.Count == 0)
+                return;
+
+            var area = OnsetArea(size, projection);
+            double from = Math.Min(projection.Start, projection.End), to = Math.Max(projection.Start, projection.End);
+            int first = 0, last = onsets.Count;
+            while (first < last)
+            {
+                int mid = (first + last) >>> 1;
+                if (onsets[mid].Seconds < from)
+                    first = mid + 1;
+                else
+                    last = mid;
+            }
+
+            bool vertical = View == LaneView.Highway;
+            for (int i = first; i < onsets.Count && onsets[i].Seconds <= to; i++)
+            {
+                var onset = onsets[i];
+                int band = drums ? Math.Max(0, (int)onset.Band - 1) : 0;
+                int shade = onset.Strength >= 0.6f ? 2 : onset.Strength >= 0.2f ? 1 : 0;
+                var brush = OnsetBrushes[drums ? (int)onset.Band : 0][shade];
+                double along = projection.AlongOf(onset.Seconds);
+
+                // A highway's strip is left of the lanes, so its first band is the one beside them.
+                double near = vertical ? area.Right - ((band + 1) * OnsetBandSize) : area.Top + (band * OnsetBandSize);
+                var tick = vertical
+                    ? new Rect(near + 1, along - 0.75, OnsetBandSize - 2, 1.5)
+                    : new Rect(along - 0.75, near + 1, 1.5, OnsetBandSize - 2);
+                context.FillRectangle(brush, tick);
+            }
+        }
+
+        /// <summary>
+        /// The proposed tempo map being reviewed, as a ghost over the real one (charter-spec C14 item 4), and Find first
+        /// downbeat's guess (C14 item 5).
+        /// </summary>
+        private void DrawTempoProposal(DrawingContext context, EditorSession session, LaneProjection projection, Size size)
+        {
+            var labels = LabelsArea(size, projection);
+            bool highway = View == LaneView.Highway;
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            double from = Math.Min(projection.Start, projection.End), to = Math.Max(projection.Start, projection.End);
+
+            var proposal = session.TempoProposal;
+            if (proposal.IsActive)
+            {
+                var beats = proposal.Beats;
+                foreach (var (first, last) in proposal.Unsure)
+                {
+                    if (beats[last] < from || beats[first] > to)
+                        continue;
+                    double a = projection.AlongOf(beats[first]), b = projection.AlongOf(beats[last]);
+                    context.FillRectangle(UnsureBrush, Box(a, b, across1, across2));
+                    var text = Label(Strings.ProposalUnsureLabel, 10, UnsureLabelBrush, highway ? Math.Max(1, labels.Width - 4) : null);
+                    context.DrawText(text, highway ? new Point(labels.X + 2, Math.Max(a, b) - text.Height) : new Point(Math.Min(a, b) + 3, labels.Bottom - text.Height));
+                }
+
+                int perMeasure = Math.Max(1, proposal.BeatsPerMeasure);
+                int start = Math.Max(0, BeatMath.NearestIndex(beats, from, double.PositiveInfinity) - 1);
+                for (int i = start; i < beats.Count && beats[i] <= to + 1; i++)
+                {
+                    double along = projection.AlongOf(beats[i]);
+                    bool measure = ((i - proposal.Downbeat) % perMeasure + perMeasure) % perMeasure == 0;
+                    context.DrawLine(measure ? ProposalMeasurePen : ProposalBeatPen, At(along, across1), At(along, across2));
+
+                    // The handle, in the margin beside the lanes, that drags the beat.
+                    var handle = highway ? new Point(labels.Right - 7, along) : new Point(along, labels.Bottom - 7);
+                    using (context.PushTransform(Matrix.CreateTranslation(handle.X, handle.Y)))
+                        context.DrawGeometry(proposal.Pinned[i] ? ProposalHandleBrush : null, ProposalHandlePen, Diamond);
+                }
+            }
+
+            if (_editor?.AudioAssist.Downbeat is { } downbeat && downbeat >= from && downbeat <= to)
+            {
+                double along = projection.AlongOf(downbeat);
+                context.DrawLine(DownbeatPen, At(along, highway ? labels.Left : labels.Top), At(along, across2));
+                var text = Label(Strings.DownbeatGhostLabel, 10, DownbeatLabelBrush);
+                context.DrawText(text, highway ? new Point(labels.X + 2, along - text.Height - 2) : new Point(along + 3, labels.Y));
+            }
+        }
+
+        /// <summary>The proposed beat whose handle is under <paramref name="position"/>, or null.</summary>
+        private int? ProposalHandleAt(Point position)
+        {
+            if (Session is not { TempoProposal.IsActive: true } session || CurrentProjection() is not { } projection)
+                return null;
+            if (!LabelsArea(Bounds.Size, projection).Contains(position))
+                return null;
+            double along = AlongOf(position);
+            double seconds = projection.SecondsAt(along);
+            double tolerance = Math.Abs(projection.SecondsAt(along + HandlePixels) - seconds);
+            return session.TempoProposal.HitTest(seconds, tolerance);
+        }
+
+        /// <summary>Drags proposed beat <paramref name="beat"/> to the pointer, onto an onset of the mix near it with snap to onset on.</summary>
+        private void DragProposedBeat(int beat, Point position)
+        {
+            if (Session is not { } session || CurrentProjection() is not { } projection || _editor is not { } editor)
+                return;
+            double seconds = projection.SecondsAt(AlongOf(position));
+            if (session.SnapToOnset && editor.Audio.Mix is { } mix)
+            {
+                var onsets = editor.Audio.Analysis.OnsetTimesAt(mix, drumBands: true, OnsetSensitivity);
+                double reach = Math.Abs(projection.SecondsAt(AlongOf(position) + (HandlePixels * 2)) - seconds);
+                if (BeatMath.NearestIndex(onsets, seconds, reach) is >= 0 and var index)
+                    seconds = onsets[index];
+            }
+
+            session.TempoProposal.MoveBeat(beat, seconds);
+        }
+
+        /// <summary>The lane's layout as the canvas has it now, for the pointer; null without a part to show.</summary>
+        private LaneProjection? CurrentProjection()
+        {
+            if (Session is not { } session || _lane?.Track is not { } key || session.TrackOf(key) is null)
+                return null;
+            var slots = session.SlotsOf(key.Instrument, View);
+            var rows = PhraseRail.RowsOf(ChartInstruments.KindOf(key.Instrument));
+            Extras = ExtrasOf(Bounds.Size, key);
+            return Project(Bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
+        }
+
+        // The sensitivity a proposed beat snaps to the mix's onsets at: the editor's default.
+        private const double OnsetSensitivity = 0.5;
+
+        /// <summary>Draws the lane again once this frame is out, to carry on with pictures there was no time for.</summary>
+        private void PostRedraw()
+        {
+            if (_isRedrawPosted)
+                return;
+            _isRedrawPosted = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _isRedrawPosted = false;
+                InvalidateVisual();
+            }, DispatcherPriority.Background);
         }
 
         /// <summary>The selected span, and the loop region.</summary>

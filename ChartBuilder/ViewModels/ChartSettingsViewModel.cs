@@ -16,6 +16,7 @@ using ChartPacker.Core.Charts;
 using ChartPacker.UI.Services;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
 {
@@ -58,6 +59,7 @@ namespace ChartBuilder.ViewModels
         private readonly IConfirmationService _confirmations;
         private readonly EditableChart _chart;
         private readonly Action<IChartCommand> _apply;
+        private readonly Func<ITempoDetector?>? _detector;
         private readonly DispatcherTimer _typingTimer;
         private long _chartMicroseconds;
         private decimal _chartBpm;
@@ -73,7 +75,8 @@ namespace ChartBuilder.ViewModels
         /// <param name="confirmations">Asks before a part with notes is removed, and before a resolution change that moves items.</param>
         /// <param name="chart">The chart open in the Editor.</param>
         /// <param name="apply">Applies a change to <paramref name="chart"/>, as one undo step.</param>
-        public ChartSettingsViewModel(BuilderSettingsService settings, IConfirmationService confirmations, EditableChart chart, Action<IChartCommand> apply)
+        /// <param name="detector">Finds the tempo in the song's audio, for Detect from audio; asked each time, as the editor comes after.</param>
+        public ChartSettingsViewModel(BuilderSettingsService settings, IConfirmationService confirmations, EditableChart chart, Action<IChartCommand> apply, Func<ITempoDetector?>? detector = null)
         {
             ArgumentNullException.ThrowIfNull(chart);
             ArgumentNullException.ThrowIfNull(apply);
@@ -81,6 +84,7 @@ namespace ChartBuilder.ViewModels
             _confirmations = confirmations;
             _chart = chart;
             _apply = apply;
+            _detector = detector;
             _typingTimer = new DispatcherTimer(TypingDelay, DispatcherPriority.Background, (_, _) => ApplyNow());
             _typingTimer.Stop();
 
@@ -141,6 +145,52 @@ namespace ChartBuilder.ViewModels
         public partial string? Problem { get; private set; }
 
         public bool HasProblem => Problem is not null;
+
+        /// <summary>Whether the song has audio to detect the tempo from (charter-spec C1, Detect from audio).</summary>
+        public bool CanDetect => _detector?.Invoke()?.CanDetect == true;
+
+        /// <summary>Whether the tempo is being detected.</summary>
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(DetectFromAudioCommand))]
+        public partial bool IsDetecting { get; private set; }
+
+        /// <summary>Why Detect from audio set nothing, or null.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasDetectStatus))]
+        public partial string? DetectStatus { get; private set; }
+
+        public bool HasDetectStatus => DetectStatus is not null;
+
+        /// <summary>
+        /// Detect from audio (charter-spec C1): finds the tempo in the mix, sets the starting BPM to it as one undoable step,
+        /// and proposes a tempo map in the editor to review.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanDetectNow))]
+        private async Task DetectFromAudioAsync()
+        {
+            if (_detector?.Invoke() is not { CanDetect: true } detector)
+                return;
+
+            IsDetecting = true;
+            DetectStatus = null;
+            try
+            {
+                if (await detector.DetectAsync() is not { } bpm)
+                {
+                    DetectStatus = Strings.DetectFromAudioNoBeat;
+                    return;
+                }
+
+                Bpm = Math.Clamp((decimal)bpm, MinBpm, MaxBpm);
+                ApplyNow();
+            }
+            finally
+            {
+                IsDetecting = false;
+            }
+        }
+
+        private bool CanDetectNow() => !IsDetecting;
 
         /// <summary>
         /// Shows what the chart has, after it changed: by this, or by an undo or redo. A number still being typed is

@@ -52,10 +52,11 @@ namespace ChartBuilder.ViewModels
             var settings = services.Settings;
             Song = song;
             Song.DefaultCharter = settings.Settings.DefaultCharterName;
-            Playback = new PlaybackViewModel(song, services.OpenOutput, services.Latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), services.Calibrate);
+            Audio = new EditorAudio(song, settings.Settings, Messages);
+            Playback = new PlaybackViewModel(song, services.OpenOutput, services.Latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), services.Calibrate, Audio);
             _undo = new ChartUndoStack(song.Chart, startsSaved);
             _undo.Changed += OnChartChanged;
-            ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song.Chart, ApplyChartSettings);
+            ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song.Chart, ApplyChartSettings, () => Editor?.AudioAssist);
             PendingChanges = PendingChangesOf();
             Title = TitleOf();
             Playback.PropertyChanged += (_, e) =>
@@ -71,10 +72,12 @@ namespace ChartBuilder.ViewModels
             TimelineHeight = saved.EditorTimelineHeight;
             IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
-            Editor = new ChartEditorViewModel(song, _undo, Playback, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
+            Editor = new ChartEditorViewModel(song, _undo, Playback, Audio, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
+            Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);
             Sections = new SectionsViewModel(Editor);
             Findings.Changed += (_, _) => RefreshSaveState();
+            Editor.AudioAssist.ShowMessagesRequested += (_, _) => _ = ShowMessagesAsync();
             Song.Changed += OnSongChanged;
             _ = MeasureAudioAsync();
             StartAutosave();
@@ -124,6 +127,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The song's audio, and the timeline's playhead, waveform and beats.</summary>
         public PlaybackViewModel Playback { get; }
+
+        /// <summary>The song's audio as the lanes draw and analyse it (charter-spec C12–C14).</summary>
+        public EditorAudio Audio { get; }
 
         public string VersionText { get; } = string.Format(CultureInfo.CurrentCulture, Strings.VersionFormat, AppVersion.Semantic);
 
@@ -253,6 +259,7 @@ namespace ChartBuilder.ViewModels
             Findings.Dispose();
             Sections.Dispose();
             Editor.Dispose();
+            Audio.Dispose();
             Playback.Dispose();
             _songLock?.Dispose();
             _songLock = null;

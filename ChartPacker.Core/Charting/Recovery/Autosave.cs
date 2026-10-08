@@ -58,7 +58,10 @@ public static class Autosave
             [.. song.Reverted],
             song.Values,
             song.IsNew ? [.. song.Tracks.Where(t => t.IsStaged).Select(t => new NewChartStem(t.StagedSourcePath!, t.Stem))] : [],
-            title);
+            title)
+        {
+            DelayMs = song.DelayMs,
+        };
     }
 
     /// <summary>
@@ -72,6 +75,7 @@ public static class Autosave
         ArgumentNullException.ThrowIfNull(file);
         var onDisk = opened.HasChartFile ? opened.Chart.Parts.Select(p => p.Instrument).ToHashSet() : [];
         var song = EditorSong.Of(opened with { Load = RecoveryStore.ReadChart(file) }, onDisk);
+        song.DelayMs = file.Manifest.DelayMs;
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }
@@ -89,6 +93,7 @@ public static class Autosave
             .ToList();
         var song = EditorSong.New(RecoveryStore.ReadChart(file).Chart, tracks);
         song.Values = file.Manifest.Values;
+        song.DelayMs = file.Manifest.DelayMs;
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }

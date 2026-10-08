@@ -99,6 +99,19 @@ public sealed class StemPeaksCache
         return false;
     }
 
+    /// <summary>
+    /// The peaks kept for <paramref name="key"/>, if they were read at <paramref name="resolution"/>, and by channel when
+    /// <paramref name="needChannels"/> (<see cref="StemPeaks.HasChannels"/>).
+    /// </summary>
+    public bool TryGet(StemPeaksKey key, WaveformResolution resolution, bool needChannels, [MaybeNullWhen(false)] out StemPeaks peaks)
+    {
+        if (TryGet(key, resolution, out peaks) && (!needChannels || peaks.HasChannels))
+            return true;
+
+        peaks = null;
+        return false;
+    }
+
     /// <summary>Keeps <paramref name="peaks"/> for <paramref name="key"/>, in place of any it had. Peaks larger than the whole cache aren't kept.</summary>
     public void Add(StemPeaksKey key, StemPeaks peaks)
     {

@@ -1660,4 +1660,304 @@ Saving also makes these changes to song.ini:
     <value>Cancel</value>
     <comment>Ends Generate fills, adding nothing.</comment>
   </data>
+  <data name="SettingsCategoryAudioAssist" xml:space="preserve">
+    <value>Audio assist</value>
+  </data>
+  <data name="LaneBackdropLabel" xml:space="preserve">
+    <value>Lanes show</value>
+  </data>
+  <data name="LaneBackdropDescription" xml:space="preserve">
+    <value>Whether a lane draws its audio as a waveform or a spectrogram until it's switched, from the lane's audio button or with W.</value>
+  </data>
+  <data name="LaneBackdropKeywords" xml:space="preserve">
+    <value>waveform spectrogram audio lane behind beside</value>
+  </data>
+  <data name="SpectrogramBudgetLabel" xml:space="preserve">
+    <value>Spectrogram memory budget (MB)</value>
+  </data>
+  <data name="SpectrogramBudgetDescription" xml:space="preserve">
+    <value>How much memory every stem's spectrogram may take together. The stems used least recently are let go first. Spectrograms are never written to disk.</value>
+  </data>
+  <data name="SpectrogramBudgetKeywords" xml:space="preserve">
+    <value>spectrogram memory budget ram megabytes</value>
+  </data>
+  <data name="LaneAudioToolTip" xml:space="preserve">
+    <value>The lane's audio: waveform or spectrogram, and onsets</value>
+  </data>
+  <data name="LaneAudioSourceLabel" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="LaneAudioAutoFormat" xml:space="preserve">
+    <value>The part's own ({0})</value>
+  </data>
+  <data name="LaneAudioMix" xml:space="preserve">
+    <value>Mix</value>
+  </data>
+  <data name="LaneShowLabel" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="LaneShowWaveform" xml:space="preserve">
+    <value>Waveform</value>
+  </data>
+  <data name="LaneShowSpectrogram" xml:space="preserve">
+    <value>Spectrogram</value>
+  </data>
+  <data name="LaneShowToolTip" xml:space="preserve">
+    <value>Waveform or spectrogram (W)</value>
+  </data>
+  <data name="LanePlacementLabel" xml:space="preserve">
+    <value>Placement</value>
+  </data>
+  <data name="LanePlacementBehind" xml:space="preserve">
+    <value>Behind</value>
+  </data>
+  <data name="LanePlacementBeside" xml:space="preserve">
+    <value>Beside</value>
+  </data>
+  <data name="LaneStereo" xml:space="preserve">
+    <value>Stereo</value>
+  </data>
+  <data name="LaneGainLabel" xml:space="preserve">
+    <value>Gain</value>
+  </data>
+  <data name="LaneGainFormat" xml:space="preserve">
+    <value>{0:+0;-0;0} dB</value>
+  </data>
+  <data name="LaneGainReset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="LaneBandLabel" xml:space="preserve">
+    <value>Band</value>
+  </data>
+  <data name="SpectrogramBandFull" xml:space="preserve">
+    <value>Full</value>
+  </data>
+  <data name="SpectrogramBandKick" xml:space="preserve">
+    <value>Kick (30–120 Hz)</value>
+  </data>
+  <data name="SpectrogramBandSnare" xml:space="preserve">
+    <value>Snare (150–300 Hz, 2–5 kHz)</value>
+  </data>
+  <data name="SpectrogramBandCymbals" xml:space="preserve">
+    <value>Cymbals (6–16 kHz)</value>
+  </data>
+  <data name="SpectrogramBandBass" xml:space="preserve">
+    <value>Bass (40–400 Hz)</value>
+  </data>
+  <data name="LaneContrastLabel" xml:space="preserve">
+    <value>Contrast</value>
+  </data>
+  <data name="LaneContrastFormat" xml:space="preserve">
+    <value>{0:0} to {1:0} dB</value>
+  </data>
+  <data name="LaneContrastFloorLabel" xml:space="preserve">
+    <value>Floor</value>
+  </data>
+  <data name="LaneContrastCeilingLabel" xml:space="preserve">
+    <value>Ceiling</value>
+  </data>
+  <data name="LaneShowOnsets" xml:space="preserve">
+    <value>Show onsets</value>
+  </data>
+  <data name="LaneSensitivityLabel" xml:space="preserve">
+    <value>Onset sensitivity</value>
+  </data>
+  <data name="LaneSensitivityFormat" xml:space="preserve">
+    <value>{0:0%}</value>
+  </data>
+  <data name="LaneNoAudio" xml:space="preserve">
+    <value>The song has no audio to show.</value>
+  </data>
+  <data name="SpectrogramOverBudgetFormat" xml:space="preserve">
+    <value>The spectrogram of {0} needs {1:0} MB, more than the whole spectrogram memory budget. Raise the budget in Settings to see it.</value>
+  </data>
+  <data name="OnsetsFindingFormat" xml:space="preserve">
+    <value>Finding onsets in {0}…</value>
+  </data>
+  <data name="OnsetsFoundFormat" xml:space="preserve">
+    <value>Found the onsets in {0}.</value>
+  </data>
+  <data name="OnsetsFailedFormat" xml:space="preserve">
+    <value>The onsets in {0} can't be found: {1}</value>
+  </data>
+  <data name="SnapToOnsetLabel" xml:space="preserve">
+    <value>Snap to onset</value>
+  </data>
+  <data name="SnapToOnsetToolTip" xml:space="preserve">
+    <value>Snap to onset (O): notes placed and moved go to the nearest onset within half a grid step</value>
+  </data>
+  <data name="SnapToOnsetOnStatus" xml:space="preserve">
+    <value>Snap to onset is on: notes go to the nearest onset within half a grid step.</value>
+  </data>
+  <data name="SnapToOnsetOffStatus" xml:space="preserve">
+    <value>Snap to onset is off: notes go to the grid.</value>
+  </data>
+  <data name="NudgeToOnsetsButton" xml:space="preserve">
+    <value>Nudge</value>
+  </data>
+  <data name="NudgeToOnsetsToolTip" xml:space="preserve">
+    <value>Nudge to onsets (Shift+O): move the selected notes to their nearest onsets</value>
+  </data>
+  <data name="NudgeNothingSelected" xml:space="preserve">
+    <value>Select the notes to nudge to their onsets first.</value>
+  </data>
+  <data name="NudgeNoOnsets" xml:space="preserve">
+    <value>There are no onsets to nudge to yet: they're still being found, or the lane has no audio.</value>
+  </data>
+  <data name="NudgeNothingMovedFormat" xml:space="preserve">
+    <value>Nothing was nudged: none of the {0} chords has an onset of its own within half a grid step.</value>
+  </data>
+  <data name="NudgeReportFormat" xml:space="preserve">
+    <value>Nudged {0} chords to their onsets; the largest move was {1:0.0} ms. {2} stayed where they were.</value>
+  </data>
+  <data name="NudgeLineFormat" xml:space="preserve">
+    <value>{0}: {1:+0.0;-0.0;0.0} ms</value>
+  </data>
+  <data name="NudgeNoOnsetLineFormat" xml:space="preserve">
+    <value>{0}: no onset within half a grid step, so it stayed</value>
+  </data>
+  <data name="NudgeBlockedLineFormat" xml:space="preserve">
+    <value>{0}: another note was nearer the onset, or in the way, so it stayed</value>
+  </data>
+  <data name="AudioAssistGroupLabel" xml:space="preserve">
+    <value>Audio assist</value>
+  </data>
+  <data name="PendingReasonDelayFromDownbeat" xml:space="preserve">
+    <value>Find first downbeat: the chart starts on the downbeat</value>
+  </data>
+  <data name="ProposeTempoMapButton" xml:space="preserve">
+    <value>Propose tempo map…</value>
+  </data>
+  <data name="ProposeTempoMapToolTip" xml:space="preserve">
+    <value>Propose a tempo map from the audio, to review over the real one</value>
+  </data>
+  <data name="ProposeTempoMapHeading" xml:space="preserve">
+    <value>Propose a tempo map</value>
+  </data>
+  <data name="ProposalListenLabel" xml:space="preserve">
+    <value>Listen to</value>
+  </data>
+  <data name="ProposalListenMix" xml:space="preserve">
+    <value>The whole mix</value>
+  </data>
+  <data name="ProposalListenLane" xml:space="preserve">
+    <value>The lane in focus</value>
+  </data>
+  <data name="ProposalAnchorEveryLabel" xml:space="preserve">
+    <value>Anchor every (measures)</value>
+  </data>
+  <data name="ProposalAnchorEveryToolTip" xml:space="preserve">
+    <value>When it's accepted, anchor a tempo marker every this many measures; 0 for none</value>
+  </data>
+  <data name="ProposalMergeLabel" xml:space="preserve">
+    <value>Merge within (ms)</value>
+  </data>
+  <data name="ProposalMergeToolTip" xml:space="preserve">
+    <value>Beats within this of their segment's tempo share its marker; 0 puts a marker on every beat</value>
+  </data>
+  <data name="ProposalScopeLabel" xml:space="preserve">
+    <value>Over</value>
+  </data>
+  <data name="ProposalScopeWholeSong" xml:space="preserve">
+    <value>The whole song</value>
+  </data>
+  <data name="ProposalScopeSelectionFormat" xml:space="preserve">
+    <value>The selection, {0} to {1}</value>
+  </data>
+  <data name="ProposalGenerate" xml:space="preserve">
+    <value>Propose</value>
+  </data>
+  <data name="ProposalFinding" xml:space="preserve">
+    <value>Finding the beat…</value>
+  </data>
+  <data name="ProposalNoBeats" xml:space="preserve">
+    <value>No steady beat was found to propose a tempo map from.</value>
+  </data>
+  <data name="ProposalRunFormat" xml:space="preserve">
+    <value>Proposed tempo map: {0} beats, about {1} BPM, {2} unsure stretches, downbeat on beat {3}.</value>
+  </data>
+  <data name="ProposalMayBeHalf" xml:space="preserve">
+    <value>It may be at half the song's tempo: Double it if so.</value>
+  </data>
+  <data name="ProposalRunHint" xml:space="preserve">
+    <value>Drag a beat's handle to adjust it.</value>
+  </data>
+  <data name="ProposalDouble" xml:space="preserve">
+    <value>Double</value>
+  </data>
+  <data name="ProposalHalve" xml:space="preserve">
+    <value>Halve</value>
+  </data>
+  <data name="ProposalDownbeatEarlierToolTip" xml:space="preserve">
+    <value>Downbeat a beat earlier</value>
+  </data>
+  <data name="ProposalDownbeatLaterToolTip" xml:space="preserve">
+    <value>Downbeat a beat later</value>
+  </data>
+  <data name="ProposalReset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="ProposalAccept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="ProposalAcceptToolTip" xml:space="preserve">
+    <value>Write the proposed tempo map, as one undoable step</value>
+  </data>
+  <data name="ProposalDiscard" xml:space="preserve">
+    <value>Discard</value>
+  </data>
+  <data name="ProposalAcceptedFormat" xml:space="preserve">
+    <value>The proposed tempo map is written: {0} tempo markers, {1} anchors.</value>
+  </data>
+  <data name="ProposalUnsureLabel" xml:space="preserve">
+    <value>Unsure: map by hand</value>
+  </data>
+  <data name="FindDownbeatButton" xml:space="preserve">
+    <value>Find first downbeat</value>
+  </data>
+  <data name="FindDownbeatToolTip" xml:space="preserve">
+    <value>Find where measure 1 most likely starts, to start the chart there</value>
+  </data>
+  <data name="DownbeatFoundFormat" xml:space="preserve">
+    <value>Measure 1 most likely starts at {0}.</value>
+  </data>
+  <data name="DownbeatNotFound" xml:space="preserve">
+    <value>No downbeat was found: the song has no steady beat to count from.</value>
+  </data>
+  <data name="DownbeatLeadIn" xml:space="preserve">
+    <value>Lead-in</value>
+  </data>
+  <data name="DownbeatLeadInToolTip" xml:space="preserve">
+    <value>Set the first tempo so measure 2 starts on the downbeat, leaving the delay alone</value>
+  </data>
+  <data name="DownbeatDelay" xml:space="preserve">
+    <value>Delay</value>
+  </data>
+  <data name="DownbeatDelayToolTip" xml:space="preserve">
+    <value>Set the song's delay so the chart starts on the downbeat (a pending change)</value>
+  </data>
+  <data name="DownbeatDismiss" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="DownbeatGhostLabel" xml:space="preserve">
+    <value>Downbeat?</value>
+  </data>
+  <data name="DownbeatDelaySetFormat" xml:space="preserve">
+    <value>The delay is set to {0} ms, so the chart starts on the downbeat. Revert it in Pending changes to take it back.</value>
+  </data>
+  <data name="DetectFromAudioButton" xml:space="preserve">
+    <value>Detect from audio</value>
+  </data>
+  <data name="DetectFromAudioToolTip" xml:space="preserve">
+    <value>Find the tempo in the song's audio, set the starting BPM, and propose a tempo map to review</value>
+  </data>
+  <data name="DetectFromAudioNoAudioToolTip" xml:space="preserve">
+    <value>The song has no audio to detect the tempo from.</value>
+  </data>
+  <data name="DetectFromAudioNoBeat" xml:space="preserve">
+    <value>No steady beat was found in the audio.</value>
+  </data>
+  <data name="SpectrogramBudgetFullFormat" xml:space="preserve">
+    <value>The spectrogram of {0} ({1:0} MB) doesn't fit in the spectrogram memory budget beside the ones shown. Raise the budget in Settings, or show fewer spectrograms.</value>
+  </data>
 </root>

@@ -57,6 +57,7 @@ namespace ChartBuilder.ViewModels
             PendingChangeReason.DrumLayout => Strings.PendingReasonDrumLayout,
             PendingChangeReason.ImportSettings => Strings.PendingReasonImportSettings,
             PendingChangeReason.MultiplierNote => Strings.PendingReasonMultiplierNote,
+            PendingChangeReason.DelayFromDownbeat => Strings.PendingReasonDelayFromDownbeat,
             _ => "",
         };
     }

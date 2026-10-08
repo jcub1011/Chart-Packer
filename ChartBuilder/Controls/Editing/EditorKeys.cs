@@ -112,6 +112,17 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.Minus or PhysicalKey.NumPadSubtract when plain:
                     lane.ZoomBy(1.25);
                     return true;
+                // The lane's audio as a waveform or a spectrogram (charter-spec C13 item 5).
+                case PhysicalKey.W when plain:
+                    lane.Audio.ToggleBackdrop();
+                    return true;
+                // Snap to onset, and Nudge to onsets (charter-spec C14 items 2 and 3).
+                case PhysicalKey.O when plain:
+                    editor.AudioAssist.ToggleSnapToOnset();
+                    return true;
+                case PhysicalKey.O when shift && !ctrl && !alt:
+                    editor.AudioAssist.Nudge();
+                    return true;
                 case PhysicalKey.V when plain:
                     lane.ToggleView();
                     canvas.FocusSibling();

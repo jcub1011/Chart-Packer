@@ -41,11 +41,6 @@ namespace ChartBuilder.ViewModels
         // How often the position shown as text follows the playhead while playing.
         private static readonly TimeSpan PositionInterval = TimeSpan.FromMilliseconds(50);
 
-        // How often the waveform is drawn again as its peaks are read.
-        private static readonly TimeSpan PeaksProgressInterval = TimeSpan.FromMilliseconds(250);
-
-        private static readonly WaveformResolution PeaksResolution = WaveformResolution.Medium;
-
         private readonly EditorSong? _song;
         private readonly Func<int, IAudioOutput>? _openOutput;
         private readonly AudioLatencyService? _latency;
@@ -54,10 +49,7 @@ namespace ChartBuilder.ViewModels
         private readonly IReadOnlyList<SongTrack> _tracks;
         private readonly DispatcherTimer _timer;
         private readonly CancellationTokenSource _cancel = new();
-
-        // The peaks read so far, by track, from the reading threads; under the lock.
-        private readonly Dictionary<SongTrack, StemPeaks> _peaks = [];
-        private readonly Lock _peaksLock = new();
+        private readonly EditorAudio? _editorAudio;
 
         private SongAudio? _audio;
         private StemPlayer? _player;
@@ -80,7 +72,8 @@ namespace ChartBuilder.ViewModels
         /// <param name="latency">The audio/visual latency, which follows the output's device.</param>
         /// <param name="volumes">The metronome's and the hit sounds' volumes, in percent, as Settings has them now.</param>
         /// <param name="calibrate">Opens the calibration tool, from the transport bar's latency (charter-spec C11).</param>
-        public PlaybackViewModel(EditorSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency, Func<(int Metronome, int Hits)>? volumes = null, Action? calibrate = null)
+        /// <param name="editorAudio">Where the mix's waveform comes from, as its stems' peaks are read.</param>
+        public PlaybackViewModel(EditorSong? song, Func<int, IAudioOutput>? openOutput, AudioLatencyService? latency, Func<(int Metronome, int Hits)>? volumes = null, Action? calibrate = null, EditorAudio? editorAudio = null)
         {
             _song = song;
             _openOutput = openOutput;
@@ -93,6 +86,9 @@ namespace ChartBuilder.ViewModels
             LengthSeconds = PlaceholderLengthSeconds;
             if (latency is not null)
                 latency.Changed += OnLatencyChanged;
+            _editorAudio = editorAudio;
+            if (editorAudio is not null)
+                editorAudio.Waveforms.Changed += OnWaveformsChanged;
         }
 
         /// <summary>Raised when the playhead is moved by hand, on the timeline, rather than by playing or by <see cref="SeekTo"/>.</summary>
@@ -298,8 +294,6 @@ namespace ChartBuilder.ViewModels
 
                 if (audio.Tracks.FirstOrDefault(t => t.Error is not null) is { } failed)
                     Message = string.Format(CultureInfo.CurrentCulture, Strings.AudioTrackFailedFormat, failed.Track.StoredName, failed.Error);
-
-                StartPeaks(_song.Entry, [.. audio.Tracks.Where(t => t.Source is not null).Select(t => t.Track)], token);
             }
             catch (OperationCanceledException)
             {
@@ -404,6 +398,8 @@ namespace ChartBuilder.ViewModels
             _cancel.Cancel();
             if (_latency is not null)
                 _latency.Changed -= OnLatencyChanged;
+            if (_editorAudio is not null)
+                _editorAudio.Waveforms.Changed -= OnWaveformsChanged;
 
             // The player before the sources it reads.
             _followingDevice?.Dispose();
@@ -502,79 +498,11 @@ namespace ChartBuilder.ViewModels
             return beats;
         }
 
-        /// <summary>Reads the tracks' peaks in the background, from the cache where it has them, and draws the mix as they come.</summary>
-        private void StartPeaks(SongEntry? entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken) =>
-            _ = Task.Run(() => ReadPeaks(entry, tracks, cancellationToken), cancellationToken);
-
-        private void ReadPeaks(SongEntry? entry, IReadOnlyList<SongTrack> tracks, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // Each key is taken before its file is read, so what's kept under it is never older than the file it names.
-                var keys = new Dictionary<SongTrack, StemPeaksKey?>();
-                foreach (var track in tracks)
-                {
-                    var key = StemPeaksCache.KeyOf(entry, track);
-                    if (key is { } found && StemPeaksCache.Shared.TryGet(found, PeaksResolution, out var cached))
-                        ShowPeaks(track, cached, cancellationToken);
-                    else
-                        keys[track] = key;
-                }
-
-                if (keys.Count == 0)
-                    return;
-
-                // Separate from the player's own sources, which are for the audio thread alone.
-                using var audio = SongAudio.Open(entry, [.. keys.Keys], cancellationToken);
-                ChunkedPeaksRead.Read(
-                    audio,
-                    PeaksResolution,
-                    completed: (opened, peaks) =>
-                    {
-                        ShowPeaks(opened.Track, peaks, cancellationToken);
-                        if (keys[opened.Track] is { } key)
-                            StemPeaksCache.Shared.Add(key, peaks);
-                    },
-                    failed: opened => ForgetPeaks(opened.Track, cancellationToken),
-                    progress: (opened, partial) => ShowPeaks(opened.Track, partial, cancellationToken),
-                    PeaksProgressInterval,
-                    cancellationToken);
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException or UnauthorizedAccessException or InvalidDataException)
-            {
-                // No waveform; the song still plays.
-                if (ex is not OperationCanceledException)
-                    Trace.TraceWarning($"Reading the waveform failed: {ex.Message}");
-            }
-        }
-
-        private void ShowPeaks(SongTrack track, StemPeaks peaks, CancellationToken cancellationToken)
-        {
-            lock (_peaksLock)
-                _peaks[track] = peaks;
-            PostWaveform(cancellationToken);
-        }
-
-        private void ForgetPeaks(SongTrack track, CancellationToken cancellationToken)
-        {
-            lock (_peaksLock)
-                _peaks.Remove(track);
-            PostWaveform(cancellationToken);
-        }
-
         /// <summary>Draws the mix of the peaks read so far, the preview left out as it's muted.</summary>
-        private void PostWaveform(CancellationToken cancellationToken)
+        private void OnWaveformsChanged(object? sender, EventArgs e)
         {
-            List<AudibleStem> stems;
-            lock (_peaksLock)
-                stems = [.. _peaks.Select(p => new AudibleStem(p.Value, IsMuted: p.Key.Stem == AudioStems.Preview, IsSolo: false))];
-
-            var waveform = WaveformPeaks.Mix(stems);
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (!cancellationToken.IsCancellationRequested)
-                    Waveform = waveform;
-            });
+            if (!_disposed && _editorAudio is { Mix: { } mix } audio)
+                Waveform = audio.Waveforms.Mono(mix);
         }
 
         /// <summary>A time as m:ss.f, or h:mm:ss.f from an hour, e.g. 3:05.2.</summary>

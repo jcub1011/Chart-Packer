@@ -17,6 +17,7 @@ public sealed class EditorSong
     private readonly HashSet<string> _reverted = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<KeyValuePair<string, string>> _values = [];
     private long? _audioLengthMs;
+    private long? _delayMs;
     private string _defaultCharter = "";
 
     private EditorSong(OpenedSong? opened, EditableChart chart, IReadOnlyList<SongTrack> tracks, IReadOnlySet<ChartInstrument> loadedParts)
@@ -88,6 +89,22 @@ public sealed class EditorSong
         }
     }
 
+    /// <summary>
+    /// The <c>delay</c> Find first downbeat set, in milliseconds, so the chart starts on the downbeat (charter-spec C14
+    /// item 5); null for none. It's a pending change, which Revert takes back, and is cleared once saved.
+    /// </summary>
+    public long? DelayMs
+    {
+        get => _delayMs;
+        set
+        {
+            if (_delayMs == value)
+                return;
+            _delayMs = value;
+            OnChanged();
+        }
+    }
+
     /// <summary>The Default charter name setting, which fills an empty <c>charter</c>.</summary>
     public string DefaultCharter
     {
@@ -130,6 +147,7 @@ public sealed class EditorSong
         DefaultCharter = _defaultCharter,
         Import = Import,
         Values = _values,
+        DelayMs = _delayMs,
     };
 
     /// <summary>Every change the chart and the song call for, reverted or not, in the order they're listed.</summary>
@@ -181,6 +199,7 @@ public sealed class EditorSong
         Opened = saved;
         LoadedParts = savedParts;
         _values = [];
+        _delayMs = null;
         OnChanged();
     }
 

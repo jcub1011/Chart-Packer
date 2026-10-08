@@ -211,6 +211,46 @@ public static class TempoMapEdits
         return Fitted(chart, tempos, [.. map.Anchors], fromTick, absorbFrom: fromTick + 1, delay, keepTimes, blocked);
     }
 
+    /// <summary>
+    /// Starts measure 2 on the downbeat at <paramref name="downbeatAudio"/> seconds of audio (charter-spec C14 item 5,
+    /// lead-in): the song's first tempo is set so measure 1 lasts until then, and the delay is left alone. Measure 1's other
+    /// unanchored markers go, measure 2 keeps the tempo that was in force there, and a later anchor stays where it is.
+    /// </summary>
+    /// <remarks>
+    /// It's refused when the downbeat isn't after the chart's start (Delay is the way then), when measure 1 would be faster
+    /// than 1000 BPM or slower than 10, or when an anchor inside measure 1 would move. An anchor on measure 2's line is
+    /// blocked, with the offer to unanchor it, as any tempo edit that can't keep one is.
+    /// </remarks>
+    public static TempoEdit LeadIn(EditableChart chart, double downbeatAudio, TimeSpan delay, bool keepTimes, BlockedAnchor blocked = BlockedAnchor.Refuse)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        var map = chart.TempoMap;
+        int resolution = map.Resolution;
+        double seconds = downbeatAudio - delay.TotalSeconds;
+        if (seconds <= 0.001)
+            return TempoEdit.Refused("The downbeat is at or before the chart's start, so measure 1 can't lead in to it: use Delay to start the chart on it instead.");
+
+        var current = map.ToTempoMap();
+        var first = current.TimeSignatures[0];
+        long measure2 = Math.Max(1, first.Numerator * resolution * 4L / first.Denominator);
+        long tempo = MicrosecondsFor(seconds, measure2, resolution);
+        double bpm = tempo > 0 ? 60_000_000.0 / tempo : 0;
+        if (bpm is < NewChartSettings.MinBpm or > NewChartSettings.MaxBpm)
+            return TempoEdit.Refused(Invariant($"Measure 1 would have to be {bpm:0.###} BPM to lead in to the downbeat: use Delay to start the chart on it instead."));
+        if (map.Anchors.Any(a => a.Tick > 0 && a.Tick < measure2))
+            return TempoEdit.Refused("An anchored marker inside measure 1 would move: unanchor it first.");
+
+        long measure2Tempo = TempoAt(current, measure2);
+        var tempos = map.Tempos.AsSpan().ToArray()
+            .Where(t => t.Tick == 0 || t.Tick >= measure2)
+            .Select(t => t.Tick == 0 ? t with { MicrosecondsPerQuarter = tempo } : t)
+            .ToList();
+        if (tempos.All(t => t.Tick != measure2))
+            tempos.Add(new TempoChange(measure2, measure2Tempo));
+        tempos.Sort(static (a, b) => a.Tick.CompareTo(b.Tick));
+        return Fitted(chart, tempos, [.. map.Anchors], 0, absorbFrom: 1, delay, keepTimes, blocked);
+    }
+
     /// <summary>The tick of the segment in force at <paramref name="tick"/>: the last tempo marker at or before it.</summary>
     public static long SegmentAt(EditableTempoMap map, long tick)
     {
@@ -233,7 +273,7 @@ public static class TempoMapEdits
         return TempoAt(map.ToTempoMap(), tick);
     }
 
-    private static long TempoAt(TempoMap map, long tick)
+    internal static long TempoAt(TempoMap map, long tick)
     {
         var tidied = map.Tempos;
         long tempo = tidied[0].MicrosecondsPerQuarter;
@@ -252,7 +292,7 @@ public static class TempoMapEdits
     /// <paramref name="edited"/> kept where it is by the last segment before it that starts at or after
     /// <paramref name="absorbFrom"/>.
     /// </summary>
-    private static TempoEdit Fitted(EditableChart chart, List<TempoChange> tempos, List<TempoAnchor> anchors, long edited, long absorbFrom, TimeSpan delay, bool keepTimes, BlockedAnchor blocked)
+    internal static TempoEdit Fitted(EditableChart chart, List<TempoChange> tempos, List<TempoAnchor> anchors, long edited, long absorbFrom, TimeSpan delay, bool keepTimes, BlockedAnchor blocked)
     {
         var map = chart.TempoMap;
         var anchor = anchors.Where(a => a.Tick > edited).OrderBy(static a => a.Tick).Cast<TempoAnchor?>().FirstOrDefault();
@@ -345,7 +385,7 @@ public static class TempoMapEdits
     }
 
     /// <summary>The tempo that makes <paramref name="ticks"/> last <paramref name="seconds"/>, in whole microseconds per quarter note.</summary>
-    private static long MicrosecondsFor(double seconds, long ticks, int resolution)
+    internal static long MicrosecondsFor(double seconds, long ticks, int resolution)
     {
         if (ticks <= 0 || !(seconds > 0))
             return 0;
@@ -353,7 +393,7 @@ public static class TempoMapEdits
         return tempo > long.MaxValue ? long.MaxValue : (long)tempo;
     }
 
-    private static long Microseconds(double seconds) => (long)Math.Round(seconds * 1_000_000, MidpointRounding.AwayFromZero);
+    internal static long Microseconds(double seconds) => (long)Math.Round(seconds * 1_000_000, MidpointRounding.AwayFromZero);
 
     private static string Invariant(FormattableString text) => FormattableString.Invariant(text);
 }

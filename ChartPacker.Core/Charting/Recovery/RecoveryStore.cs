@@ -40,6 +40,9 @@ public sealed record RecoveryManifest(
 
     /// <summary>Whether it's a new chart that was never saved, which has no song to be opened from.</summary>
     public bool IsUntitled => SongPath is null;
+
+    /// <summary>The delay Find first downbeat set and the song hadn't saved yet, in milliseconds; null for none.</summary>
+    public long? DelayMs { get; init; }
 }
 
 /// <summary>A recovery file found in the store.</summary>
@@ -256,6 +259,8 @@ public sealed class RecoveryStore(string folder)
             ["stems"] = new JsonArray([.. m.Stems.Select(s => (JsonNode)new JsonArray(JsonValue.Create(s.SourcePath), JsonValue.Create(s.Stem)))]),
             ["title"] = m.Title,
         };
+        if (m.DelayMs is { } delay)
+            json["delayMs"] = delay;
         if (m.ChartFile is { } chart)
         {
             json["chartFile"] = new JsonObject
@@ -297,7 +302,10 @@ public sealed class RecoveryStore(string folder)
                 [.. (json["reverted"] as JsonArray ?? []).Select(k => k!.GetValue<string>())],
                 [.. Pairs(json["values"]).Select(p => KeyValuePair.Create(p.Key, p.Value ?? ""))],
                 [.. (json["stems"] as JsonArray ?? []).OfType<JsonArray>().Select(s => new NewChartStem(s[0]!.GetValue<string>(), s[1]!.GetValue<string>()))],
-                json["title"]?.GetValue<string>() ?? "");
+                json["title"]?.GetValue<string>() ?? "")
+            {
+                DelayMs = json["delayMs"]?.GetValue<long>(),
+            };
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException or NullReferenceException or JsonException)
         {

@@ -32,6 +32,37 @@ public sealed partial class EditorTools
 
     private SnapGrid Snap => _session.Snap;
 
+    /// <summary>
+    /// Where a note placed or moved to <paramref name="tick"/> of <paramref name="key"/>'s track goes: the nearest onset
+    /// within half a grid step with snap to onset on, otherwise the grid (charter-spec C14 item 2).
+    /// </summary>
+    private long SnapTick(double tick, ChartTrackKey key)
+    {
+        if (_session.SnapToOnset && _session.Onsets?.OnsetsFor(key) is { Count: > 0 } onsets
+            && OnsetSnap.Nearest(tick, onsets, Map, _session.Delay.TotalSeconds, Snap) is { } onset)
+            return onset;
+        return Snap.Nearest(tick, Map);
+    }
+
+    /// <summary>
+    /// Moves the selected notes to their nearest onsets, chord by chord, as one step (charter-spec C14 item 3), and keeps
+    /// them selected where they land; chords with no onset near stay. Null when nothing is selected or there are no
+    /// onsets.
+    /// </summary>
+    public NudgePlan? NudgeSelectionToOnsets()
+    {
+        if (_session.Selection.Track is not { } key || _session.Selection.Notes is not { Count: > 0 } notes)
+            return null;
+        if (_session.Onsets?.OnsetsFor(key) is not { Count: > 0 } onsets)
+            return null;
+
+        Cancel();
+        var plan = OnsetNudge.Plan(_session, key, notes, onsets);
+        if (plan.Command is { } command && _session.Execute(command))
+            _session.Selection.Select(key, plan.Notes);
+        return plan;
+    }
+
     private TempoMap Map => _session.TempoMap;
 
     /// <summary>
@@ -679,7 +710,7 @@ public sealed partial class EditorTools
         int? lane = shift ? ApartLane(point.Slots) : point.Lane;
         if (lane is not { } shown)
             return null;
-        long tick = Snap.Nearest(point.Tick, Map);
+        long tick = SnapTick(point.Tick, point.Track);
 
         // The pad drawn in the column clicked: inside a disco flip section, yellow's column places red (C6 item 7).
         int placed = _session.StoredLane(point.Track, tick, shown);
@@ -948,7 +979,8 @@ public sealed partial class EditorTools
 
         public override void Drag(ChartPoint point)
         {
-            long tick = Tools.Snap.Nearest(_grabbed.Tick + (point.Tick - _pressed.Tick), Tools.Map);
+            // The note grabbed goes to the grid or an onset; the others keep their places around it.
+            long tick = Tools.SnapTick(_grabbed.Tick + (point.Tick - _pressed.Tick), _track);
             long tickDelta = Math.Max(tick - _grabbed.Tick, -_notes.Min(static n => n.Tick));
             int apart = ApartLane(point.Slots);
             int wanted = point.Lane is { } lane && _pressed.Lane is { } from && lane != apart && from != apart

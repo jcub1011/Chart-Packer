@@ -107,12 +107,14 @@ public sealed class RemoveNotes : ChartCommand
 /// moves into the open or kick lane, as that would make it another kind of note.
 /// </summary>
 /// <remarks>
-/// A chord's forcing and tap belong to its tick. When every note of a chord moves, its marking moves with them, added to
-/// whatever the chord they land on is marked; when only some move, the marking stays with those left.
+/// A chord's forcing and tap belong to its tick. When every note of a chord moves by the same number of ticks, its marking
+/// moves with them, added to whatever the chord they land on is marked; when only some move, or they move apart, the
+/// marking stays with the tick.
 /// </remarks>
 public sealed class MoveNotes : ChartCommand
 {
     private readonly EditableNote[] _notes;
+    private readonly long[] _tickDeltas;
     private readonly List<(long Tick, ChordFlags Previous)> _flags = [];
     private EditableNote[] _moved = [];
 
@@ -125,8 +127,24 @@ public sealed class MoveNotes : ChartCommand
         Difficulty = difficulty;
         _notes = AtLeastOne(notes, nameof(notes));
         NoteEdits.CheckDistinct(_notes, nameof(notes));
+        _tickDeltas = [.. _notes.Select(_ => tickDelta)];
         TickDelta = tickDelta;
         LaneDelta = laneDelta;
+    }
+
+    /// <summary>Moves each note in time by a number of ticks of its own, as Nudge to onset does (charter-spec C14 item 3).</summary>
+    /// <param name="moves">The notes, at least one, each exactly as the track has it, and how many ticks later each moves.</param>
+    public MoveNotes(ChartInstrument part, ChartDifficulty difficulty, IEnumerable<(EditableNote Note, long TickDelta)> moves)
+    {
+        ArgumentNullException.ThrowIfNull(moves);
+        var list = moves.ToList();
+        Part = part;
+        Difficulty = difficulty;
+        _notes = AtLeastOne(list.Select(static m => m.Note), nameof(moves));
+        NoteEdits.CheckDistinct(_notes, nameof(moves));
+        _tickDeltas = [.. list.Select(static m => m.TickDelta)];
+        TickDelta = _tickDeltas[0];
+        LaneDelta = 0;
     }
 
     public ChartInstrument Part { get; }
@@ -136,7 +154,11 @@ public sealed class MoveNotes : ChartCommand
     /// <summary>The notes as they were before moving.</summary>
     public IReadOnlyList<EditableNote> Notes => _notes;
 
+    /// <summary>How many ticks the first note moves; see <see cref="TickDeltas"/> for each.</summary>
     public long TickDelta { get; }
+
+    /// <summary>How many ticks each note moves, in the order of <see cref="Notes"/>.</summary>
+    public IReadOnlyList<long> TickDeltas => _tickDeltas;
 
     public int LaneDelta { get; }
 
@@ -152,9 +174,9 @@ public sealed class MoveNotes : ChartCommand
         for (int i = 0; i < _notes.Length; i++)
         {
             var note = _notes[i];
-            long tick = note.Tick + TickDelta;
+            long tick = note.Tick + _tickDeltas[i];
             if (tick < 0)
-                throw new InvalidOperationException(Invariant($"Moving {Describe(note)} {TickDelta} ticks would put it before the start of the song."));
+                throw new InvalidOperationException(Invariant($"Moving {Describe(note)} {_tickDeltas[i]} ticks would put it before the start of the song."));
             moved[i] = note with { Tick = tick, Lane = note.Lane + LaneDelta };
 
             // Moving between an open (or a kick) and the other lanes would change what the note is, not where it is.
@@ -210,28 +232,28 @@ public sealed class MoveNotes : ChartCommand
     /// <summary>Whether <paramref name="lane"/> is one a note can't move into or out of by lanes: a fret part's open, or the drums' kick.</summary>
     private static bool IsApart(ChartInstrumentKind kind, int lane) => lane == (kind == ChartInstrumentKind.Drums ? 0 : ChartNote.OpenLane);
 
-    // The marking of each tick it changes, once the chords whose notes all move have taken their marking with them.
+    // The marking of each tick it changes, once the chords whose notes all move together have taken their marking with them.
     private List<(long Tick, ChordFlags Flags)> FlagsAfter(EditableTrack track)
     {
-        if (TickDelta == 0)
-            return [];
-
-        var carried = new List<(long Tick, ChordFlags Flags)>();
-        foreach (var chord in _notes.GroupBy(static n => n.Tick))
+        var carried = new List<(long Tick, ChordFlags Flags, long Delta)>();
+        foreach (var chord in Enumerable.Range(0, _notes.Length).GroupBy(i => _notes[i].Tick))
         {
+            long delta = _tickDeltas[chord.First()];
+            if (delta == 0 || chord.Any(i => _tickDeltas[i] != delta))
+                continue;
             var flags = track.FlagsAt(chord.Key);
             if (flags != ChordFlags.None && track.Notes.At(chord.Key).Length == chord.Count())
-                carried.Add((chord.Key, flags));
+                carried.Add((chord.Key, flags, delta));
         }
 
         var after = new Dictionary<long, ChordFlags>();
 
         // Every chord that moves leaves its tick first, so a chord landing where another left joins only what stays.
-        foreach (var (tick, _) in carried)
+        foreach (var (tick, _, _) in carried)
             after[tick] = ChordFlags.None;
-        foreach (var (tick, flags) in carried)
+        foreach (var (tick, flags, delta) in carried)
         {
-            long to = tick + TickDelta;
+            long to = tick + delta;
             after[to] = (after.TryGetValue(to, out var there) ? there : track.FlagsAt(to)) | flags;
         }
 

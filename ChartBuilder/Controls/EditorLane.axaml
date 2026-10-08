@@ -131,6 +131,121 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <!-- The lane's audio (charter-spec C12–C14): which, as a waveform or a spectrogram, where, and its onsets. -->
+                    <Button Classes="tool"
+                            IsVisible="{Binding !IsVocal}"
+                            ToolTip.Tip="{x:Static res:Strings.LaneAudioToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneAudioToolTip}">
+                        <PathIcon Width="14" Height="14" Data="{StaticResource VolumeIconGeometry}" />
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <StackPanel Spacing="8" Width="260" DataContext="{Binding Audio}" x:DataType="vm:LaneAudioViewModel">
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.LaneNoAudio}" IsVisible="{Binding !HasAudio}" />
+                                    <StackPanel Spacing="8" IsVisible="{Binding HasAudio}">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Static res:Strings.LaneAudioSourceLabel}" />
+                                            <ComboBox HorizontalAlignment="Stretch"
+                                                      ItemsSource="{Binding SourceChoices}"
+                                                      SelectedItem="{Binding SelectedSource}"
+                                                      AutomationProperties.Name="{x:Static res:Strings.LaneAudioSourceLabel}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:AudioSourceChoice">
+                                                        <TextBlock Text="{Binding Label}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Static res:Strings.LaneShowLabel}" ToolTip.Tip="{x:Static res:Strings.LaneShowToolTip}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <RadioButton Content="{x:Static res:Strings.LaneShowWaveform}" IsChecked="{Binding IsWaveform}" />
+                                                <RadioButton Content="{x:Static res:Strings.LaneShowSpectrogram}" IsChecked="{Binding IsSpectrogram}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Static res:Strings.LanePlacementLabel}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <RadioButton Content="{x:Static res:Strings.LanePlacementBehind}" IsChecked="{Binding IsBehind}" />
+                                                <RadioButton Content="{x:Static res:Strings.LanePlacementBeside}" IsChecked="{Binding IsBeside}" />
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <!-- The waveform's channels and gain (C12 item 4). -->
+                                        <StackPanel Spacing="4" IsVisible="{Binding IsWaveform}">
+                                            <CheckBox Content="{x:Static res:Strings.LaneStereo}" IsChecked="{Binding IsStereo}" />
+                                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.LaneGainLabel}" />
+                                                <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="muted" Margin="0,0,6,0" Text="{Binding GainText}" />
+                                                <Button Grid.Column="2" Content="{x:Static res:Strings.LaneGainReset}" Command="{Binding ResetGainCommand}" />
+                                            </Grid>
+                                            <Slider Minimum="{x:Static vm:LaneAudioViewModel.MinGainDb}"
+                                                    Maximum="{x:Static vm:LaneAudioViewModel.MaxGainDb}"
+                                                    SmallChange="1"
+                                                    LargeChange="6"
+                                                    TickFrequency="1"
+                                                    IsSnapToTickEnabled="True"
+                                                    Value="{Binding GainDb}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.LaneGainLabel}" />
+                                        </StackPanel>
+
+                                        <!-- The spectrogram's band and contrast (C13 items 1 and 4). -->
+                                        <StackPanel Spacing="4" IsVisible="{Binding IsSpectrogram}">
+                                            <TextBlock Text="{x:Static res:Strings.LaneBandLabel}" />
+                                            <ComboBox HorizontalAlignment="Stretch"
+                                                      ItemsSource="{x:Static vm:LaneAudioViewModel.BandChoices}"
+                                                      SelectedItem="{Binding SelectedBand}"
+                                                      AutomationProperties.Name="{x:Static res:Strings.LaneBandLabel}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:BandChoice">
+                                                        <TextBlock Text="{Binding Label}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneContrastLabel}" />
+                                                <TextBlock Grid.Column="1" Classes="muted" Text="{Binding ContrastText}" />
+                                            </Grid>
+                                            <Slider Minimum="{x:Static vm:LaneAudioViewModel.MinFloorDb}"
+                                                    Maximum="-6"
+                                                    SmallChange="1"
+                                                    LargeChange="6"
+                                                    TickFrequency="1"
+                                                    IsSnapToTickEnabled="True"
+                                                    Value="{Binding FloorDb}"
+                                                    ToolTip.Tip="{x:Static res:Strings.LaneContrastFloorLabel}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.LaneContrastFloorLabel}" />
+                                            <Slider Minimum="{x:Static vm:LaneAudioViewModel.MinCeilingDb}"
+                                                    Maximum="0"
+                                                    SmallChange="1"
+                                                    LargeChange="6"
+                                                    TickFrequency="1"
+                                                    IsSnapToTickEnabled="True"
+                                                    Value="{Binding CeilingDb}"
+                                                    ToolTip.Tip="{x:Static res:Strings.LaneContrastCeilingLabel}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.LaneContrastCeilingLabel}" />
+                                        </StackPanel>
+
+                                        <!-- The onsets beside the lanes, and how many there are (C14 item 1). -->
+                                        <StackPanel Spacing="4">
+                                            <CheckBox Content="{x:Static res:Strings.LaneShowOnsets}" IsChecked="{Binding ShowOnsets}" />
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneSensitivityLabel}" />
+                                                <TextBlock Grid.Column="1" Classes="muted" Text="{Binding SensitivityText}" />
+                                            </Grid>
+                                            <Slider Minimum="0"
+                                                    Maximum="1"
+                                                    SmallChange="0.05"
+                                                    LargeChange="0.1"
+                                                    TickFrequency="0.01"
+                                                    IsSnapToTickEnabled="True"
+                                                    Value="{Binding OnsetSensitivity}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.LaneSensitivityLabel}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
                     <!-- The lane's look-ahead: how far beyond the strike line it shows. -->
                     <Button Classes="lane-part"
                             IsVisible="{Binding !IsVocal}"

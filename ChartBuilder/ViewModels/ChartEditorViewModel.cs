@@ -61,12 +61,14 @@ namespace ChartBuilder.ViewModels
         private IReadOnlyList<PhraseKindChoice>? _phraseChoices;
 
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
-        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout)
+        /// <param name="audio">The song's audio as the lanes draw and analyse it.</param>
+        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, EditorAudio audio, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout)
         {
             _settings = settings;
             _confirmations = confirmations;
             Song = song;
             Playback = playback;
+            Audio = audio;
             Messages = messages;
             var saved = settings.Settings;
             Session = new EditorSession(undo, song.Delay, song.EffectivePairs())
@@ -79,6 +81,8 @@ namespace ChartBuilder.ViewModels
             SelectedFillEnd = FillEndChoices[0];
             Lanes = new LaneDockViewModel(layout, this);
             Properties = new PropertiesViewModel(this);
+            Session.Onsets = new LaneOnsetSource(this);
+            AudioAssist = new AudioAssistViewModel(this);
 
             _refresh = new DispatcherTimer(DispatcherPriority.Background) { Interval = RefreshDelay };
             _refresh.Tick += (_, _) => RefreshDerived();
@@ -105,6 +109,15 @@ namespace ChartBuilder.ViewModels
         public EditorSession Session { get; }
 
         public PlaybackViewModel Playback { get; }
+
+        /// <summary>The song's audio as the lanes draw and analyse it: waveforms, spectrograms and onsets.</summary>
+        public EditorAudio Audio { get; }
+
+        /// <summary>Snap to onset, Nudge to onsets, and the proposed tempo map (charter-spec C14).</summary>
+        public AudioAssistViewModel AudioAssist { get; }
+
+        /// <summary>What a lane draws its audio as until it's switched: the setting's.</summary>
+        public LaneBackdrop DefaultBackdrop => _settings.Settings.DefaultLaneBackdrop;
 
         /// <summary>What the editor has had to say: why an edit was refused, or what a key did.</summary>
         public EditorMessages Messages { get; }
@@ -262,8 +275,14 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial double VisibleEnd { get; private set; }
 
-        /// <summary>Takes up what may have changed in Settings: whether tempo edits keep times.</summary>
-        public void ReloadSettings() => Session.KeepTimes = _settings.Settings.TempoEdits == TempoEditMode.KeepTimes;
+        /// <summary>Takes up what may have changed in Settings: whether tempo edits keep times, and what lanes draw their audio as.</summary>
+        public void ReloadSettings()
+        {
+            Session.KeepTimes = _settings.Settings.TempoEdits == TempoEditMode.KeepTimes;
+            Audio.ReloadSettings(_settings.Settings);
+            foreach (var lane in Lanes.All)
+                lane.Audio.Refresh();
+        }
 
         /// <summary>Follows the playhead, once a frame while it plays: the cursor moves with it, and the view with the cursor.</summary>
         public void FollowPlayback()
@@ -333,7 +352,8 @@ namespace ChartBuilder.ViewModels
         /// the marker, or add one a beat before it.
         /// </summary>
         /// <param name="make">Works out the edit for each answer.</param>
-        public async Task ApplyTempoEditAsync(Func<BlockedAnchor, TempoEdit> make)
+        /// <returns>Whether the edit was made.</returns>
+        public async Task<bool> ApplyTempoEditAsync(Func<BlockedAnchor, TempoEdit> make)
         {
             var edit = make(BlockedAnchor.Refuse);
             if (edit.IsRefused && edit.Blocking is not null)
@@ -357,13 +377,13 @@ namespace ChartBuilder.ViewModels
                 }
 
                 if (edit is null)
-                    return;
+                    return false;
             }
 
-            if (edit.IsRefused)
-                Session.Status = edit.Refusal;
-            else
-                Session.Execute(edit.Command!);
+            if (!edit.IsRefused)
+                return Session.Execute(edit.Command!);
+            Session.Status = edit.Refusal;
+            return false;
         }
 
         [RelayCommand]
@@ -438,6 +458,7 @@ namespace ChartBuilder.ViewModels
             RefreshFills();
             RefreshPhraseChoices();
             RefreshVisibleSpan();
+            AudioAssist.Refresh();
             ScheduleRefresh();
         }
 
@@ -504,6 +525,7 @@ namespace ChartBuilder.ViewModels
         {
             Properties.Refresh();
             OnPropertyChanged(nameof(FillScopeText));
+            AudioAssist.Refresh();
         }
 
         // The delay or the song's settings moved every note against the audio, or changed how they're read.

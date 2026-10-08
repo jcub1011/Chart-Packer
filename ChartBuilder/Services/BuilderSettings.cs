@@ -65,6 +65,18 @@ namespace ChartBuilder.Services
         /// <summary>How fast notes go by in a lane whose look-ahead hasn't been set: 1 shows <see cref="LookAheadAtSpeedOne"/> seconds beyond the strike line.</summary>
         public double EditorHighwaySpeed { get; set; } = 1;
 
+        /// <summary>What a lane draws its audio as, until it's switched (<c>W</c>): the waveform or the spectrogram (charter-spec C12, C13).</summary>
+        public LaneBackdrop DefaultLaneBackdrop { get; set; } = LaneBackdrop.Waveform;
+
+        /// <summary>The least the spectrogram memory budget can be, in MB.</summary>
+        public const int MinSpectrogramBudgetMb = 64;
+
+        /// <summary>The most the spectrogram memory budget can be, in MB.</summary>
+        public const int MaxSpectrogramBudgetMb = 4096;
+
+        /// <summary>How much memory every stem's spectrogram may take together, in MB (charter-spec C13 item 3).</summary>
+        public int SpectrogramBudgetMb { get; set; } = 256;
+
         /// <summary>The metronome's volume, in percent of full.</summary>
         public int MetronomeVolume { get; set; } = 50;
 

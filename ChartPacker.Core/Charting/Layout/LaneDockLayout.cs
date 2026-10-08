@@ -51,6 +51,9 @@ public sealed class DockLane : DockNode
     /// default.
     /// </summary>
     public double? LookAhead { get; internal set; }
+
+    /// <summary>How the lane shows its audio (charter-spec C12–C14).</summary>
+    public LaneAudioOptions Audio { get; internal set; } = LaneAudioOptions.Default;
 }
 
 /// <summary>Two or more nodes side by side or stacked, each given a share of the room in proportion to its weight.</summary>
@@ -220,6 +223,17 @@ public sealed class LaneDockLayout
     {
         RequireOpen(lane);
         lane.LookAhead = seconds is { } value && IsWeight(value) ? value : null;
+    }
+
+    /// <summary>
+    /// Sets how <paramref name="lane"/> shows its audio. It's kept with the layout but doesn't change its shape, so it
+    /// raises no <see cref="Changed"/>.
+    /// </summary>
+    public void SetAudio(DockLane lane, LaneAudioOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        RequireOpen(lane);
+        lane.Audio = options.Clamped();
     }
 
     /// <summary>
@@ -431,6 +445,7 @@ public sealed class LaneDockLayout
                 Difficulty = lane.Part.Track?.Difficulty.ToString(),
                 Vocal = lane.Part.Vocal?.ToString(),
                 LookAhead = lane.LookAhead,
+                Audio = lane.Audio == LaneAudioOptions.Default ? null : LaneAudioState.Of(lane.Audio),
             };
         }
 
@@ -451,6 +466,7 @@ public sealed class LaneDockLayout
                 return null;
             var lane = NewLane(part);
             lane.LookAhead = state.LookAhead is { } seconds && IsWeight(seconds) ? seconds : null;
+            lane.Audio = state.Audio?.ToOptions() ?? LaneAudioOptions.Default;
             return lane;
         }
 

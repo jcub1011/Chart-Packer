@@ -550,6 +550,9 @@ the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on th
   setting, and keeps anchors where they are.
 - **Detect from audio** comes with [C14](#c14-onset-and-beat-assist) (CM4). It runs the tempo
   estimate on the mix, fills in the starting BPM, and proposes a tempo map to review in the editor.
+  *Settled in CM4:* it's a button under Starting BPM. The BPM is the first confident stretch's,
+  tidied to a whole BPM when it's within 0.05 of one (`BpmTidy`), and set as one undoable step, as
+  a BPM typed is. The proposal for the whole song then shows in the editor, as C14 item 4's does.
 
 **Parts.**
 
@@ -1378,6 +1381,28 @@ Acceptance criteria:
    quiet stems. `StemPeaks` averages the channels today, so stereo needs per-channel peaks, which
    are new.
 
+*Settled in CM4:*
+
+- **Where the options are.** Each lane's header has an audio button, whose flyout picks the audio
+  (the part's own stems, the mix, or any one stem), waveform or spectrogram, behind or beside, and
+  each one's own options, and the onsets (C14). They're kept with the lane layout
+  (`LaneAudioOptions`). The **Lanes show** setting picks waveform or spectrogram for a lane that
+  hasn't been switched.
+- **Resolution.** Every stem is read once at 5 ms a bucket (`WaveformResolution.High`), and drawn
+  with a power of two of buckets to a bar, as many as fit in a screen pixel, so one read serves
+  every zoom. The editor's waveforms come from one place, `StemWaveforms`, which also gives the
+  bottom timeline its mix.
+- **Stereo.** A stem's channels are read only when a lane first shows it in stereo
+  (`StemPeaksReader`'s `channels`); until then it's drawn in mono. Left is drawn beside right on a
+  highway, above it on a timeline, both at one gain.
+- **Gain** is in dB, from −12 to +24, on top of the gain that brings the loudest peak to full
+  scale.
+- **Beside** is a column right of a highway's phrase rail. A timeline's strip is always drawn at
+  full strength; Behind also draws the audio faintly behind its rows.
+- **AC C12.1.** Pictures of the waveform are drawn within a budget of 6 ms in each 16 ms
+  (`PaintBudget`). One there's no time for is stood in for by the neighbouring zoom's picture, and
+  drawn once the frame is out.
+
 Acceptance criteria:
 
 - **AC C12.1** Zooming and scrolling a 10-minute song never blocks the UI thread for more than
@@ -1418,6 +1443,27 @@ Acceptance criteria:
    - **Full**
 5. **Placement** is the same as for the waveform: behind the lanes, beside them, or as the strip
    in the Timeline view. The waveform and the spectrogram can be switched with one key.
+
+*Settled in CM4:*
+
+- **Levels.** Each byte is an absolute level, −120 dB plus half a decibel a step, a full-scale sine
+  reading 0 dB. The contrast is applied as it's drawn, so changing it computes nothing again; the
+  floor and ceiling are each lane's own (default −80 dB and 0 dB).
+- **Low rows.** A row that holds an FFT bin takes the loudest of its bins. Below about 870 Hz the
+  rows hold none, and each is read off a parabola through the levels of the louder bin either side
+  and its neighbours.
+- **Colours** run from black through violet, magenta and orange to pale yellow, blended in OKLab with
+  lightness rising evenly (`SpectrogramColors`). A band preset dims the rows outside it to 30%.
+- **Computing.** Columns are computed in chunks of 256 on threads below normal priority
+  (`AnalysisWorkers`), the chunk nearest the middle of the view first, and frames two to an FFT.
+  Chunks near the view come before onsets; the rest of the song after.
+- **The budget.** A spectrogram counts at its full size from the moment it's started. One used in
+  the last 2 s isn't released to make room for another: the newcomer is refused, and the editor
+  says so, so two lanes that don't both fit don't take turns releasing each other. The budget is
+  64 MB to 4096 MB.
+- **Drawing.** As the waveform's, in pictures of 256 columns, each a column or the loudest of a
+  power of two of them, drawn within the same budget, and drawn again as more of their columns are
+  ready, at most every 100 ms. Behind the lanes it's at 45% opacity.
 
 Acceptance criteria:
 
@@ -1460,6 +1506,48 @@ Acceptance criteria:
      change ([C17](#c17-save-and-export)).
 6. Everything here is a hint. Nothing changes the chart without an explicit action, and every
    action can be undone.
+
+*Settled in CM4:*
+
+- **Onsets** have their own STFT, separate from the spectrogram's: a 1024-sample window every 128
+  samples, twelve bands an octave, each compared with the frame two before (spectral flux). The
+  whole spectrum is compressed hard, so soft onsets in a loud mix count; the drum bands gently, so
+  one band's leakage from a loud hit in another doesn't. A drum band's onset that's weak for its
+  band, at the same moment as a strong one in another, is taken as leakage and left out. Each onset
+  is timed off the audio itself, at the 32-sample block where the level rises most, which puts a
+  sharp hit within a millisecond whatever its level.
+- **Sensitivity** is each lane's own, in its audio flyout: a threshold on how far an onset stands
+  out, so changing it computes nothing again. Onsets are drawn in a strip of 6 px per band: left of
+  a highway's lanes, under a timeline's rows. Drums have three bands, kick nearest the lanes, in the
+  colours of the pads they likely belong to.
+- **Snap to onset** (`O`, and the toolbar) applies to placing a note with the mouse and to moving
+  notes: the note grabbed goes to the onset, the others keep their places around it. Keys, sustains,
+  phrases and tempo markers keep to the grid. The reach is half a step of the snap in the toolbar,
+  even with the grid off. The onsets are those of the lane showing the part, at its sensitivity.
+- **Nudge to onsets** (`Shift`+`O`) moves chord by chord, each by its own amount, keeping each
+  chord's forcing with it. Two chords after one onset: the nearer has it. A chord can't land on a
+  note that isn't moving. The report gives every chord's move in milliseconds, and opens the
+  Messages dialog when any chord stayed.
+- **The proposal** is estimated from the mix by default, or the lane in focus, over the selection or
+  the whole song. Its downbeat is Find first downbeat's (item 5). It's reviewed in a bar over the
+  lanes (Double, Halve, the downbeat a beat either way, Reset, Accept, Discard) and stays through
+  edits, a delay change included, until it's accepted or discarded. Dragging a beat's handle pins
+  it, and the beats either side are spaced evenly again up to the nearest pinned beat or two
+  measures away.
+- **Accepting.** For the whole song, the downbeat goes on measure 2's line and measure 1 leads in to
+  it; every tempo marker and anchor is replaced, and the time signatures are kept. Beats share a
+  marker while each is within the **merge** tolerance (5 ms by default) of its segment's tempo.
+  Anchors go on measures 1 + n, 1 + 2n, …, and on both ends of each unsure stretch, which is one
+  segment. For a selection, its first beat goes on the beat line nearest it, the segment before it
+  takes up the change, the tempo in force after its last beat carries on, and the next anchor stays
+  where it is.
+- **Find first downbeat** chooses the beat of each measure with the strongest kick, and more weakly
+  the strongest onsets, at the first such beat from where the music starts. It's shown as a line
+  labelled **Downbeat?**, with a bar to step it a beat either way. **Lead-in** sets the first tempo
+  so measure 2 starts on it; measure 1's other unanchored markers go. It's refused when the
+  downbeat isn't after the chart's start, when measure 1 would be faster than 1000 BPM or slower
+  than 10, or when an anchor inside measure 1 would move. **Delay** sets `delay` in place of the
+  song's (`delay_seconds` goes too when it's 0), as a pending change Revert takes back.
 
 Acceptance criteria:
 
@@ -2087,6 +2175,7 @@ These are the defaults. Rebinding is future work.
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
 | `[` / `]` | Coarser or finer snap |
 | `O` | Snap to onset on or off |
+| `Shift`+`O` | Nudge the selected notes to their onsets |
 | `B` | Tap tempo |
 | `Ctrl`+wheel, `+` / `−` | Zoom |
 | `Ctrl`+`1`–`4` | Easy to Expert |
@@ -2097,7 +2186,7 @@ These are the defaults. Rebinding is future work.
 | `S` | Star power phrase over the selection |
 | `L` | Set the loop region to the selection |
 | `R` | Start or stop record mode |
-| `W` | Switch between waveform and spectrogram |
+| `W` | Switch the lane between waveform and spectrogram |
 | `Ctrl`+`A` | Select all in the current difficulty |
 | `Ctrl`+`Z`; `Ctrl`+`Y` or `Ctrl`+`Shift`+`Z` | Undo; redo |
 | `Ctrl`+`X` / `C` / `V` | Cut, copy, paste |
@@ -2134,8 +2223,8 @@ opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
 | Default editor view | Highway |
 | Editor highway speed | The inspector's default `HighwayNoteSpeed` |
 | Notes keep ticks or times when the tempo changes | Keep ticks |
-| Waveform or spectrogram behind the lanes | Waveform |
-| Spectrogram memory budget | 256 MB |
+| Waveform or spectrogram behind the lanes (**Lanes show**, under Audio assist) | Waveform |
+| Spectrogram memory budget (under Audio assist) | 256 MB (64 to 4096) |
 | Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
 | Prompt for calibration on first editor use | On |

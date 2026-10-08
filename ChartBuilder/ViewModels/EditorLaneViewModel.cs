@@ -30,6 +30,12 @@ namespace ChartBuilder.ViewModels
             Lane = lane;
             View = dock.Editor?.DefaultView ?? LaneView.Highway;
             LookAhead = EditorViewport.ClampLookAhead(lane.LookAhead ?? dock.Editor?.DefaultLookAhead ?? 2);
+            Audio = new LaneAudioViewModel(this, lane.Audio, options =>
+            {
+                if (_dock.Layout.Find(Lane.Id) is not null)
+                    _dock.Layout.SetAudio(Lane, options);
+            });
+            Audio.Changed += (_, _) => OnPropertyChanged(nameof(Audio));
             Refresh();
             _isMade = true;
         }
@@ -39,6 +45,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The editor the lane's canvas edits; null for a lane without one.</summary>
         public ChartEditorViewModel? Editor => _dock.Editor;
+
+        /// <summary>How the lane shows its audio: the header's audio button (charter-spec C12–C14).</summary>
+        public LaneAudioViewModel Audio { get; }
 
         [ObservableProperty]
         public partial string Title { get; private set; } = "";
@@ -155,6 +164,7 @@ namespace ChartBuilder.ViewModels
                 pick: p => layout.SetPart(Lane, p));
             OnPropertyChanged(nameof(AddMenu));
             RefreshDifficulties();
+            Audio?.Refresh();
         }
 
         /// <summary>Takes in which difficulties have notes, after an edit.</summary>
