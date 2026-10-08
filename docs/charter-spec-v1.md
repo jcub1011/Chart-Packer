@@ -752,6 +752,9 @@ Acceptance criteria:
      *Settled in CM3:* the end is the tick after the last one the phrase covers. Properties also
      shows the kind, which it doesn't change, and the start's time. A start or end typed there moves
      that end of every selected phrase, each keeping its other end, as one undoable step.
+   - *Settled in CM3:* **Disco flip ranges** ([C6](#c6-drums-4-lane-pro-and-5-lane) item 7): start
+     and end, set as a phrase's are, as one undoable step, and the difficulty, which is only shown.
+     A range without an end shows an empty end.
    - **Tempo markers:** BPM, time signature, and whether it's anchored.
    - With several items selected, a field shows `<<multiple>>` when the values differ, and
      editing it sets every item. This is the same model as the metadata editor's bulk editing.
@@ -940,6 +943,29 @@ Acceptance criteria:
      a plain mix at its end, each with the stem configuration in force there, and turns plain mixes
      inside it into `d` ones. Removing a range turns its mixes back, and leaves out any that then
      change nothing. A range can't overlap another, or cover a mix with another setting.
+   - *Settled in CM3:* inside a range, Pro drums' notes are drawn where the games play them: red as
+     a yellow cymbal in yellow's column, and yellow, cymbal or tom, as a red pad in red's. This holds
+     on the highway and the timeline, in the strike glow, and for a ghost difficulty. Whether a note
+     is flipped is the game view's, so the editor can't disagree with the games: a mix takes effect
+     from the first note at or after it, and one still on at a difficulty's last note carries into
+     the next difficulty up. 4-lane and 5-lane drums are never flipped, as the games flip Pro only.
+   - *Settled in CM3:* editing inside a range works on the pads drawn. A click hits the note drawn
+     in the column, and the Place tool and the number keys place the pad drawn there, so yellow's
+     column places red; the hover shows it as it will be drawn. A box selects by the columns drawn.
+     A move across columns, by a drag or `Alt`+arrows, gives each note the pad drawn in the column
+     it lands in, at the tick it lands on, so red moved one column right inside a range is blue.
+     When that isn't the same lane step for every note, the move is made as removing the notes and
+     adding them again, in one undoable step. A move only in time keeps the pads stored, so a note
+     moved into or out of a range is then drawn in the other column.
+   - *Settled in CM3:* the phrase rail ([C8](#c8-phrases-and-events) item 1) beside a drums lane
+     has a last row, **Disco flip**, with the ranges of the lane's difficulty, on every drum variant.
+     A range a loaded file never ends runs to the far end of the view. The Phrase tool's picker
+     offers **Disco flip** on Pro drums only, and draws a range on the lane's difficulty. Ranges are
+     selected, moved, resized and deleted in the rail as phrases are, each drag one undoable step,
+     and Delete removes them with the rest of the selection. A drag that would overlap another
+     range, or cover a mix with another setting, is refused in the status. A range without an end
+     can be selected, deleted and given an end in Properties, but not moved, nor its start changed,
+     until it has one.
 8. **4-lane ↔ 5-lane conversion helper.**
    - Converts a whole drum part with the fixed mapping in [§7.6](#76-drum-layout-conversion).
      Clone Hero and YARG each convert in their own slightly different way when they play one
@@ -1008,9 +1034,10 @@ Acceptance criteria:
      toolbar, from the grid step pressed to the one let go, either way, as one undoable step. A click
      adds nothing. The picker offers only the kinds the part in focus can have: star power, solo and
      big rock ending on 5-fret and GHL; star power, solo, drum fill, roll and trill on drums, where a
-     fill drawn at or after `[coda]` is made a big rock ending (item 4). When the focus moves to a
-     part that can't have the kind picked, it goes back to star power. New rolls and trills reach
-     Expert only ([C6](#c6-drums-4-lane-pro-and-5-lane) item 6).
+     fill drawn at or after `[coda]` is made a big rock ending (item 4). Pro drums also offer disco
+     flip ([C6](#c6-drums-4-lane-pro-and-5-lane) item 7). When the focus moves to a part that can't
+     have the kind picked, or the drums stop being Pro, it goes back to star power. New rolls and
+     trills reach Expert only ([C6](#c6-drums-4-lane-pro-and-5-lane) item 6).
    - *Settled in CM3:* each lane draws its part's phrases as bars in a **phrase rail**: right of a
      highway's forcing marks, and above a timeline's. The rail has a row for each kind the part can
      have, in the picker's order, so overlapping phrases don't hide each other; a drums big rock
@@ -1019,7 +1046,9 @@ Acceptance criteria:
      their lengths; dragging within a few pixels of an end moves that end to the grid, never closer
      than a grid step to the other. Each drag is one undoable step. Delete removes the selected
      phrases, with any selected notes and tempo markers, in one step. Selecting notes or tempo markers
-     drops the selected phrases, and the other way round, unless Shift adds them.
+     drops the selected phrases, and the other way round, unless Shift adds them. On drums, a last
+     row holds the lane's difficulty's disco flip ranges ([C6](#c6-drums-4-lane-pro-and-5-lane)
+     item 7), which are edited the same way.
    - *Settled in CM3:* star power and solos also tint the lanes faintly behind the notes. Fills, big
      rock endings, rolls and trills are drawn only in the rail.
    - *Settled in CM3:* `S` ([§9](#9-keyboard-shortcuts)) puts star power over the selected notes:

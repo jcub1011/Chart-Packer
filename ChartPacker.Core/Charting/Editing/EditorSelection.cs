@@ -9,9 +9,10 @@ public readonly record struct NotePlace(long Tick, int Lane, bool DoubleKick = f
 }
 
 /// <summary>
-/// What's selected in the editor (charter-spec C15 item 2): notes of one track, tempo markers, phrases of one part, and a
-/// span of ticks across the lanes. Notes are kept by their place, so a note keeps its selection when its length changes,
-/// and loses it when it goes. Phrases are kept as they are, so a phrase changed is selected again as what it became.
+/// What's selected in the editor (charter-spec C15 item 2): notes of one track, tempo markers, phrases of one part, disco
+/// flip sections of the drums' difficulties, and a span of ticks across the lanes. Notes are kept by their place, so a
+/// note keeps its selection when its length changes, and loses it when it goes. Phrases and disco flip sections are kept
+/// as they are, so one changed is selected again as what it became.
 /// </summary>
 public sealed class EditorSelection
 {
@@ -19,6 +20,7 @@ public sealed class EditorSelection
     private readonly HashSet<NotePlace> _notes = [];
     private readonly SortedSet<long> _tempos = [];
     private readonly HashSet<Phrase> _phrases = [];
+    private readonly HashSet<DiscoFlipSection> _discoFlips = [];
 
     public EditorSelection(EditableChart chart)
     {
@@ -44,11 +46,17 @@ public sealed class EditorSelection
     /// <summary>The part the selected phrases are of, or null when no phrases are selected.</summary>
     public ChartInstrument? PhrasePart { get; private set; }
 
-    public bool IsEmpty => _notes.Count == 0 && _tempos.Count == 0 && _phrases.Count == 0 && Range is null;
+    public bool IsEmpty => _notes.Count == 0 && _tempos.Count == 0 && _phrases.Count == 0 && _discoFlips.Count == 0 && Range is null;
 
     public bool HasNotes => _notes.Count > 0;
 
     public bool HasPhrases => _phrases.Count > 0;
+
+    public bool HasDiscoFlips => _discoFlips.Count > 0;
+
+    /// <summary>The selected disco flip sections, by difficulty, then in tick order.</summary>
+    public IReadOnlyList<DiscoFlipSection> DiscoFlips =>
+        [.. _discoFlips.OrderBy(static s => s.Difficulty).ThenBy(static s => s.Range.Tick)];
 
     /// <summary>The selected phrases, in the part's order.</summary>
     public IReadOnlyList<Phrase> Phrases
@@ -83,8 +91,9 @@ public sealed class EditorSelection
 
     /// <summary>
     /// The span of ticks the selection covers, for playing it, looping it or fitting a tempo to it: the span selected,
-    /// or else from the first selected note to where the last is let go, or else from the first selected phrase's start
-    /// to the last one's end, or else from the first selected tempo marker to the last. Null when it covers no ticks.
+    /// or else from the first selected note to where the last is let go, or else from the first selected phrase's or
+    /// disco flip section's start to the last one's end (a section without one adding only its start), or else from the
+    /// first selected tempo marker to the last. Null when it covers no ticks.
     /// </summary>
     public (long From, long To)? Span
     {
@@ -100,10 +109,13 @@ public sealed class EditorSelection
                 return to > from ? (from, to) : null;
             }
 
-            if (_phrases.Count > 0)
+            if (_phrases.Count > 0 || _discoFlips.Count > 0)
             {
-                long from = _phrases.Min(static p => p.Tick);
-                long to = _phrases.Max(static p => p.Tick + p.Length);
+                var spans = _phrases.Select(static p => (From: p.Tick, To: p.Tick + p.Length))
+                    .Concat(_discoFlips.Select(static s => (From: s.Range.Tick, To: s.Range.EndTick ?? s.Range.Tick)))
+                    .ToList();
+                long from = spans.Min(static s => s.From);
+                long to = spans.Max(static s => s.To);
                 return to > from ? (from, to) : null;
             }
 
@@ -117,6 +129,9 @@ public sealed class EditorSelection
     /// <summary>Whether <paramref name="phrase"/> of <paramref name="part"/> is selected.</summary>
     public bool Contains(ChartInstrument part, Phrase phrase) => PhrasePart == part && _phrases.Contains(phrase);
 
+    /// <summary>Whether <paramref name="section"/> is selected.</summary>
+    public bool Contains(DiscoFlipSection section) => _discoFlips.Contains(section);
+
     /// <summary>Selects nothing.</summary>
     public void Clear()
     {
@@ -125,6 +140,7 @@ public sealed class EditorSelection
         _notes.Clear();
         _tempos.Clear();
         ClearPhraseSet();
+        _discoFlips.Clear();
         Track = null;
         Range = null;
         Raise();
@@ -147,6 +163,7 @@ public sealed class EditorSelection
             _notes.Clear();
             _tempos.Clear();
             ClearPhraseSet();
+            _discoFlips.Clear();
             Range = null;
         }
         else if (Track != track)
@@ -184,6 +201,7 @@ public sealed class EditorSelection
             _notes.Clear();
             _tempos.Clear();
             ClearPhraseSet();
+            _discoFlips.Clear();
             Track = null;
             Range = null;
         }
@@ -201,6 +219,7 @@ public sealed class EditorSelection
         {
             _notes.Clear();
             _tempos.Clear();
+            _discoFlips.Clear();
             Track = null;
             Range = null;
         }
@@ -251,6 +270,56 @@ public sealed class EditorSelection
         Raise();
     }
 
+    /// <summary>
+    /// Selects <paramref name="sections"/>, in place of what was selected or as well as it. Disco flip sections are selected
+    /// as phrases are: selecting them drops the notes, tempo markers, span and phrases, unless adding.
+    /// </summary>
+    public void SelectDiscoFlips(IEnumerable<DiscoFlipSection> sections, bool add = false)
+    {
+        ArgumentNullException.ThrowIfNull(sections);
+        if (!add)
+        {
+            _notes.Clear();
+            _tempos.Clear();
+            ClearPhraseSet();
+            _discoFlips.Clear();
+            Track = null;
+            Range = null;
+        }
+
+        _discoFlips.UnionWith(sections);
+        Raise();
+    }
+
+    /// <summary>Selects <paramref name="section"/> when it isn't, and the other way round, keeping the rest.</summary>
+    public void Toggle(DiscoFlipSection section)
+    {
+        if (!_discoFlips.Remove(section))
+            _discoFlips.Add(section);
+        Raise();
+    }
+
+    /// <summary>
+    /// Selects <paramref name="sections"/> in place of the disco flip sections selected, keeping the rest: the same sections
+    /// as an edit has changed them.
+    /// </summary>
+    public void ReplaceDiscoFlips(IEnumerable<DiscoFlipSection> sections)
+    {
+        ArgumentNullException.ThrowIfNull(sections);
+        _discoFlips.Clear();
+        _discoFlips.UnionWith(sections);
+        Raise();
+    }
+
+    /// <summary>Selects no disco flip sections, keeping the rest.</summary>
+    public void ClearDiscoFlips()
+    {
+        if (_discoFlips.Count == 0)
+            return;
+        _discoFlips.Clear();
+        Raise();
+    }
+
     /// <summary>Selects the span from <paramref name="from"/> to <paramref name="to"/>, keeping the notes and markers selected.</summary>
     public void SetRange(long from, long to)
     {
@@ -262,13 +331,13 @@ public sealed class EditorSelection
     }
 
     /// <summary>
-    /// Drops what the chart no longer has: notes gone from their places, markers gone from their ticks, and phrases the
-    /// part no longer has as they were.
+    /// Drops what the chart no longer has: notes gone from their places, markers gone from their ticks, and phrases and
+    /// disco flip sections the chart no longer has as they were.
     /// </summary>
     /// <returns>Whether anything was dropped.</returns>
     public bool Reconcile()
     {
-        int before = _notes.Count + _tempos.Count + _phrases.Count;
+        int before = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count;
         if (Track is { } key && _chart.PartOf(key.Instrument) is { } part)
         {
             var track = part[key.Difficulty];
@@ -288,7 +357,11 @@ public sealed class EditorSelection
             _phrases.Clear();
         if (_phrases.Count == 0)
             PhrasePart = null;
-        bool dropped = _notes.Count + _tempos.Count + _phrases.Count != before;
+        if (_chart.PartOf(ChartInstrument.Drums) is { } drums)
+            _discoFlips.RemoveWhere(s => !Charting.DiscoFlips.RangesOf(drums[s.Difficulty]).Contains(s.Range));
+        else
+            _discoFlips.Clear();
+        bool dropped = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count != before;
         if (dropped)
             Raise();
         return dropped;

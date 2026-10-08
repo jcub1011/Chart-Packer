@@ -74,6 +74,7 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush StarPowerTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x16));
         private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
+        private static readonly Color DiscoFlipColor = Color.FromRgb(0xF2, 0x7B, 0xD0);
         private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
         private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
         private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
@@ -212,7 +213,7 @@ namespace ChartBuilder.Controls.Editing
 
             var slots = session.SlotsOf(key.Instrument, View);
             var part = session.Chart.PartOf(key.Instrument)!;
-            var rows = PhraseRail.KindsOf(part.Kind);
+            var rows = PhraseRail.RowsOf(part.Kind);
             var projection = Project(bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
             var lanes = Box(projection.TimeFrom, projection.TimeFrom + projection.TimeLength, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count));
             var map = session.TempoMap;
@@ -230,6 +231,7 @@ namespace ChartBuilder.Controls.Editing
             DrawSections(context, session, projection, fromTick, toTick, bounds.Size);
             DrawStrikeBand(context, session, projection);
             DrawPhraseRail(context, session, part, rows, projection);
+            DrawDiscoFlips(context, session, key, rows, projection, fromTick, toTick);
 
             using (context.PushClip(lanes))
             {
@@ -285,7 +287,7 @@ namespace ChartBuilder.Controls.Editing
             _lastPoint = point;
 
             // A box is drawn from a press in the lanes that's on no note, with the select tool.
-            _boxFrom = session.Tool == EditorTool.Select && point.Rail is null && session.TrackOf(point.Track) is { } track && EditorTools.HitTest(track, point, point.Slots.Across) is null
+            _boxFrom = session.Tool == EditorTool.Select && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
                 ? current.Position
                 : null;
             _boxTo = current.Position;
@@ -406,7 +408,7 @@ namespace ChartBuilder.Controls.Editing
             if (Session is not { } session || _lane?.Track is not { } key || session.TrackOf(key) is null)
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);
-            var rows = PhraseRail.KindsOf(ChartInstruments.KindOf(key.Instrument));
+            var rows = PhraseRail.RowsOf(ChartInstruments.KindOf(key.Instrument));
             var projection = Project(Bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
             double seconds = projection.SecondsAt(AlongOf(position));
             double tick = session.TickAt(seconds);
@@ -417,7 +419,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The kind whose phrase rail row is at <paramref name="across"/> pixels, or null when it's outside the rail.</summary>
-        private PhraseKind? PhraseRowAt(LaneProjection projection, IReadOnlyList<PhraseKind> rows, double across)
+        private RailKind? PhraseRowAt(LaneProjection projection, IReadOnlyList<RailKind> rows, double across)
         {
             double from = PhraseRailFrom(projection, rows.Count);
             if (rows.Count == 0 || across < from || across > from + PhraseRailSize(rows.Count))
@@ -435,13 +437,14 @@ namespace ChartBuilder.Controls.Editing
             return (from, from + PhraseRowSize);
         }
 
-        /// <summary>Shows a resize arrow over a phrase bar's end in the rail, and a hand over its body.</summary>
+        /// <summary>Shows a resize arrow over a phrase or disco flip bar's end in the rail, and a hand over its body.</summary>
         private void ShowRailCursor(Point position)
         {
             StandardCursorType? wanted = null;
-            if (PointAt(position) is { Rail: not null } point && Session?.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } hit)
+            if (PointAt(position) is { Rail: not null } point && Session is { } session && session.Chart.PartOf(point.Track.Instrument) is { } part
+                && (PhraseRail.HitTest(part, point)?.Grip ?? PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point)?.Grip) is { } grip)
             {
-                wanted = hit.Grip == PhraseGrip.Body ? StandardCursorType.Hand
+                wanted = grip == PhraseGrip.Body ? StandardCursorType.Hand
                     : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
                     : StandardCursorType.SizeWestEast;
             }
@@ -633,7 +636,7 @@ namespace ChartBuilder.Controls.Editing
         /// The phrase rail (charter-spec C8): a row for each kind the part can have, with each phrase a bar in its kind's
         /// row, so phrases that overlap don't hide each other. The selected ones are lit and outlined.
         /// </summary>
-        private void DrawPhraseRail(DrawingContext context, EditorSession session, EditablePart part, IReadOnlyList<PhraseKind> rows, LaneProjection projection)
+        private void DrawPhraseRail(DrawingContext context, EditorSession session, EditablePart part, IReadOnlyList<RailKind> rows, LaneProjection projection)
         {
             double along1 = projection.TimeFrom, along2 = projection.TimeFrom + projection.TimeLength;
             for (int i = 0; i < rows.Count; i++)
@@ -656,6 +659,34 @@ namespace ChartBuilder.Controls.Editing
                     context.DrawRectangle(_gems.Brush(HighwayPalette.Lighten(color, 0.45)), _gems.Pen(accent, 1.5), bar.Inflate(1), 2, 2);
                 else
                     context.DrawRectangle(_gems.Brush(color), null, bar, 2, 2);
+            }
+        }
+
+        /// <summary>
+        /// The disco flip sections of the lane's difficulty (charter-spec C6 item 7) as bars in the rail's last row, as
+        /// phrases are drawn. A section a loaded file never ends runs on to the far end of the view.
+        /// </summary>
+        private void DrawDiscoFlips(DrawingContext context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
+        {
+            int row = IndexOf(rows, RailKind.DiscoFlip);
+            if (row < 0)
+                return;
+            var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+            var accent = ((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color ?? Color.FromRgb(0x7C, 0xB4, 0xFF);
+            double farEnd = projection.AlongOf(projection.End);
+            foreach (var range in session.DiscoFlipRangesOf(key))
+            {
+                if (range.Tick > toTick || range.EndTick < fromTick)
+                    continue;
+                double start = projection.AlongOf(session.AudioAt(range.Tick));
+                double end = range.EndTick is { } endTick ? projection.AlongOf(session.AudioAt(endTick)) : farEnd;
+                if (Math.Abs(end - start) < 2)
+                    end = start + (View == LaneView.Highway ? -2 : 2);
+                var bar = Box(start, end, across1, across2);
+                if (session.Selection.Contains(new DiscoFlipSection(key.Difficulty, range)))
+                    context.DrawRectangle(_gems.Brush(HighwayPalette.Lighten(DiscoFlipColor, 0.45)), _gems.Pen(accent, 1.5), bar.Inflate(1), 2, 2);
+                else
+                    context.DrawRectangle(_gems.Brush(DiscoFlipColor), null, bar, 2, 2);
             }
         }
 
@@ -705,7 +736,7 @@ namespace ChartBuilder.Controls.Editing
             return new Rect(a, b);
         }
 
-        private static int IndexOf(IReadOnlyList<PhraseKind> rows, PhraseKind kind)
+        private static int IndexOf(IReadOnlyList<RailKind> rows, RailKind kind)
         {
             for (int i = 0; i < rows.Count; i++)
             {
@@ -876,8 +907,9 @@ namespace ChartBuilder.Controls.Editing
                 var note = notes[i];
                 if (note.Length <= EditableNote.PlainLength || (slots.Across == note.Lane))
                     continue;
-                var shown = Shown(game, note, drums);
-                int column = slots.IndexOf(note.Lane);
+                int lane = session.ShownLane(key, note);
+                var shown = Shown(game, note, drums, lane);
+                int column = slots.IndexOf(lane);
                 if (column < 0)
                     continue;
                 double start = projection.AlongOf(session.AudioAt(note.Tick));
@@ -921,7 +953,9 @@ namespace ChartBuilder.Controls.Editing
 
             void DrawNote(EditableNote note, bool across, bool barre)
             {
-                var shown = Shown(game, note, drums);
+                // Inside a disco flip section, on the pad the player hits (charter-spec C6 item 7).
+                int lane = session.ShownLane(key, note);
+                var shown = Shown(game, note, drums, lane);
                 var color = HighwayPalette.NoteColor(kind, laneCount, shown);
                 double along = projection.AlongOf(session.AudioAt(note.Tick));
                 Rect rect;
@@ -933,7 +967,7 @@ namespace ChartBuilder.Controls.Editing
                 }
                 else
                 {
-                    int column = slots.IndexOf(note.Lane);
+                    int column = slots.IndexOf(lane);
                     if (column < 0)
                         return;
                     rect = GemRect(projection, column, along, size);
@@ -971,23 +1005,27 @@ namespace ChartBuilder.Controls.Editing
             context.DrawText(text, at);
         }
 
-        /// <summary>The note the place tool would put down where the pointer is.</summary>
+        /// <summary>The note the place tool would put down where the pointer is, as it would be drawn.</summary>
         private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
             if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || PointAt(hover) is not { } point || point.Lane is not { } lane)
                 return;
             long tick = session.Snap.Nearest(point.Tick, session.TempoMap);
             int column = slots.IndexOf(lane);
-            if (column < 0 || track.TryGetNote(tick, lane, false, out _))
+            int stored = session.StoredLane(key, tick, lane);
+            if (column < 0 || track.TryGetNote(tick, stored, false, out _))
                 return;
             double along = projection.AlongOf(session.AudioAt(tick));
 
             // As it would be placed: numbered and coloured as Shown has it, and on Pro drums a cymbal unless a tom marker
-            // covers it.
+            // covers it. Inside a disco flip section, the red placed in yellow's column is a yellow cymbal, and the yellow
+            // placed in red's a red pad (C6 item 7).
             bool drums = track.Kind == ChartInstrumentKind.Drums;
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
-            bool cymbal = drums && session.Chart.DrumsVariant == DrumsVariant.Pro && lane is >= TomMarker.FirstPad and <= TomMarker.LastPad
-                && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
+            bool cymbal = stored != lane
+                ? lane == 2
+                : drums && session.Chart.DrumsVariant == DrumsVariant.Pro && lane is >= TomMarker.FirstPad and <= TomMarker.LastPad
+                    && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
             var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, cymbal ? NoteFlags.Cymbal : NoteFlags.None);
             var color = HighwayPalette.NoteColor(track.Kind, laneCount, placed);
             var rect = GemRect(projection, column, along, GemSize(projection));
@@ -1064,18 +1102,19 @@ namespace ChartBuilder.Controls.Editing
                     continue;
 
                 // Held while the games read it as a sustain and its tail hasn't passed.
-                var shown = Shown(game, note, drums);
+                int lane = session.ShownLane(key, note);
+                var shown = Shown(game, note, drums, lane);
                 double glow = StrikeGlow.Brightness(now - start, shown.Length > 0 && session.AudioAt(note.Tick + shown.Length) > now);
                 if (glow <= 0)
                     continue;
 
-                // An open note or kick across the highway lights every column.
+                // An open note or kick across the highway lights every column; a pad, the column it's drawn in.
                 if (slots.Across == note.Lane)
                 {
                     for (int c = 0; c < count; c++)
                         hits[c] = Math.Max(hits[c], glow * StrikeGlow.SpreadLevel);
                 }
-                else if (slots.IndexOf(note.Lane) is var column and >= 0)
+                else if (slots.IndexOf(lane) is var column and >= 0)
                 {
                     hits[column] = Math.Max(hits[column], glow);
                 }
@@ -1107,13 +1146,16 @@ namespace ChartBuilder.Controls.Editing
             : Math.Clamp(projection.LaneSize * 0.9, 8, 16);
 
         /// <summary>
-        /// How the games read <paramref name="note"/>: its game-view note, with its natural HOPO, star power and sustain
-        /// cutoff; or, when they don't read it as written, the note as it is. Its lane is numbered as the game view's are,
-        /// which the palette colours by: a drum pad's from red, and the kick as an open note.
+        /// How the games read <paramref name="note"/>, drawn in <paramref name="shownLane"/>
+        /// (<see cref="EditorSession.ShownLane(ChartTrackKey, EditableNote)"/>): its game-view note, with its natural HOPO,
+        /// star power and sustain cutoff; or, when they don't read it as written, the note as it is. Its lane is numbered as
+        /// the game view's are, which the palette colours by: a drum pad's from red, and the kick as an open note. Inside a
+        /// disco flip section, that's the pad the player hits, so a red note finds the yellow cymbal the games make of it,
+        /// and is one when there's no game view to find it in (a ghost difficulty's).
         /// </summary>
-        private static ChartNote Shown(IReadOnlyList<ChartNote>? game, EditableNote note, bool drums)
+        private static ChartNote Shown(IReadOnlyList<ChartNote>? game, EditableNote note, bool drums, int shownLane)
         {
-            int lane = drums ? (note.Lane == 0 ? ChartNote.OpenLane : note.Lane - 1) : note.Lane;
+            int lane = drums ? (note.Lane == 0 ? ChartNote.OpenLane : shownLane - 1) : note.Lane;
             if (game is not null)
             {
                 int lo = 0, hi = game.Count;
@@ -1134,7 +1176,10 @@ namespace ChartBuilder.Controls.Editing
                 }
             }
 
-            return new ChartNote(note.Tick, note.Length, lane, note.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None);
+            var flags = note.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None;
+            if (drums && note.Lane != shownLane && shownLane == 2)
+                flags |= NoteFlags.Cymbal;
+            return new ChartNote(note.Tick, note.Length, lane, flags);
         }
 
         /// <summary>The longest note of <paramref name="track"/>, worked out once after each edit.</summary>

@@ -8,8 +8,8 @@
              x:Class="ChartBuilder.Views.PropertiesView"
              x:DataType="vm:PropertiesViewModel">
 
-    <!-- Properties (charter-spec C3 item 4): the selected notes, phrases, tempo markers and span. A field shows <<multiple>> when
-         the items differ, and a value typed there is applied to every item once the field loses focus. -->
+    <!-- Properties (charter-spec C3 item 4): the selected notes, phrases, disco flip sections, tempo markers and span. A field
+         shows <<multiple>> when the items differ, and a value typed there is applied to every item once the field loses focus. -->
     <UserControl.Styles>
         <Style Selector="TextBlock.section-heading">
             <Setter Property="FontSize" Value="13" />
@@ -93,6 +93,26 @@
                               SelectedItem="{Binding SelectedLowestDifficulty}"
                               DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
                               AutomationProperties.Name="{x:Static res:Strings.PropertiesLowestDifficultyLabel}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Disco flip sections: start and end, and the difficulty, which is only shown (charter-spec C6 item 7). -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasDiscoFlips}">
+            <TextBlock Classes="section-heading" Text="{Binding DiscoFlipsHeading}" />
+            <Border Classes="section">
+                <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
+                    <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesDifficultyLabel}" />
+                    <SelectableTextBlock Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding DiscoFlipDifficultyText}" />
+                    <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesStartLabel}" />
+                    <TextBox Grid.Row="1" Grid.Column="1"
+                             Text="{Binding DiscoFlipStartText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesStartLabel}" />
+                    <TextBlock Grid.Row="2" Classes="muted" Text="{x:Static res:Strings.PropertiesEndLabel}" />
+                    <TextBox Grid.Row="2" Grid.Column="1"
+                             Text="{Binding DiscoFlipEndText, UpdateSourceTrigger=LostFocus}"
+                             PlaceholderText="{x:Static res:Strings.PropertiesDiscoFlipNoEnd}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesEndLabel}" />
                 </Grid>
             </Border>
         </StackPanel>

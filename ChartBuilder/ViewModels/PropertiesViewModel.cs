@@ -17,8 +17,9 @@ namespace ChartBuilder.ViewModels
     public sealed record DifficultyChoice(ChartDifficulty Difficulty, string Label);
 
     /// <summary>
-    /// The Properties panel (charter-spec C3 item 4): the selected notes, phrases, tempo markers and span. A field shows
-    /// <see cref="Multiple"/> when the items differ, and editing it sets every item, as one undoable step.
+    /// The Properties panel (charter-spec C3 item 4): the selected notes, phrases, disco flip sections, tempo markers and
+    /// span. A field shows <see cref="Multiple"/> when the items differ, and editing it sets every item, as one undoable
+    /// step.
     /// </summary>
     public sealed partial class PropertiesViewModel : ViewModelBase
     {
@@ -47,13 +48,17 @@ namespace ChartBuilder.ViewModels
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsEmpty))]
+        public partial bool HasDiscoFlips { get; private set; }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsEmpty))]
         public partial bool HasTempos { get; private set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsEmpty))]
         public partial bool HasSpan { get; private set; }
 
-        public bool IsEmpty => !HasNotes && !HasPhrases && !HasTempos && !HasSpan;
+        public bool IsEmpty => !HasNotes && !HasPhrases && !HasDiscoFlips && !HasTempos && !HasSpan;
 
         [ObservableProperty]
         public partial string NotesHeading { get; private set; } = "";
@@ -146,6 +151,21 @@ namespace ChartBuilder.ViewModels
             [.. new[] { ChartDifficulty.Expert, ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy }.Select(d => new DifficultyChoice(d, ChartLabels.DifficultyName(d)))];
 
         [ObservableProperty]
+        public partial string DiscoFlipsHeading { get; private set; } = "";
+
+        /// <summary>Where the disco flip sections start, in ticks.</summary>
+        [ObservableProperty]
+        public partial string DiscoFlipStartText { get; set; } = "";
+
+        /// <summary>Where the disco flip sections end, in ticks: the tick disco flip goes off. Empty for one that never ends.</summary>
+        [ObservableProperty]
+        public partial string DiscoFlipEndText { get; set; } = "";
+
+        /// <summary>The difficulty each disco flip section is of, which it doesn't change (charter-spec C6 item 7).</summary>
+        [ObservableProperty]
+        public partial string DiscoFlipDifficultyText { get; private set; } = "";
+
+        [ObservableProperty]
         public partial string TemposHeading { get; private set; } = "";
 
         [ObservableProperty]
@@ -175,6 +195,7 @@ namespace ChartBuilder.ViewModels
             {
                 RefreshNotes();
                 RefreshPhrases();
+                RefreshDiscoFlips();
                 RefreshTempos();
                 RefreshSpan();
             }
@@ -240,6 +261,24 @@ namespace ChartBuilder.ViewModels
                 return;
             if (long.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick) && tick >= 0)
                 Session.Tools.SetPhraseEnd(tick);
+            Refresh();
+        }
+
+        partial void OnDiscoFlipStartTextChanged(string value)
+        {
+            if (_loading)
+                return;
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick) && tick >= 0)
+                Session.Tools.SetDiscoFlipStart(tick);
+            Refresh();
+        }
+
+        partial void OnDiscoFlipEndTextChanged(string value)
+        {
+            if (_loading)
+                return;
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick) && tick >= 0)
+                Session.Tools.SetDiscoFlipEnd(tick);
             Refresh();
         }
 
@@ -418,8 +457,9 @@ namespace ChartBuilder.ViewModels
         {
             var part = Session.Chart.PartOf(key.Instrument)!;
             var pads = notes.Where(static n => n.Lane > 0).ToList();
+            // Not a yellow inside a disco flip section, which the games play as red (charter-spec C6 item 7).
             var cymbals = Session.Chart.DrumsVariant == DrumsVariant.Pro
-                ? pads.Where(static n => n.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad).ToList()
+                ? pads.Where(n => Session.Tools.CanToggleCymbal(key, n)).ToList()
                 : [];
             var kicks = notes.Where(static n => n.Lane == 0).ToList();
 
@@ -448,6 +488,22 @@ namespace ChartBuilder.ViewModels
             var lowest = phrases.Where(p => Phrase.HasLowestDifficulty(p.Kind)).Select(p => p.LowestDifficulty).Distinct().ToList();
             HasLowestDifficulty = lowest.Count > 0;
             SelectedLowestDifficulty = lowest.Count == 1 ? LowestDifficultyChoices.FirstOrDefault(c => c.Difficulty == lowest[0]) : null;
+        }
+
+        /// <summary>The disco flip fields (charter-spec C3 item 4, C6 item 7): start and end, and the difficulty.</summary>
+        private void RefreshDiscoFlips()
+        {
+            var sections = Session.Selection.DiscoFlips;
+            HasDiscoFlips = sections.Count > 0;
+            if (!HasDiscoFlips)
+                return;
+
+            DiscoFlipsHeading = sections.Count == 1
+                ? Strings.PropertiesDiscoFlipHeading
+                : string.Format(CultureInfo.CurrentCulture, Strings.PropertiesDiscoFlipsHeadingFormat, sections.Count);
+            DiscoFlipStartText = Same(sections, s => s.Range.Tick.ToString(CultureInfo.CurrentCulture));
+            DiscoFlipEndText = Same(sections, s => s.Range.EndTick?.ToString(CultureInfo.CurrentCulture) ?? "");
+            DiscoFlipDifficultyText = Same(sections, s => ChartLabels.DifficultyName(s.Difficulty));
         }
 
         private void RefreshTempos()

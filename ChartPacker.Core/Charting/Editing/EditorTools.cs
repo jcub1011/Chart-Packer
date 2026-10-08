@@ -16,6 +16,9 @@ public sealed partial class EditorTools
 {
     private const string DoubleKickOffExpert = "A 2x kick is on Expert only.";
     private const string NoPhraseLength = "A phrase has to end after it starts.";
+    private const string NoDiscoFlipLength = "A disco flip section has to end after it starts.";
+    private const string DiscoFlipOffPro = "Only Pro drums have disco flip.";
+    private const string DiscoFlipWithoutEnd = "This disco flip section never ends, as the file has it, so it can't be moved or have its start changed. Give it an end first.";
 
     private readonly EditorSession _session;
     private Gesture? _gesture;
@@ -54,7 +57,7 @@ public sealed partial class EditorTools
             EditorTool.Place => PressPlace(point, shift),
             EditorTool.Erase => new EraseGesture(this, point),
             EditorTool.Sustain => PressSustain(point),
-            EditorTool.Phrase => point.Lane is null ? null : new PhraseDrawGesture(this, point, _session.PhraseKind),
+            EditorTool.Phrase => point.Lane is null ? null : PressDraw(point),
             EditorTool.Tempo => PressTempo(point),
             _ => null,
         };
@@ -81,14 +84,16 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Places a note in <paramref name="lane"/> at the cursor of the focused lane, or removes the one there (charter-spec
-    /// §9: 1–5, and 0 for an open note or the kick).
+    /// Places a note in <paramref name="shown"/>'s column at the cursor of the focused lane, or removes the one there
+    /// (charter-spec §9: 1–5, and 0 for an open note or the kick). Inside a disco flip section, it's the pad drawn in that
+    /// column (C6 item 7), so 2 places red.
     /// </summary>
-    public void ToggleNoteAtCursor(int lane)
+    public void ToggleNoteAtCursor(int shown)
     {
         if (_session.Focused is not { } key || _session.TrackOf(key) is not { } track)
             return;
         long tick = _session.CursorTick;
+        int lane = _session.StoredLane(key, tick, shown);
         if (track.TryGetNote(tick, lane, doubleKick: false, out var note))
         {
             _session.Execute(new RemoveNotes(key.Instrument, key.Difficulty, [note]));
@@ -121,8 +126,8 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Moves the selected notes <paramref name="steps"/> grid steps in time and <paramref name="lanes"/> lanes across
-    /// (charter-spec §9, Alt+arrows), as one step.
+    /// Moves the selected notes <paramref name="steps"/> grid steps in time and <paramref name="lanes"/> columns across
+    /// (charter-spec §9, Alt+arrows), as one step; across the columns as they're drawn (<see cref="MoveOf"/>).
     /// </summary>
     public void MoveSelection(int steps, int lanes, LaneSlots slots)
     {
@@ -134,18 +139,18 @@ public sealed partial class EditorTools
             return;
         var first = notes[0];
         long tickDelta = steps == 0 ? 0 : Snap.Step(first.Tick, steps, Map) - first.Tick;
-        int laneDelta = LaneDelta(notes, lanes, slots);
+        int laneDelta = LaneDelta(ShownLanes(key, notes), lanes, slots);
         if (tickDelta == 0 && laneDelta == 0)
             return;
-        var command = new MoveNotes(key.Instrument, key.Difficulty, notes, tickDelta, laneDelta);
-        if (MoveRefusal(key, notes, tickDelta, laneDelta) is { } why)
+        var (command, moved) = MoveOf(key, notes, tickDelta, laneDelta);
+        if (MoveRefusal(key, notes, moved) is { } why)
         {
             _session.Status = why;
             return;
         }
 
         if (_session.Execute(command))
-            _session.Selection.Select(key, command.Moved);
+            _session.Selection.Select(key, moved);
     }
 
     /// <summary>Selects every note of the focused lane (Ctrl+A).</summary>
@@ -156,7 +161,7 @@ public sealed partial class EditorTools
         _session.Selection.Select(key, track.Notes);
     }
 
-    /// <summary>Deletes the selected notes, phrases and tempo markers (Delete), as one step.</summary>
+    /// <summary>Deletes the selected notes, phrases, disco flip sections and tempo markers (Delete), as one step.</summary>
     public void DeleteSelection()
     {
         var selection = _session.Selection;
@@ -168,6 +173,9 @@ public sealed partial class EditorTools
             foreach (var phrase in selection.Phrases)
                 steps.Add(() => (new RemovePhrase(part, phrase), null));
         }
+
+        foreach (var section in selection.DiscoFlips)
+            steps.Add(() => (new RemoveDiscoFlip(section.Difficulty, section.Range), null));
 
         // Each removal is worked out against the chart the ones before it leave.
         foreach (long tick in selection.TempoTicks.Reverse())
@@ -231,6 +239,88 @@ public sealed partial class EditorTools
     /// </summary>
     public void SetLowestDifficulty(ChartDifficulty difficulty) =>
         ChangeSelectedPhrases(p => Phrase.HasLowestDifficulty(p.Kind) ? p with { LowestDifficulty = difficulty } : p);
+
+    /// <summary>
+    /// Moves the start of every selected disco flip section to <paramref name="tick"/>, keeping its end, as Properties sets
+    /// it (charter-spec C3 item 4, C6 item 7), as one step.
+    /// </summary>
+    public void SetDiscoFlipStart(long tick) => ChangeSelectedDiscoFlips(r => (tick, r.EndTick));
+
+    /// <summary>Moves the end of every selected disco flip section to <paramref name="tick"/>, as Properties sets it, as one step.</summary>
+    public void SetDiscoFlipEnd(long tick) => ChangeSelectedDiscoFlips(r => (r.Tick, tick));
+
+    /// <summary>Changes the selected disco flip sections, as one step, and selects them as they become.</summary>
+    private void ChangeSelectedDiscoFlips(Func<DiscoFlipRange, (long Tick, long? EndTick)> change)
+    {
+        var selection = _session.Selection;
+        var selected = selection.DiscoFlips;
+        var changes = new List<(DiscoFlipSection From, long Tick, long EndTick)>();
+        foreach (var section in selected)
+        {
+            var (tick, end) = change(section.Range);
+            if (tick == section.Range.Tick && end == section.Range.EndTick)
+                continue;
+            if (end is not { } endTick)
+            {
+                _session.Status = DiscoFlipWithoutEnd;
+                return;
+            }
+
+            if (tick < 0 || endTick <= tick)
+            {
+                _session.Status = NoDiscoFlipLength;
+                return;
+            }
+
+            changes.Add((section, tick, endTick));
+        }
+
+        if (changes.Count > 0 && _session.Execute(DiscoFlipChangeOf(changes)))
+            ReselectDiscoFlips(selected, changes.Select(static c => (c.From, c.Tick)));
+    }
+
+    /// <summary>
+    /// Selects <paramref name="selected"/> in place of the disco flip sections selected, each of <paramref name="changed"/>
+    /// as the edit has left it: the section now covering its new start.
+    /// </summary>
+    private void ReselectDiscoFlips(IEnumerable<DiscoFlipSection> selected, IEnumerable<(DiscoFlipSection From, long Tick)> changed)
+    {
+        var now = changed.ToDictionary(static c => c.From, c => SectionAt(c.From.Difficulty, c.Tick));
+        var selection = _session.Selection;
+        selection.ReplaceDiscoFlips(selected.Select(s => now.TryGetValue(s, out var after) ? after : s).OfType<DiscoFlipSection>());
+        selection.Reconcile();
+    }
+
+    /// <summary>
+    /// The command that changes each disco flip section to start and end where given, as one: those moving later first,
+    /// the latest first, then the others, the earliest first, so none is refused for a place another is leaving.
+    /// </summary>
+    private static IChartCommand DiscoFlipChangeOf(IEnumerable<(DiscoFlipSection From, long Tick, long EndTick)> changes)
+    {
+        var ordered = changes
+            .OrderByDescending(static c => c.Tick > c.From.Range.Tick)
+            .ThenBy(static c => c.Tick > c.From.Range.Tick ? -c.From.Range.Tick : c.From.Range.Tick)
+            .Select(static c => (IChartCommand)new ChangeDiscoFlip(c.From.Difficulty, c.From.Range, c.Tick, c.EndTick))
+            .ToList();
+        return ordered.Count == 1 ? ordered[0] : new CompositeCommand(ordered);
+    }
+
+    /// <summary>
+    /// The disco flip section of <paramref name="difficulty"/> that covers <paramref name="tick"/> as the chart is now, for
+    /// selecting a section as an edit has left it: moved, or joined with one it now touches.
+    /// </summary>
+    private DiscoFlipSection? SectionAt(ChartDifficulty difficulty, long tick)
+    {
+        if (Chart.PartOf(ChartInstrument.Drums) is not { } drums)
+            return null;
+        foreach (var range in DiscoFlips.RangesOf(drums[difficulty]))
+        {
+            if (range.Covers(tick))
+                return new DiscoFlipSection(difficulty, range);
+        }
+
+        return null;
+    }
 
     /// <summary>Changes the selected phrases, as one step, and selects them as they become.</summary>
     private void ChangeSelectedPhrases(Func<Phrase, Phrase> change)
@@ -424,24 +514,39 @@ public sealed partial class EditorTools
         return notes.Count == 0 ? null : (key, drums, notes);
     }
 
-    /// <summary>The places of the selected yellow, blue and green drum notes; null, with the status saying why, when none is.</summary>
+    /// <summary>
+    /// The places of the selected yellow, blue and green drum notes; null, with the status saying why, when none is. Inside
+    /// a disco flip section (charter-spec C6 item 7), red and yellow are left out: the games play red as a yellow cymbal and
+    /// yellow as red whatever the tom markers say, so a toggle there would change only other difficulties' notes.
+    /// </summary>
     private (ChartTrackKey Key, EditablePart Drums, IReadOnlyList<(int Pad, long Tick)> Places)? SelectedCymbals()
     {
         if (SelectedDrums() is not { } selected)
             return null;
+        var key = selected.Key;
         var places = selected.Notes
-            .Where(static n => n.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad)
+            .Where(n => CanToggleCymbal(key, n))
             .Select(static n => (n.Lane, n.Tick))
             .Distinct()
             .ToList();
         if (places.Count == 0)
         {
-            _session.Status = "Only yellow, blue and green notes are cymbals or toms.";
+            _session.Status = selected.Notes.Any(n => _session.ShownLane(key, n) != n.Lane)
+                ? "Inside a disco flip, red plays as a yellow cymbal and yellow as red, so they can't be made cymbals or toms."
+                : "Only yellow, blue and green notes are cymbals or toms.";
             return null;
         }
 
         return (selected.Key, selected.Drums, places);
     }
+
+    /// <summary>
+    /// Whether <paramref name="note"/> of <paramref name="key"/>'s track can be made a cymbal or a tom (charter-spec C6
+    /// item 3): a yellow, blue or green note, but not one inside a disco flip section that the games play as red (C6 item
+    /// 7). <c>C</c> and Properties' Cymbal box go by this.
+    /// </summary>
+    public bool CanToggleCymbal(ChartTrackKey key, EditableNote note) =>
+        note.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad && _session.ShownLane(key, note) == note.Lane;
 
     /// <summary>The selected drum notes on a pad, not the kick; null, with the status saying why, when none is.</summary>
     private List<EditableNote>? SelectedPads()
@@ -505,24 +610,29 @@ public sealed partial class EditorTools
     /// <summary>
     /// The note whose start or tail is under <paramref name="point"/>, the start first, or null for none. In a shared
     /// column (GHL's), a note in the half the pointer is in comes first, then the other half's, whose gem fills the column
-    /// when it's alone.
+    /// when it's alone. A note is in the column it's drawn in: inside a disco flip section, the pad the player hits
+    /// (charter-spec C6 item 7, <see cref="EditorSession.ShownLane(ChartTrackKey, EditableNote)"/>).
     /// </summary>
-    public static (EditableNote Note, bool IsTail)? HitTest(EditableTrack track, ChartPoint point, int? across)
+    public (EditableNote Note, bool IsTail)? HitTest(ChartPoint point) =>
+        _session.TrackOf(point.Track) is { } track ? HitTest(track, point, n => _session.ShownLane(point.Track, n)) : null;
+
+    private static (EditableNote Note, bool IsTail)? HitTest(EditableTrack track, ChartPoint point, Func<EditableNote, int> shownLane)
     {
-        ArgumentNullException.ThrowIfNull(track);
         long from = (long)Math.Floor(point.Tick - point.Tolerance);
         long to = (long)Math.Ceiling(point.Tick + point.Tolerance);
         int? partner = point.Lane is { } pointed ? point.Slots.PartnerOf(pointed) : null;
+        int? across = point.Slots.Across;
         EditableNote? best = null, bestPartner = null, bestAcross = null;
         double bestDistance = double.MaxValue, bestPartnerDistance = double.MaxValue, bestAcrossDistance = double.MaxValue;
         foreach (var note in track.Notes.Between(Math.Max(0, from), to))
         {
             double distance = Math.Abs(note.Tick - point.Tick);
-            if (note.Lane == point.Lane && distance < bestDistance)
+            int drawn = shownLane(note);
+            if (drawn == point.Lane && distance < bestDistance)
                 (best, bestDistance) = (note, distance);
-            else if (note.Lane == partner && distance < bestPartnerDistance)
+            else if (drawn == partner && distance < bestPartnerDistance)
                 (bestPartner, bestPartnerDistance) = (note, distance);
-            else if (note.Lane == across && distance < bestAcrossDistance)
+            else if (drawn == across && distance < bestAcrossDistance)
                 (bestAcross, bestAcrossDistance) = (note, distance);
         }
 
@@ -536,7 +646,10 @@ public sealed partial class EditorTools
         for (int i = notes.FirstAfter((long)Math.Floor(point.Tick)) - 1; i >= 0; i--)
         {
             var note = notes[i];
-            if ((note.Lane == lane || note.Lane == partner) && note.Length > EditableNote.PlainLength && note.Tick + note.Length >= point.Tick)
+            if (note.Length <= EditableNote.PlainLength || note.Tick + note.Length < point.Tick)
+                continue;
+            int shown = shownLane(note);
+            if (shown == lane || shown == partner)
                 return (note, true);
         }
 
@@ -545,9 +658,8 @@ public sealed partial class EditorTools
 
     private Gesture? PressSelect(ChartPoint point, bool shift)
     {
-        var track = _session.TrackOf(point.Track)!;
         var selection = _session.Selection;
-        if (HitTest(track, point, point.Slots.Across) is { } hit)
+        if (HitTest(point) is { } hit)
         {
             if (hit.IsTail)
                 return SustainOf(point, hit.Note);
@@ -565,9 +677,12 @@ public sealed partial class EditorTools
     {
         var track = _session.TrackOf(point.Track)!;
         int? lane = shift ? ApartLane(point.Slots) : point.Lane;
-        if (lane is not { } placed)
+        if (lane is not { } shown)
             return null;
         long tick = Snap.Nearest(point.Tick, Map);
+
+        // The pad drawn in the column clicked: inside a disco flip section, yellow's column places red (C6 item 7).
+        int placed = _session.StoredLane(point.Track, tick, shown);
         if (track.TryGetNote(tick, placed, doubleKick: false, out var there))
         {
             _session.Selection.Select(point.Track, [there]);
@@ -587,8 +702,7 @@ public sealed partial class EditorTools
 
     private Gesture? PressSustain(ChartPoint point)
     {
-        var track = _session.TrackOf(point.Track)!;
-        return HitTest(track, point, point.Slots.Across) is { } hit ? SustainOf(point, hit.Note) : null;
+        return HitTest(point) is { } hit ? SustainOf(point, hit.Note) : null;
     }
 
     private SustainGesture SustainOf(ChartPoint point, EditableNote grabbed)
@@ -632,19 +746,25 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// A press in the phrase rail, with any tool: on a phrase's bar it selects the phrase (Shift adds it or takes it
-    /// away), and a drag moves it, or resizes it by the end grabbed. Elsewhere in the rail, the Phrase tool draws a phrase,
-    /// and the others select no phrases.
+    /// away), and a drag moves it, or resizes it by the end grabbed; the same on a disco flip section's bar. Elsewhere in
+    /// the rail, the Phrase tool draws, and the others select no phrases or sections.
     /// </summary>
     private Gesture? PressRail(ChartPoint point, bool shift)
     {
         var part = Chart.PartOf(point.Track.Instrument)!;
         var selection = _session.Selection;
+        if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is { } flip)
+            return PressDiscoFlip(point, flip, shift);
         if (PhraseRail.HitTest(part, point) is not { } hit)
         {
             if (_session.Tool == EditorTool.Phrase)
-                return new PhraseDrawGesture(this, point, _session.PhraseKind);
+                return PressDraw(point);
             if (!shift)
+            {
                 selection.ClearPhrases();
+                selection.ClearDiscoFlips();
+            }
+
             return null;
         }
 
@@ -659,15 +779,76 @@ public sealed partial class EditorTools
             : new PhraseResizeGesture(this, point, hit.Phrase, hit.Grip == PhraseGrip.Start);
     }
 
-    /// <summary>How many lanes <paramref name="notes"/> can move by, towards <paramref name="wanted"/>: none when an open note or a kick is among them, and never out of the lanes.</summary>
-    private static int LaneDelta(IReadOnlyList<EditableNote> notes, int wanted, LaneSlots slots)
+    /// <summary>
+    /// A press on a disco flip section's bar (charter-spec C6 item 7), as on a phrase's: it selects the section (Shift adds
+    /// it or takes it away), and a drag moves the selected sections, or resizes this one by the end grabbed.
+    /// </summary>
+    private Gesture? PressDiscoFlip(ChartPoint point, DiscoFlipHit hit, bool shift)
+    {
+        var selection = _session.Selection;
+        if (shift)
+            selection.Toggle(hit.Section);
+        else if (!selection.Contains(hit.Section))
+            selection.SelectDiscoFlips([hit.Section]);
+        if (!selection.Contains(hit.Section))
+            return null;
+        return hit.Grip == PhraseGrip.Body
+            ? new DiscoFlipMoveGesture(this, point, hit.Section)
+            : new DiscoFlipResizeGesture(this, point, hit.Section, hit.Grip == PhraseGrip.Start);
+    }
+
+    /// <summary>
+    /// A press with the Phrase tool where it draws: a phrase of the kind picked, or a disco flip section on the lane's
+    /// difficulty, which only Pro drums have.
+    /// </summary>
+    private Gesture? PressDraw(ChartPoint point)
+    {
+        if (_session.PhraseKind.Phrase is { } kind)
+            return new PhraseDrawGesture(this, point, kind);
+        if (ChartInstruments.KindOf(point.Track.Instrument) != ChartInstrumentKind.Drums || !_session.IsProDrums)
+        {
+            _session.Status = DiscoFlipOffPro;
+            return null;
+        }
+
+        return new DiscoFlipDrawGesture(this, point);
+    }
+
+    /// <summary>The lanes <paramref name="notes"/> of <paramref name="key"/>'s track are drawn in (<see cref="EditorSession.ShownLane(ChartTrackKey, EditableNote)"/>).</summary>
+    private List<int> ShownLanes(ChartTrackKey key, IReadOnlyList<EditableNote> notes) => [.. notes.Select(n => _session.ShownLane(key, n))];
+
+    /// <summary>
+    /// The command that moves <paramref name="notes"/> of <paramref name="key"/>'s track <paramref name="tickDelta"/> ticks
+    /// and <paramref name="laneDelta"/> columns across, as they're drawn, and where they land. A note moved only in time
+    /// keeps its pad, so it may be drawn in another column once it's in or out of a disco flip section (charter-spec C6
+    /// item 7). One moved across goes to the pad drawn in the column it's taken to, at the tick it lands on: inside a
+    /// section, red and yellow swap both ways. Where that isn't one lane delta for every note, the move is made as their
+    /// removal and their adding again, in one step.
+    /// </summary>
+    private (IChartCommand Command, IReadOnlyList<EditableNote> Moved) MoveOf(ChartTrackKey key, IReadOnlyList<EditableNote> notes, long tickDelta, int laneDelta)
+    {
+        var moved = notes
+            .Select(n => n with
+            {
+                Tick = n.Tick + tickDelta,
+                Lane = laneDelta == 0 ? n.Lane : _session.StoredLane(key, n.Tick + tickDelta, _session.ShownLane(key, n) + laneDelta),
+            })
+            .ToList();
+        int stored = moved[0].Lane - notes[0].Lane;
+        if (Enumerable.Range(0, notes.Count).All(i => moved[i].Lane - notes[i].Lane == stored))
+            return (new MoveNotes(key.Instrument, key.Difficulty, notes, tickDelta, stored), moved);
+        return (new CompositeCommand([new RemoveNotes(key.Instrument, key.Difficulty, notes), new AddNotes(key.Instrument, key.Difficulty, moved)]), moved);
+    }
+
+    /// <summary>How many columns notes drawn in <paramref name="lanes"/> can move by, towards <paramref name="wanted"/>: none when an open note or a kick is among them, and never out of the lanes.</summary>
+    private static int LaneDelta(IReadOnlyList<int> lanes, int wanted, LaneSlots slots)
     {
         int apart = ApartLane(slots);
-        if (wanted == 0 || notes.Any(n => n.Lane == apart || slots.IndexOf(n.Lane) < 0))
+        if (wanted == 0 || lanes.Any(l => l == apart || slots.IndexOf(l) < 0))
             return 0;
         int movable = slots.Across is null ? slots.Slots.Count - 1 : slots.Slots.Count;
-        int lowest = notes.Min(n => slots.IndexOf(n.Lane));
-        int highest = notes.Max(n => slots.IndexOf(n.Lane));
+        int lowest = lanes.Min(slots.IndexOf);
+        int highest = lanes.Max(slots.IndexOf);
 
         // The lanes are numbered in their column order, so a move across columns is a move across lane numbers. A
         // column's shared lanes are numbered in the same order (GHL's black frets), so they move with them.
@@ -707,12 +888,8 @@ public sealed partial class EditorTools
         return slots.Across ?? slots.Slots[^1];
     }
 
-    private string? MoveRefusal(ChartTrackKey key, IReadOnlyList<EditableNote> notes, long tickDelta, int laneDelta)
-    {
-        var track = _session.TrackOf(key)!;
-        var moved = notes.Select(n => n with { Tick = n.Tick + tickDelta, Lane = n.Lane + laneDelta });
-        return PlacementRefusal(track, moved, notes as IReadOnlyCollection<EditableNote>);
-    }
+    private string? MoveRefusal(ChartTrackKey key, IReadOnlyList<EditableNote> notes, IReadOnlyList<EditableNote> moved) =>
+        PlacementRefusal(_session.TrackOf(key)!, moved, notes as IReadOnlyCollection<EditableNote>);
 
     /// <summary>A gesture of one tool, from a press to its release.</summary>
     private abstract class Gesture(EditorTools tools)
@@ -734,15 +911,22 @@ public sealed partial class EditorTools
         }
     }
 
-    /// <summary>Drags selected notes in time (to the grid) and across lanes.</summary>
+    /// <summary>
+    /// Drags selected notes in time (to the grid) and across the columns as they're drawn (<see cref="MoveOf"/>). The
+    /// pointer's columns are the ones drawn, so its column delta is worked out on the notes' drawn lanes too.
+    /// </summary>
     private sealed class MoveGesture : Gesture
     {
         private readonly ChartTrackKey _track;
         private readonly ChartPoint _pressed;
         private readonly EditableNote _grabbed;
         private readonly IReadOnlyList<EditableNote> _notes;
+        private readonly List<int> _shown;
         private readonly IReadOnlyCollection<NotePlace> _selected;
-        private MoveNotes? _move;
+
+        // The move previewed, and the notes where it put them; null with none.
+        private (long Ticks, int Lanes)? _delta;
+        private IReadOnlyList<EditableNote>? _moved;
 
         public MoveGesture(EditorTools tools, ChartPoint pressed, EditableNote grabbed)
             : base(tools)
@@ -751,6 +935,7 @@ public sealed partial class EditorTools
             _pressed = pressed;
             _grabbed = grabbed;
             _notes = Session.Selection.Notes;
+            _shown = Tools.ShownLanes(_track, _notes);
             _selected = [.. Session.Selection.Places];
         }
 
@@ -762,37 +947,37 @@ public sealed partial class EditorTools
             int wanted = point.Lane is { } lane && _pressed.Lane is { } from && lane != apart && from != apart
                 ? point.Slots.IndexOf(lane) - point.Slots.IndexOf(from)
                 : 0;
-            int laneDelta = LaneDelta(_notes, wanted, point.Slots) + RowDelta(_notes, _pressed.Lane, point.Lane, point.Slots);
-            if (_move is { } current && current.TickDelta == tickDelta && current.LaneDelta == laneDelta)
+            int laneDelta = LaneDelta(_shown, wanted, point.Slots) + RowDelta(_notes, _pressed.Lane, point.Lane, point.Slots);
+            if (_delta == (tickDelta, laneDelta))
                 return;
 
             if (tickDelta == 0 && laneDelta == 0)
             {
                 Session.Preview(null);
-                _move = null;
+                (_delta, _moved) = (null, null);
                 Session.Selection.SelectPlaces(_track, _selected);
                 return;
             }
 
-            if (Tools.MoveRefusal(_track, _notes, tickDelta, laneDelta) is { } why)
+            var (command, moved) = Tools.MoveOf(_track, _notes, tickDelta, laneDelta);
+            if (Tools.MoveRefusal(_track, _notes, moved) is { } why)
             {
                 Session.Status = why;
                 return;
             }
 
-            var move = new MoveNotes(_track.Instrument, _track.Difficulty, _notes, tickDelta, laneDelta);
-            if (Session.Preview(move))
+            if (Session.Preview(command))
             {
-                _move = move;
-                Session.Selection.Select(_track, move.Moved);
+                (_delta, _moved) = ((tickDelta, laneDelta), moved);
+                Session.Selection.Select(_track, moved);
             }
         }
 
         public override void Release(ChartPoint point)
         {
             Drag(point);
-            if (Session.CommitPreview() is MoveNotes move)
-                Session.Selection.Select(_track, move.Moved);
+            if (Session.CommitPreview() is not null && _moved is { } moved)
+                Session.Selection.Select(_track, moved);
         }
 
         public override void Cancel() => Session.Selection.SelectPlaces(_track, _selected);
@@ -865,8 +1050,7 @@ public sealed partial class EditorTools
                 return;
 
             // The notes erased so far are out of the chart, as the preview, so the hit is among those left.
-            var track = Session.TrackOf(_track)!;
-            if (HitTest(track, point, point.Slots.Across) is not { } hit)
+            if (Tools.HitTest(point) is not { } hit)
                 return;
             _erased.Add(hit.Note);
             Session.Preview(new RemoveNotes(_track.Instrument, _track.Difficulty, _erased));
@@ -1085,6 +1269,171 @@ public sealed partial class EditorTools
         public override void Cancel() => Session.Selection.ReplacePhrases(_part, _selected);
     }
 
+    /// <summary>
+    /// Draws out a disco flip section on the lane's difficulty along time (charter-spec C6 item 7), as a phrase is drawn:
+    /// from the grid step pressed to the one the pointer is at, either way. A click without a drag adds nothing, and
+    /// selects no sections.
+    /// </summary>
+    private sealed class DiscoFlipDrawGesture : Gesture
+    {
+        private readonly ChartTrackKey _track;
+        private readonly long _from;
+        private (long Tick, long EndTick)? _tried;
+
+        public DiscoFlipDrawGesture(EditorTools tools, ChartPoint pressed)
+            : base(tools)
+        {
+            _track = pressed.Track;
+            _from = Tools.Snap.Nearest(pressed.Tick, Tools.Map);
+        }
+
+        public override void Drag(ChartPoint point)
+        {
+            if (point.Track != _track)
+                return;
+            long to = Tools.Snap.Nearest(point.Tick, Tools.Map);
+            (long, long)? span = to == _from ? null : (Math.Min(_from, to), Math.Max(_from, to));
+            if (span == _tried)
+                return;
+            _tried = span;
+
+            // A refusal, said in the status, leaves nothing to add, rather than the section drawn before it.
+            if (!Session.Preview(span is { } added ? new AddDiscoFlip(_track.Difficulty, added.Item1, added.Item2) : null))
+                Session.Preview(null);
+        }
+
+        public override void Release(ChartPoint point)
+        {
+            Drag(point);
+            if (Session.CommitPreview() is AddDiscoFlip added && Tools.SectionAt(added.Difficulty, added.Tick) is { } section)
+                Session.Selection.SelectDiscoFlips([section]);
+            else if (_tried is null)
+                Session.Selection.ClearDiscoFlips();
+        }
+    }
+
+    /// <summary>
+    /// Drags the selected disco flip sections in time, by the bar grabbed, to the grid, each keeping its length, as phrases
+    /// are dragged. Nothing moves until the pointer has, so a click only selects. A section without an end can't move.
+    /// </summary>
+    private sealed class DiscoFlipMoveGesture : Gesture
+    {
+        private readonly ChartPoint _pressed;
+        private readonly DiscoFlipSection _grabbed;
+        private readonly IReadOnlyList<DiscoFlipSection> _sections;
+
+        // The move last tried, so one refused isn't tried, and said, again as the pointer moves on within a grid step.
+        private long _delta;
+        private bool _moved;
+
+        public DiscoFlipMoveGesture(EditorTools tools, ChartPoint pressed, DiscoFlipSection grabbed)
+            : base(tools)
+        {
+            _pressed = pressed;
+            _grabbed = grabbed;
+            _sections = Session.Selection.DiscoFlips;
+        }
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - _pressed.Tick) > _pressed.Tolerance;
+            if (!_moved)
+                return;
+            long tick = Tools.Snap.Nearest(_grabbed.Range.Tick + (point.Tick - _pressed.Tick), Tools.Map);
+            long delta = Math.Max(tick - _grabbed.Range.Tick, -_sections.Min(static s => s.Range.Tick));
+            if (delta == _delta)
+                return;
+            _delta = delta;
+
+            Session.Preview(null);
+            Session.Selection.ReplaceDiscoFlips(_sections);
+            if (delta == 0)
+                return;
+            if (_sections.Any(static s => s.Range.EndTick is null))
+            {
+                Session.Status = DiscoFlipWithoutEnd;
+                return;
+            }
+
+            // A refusal, said in the status, leaves the sections where they were rather than where the last drag put them.
+            var changes = _sections.Select(s => (From: s, Tick: s.Range.Tick + delta, EndTick: s.Range.EndTick!.Value + delta)).ToList();
+            if (Session.Preview(DiscoFlipChangeOf(changes)))
+                Tools.ReselectDiscoFlips(_sections, changes.Select(static c => (c.From, c.Tick)));
+        }
+
+        public override void Cancel() => Session.Selection.ReplaceDiscoFlips(_sections);
+    }
+
+    /// <summary>
+    /// Drags one end of a disco flip section to the grid, the other staying where it is, as a phrase's end is dragged: it
+    /// never reaches the other end, and nothing changes until the pointer has moved. A section without an end can't have
+    /// its start dragged.
+    /// </summary>
+    private sealed class DiscoFlipResizeGesture : Gesture
+    {
+        private readonly ChartPoint _pressed;
+        private readonly DiscoFlipSection _section;
+        private readonly bool _start;
+        private readonly IReadOnlyList<DiscoFlipSection> _selected;
+
+        // The span last tried, so one refused isn't tried, and said, again as the pointer moves on within a grid step.
+        private (long Tick, long? EndTick) _tried;
+        private bool _moved;
+
+        public DiscoFlipResizeGesture(EditorTools tools, ChartPoint pressed, DiscoFlipSection section, bool start)
+            : base(tools)
+        {
+            _pressed = pressed;
+            _section = section;
+            _start = start;
+            _selected = Session.Selection.DiscoFlips;
+            _tried = (section.Range.Tick, section.Range.EndTick);
+        }
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - _pressed.Tick) > _pressed.Tolerance;
+            if (!_moved)
+                return;
+            if (_section.Range.EndTick is not { } end)
+            {
+                Session.Status = DiscoFlipWithoutEnd;
+                return;
+            }
+
+            var snap = Tools.Snap;
+            var map = Tools.Map;
+            long at = snap.Nearest(point.Tick, map);
+            long start = _section.Range.Tick;
+            if (_start)
+            {
+                if (at >= end)
+                    at = snap.IsOn ? snap.Step(end, -1, map) : end - 1;
+                if (at >= end || at < 0)
+                    return;
+                start = at;
+            }
+            else
+            {
+                end = Math.Max(at, snap.IsOn ? snap.Step(start, 1, map) : start + 1);
+            }
+
+            if ((start, end) == _tried)
+                return;
+            _tried = (start, end);
+
+            // A refusal, said in the status, leaves the section as it was rather than as the last drag made it.
+            Session.Preview(null);
+            Session.Selection.ReplaceDiscoFlips(_selected);
+            if ((start, end) == (_section.Range.Tick, _section.Range.EndTick))
+                return;
+            if (Session.Preview(new ChangeDiscoFlip(_section.Difficulty, _section.Range, start, end)))
+                Tools.ReselectDiscoFlips(_selected, [(_section, start)]);
+        }
+
+        public override void Cancel() => Session.Selection.ReplaceDiscoFlips(_selected);
+    }
+
     /// <summary>Drags a box over notes, selecting them and the span of ticks it covers; a click in an empty place clears the selection.</summary>
     private sealed class BoxGesture : Gesture
     {
@@ -1119,10 +1468,11 @@ public sealed partial class EditorTools
             if (a is null || b is null)
                 (lo, hi) = (0, slots.Slots.Count - 1);
 
+            // By the columns the notes are drawn in, which inside a disco flip section swap red and yellow.
             var inBox = new List<NotePlace>();
             foreach (var note in track.Notes.Between(from, to))
             {
-                int index = slots.IndexOf(note.Lane);
+                int index = slots.IndexOf(Session.ShownLane(_pressed.Track, note));
                 if ((index >= lo && index <= hi) || (index < 0 && note.Lane == slots.Across))
                     inBox.Add(NotePlace.Of(note));
             }

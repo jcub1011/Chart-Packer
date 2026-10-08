@@ -1094,6 +1094,26 @@ Open it anyway?</value>
     <value>Big rock ending</value>
     <comment>A kind of phrase.</comment>
   </data>
+  <data name="PhraseKindDiscoFlip" xml:space="preserve">
+    <value>Disco flip</value>
+    <comment>What the Phrase tool can draw on Pro drums besides phrases: a section where the games swap red and yellow.</comment>
+  </data>
+  <data name="PropertiesDiscoFlipHeading" xml:space="preserve">
+    <value>Disco flip</value>
+    <comment>Properties' heading for one selected disco flip section.</comment>
+  </data>
+  <data name="PropertiesDiscoFlipsHeadingFormat" xml:space="preserve">
+    <value>{0} disco flip sections</value>
+    <comment>Properties' heading for several selected disco flip sections, with how many.</comment>
+  </data>
+  <data name="PropertiesDifficultyLabel" xml:space="preserve">
+    <value>Difficulty</value>
+    <comment>A Properties field: the difficulty a disco flip section is on. It can't be changed there.</comment>
+  </data>
+  <data name="PropertiesDiscoFlipNoEnd" xml:space="preserve">
+    <value>Never ends</value>
+    <comment>Shown in a disco flip section's empty End field when the file never turns disco flip off.</comment>
+  </data>
   <data name="PropertiesPhraseHeading" xml:space="preserve">
     <value>Phrase</value>
     <comment>Properties' heading for one selected phrase.</comment>

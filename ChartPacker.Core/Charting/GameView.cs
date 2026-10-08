@@ -108,6 +108,31 @@ public static class GameView
     }
 
     /// <summary>
+    /// Where the games swap red and yellow on <paramref name="chart"/>'s drums (charter-spec C6 item 7), worked out as
+    /// <see cref="Project(EditableChart, ChartReadOptions)"/> works out each drum note's: from the mix events the reader
+    /// reads, the model's and any kept as text, and the drums' layout, given <paramref name="options"/>. None when the
+    /// chart has no drums, and none unless the games read them as Pro.
+    /// </summary>
+    public static GameDiscoFlips DiscoFlips(EditableChart chart, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        var drums = chart.Parts.FirstOrDefault(p => p.Kind == ChartInstrumentKind.Drums);
+        if (drums is null)
+            return GameDiscoFlips.None;
+
+        // The notes are in tick order, so each difficulty's last is its latest.
+        var lastTicks = new Dictionary<ChartDifficulty, long>();
+        foreach (var track in drums.Tracks)
+        {
+            if (track.Notes.Count > 0)
+                lastTicks[track.Difficulty] = track.Notes[track.Notes.Count - 1].Tick;
+        }
+
+        return GameDiscoFlips.Read(lastTicks, GameNotes.MixesOf(TextsOf(drums)), DrumsLayoutOf(drums, SavedTomMarkers(chart, drums), options));
+    }
+
+    /// <summary>
     /// The drums' tom markers as the saved file has them: none for 4-lane drums, whose markers the writer leaves out, as
     /// the games would read any as Pro drums (charter-spec C6 item 9).
     /// </summary>

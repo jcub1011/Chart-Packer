@@ -41,7 +41,7 @@ internal static class EditorSessions
     }
 
     /// <summary>The point at <paramref name="tick"/> in the phrase rail's row for <paramref name="row"/> beside <paramref name="key"/>'s lane, in <paramref name="view"/>.</summary>
-    public static ChartPoint RailAt(EditorSession session, double tick, PhraseKind row, LaneView view = LaneView.Highway, ChartTrackKey? key = null, double tolerance = 10) =>
+    public static ChartPoint RailAt(EditorSession session, double tick, RailKind row, LaneView view = LaneView.Highway, ChartTrackKey? key = null, double tolerance = 10) =>
         At(session, tick, null, view, key, tolerance) with { Rail = row };
 
     /// <summary>Clicks at a point: a press and a release in one place.</summary>

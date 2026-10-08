@@ -36,7 +36,11 @@ public enum EditorModifiers
 /// The row of the phrase rail under the pointer (<see cref="PhraseRail"/>), by the kind it holds, or null when the pointer
 /// isn't in the rail. <paramref name="Lane"/> is null when it is.
 /// </param>
-public readonly record struct ChartPoint(ChartTrackKey Track, double Tick, int? Lane, double Tolerance, LaneSlots Slots, PhraseKind? Rail = null);
+/// <remarks>
+/// <paramref name="Lane"/> is the column the pointer is in, as drawn: inside a disco flip section of Pro drums, the pad
+/// the player hits, which the tools map back to the pad stored (<see cref="EditorSession.StoredLane"/>).
+/// </remarks>
+public readonly record struct ChartPoint(ChartTrackKey Track, double Tick, int? Lane, double Tolerance, LaneSlots Slots, RailKind? Rail = null);
 
 /// <summary>A change to the chart the editor shows: one done, undone or redone, or a gesture's preview.</summary>
 public sealed class EditorChartChangedEventArgs(ChartChange affected, bool isPreview) : EventArgs
@@ -64,6 +68,8 @@ public sealed class EditorSession
     private IReadOnlyList<KeyValuePair<string, string>> _songIni;
     private IChartCommand? _preview;
     private ChartReadOptions? _readOptions;
+    private GameDiscoFlips? _discoFlips;
+    private readonly Dictionary<ChartDifficulty, IReadOnlyList<DiscoFlipRange>> _discoFlipRanges = [];
 
     /// <param name="undo">The chart's undo stack.</param>
     /// <param name="delay">The song's delay: how much later than its ticks say the chart plays against the audio.</param>
@@ -118,6 +124,7 @@ public sealed class EditorSession
         Delay = delay;
         _readOptions = null;
         _game.Clear();
+        ForgetDiscoFlips();
         SongSettingsChanged?.Invoke(this, EventArgs.Empty);
         RaiseState();
     }
@@ -158,10 +165,11 @@ public sealed class EditorSession
     }
 
     /// <summary>
-    /// The kind of phrase the Phrase tool draws, of those the focused part can have (<see cref="PhraseRail.KindsOf"/>).
-    /// When the focus moves to a part that can't have it, it goes back to star power.
+    /// The kind of phrase the Phrase tool draws, of those offered for the focused part (<see cref="ToolKindsOf"/>), or disco
+    /// flip on Pro drums. When the focus moves to a part that isn't offered it, or the drums stop being Pro, it goes back
+    /// to star power.
     /// </summary>
-    public PhraseKind PhraseKind
+    public RailKind PhraseKind
     {
         get;
         set
@@ -185,8 +193,7 @@ public sealed class EditorSession
             if (field == value)
                 return;
             field = value;
-            if (value is { } key && !PhraseRail.KindsOf(ChartInstruments.KindOf(key.Instrument)).Contains(PhraseKind))
-                PhraseKind = PhraseKind.StarPower;
+            KeepPhraseKindOffered();
             RaiseState();
         }
     }
@@ -212,6 +219,62 @@ public sealed class EditorSession
 
     /// <summary>Whether the drums are drawn with five pads.</summary>
     public bool IsFiveLaneDrums => Chart.DrumsVariant is { } variant ? variant == DrumsVariant.FiveLane : GameView.IsFiveLaneDrums(Chart, ReadOptions);
+
+    /// <summary>Whether the drums are Pro, the only drums the games flip (charter-spec C6 item 7).</summary>
+    public bool IsProDrums => Chart.DrumsVariant is { } variant ? variant == DrumsVariant.Pro : DiscoFlips.IsProDrums;
+
+    /// <summary>
+    /// Where the games swap red and yellow on the drums (charter-spec C6 item 7), as the game view reads it. Worked out
+    /// again only after an edit touches the drums.
+    /// </summary>
+    public GameDiscoFlips DiscoFlips => _discoFlips ??= GameView.DiscoFlips(Chart, ReadOptions);
+
+    /// <summary>
+    /// The disco flip sections of <paramref name="key"/>'s track (<see cref="Charting.DiscoFlips.RangesOf"/>), for the rail
+    /// to draw and hit-test on every frame and pointer move; none when it isn't a drums track. Worked out again only after
+    /// an edit touches the drums.
+    /// </summary>
+    public IReadOnlyList<DiscoFlipRange> DiscoFlipRangesOf(ChartTrackKey key)
+    {
+        if (ChartInstruments.KindOf(key.Instrument) != ChartInstrumentKind.Drums || TrackOf(key) is not { } track)
+            return [];
+        if (!_discoFlipRanges.TryGetValue(key.Difficulty, out var ranges))
+        {
+            ranges = Charting.DiscoFlips.RangesOf(track);
+            _discoFlipRanges[key.Difficulty] = ranges;
+        }
+
+        return ranges;
+    }
+
+    /// <summary>
+    /// The lane a note stored in <paramref name="lane"/> at <paramref name="tick"/> of <paramref name="key"/>'s track is
+    /// drawn in: the pad the player hits (charter-spec C6 item 7). Where the games flip the drums (<see cref="DiscoFlips"/>),
+    /// red and yellow swap; everywhere else, and for every other lane, it's <paramref name="lane"/>. The canvases draw by
+    /// this, and the tools map the pointer's column back by <see cref="StoredLane"/>.
+    /// </summary>
+    public int ShownLane(ChartTrackKey key, long tick, int lane) =>
+        lane is 1 or 2 && ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums && DiscoFlips.IsFlipped(key.Difficulty, tick) ? 3 - lane : lane;
+
+    /// <summary>The lane <paramref name="note"/> of <paramref name="key"/>'s track is drawn in (<see cref="ShownLane(ChartTrackKey, long, int)"/>).</summary>
+    public int ShownLane(ChartTrackKey key, EditableNote note) => ShownLane(key, note.Tick, note.Lane);
+
+    /// <summary>
+    /// The lane a note drawn in <paramref name="shown"/> at <paramref name="tick"/> of <paramref name="key"/>'s track is
+    /// stored in: the pad drawn there, as <see cref="ShownLane(ChartTrackKey, long, int)"/> draws it. Swapping red and
+    /// yellow undoes itself, so it's the same mapping: a note placed in the yellow column inside a section is red.
+    /// </summary>
+    public int StoredLane(ChartTrackKey key, long tick, int shown) => ShownLane(key, tick, shown);
+
+    /// <summary>
+    /// The kinds the Phrase tool offers for <paramref name="instrument"/>'s part (charter-spec C8): its rail's rows, with
+    /// disco flip only on Pro drums (<see cref="PhraseRail.ToolKindsOf"/>).
+    /// </summary>
+    public IReadOnlyList<RailKind> ToolKindsOf(ChartInstrument instrument)
+    {
+        var kind = ChartInstruments.KindOf(instrument);
+        return PhraseRail.ToolKindsOf(kind, kind == ChartInstrumentKind.Drums && IsProDrums);
+    }
 
     /// <summary>Whether a gesture's preview is applied to the chart.</summary>
     public bool HasPreview => _preview is not null;
@@ -400,8 +463,19 @@ public sealed class EditorSession
     {
         Forget(affected);
         if (!isPreview)
+        {
             Selection.Reconcile();
+            KeepPhraseKindOffered();
+        }
+
         ChartChanged?.Invoke(this, new EditorChartChangedEventArgs(affected, isPreview));
+    }
+
+    // The Phrase tool's kind goes back to star power when the focused part isn't offered it.
+    private void KeepPhraseKindOffered()
+    {
+        if (Focused is { } key && !ToolKindsOf(key.Instrument).Contains(PhraseKind))
+            PhraseKind = Charting.PhraseKind.StarPower;
     }
 
     // Drops the game view of every track the change touched.
@@ -411,18 +485,29 @@ public sealed class EditorSession
         {
             _readOptions = null;
             _game.Clear();
+            ForgetDiscoFlips();
             return;
         }
 
         foreach (var region in affected.Regions)
         {
-            bool wholePart = region.Difficulty is null || ChartInstruments.KindOf(region.Part) == ChartInstrumentKind.Drums;
+            bool drums = ChartInstruments.KindOf(region.Part) == ChartInstrumentKind.Drums;
+            if (drums)
+                ForgetDiscoFlips();
+            bool wholePart = region.Difficulty is null || drums;
             foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
             {
                 if (wholePart || region.Difficulty == difficulty)
                     _game.Remove(new ChartTrackKey(region.Part, difficulty));
             }
         }
+    }
+
+    // Drops the flips and the sections worked out from the drums, once an edit has touched them or the song's settings changed.
+    private void ForgetDiscoFlips()
+    {
+        _discoFlips = null;
+        _discoFlipRanges.Clear();
     }
 
     private void RaiseState() => StateChanged?.Invoke(this, EventArgs.Empty);

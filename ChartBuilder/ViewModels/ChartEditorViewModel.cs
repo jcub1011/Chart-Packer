@@ -23,8 +23,8 @@ namespace ChartBuilder.ViewModels
     /// <summary>A snap the toolbar offers.</summary>
     public sealed record SnapChoice(int Division, string Label);
 
-    /// <summary>A kind of phrase the toolbar's picker offers the Phrase tool.</summary>
-    public sealed record PhraseKindChoice(PhraseKind Kind, string Label);
+    /// <summary>A kind of phrase the toolbar's picker offers the Phrase tool, or disco flip.</summary>
+    public sealed record PhraseKindChoice(RailKind Kind, string Label);
 
     /// <summary>
     /// The chart's editor (charter-spec §4.5, C3): the lanes and their canvases, the tools, the snap, and the editor's
@@ -43,9 +43,10 @@ namespace ChartBuilder.ViewModels
         // Tap tempo's message, which each tap updates.
         private const string TapTempoMessageKey = "tap-tempo";
 
-        // The Phrase tool's kinds, for 5-fret and GHL, and for drums.
-        private static readonly IReadOnlyList<PhraseKindChoice> FretPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.FiveFret);
-        private static readonly IReadOnlyList<PhraseKindChoice> DrumPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.Drums);
+        // The Phrase tool's kinds, for 5-fret and GHL, for 4-lane and 5-lane drums, and for Pro drums, which have disco flip.
+        private static readonly IReadOnlyList<PhraseKindChoice> FretPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.FiveFret, proDrums: false);
+        private static readonly IReadOnlyList<PhraseKindChoice> DrumPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.Drums, proDrums: false);
+        private static readonly IReadOnlyList<PhraseKindChoice> ProDrumPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.Drums, proDrums: true);
 
         private readonly BuilderSettingsService _settings;
         private readonly IConfirmationService _confirmations;
@@ -187,17 +188,21 @@ namespace ChartBuilder.ViewModels
         /// <summary>
         /// The kinds of phrase the Phrase tool offers for the part in focus (charter-spec C8): star power, solos and big
         /// rock endings on 5-fret and GHL; star power, solos, fills, rolls and trills on drums, whose big rock ending is a
-        /// fill after <c>[coda]</c>.
+        /// fill after <c>[coda]</c>; and on Pro drums, disco flip too (C6 item 7), the only drums the games flip.
         /// </summary>
         public IReadOnlyList<PhraseKindChoice> PhraseKindChoices =>
-            Session.Focused is { } key && ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums ? DrumPhraseChoices : FretPhraseChoices;
+            Session.Focused is { } key && ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums
+                ? Session.IsProDrums ? ProDrumPhraseChoices : DrumPhraseChoices
+                : FretPhraseChoices;
 
         /// <summary>The kind the Phrase tool draws. Picking one picks the Phrase tool too.</summary>
         public PhraseKindChoice? SelectedPhraseKind
         {
             get
             {
-                var kind = Session.Focused is { } key ? PhraseRail.RowOf(ChartInstruments.KindOf(key.Instrument), Session.PhraseKind) : Session.PhraseKind;
+                var kind = Session.PhraseKind;
+                if (kind.Phrase is { } phrase && Session.Focused is { } key)
+                    kind = PhraseRail.RowOf(ChartInstruments.KindOf(key.Instrument), phrase);
                 return PhraseKindChoices.FirstOrDefault(c => c.Kind == kind);
             }
 
@@ -368,8 +373,17 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsSustainTool));
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
+            RefreshPhraseChoices();
+            RefreshVisibleSpan();
+            ScheduleRefresh();
+        }
 
-            // The picker's list changes only with the kind of part in focus, so it isn't rebuilt on every change.
+        /// <summary>
+        /// The picker's list and pick, after the focus or the drums' variant changes. The list changes only with the kind of
+        /// part in focus and whether drums are Pro, so it isn't rebuilt on every change.
+        /// </summary>
+        private void RefreshPhraseChoices()
+        {
             if (!ReferenceEquals(_phraseChoices, PhraseKindChoices))
             {
                 _phraseChoices = PhraseKindChoices;
@@ -377,8 +391,6 @@ namespace ChartBuilder.ViewModels
             }
 
             OnPropertyChanged(nameof(SelectedPhraseKind));
-            RefreshVisibleSpan();
-            ScheduleRefresh();
         }
 
         /// <summary>A phrase's kind, in words: Star power, Solo, Drum fill…</summary>
@@ -392,8 +404,11 @@ namespace ChartBuilder.ViewModels
             _ => Strings.PhraseKindBigRockEnding,
         };
 
-        private static IReadOnlyList<PhraseKindChoice> PhraseChoicesOf(ChartInstrumentKind kind) =>
-            [.. PhraseRail.KindsOf(kind).Select(k => new PhraseKindChoice(k, PhraseKindName(k)))];
+        /// <summary>A kind the Phrase tool draws, in words: a phrase's kind, or Disco flip.</summary>
+        internal static string PhraseKindName(RailKind kind) => kind.Phrase is { } phrase ? PhraseKindName(phrase) : Strings.PhraseKindDiscoFlip;
+
+        private static IReadOnlyList<PhraseKindChoice> PhraseChoicesOf(ChartInstrumentKind kind, bool proDrums) =>
+            [.. PhraseRail.ToolKindsOf(kind, proDrums).Select(k => new PhraseKindChoice(k, PhraseKindName(k)))];
 
         // What the session says is why something was refused.
         private void OnStatusPosted(object? sender, string status) => Messages.Warning(status);
@@ -404,6 +419,7 @@ namespace ChartBuilder.ViewModels
                 return;
             ScheduleRefresh();
             Properties.Refresh();
+            RefreshPhraseChoices();
             foreach (var lane in Lanes.All)
                 lane.RefreshDifficulties();
         }
