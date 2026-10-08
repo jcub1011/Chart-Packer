@@ -17,8 +17,12 @@ namespace ChartPacker.UI.Controls.Highway
         private static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
         private static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
 
+        // How opaque a ghost note's face is.
+        private const double GhostOpacity = 0.45;
+
         private readonly Dictionary<Color, IBrush> _brushes = [];
         private readonly Dictionary<(Color, double), IPen> _pens = [];
+        private readonly Dictionary<Color, IPen> _dashedPens = [];
 
         // A cymbal's shape for each size of gem, at the origin, moved to each gem drawn.
         private readonly Dictionary<Size, StreamGeometry> _cymbals = [];
@@ -29,6 +33,26 @@ namespace ChartPacker.UI.Controls.Highway
         /// <param name="kind">How the part's notes are laid out, which says whether the note is a black fret.</param>
         /// <param name="outlined">Whether only its outline is drawn, so what's behind it shows through.</param>
         public void DrawGem(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
+        {
+            // A ghost: faded, with a dashed edge in its colour.
+            if (!outlined && (note.Flags & NoteFlags.Ghost) != 0)
+            {
+                using (context.PushOpacity(GhostOpacity))
+                    DrawFace(context, kind, note, color, rect, outlined);
+                DrawEdge(context, note, rect.Deflate(0.5), DashedPen(color));
+            }
+            else
+            {
+                DrawFace(context, kind, note, color, rect, outlined);
+            }
+
+            // An accent: a bright ring around it.
+            if ((note.Flags & NoteFlags.Accent) != 0)
+                DrawEdge(context, note, rect.Inflate(2), Pen(HighwayPalette.WhiteFret, 1.5));
+        }
+
+        /// <summary>Draws the gem itself, as <see cref="DrawGem"/> does, without an accent's or a ghost's marks.</summary>
+        private void DrawFace(DrawingContext context, ChartInstrumentKind kind, ChartNote note, Color color, Rect rect, bool outlined)
         {
             bool black = HighwayPalette.IsBlackFret(kind, note.Lane);
 
@@ -124,6 +148,28 @@ namespace ChartPacker.UI.Controls.Highway
 
                 context.DrawGeometry(null, OutlinePen, hexagon);
             }
+        }
+
+        /// <summary>Draws the edge of a gem's shape in <paramref name="rect"/>: a cymbal's hexagon, or a rounded gem's.</summary>
+        private void DrawEdge(DrawingContext context, ChartNote note, Rect rect, IPen pen)
+        {
+            if ((note.Flags & NoteFlags.Cymbal) == 0)
+            {
+                double radius = CornerOf(rect);
+                context.DrawRectangle(null, pen, rect, radius, radius);
+                return;
+            }
+
+            using (context.PushTransform(Matrix.CreateTranslation(rect.X, rect.Y)))
+                context.DrawGeometry(null, pen, Cymbal(rect.Size));
+        }
+
+        /// <summary>A dashed pen of <paramref name="color"/>, for a ghost's edge, made once.</summary>
+        private IPen DashedPen(Color color)
+        {
+            if (!_dashedPens.TryGetValue(color, out var pen))
+                _dashedPens[color] = pen = new ImmutablePen(color.ToUInt32(), 1, new ImmutableDashStyle([2, 1.5], 0));
+            return pen;
         }
 
         /// <summary>A brush of <paramref name="color"/>, made once.</summary>

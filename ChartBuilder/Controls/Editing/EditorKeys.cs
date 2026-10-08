@@ -59,8 +59,14 @@ namespace ChartBuilder.Controls.Editing
                 return true;
             }
 
-            // 1 to 5 (6 for GHL) are the lanes in a highway's order, and 0 the open note or the kick (§9). Shift+0, the 2×
-            // kick, comes with drums (CM3).
+            // 1 to 5 (6 for GHL) are the lanes in a highway's order, and 0 the open note or the kick; Shift+0 is the 2× kick
+            // (§9).
+            if (shift && !ctrl && !alt && LaneKey(key) == 0 && lane.Track is { Instrument: var instrument } && ChartInstruments.KindOf(instrument) == ChartInstrumentKind.Drums)
+            {
+                tools.ToggleDoubleKickAtCursor();
+                return true;
+            }
+
             if (plain && LaneKey(key) is { } number && lane.Track is not null)
             {
                 var placeable = LaneSlots.Of(ChartInstruments.KindOf(lane.Track!.Value.Instrument), LaneView.Highway, session.IsFiveLaneDrums);
@@ -110,6 +116,15 @@ namespace ChartBuilder.Controls.Editing
                     return true;
                 case PhysicalKey.T when plain:
                     tools.ToggleChordFlag(ChordFlags.Tap);
+                    return true;
+                case PhysicalKey.C when plain:
+                    tools.ToggleCymbal();
+                    return true;
+                case PhysicalKey.A when plain:
+                    tools.ToggleDynamics(NoteDynamics.Accent);
+                    return true;
+                case PhysicalKey.A when shift && !ctrl && !alt:
+                    tools.ToggleDynamics(NoteDynamics.Ghost);
                     return true;
                 case PhysicalKey.B when plain:
                     editor.Tap();

@@ -135,13 +135,6 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether drums are ticked, so their variant is offered.</summary>
         public bool HasDrums => Parts.Any(p => p.IsDrums && p.IsChecked);
 
-        /// <summary>Whether the drum variant can be changed: not while the drums have notes, until their conversion comes.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(DrumsToolTip))]
-        public partial bool CanChangeDrums { get; private set; }
-
-        public string? DrumsToolTip => CanChangeDrums ? null : Strings.ChartSettingsDrumsLockedToolTip;
-
         /// <summary>What stops a change being applied, or why the last one wasn't; null when nothing does.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasProblem))]
@@ -299,7 +292,6 @@ namespace ChartBuilder.ViewModels
                 foreach (var part in Parts)
                     part.IsChecked = values.Parts.Contains(part.Instrument);
                 SelectedDrums = DrumsVariants.First(d => d.Value == values.Drums);
-                CanChangeDrums = _chart.PartOf(ChartInstrument.Drums)?.HasNotes != true;
             }
             finally
             {

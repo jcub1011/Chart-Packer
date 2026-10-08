@@ -188,7 +188,28 @@ namespace ChartBuilder.ViewModels
                 // Refused before anything changed, as every command checks first, so Chart settings shows the chart again.
                 Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsNotAppliedFormat, ex.Message));
                 ChartSettings.Reload();
+                return;
             }
+
+            if (DrumConversionText.ConversionIn(command) is { Report: { } report } conversion)
+                ReportConversion(conversion, report);
+        }
+
+        /// <summary>
+        /// Says what a drum conversion did (charter-spec C6 item 8). When it left notes out or changed them, the Messages
+        /// dialog opens on the report, as nothing else lists notes no longer in the chart.
+        /// </summary>
+        private void ReportConversion(ConvertDrums conversion, DrumConversionReport report)
+        {
+            string text = DrumConversionText.Format(conversion, report, tick => Editor.Session.AudioAt(tick));
+            if (!DrumConversionText.NeedsReading(report))
+            {
+                Messages.Info(text);
+                return;
+            }
+
+            Messages.Warning(text);
+            _ = ShowMessagesAsync();
         }
 
         [RelayCommand(CanExecute = nameof(CanUndo))]

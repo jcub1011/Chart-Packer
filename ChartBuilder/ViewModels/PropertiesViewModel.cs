@@ -79,6 +79,35 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial bool? IsTap { get; set; }
 
+        /// <summary>Whether the notes are drums, which have cymbals, accents, ghosts and 2× kicks rather than forcing.</summary>
+        [ObservableProperty]
+        public partial bool IsDrums { get; private set; }
+
+        /// <summary>Whether a selected note can be a cymbal or a tom: a yellow, blue or green note of Pro drums.</summary>
+        [ObservableProperty]
+        public partial bool CanCymbal { get; private set; }
+
+        /// <summary>Whether the selected yellow, blue and green notes are cymbals; tom markers make them toms (C6 item 3).</summary>
+        [ObservableProperty]
+        public partial bool? IsCymbal { get; set; }
+
+        /// <summary>Whether a selected note can be an accent or a ghost: one on a pad, not the kick.</summary>
+        [ObservableProperty]
+        public partial bool CanDynamics { get; private set; }
+
+        [ObservableProperty]
+        public partial bool? IsAccent { get; set; }
+
+        [ObservableProperty]
+        public partial bool? IsGhost { get; set; }
+
+        /// <summary>Whether a selected note can be a 2× kick: a kick on Expert.</summary>
+        [ObservableProperty]
+        public partial bool CanDoubleKick { get; private set; }
+
+        [ObservableProperty]
+        public partial bool? IsDoubleKick { get; set; }
+
         [ObservableProperty]
         public partial string TemposHeading { get; private set; } = "";
 
@@ -164,6 +193,26 @@ namespace ChartBuilder.ViewModels
 
         partial void OnIsTapChanged(bool? value) => SetChordFlag(ChordFlags.Tap, value);
 
+        partial void OnIsCymbalChanged(bool? value)
+        {
+            if (_loading || value is not { } cymbal)
+                return;
+            Session.Tools.SetTom(!cymbal);
+            Refresh();
+        }
+
+        partial void OnIsAccentChanged(bool? value) => SetDynamics(NoteDynamics.Accent, value);
+
+        partial void OnIsGhostChanged(bool? value) => SetDynamics(NoteDynamics.Ghost, value);
+
+        partial void OnIsDoubleKickChanged(bool? value)
+        {
+            if (_loading || value is not { } on)
+                return;
+            Session.Tools.SetDoubleKick(on);
+            Refresh();
+        }
+
         partial void OnBpmTextChanged(string value)
         {
             if (_loading)
@@ -236,6 +285,15 @@ namespace ChartBuilder.ViewModels
             Refresh();
         }
 
+        /// <summary>Makes the selected pads <paramref name="dynamics"/>, or normal hits when it's unticked.</summary>
+        private void SetDynamics(NoteDynamics dynamics, bool? value)
+        {
+            if (_loading || value is not { } on)
+                return;
+            Session.Tools.SetDynamics(on ? dynamics : NoteDynamics.None);
+            Refresh();
+        }
+
         private void SetSignature()
         {
             if (_loading)
@@ -281,11 +339,33 @@ namespace ChartBuilder.ViewModels
             MeasureBeatText = Same(notes, n => MeasureBeat(map, n.Tick));
             LaneText = Same(notes, n => LaneName(track.Kind, n, Session.IsFiveLaneDrums));
             LengthText = Same(notes, n => n.Length.ToString(CultureInfo.CurrentCulture));
-            CanForce = track.Kind != ChartInstrumentKind.Drums;
+            IsDrums = track.Kind == ChartInstrumentKind.Drums;
+            CanForce = !IsDrums;
             var chords = notes.Select(n => track.FlagsAt(n.Tick)).ToList();
-            IsForcedHopo = AllOrNone(chords, ChordFlags.ForceHopo);
-            IsForcedStrum = AllOrNone(chords, ChordFlags.ForceStrum);
-            IsTap = AllOrNone(chords, ChordFlags.Tap);
+            IsForcedHopo = AllOrNone(chords, c => c.HasFlag(ChordFlags.ForceHopo));
+            IsForcedStrum = AllOrNone(chords, c => c.HasFlag(ChordFlags.ForceStrum));
+            IsTap = AllOrNone(chords, c => c.HasFlag(ChordFlags.Tap));
+            if (IsDrums)
+                RefreshDrums(key, notes);
+        }
+
+        /// <summary>The drum fields: cymbal or tom, accent, ghost and 2× kick (charter-spec C6).</summary>
+        private void RefreshDrums(ChartTrackKey key, IReadOnlyList<EditableNote> notes)
+        {
+            var part = Session.Chart.PartOf(key.Instrument)!;
+            var pads = notes.Where(static n => n.Lane > 0).ToList();
+            var cymbals = Session.Chart.DrumsVariant == DrumsVariant.Pro
+                ? pads.Where(static n => n.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad).ToList()
+                : [];
+            var kicks = notes.Where(static n => n.Lane == 0).ToList();
+
+            CanCymbal = cymbals.Count > 0;
+            IsCymbal = AllOrNone(cymbals, n => !DrumCymbals.IsTom(part, n.Lane, n.Tick));
+            CanDynamics = pads.Count > 0;
+            IsAccent = AllOrNone(pads, static n => n.Dynamics == NoteDynamics.Accent);
+            IsGhost = AllOrNone(pads, static n => n.Dynamics == NoteDynamics.Ghost);
+            CanDoubleKick = kicks.Count > 0 && key.Difficulty == ChartDifficulty.Expert;
+            IsDoubleKick = AllOrNone(kicks, static n => n.DoubleKick);
         }
 
         private void RefreshTempos()
@@ -326,8 +406,9 @@ namespace ChartBuilder.ViewModels
             return values.Count == 1 ? values[0] : Multiple;
         }
 
-        private static bool? AllOrNone(List<ChordFlags> chords, ChordFlags flag) =>
-            chords.All(c => c.HasFlag(flag)) ? true : chords.Any(c => c.HasFlag(flag)) ? null : false;
+        /// <summary>True when every item is so, false when none is (or there are none), and null when some are.</summary>
+        private static bool? AllOrNone<T>(List<T> items, Func<T, bool> test) =>
+            items.Count > 0 && items.All(test) ? true : items.Any(test) ? null : false;
 
         private static TimeSignature SignatureAt(TempoMap map, long tick) => map.TimeSignatures.Last(s => s.Tick <= tick);
 

@@ -560,8 +560,8 @@ the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on th
 - Unticking a part that has notes asks for confirmation, as **Remove part** does
   ([C2](#c2-open-and-import)).
 - The drum variant of a drums part that has notes is changed with the conversion in
-  [C6](#c6-drums-4-lane-pro-and-5-lane) (CM3). Until then the variant can be changed only while the
-  part has no notes.
+  [C6](#c6-drums-4-lane-pro-and-5-lane) item 8 when it goes to or from 5-lane. Switching between
+  4-lane and Pro is a setting (C6 item 9), and keeps the notes as they are.
 
 **Applying.**
 
@@ -899,6 +899,9 @@ Acceptance criteria:
      track automatically while the track has any, and removed when it has none.
    - Every other note is written with velocity 100. Velocities in a loaded chart without
      `[ENABLE_CHART_DYNAMICS]` are not read as accents or ghosts ([§4.1](#editable-model)).
+   - *Settled in CM3:* an accent is drawn with a bright ring around it, and a ghost faded with a
+     dashed edge, on both apps' highways. The editor shows them as soon as they're added, as the save
+     will write `[ENABLE_CHART_DYNAMICS]` for them.
 5. **Drum fills (activation lanes).**
    - A phrase on every difficulty. Its last note is where star power is activated.
    - **Generate fills** proposes fills over the selection or the whole part. The author picks,
@@ -947,6 +950,8 @@ Acceptance criteria:
      5-lane to Pro, a tick where one difficulty's note becomes a cymbal and another's a tom on the
      same pad takes the hardest difficulty's, as `ChartToMidi` does, and the other note is listed
      too. A fifth-pad note in a 4-lane or Pro chart converts as a green tom.
+   - *Settled in CM3:* the report is a message. When it lists notes, or the drums were 4-lane, it's
+     a warning and the Messages dialog opens on it; otherwise it only says the drums were converted.
 9. **Drum variant.**
    - Switching between 4-lane and Pro is a song setting (`pro_drums`), not a conversion: a 4-lane
      chart's tom markers are kept, so switching back to Pro brings them back.

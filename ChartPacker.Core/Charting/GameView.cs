@@ -204,8 +204,9 @@ public static class GameView
             var list = new List<DrumHit>(track.Notes.Count);
             foreach (var note in track.Notes.OrderBy(static n => n.Tick).ThenBy(static n => n.Length).ThenBy(static n => n.DoubleKick ? -1 : n.Lane))
             {
-                // YARG reads accents and ghosts on the pads alone: never the kick or the 2x kick.
-                var dynamics = part.ChartDynamics && note.Lane > 0 ? note.Dynamics.ToFlags() : NoteFlags.None;
+                // YARG reads accents and ghosts on the pads alone: never the kick or the 2x kick. A note has them only
+                // where the save writes [ENABLE_CHART_DYNAMICS] (MidiChartWriter.Normalize), so they're read as they are.
+                var dynamics = note.Lane > 0 ? note.Dynamics.ToFlags() : NoteFlags.None;
                 list.Add(new DrumHit(note.Tick, note.DoubleKick ? -1 : note.Lane, dynamics));
             }
 

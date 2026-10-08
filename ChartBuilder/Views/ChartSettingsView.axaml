@@ -98,9 +98,7 @@
                         <ComboBox MinWidth="120"
                                   ItemsSource="{Binding DrumsVariants}"
                                   SelectedItem="{Binding SelectedDrums}"
-                                  IsEnabled="{Binding CanChangeDrums}"
-                                  ToolTip.Tip="{Binding DrumsToolTip}"
-                                  ToolTip.ShowOnDisabled="True"
+                                  ToolTip.Tip="{x:Static res:Strings.ChartSettingsDrumsToolTip}"
                                   AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDrumsLabel}" />
                     </StackPanel>
                 </StackPanel>

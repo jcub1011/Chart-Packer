@@ -204,21 +204,24 @@ public sealed class EditorTools
     /// </summary>
     public void ToggleCymbal()
     {
-        if (SelectedDrums() is not { } selected)
-            return;
-        var (key, drums, notes) = selected;
-        var places = notes
-            .Where(static n => n.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad)
-            .Select(static n => (n.Lane, n.Tick))
-            .ToList();
-        if (places.Count == 0)
-        {
-            _session.Status = "Only yellow, blue and green notes are cymbals or toms.";
-            return;
-        }
+        if (SelectedCymbals() is { } selected)
+            SetTom(!selected.Places.All(p => DrumCymbals.IsTom(selected.Drums, p.Pad, p.Tick)));
+    }
 
-        bool tom = !places.All(p => DrumCymbals.IsTom(drums, p.Lane, p.Tick));
-        var command = new SetToms(places, tom, key.Difficulty);
+    /// <summary>
+    /// Makes the selected yellow, blue and green Pro drum notes toms, or cymbals (charter-spec C6 item 3), as the
+    /// Properties panel sets them. The same pads at those ticks change on every difficulty, and the status says which
+    /// others have a note there.
+    /// </summary>
+    public void SetTom(bool tom)
+    {
+        if (SelectedCymbals() is not { } selected)
+            return;
+        var places = selected.Places.Where(p => DrumCymbals.IsTom(selected.Drums, p.Pad, p.Tick) != tom).ToList();
+        if (places.Count == 0)
+            return;
+
+        var command = new SetToms(places, tom, selected.Key.Difficulty);
         if (_session.Execute(command) && command.SharedWith.Count > 0)
         {
             string what = tom ? "toms" : "cymbals";
@@ -232,19 +235,21 @@ public sealed class EditorTools
     /// </summary>
     public void ToggleDynamics(NoteDynamics dynamics)
     {
-        if (SelectedDrums() is not { } selected)
-            return;
-        var (key, _, notes) = selected;
-        var pads = notes.Where(static n => n.Lane > 0).ToList();
-        if (pads.Count == 0)
-        {
-            _session.Status = "A kick can't be an accent or a ghost.";
-            return;
-        }
+        if (SelectedPads() is { } pads)
+            SetDynamics(pads.All(n => n.Dynamics == dynamics) ? NoteDynamics.None : dynamics);
+    }
 
-        var set = pads.All(n => n.Dynamics == dynamics) ? NoteDynamics.None : dynamics;
-        var changing = pads.Where(n => n.Dynamics != set).ToList();
-        _session.Execute(new SetDynamics(key.Instrument, key.Difficulty, changing, set));
+    /// <summary>
+    /// Makes the selected drum pad notes <paramref name="dynamics"/>, as the Properties panel sets them (charter-spec C6
+    /// item 4). Kicks are left as they are.
+    /// </summary>
+    public void SetDynamics(NoteDynamics dynamics)
+    {
+        if (_session.Selection.Track is not { } key || SelectedPads() is not { } pads)
+            return;
+        var changing = pads.Where(n => n.Dynamics != dynamics).ToList();
+        if (changing.Count > 0)
+            _session.Execute(new SetDynamics(key.Instrument, key.Difficulty, changing, dynamics));
     }
 
     /// <summary>
@@ -252,6 +257,16 @@ public sealed class EditorTools
     /// item 2).
     /// </summary>
     public void ToggleDoubleKick()
+    {
+        if (SelectedDrums() is { } selected && selected.Notes.Where(static n => n.Lane == 0).ToList() is { Count: > 0 } kicks)
+            SetDoubleKick(!kicks.All(static k => k.DoubleKick));
+    }
+
+    /// <summary>
+    /// Makes the selected Expert kicks 2× kicks, or plain kicks, as the Properties panel sets them (charter-spec C6
+    /// item 2). The kicks stay selected.
+    /// </summary>
+    public void SetDoubleKick(bool on)
     {
         if (SelectedDrums() is not { } selected)
             return;
@@ -265,9 +280,8 @@ public sealed class EditorTools
             return;
         }
 
-        bool on = !kicks.All(static k => k.DoubleKick);
         var changing = kicks.Where(k => k.DoubleKick != on).ToList();
-        if (_session.Execute(new SetDoubleKick(changing, on)))
+        if (changing.Count > 0 && _session.Execute(new SetDoubleKick(changing, on)))
             _session.Selection.Select(key, [.. notes.Where(static n => n.Lane != 0), .. kicks.Select(k => k with { DoubleKick = on })]);
     }
 
@@ -305,6 +319,40 @@ public sealed class EditorTools
             return null;
         var notes = selection.Notes;
         return notes.Count == 0 ? null : (key, drums, notes);
+    }
+
+    /// <summary>The places of the selected yellow, blue and green drum notes; null, with the status saying why, when none is.</summary>
+    private (ChartTrackKey Key, EditablePart Drums, IReadOnlyList<(int Pad, long Tick)> Places)? SelectedCymbals()
+    {
+        if (SelectedDrums() is not { } selected)
+            return null;
+        var places = selected.Notes
+            .Where(static n => n.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad)
+            .Select(static n => (n.Lane, n.Tick))
+            .Distinct()
+            .ToList();
+        if (places.Count == 0)
+        {
+            _session.Status = "Only yellow, blue and green notes are cymbals or toms.";
+            return null;
+        }
+
+        return (selected.Key, selected.Drums, places);
+    }
+
+    /// <summary>The selected drum notes on a pad, not the kick; null, with the status saying why, when none is.</summary>
+    private List<EditableNote>? SelectedPads()
+    {
+        if (SelectedDrums() is not { } selected)
+            return null;
+        var pads = selected.Notes.Where(static n => n.Lane > 0).ToList();
+        if (pads.Count == 0)
+        {
+            _session.Status = "A kick can't be an accent or a ghost.";
+            return null;
+        }
+
+        return pads;
     }
 
     /// <summary>Difficulties in words, for the status: "Hard", "Hard and Easy", "Hard, Medium and Easy".</summary>

@@ -56,6 +56,14 @@
                         <CheckBox Content="{x:Static res:Strings.PropertiesForceStrum}" IsChecked="{Binding IsForcedStrum}" />
                         <CheckBox Content="{x:Static res:Strings.PropertiesTap}" IsChecked="{Binding IsTap}" />
                     </WrapPanel>
+                    <!-- Drums have no forcing, so their row takes its place (charter-spec C6). -->
+                    <TextBlock Grid.Row="5" Classes="muted" Text="{x:Static res:Strings.PropertiesDrumsLabel}" IsVisible="{Binding IsDrums}" />
+                    <WrapPanel Grid.Row="5" Grid.Column="1" ItemSpacing="8" IsVisible="{Binding IsDrums}">
+                        <CheckBox Content="{x:Static res:Strings.PropertiesCymbal}" IsChecked="{Binding IsCymbal}" IsEnabled="{Binding CanCymbal}" />
+                        <CheckBox Content="{x:Static res:Strings.PropertiesAccent}" IsChecked="{Binding IsAccent}" IsEnabled="{Binding CanDynamics}" />
+                        <CheckBox Content="{x:Static res:Strings.PropertiesGhost}" IsChecked="{Binding IsGhost}" IsEnabled="{Binding CanDynamics}" />
+                        <CheckBox Content="{x:Static res:Strings.PropertiesDoubleKick}" IsChecked="{Binding IsDoubleKick}" IsEnabled="{Binding CanDoubleKick}" />
+                    </WrapPanel>
                 </Grid>
             </Border>
         </StackPanel>

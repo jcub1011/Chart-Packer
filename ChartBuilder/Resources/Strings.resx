@@ -590,8 +590,8 @@ Open it anyway?</value>
   <data name="ChartSettingsDrumsLabel" xml:space="preserve">
     <value>Drums</value>
   </data>
-  <data name="ChartSettingsDrumsLockedToolTip" xml:space="preserve">
-    <value>The drums have notes, so their variant can't be changed yet. Converting them comes in a later version.</value>
+  <data name="ChartSettingsDrumsToolTip" xml:space="preserve">
+    <value>Switching between 4-lane and Pro keeps the notes as they are. Switching to or from 5-lane converts them, and lists any it couldn't place. Undo brings them back.</value>
   </data>
   <data name="DrumsFourLane" xml:space="preserve">
     <value>4-lane</value>
@@ -601,6 +601,38 @@ Open it anyway?</value>
   </data>
   <data name="DrumsFiveLane" xml:space="preserve">
     <value>5-lane</value>
+  </data>
+  <data name="DrumConversionDoneFormat" xml:space="preserve">
+    <value>Converted the drums to {0}.</value>
+    <comment>{0} is the drum variant: 4-lane, Pro or 5-lane.</comment>
+  </data>
+  <data name="DrumConversionReportFormat" xml:space="preserve">
+    <value>Converted the drums to {0}. Notes the mapping couldn't place as it says: {1}. Undo brings them back.</value>
+    <comment>{0} is the drum variant; {1} how many notes are listed below.</comment>
+  </data>
+  <data name="DrumConversionFromFourLane" xml:space="preserve">
+    <value>The drums were 4-lane, so their cymbals and toms, which the player never saw, were taken from the tom markers as they stood.</value>
+  </data>
+  <data name="DrumConversionLineFormat" xml:space="preserve">
+    <value>{0}, {1}: {2}, {3}</value>
+    <comment>One note of the drum conversion's report: {0} the difficulty, {1} its time, {2} its pad, {3} what became of it.</comment>
+  </data>
+  <data name="DrumConversionCymbalFormat" xml:space="preserve">
+    <value>{0} cymbal</value>
+    <comment>{0} is a pad's colour, such as Blue.</comment>
+  </data>
+  <data name="DrumConversionTomFormat" xml:space="preserve">
+    <value>{0} tom</value>
+    <comment>{0} is a pad's colour, such as Blue.</comment>
+  </data>
+  <data name="DrumConversionLeftOut" xml:space="preserve">
+    <value>left out (another note landed on its pad)</value>
+  </data>
+  <data name="DrumConversionMadeCymbal" xml:space="preserve">
+    <value>kept as a cymbal (a harder difficulty's note decided it)</value>
+  </data>
+  <data name="DrumConversionMadeTom" xml:space="preserve">
+    <value>kept as a tom (a harder difficulty's note decided it)</value>
   </data>
   <data name="PartLead" xml:space="preserve">
     <value>Lead</value>
@@ -921,6 +953,26 @@ Open it anyway?</value>
   <data name="PropertiesTap" xml:space="preserve">
     <value>Tap</value>
     <comment>A checkbox: the chord is a tap chord (T).</comment>
+  </data>
+  <data name="PropertiesDrumsLabel" xml:space="preserve">
+    <value>Hit</value>
+    <comment>A Properties field: how a drum note is hit (cymbal, accent, ghost, 2× kick).</comment>
+  </data>
+  <data name="PropertiesCymbal" xml:space="preserve">
+    <value>Cymbal</value>
+    <comment>A checkbox: the Pro drums note is a cymbal; unticked, a tom (C).</comment>
+  </data>
+  <data name="PropertiesAccent" xml:space="preserve">
+    <value>Accent</value>
+    <comment>A checkbox: the drum note is an accent (A).</comment>
+  </data>
+  <data name="PropertiesGhost" xml:space="preserve">
+    <value>Ghost</value>
+    <comment>A checkbox: the drum note is a ghost (Shift+A).</comment>
+  </data>
+  <data name="PropertiesDoubleKick" xml:space="preserve">
+    <value>2× kick</value>
+    <comment>A checkbox: the Expert kick is a 2× kick (Expert+).</comment>
   </data>
   <data name="PropertiesBpmLabel" xml:space="preserve">
     <value>BPM</value>

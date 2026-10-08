@@ -694,9 +694,17 @@ namespace ChartBuilder.Controls.Editing
             if (column < 0 || track.TryGetNote(tick, lane, false, out _))
                 return;
             double along = projection.AlongOf(session.AudioAt(tick));
-            var color = HighwayPalette.NoteColor(track.Kind, 5, new ChartNote(tick, 0, track.Kind == ChartInstrumentKind.Drums ? lane - 1 : lane, NoteFlags.None));
+
+            // As it would be placed: numbered and coloured as Shown has it, and on Pro drums a cymbal unless a tom marker
+            // covers it.
+            bool drums = track.Kind == ChartInstrumentKind.Drums;
+            int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
+            bool cymbal = drums && session.Chart.DrumsVariant == DrumsVariant.Pro && lane is >= TomMarker.FirstPad and <= TomMarker.LastPad
+                && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
+            var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, cymbal ? NoteFlags.Cymbal : NoteFlags.None);
+            var color = HighwayPalette.NoteColor(track.Kind, laneCount, placed);
             using (context.PushOpacity(0.45))
-                _gems.DrawGem(context, track.Kind, new ChartNote(tick, 0, lane, NoteFlags.None), color, GemRect(projection, column, along, GemSize(projection)), outlined: true);
+                _gems.DrawGem(context, track.Kind, placed, color, GemRect(projection, column, along, GemSize(projection)), outlined: true);
         }
 
         /// <summary>The strike line's band, on the cursor, behind the notes: dark across the lanes, as in the games.</summary>
