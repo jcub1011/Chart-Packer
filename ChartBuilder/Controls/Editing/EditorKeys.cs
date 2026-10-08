@@ -149,9 +149,12 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.Delete or PhysicalKey.Backspace when plain:
                     tools.DeleteSelection();
                     return true;
+                // Esc takes back a gesture, else ends a run of Generate fills, else clears the selection.
                 case PhysicalKey.Escape when plain:
                     if (tools.IsActive)
                         tools.Cancel();
+                    else if (session.Fills.IsActive)
+                        session.Fills.Cancel();
                     else
                         session.Selection.Clear();
                     return true;

@@ -929,6 +929,29 @@ Acceptance criteria:
      follows `[coda]` ([C8](#c8-phrases-and-events) item 4). Adding, moving or removing `[coda]`
      changes the phrases it decides in the same undoable step, and a fill can't be added after
      `[coda]`, nor a big rock ending before it.
+   - *Settled in CM3:* Generate fills proposes at measure lines. A fill at one lasts the fill length
+     in measures, by the time signatures in force, and ends on the first beat of the measure after:
+     its **activation note**. That must be a crash (or, for any note, a note other than a 2× kick) on
+     the hardest difficulty with notes, and every difficulty with notes must have a note other than a
+     2× kick there, or the spot is left out. The fill ends the tick after that note, as CHR043's fix
+     ends one ([§6](#6-chart-lint-rule-catalogue)), so the note is the last it covers and CHR043
+     never fires on it. A crash on Pro is a green note no tom marker covers; 4-lane's green is a crash
+     whatever its markers say. Spots are taken earliest first, from where the second star power
+     phrase ends (overlapping phrases count as one, as saving merges them). A fill never overlaps
+     star power (CHR042), another fill or a big rock ending, ends before the first `[coda]`, and
+     starts at least the spacing in measures from every other fill's start, those already there and
+     those proposed. Over the selection, a fill starts at or after the selection's start and ends on
+     a note at or before its end.
+   - *Settled in CM3:* **Generate fills…** is beside the Phrase tool's picker, for a drums lane with
+     notes, and its options are in its flyout, kept while the editor is open. The proposals are
+     drawn as dashed ghosts in the rail's fills row, over the bars there, with a faint band across the
+     lanes; a dropped one is faint and struck through. A click on a ghost keeps or drops it, before
+     anything else under it. While they're shown, a bar over the lanes counts those kept, with
+     **Keep all**, **Drop all**, **Add fills** and **Cancel**; `Esc` cancels too, once nothing
+     focused has taken it (a drag is taken back first, and a field keeps its own `Esc`). Any change to the
+     chart but the run's own, an undo included, or to the song's settings, ends the run and says so,
+     as the proposals were worked out from the chart before it. When nothing fits, the message says
+     why: no drum notes, fewer than two star power phrases, or no spot.
 6. **Rolls and trills.**
    - Single-lane roll and two-lane trill phrases.
    - New ones reach Expert only, as the games default to. Each can be extended down to Hard,
@@ -2079,6 +2102,7 @@ These are the defaults. Rebinding is future work.
 | `Ctrl`+`Z`; `Ctrl`+`Y` or `Ctrl`+`Shift`+`Z` | Undo; redo |
 | `Ctrl`+`X` / `C` / `V` | Cut, copy, paste |
 | `Delete` | Delete the selection |
+| `Esc` | Take back a drag; else end a run of Generate fills, adding nothing; else clear the selection |
 | `Ctrl`+`S` | Save |
 
 ## 10. Settings

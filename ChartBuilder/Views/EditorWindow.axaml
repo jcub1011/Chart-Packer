@@ -150,7 +150,8 @@
                     </Border>
 
                     <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time. Beside the Phrase tool is
-                         the kind of phrase it adds, of those the part in focus can have (C8). -->
+                         the kind of phrase it adds, of those the part in focus can have (C8), and Generate fills (C6
+                         item 5), whose options are in its flyout. -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
                             <StackPanel.Styles>
@@ -180,6 +181,62 @@
                                       DisplayMemberBinding="{Binding Label, x:DataType=vm:PhraseKindChoice}"
                                       ToolTip.Tip="{x:Static res:Strings.ToolPhraseKindToolTip}"
                                       AutomationProperties.Name="{x:Static res:Strings.ToolPhraseKindName}" />
+                            <Button x:Name="GenerateFillsButton"
+                                    Classes="labelled"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Content="{x:Static res:Strings.GenerateFillsButton}"
+                                    IsEnabled="{Binding Editor.CanGenerateFills}"
+                                    ToolTip.Tip="{x:Static res:Strings.GenerateFillsToolTip}"
+                                    ToolTip.ShowOnDisabled="True">
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedLeft">
+                                        <StackPanel Spacing="10" MinWidth="260">
+                                            <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.GenerateFillsHeading}" />
+                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
+                                                <NumericUpDown Grid.Row="0"
+                                                               Grid.Column="1"
+                                                               Value="{Binding Editor.FillSpacing}"
+                                                               Minimum="1"
+                                                               Maximum="64"
+                                                               Increment="1"
+                                                               FormatString="0"
+                                                               ParsingNumberStyle="Integer"
+                                                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsSpacingToolTip}"
+                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsSpacingLabel}" />
+                                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsLengthLabel}" />
+                                                <NumericUpDown Grid.Row="1"
+                                                               Grid.Column="1"
+                                                               Value="{Binding Editor.FillLength}"
+                                                               Minimum="1"
+                                                               Maximum="16"
+                                                               Increment="1"
+                                                               FormatString="0"
+                                                               ParsingNumberStyle="Integer"
+                                                               ToolTip.Tip="{x:Static res:Strings.GenerateFillsLengthToolTip}"
+                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateFillsLengthLabel}" />
+                                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsEndLabel}" />
+                                                <ComboBox Grid.Row="2"
+                                                          Grid.Column="1"
+                                                          HorizontalAlignment="Stretch"
+                                                          ItemsSource="{Binding Editor.FillEndChoices}"
+                                                          SelectedItem="{Binding Editor.SelectedFillEnd}"
+                                                          DisplayMemberBinding="{Binding Label, x:DataType=vm:FillEndChoice}"
+                                                          ToolTip.Tip="{x:Static res:Strings.GenerateFillsEndToolTip}"
+                                                          AutomationProperties.Name="{x:Static res:Strings.GenerateFillsEndLabel}" />
+                                                <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsScopeLabel}" />
+                                                <TextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Editor.FillScopeText}" />
+                                            </Grid>
+                                            <Button Classes="accent"
+                                                    HorizontalAlignment="Right"
+                                                    Content="{x:Static res:Strings.GenerateFillsGenerate}"
+                                                    Command="{Binding Editor.GenerateFillsCommand}"
+                                                    Click="OnGenerateFillsClick" />
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolTempo}" IsChecked="{Binding Editor.IsTempoTool}" ToolTip.Tip="{x:Static res:Strings.ToolTempoToolTip}" />
                         </StackPanel>
                     </Border>
@@ -255,34 +312,62 @@
                           Background="{DynamicResource SubtleBorderBrush}"
                           IsVisible="{Binding !IsLeftPanelCollapsed}" />
 
-            <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. -->
-            <Panel Grid.Column="2">
-                <bctl:LaneDockHost x:Name="LaneHost"
-                                   Lanes="{Binding Lanes}"
-                                   IsVisible="{Binding Lanes.HasLanes}"
-                                   SplitterBrush="{DynamicResource SubtleBorderBrush}"
-                                   GuideBrush="{DynamicResource ToolbarGroupBrush}"
-                                   GuideBorderBrush="{DynamicResource SubtleBorderBrush}"
-                                   AccentBrush="{DynamicResource AccentTextBrush}"
-                                   PreviewBrush="{DynamicResource AccentTintBrush}" />
-                <StackPanel Classes="placeholder" IsVisible="{Binding !Lanes.HasLanes}">
-                    <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.NoLanesOpen}" />
-                    <TextBlock Classes="muted centered" FontSize="12" Text="{x:Static res:Strings.NoLanesOpenHint}" />
-                    <Button Classes="labelled"
-                            Margin="0,8,0,0"
-                            HorizontalAlignment="Center"
-                            AutomationProperties.Name="{x:Static res:Strings.AddLaneButton}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ctl:LineIcon Data="{StaticResource AddStroke}" />
-                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.AddLaneButton}" />
+            <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. Over them,
+                 while Generate fills runs (charter-spec C6 item 5), a bar to keep, drop, add or cancel its proposals. -->
+            <DockPanel Grid.Column="2">
+                <Border DockPanel.Dock="Top"
+                        IsVisible="{Binding Editor.IsFillRunActive}"
+                        Background="{DynamicResource ToolbarBrush}"
+                        BorderBrush="{DynamicResource SubtleBorderBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="12,4">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Editor.FillRunText}" />
+                        <TextBlock Grid.Column="1"
+                                   Classes="muted"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{x:Static res:Strings.FillRunHint}" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunKeepAll}" Command="{Binding Editor.KeepAllFillsCommand}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunDropAll}" Command="{Binding Editor.DropAllFillsCommand}" />
+                            <Button Classes="labelled accent"
+                                    Content="{x:Static res:Strings.FillRunAdd}"
+                                    Command="{Binding Editor.AddFillsCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.FillRunAddToolTip}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunCancel}" Command="{Binding Editor.CancelFillsCommand}" />
                         </StackPanel>
-                        <Button.Flyout>
-                            <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                        ItemsSource="{Binding Lanes.AddMenu, Converter={StaticResource LaneMenu}}" />
-                        </Button.Flyout>
-                    </Button>
-                </StackPanel>
-            </Panel>
+                    </Grid>
+                </Border>
+                <Panel>
+                    <bctl:LaneDockHost x:Name="LaneHost"
+                                       Lanes="{Binding Lanes}"
+                                       IsVisible="{Binding Lanes.HasLanes}"
+                                       SplitterBrush="{DynamicResource SubtleBorderBrush}"
+                                       GuideBrush="{DynamicResource ToolbarGroupBrush}"
+                                       GuideBorderBrush="{DynamicResource SubtleBorderBrush}"
+                                       AccentBrush="{DynamicResource AccentTextBrush}"
+                                       PreviewBrush="{DynamicResource AccentTintBrush}" />
+                    <StackPanel Classes="placeholder" IsVisible="{Binding !Lanes.HasLanes}">
+                        <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.NoLanesOpen}" />
+                        <TextBlock Classes="muted centered" FontSize="12" Text="{x:Static res:Strings.NoLanesOpenHint}" />
+                        <Button Classes="labelled"
+                                Margin="0,8,0,0"
+                                HorizontalAlignment="Center"
+                                AutomationProperties.Name="{x:Static res:Strings.AddLaneButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.AddLaneButton}" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                            ItemsSource="{Binding Lanes.AddMenu, Converter={StaticResource LaneMenu}}" />
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+                </Panel>
+            </DockPanel>
 
             <GridSplitter Grid.Column="3"
                           ResizeDirection="Columns"

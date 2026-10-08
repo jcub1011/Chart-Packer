@@ -84,13 +84,14 @@ public sealed class EditorSession
         Viewport = new EditorViewport();
         Selection = new EditorSelection(Chart);
         Tools = new EditorTools(this);
+        Fills = new FillProposals(this);
         undo.Changed += OnUndoChanged;
     }
 
     /// <summary>Raised after the chart changes: a command done, undone or redone, or a preview applied or taken back.</summary>
     public event EventHandler<EditorChartChangedEventArgs>? ChartChanged;
 
-    /// <summary>Raised when the snap, the tool, the focused lane or the status changes.</summary>
+    /// <summary>Raised when the snap, the tool, the focused lane, the status or the proposed fills change.</summary>
     public event EventHandler? StateChanged;
 
     /// <summary>Raised each time a status is said, even one the same as the last, so a refusal repeated is said again.</summary>
@@ -125,6 +126,7 @@ public sealed class EditorSession
         _readOptions = null;
         _game.Clear();
         ForgetDiscoFlips();
+        Fills.OnChanged();
         SongSettingsChanged?.Invoke(this, EventArgs.Empty);
         RaiseState();
     }
@@ -135,6 +137,9 @@ public sealed class EditorSession
 
     /// <summary>The tools, which turn clicks, drags and keys into commands.</summary>
     public EditorTools Tools { get; }
+
+    /// <summary>The run of Generate fills going on, if there's one (charter-spec C6 item 5).</summary>
+    public FillProposals Fills { get; }
 
     /// <summary>The tempo map the chart's ticks are timed by.</summary>
     public TempoMap TempoMap => Chart.TempoMap.ToTempoMap();
@@ -222,6 +227,9 @@ public sealed class EditorSession
 
     /// <summary>Whether the drums are Pro, the only drums the games flip (charter-spec C6 item 7).</summary>
     public bool IsProDrums => Chart.DrumsVariant is { } variant ? variant == DrumsVariant.Pro : DiscoFlips.IsProDrums;
+
+    /// <summary>How the drums are charted, as the editor draws them (<see cref="IsFiveLaneDrums"/>, <see cref="IsProDrums"/>).</summary>
+    public DrumsVariant DrumsVariantShown => IsFiveLaneDrums ? DrumsVariant.FiveLane : IsProDrums ? DrumsVariant.Pro : DrumsVariant.FourLane;
 
     /// <summary>
     /// Where the games swap red and yellow on the drums (charter-spec C6 item 7), as the game view reads it. Worked out
@@ -466,6 +474,7 @@ public sealed class EditorSession
         {
             Selection.Reconcile();
             KeepPhraseKindOffered();
+            Fills.OnChanged();
         }
 
         ChartChanged?.Invoke(this, new EditorChartChangedEventArgs(affected, isPreview));
@@ -510,5 +519,5 @@ public sealed class EditorSession
         _discoFlipRanges.Clear();
     }
 
-    private void RaiseState() => StateChanged?.Invoke(this, EventArgs.Empty);
+    internal void RaiseState() => StateChanged?.Invoke(this, EventArgs.Empty);
 }

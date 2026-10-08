@@ -2,9 +2,9 @@
 
 | | |
 | --- | --- |
-| **Status** | Current as of 2026-10-07 |
+| **Status** | Current as of 2026-10-08 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM3: Drums and GHL](#cm3-drums-and-ghl) |
+| **Next up** | [CM4: Audio assist](#cm4-audio-assist) |
 
 ---
 
@@ -21,7 +21,7 @@ its exit criteria. This file owns only the order and the status.
 | 1 | [CM0: Split](#cm0-split) | Done | Exit criteria met | — |
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
 | 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | Done | Exit criteria met | CM1 |
-| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | In progress | Core commands, lint, drums in the editor, GHL, phrases and events (5a to 5c) | CM2 |
+| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Done | Exit criteria met | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
 
@@ -78,9 +78,9 @@ Most of it is in `ChartPacker.Core/Charting/`, with its tests in the new `ChartB
 
 **Left for later:**
 
-- **The CHR lint rules.** The timing, 5-fret and song rules came with CM2; the drums and phrase
-  rules come with CM3.
-- **Cymbal/tom toggling and drum conversion** (CM3).
+- **The CHR lint rules.** Done: the timing, 5-fret and song rules came with CM2, and the drums and
+  phrase rules with CM3.
+- **Cymbal/tom toggling and drum conversion.** Done in CM3.
 - **Two re-save cases.** A mix kept as text before a standard mix on the same tick, and a tom
   marker before a fifth-pad note on the same tick. The game view reads both as the games do, but
   re-saving changes how such a file plays. Each is a candidate for a load issue or a lint rule.
@@ -146,9 +146,8 @@ engine. Its design decisions are recorded in the spec, as *Settled in CM2* and *
 
 **Left for later:**
 
-- **Phrases and drums in the editor** (CM3): the Phrase tool, solos and the `S` key; cymbal and
-  tom (`C`), accents and ghosts (`A`) and the 2× kick (Shift+0); GHL's stacked columns, as GHL
-  lanes are six columns for now.
+- **Phrases and drums in the editor.** Done in CM3: the Phrase tool, solos and the `S` key; cymbal
+  and tom (`C`), accents and ghosts (`A`) and the 2× kick (`Shift`+`0`); GHL's stacked columns.
 - **Record mode**, which shifts key presses by the latency
   ([C15](charter-spec-v1.md#c15-editing-ergonomics)), with CM5.
 - **Ratings.** CHR083 can't be cleared in the editor until a part can be rated (the Chart
@@ -163,45 +162,50 @@ engine. Its design decisions are recorded in the spec, as *Settled in CM2* and *
 
 ## CM3: Drums and GHL
 
-**Status: in progress.**
+**Status: done.**
 
-It is built in six phases, each reviewed before the next:
+The editor now edits every v1 instrument family, with phrases and events. It was built in six
+phases, each reviewed before the next, and its design decisions are recorded in the spec, as
+*Settled in CM3*.
 
-1. **Core commands:** cymbal and tom, 2× kick, disco flip, the 5-lane conversion, text event changes, and
-   keeping drum fills and big rock endings as `[coda]` makes them.
-2. **Lint:** the drums and phrase rules, with their fixes.
-3. **Drums in the editor:** the `C`, `A`, `Shift`+`A` and `Shift`+`0` keys, accents and ghosts, drum
-   Properties, and the variant change with its conversion report.
-4. **GHL's stacked columns.**
-5. **Phrases and events:** the Phrase tool, the `S` key, phrase bands, and the Sections tab.
-6. **Generate fills.**
+**What was built:**
 
-Phases 1 to 5 are done, and phase 6, Generate fills, is next. Phase 5 was built in three parts:
+- **Drums** ([C6](charter-spec-v1.md#c6-drums-4-lane-pro-and-5-lane)). Cymbal and tom (`C`), which
+  keeps the tom markers for every difficulty; accents and ghosts (`A`, `Shift`+`A`), drawn as the
+  games show them and saved with `[ENABLE_CHART_DYNAMICS]` when needed; the 2× kick (`Shift`+`0`);
+  drum fields in Properties. The variant change in Chart settings, with the 4-lane ↔ 5-lane
+  conversion (`ConvertDrums`) and its report in the Messages dialog.
+- **Disco flip** (C6 item 7). `GameDiscoFlips` decides the flip once for the reader, the game view
+  and the editor. Notes inside a range are drawn and edited on the pads the player hits, and ranges
+  are drawn, moved and resized in the phrase rail.
+- **GHL** ([C7](charter-spec-v1.md#c7-6-fret-ghl-notes)). Three stacked columns in both views, the
+  black fret in each column's first half, barre chords drawn as in the game.
+- **Phrases** ([C8](charter-spec-v1.md#c8-phrases-and-events) items 1, 2 and 4, C6 items 5–6). The
+  Phrase tool and its kind picker, the phrase rail beside each lane (select, move, resize, delete),
+  the star power and solo tints with the solo note count, the `S` key, and phrases in Properties.
+  Fills and big rock endings follow `[coda]`.
+- **Events** (C8 items 3, 5 and 6). The Sections tab, with every `EVENTS` text event and the focused
+  part's own; **Insert section** and **Insert event**; `Ctrl`+`↑`/`↓` between sections; section
+  labels on the lanes; `MeasureBeat` for measure and beat without walking the beat lines.
+- **Generate fills** (C6 item 5). Proposals on measure downbeats that end on a crash (or any note)
+  every charted difficulty has, after the second star power phrase and never inside one; kept or
+  dropped as ghosts, and added as one undoable step.
+- **Lint.** The drums and phrase rules ([§6](charter-spec-v1.md#lint-rules)) with their fixes.
 
-- **5a** (done): the Phrase tool and its kind picker, the phrase rail beside each lane with
-  selecting, moving, resizing and deleting phrases, the star power and solo tints with the solo note
-  count, the `S` key, and phrases in Properties.
-- **5b** (done): the Sections tab, listing `EVENTS`' text events and the focused part's own, with
-  go-to, renaming, moving by tick and deleting; **Insert section** and **Insert event**; `Ctrl`+`↑`
-  and `Ctrl`+`↓`; and section labels on the lanes.
-- **5c** (done): disco flip in the editor: notes inside a range drawn and edited on the pads the
-  player hits, as the game view reads the flip
-  ([C6](charter-spec-v1.md#c6-drums-4-lane-pro-and-5-lane) item 7); a Disco flip row in the drums'
-  phrase rail, with drawing, selecting, moving, resizing and deleting ranges; and ranges in
-  Properties.
+**Left for later:**
 
-Its design decisions are recorded in the spec, as *Settled in CM3*.
+- **Disco flip.** Properties' Lane field names the stored pad, not the pad drawn; the lanes have no
+  tint behind a range, only its bar in the rail.
+- **Events** move by their Tick field in the Sections tab, not by dragging on the lanes. Song events
+  can only be moved or deleted. The tab's row matching has no unit tests, as the tests reach only
+  Core.
+- **GHL.** No key switches a note between its column's white and black frets; a drag into the other
+  half does.
+- **Phrases.** Resizing a bar's end resizes only that bar, even with several selected.
+- **Generate fills.** Its options last only while the editor is open, and the fills added aren't
+  selected.
 
-It covers:
-
-- [C6](charter-spec-v1.md#c6-drums-4-lane-pro-and-5-lane), all three drum variants and the
-  conversion;
-- [C7](charter-spec-v1.md#c7-6-fret-ghl-notes), GHL;
-- [C8](charter-spec-v1.md#c8-phrases-and-events), phrases and events;
-- the drums and phrase lint rules.
-
-It comes after CM2 because it adds instruments to the editor CM2 builds, and reuses its views,
-tools and save path.
+**Contents:** see [§13](charter-spec-v1.md#13-milestones).
 
 ## CM4: Audio assist
 

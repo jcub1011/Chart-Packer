@@ -1585,4 +1585,79 @@ Saving also makes these changes to song.ini:
   <data name="SectionsKeysHint" xml:space="preserve">
     <value>Ctrl+↑ and Ctrl+↓ move the cursor to the next section and the previous one.</value>
   </data>
+  <data name="GenerateFillsButton" xml:space="preserve">
+    <value>Generate fills…</value>
+    <comment>The toolbar button, beside the Phrase tool, that opens Generate fills' options.</comment>
+  </data>
+  <data name="GenerateFillsToolTip" xml:space="preserve">
+    <value>Propose drum fills over the selection, or the whole part, to keep or drop before they're added. For a drums lane with notes.</value>
+    <comment>The Generate fills button's tooltip.</comment>
+  </data>
+  <data name="GenerateFillsHeading" xml:space="preserve">
+    <value>Generate fills</value>
+  </data>
+  <data name="GenerateFillsSpacingLabel" xml:space="preserve">
+    <value>Spacing (measures)</value>
+    <comment>How many measures apart generated fills start, at the least.</comment>
+  </data>
+  <data name="GenerateFillsSpacingToolTip" xml:space="preserve">
+    <value>Fills start at least this many measures apart, counting the fills already there.</value>
+  </data>
+  <data name="GenerateFillsLengthLabel" xml:space="preserve">
+    <value>Fill length (measures)</value>
+  </data>
+  <data name="GenerateFillsLengthToolTip" xml:space="preserve">
+    <value>How long each fill is, up to the note it ends on.</value>
+  </data>
+  <data name="GenerateFillsEndLabel" xml:space="preserve">
+    <value>End on</value>
+    <comment>What a generated fill must end on: a crash or any note.</comment>
+  </data>
+  <data name="GenerateFillsEndToolTip" xml:space="preserve">
+    <value>The note star power is activated on, on a measure's first beat. A crash is a green cymbal on Pro drums, orange on 5-lane and green on 4-lane.</value>
+  </data>
+  <data name="GenerateFillsEndCrash" xml:space="preserve">
+    <value>Crash</value>
+  </data>
+  <data name="GenerateFillsEndAnyNote" xml:space="preserve">
+    <value>Any note</value>
+  </data>
+  <data name="GenerateFillsScopeLabel" xml:space="preserve">
+    <value>Over</value>
+    <comment>Where fills are proposed: the selection, or the whole part.</comment>
+  </data>
+  <data name="GenerateFillsScopeSelection" xml:space="preserve">
+    <value>The selection</value>
+  </data>
+  <data name="GenerateFillsScopeWholePart" xml:space="preserve">
+    <value>The whole part</value>
+  </data>
+  <data name="GenerateFillsGenerate" xml:space="preserve">
+    <value>Generate</value>
+    <comment>Proposes the fills, shown as ghosts to keep or drop.</comment>
+  </data>
+  <data name="FillRunFormat" xml:space="preserve">
+    <value>{0} of {1} proposed fills kept</value>
+    <comment>The bar over the lanes while Generate fills runs. {0} is how many are kept, {1} how many were proposed.</comment>
+  </data>
+  <data name="FillRunHint" xml:space="preserve">
+    <value>Click a ghost in the rail's fills row to keep or drop it. Esc cancels.</value>
+  </data>
+  <data name="FillRunKeepAll" xml:space="preserve">
+    <value>Keep all</value>
+  </data>
+  <data name="FillRunDropAll" xml:space="preserve">
+    <value>Drop all</value>
+  </data>
+  <data name="FillRunAdd" xml:space="preserve">
+    <value>Add fills</value>
+    <comment>Adds the kept fills, as one step to undo.</comment>
+  </data>
+  <data name="FillRunAddToolTip" xml:space="preserve">
+    <value>Add the kept fills, as one step to undo</value>
+  </data>
+  <data name="FillRunCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Ends Generate fills, adding nothing.</comment>
+  </data>
 </root>

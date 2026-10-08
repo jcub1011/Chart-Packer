@@ -745,12 +745,19 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// A press in the phrase rail, with any tool: on a phrase's bar it selects the phrase (Shift adds it or takes it
-    /// away), and a drag moves it, or resizes it by the end grabbed; the same on a disco flip section's bar. Elsewhere in
-    /// the rail, the Phrase tool draws, and the others select no phrases or sections.
+    /// A press in the phrase rail, with any tool: on a proposed fill's ghost, while Generate fills runs, it keeps or drops
+    /// the fill (charter-spec C6 item 5), before any bar under it. On a phrase's bar it selects the phrase (Shift adds it
+    /// or takes it away), and a drag moves it, or resizes it by the end grabbed; the same on a disco flip section's bar.
+    /// Elsewhere in the rail, the Phrase tool draws, and the others select no phrases or sections.
     /// </summary>
     private Gesture? PressRail(ChartPoint point, bool shift)
     {
+        if (_session.Fills.HitTest(point) is { } ghost)
+        {
+            _session.Fills.Toggle(ghost);
+            return null;
+        }
+
         var part = Chart.PartOf(point.Track.Instrument)!;
         var selection = _session.Selection;
         if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, _session.DiscoFlipRangesOf(point.Track), point) is { } flip)

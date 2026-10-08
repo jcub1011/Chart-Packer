@@ -26,6 +26,9 @@ namespace ChartBuilder.ViewModels
     /// <summary>A kind of phrase the toolbar's picker offers the Phrase tool, or disco flip.</summary>
     public sealed record PhraseKindChoice(RailKind Kind, string Label);
 
+    /// <summary>What a generated fill must end on, as Generate fills' options offer it.</summary>
+    public sealed record FillEndChoice(FillEnd End, string Label);
+
     /// <summary>
     /// The chart's editor (charter-spec §4.5, C3): the lanes and their canvases, the tools, the snap, and the editor's
     /// <see cref="EditorSession"/>, joined to playback. The cursor is the lanes' strike line and the playhead: it follows
@@ -72,6 +75,8 @@ namespace ChartBuilder.ViewModels
                 KeepTimes = saved.TempoEdits == TempoEditMode.KeepTimes,
             };
             SnapChoices = [.. SnapGrid.CommonDivisions.Select(d => new SnapChoice(d, BuilderSettingsCatalog.SnapLabel(d)))];
+            FillEndChoices = [new FillEndChoice(FillEnd.Crash, Strings.GenerateFillsEndCrash), new FillEndChoice(FillEnd.AnyNote, Strings.GenerateFillsEndAnyNote)];
+            SelectedFillEnd = FillEndChoices[0];
             Lanes = new LaneDockViewModel(layout, this);
             Properties = new PropertiesViewModel(this);
 
@@ -215,6 +220,36 @@ namespace ChartBuilder.ViewModels
             }
         }
 
+        /// <summary>Whether Generate fills can run (charter-spec C6 item 5): the lane in focus is a drums part with notes.</summary>
+        public bool CanGenerateFills =>
+            Session.Focused is { } key && ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums && Session.Chart.PartOf(key.Instrument) is { HasNotes: true };
+
+        /// <summary>
+        /// How many measures apart generated fills start, at the least. Generate fills' options are kept while the editor is
+        /// open, so the next run starts from the last one's.
+        /// </summary>
+        [ObservableProperty]
+        public partial decimal? FillSpacing { get; set; } = FillOptions.Default.SpacingMeasures;
+
+        /// <summary>How many measures a generated fill lasts.</summary>
+        [ObservableProperty]
+        public partial decimal? FillLength { get; set; } = FillOptions.Default.LengthMeasures;
+
+        public IReadOnlyList<FillEndChoice> FillEndChoices { get; }
+
+        /// <summary>What a generated fill must end on.</summary>
+        [ObservableProperty]
+        public partial FillEndChoice? SelectedFillEnd { get; set; }
+
+        /// <summary>Where Generate fills proposes: over the selection's span when there's one, else the whole part.</summary>
+        public string FillScopeText => Session.Selection.Span is null ? Strings.GenerateFillsScopeWholePart : Strings.GenerateFillsScopeSelection;
+
+        /// <summary>Whether a run of Generate fills is going on, with its proposals shown as ghosts to keep or drop.</summary>
+        public bool IsFillRunActive => Session.Fills.IsActive;
+
+        /// <summary>How many of the run's proposals are kept, of how many.</summary>
+        public string FillRunText => string.Format(CultureInfo.CurrentCulture, Strings.FillRunFormat, Session.Fills.KeptCount, Session.Fills.Proposals.Count);
+
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
         [ObservableProperty]
         public partial OverviewData? Overview { get; private set; }
@@ -334,6 +369,33 @@ namespace ChartBuilder.ViewModels
         [RelayCommand]
         private void CoarserSnap() => Session.Snap = Session.Snap.Coarser();
 
+        /// <summary>Proposes fills with the options picked, over the selection's span or the whole part.</summary>
+        [RelayCommand]
+        private void GenerateFills()
+        {
+            var options = new FillOptions(
+                (int)Math.Max(1, FillSpacing ?? FillOptions.Default.SpacingMeasures),
+                (int)Math.Max(1, FillLength ?? FillOptions.Default.LengthMeasures),
+                SelectedFillEnd?.End ?? FillEnd.Crash);
+            Session.Fills.Start(options, Session.Selection.Span);
+        }
+
+        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
+        private void KeepAllFills() => Session.Fills.KeepAll();
+
+        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
+        private void DropAllFills() => Session.Fills.DropAll();
+
+        /// <summary>Adds the kept fills as one undoable step, ending the run.</summary>
+        [RelayCommand(CanExecute = nameof(CanAddFills))]
+        private void AddFills() => Session.Fills.Accept();
+
+        private bool CanAddFills() => Session.Fills.KeptCount > 0;
+
+        /// <summary>Ends the run, adding nothing (Esc).</summary>
+        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
+        private void CancelFills() => Session.Fills.Cancel();
+
         [RelayCommand]
         private void FinerSnap() => Session.Snap = Session.Snap.Finer();
 
@@ -373,9 +435,22 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsSustainTool));
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
+            RefreshFills();
             RefreshPhraseChoices();
             RefreshVisibleSpan();
             ScheduleRefresh();
+        }
+
+        /// <summary>Generate fills' button, and the bar over the lanes while a run goes on, after the focus, the chart or the run changes.</summary>
+        private void RefreshFills()
+        {
+            OnPropertyChanged(nameof(CanGenerateFills));
+            OnPropertyChanged(nameof(IsFillRunActive));
+            OnPropertyChanged(nameof(FillRunText));
+            KeepAllFillsCommand.NotifyCanExecuteChanged();
+            DropAllFillsCommand.NotifyCanExecuteChanged();
+            AddFillsCommand.NotifyCanExecuteChanged();
+            CancelFillsCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>
@@ -420,11 +495,16 @@ namespace ChartBuilder.ViewModels
             ScheduleRefresh();
             Properties.Refresh();
             RefreshPhraseChoices();
+            OnPropertyChanged(nameof(CanGenerateFills));
             foreach (var lane in Lanes.All)
                 lane.RefreshDifficulties();
         }
 
-        private void OnSelectionChanged(object? sender, EventArgs e) => Properties.Refresh();
+        private void OnSelectionChanged(object? sender, EventArgs e)
+        {
+            Properties.Refresh();
+            OnPropertyChanged(nameof(FillScopeText));
+        }
 
         // The delay or the song's settings moved every note against the audio, or changed how they're read.
         private void OnSongSettingsChanged(object? sender, EventArgs e)

@@ -75,6 +75,15 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
         private static readonly Color DiscoFlipColor = Color.FromRgb(0xF2, 0x7B, 0xD0);
+        private static readonly Color FillColor = Color.FromRgb(0x7C, 0xDB, 0x8A);
+
+        // Generate fills' proposals (charter-spec C6 item 5): a kept one's ghost is a dashed bar, lit, with a faint band across
+        // the lanes; a dropped one's only a faint dashed outline, struck through, and a fainter band.
+        private static readonly IPen KeptGhostPen = new ImmutablePen(FillColor.ToUInt32(), 1.5, new ImmutableDashStyle([3, 2], 0));
+        private static readonly IPen DroppedGhostPen = new ImmutablePen(HighwayPalette.WithAlpha(FillColor, 0x60).ToUInt32(), 1, new ImmutableDashStyle([3, 2], 0));
+        private static readonly IBrush KeptGhostBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(FillColor, 0x50));
+        private static readonly IBrush KeptBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(FillColor, 0x1C));
+        private static readonly IBrush DroppedBandBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(FillColor, 0x08));
         private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
         private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
         private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
@@ -225,6 +234,7 @@ namespace ChartBuilder.Controls.Editing
             DrawWaveform(context, bounds.Size, projection);
             FindPhrasesShown(part, fromTick, toTick);
             DrawPhraseTints(context, session, projection);
+            DrawFillBands(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
             DrawBeats(context, session, map, projection, fromTick, toTick, bounds.Size);
             DrawTempoMarkers(context, session, projection, fromTick, toTick, bounds.Size);
@@ -232,6 +242,7 @@ namespace ChartBuilder.Controls.Editing
             DrawStrikeBand(context, session, projection);
             DrawPhraseRail(context, session, part, rows, projection);
             DrawDiscoFlips(context, session, key, rows, projection, fromTick, toTick);
+            DrawFillGhosts(context, session, key, rows, projection, fromTick, toTick);
 
             using (context.PushClip(lanes))
             {
@@ -437,16 +448,26 @@ namespace ChartBuilder.Controls.Editing
             return (from, from + PhraseRowSize);
         }
 
-        /// <summary>Shows a resize arrow over a phrase or disco flip bar's end in the rail, and a hand over its body.</summary>
+        /// <summary>
+        /// Shows a resize arrow over a phrase or disco flip bar's end in the rail, and a hand over its body, or over a
+        /// proposed fill's ghost, which is clicked to keep or drop it.
+        /// </summary>
         private void ShowRailCursor(Point position)
         {
             StandardCursorType? wanted = null;
-            if (PointAt(position) is { Rail: not null } point && Session is { } session && session.Chart.PartOf(point.Track.Instrument) is { } part
-                && (PhraseRail.HitTest(part, point)?.Grip ?? PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point)?.Grip) is { } grip)
+            if (PointAt(position) is { Rail: not null } point && Session is { } session)
             {
-                wanted = grip == PhraseGrip.Body ? StandardCursorType.Hand
-                    : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
-                    : StandardCursorType.SizeWestEast;
+                if (session.Fills.HitTest(point) is not null)
+                {
+                    wanted = StandardCursorType.Hand;
+                }
+                else if (session.Chart.PartOf(point.Track.Instrument) is { } part
+                    && (PhraseRail.HitTest(part, point)?.Grip ?? PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point)?.Grip) is { } grip)
+                {
+                    wanted = grip == PhraseGrip.Body ? StandardCursorType.Hand
+                        : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
+                        : StandardCursorType.SizeWestEast;
+                }
             }
 
             if (wanted == _cursorType)
@@ -691,6 +712,50 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
+        /// The ghosts of Generate fills' proposals (charter-spec C6 item 5) in the fills row beside a drums lane, drawn over
+        /// the bars there, as a click on one keeps or drops it before it reaches a bar.
+        /// </summary>
+        private void DrawFillGhosts(DrawingContext context, EditorSession session, ChartTrackKey key, IReadOnlyList<RailKind> rows, LaneProjection projection, double fromTick, double toTick)
+        {
+            var fills = session.Fills;
+            int row = IndexOf(rows, PhraseKind.DrumFill);
+            if (!fills.IsActive || key.Instrument != FillProposals.Part || row < 0)
+                return;
+            var (across1, across2) = PhraseRowOf(projection, rows.Count, row);
+            for (int i = 0; i < fills.Proposals.Count; i++)
+            {
+                var fill = fills.Proposals[i].Fill;
+                if (fill.Tick > toTick || fill.CoverEnd < fromTick)
+                    continue;
+                var bar = BoxOf(projection, session, fill, across1, across2).Inflate(0.5);
+                if (fills.IsKept(i))
+                {
+                    context.DrawRectangle(KeptGhostBrush, KeptGhostPen, bar, 2, 2);
+                }
+                else
+                {
+                    context.DrawRectangle(null, DroppedGhostPen, bar, 2, 2);
+                    context.DrawLine(DroppedGhostPen, bar.TopLeft, bar.BottomRight);
+                }
+            }
+        }
+
+        /// <summary>A faint band across the lanes, behind the notes, over each of Generate fills' proposals on a drums lane.</summary>
+        private void DrawFillBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
+        {
+            var fills = session.Fills;
+            if (!fills.IsActive || key.Instrument != FillProposals.Part)
+                return;
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            for (int i = 0; i < fills.Proposals.Count; i++)
+            {
+                var fill = fills.Proposals[i].Fill;
+                if (fill.Tick <= toTick && fill.CoverEnd >= fromTick)
+                    context.FillRectangle(fills.IsKept(i) ? KeptBandBrush : DroppedBandBrush, BoxOf(projection, session, fill, across1, across2));
+            }
+        }
+
+        /// <summary>
         /// A solo's note count on the difficulty shown, at its start (charter-spec C8 item 2): only for the solos that start
         /// on screen, as the others' counts aren't seen.
         /// </summary>
@@ -752,7 +817,7 @@ namespace ChartBuilder.Controls.Editing
         {
             PhraseKind.StarPower => HighwayPalette.StarPower,
             PhraseKind.Solo => SoloColor,
-            PhraseKind.DrumFill => Color.FromRgb(0x7C, 0xDB, 0x8A),
+            PhraseKind.DrumFill => FillColor,
             PhraseKind.Roll => Color.FromRgb(0xFF, 0xD2, 0x5E),
             PhraseKind.Trill => Color.FromRgb(0xFF, 0x9F, 0x5A),
             _ => Color.FromRgb(0xFF, 0x6E, 0x7A),

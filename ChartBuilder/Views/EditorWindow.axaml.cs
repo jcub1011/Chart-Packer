@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using ChartBuilder.Controls;
 using ChartBuilder.Services;
 using ChartBuilder.ViewModels;
@@ -60,6 +62,23 @@ namespace ChartBuilder.Views
             if (_viewModel is not null)
                 _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
+
+        /// <summary>
+        /// Esc ends a run of Generate fills (charter-spec C6 item 5) when nothing focused took it first: a lane takes back
+        /// its drag before it ends the run (EditorKeys), and a field or a list keeps its own Esc. Not a key binding, which
+        /// would run before the focused control saw the key.
+        /// </summary>
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.Handled || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None || _viewModel?.Editor.Session.Fills is not { IsActive: true } fills)
+                return;
+            fills.Cancel();
+            e.Handled = true;
+        }
+
+        /// <summary>Generate fills' options close once the fills are proposed, so the ghosts can be seen.</summary>
+        private void OnGenerateFillsClick(object? sender, RoutedEventArgs e) => GenerateFillsButton.Flyout?.Hide();
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
