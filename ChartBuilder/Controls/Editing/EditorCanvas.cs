@@ -74,6 +74,9 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush StarPowerTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x16));
         private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
         private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
+        private static readonly Color SectionColor = Color.FromRgb(0x5E, 0xEA, 0xD4);
+        private static readonly IPen SectionPen = new ImmutablePen(HighwayPalette.WithAlpha(SectionColor, 0x70).ToUInt32(), 1.5);
+        private static readonly IBrush SectionBrush = new ImmutableSolidColorBrush(SectionColor);
         private static readonly Typeface LabelFace = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
         private readonly GemPainter _gems = new();
@@ -141,7 +144,7 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         protected abstract LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead, int phraseRows);
 
-        /// <summary>Where the margin is that measure numbers and tempo markers are drawn in: the left rail of a highway, the ruler along a timeline's top.</summary>
+        /// <summary>Where the margin is that measure numbers, tempo markers and section names are drawn in: the left rail of a highway, the ruler along a timeline's top.</summary>
         protected abstract Rect LabelsArea(Size size, LaneProjection projection);
 
         /// <summary>Where the waveform is drawn: behind a highway's lanes, or in a strip over a timeline's.</summary>
@@ -224,6 +227,7 @@ namespace ChartBuilder.Controls.Editing
             DrawSpans(context, session, projection);
             DrawBeats(context, session, map, projection, fromTick, toTick, bounds.Size);
             DrawTempoMarkers(context, session, projection, fromTick, toTick, bounds.Size);
+            DrawSections(context, session, projection, fromTick, toTick, bounds.Size);
             DrawStrikeBand(context, session, projection);
             DrawPhraseRail(context, session, part, rows, projection);
 
@@ -774,14 +778,9 @@ namespace ChartBuilder.Controls.Editing
             {
                 double along = projection.AlongOf(session.AudioAt(marker.Tick));
                 bool selected = session.Selection.TempoTicks.Contains(marker.Tick);
-                bool anchored = !tempoMap.Anchors.At(marker.Tick).IsEmpty;
                 context.DrawLine(TempoPen, At(along, across1), At(along, across2));
 
-                string bpm = EditableTempoMap.BpmOf(marker.MicrosecondsPerQuarter).ToString("0.###", CultureInfo.CurrentCulture);
-                var signature = tempoMap.TimeSignatures.At(marker.Tick);
-                if (!signature.IsEmpty)
-                    bpm += string.Create(CultureInfo.CurrentCulture, $" {signature[^1].Numerator}/{signature[^1].Denominator}");
-                var text = Label((anchored ? "⚓ " : "") + bpm, 10, selected ? accent : TempoBrush);
+                var text = Label(TempoText(tempoMap, marker), 10, selected ? accent : TempoBrush);
                 var at = View == LaneView.Highway
                     ? new Point(labels.X + 2, along + 1)
                     : new Point(along + 3, labels.Y + 1);
@@ -796,8 +795,65 @@ namespace ChartBuilder.Controls.Editing
                 if (!tempoMap.Tempos.At(signature.Tick).IsEmpty)
                     continue;
                 double along = projection.AlongOf(session.AudioAt(signature.Tick));
-                var text = Label(string.Create(CultureInfo.CurrentCulture, $"{signature.Numerator}/{signature.Denominator}"), 10, TempoBrush);
+                var text = Label(SignatureText(signature), 10, TempoBrush);
                 context.DrawText(text, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
+            }
+        }
+
+        /// <summary>A tempo marker's label: its tempo, any time signature at its tick, and whether it's anchored.</summary>
+        private static string TempoText(EditableTempoMap tempoMap, TempoChange marker)
+        {
+            bool anchored = !tempoMap.Anchors.At(marker.Tick).IsEmpty;
+            string bpm = EditableTempoMap.BpmOf(marker.MicrosecondsPerQuarter).ToString("0.###", CultureInfo.CurrentCulture);
+            var signature = tempoMap.TimeSignatures.At(marker.Tick);
+            if (!signature.IsEmpty)
+                bpm += " " + SignatureText(signature[^1]);
+            return (anchored ? "⚓ " : "") + bpm;
+        }
+
+        private static string SignatureText(TimeSignatureMarker signature) =>
+            string.Create(CultureInfo.CurrentCulture, $"{signature.Numerator}/{signature.Denominator}");
+
+        /// <summary>
+        /// The sections (charter-spec C8 item 3): a faint line across the lanes and the labels' margin at each one's start,
+        /// and its name in the margin. A highway's name is above the measure number, cut short to the rail's width; a
+        /// timeline's is in the ruler, after the measure number and any tempo there.
+        /// </summary>
+        private void DrawSections(DrawingContext context, EditorSession session, LaneProjection projection, double fromTick, double toTick, Size size)
+        {
+            var labels = LabelsArea(size, projection);
+            bool highway = View == LaneView.Highway;
+            double across1 = highway ? labels.Left : labels.Top;
+            double across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            var tempoMap = session.Chart.TempoMap;
+            foreach (var e in session.Chart.Events.Between((long)Math.Floor(fromTick), (long)Math.Ceiling(toTick)))
+            {
+                if (SectionEvents.NameOf(e.Text) is not { } name)
+                    continue;
+                double along = projection.AlongOf(session.AudioAt(e.Tick));
+                context.DrawLine(SectionPen, At(along, across1), At(along, across2));
+
+                // The measure number drawn at its tick, when it starts a measure.
+                int measure = _measures.BinarySearch(e.Tick);
+                var number = measure >= 0 ? Label((measure + 1).ToString(CultureInfo.CurrentCulture), 10, LabelBrush ?? DefaultLabelBrush) : null;
+                if (highway)
+                {
+                    var text = Label(name, 10, SectionBrush, Math.Max(1, labels.Width - 4));
+                    context.DrawText(text, new Point(labels.X + 2, along - (number?.Height ?? 0) - text.Height));
+                    continue;
+                }
+
+                double before = number?.Width ?? 0;
+                var tempos = tempoMap.Tempos.At(e.Tick);
+                var signatures = tempoMap.TimeSignatures.At(e.Tick);
+                if (!tempos.IsEmpty)
+                    before = Math.Max(before, Label(TempoText(tempoMap, tempos[^1]), 10, TempoBrush).Width);
+                else if (!signatures.IsEmpty)
+                    before = Math.Max(before, Label(SignatureText(signatures[^1]), 10, TempoBrush).Width);
+                var label = Label(name, 10, SectionBrush);
+                var at = new Point(along + 3 + (before > 0 ? before + 6 : 0), labels.Y + Math.Max(0, (labels.Height - label.Height) / 2));
+                context.FillRectangle(BadgeBrush, new Rect(at, new Size(label.Width, label.Height)).Inflate(1));
+                context.DrawText(label, at);
             }
         }
 
@@ -1112,14 +1168,22 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        private FormattedText Label(string text, double size, IBrush brush)
+        /// <summary>A label, made once and kept; cut short with an ellipsis at <paramref name="maxWidth"/> when it's given.</summary>
+        private FormattedText Label(string text, double size, IBrush brush, double? maxWidth = null)
         {
-            string key = string.Create(CultureInfo.InvariantCulture, $"{text}|{size}|{brush.GetHashCode()}");
+            string key = string.Create(CultureInfo.InvariantCulture, $"{text}|{size}|{brush.GetHashCode()}|{maxWidth}");
             if (!_labels.TryGetValue(key, out var label))
             {
                 if (_labels.Count > 512)
                     _labels.Clear();
                 label = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, LabelFace, size, brush);
+                if (maxWidth is { } width)
+                {
+                    label.MaxTextWidth = width;
+                    label.MaxLineCount = 1;
+                    label.Trimming = TextTrimming.CharacterEllipsis;
+                }
+
                 _labels[key] = label;
             }
 

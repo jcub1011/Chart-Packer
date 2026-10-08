@@ -47,6 +47,14 @@ namespace ChartBuilder.Controls.Editing
                 return true;
             }
 
+            // Ctrl+↑ and Ctrl+↓: the next section's start and the previous one's, in either view; up is later, as it is
+            // up a highway and with PgUp (§9).
+            if (ctrl && !alt && !shift && key is PhysicalKey.ArrowUp or PhysicalKey.ArrowDown)
+            {
+                tools.StepCursorSections(key == PhysicalKey.ArrowUp ? 1 : -1);
+                return true;
+            }
+
             if (alt && !ctrl && (later != 0 || across != 0) && canvas.Slots is { } slots)
             {
                 tools.MoveSelection(later, across, slots);

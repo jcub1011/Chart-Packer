@@ -1472,4 +1472,97 @@ Saving also makes these changes to song.ini:
   <data name="SaveAndPackErrorsFormat" xml:space="preserve">
     <value>Saved, but not packed: the chart has {0} errors. See Findings.</value>
   </data>
+  <data name="SectionsTab" xml:space="preserve">
+    <value>Sections</value>
+    <comment>The left panel's tab listing the chart's sections and other text events.</comment>
+  </data>
+  <data name="SectionsInsertSectionButton" xml:space="preserve">
+    <value>Insert section</value>
+  </data>
+  <data name="SectionsInsertSectionToolTip" xml:space="preserve">
+    <value>Add a section at the cursor, on the grid</value>
+  </data>
+  <data name="SectionsCustomSection" xml:space="preserve">
+    <value>Custom…</value>
+    <comment>Insert section's entry for a section named freely: it's added to be renamed.</comment>
+  </data>
+  <data name="SectionsCustomName" xml:space="preserve">
+    <value>Section</value>
+    <comment>The name Custom… gives a new section to rename; "Section 2" and on when a section has it already.</comment>
+  </data>
+  <data name="SectionsInsertEventButton" xml:space="preserve">
+    <value>Insert event</value>
+  </data>
+  <data name="SectionsInsertEventToolTip" xml:space="preserve">
+    <value>Add a song event or a text event at the cursor, on the grid</value>
+  </data>
+  <data name="SongEventCoda" xml:space="preserve">
+    <value>Coda</value>
+    <comment>The song event [coda], after which drum fills are a big rock ending.</comment>
+  </data>
+  <data name="SongEventMusicStart" xml:space="preserve">
+    <value>Music start</value>
+    <comment>The song event [music_start].</comment>
+  </data>
+  <data name="SongEventMusicEnd" xml:space="preserve">
+    <value>Music end</value>
+    <comment>The song event [music_end].</comment>
+  </data>
+  <data name="SongEventEnd" xml:space="preserve">
+    <value>End</value>
+    <comment>The song event [end], which saving keeps after the last note.</comment>
+  </data>
+  <data name="SectionsTextEvent" xml:space="preserve">
+    <value>Text event…</value>
+    <comment>Insert event's entry for a free text event in EVENTS, added to be renamed.</comment>
+  </data>
+  <data name="SectionsPartTextEventFormat" xml:space="preserve">
+    <value>Text event on {0}…</value>
+    <comment>Insert event's entry for a free text event on the focused part's track. {0} is the part.</comment>
+  </data>
+  <data name="SectionsEventsHeading" xml:space="preserve">
+    <value>Sections and events</value>
+    <comment>The heading over EVENTS' text events: sections, song events and free text.</comment>
+  </data>
+  <data name="SectionsPartHeadingFormat" xml:space="preserve">
+    <value>Text events on {0}</value>
+    <comment>The heading over the focused part's own text events. {0} is the part.</comment>
+  </data>
+  <data name="SectionsNone" xml:space="preserve">
+    <value>No sections or events yet. Put the cursor where one starts, then Insert section.</value>
+  </data>
+  <data name="SectionsWhereFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment>Where a text event is: {0} is its time in the song; {1} its measure and beat.</comment>
+  </data>
+  <data name="SectionsTickLabel" xml:space="preserve">
+    <value>Tick</value>
+    <comment>A text event's tick, which can be typed to move it.</comment>
+  </data>
+  <data name="SectionsTickToolTip" xml:space="preserve">
+    <value>Where it is, in ticks. Type another tick and press Enter to move it there.</value>
+  </data>
+  <data name="SectionsNameToolTip" xml:space="preserve">
+    <value>The section's name. Type a new one and press Enter to rename it.</value>
+  </data>
+  <data name="SectionsTextToolTip" xml:space="preserve">
+    <value>The event's text, brackets included, as it's written. Type new text and press Enter to change it.</value>
+  </data>
+  <data name="SectionsSongEventToolTipFormat" xml:space="preserve">
+    <value>Written as {0}. Its tick can be changed here, or it can be deleted.</value>
+    <comment>A song event's label's tooltip. {0} is its text, e.g. [music_start].</comment>
+  </data>
+  <data name="SectionsGoToButton" xml:space="preserve">
+    <value>→</value>
+    <comment>A row's button that moves the cursor to its event.</comment>
+  </data>
+  <data name="SectionsGoToToolTip" xml:space="preserve">
+    <value>Move the cursor to it</value>
+  </data>
+  <data name="SectionsDeleteToolTip" xml:space="preserve">
+    <value>Delete it, as one step to undo</value>
+  </data>
+  <data name="SectionsKeysHint" xml:space="preserve">
+    <value>Ctrl+↑ and Ctrl+↓ move the cursor to the next section and the previous one.</value>
+  </data>
 </root>

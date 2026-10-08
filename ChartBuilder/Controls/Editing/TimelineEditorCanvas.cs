@@ -6,8 +6,8 @@ namespace ChartBuilder.Controls.Editing
 {
     /// <summary>
     /// The timeline view of a lane (charter-spec C3 item 1), in the style of a DAW: time runs left to right and each note
-    /// lane is a row, under a ruler of measure numbers and tempo markers, a strip of the waveform and the phrase rail (C8).
-    /// It suits long-range editing and lining notes up with the audio.
+    /// lane is a row, under a ruler of measure numbers, tempo markers and section names, a strip of the waveform and the
+    /// phrase rail (C8). It suits long-range editing and lining notes up with the audio.
     /// </summary>
     public sealed class TimelineEditorCanvas : EditorCanvas
     {

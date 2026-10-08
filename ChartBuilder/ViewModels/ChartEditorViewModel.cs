@@ -515,7 +515,7 @@ namespace ChartBuilder.ViewModels
             var sections = new List<OverviewSection>();
             foreach (var e in chart.Events)
             {
-                if (SectionName(e.Text) is { } name)
+                if (SectionEvents.NameOf(e.Text) is { } name)
                     sections.Add(new OverviewSection(Session.AudioAt(e.Tick), name));
             }
 
@@ -546,17 +546,6 @@ namespace ChartBuilder.ViewModels
             }
 
             return new OverviewData(sections, density, starPower, solos);
-        }
-
-        /// <summary>A section's name from its text event (<c>[section Verse 1]</c> or <c>[prc_verse_1]</c>), or null when it isn't one.</summary>
-        internal static string? SectionName(string text)
-        {
-            string trimmed = text.Trim().TrimStart('[').TrimEnd(']');
-            if (trimmed.StartsWith("section ", StringComparison.OrdinalIgnoreCase))
-                return trimmed["section ".Length..].Trim();
-            if (trimmed.StartsWith("prc_", StringComparison.OrdinalIgnoreCase))
-                return trimmed["prc_".Length..].Replace('_', ' ');
-            return null;
         }
     }
 

@@ -12,7 +12,7 @@ namespace ChartPacker.Core.Charting.Editing;
 /// A press starts a gesture, drags change it, and the release ends it, as one step on the undo stack. While it goes on, the
 /// gesture's change is applied to the chart as a preview (<see cref="EditorSession.Preview"/>), so every view draws it.
 /// </remarks>
-public sealed class EditorTools
+public sealed partial class EditorTools
 {
     private const string DoubleKickOffExpert = "A 2x kick is on Expert only.";
     private const string NoPhraseLength = "A phrase has to end after it starts.";

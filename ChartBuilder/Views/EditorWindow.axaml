@@ -233,7 +233,8 @@
                 <ColumnDefinition Width="280" MinWidth="180" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left panel: the Chart Inspector, and Chart settings. -->
+            <!-- Left panel: the Chart Inspector, Chart settings, and the sections and other text events (charter-spec
+                 C8 items 3, 5 and 6). -->
             <bctl:EditorSidePanel Grid.Column="0"
                                   IsCollapsed="{Binding IsLeftPanelCollapsed}"
                                   ToggleCommand="{Binding ToggleLeftPanelCommand}">
@@ -242,6 +243,9 @@
                 </TabItem>
                 <TabItem Header="{x:Static res:Strings.ChartSettingsTab}">
                     <views:ChartSettingsView DataContext="{Binding ChartSettings}" />
+                </TabItem>
+                <TabItem Header="{x:Static res:Strings.SectionsTab}">
+                    <views:SectionsView DataContext="{Binding Sections}" />
                 </TabItem>
             </bctl:EditorSidePanel>
 

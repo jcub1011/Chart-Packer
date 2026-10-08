@@ -494,24 +494,14 @@ namespace ChartBuilder.ViewModels
 
         private static TimeSignature SignatureAt(TempoMap map, long tick) => map.TimeSignatures.Last(s => s.Tick <= tick);
 
-        /// <summary>Where <paramref name="tick"/> is in the song's measures, e.g. "m41 · beat 3", counting both from 1.</summary>
+        /// <summary>
+        /// Where <paramref name="tick"/> is in the song's measures, e.g. "m41 · beat 3", counting both from 1. It costs no
+        /// more far into the song than near its start (<see cref="ChartPacker.Core.Charting.Editing.MeasureBeat"/>).
+        /// </summary>
         internal static string MeasureBeat(TempoMap map, long tick)
         {
-            int measure = 0;
-            long measureStart = 0;
-            foreach (var line in map.BeatLines(0, tick))
-            {
-                if (line.IsMeasure)
-                {
-                    measure++;
-                    measureStart = line.Tick;
-                }
-            }
-
-            var signature = SignatureAt(map, tick);
-            double beatTicks = map.Resolution * 4.0 / signature.Denominator;
-            double beat = 1 + ((tick - measureStart) / beatTicks);
-            return string.Format(CultureInfo.CurrentCulture, Strings.PropertiesMeasureBeatFormat, Math.Max(1, measure), beat.ToString("0.##", CultureInfo.CurrentCulture));
+            var at = ChartPacker.Core.Charting.Editing.MeasureBeat.At(map, tick);
+            return string.Format(CultureInfo.CurrentCulture, Strings.PropertiesMeasureBeatFormat, at.Measure, at.Beat.ToString("0.##", CultureInfo.CurrentCulture));
         }
 
         /// <summary>A note's lane, in words: Green, Open, Kick, White 2…</summary>

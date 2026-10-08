@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace ChartPacker.Core.Charting;
 
 /// <summary>
@@ -43,6 +45,32 @@ public static class SectionEvents
         return styleOf is not null && Inner(styleOf).StartsWith(PracticePrefix, StringComparison.OrdinalIgnoreCase)
             ? "[" + PracticePrefix + trimmed.Replace(' ', '_') + "]"
             : "[" + SectionPrefix + trimmed + "]";
+    }
+
+    /// <summary>
+    /// <paramref name="name"/>, or when a section of <paramref name="chart"/> already has it, the name with the lowest
+    /// number from 2 that none has ("Section 2"), as <b>Insert section</b>'s Custom… names a new one to rename.
+    /// </summary>
+    public static string FreeName(EditableChart chart, string name)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in chart.Events)
+        {
+            if (NameOf(e.Text) is { } existing)
+                taken.Add(existing);
+        }
+
+        string trimmed = name.Trim();
+        if (!taken.Contains(trimmed))
+            return trimmed;
+        for (int n = 2; ; n++)
+        {
+            string numbered = string.Create(CultureInfo.InvariantCulture, $"{trimmed} {n}");
+            if (!taken.Contains(numbered))
+                return numbered;
+        }
     }
 
     /// <summary>The sections of <paramref name="chart"/>'s <c>EVENTS</c>, in order.</summary>

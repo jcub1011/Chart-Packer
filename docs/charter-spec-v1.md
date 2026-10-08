@@ -1033,6 +1033,31 @@ Acceptance criteria:
 3. **Sections** in `EVENTS`. They are named freely and shown in the overview strip and in a new
    section list beside it. Sections can be renamed in the list, and **Insert section** takes the
    name from a menu of common ones (Intro, Verse 1, Chorus 1, Bridge, Solo, Outro…).
+   - *Settled in CM3:* the list is the **Sections** tab, in the left panel after Chart settings. It
+     lists every text event of `EVENTS` in time order, each with its time and its measure and beat:
+     a section by its name; a song event (item 5, and `[coda]`) by what it is, set apart from the
+     sections; anything else as it's written. Under them, headed by the part, are the focused lane's
+     part's own text events, when it has any (item 6). Each row has a go-to, which moves the cursor
+     there and leaves the focus where it is; its name or text, typed to rename it; its tick, typed to
+     move it; and a delete. Each is one undoable step. A section is renamed by its name and keeps its
+     `[section …]` or `[prc_…]` style, and an empty name is refused. The list follows edits, undo and
+     redo, a drag's preview and the focus, and a row whose event hasn't changed keeps what's being
+     typed in it.
+   - *Settled in CM3:* **Insert section** inserts `[section <name>]` at the cursor, on the grid. Its
+     menu has the common names and **Custom…**, which inserts one named "Section" (or the next free
+     "Section 2", "Section 3"…) with its name ready to type over. Where there's a section at that tick
+     already, it's refused rather than stacking two, as is moving or renaming an event into one there.
+     Only a duplicate an edit makes is refused, so a loaded chart's sections already sharing a tick
+     can still be renamed and moved. A name with `[` or `]` is refused, as the event's own brackets
+     end at the first `]`. A tick typed far past the end of the song (later than an hour in, or 64
+     measures past the chart's last note, event or tempo marker) is refused, for any text event.
+   - *Settled in CM3:* `Ctrl`+`↑` ([§9](#9-keyboard-shortcuts)) moves the cursor to the start of the
+     next section after it, and `Ctrl`+`↓` to the previous one's, in either view: up is later, as `↑`
+     is on a highway and `PgUp` is. Only sections count, and sections at one tick are one start. With
+     none that way, the cursor stays and the status says so.
+   - *Settled in CM3:* each lane draws a section as a faint line across the lanes and the labels'
+     margin, with its name in the margin: in a highway's rail above the measure number, cut short to
+     fit, and in a timeline's ruler after the measure number and any tempo there.
 4. **Big rock ending** (all five pitches 120–124 held together on a guitar or bass track) and
    `[coda]`. On drums, the same pitches are fills, and a big rock ending is the fill markers after
    `[coda]`. Chart Builder shows those as a big rock ending, not a fill, and the fill rules (CHR042,
@@ -1042,8 +1067,20 @@ Acceptance criteria:
    note's end, a sustain's included. The move is an undo step of its own, made once the save is going
    ahead, so the model the editor holds is the one saved (AC C17.4). **Export copy** moves `[end]`
    in its own snapshot only, never in the model the editor holds.
+   - *Settled in CM3:* **Insert event**, in the Sections tab, inserts `[coda]`, `[music_start]`,
+     `[music_end]` or `[end]` at the cursor, on the grid. Inserting, moving or deleting `[coda]` makes
+     the drum fills and big rock endings what it then decides, in the same step (item 4). A second
+     `[music_start]`, `[music_end]` or `[end]` is refused, as is moving or renaming another event into
+     one; the status says where the one there is, to move it instead. Either of a loaded chart's two
+     `[end]`s can still be moved. A song event is moved by its tick or deleted, but not renamed. The
+     save's move of `[end]` is as above.
 6. **Free text events**, in `EVENTS` or on a part track, for anything else. Events the model
    doesn't know are shown and kept, not deleted.
+   - *Settled in CM3:* **Insert event**'s **Text event…** inserts `[event]` in `EVENTS` at the cursor,
+     on the grid, with its text ready to type over, and **Text event on *part*…** puts one on the
+     focused part's track. Free text is edited as it's written, brackets and all; text left empty is
+     refused, as deleting is how one is taken away. A part's text events are free text, so none is
+     refused for what it says.
 
 Acceptance criteria:
 
@@ -1871,8 +1908,8 @@ Editor straight away, with no dialog before it.
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- ⚙ opens **Program settings** (Ctrl+,). The left panel's tabs are the **Chart Inspector** and
-  **Chart settings**. The ◉ (View) menu will choose which lanes are shown; it is a placeholder so
+- ⚙ opens **Program settings** (Ctrl+,). The left panel's tabs are the **Chart Inspector**,
+  **Chart settings** and **Sections** ([C8](#c8-phrases-and-events) item 3). The ◉ (View) menu will choose which lanes are shown; it is a placeholder so
   far. The toolbar's groups wrap onto more rows as the
   window narrows.
 - The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part. They are
@@ -1995,7 +2032,7 @@ These are the defaults. Rebinding is future work.
 | `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
 | `Alt`+arrows | Move the selection one grid step in time, or one lane across |
 | `PgUp` / `PgDn` | Move the cursor one measure |
-| `Ctrl`+`↑` / `Ctrl`+`↓` | Previous or next section |
+| `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
 | `[` / `]` | Coarser or finer snap |
 | `O` | Snap to onset on or off |
 | `B` | Tap tempo |

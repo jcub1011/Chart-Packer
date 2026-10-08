@@ -6,13 +6,14 @@ namespace ChartBuilder.Controls.Editing
 {
     /// <summary>
     /// The highway view of a lane (charter-spec C3 item 1): time runs upwards, as in the games, with the waveform behind
-    /// the lanes, measure numbers and tempo markers in a rail on the left, chords' forcing marks on the right, and the
-    /// phrase rail beyond them (C8). Its columns are no wider than <see cref="MaxLaneSize"/>, so a wide lane doesn't stretch
+    /// the lanes, measure numbers, tempo markers and section names in a rail on the left, chords' forcing marks on the
+    /// right, and the phrase rail beyond them (C8). Its columns are no wider than <see cref="MaxLaneSize"/>, so a wide lane doesn't stretch
     /// the highway across it; the highway is centred in it instead.
     /// </summary>
     public sealed class HighwayEditorCanvas : EditorCanvas
     {
-        // The rail on the left, for measure numbers and tempo markers, and the margin on the right, for forcing marks.
+        // The rail on the left, for measure numbers, tempo markers and section names, and the margin on the right, for
+        // forcing marks.
         private const double RailWidth = 56;
         private const double MarkWidth = 18;
 

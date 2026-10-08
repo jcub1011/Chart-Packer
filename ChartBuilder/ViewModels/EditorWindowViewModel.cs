@@ -73,6 +73,7 @@ namespace ChartBuilder.ViewModels
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
             Editor = new ChartEditorViewModel(song, _undo, Playback, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
             Findings = new FindingsViewModel(song, _undo, Editor);
+            Sections = new SectionsViewModel(Editor);
             Findings.Changed += (_, _) => RefreshSaveState();
             Song.Changed += OnSongChanged;
             _ = MeasureAudioAsync();
@@ -134,6 +135,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The findings panel: the chart's lint findings as it's edited.</summary>
         public FindingsViewModel Findings { get; }
+
+        /// <summary>The Sections tab: the chart's sections and other text events.</summary>
+        public SectionsViewModel Sections { get; }
 
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
         public LaneDockViewModel Lanes => Editor.Lanes;
@@ -247,6 +251,7 @@ namespace ChartBuilder.ViewModels
             _undo.Changed -= OnChartChanged;
             Song.Changed -= OnSongChanged;
             Findings.Dispose();
+            Sections.Dispose();
             Editor.Dispose();
             Playback.Dispose();
             _songLock?.Dispose();
