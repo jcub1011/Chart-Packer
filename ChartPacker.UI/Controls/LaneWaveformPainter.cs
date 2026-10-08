@@ -5,7 +5,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using ChartPacker.Audio.Waveforms;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// Draws a waveform behind a lane's notes: along the lane's time axis, centred across it, as

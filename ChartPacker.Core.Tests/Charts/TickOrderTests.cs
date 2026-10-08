@@ -52,7 +52,7 @@ public sealed class TickOrderTests
 
         TickOrder.KeepFirstOfEach(list, static e => e.Tick, static e => e.Key);
 
-        Assert.AreSequenceEqual(["a", "b", "d", "f"], list.Select(e => e.Name).ToArray());
+        Assert.AreSequenceEqual(["a", "b", "d", "f"], [.. list.Select(e => e.Name)]);
     }
 
     [TestMethod]

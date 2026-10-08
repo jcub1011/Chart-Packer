@@ -1,7 +1,7 @@
 using System.Globalization;
 using ChartPacker.Resources;
 
-namespace ChartPacker.Formatting
+namespace ChartPacker.UI.Formatting
 {
     /// <summary>Formats byte counts for display, e.g. "42 KB" or "4.1 MB", using 1024-byte units.</summary>
     public static class ByteSizeFormatter

@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels

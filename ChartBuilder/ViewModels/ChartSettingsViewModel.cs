@@ -13,8 +13,8 @@ using ChartBuilder.Services;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charts;
-using ChartPacker.Services;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartBuilder.ViewModels

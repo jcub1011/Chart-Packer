@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using ChartBuilder.ViewModels;
-using ChartPacker.Views;
+using ChartPacker.UI.Views;
 
 namespace ChartBuilder.Views
 {

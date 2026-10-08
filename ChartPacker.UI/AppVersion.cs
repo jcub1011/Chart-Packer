@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace ChartPacker
+namespace ChartPacker.UI
 {
     /// <summary>The program version, as set by <c>&lt;Version&gt;</c> in Directory.Build.props.</summary>
     /// <remarks>Chart Packer and Chart Builder ship together with one version, so this assembly's is theirs too.</remarks>

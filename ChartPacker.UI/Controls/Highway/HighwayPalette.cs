@@ -2,7 +2,7 @@ using System;
 using Avalonia.Media;
 using ChartPacker.Core.Charts;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls.Highway
 {
     /// <summary>
     /// The colours notes are drawn in, as the games colour them, for every view that draws notes: Chart Packer's highway

@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Validation;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartBuilder.ViewModels

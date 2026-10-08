@@ -6,7 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using ChartBuilder.ViewModels;
-using ChartPacker.Controls;
+using ChartPacker.UI.Controls;
 
 namespace ChartBuilder.Controls
 {

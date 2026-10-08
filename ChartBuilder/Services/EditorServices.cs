@@ -1,7 +1,7 @@
 using System;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.Services;
+using ChartPacker.UI.Services;
 
 namespace ChartBuilder.Services
 {

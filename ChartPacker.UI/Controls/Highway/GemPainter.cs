@@ -5,7 +5,7 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartPacker.Core.Charts;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls.Highway
 {
     /// <summary>
     /// Draws notes as the games show them: two-tone gems, HOPO and tap marks, cymbals, open-note and kick bars, and

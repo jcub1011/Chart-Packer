@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:res="using:ChartPacker.Resources"
-             xmlns:ctl="using:ChartPacker.Controls"
+             xmlns:ctl="using:ChartPacker.UI.Controls"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="52"
              x:Class="ChartPacker.Views.ToolbarView"
              x:DataType="vm:MainWindowViewModel">

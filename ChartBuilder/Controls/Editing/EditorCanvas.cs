@@ -11,10 +11,11 @@ using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ChartBuilder.ViewModels;
-using ChartPacker.Controls;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charts;
+using ChartPacker.UI.Controls;
+using ChartPacker.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls.Editing
 {
@@ -66,6 +67,9 @@ namespace ChartBuilder.Controls.Editing
 
         private readonly GemPainter _gems = new();
         private readonly Dictionary<string, FormattedText> _labels = [];
+
+        // How brightly each column is lit as the song plays through the strike line.
+        private double[] _hits = [];
         private EditorLaneViewModel? _lane;
         private ChartEditorViewModel? _editor;
         private bool _isFrameRequested;
@@ -189,6 +193,9 @@ namespace ChartBuilder.Controls.Editing
 
             using (context.PushClip(lanes))
             {
+                if (_editor?.Playback.IsPlaying == true)
+                    DrawGlow(context, session, key, track, projection, slots);
+
                 if (_lane.Ghost is { } ghost && session.Chart.PartOf(key.Instrument) is { } part)
                 {
                     using (context.PushOpacity(0.28))
@@ -428,6 +435,8 @@ namespace ChartBuilder.Controls.Editing
             switch (e.PropertyName)
             {
                 case nameof(PlaybackViewModel.IsPlaying):
+                    // Paused, the strike line's glow goes out.
+                    InvalidateVisual();
                     RequestFrame();
                     break;
                 case nameof(PlaybackViewModel.Waveform):
@@ -701,13 +710,87 @@ namespace ChartBuilder.Controls.Editing
             context.DrawLine(StrikeEdgePen, At(along + half, across1), At(along + half, across2));
         }
 
+        /// <summary>
+        /// The columns the song is playing through, lit as the inspector's highway lights them: a beam rising from the
+        /// strike line and the column's target filled in, as each note reaches it, fading, and held while it's sustained.
+        /// </summary>
+        private void DrawGlow(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
+        {
+            var kind = track.Kind;
+            bool drums = kind == ChartInstrumentKind.Drums;
+            int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
+            double now = session.Viewport.Cursor;
+            var hits = HitsAt(session, key, track, slots, now);
+            double strike = projection.AlongOf(now);
+            double reach = StrikeGlow.BeamReach * (projection.AlongOf(projection.End) - strike);
+            double size = GemSize(projection);
+            for (int column = 0; column < slots.Slots.Count; column++)
+            {
+                double hit = hits[column];
+                if (hit <= 0)
+                    continue;
+
+                // The timeline's row for open notes or the kick lights in their colour.
+                var color = slots.Slots[column] == (drums ? 0 : ChartNote.OpenLane)
+                    ? (drums ? HighwayPalette.Kick : HighwayPalette.Open)
+                    : HighwayPalette.HitColor(kind, laneCount, column);
+                double edge = projection.LaneFrom + (column * projection.LaneSize);
+                using (context.PushOpacity(hit * StrikeGlow.BeamOpacity))
+                    context.FillRectangle(StrikeGlow.Beam(color, View == LaneView.Highway), Box(strike, strike + reach, edge, edge + projection.LaneSize));
+
+                var rect = GemRect(projection, column, strike, size);
+                double radius = GemPainter.CornerOf(rect);
+                context.DrawRectangle(_gems.Brush(StrikeGlow.TargetFill(color, hit)), _gems.Pen(StrikeGlow.TargetEdge(color), 2), rect.Deflate(1), radius, radius);
+            }
+        }
+
+        /// <summary>How brightly each column is lit at <paramref name="now"/>, from 0 to 1: just struck, or held.</summary>
+        private double[] HitsAt(EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, double now)
+        {
+            int count = slots.Slots.Count;
+            if (_hits.Length < count)
+                _hits = new double[count];
+            var hits = _hits;
+            Array.Clear(hits, 0, count);
+
+            bool drums = track.Kind == ChartInstrumentKind.Drums;
+            var game = session.GameTrack(key).Notes;
+            double from = Math.Max(0, session.TickAt(now - StrikeGlow.Seconds));
+            var notes = track.Notes.Between((long)Math.Max(0, Math.Floor(from) - LongestOf(key, track)), (long)Math.Ceiling(Math.Max(0, session.TickAt(now))) + 1);
+            foreach (var note in notes)
+            {
+                double start = session.AudioAt(note.Tick);
+                if (start > now)
+                    continue;
+
+                // Held while the games read it as a sustain and its tail hasn't passed.
+                var shown = Shown(game, note, drums);
+                double glow = StrikeGlow.Brightness(now - start, shown.Length > 0 && session.AudioAt(note.Tick + shown.Length) > now);
+                if (glow <= 0)
+                    continue;
+
+                // An open note or kick across the highway lights every column.
+                if (slots.Across == note.Lane)
+                {
+                    for (int c = 0; c < count; c++)
+                        hits[c] = Math.Max(hits[c], glow * StrikeGlow.SpreadLevel);
+                }
+                else if (slots.IndexOf(note.Lane) is var column and >= 0)
+                {
+                    hits[column] = Math.Max(hits[column], glow);
+                }
+            }
+
+            return hits;
+        }
+
         /// <summary>The cursor's line through the strike band, over the notes and into the labels' margin.</summary>
         private void DrawCursor(DrawingContext context, EditorSession session, LaneProjection projection, Rect lanes)
         {
             double along = projection.AlongOf(session.Viewport.Cursor);
             var pen = new ImmutablePen(((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF, 1.5);
-            var area = new Rect(Bounds.Size);
-            context.DrawLine(pen, At(along, View == LaneView.Highway ? area.Left : area.Top), At(along, View == LaneView.Highway ? lanes.Right : lanes.Bottom));
+            var labels = LabelsArea(Bounds.Size, projection);
+            context.DrawLine(pen, At(along, View == LaneView.Highway ? labels.Left : labels.Top), At(along, View == LaneView.Highway ? lanes.Right : lanes.Bottom));
         }
 
         /// <summary>A gem in <paramref name="column"/> at <paramref name="along"/>.</summary>

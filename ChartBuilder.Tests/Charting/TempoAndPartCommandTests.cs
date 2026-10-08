@@ -27,7 +27,7 @@ public sealed class TempoAndPartCommandTests
         var after = AppliesRevertsAndRedoes(chart, command);
 
         Assert.AreSequenceEqual([new TempoChange(0, 500_000), new TempoChange(960, 600_000), new TempoChange(1920, 400_000)], after.TempoMap.Tempos.ToList());
-        ChartTickSnapshot.Refill(after.TempoMap.Tempos, before.TempoMap.Tempos.AsSpan().ToArray());
+        ChartTickSnapshot.Refill(after.TempoMap.Tempos, [.. before.TempoMap.Tempos]);
         AssertSame(before, after, "with the tempo markers put back");
         Assert.IsTrue(command.Affected.TempoMapChanged);
         Assert.IsEmpty(command.Affected.Regions);
@@ -187,9 +187,9 @@ public sealed class TempoAndPartCommandTests
         Assert.AreSequenceEqual(command.Anchors, after.TempoMap.Anchors.ToList());
         Assert.IsNull(command.Report);
         Assert.IsEmpty(command.Collisions);
-        ChartTickSnapshot.Refill(after.TempoMap.Tempos, before.TempoMap.Tempos.AsSpan().ToArray());
-        ChartTickSnapshot.Refill(after.TempoMap.TimeSignatures, before.TempoMap.TimeSignatures.AsSpan().ToArray());
-        ChartTickSnapshot.Refill(after.TempoMap.Anchors, before.TempoMap.Anchors.AsSpan().ToArray());
+        ChartTickSnapshot.Refill(after.TempoMap.Tempos, [.. before.TempoMap.Tempos]);
+        ChartTickSnapshot.Refill(after.TempoMap.TimeSignatures, [.. before.TempoMap.TimeSignatures]);
+        ChartTickSnapshot.Refill(after.TempoMap.Anchors, [.. before.TempoMap.Anchors]);
         AssertSame(before, after, "with the tempo map put back");
     }
 

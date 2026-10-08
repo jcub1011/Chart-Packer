@@ -8,7 +8,7 @@ using Avalonia.Platform.Storage;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     public sealed class AvaloniaFilePickerService(Func<TopLevel?> topLevel) : IFilePickerService
     {

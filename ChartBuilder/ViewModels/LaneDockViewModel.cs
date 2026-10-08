@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ChartPacker.Core.Charting.Layout;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartBuilder.ViewModels

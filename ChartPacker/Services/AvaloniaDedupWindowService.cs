@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Trash;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
 

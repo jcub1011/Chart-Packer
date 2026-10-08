@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Saving;
-using ChartPacker.Services;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

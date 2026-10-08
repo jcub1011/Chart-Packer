@@ -1,10 +1,11 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using ChartPacker.UI.Views;
 using ChartPacker.ViewModels.Settings;
 using ChartPacker.Views;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     /// <param name="createViewModel">
     /// Makes the window's view model from a folder picker owned by the Settings window, so a picker opened

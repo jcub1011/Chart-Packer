@@ -11,6 +11,7 @@ using ChartPacker.Core.Packing;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
+using ChartPacker.UI.Services;
 using ChartPacker.ViewModels;
 
 namespace ChartPacker.Services

@@ -192,7 +192,7 @@ public sealed class EditorSong
     public static EditorSong Of(OpenedSong song, IReadOnlySet<ChartInstrument>? loadedParts = null)
     {
         ArgumentNullException.ThrowIfNull(song);
-        loadedParts ??= song.HasChartFile ? song.Chart.Parts.Select(p => p.Instrument).ToHashSet() : new HashSet<ChartInstrument>();
+        loadedParts ??= song.HasChartFile ? [.. song.Chart.Parts.Select(p => p.Instrument)] : new HashSet<ChartInstrument>();
         return new EditorSong(song, song.Chart, SongTracks.Resolve(song.StoredNames, null), loadedParts);
     }
 

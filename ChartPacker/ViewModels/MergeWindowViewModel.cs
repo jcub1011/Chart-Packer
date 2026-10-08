@@ -16,6 +16,8 @@ using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Text;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -143,7 +145,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The per-source cells, without the leave-out option the Include checkbox stands for.</summary>
         /// <remarks>Worked out once, when first shown: the options are all added before then, and a fresh list would regenerate the cells.</remarks>
-        public IReadOnlyList<MergeOptionViewModel> SourceOptions => _sourceOptions ??= Options.Where(o => o.Source is not null).ToList();
+        public IReadOnlyList<MergeOptionViewModel> SourceOptions => _sourceOptions ??= [.. Options.Where(o => o.Source is not null)];
 
         /// <summary>The leave-out option the Include checkbox stands for, if the row has one.</summary>
         public MergeOptionViewModel? LeaveOutOption => Options.FirstOrDefault(o => o.Source is null);

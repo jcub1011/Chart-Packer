@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
-using ChartPacker.Views;
+using ChartPacker.UI.Views;
 
 namespace ChartBuilder.Services
 {

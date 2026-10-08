@@ -9,7 +9,7 @@ using ChartPacker.Audio.Playback;
 using ChartPacker.Audio.Synthesis;
 using ChartPacker.Core.Calibration;
 using ChartPacker.Core.Settings;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia.Threading;
 using ChartPacker.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

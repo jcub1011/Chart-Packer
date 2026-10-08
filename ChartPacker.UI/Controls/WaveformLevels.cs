@@ -1,7 +1,7 @@
 using System;
 using ChartPacker.Audio.Waveforms;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// A waveform's levels over a stretch of time, and how loud to draw them, for each control that draws one.

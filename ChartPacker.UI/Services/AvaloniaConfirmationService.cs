@@ -1,9 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using ChartPacker.UI.Views;
 using ChartPacker.Views;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     /// <summary>Shows a <see cref="ConfirmDialog"/> over the owner window. Avalonia has no built-in message box.</summary>
     public sealed class AvaloniaConfirmationService(Func<Window?> owner) : IConfirmationService

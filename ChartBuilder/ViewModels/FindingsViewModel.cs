@@ -11,7 +11,7 @@ using ChartPacker.Core.Charting.Lint;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Validation;
 using ChartPacker.Core.Validation.QuickFixes;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;

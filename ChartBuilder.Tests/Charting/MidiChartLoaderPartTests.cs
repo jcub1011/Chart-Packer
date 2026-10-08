@@ -19,7 +19,7 @@ public sealed class MidiChartLoaderPartTests
         return (result.Chart.PartOf(instrument)!, result.Issues);
     }
 
-    private static List<EditableNote> NotesOf(EditablePart part, ChartDifficulty difficulty) => part[difficulty].Notes.ToList();
+    private static List<EditableNote> NotesOf(EditablePart part, ChartDifficulty difficulty) => [.. part[difficulty].Notes];
 
     // Five-fret and six-fret.
 

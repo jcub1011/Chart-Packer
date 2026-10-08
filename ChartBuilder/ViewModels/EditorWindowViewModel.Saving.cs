@@ -13,7 +13,7 @@ using ChartPacker.Core.Launching;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
 using ChartPacker.Core.Validation;
-using ChartPacker.Services;
+using ChartPacker.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
@@ -331,7 +331,7 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        private static HashSet<ChartInstrument> PartsOf(EditableChart chart) => chart.Parts.Select(p => p.Instrument).ToHashSet();
+        private static HashSet<ChartInstrument> PartsOf(EditableChart chart) => [.. chart.Parts.Select(p => p.Instrument)];
 
         /// <summary>
         /// Moves <c>[end]</c> after the last note (CHR085), as its own undo step, once the save is going ahead, so the model

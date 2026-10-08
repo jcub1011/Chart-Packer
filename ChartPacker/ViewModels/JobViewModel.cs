@@ -11,6 +11,7 @@ using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

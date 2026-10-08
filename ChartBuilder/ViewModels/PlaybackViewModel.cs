@@ -16,7 +16,7 @@ using ChartPacker.Audio.Synthesis;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Scanning;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

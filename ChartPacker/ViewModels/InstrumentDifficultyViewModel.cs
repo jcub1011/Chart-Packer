@@ -6,6 +6,7 @@ using ChartPacker.Core.Charts;
 using ChartPacker.Core.Library;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Resources;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

@@ -158,7 +158,7 @@ public sealed class ChartRuleTests
 
         var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr021);
 
-        Assert.AreSequenceEqual(new long[] { Beat }, findings.Select(f => f.Location!.Tick).ToArray());
+        Assert.AreSequenceEqual(new long[] { Beat }, [.. findings.Select(f => f.Location!.Tick)]);
     }
 
     [TestMethod]

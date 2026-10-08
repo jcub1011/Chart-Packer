@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using ChartPacker.Audio.Waveforms;
+using ChartPacker.UI.Controls;
 
 namespace ChartPacker.Controls
 {

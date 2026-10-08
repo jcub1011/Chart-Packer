@@ -3,7 +3,7 @@
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:views="using:ChartBuilder.Views"
         xmlns:res="using:ChartBuilder.Resources"
-        xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:ctl="using:ChartPacker.UI.Controls"
         xmlns:bctl="using:ChartBuilder.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"

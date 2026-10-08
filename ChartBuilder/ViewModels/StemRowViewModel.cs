@@ -1,33 +1,25 @@
 using ChartPacker.Audio.Mixing;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartBuilder.ViewModels
 {
     /// <summary>One stem in the transport bar's Stems menu (charter-spec C3 item 6): its mute, solo and volume.</summary>
-    public sealed partial class StemRowViewModel : ViewModelBase
+    public sealed partial class StemRowViewModel(MixerStem stem) : ViewModelBase
     {
-        private readonly MixerStem _stem;
-
-        public StemRowViewModel(MixerStem stem)
-        {
-            _stem = stem;
-            IsMuted = stem.IsMuted;
-            IsSolo = stem.IsSolo;
-            VolumePercent = stem.Volume * 100;
-        }
+        private readonly MixerStem _stem = stem;
 
         public string Name => _stem.Name;
 
         [ObservableProperty]
-        public partial bool IsMuted { get; set; }
+        public partial bool IsMuted { get; set; } = stem.IsMuted;
 
         [ObservableProperty]
-        public partial bool IsSolo { get; set; }
+        public partial bool IsSolo { get; set; } = stem.IsSolo;
 
         /// <summary>The stem's volume, from 0 to 100%.</summary>
         [ObservableProperty]
-        public partial double VolumePercent { get; set; }
+        public partial double VolumePercent { get; set; } = stem.Volume * 100;
 
         partial void OnIsMutedChanged(bool value) => _stem.IsMuted = value;
 

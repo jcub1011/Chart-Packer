@@ -12,6 +12,7 @@ using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
 using ChartPacker.Ffmpeg;
 using ChartPacker.Services;
+using ChartPacker.UI.Services;
 using ChartPacker.ViewModels;
 using ChartPacker.ViewModels.Settings;
 using ChartPacker.Views;

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using ChartPacker.Core.Scanning;
+using ChartPacker.UI.Services;
 
 namespace ChartPacker.Services
 {

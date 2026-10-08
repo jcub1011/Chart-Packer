@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     /// <summary>Which of a prompt's two actions the user chose, or that they cancelled it.</summary>
     public enum ConfirmChoice

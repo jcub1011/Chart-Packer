@@ -10,9 +10,11 @@ using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
 using ChartPacker.Core.Trash;
-using ChartPacker.Formatting;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.Formatting;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

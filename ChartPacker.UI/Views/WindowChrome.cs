@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 
-namespace ChartPacker.Views
+namespace ChartPacker.UI.Views
 {
     /// <summary>Window frame tweaks shared by both apps' windows.</summary>
     public static class WindowChrome

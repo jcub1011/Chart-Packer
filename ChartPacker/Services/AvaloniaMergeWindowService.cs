@@ -9,6 +9,8 @@ using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
 

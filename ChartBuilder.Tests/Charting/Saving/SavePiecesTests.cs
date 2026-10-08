@@ -203,7 +203,7 @@ public sealed class SavePiecesTests
                 KeyValuePair.Create("preview_start_time", "12250"),
                 KeyValuePair.Create("diff_band", "4"),
             },
-            pairs.ToArray());
+            [.. pairs]);
         Assert.IsEmpty(ChartSongSection.Read("[SyncTrack]\n{\n}\n"u8.ToArray()));
     }
 

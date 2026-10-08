@@ -1,7 +1,7 @@
 using Avalonia;
 using ChartBuilder.Services;
-using ChartPacker;
 using ChartPacker.Core;
+using ChartPacker.UI;
 using System;
 
 namespace ChartBuilder

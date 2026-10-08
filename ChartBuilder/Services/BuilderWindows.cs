@@ -16,9 +16,9 @@ using ChartPacker.Core.Charts;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
-using ChartPacker.Services;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.Views;
 using ChartPacker.ViewModels.Settings;
-using ChartPacker.Views;
 
 namespace ChartBuilder.Services
 {

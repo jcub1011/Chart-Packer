@@ -2,11 +2,11 @@ using System;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
-using ChartPacker;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
+using ChartPacker.UI;
 
 namespace ChartBuilder.Services
 {

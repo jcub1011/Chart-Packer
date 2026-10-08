@@ -10,6 +10,8 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
+using ChartPacker.UI.Controls;
+using ChartPacker.UI.Controls.Highway;
 
 namespace ChartPacker.Controls
 {
@@ -133,9 +135,6 @@ namespace ChartPacker.Controls
         // The top of the highway fades out over this fraction of its height, so notes come in rather than pop in.
         private const double FadeFraction = 0.2;
 
-        // How long a lane lights up after a note reaches it, in seconds.
-        private const double HitGlow = 0.16;
-
         private static readonly IBrush HighwayBrush = VerticalGradient(
             (0, Color.FromArgb(0x80, 0x06, 0x06, 0x0C)),
             (0.5, Color.FromArgb(0xCC, 0x08, 0x08, 0x10)),
@@ -165,7 +164,6 @@ namespace ChartPacker.Controls
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
 
         private readonly GemPainter _gems = new();
-        private readonly Dictionary<Color, IBrush> _beams = [];
         private readonly Dictionary<string, FormattedText> _labels = [];
         private bool _isFrameRequested;
         private Rect? _viewport;
@@ -664,8 +662,8 @@ namespace ChartPacker.Controls
                 {
                     if (hits[column] > 0)
                     {
-                        using (context.PushOpacity(hits[column] * 0.8))
-                            context.FillRectangle(Beam(HitColor(lane, column)), new Rect(bounds.X + (column * laneWidth), strike * 0.45, laneWidth, strike * 0.55));
+                        using (context.PushOpacity(hits[column] * StrikeGlow.BeamOpacity))
+                            context.FillRectangle(StrikeGlow.Beam(HitColor(lane, column), isVertical: true), new Rect(bounds.X + (column * laneWidth), strike * (1 - StrikeGlow.BeamReach), laneWidth, strike * StrikeGlow.BeamReach));
                     }
                 }
 
@@ -701,13 +699,10 @@ namespace ChartPacker.Controls
                 _hits = new double[lane.LaneCount];
             var hits = _hits;
             Array.Clear(hits, 0, lane.LaneCount);
-            for (int i = LowerBound(lane.Starts, now - Math.Max(HitGlow, lane.MaxLength)); i < lane.Starts.Length && lane.Starts[i] <= now; i++)
+            for (int i = LowerBound(lane.Starts, now - Math.Max(StrikeGlow.Seconds, lane.MaxLength)); i < lane.Starts.Length && lane.Starts[i] <= now; i++)
             {
                 var note = lane.Notes[i];
-                double since = now - lane.Starts[i];
-                double glow = since < HitGlow ? 1 - (since / HitGlow) : 0;
-                if (lane.Ends[i] > now && lane.Ends[i] > lane.Starts[i])
-                    glow = Math.Max(glow, 0.55);
+                double glow = StrikeGlow.Brightness(now - lane.Starts[i], lane.Ends[i] > now && lane.Ends[i] > lane.Starts[i]);
                 if (glow <= 0)
                     continue;
 
@@ -715,7 +710,7 @@ namespace ChartPacker.Controls
                 if (note.Lane == ChartNote.OpenLane)
                 {
                     for (int c = 0; c < lane.LaneCount; c++)
-                        hits[c] = Math.Max(hits[c], glow * 0.6);
+                        hits[c] = Math.Max(hits[c], glow * StrikeGlow.SpreadLevel);
                 }
                 else
                 {
@@ -743,8 +738,8 @@ namespace ChartPacker.Controls
                 double hit = hits[column];
 
                 // Hollow until struck, then filled in the lane's colour.
-                var fill = hit > 0 ? HighwayPalette.WithAlpha(color, (byte)(0x50 + (hit * 0xAF))) : HighwayPalette.WithAlpha(HighwayPalette.Darken(color, 0.72), 0xC8);
-                context.DrawRectangle(Brush(fill), Pen(hit > 0 ? HighwayPalette.Lighten(color, 0.4) : color, 2), rect.Deflate(1), radius, radius);
+                var fill = hit > 0 ? StrikeGlow.TargetFill(color, hit) : HighwayPalette.WithAlpha(HighwayPalette.Darken(color, 0.72), 0xC8);
+                context.DrawRectangle(Brush(fill), Pen(hit > 0 ? StrikeGlow.TargetEdge(color) : color, 2), rect.Deflate(1), radius, radius);
             }
         }
 
@@ -848,20 +843,13 @@ namespace ChartPacker.Controls
 
         private static Color NoteColor(HighwayLane lane, ChartNote note) => HighwayPalette.NoteColor(lane.Kind, lane.LaneCount, note);
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "<Pending>")]
         private static IBrush VerticalGradient(params (double Offset, Color Color)[] stops) => new ImmutableLinearGradientBrush(
             [.. stops.Select(s => new ImmutableGradientStop(s.Offset, s.Color))],
             startPoint: new RelativePoint(0.5, 0, RelativeUnit.Relative),
             endPoint: new RelativePoint(0.5, 1, RelativeUnit.Relative));
 
         private IBrush Brush(Color color) => _gems.Brush(color);
-
-        /// <summary>A struck lane's beam: clear at the top, the lane's colour at the strike line.</summary>
-        private IBrush Beam(Color color)
-        {
-            if (!_beams.TryGetValue(color, out var brush))
-                _beams[color] = brush = VerticalGradient((0, HighwayPalette.WithAlpha(color, 0)), (1, HighwayPalette.WithAlpha(color, 0x70)));
-            return brush;
-        }
 
         private IPen Pen(Color color, double thickness) => _gems.Pen(color, thickness);
 

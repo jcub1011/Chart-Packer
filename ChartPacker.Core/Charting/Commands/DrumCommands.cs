@@ -153,13 +153,11 @@ public sealed class SetToms : ChartCommand
 }
 
 /// <summary>Removes tom markers from the drums, such as one that covers no note (CHR040).</summary>
-public sealed class RemoveTomMarkers : ChartCommand
+/// <param name="markers">The markers, at least one, each exactly as the drums have it.</param>
+public sealed class RemoveTomMarkers(IEnumerable<TomMarker> markers) : ChartCommand
 {
-    private readonly TomMarker[] _markers;
+    private readonly TomMarker[] _markers = AtLeastOne(markers, nameof(markers));
     private readonly EditLog _log = new();
-
-    /// <param name="markers">The markers, at least one, each exactly as the drums have it.</param>
-    public RemoveTomMarkers(IEnumerable<TomMarker> markers) => _markers = AtLeastOne(markers, nameof(markers));
 
     public IReadOnlyList<TomMarker> Markers => _markers;
 
@@ -361,7 +359,7 @@ public sealed class ConvertDrums : ChartCommand
 
         var (notes, markers, report) = DrumConversion.Convert(drums, from, To);
         _oldNotes = [.. drums.Tracks.Select(static t => t.Notes.AsSpan().ToArray())];
-        _oldMarkers = drums.TomMarkers.AsSpan().ToArray();
+        _oldMarkers = [.. drums.TomMarkers];
         foreach (var track in drums.Tracks)
             ChartTickSnapshot.Refill(track.Notes, notes[(int)track.Difficulty]);
         ChartTickSnapshot.Refill(drums.TomMarkers, markers);

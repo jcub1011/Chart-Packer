@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
-             xmlns:ctl="using:ChartPacker.Controls"
+             xmlns:ctl="using:ChartPacker.UI.Controls"
              xmlns:bctl="using:ChartBuilder.Controls"
              xmlns:edit="using:ChartBuilder.Controls.Editing"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"

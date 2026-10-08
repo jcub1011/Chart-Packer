@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     public interface ISettingsWindowService
     {

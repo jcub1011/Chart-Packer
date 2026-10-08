@@ -7,15 +7,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
-using ChartPacker.Services;
-using ChartPacker.ViewModels;
+using ChartPacker.UI;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

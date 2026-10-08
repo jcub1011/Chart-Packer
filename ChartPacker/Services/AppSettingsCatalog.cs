@@ -6,6 +6,7 @@ using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
+using ChartPacker.UI;
 using ChartPacker.ViewModels;
 
 namespace ChartPacker.Services

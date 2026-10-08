@@ -11,7 +11,7 @@ using ChartPacker.Resources;
 using Serilog;
 using Serilog.Core;
 
-namespace ChartPacker
+namespace ChartPacker.UI
 {
     /// <summary>
     /// Sets up Serilog for one of the apps: a daily log file in <see cref="UserConfigPaths.LogFolder"/>, and a log entry

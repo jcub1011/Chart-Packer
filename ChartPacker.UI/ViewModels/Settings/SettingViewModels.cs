@@ -9,7 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
-using ChartPacker.Services;
+using ChartPacker.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
