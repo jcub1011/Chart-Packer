@@ -6,9 +6,9 @@ namespace ChartBuilder.Controls.Editing
 {
     /// <summary>
     /// The highway view of a lane (charter-spec C3 item 1): time runs upwards, as in the games, with the waveform behind
-    /// the lanes, measure numbers and tempo markers in a rail on the left, and chords' forcing marks on the right. Its
-    /// columns are no wider than <see cref="MaxLaneSize"/>, so a wide lane doesn't stretch the highway across it; the
-    /// highway is centred in it instead.
+    /// the lanes, measure numbers and tempo markers in a rail on the left, chords' forcing marks on the right, and the
+    /// phrase rail beyond them (C8). Its columns are no wider than <see cref="MaxLaneSize"/>, so a wide lane doesn't stretch
+    /// the highway across it; the highway is centred in it instead.
     /// </summary>
     public sealed class HighwayEditorCanvas : EditorCanvas
     {
@@ -21,11 +21,12 @@ namespace ChartBuilder.Controls.Editing
 
         protected override LaneView View => LaneView.Highway;
 
-        protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead)
+        protected override LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead, int phraseRows)
         {
             int count = slots.Slots.Count;
-            double laneSize = Math.Min(MaxLaneSize, Math.Max(1, size.Width - RailWidth - MarkWidth) / count);
-            double left = Math.Max(0, (size.Width - (RailWidth + (laneSize * count) + MarkWidth)) / 2);
+            double phrases = PhraseRailSize(phraseRows);
+            double laneSize = Math.Min(MaxLaneSize, Math.Max(1, size.Width - RailWidth - MarkWidth - phrases) / count);
+            double left = Math.Max(0, (size.Width - (RailWidth + (laneSize * count) + MarkWidth + phrases)) / 2);
             return LaneProjection.Of(LaneView.Highway, 0, Math.Max(1, size.Height), left + RailWidth, laneSize, slots, viewport, lookAhead);
         }
 
@@ -33,5 +34,9 @@ namespace ChartBuilder.Controls.Editing
 
         protected override Rect WaveformArea(Size size, LaneProjection projection) =>
             new(projection.LaneFrom + 4, 0, Math.Max(0, (projection.LaneSize * projection.Slots.Slots.Count) - 8), size.Height);
+
+        // Right of the forcing marks.
+        protected override double PhraseRailFrom(LaneProjection projection, int phraseRows) =>
+            projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count) + MarkWidth;
     }
 }

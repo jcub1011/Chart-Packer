@@ -149,7 +149,8 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time. Phrases come with CM3. -->
+                    <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time. Beside the Phrase tool is
+                         the kind of phrase it adds, of those the part in focus can have (C8). -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
                             <StackPanel.Styles>
@@ -165,18 +166,20 @@
                                     <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
                                     <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
                                 </Style>
-                                <Style Selector="Button.coming">
-                                    <Setter Property="IsEnabled" Value="False" />
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Setter Property="ToolTip.Tip" Value="{x:Static res:Strings.PhraseToolComingToolTip}" />
-                                    <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
-                                </Style>
                             </StackPanel.Styles>
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSelect}" IsChecked="{Binding Editor.IsSelectTool}" ToolTip.Tip="{x:Static res:Strings.ToolSelectToolTip}" />
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolPlace}" IsChecked="{Binding Editor.IsPlaceTool}" ToolTip.Tip="{x:Static res:Strings.ToolPlaceToolTip}" />
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolErase}" IsChecked="{Binding Editor.IsEraseTool}" ToolTip.Tip="{x:Static res:Strings.ToolEraseToolTip}" />
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSustain}" IsChecked="{Binding Editor.IsSustainTool}" ToolTip.Tip="{x:Static res:Strings.ToolSustainToolTip}" />
-                            <Button Classes="labelled coming" Content="{x:Static res:Strings.ToolPhrase}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolPhrase}" IsChecked="{Binding Editor.IsPhraseTool}" ToolTip.Tip="{x:Static res:Strings.ToolPhraseToolTip}" />
+                            <ComboBox VerticalAlignment="Center"
+                                      Height="28"
+                                      MinWidth="124"
+                                      ItemsSource="{Binding Editor.PhraseKindChoices}"
+                                      SelectedItem="{Binding Editor.SelectedPhraseKind}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:PhraseKindChoice}"
+                                      ToolTip.Tip="{x:Static res:Strings.ToolPhraseKindToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.ToolPhraseKindName}" />
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolTempo}" IsChecked="{Binding Editor.IsTempoTool}" ToolTip.Tip="{x:Static res:Strings.ToolTempoToolTip}" />
                         </StackPanel>
                     </Border>

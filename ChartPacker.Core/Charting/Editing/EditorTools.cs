@@ -15,6 +15,7 @@ namespace ChartPacker.Core.Charting.Editing;
 public sealed class EditorTools
 {
     private const string DoubleKickOffExpert = "A 2x kick is on Expert only.";
+    private const string NoPhraseLength = "A phrase has to end after it starts.";
 
     private readonly EditorSession _session;
     private Gesture? _gesture;
@@ -30,7 +31,10 @@ public sealed class EditorTools
 
     private TempoMap Map => _session.TempoMap;
 
-    /// <summary>Starts a gesture at <paramref name="point"/> with the current tool.</summary>
+    /// <summary>
+    /// Starts a gesture at <paramref name="point"/> with the current tool; in the phrase rail, with any tool, a gesture on
+    /// the phrase there (charter-spec C8).
+    /// </summary>
     public void Press(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
         Cancel();
@@ -38,12 +42,19 @@ public sealed class EditorTools
         if (_session.TrackOf(point.Track) is null)
             return;
         bool shift = modifiers.HasFlag(EditorModifiers.Shift);
+        if (point.Rail is not null)
+        {
+            _gesture = PressRail(point, shift);
+            return;
+        }
+
         _gesture = _session.Tool switch
         {
             EditorTool.Select => PressSelect(point, shift),
             EditorTool.Place => PressPlace(point, shift),
             EditorTool.Erase => new EraseGesture(this, point),
             EditorTool.Sustain => PressSustain(point),
+            EditorTool.Phrase => point.Lane is null ? null : new PhraseDrawGesture(this, point, _session.PhraseKind),
             EditorTool.Tempo => PressTempo(point),
             _ => null,
         };
@@ -145,13 +156,18 @@ public sealed class EditorTools
         _session.Selection.Select(key, track.Notes);
     }
 
-    /// <summary>Deletes the selected notes and tempo markers (Delete), as one step.</summary>
+    /// <summary>Deletes the selected notes, phrases and tempo markers (Delete), as one step.</summary>
     public void DeleteSelection()
     {
         var selection = _session.Selection;
         var steps = new List<Func<(IChartCommand?, string?)>>();
         if (selection.Track is { } key && selection.Notes is { Count: > 0 } notes)
             steps.Add(() => (new RemoveNotes(key.Instrument, key.Difficulty, notes), null));
+        if (selection.PhrasePart is { } part)
+        {
+            foreach (var phrase in selection.Phrases)
+                steps.Add(() => (new RemovePhrase(part, phrase), null));
+        }
 
         // Each removal is worked out against the chart the ones before it leave.
         foreach (long tick in selection.TempoTicks.Reverse())
@@ -164,6 +180,93 @@ public sealed class EditorTools
         }
 
         _session.ExecuteAsOne(steps);
+    }
+
+    /// <summary>
+    /// Adds a star power phrase over the selection (charter-spec §9: S), or removes the one there already, which starts
+    /// and ends exactly where it would. Over selected notes, it runs from the first one's tick to the end of the last to
+    /// end, a tick past it for a note without a sustain, so it covers every one as the games read markers; otherwise over
+    /// the span selected, in the focused lane's part.
+    /// </summary>
+    public void ToggleStarPowerOverSelection()
+    {
+        var selection = _session.Selection;
+        ChartInstrument part;
+        long from, to;
+        if (selection.Track is { } key && selection.Notes is { Count: > 0 } notes)
+        {
+            part = key.Instrument;
+            from = notes[0].Tick;
+            to = notes.Max(static n => n.Tick + Math.Max(1, n.Length));
+        }
+        else if (selection.Range is { } range && range.To > range.From && _session.Focused is { } focused)
+        {
+            part = focused.Instrument;
+            (from, to) = range;
+        }
+        else
+        {
+            _session.Status = "Select notes or a span to put star power over.";
+            return;
+        }
+
+        if (Chart.PartOf(part) is not { } phrased)
+            return;
+        var phrase = new Phrase(PhraseKind.StarPower, from, to - from);
+        _session.Execute(phrased.Phrases.IndexOf(phrase) >= 0 ? new RemovePhrase(part, phrase) : new AddPhrase(part, phrase));
+    }
+
+    /// <summary>
+    /// Moves the start of every selected phrase to <paramref name="tick"/>, keeping its end, as Properties sets it
+    /// (charter-spec C3 item 4), as one step.
+    /// </summary>
+    public void SetPhraseStart(long tick) => ChangeSelectedPhrases(p => p with { Tick = tick, Length = p.Tick + p.Length - tick });
+
+    /// <summary>Moves the end of every selected phrase to <paramref name="tick"/>, as Properties sets it, as one step.</summary>
+    public void SetPhraseEnd(long tick) => ChangeSelectedPhrases(p => p with { Length = tick - p.Tick });
+
+    /// <summary>
+    /// Extends every selected roll and trill down to <paramref name="difficulty"/> from Expert (charter-spec C6 item 6), as
+    /// Properties sets it, as one step. Other phrases are left as they are.
+    /// </summary>
+    public void SetLowestDifficulty(ChartDifficulty difficulty) =>
+        ChangeSelectedPhrases(p => Phrase.HasLowestDifficulty(p.Kind) ? p with { LowestDifficulty = difficulty } : p);
+
+    /// <summary>Changes the selected phrases, as one step, and selects them as they become.</summary>
+    private void ChangeSelectedPhrases(Func<Phrase, Phrase> change)
+    {
+        var selection = _session.Selection;
+        if (selection.PhrasePart is not { } part)
+            return;
+        var from = selection.Phrases;
+        var to = from.Select(p => Classified(part, change(p))).ToList();
+        var changing = Enumerable.Range(0, from.Count).Where(i => from[i] != to[i]).ToList();
+        if (changing.Count == 0)
+            return;
+        if (changing.Any(i => to[i].Tick < 0 || to[i].Length <= 0))
+        {
+            _session.Status = NoPhraseLength;
+            return;
+        }
+
+        if (_session.Execute(ChangeOf(part, [.. changing.Select(i => from[i])], [.. changing.Select(i => to[i])])))
+            selection.ReplacePhrases(part, to);
+    }
+
+    /// <summary>
+    /// <paramref name="phrase"/> as <paramref name="part"/> holds it at its tick: on drums, a fill at or after <c>[coda]</c>
+    /// is a big rock ending, and one before it a fill (charter-spec C8 item 4).
+    /// </summary>
+    private Phrase Classified(ChartInstrument part, Phrase phrase) =>
+        ChartInstruments.KindOf(part) == ChartInstrumentKind.Drums && phrase.Kind is PhraseKind.DrumFill or PhraseKind.BigRockEnding
+            ? phrase with { Kind = DrumFills.KindAt(Chart, phrase.Tick) }
+            : phrase;
+
+    /// <summary>The command that changes each of <paramref name="from"/> to the phrase at its index in <paramref name="to"/>.</summary>
+    private static IChartCommand ChangeOf(ChartInstrument part, IReadOnlyList<Phrase> from, IReadOnlyList<Phrase> to)
+    {
+        var commands = from.Select((p, i) => (IChartCommand)new ChangePhrase(part, p, to[i])).ToList();
+        return commands.Count == 1 ? commands[0] : new CompositeCommand(commands);
     }
 
     /// <summary>
@@ -527,6 +630,35 @@ public sealed class EditorTools
         return null;
     }
 
+    /// <summary>
+    /// A press in the phrase rail, with any tool: on a phrase's bar it selects the phrase (Shift adds it or takes it
+    /// away), and a drag moves it, or resizes it by the end grabbed. Elsewhere in the rail, the Phrase tool draws a phrase,
+    /// and the others select no phrases.
+    /// </summary>
+    private Gesture? PressRail(ChartPoint point, bool shift)
+    {
+        var part = Chart.PartOf(point.Track.Instrument)!;
+        var selection = _session.Selection;
+        if (PhraseRail.HitTest(part, point) is not { } hit)
+        {
+            if (_session.Tool == EditorTool.Phrase)
+                return new PhraseDrawGesture(this, point, _session.PhraseKind);
+            if (!shift)
+                selection.ClearPhrases();
+            return null;
+        }
+
+        if (shift)
+            selection.Toggle(part.Instrument, hit.Phrase);
+        else if (!selection.Contains(part.Instrument, hit.Phrase))
+            selection.SelectPhrases(part.Instrument, [hit.Phrase]);
+        if (!selection.Contains(part.Instrument, hit.Phrase))
+            return null;
+        return hit.Grip == PhraseGrip.Body
+            ? new PhraseMoveGesture(this, point, hit.Phrase)
+            : new PhraseResizeGesture(this, point, hit.Phrase, hit.Grip == PhraseGrip.Start);
+    }
+
     /// <summary>How many lanes <paramref name="notes"/> can move by, towards <paramref name="wanted"/>: none when an open note or a kick is among them, and never out of the lanes.</summary>
     private static int LaneDelta(IReadOnlyList<EditableNote> notes, int wanted, LaneSlots slots)
     {
@@ -785,6 +917,172 @@ public sealed class EditorTools
             if (command is ChangeTempoMap && !anchored)
                 Session.Selection.SelectTempos([Tools.Snap.Nearest(point.Tick, Tools.Map)]);
         }
+    }
+
+    /// <summary>
+    /// Draws out a phrase of one kind along time, from the grid step pressed to the one the pointer is at, either way
+    /// (charter-spec C8). New rolls and trills reach Expert only (C6 item 6). A click without a drag adds nothing, and
+    /// selects no phrases.
+    /// </summary>
+    private sealed class PhraseDrawGesture : Gesture
+    {
+        private readonly ChartInstrument _part;
+        private readonly PhraseKind _kind;
+        private readonly long _from;
+        private Phrase? _tried;
+
+        public PhraseDrawGesture(EditorTools tools, ChartPoint pressed, PhraseKind kind)
+            : base(tools)
+        {
+            _part = pressed.Track.Instrument;
+            _kind = kind;
+            _from = Tools.Snap.Nearest(pressed.Tick, Tools.Map);
+        }
+
+        public override void Drag(ChartPoint point)
+        {
+            if (point.Track.Instrument != _part)
+                return;
+            long to = Tools.Snap.Nearest(point.Tick, Tools.Map);
+            Phrase? phrase = to == _from
+                ? null
+                : Tools.Classified(_part, new Phrase(_kind, Math.Min(_from, to), Math.Abs(to - _from), Phrase.HasLowestDifficulty(_kind) ? ChartDifficulty.Expert : null));
+            if (phrase == _tried)
+                return;
+            _tried = phrase;
+
+            // A refusal, said in the status, leaves nothing to add, rather than the phrase drawn before it.
+            if (!Session.Preview(phrase is { } added ? new AddPhrase(_part, added) : null))
+                Session.Preview(null);
+        }
+
+        public override void Release(ChartPoint point)
+        {
+            Drag(point);
+            if (Session.CommitPreview() is AddPhrase added)
+                Session.Selection.SelectPhrases(_part, [added.Phrase]);
+            else if (_tried is null)
+                Session.Selection.ClearPhrases();
+        }
+    }
+
+    /// <summary>
+    /// Drags the selected phrases in time, by the bar grabbed, to the grid, each keeping its length. Nothing moves until
+    /// the pointer has, so a click only selects, and leaves a phrase off the grid where it is.
+    /// </summary>
+    private sealed class PhraseMoveGesture : Gesture
+    {
+        private readonly ChartInstrument _part;
+        private readonly ChartPoint _pressed;
+        private readonly Phrase _grabbed;
+        private readonly IReadOnlyList<Phrase> _phrases;
+        // The move last tried, so one refused isn't tried, and said, again as the pointer moves on within a grid step.
+        private long _delta;
+        private bool _moved;
+
+        public PhraseMoveGesture(EditorTools tools, ChartPoint pressed, Phrase grabbed)
+            : base(tools)
+        {
+            _part = pressed.Track.Instrument;
+            _pressed = pressed;
+            _grabbed = grabbed;
+            _phrases = Session.Selection.Phrases;
+        }
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - _pressed.Tick) > _pressed.Tolerance;
+            if (!_moved)
+                return;
+            long tick = Tools.Snap.Nearest(_grabbed.Tick + (point.Tick - _pressed.Tick), Tools.Map);
+            long delta = Math.Max(tick - _grabbed.Tick, -_phrases.Min(static p => p.Tick));
+            if (delta == _delta)
+                return;
+
+            if (delta == 0)
+            {
+                _delta = 0;
+                Session.Preview(null);
+                Session.Selection.ReplacePhrases(_part, _phrases);
+                return;
+            }
+
+            // A refusal, said in the status, leaves the phrases where they were rather than where the last drag put them.
+            var moved = _phrases.Select(p => Tools.Classified(_part, p with { Tick = p.Tick + delta })).ToList();
+            bool previewed = Session.Preview(ChangeOf(_part, _phrases, moved));
+            if (!previewed)
+                Session.Preview(null);
+            _delta = delta;
+            Session.Selection.ReplacePhrases(_part, previewed ? moved : _phrases);
+        }
+
+        public override void Cancel() => Session.Selection.ReplacePhrases(_part, _phrases);
+    }
+
+    /// <summary>
+    /// Drags one end of a phrase to the grid, the other staying where it is. It never reaches the other end: at the
+    /// nearest, it's a grid step (a tick, with snap off) short of it. Nothing changes until the pointer has moved, so a
+    /// click only selects, and leaves an end off the grid, such as one S put a tick past a note, where it is.
+    /// </summary>
+    private sealed class PhraseResizeGesture : Gesture
+    {
+        private readonly ChartInstrument _part;
+        private readonly ChartPoint _pressed;
+        private readonly Phrase _phrase;
+        private readonly bool _start;
+        private readonly IReadOnlyList<Phrase> _selected;
+
+        // The phrase last tried, so one refused isn't tried, and said, again as the pointer moves on within a grid step.
+        private Phrase _tried;
+        private bool _moved;
+
+        public PhraseResizeGesture(EditorTools tools, ChartPoint pressed, Phrase phrase, bool start)
+            : base(tools)
+        {
+            _part = pressed.Track.Instrument;
+            _pressed = pressed;
+            _phrase = phrase;
+            _start = start;
+            _selected = Session.Selection.Phrases;
+            _tried = phrase;
+        }
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - _pressed.Tick) > _pressed.Tolerance;
+            if (!_moved)
+                return;
+            var snap = Tools.Snap;
+            var map = Tools.Map;
+            long at = snap.Nearest(point.Tick, map);
+            long start = _phrase.Tick, end = _phrase.Tick + _phrase.Length;
+            if (_start)
+            {
+                if (at >= end)
+                    at = snap.IsOn ? snap.Step(end, -1, map) : end - 1;
+                if (at >= end || at < 0)
+                    return;
+                start = at;
+            }
+            else
+            {
+                end = Math.Max(at, snap.IsOn ? snap.Step(start, 1, map) : start + 1);
+            }
+
+            var resized = Tools.Classified(_part, _phrase with { Tick = start, Length = end - start });
+            if (resized == _tried)
+                return;
+            _tried = resized;
+
+            // A refusal, said in the status, leaves the phrase as it was rather than as the last drag made it.
+            bool previewed = Session.Preview(resized == _phrase ? null : new ChangePhrase(_part, _phrase, resized));
+            if (!previewed)
+                Session.Preview(null);
+            var shown = previewed ? resized : _phrase;
+            Session.Selection.ReplacePhrases(_part, _selected.Select(p => p == _phrase ? shown : p));
+        }
+
+        public override void Cancel() => Session.Selection.ReplacePhrases(_part, _selected);
     }
 
     /// <summary>Drags a box over notes, selecting them and the span of ticks it covers; a click in an empty place clears the selection.</summary>

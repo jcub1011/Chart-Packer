@@ -13,8 +13,11 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
 {
+    /// <summary>A difficulty a roll or trill can reach down to, as Properties offers it.</summary>
+    public sealed record DifficultyChoice(ChartDifficulty Difficulty, string Label);
+
     /// <summary>
-    /// The Properties panel (charter-spec C3 item 4): the selected notes, tempo markers and span. A field shows
+    /// The Properties panel (charter-spec C3 item 4): the selected notes, phrases, tempo markers and span. A field shows
     /// <see cref="Multiple"/> when the items differ, and editing it sets every item, as one undoable step.
     /// </summary>
     public sealed partial class PropertiesViewModel : ViewModelBase
@@ -40,13 +43,17 @@ namespace ChartBuilder.ViewModels
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsEmpty))]
+        public partial bool HasPhrases { get; private set; }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsEmpty))]
         public partial bool HasTempos { get; private set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsEmpty))]
         public partial bool HasSpan { get; private set; }
 
-        public bool IsEmpty => !HasNotes && !HasTempos && !HasSpan;
+        public bool IsEmpty => !HasNotes && !HasPhrases && !HasTempos && !HasSpan;
 
         [ObservableProperty]
         public partial string NotesHeading { get; private set; } = "";
@@ -109,6 +116,36 @@ namespace ChartBuilder.ViewModels
         public partial bool? IsDoubleKick { get; set; }
 
         [ObservableProperty]
+        public partial string PhrasesHeading { get; private set; } = "";
+
+        [ObservableProperty]
+        public partial string PhraseKindText { get; private set; } = "";
+
+        /// <summary>Where the phrases start, in ticks.</summary>
+        [ObservableProperty]
+        public partial string PhraseStartText { get; set; } = "";
+
+        /// <summary>Where the phrases end, in ticks: the tick after the last one they cover.</summary>
+        [ObservableProperty]
+        public partial string PhraseEndText { get; set; } = "";
+
+        /// <summary>Where the phrases start, in the audio.</summary>
+        [ObservableProperty]
+        public partial string PhraseTimeText { get; private set; } = "";
+
+        /// <summary>Whether a roll or trill is selected, which reaches down from Expert (charter-spec C6 item 6).</summary>
+        [ObservableProperty]
+        public partial bool HasLowestDifficulty { get; private set; }
+
+        /// <summary>The lowest difficulty the selected rolls and trills reach, or null when they differ.</summary>
+        [ObservableProperty]
+        public partial DifficultyChoice? SelectedLowestDifficulty { get; set; }
+
+        /// <summary>The difficulties a roll or trill can reach down to, from Expert only to every one.</summary>
+        public IReadOnlyList<DifficultyChoice> LowestDifficultyChoices { get; } =
+            [.. new[] { ChartDifficulty.Expert, ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy }.Select(d => new DifficultyChoice(d, ChartLabels.DifficultyName(d)))];
+
+        [ObservableProperty]
         public partial string TemposHeading { get; private set; } = "";
 
         [ObservableProperty]
@@ -137,6 +174,7 @@ namespace ChartBuilder.ViewModels
             try
             {
                 RefreshNotes();
+                RefreshPhrases();
                 RefreshTempos();
                 RefreshSpan();
             }
@@ -184,6 +222,32 @@ namespace ChartBuilder.ViewModels
             var notes = Session.Selection.Notes.Where(n => n.Length != Math.Max(EditableNote.PlainLength, length)).ToList();
             if (notes.Count > 0 && length >= 0)
                 Session.Execute(new SetSustain(key.Instrument, key.Difficulty, notes, Math.Max(EditableNote.PlainLength, length)));
+            Refresh();
+        }
+
+        partial void OnPhraseStartTextChanged(string value)
+        {
+            if (_loading)
+                return;
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick) && tick >= 0)
+                Session.Tools.SetPhraseStart(tick);
+            Refresh();
+        }
+
+        partial void OnPhraseEndTextChanged(string value)
+        {
+            if (_loading)
+                return;
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick) && tick >= 0)
+                Session.Tools.SetPhraseEnd(tick);
+            Refresh();
+        }
+
+        partial void OnSelectedLowestDifficultyChanged(DifficultyChoice? value)
+        {
+            if (_loading || value is null)
+                return;
+            Session.Tools.SetLowestDifficulty(value.Difficulty);
             Refresh();
         }
 
@@ -366,6 +430,24 @@ namespace ChartBuilder.ViewModels
             IsGhost = AllOrNone(pads, static n => n.Dynamics == NoteDynamics.Ghost);
             CanDoubleKick = kicks.Count > 0 && key.Difficulty == ChartDifficulty.Expert;
             IsDoubleKick = AllOrNone(kicks, static n => n.DoubleKick);
+        }
+
+        /// <summary>The phrase fields (charter-spec C3 item 4): kind, start and end, and a roll's or trill's lowest difficulty.</summary>
+        private void RefreshPhrases()
+        {
+            var phrases = Session.Selection.Phrases;
+            HasPhrases = phrases.Count > 0;
+            if (!HasPhrases)
+                return;
+
+            PhrasesHeading = string.Format(CultureInfo.CurrentCulture, phrases.Count == 1 ? Strings.PropertiesPhraseHeading : Strings.PropertiesPhrasesHeadingFormat, phrases.Count);
+            PhraseKindText = Same(phrases, p => ChartEditorViewModel.PhraseKindName(p.Kind));
+            PhraseStartText = Same(phrases, p => p.Tick.ToString(CultureInfo.CurrentCulture));
+            PhraseEndText = Same(phrases, p => (p.Tick + p.Length).ToString(CultureInfo.CurrentCulture));
+            PhraseTimeText = Same(phrases, p => SongTime.Format(TimeSpan.FromSeconds(Math.Max(0, Session.AudioAt(p.Tick))), decimals: 3));
+            var lowest = phrases.Where(p => Phrase.HasLowestDifficulty(p.Kind)).Select(p => p.LowestDifficulty).Distinct().ToList();
+            HasLowestDifficulty = lowest.Count > 0;
+            SelectedLowestDifficulty = lowest.Count == 1 ? LowestDifficultyChoices.FirstOrDefault(c => c.Difficulty == lowest[0]) : null;
         }
 
         private void RefreshTempos()

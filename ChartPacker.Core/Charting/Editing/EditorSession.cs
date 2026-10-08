@@ -30,9 +30,13 @@ public enum EditorModifiers
 /// <param name="Track">The lane's part and difficulty.</param>
 /// <param name="Tick">The tick under the pointer, unrounded.</param>
 /// <param name="Lane">The note lane under the pointer (<see cref="EditableNote.Lane"/>), or null when it's outside the lanes.</param>
-/// <param name="Tolerance">How many ticks from a note's start the pointer still hits it.</param>
+/// <param name="Tolerance">How many ticks from a note's start, or a phrase's end, the pointer still hits it.</param>
 /// <param name="Slots">The lane's columns or rows.</param>
-public readonly record struct ChartPoint(ChartTrackKey Track, double Tick, int? Lane, double Tolerance, LaneSlots Slots);
+/// <param name="Rail">
+/// The row of the phrase rail under the pointer (<see cref="PhraseRail"/>), by the kind it holds, or null when the pointer
+/// isn't in the rail. <paramref name="Lane"/> is null when it is.
+/// </param>
+public readonly record struct ChartPoint(ChartTrackKey Track, double Tick, int? Lane, double Tolerance, LaneSlots Slots, PhraseKind? Rail = null);
 
 /// <summary>A change to the chart the editor shows: one done, undone or redone, or a gesture's preview.</summary>
 public sealed class EditorChartChangedEventArgs(ChartChange affected, bool isPreview) : EventArgs
@@ -153,6 +157,22 @@ public sealed class EditorSession
         }
     }
 
+    /// <summary>
+    /// The kind of phrase the Phrase tool draws, of those the focused part can have (<see cref="PhraseRail.KindsOf"/>).
+    /// When the focus moves to a part that can't have it, it goes back to star power.
+    /// </summary>
+    public PhraseKind PhraseKind
+    {
+        get;
+        set
+        {
+            if (field == value)
+                return;
+            field = value;
+            RaiseState();
+        }
+    }
+
     /// <summary>Whether notes keep their times rather than their ticks when the tempo changes (charter-spec C4 item 3).</summary>
     public bool KeepTimes { get; set; }
 
@@ -165,6 +185,8 @@ public sealed class EditorSession
             if (field == value)
                 return;
             field = value;
+            if (value is { } key && !PhraseRail.KindsOf(ChartInstruments.KindOf(key.Instrument)).Contains(PhraseKind))
+                PhraseKind = PhraseKind.StarPower;
             RaiseState();
         }
     }

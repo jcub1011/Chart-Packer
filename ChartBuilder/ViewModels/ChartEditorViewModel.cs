@@ -23,6 +23,9 @@ namespace ChartBuilder.ViewModels
     /// <summary>A snap the toolbar offers.</summary>
     public sealed record SnapChoice(int Division, string Label);
 
+    /// <summary>A kind of phrase the toolbar's picker offers the Phrase tool.</summary>
+    public sealed record PhraseKindChoice(PhraseKind Kind, string Label);
+
     /// <summary>
     /// The chart's editor (charter-spec §4.5, C3): the lanes and their canvases, the tools, the snap, and the editor's
     /// <see cref="EditorSession"/>, joined to playback. The cursor is the lanes' strike line and the playhead: it follows
@@ -40,6 +43,10 @@ namespace ChartBuilder.ViewModels
         // Tap tempo's message, which each tap updates.
         private const string TapTempoMessageKey = "tap-tempo";
 
+        // The Phrase tool's kinds, for 5-fret and GHL, and for drums.
+        private static readonly IReadOnlyList<PhraseKindChoice> FretPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.FiveFret);
+        private static readonly IReadOnlyList<PhraseKindChoice> DrumPhraseChoices = PhraseChoicesOf(ChartInstrumentKind.Drums);
+
         private readonly BuilderSettingsService _settings;
         private readonly IConfirmationService _confirmations;
         private readonly DispatcherTimer _refresh;
@@ -47,6 +54,7 @@ namespace ChartBuilder.ViewModels
         private readonly TapTempo _taps = new();
         private double _firstTap;
         private bool _syncing;
+        private IReadOnlyList<PhraseKindChoice>? _phraseChoices;
 
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
         public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout)
@@ -164,10 +172,42 @@ namespace ChartBuilder.ViewModels
             set => SetTool(EditorTool.Sustain, value);
         }
 
+        public bool IsPhraseTool
+        {
+            get => Session.Tool == EditorTool.Phrase;
+            set => SetTool(EditorTool.Phrase, value);
+        }
+
         public bool IsTempoTool
         {
             get => Session.Tool == EditorTool.Tempo;
             set => SetTool(EditorTool.Tempo, value);
+        }
+
+        /// <summary>
+        /// The kinds of phrase the Phrase tool offers for the part in focus (charter-spec C8): star power, solos and big
+        /// rock endings on 5-fret and GHL; star power, solos, fills, rolls and trills on drums, whose big rock ending is a
+        /// fill after <c>[coda]</c>.
+        /// </summary>
+        public IReadOnlyList<PhraseKindChoice> PhraseKindChoices =>
+            Session.Focused is { } key && ChartInstruments.KindOf(key.Instrument) == ChartInstrumentKind.Drums ? DrumPhraseChoices : FretPhraseChoices;
+
+        /// <summary>The kind the Phrase tool draws. Picking one picks the Phrase tool too.</summary>
+        public PhraseKindChoice? SelectedPhraseKind
+        {
+            get
+            {
+                var kind = Session.Focused is { } key ? PhraseRail.RowOf(ChartInstruments.KindOf(key.Instrument), Session.PhraseKind) : Session.PhraseKind;
+                return PhraseKindChoices.FirstOrDefault(c => c.Kind == kind);
+            }
+
+            set
+            {
+                if (value is null || value.Kind == Session.PhraseKind)
+                    return;
+                Session.PhraseKind = value.Kind;
+                Session.Tool = EditorTool.Phrase;
+            }
         }
 
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
@@ -326,10 +366,34 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsPlaceTool));
             OnPropertyChanged(nameof(IsEraseTool));
             OnPropertyChanged(nameof(IsSustainTool));
+            OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
+
+            // The picker's list changes only with the kind of part in focus, so it isn't rebuilt on every change.
+            if (!ReferenceEquals(_phraseChoices, PhraseKindChoices))
+            {
+                _phraseChoices = PhraseKindChoices;
+                OnPropertyChanged(nameof(PhraseKindChoices));
+            }
+
+            OnPropertyChanged(nameof(SelectedPhraseKind));
             RefreshVisibleSpan();
             ScheduleRefresh();
         }
+
+        /// <summary>A phrase's kind, in words: Star power, Solo, Drum fill…</summary>
+        internal static string PhraseKindName(PhraseKind kind) => kind switch
+        {
+            PhraseKind.StarPower => Strings.PhraseKindStarPower,
+            PhraseKind.Solo => Strings.PhraseKindSolo,
+            PhraseKind.DrumFill => Strings.PhraseKindDrumFill,
+            PhraseKind.Roll => Strings.PhraseKindRoll,
+            PhraseKind.Trill => Strings.PhraseKindTrill,
+            _ => Strings.PhraseKindBigRockEnding,
+        };
+
+        private static IReadOnlyList<PhraseKindChoice> PhraseChoicesOf(ChartInstrumentKind kind) =>
+            [.. PhraseRail.KindsOf(kind).Select(k => new PhraseKindChoice(k, PhraseKindName(k)))];
 
         // What the session says is why something was refused.
         private void OnStatusPosted(object? sender, string status) => Messages.Warning(status);

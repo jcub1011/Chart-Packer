@@ -1038,10 +1038,6 @@ Open it anyway?</value>
     <value>Black {0}</value>
     <comment>A six-fret note's lane, with its column.</comment>
   </data>
-  <data name="PhraseToolComingToolTip" xml:space="preserve">
-    <value>Star power, solos and other phrases come with drums and GHL.</value>
-    <comment>The Phrase tool's tooltip while it's not built yet.</comment>
-  </data>
   <data name="ToolSelectToolTip" xml:space="preserve">
     <value>Select notes and drag them in time or across lanes; drag a tail to set a sustain; drag in an empty place to select a span. Click an empty place to clear the selection.</value>
     <comment>The Select tool's tooltip.</comment>
@@ -1061,6 +1057,66 @@ Open it anyway?</value>
   <data name="ToolTempoToolTip" xml:space="preserve">
     <value>Click to add a tempo marker; drag one to move it, or, when it's anchored, to fit the tempo to the audio. Edit its tempo in Properties.</value>
     <comment>The Tempo tool's tooltip.</comment>
+  </data>
+  <data name="ToolPhraseToolTip" xml:space="preserve">
+    <value>Drag along the lanes to add a phrase of the kind picked beside this. With any tool, click a phrase in the rail beside the lanes to select it, drag it to move it, or drag either end to resize it. S puts star power over the selection.</value>
+    <comment>The Phrase tool's tooltip.</comment>
+  </data>
+  <data name="ToolPhraseKindToolTip" xml:space="preserve">
+    <value>The kind of phrase the Phrase tool adds</value>
+    <comment>The tooltip of the picker beside the Phrase tool.</comment>
+  </data>
+  <data name="ToolPhraseKindName" xml:space="preserve">
+    <value>Phrase kind</value>
+    <comment>The accessible name of the picker beside the Phrase tool.</comment>
+  </data>
+  <data name="PhraseKindStarPower" xml:space="preserve">
+    <value>Star power</value>
+    <comment>A kind of phrase.</comment>
+  </data>
+  <data name="PhraseKindSolo" xml:space="preserve">
+    <value>Solo</value>
+    <comment>A kind of phrase.</comment>
+  </data>
+  <data name="PhraseKindDrumFill" xml:space="preserve">
+    <value>Drum fill</value>
+    <comment>A kind of phrase: a drums activation fill; after [coda], a big rock ending.</comment>
+  </data>
+  <data name="PhraseKindRoll" xml:space="preserve">
+    <value>Roll</value>
+    <comment>A kind of phrase: a drum roll, on one lane.</comment>
+  </data>
+  <data name="PhraseKindTrill" xml:space="preserve">
+    <value>Trill</value>
+    <comment>A kind of phrase: a drum trill, between two lanes.</comment>
+  </data>
+  <data name="PhraseKindBigRockEnding" xml:space="preserve">
+    <value>Big rock ending</value>
+    <comment>A kind of phrase.</comment>
+  </data>
+  <data name="PropertiesPhraseHeading" xml:space="preserve">
+    <value>Phrase</value>
+    <comment>Properties' heading for one selected phrase.</comment>
+  </data>
+  <data name="PropertiesPhrasesHeadingFormat" xml:space="preserve">
+    <value>{0} phrases</value>
+    <comment>Properties' heading for several selected phrases, with how many.</comment>
+  </data>
+  <data name="PropertiesKindLabel" xml:space="preserve">
+    <value>Kind</value>
+    <comment>A Properties field: what kind of phrase it is.</comment>
+  </data>
+  <data name="PropertiesStartLabel" xml:space="preserve">
+    <value>Start</value>
+    <comment>A Properties field: where the phrase starts, in ticks.</comment>
+  </data>
+  <data name="PropertiesEndLabel" xml:space="preserve">
+    <value>End</value>
+    <comment>A Properties field: where the phrase ends, in ticks; the tick it ends on isn't covered.</comment>
+  </data>
+  <data name="PropertiesLowestDifficultyLabel" xml:space="preserve">
+    <value>Lowest difficulty</value>
+    <comment>A Properties field: the lowest difficulty a drum roll or trill reaches down to from Expert.</comment>
   </data>
   <data name="SnapLabel" xml:space="preserve">
     <value>Snap</value>

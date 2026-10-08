@@ -40,8 +40,14 @@ namespace ChartBuilder.Controls.Editing
         public static readonly StyledProperty<IBrush?> LabelBrushProperty =
             AvaloniaProperty.Register<EditorCanvas, IBrush?>(nameof(LabelBrush));
 
-        // How near a note's start the pointer hits it, in pixels.
+        // How near a note's start, or a phrase bar's end in the rail, the pointer hits it, in pixels.
         private const double HitPixels = 7;
+
+        // The phrase rail's rows, across the view, in pixels: each one's thickness, the gap between them, and the margin
+        // either side of the rail.
+        private const double PhraseRowSize = 6;
+        private const double PhraseRowGap = 2;
+        private const double PhraseRailMargin = 3;
 
         private static readonly IBrush LanesBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF0, 0x08, 0x08, 0x0F));
         private static readonly IBrush RailBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xFF, 0x12, 0x13, 0x1B));
@@ -63,6 +69,11 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush DefaultAccentBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x7C, 0xB4, 0xFF));
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
+        private static readonly IBrush PhraseRowBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF));
+        private static readonly Color SoloColor = Color.FromRgb(0xC3, 0x8E, 0xFF);
+        private static readonly IBrush StarPowerTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(HighwayPalette.StarPower, 0x16));
+        private static readonly IBrush SoloTintBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(SoloColor, 0x1A));
+        private static readonly IBrush SoloLabelBrush = new ImmutableSolidColorBrush(SoloColor);
         private static readonly Typeface LabelFace = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
         private readonly GemPainter _gems = new();
@@ -88,6 +99,15 @@ namespace ChartBuilder.Controls.Editing
         // The ticks of the measures' first beats, for numbering them; kept for the tempo map they're for.
         private TempoMap? _measuresOf;
         private List<long> _measures = [];
+
+        // The pointer's shapes over the phrase rail, made once each: a resize arrow over a bar's end, a hand over its body.
+        private static readonly Dictionary<StandardCursorType, Cursor> RailCursors = [];
+
+        private StandardCursorType? _cursorType;
+
+        // The phrases of the lane's part that reach into the ticks shown, found once a frame for each of the passes that
+        // draw them.
+        private readonly List<Phrase> _phrasesShown = [];
 
         static EditorCanvas()
         {
@@ -117,15 +137,26 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Where the time axis and the lanes are, for a canvas of <paramref name="size"/> showing <paramref name="lookAhead"/>
-        /// seconds beyond the strike line.
+        /// seconds beyond the strike line, with room kept for a phrase rail of <paramref name="phraseRows"/> rows.
         /// </summary>
-        protected abstract LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead);
+        protected abstract LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead, int phraseRows);
 
         /// <summary>Where the margin is that measure numbers and tempo markers are drawn in: the left rail of a highway, the ruler along a timeline's top.</summary>
         protected abstract Rect LabelsArea(Size size, LaneProjection projection);
 
         /// <summary>Where the waveform is drawn: behind a highway's lanes, or in a strip over a timeline's.</summary>
         protected abstract Rect WaveformArea(Size size, LaneProjection projection);
+
+        /// <summary>
+        /// Where the phrase rail of <paramref name="phraseRows"/> rows starts across the view, in pixels (charter-spec C8):
+        /// right of a highway's forcing marks, above a timeline's. Its rows follow on from there, in
+        /// <see cref="PhraseRail.KindsOf"/>' order.
+        /// </summary>
+        protected abstract double PhraseRailFrom(LaneProjection projection, int phraseRows);
+
+        /// <summary>How thick the phrase rail of <paramref name="phraseRows"/> rows is across the view, in pixels.</summary>
+        protected static double PhraseRailSize(int phraseRows) =>
+            phraseRows == 0 ? 0 : (phraseRows * PhraseRowSize) + ((phraseRows - 1) * PhraseRowGap) + (2 * PhraseRailMargin);
 
         /// <summary>The point <paramref name="along"/> the time axis and <paramref name="across"/> the lanes.</summary>
         protected Point At(double along, double across) => View == LaneView.Highway ? new Point(across, along) : new Point(along, across);
@@ -177,7 +208,9 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             var slots = session.SlotsOf(key.Instrument, View);
-            var projection = Project(bounds.Size, slots, session.Viewport, _lane.LookAhead);
+            var part = session.Chart.PartOf(key.Instrument)!;
+            var rows = PhraseRail.KindsOf(part.Kind);
+            var projection = Project(bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
             var lanes = Box(projection.TimeFrom, projection.TimeFrom + projection.TimeLength, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count));
             var map = session.TempoMap;
             double fromTick = Math.Max(0, session.TickAt(projection.Start));
@@ -186,23 +219,27 @@ namespace ChartBuilder.Controls.Editing
             context.FillRectangle(LanesBrush, lanes);
             DrawLaneDividers(context, projection, slots);
             DrawWaveform(context, bounds.Size, projection);
+            FindPhrasesShown(part, fromTick, toTick);
+            DrawPhraseTints(context, session, projection);
             DrawSpans(context, session, projection);
             DrawBeats(context, session, map, projection, fromTick, toTick, bounds.Size);
             DrawTempoMarkers(context, session, projection, fromTick, toTick, bounds.Size);
             DrawStrikeBand(context, session, projection);
+            DrawPhraseRail(context, session, part, rows, projection);
 
             using (context.PushClip(lanes))
             {
                 if (_editor?.Playback.IsPlaying == true)
                     DrawGlow(context, session, key, track, projection, slots);
 
-                if (_lane.Ghost is { } ghost && session.Chart.PartOf(key.Instrument) is { } part)
+                if (_lane.Ghost is { } ghost)
                 {
                     using (context.PushOpacity(0.28))
                         DrawNotes(context, session, new ChartTrackKey(key.Instrument, ghost), part[ghost], projection, slots, fromTick, toTick, isGhost: true);
                 }
 
                 DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, isGhost: false);
+                DrawSoloCounts(context, session, track, projection, fromTick, toTick);
                 DrawHover(context, session, key, track, projection, slots);
             }
 
@@ -243,8 +280,8 @@ namespace ChartBuilder.Controls.Editing
             _isPressed = true;
             _lastPoint = point;
 
-            // A box is drawn from a press that's on no note, with the select tool.
-            _boxFrom = session.Tool == EditorTool.Select && session.TrackOf(point.Track) is { } track && EditorTools.HitTest(track, point, point.Slots.Across) is null
+            // A box is drawn from a press in the lanes that's on no note, with the select tool.
+            _boxFrom = session.Tool == EditorTool.Select && point.Rail is null && session.TrackOf(point.Track) is { } track && EditorTools.HitTest(track, point, point.Slots.Across) is null
                 ? current.Position
                 : null;
             _boxTo = current.Position;
@@ -263,6 +300,10 @@ namespace ChartBuilder.Controls.Editing
                 _lastPoint = point;
                 _boxTo = position;
                 session.Tools.Drag(point);
+            }
+            else if (!_isPressed)
+            {
+                ShowRailCursor(position);
             }
 
             InvalidateVisual();
@@ -352,17 +393,71 @@ namespace ChartBuilder.Controls.Editing
 
         internal LaneView CanvasView => View;
 
-        /// <summary>The chart point under <paramref name="position"/>, or null when there's no part to edit.</summary>
+        /// <summary>
+        /// The chart point under <paramref name="position"/>, or null when there's no part to edit: in the lanes, or in the
+        /// phrase rail's row there.
+        /// </summary>
         private ChartPoint? PointAt(Point position)
         {
             if (Session is not { } session || _lane?.Track is not { } key || session.TrackOf(key) is null)
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);
-            var projection = Project(Bounds.Size, slots, session.Viewport, _lane.LookAhead);
+            var rows = PhraseRail.KindsOf(ChartInstruments.KindOf(key.Instrument));
+            var projection = Project(Bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
             double seconds = projection.SecondsAt(AlongOf(position));
             double tick = session.TickAt(seconds);
             double tolerance = Math.Max(1, projection.TicksOf(HitPixels, Math.Max(0, tick), session.TempoMap));
-            return new ChartPoint(key, tick, projection.LaneAt(AcrossOf(position)), tolerance, slots);
+            double across = AcrossOf(position);
+            var rail = PhraseRowAt(projection, rows, across);
+            return new ChartPoint(key, tick, rail is null ? projection.LaneAt(across) : null, tolerance, slots, rail);
+        }
+
+        /// <summary>The kind whose phrase rail row is at <paramref name="across"/> pixels, or null when it's outside the rail.</summary>
+        private PhraseKind? PhraseRowAt(LaneProjection projection, IReadOnlyList<PhraseKind> rows, double across)
+        {
+            double from = PhraseRailFrom(projection, rows.Count);
+            if (rows.Count == 0 || across < from || across > from + PhraseRailSize(rows.Count))
+                return null;
+
+            // A gap goes to the rows either side of it, and the margins to the first and last.
+            int row = (int)Math.Floor((across - from - PhraseRailMargin + (PhraseRowGap / 2)) / (PhraseRowSize + PhraseRowGap));
+            return rows[Math.Clamp(row, 0, rows.Count - 1)];
+        }
+
+        /// <summary>Where the row of the phrase rail at <paramref name="index"/> is across the view: its near and far edges.</summary>
+        private (double From, double To) PhraseRowOf(LaneProjection projection, int rowCount, int index)
+        {
+            double from = PhraseRailFrom(projection, rowCount) + PhraseRailMargin + (index * (PhraseRowSize + PhraseRowGap));
+            return (from, from + PhraseRowSize);
+        }
+
+        /// <summary>Shows a resize arrow over a phrase bar's end in the rail, and a hand over its body.</summary>
+        private void ShowRailCursor(Point position)
+        {
+            StandardCursorType? wanted = null;
+            if (PointAt(position) is { Rail: not null } point && Session?.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } hit)
+            {
+                wanted = hit.Grip == PhraseGrip.Body ? StandardCursorType.Hand
+                    : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
+                    : StandardCursorType.SizeWestEast;
+            }
+
+            if (wanted == _cursorType)
+                return;
+            _cursorType = wanted;
+            if (wanted is not { } type)
+            {
+                Cursor = null;
+                return;
+            }
+
+            if (!RailCursors.TryGetValue(type, out var cursor))
+            {
+                cursor = new Cursor(type);
+                RailCursors[type] = cursor;
+            }
+
+            Cursor = cursor;
         }
 
         private static EditorModifiers ModifiersOf(KeyModifiers keys) =>
@@ -512,6 +607,121 @@ namespace ChartBuilder.Controls.Editing
             if (session.Selection.Range is { } range && range.To > range.From)
                 context.FillRectangle(SpanBrush, Box(projection.AlongOf(session.AudioAt(range.From)), projection.AlongOf(session.AudioAt(range.To)), across1, across2));
         }
+
+        /// <summary>A faint tint across the lanes, behind the notes, over each star power phrase and solo (charter-spec C8).</summary>
+        private void DrawPhraseTints(DrawingContext context, EditorSession session, LaneProjection projection)
+        {
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            foreach (var phrase in _phrasesShown)
+            {
+                var tint = phrase.Kind switch
+                {
+                    PhraseKind.StarPower => StarPowerTintBrush,
+                    PhraseKind.Solo => SoloTintBrush,
+                    _ => null,
+                };
+                if (tint is not null)
+                    context.FillRectangle(tint, BoxOf(projection, session, phrase, across1, across2));
+            }
+        }
+
+        /// <summary>
+        /// The phrase rail (charter-spec C8): a row for each kind the part can have, with each phrase a bar in its kind's
+        /// row, so phrases that overlap don't hide each other. The selected ones are lit and outlined.
+        /// </summary>
+        private void DrawPhraseRail(DrawingContext context, EditorSession session, EditablePart part, IReadOnlyList<PhraseKind> rows, LaneProjection projection)
+        {
+            double along1 = projection.TimeFrom, along2 = projection.TimeFrom + projection.TimeLength;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var (from, to) = PhraseRowOf(projection, rows.Count, i);
+                context.FillRectangle(PhraseRowBrush, Box(along1, along2, from, to));
+            }
+
+            var selection = session.Selection;
+            var accent = ((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color ?? Color.FromRgb(0x7C, 0xB4, 0xFF);
+            foreach (var phrase in _phrasesShown)
+            {
+                int row = IndexOf(rows, PhraseRail.RowOf(part.Kind, phrase.Kind));
+                if (row < 0)
+                    continue;
+                var (from, to) = PhraseRowOf(projection, rows.Count, row);
+                var bar = BoxOf(projection, session, phrase, from, to);
+                var color = PhraseColor(phrase.Kind);
+                if (selection.Contains(part.Instrument, phrase))
+                    context.DrawRectangle(_gems.Brush(HighwayPalette.Lighten(color, 0.45)), _gems.Pen(accent, 1.5), bar.Inflate(1), 2, 2);
+                else
+                    context.DrawRectangle(_gems.Brush(color), null, bar, 2, 2);
+            }
+        }
+
+        /// <summary>
+        /// A solo's note count on the difficulty shown, at its start (charter-spec C8 item 2): only for the solos that start
+        /// on screen, as the others' counts aren't seen.
+        /// </summary>
+        private void DrawSoloCounts(DrawingContext context, EditorSession session, EditableTrack track, LaneProjection projection, double fromTick, double toTick)
+        {
+            long from = (long)Math.Floor(fromTick) - 1, to = (long)Math.Ceiling(toTick);
+            foreach (var phrase in _phrasesShown)
+            {
+                if (phrase.Kind != PhraseKind.Solo || phrase.Tick < from || phrase.Tick > to)
+                    continue;
+                var text = Label(PhraseRail.NoteCount(track, phrase).ToString(CultureInfo.CurrentCulture), 9, SoloLabelBrush);
+                double along = projection.AlongOf(session.AudioAt(phrase.Tick));
+                var at = View == LaneView.Highway
+                    ? new Point(projection.LaneFrom + 3, along - text.Height - 2)
+                    : new Point(along + 3, projection.LaneFrom + 2);
+                context.FillRectangle(BadgeBrush, new Rect(at, new Size(text.Width, text.Height)).Inflate(1));
+                context.DrawText(text, at);
+            }
+        }
+
+        /// <summary>Finds the part's phrases that reach into the ticks shown, for this frame's passes.</summary>
+        private void FindPhrasesShown(EditablePart part, double fromTick, double toTick)
+        {
+            _phrasesShown.Clear();
+            long from = (long)Math.Floor(fromTick);
+            var phrases = part.Phrases;
+            for (int i = 0, end = phrases.FirstAfter((long)Math.Ceiling(toTick)); i < end; i++)
+            {
+                if (phrases[i].CoverEnd >= from)
+                    _phrasesShown.Add(phrases[i]);
+            }
+        }
+
+        /// <summary>The box a phrase spans along the time axis, between two points across it: at least two pixels long, so one with no length shows.</summary>
+        private static Rect BoxOf(LaneProjection projection, EditorSession session, Phrase phrase, double across1, double across2)
+        {
+            double start = projection.AlongOf(session.AudioAt(phrase.Tick));
+            double end = projection.AlongOf(session.AudioAt(phrase.Tick + phrase.Length));
+            if (Math.Abs(end - start) < 2)
+                end = start + (projection.View == LaneView.Highway ? -2 : 2);
+            var a = projection.View == LaneView.Highway ? new Point(across1, Math.Min(start, end)) : new Point(Math.Min(start, end), across1);
+            var b = projection.View == LaneView.Highway ? new Point(across2, Math.Max(start, end)) : new Point(Math.Max(start, end), across2);
+            return new Rect(a, b);
+        }
+
+        private static int IndexOf(IReadOnlyList<PhraseKind> rows, PhraseKind kind)
+        {
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (rows[i] == kind)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>The colour of a kind of phrase in the rail: star power as its notes are drawn, the others each their own.</summary>
+        private static Color PhraseColor(PhraseKind kind) => kind switch
+        {
+            PhraseKind.StarPower => HighwayPalette.StarPower,
+            PhraseKind.Solo => SoloColor,
+            PhraseKind.DrumFill => Color.FromRgb(0x7C, 0xDB, 0x8A),
+            PhraseKind.Roll => Color.FromRgb(0xFF, 0xD2, 0x5E),
+            PhraseKind.Trill => Color.FromRgb(0xFF, 0x9F, 0x5A),
+            _ => Color.FromRgb(0xFF, 0x6E, 0x7A),
+        };
 
         /// <summary>The grid's steps faintly, then the beat and measure lines, with the measures' numbers in the labels' margin.</summary>
         private void DrawBeats(DrawingContext context, EditorSession session, TempoMap map, LaneProjection projection, double fromTick, double toTick, Size size)

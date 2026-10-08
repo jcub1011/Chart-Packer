@@ -126,6 +126,9 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.A when shift && !ctrl && !alt:
                     tools.ToggleDynamics(NoteDynamics.Ghost);
                     return true;
+                case PhysicalKey.S when plain:
+                    tools.ToggleStarPowerOverSelection();
+                    return true;
                 case PhysicalKey.B when plain:
                     editor.Tap();
                     return true;

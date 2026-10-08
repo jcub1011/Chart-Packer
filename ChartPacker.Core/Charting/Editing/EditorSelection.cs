@@ -9,15 +9,16 @@ public readonly record struct NotePlace(long Tick, int Lane, bool DoubleKick = f
 }
 
 /// <summary>
-/// What's selected in the editor (charter-spec C15 item 2): notes of one track, tempo markers, and a span of ticks across
-/// the lanes. Notes are kept by their place, so a note keeps its selection when its length changes, and loses it when
-/// it goes.
+/// What's selected in the editor (charter-spec C15 item 2): notes of one track, tempo markers, phrases of one part, and a
+/// span of ticks across the lanes. Notes are kept by their place, so a note keeps its selection when its length changes,
+/// and loses it when it goes. Phrases are kept as they are, so a phrase changed is selected again as what it became.
 /// </summary>
 public sealed class EditorSelection
 {
     private readonly EditableChart _chart;
     private readonly HashSet<NotePlace> _notes = [];
     private readonly SortedSet<long> _tempos = [];
+    private readonly HashSet<Phrase> _phrases = [];
 
     public EditorSelection(EditableChart chart)
     {
@@ -40,9 +41,25 @@ public sealed class EditorSelection
     /// <summary>The span selected across the lanes, in ticks, both ends included; null for none.</summary>
     public (long From, long To)? Range { get; private set; }
 
-    public bool IsEmpty => _notes.Count == 0 && _tempos.Count == 0 && Range is null;
+    /// <summary>The part the selected phrases are of, or null when no phrases are selected.</summary>
+    public ChartInstrument? PhrasePart { get; private set; }
+
+    public bool IsEmpty => _notes.Count == 0 && _tempos.Count == 0 && _phrases.Count == 0 && Range is null;
 
     public bool HasNotes => _notes.Count > 0;
+
+    public bool HasPhrases => _phrases.Count > 0;
+
+    /// <summary>The selected phrases, in the part's order.</summary>
+    public IReadOnlyList<Phrase> Phrases
+    {
+        get
+        {
+            var phrases = _phrases.ToList();
+            phrases.Sort(Phrase.Order);
+            return phrases;
+        }
+    }
 
     /// <summary>The selected notes as the chart has them now, in track order.</summary>
     public IReadOnlyList<EditableNote> Notes
@@ -66,8 +83,8 @@ public sealed class EditorSelection
 
     /// <summary>
     /// The span of ticks the selection covers, for playing it, looping it or fitting a tempo to it: the span selected,
-    /// or else from the first selected note to where the last is let go, or else from the first selected tempo marker
-    /// to the last. Null when it covers no ticks.
+    /// or else from the first selected note to where the last is let go, or else from the first selected phrase's start
+    /// to the last one's end, or else from the first selected tempo marker to the last. Null when it covers no ticks.
     /// </summary>
     public (long From, long To)? Span
     {
@@ -83,12 +100,22 @@ public sealed class EditorSelection
                 return to > from ? (from, to) : null;
             }
 
+            if (_phrases.Count > 0)
+            {
+                long from = _phrases.Min(static p => p.Tick);
+                long to = _phrases.Max(static p => p.Tick + p.Length);
+                return to > from ? (from, to) : null;
+            }
+
             return _tempos.Count >= 2 ? (_tempos.Min, _tempos.Max) : null;
         }
     }
 
     /// <summary>Whether <paramref name="note"/> of <paramref name="track"/> is selected.</summary>
     public bool Contains(ChartTrackKey track, EditableNote note) => Track == track && _notes.Contains(NotePlace.Of(note));
+
+    /// <summary>Whether <paramref name="phrase"/> of <paramref name="part"/> is selected.</summary>
+    public bool Contains(ChartInstrument part, Phrase phrase) => PhrasePart == part && _phrases.Contains(phrase);
 
     /// <summary>Selects nothing.</summary>
     public void Clear()
@@ -97,6 +124,7 @@ public sealed class EditorSelection
             return;
         _notes.Clear();
         _tempos.Clear();
+        ClearPhraseSet();
         Track = null;
         Range = null;
         Raise();
@@ -118,6 +146,7 @@ public sealed class EditorSelection
         {
             _notes.Clear();
             _tempos.Clear();
+            ClearPhraseSet();
             Range = null;
         }
         else if (Track != track)
@@ -154,11 +183,71 @@ public sealed class EditorSelection
         {
             _notes.Clear();
             _tempos.Clear();
+            ClearPhraseSet();
             Track = null;
             Range = null;
         }
 
         _tempos.UnionWith(ticks);
+        Raise();
+    }
+
+    /// <summary>Selects <paramref name="phrases"/> of <paramref name="part"/>, in place of what was selected or as well as it.</summary>
+    /// <param name="add">Whether to keep what's selected; only the phrases of another part are dropped.</param>
+    public void SelectPhrases(ChartInstrument part, IEnumerable<Phrase> phrases, bool add = false)
+    {
+        ArgumentNullException.ThrowIfNull(phrases);
+        if (!add)
+        {
+            _notes.Clear();
+            _tempos.Clear();
+            Track = null;
+            Range = null;
+        }
+
+        if (!add || PhrasePart != part)
+            _phrases.Clear();
+        PhrasePart = part;
+        _phrases.UnionWith(phrases);
+        if (_phrases.Count == 0)
+            PhrasePart = null;
+        Raise();
+    }
+
+    /// <summary>Selects <paramref name="phrase"/> when it isn't, and the other way round, keeping the rest.</summary>
+    public void Toggle(ChartInstrument part, Phrase phrase)
+    {
+        if (PhrasePart != part)
+            _phrases.Clear();
+        PhrasePart = part;
+        if (!_phrases.Remove(phrase))
+            _phrases.Add(phrase);
+        if (_phrases.Count == 0)
+            PhrasePart = null;
+        Raise();
+    }
+
+    /// <summary>
+    /// Selects <paramref name="phrases"/> of <paramref name="part"/> in place of the phrases selected, keeping the notes,
+    /// markers and span: the same phrases as an edit has changed them.
+    /// </summary>
+    public void ReplacePhrases(ChartInstrument part, IEnumerable<Phrase> phrases)
+    {
+        ArgumentNullException.ThrowIfNull(phrases);
+        _phrases.Clear();
+        PhrasePart = part;
+        _phrases.UnionWith(phrases);
+        if (_phrases.Count == 0)
+            PhrasePart = null;
+        Raise();
+    }
+
+    /// <summary>Selects no phrases, keeping the rest.</summary>
+    public void ClearPhrases()
+    {
+        if (_phrases.Count == 0)
+            return;
+        ClearPhraseSet();
         Raise();
     }
 
@@ -172,11 +261,14 @@ public sealed class EditorSelection
         Raise();
     }
 
-    /// <summary>Drops what the chart no longer has: notes gone from their places, and markers gone from their ticks.</summary>
+    /// <summary>
+    /// Drops what the chart no longer has: notes gone from their places, markers gone from their ticks, and phrases the
+    /// part no longer has as they were.
+    /// </summary>
     /// <returns>Whether anything was dropped.</returns>
     public bool Reconcile()
     {
-        int before = _notes.Count + _tempos.Count;
+        int before = _notes.Count + _tempos.Count + _phrases.Count;
         if (Track is { } key && _chart.PartOf(key.Instrument) is { } part)
         {
             var track = part[key.Difficulty];
@@ -190,10 +282,22 @@ public sealed class EditorSelection
         if (_notes.Count == 0)
             Track = null;
         _tempos.RemoveWhere(t => _chart.TempoMap.Tempos.At(t).IsEmpty);
-        bool dropped = _notes.Count + _tempos.Count != before;
+        if (PhrasePart is { } instrument && _chart.PartOf(instrument) is { } phrased)
+            _phrases.RemoveWhere(p => phrased.Phrases.IndexOf(p) < 0);
+        else
+            _phrases.Clear();
+        if (_phrases.Count == 0)
+            PhrasePart = null;
+        bool dropped = _notes.Count + _tempos.Count + _phrases.Count != before;
         if (dropped)
             Raise();
         return dropped;
+    }
+
+    private void ClearPhraseSet()
+    {
+        _phrases.Clear();
+        PhrasePart = null;
     }
 
     private void Raise() => Changed?.Invoke(this, EventArgs.Empty);

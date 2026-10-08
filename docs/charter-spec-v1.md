@@ -749,6 +749,9 @@ Acceptance criteria:
    - **Notes:** tick, time, measure and beat, lane, length, and flags. The chord's forcing and
      the part's cymbal/tom flag are shown as such ([§4.1](#editable-model)).
    - **Phrases:** start and end, plus for rolls and trills the lowest difficulty they reach.
+     *Settled in CM3:* the end is the tick after the last one the phrase covers. Properties also
+     shows the kind, which it doesn't change, and the start's time. A start or end typed there moves
+     that end of every selected phrase, each keeping its other end, as one undoable step.
    - **Tempo markers:** BPM, time signature, and whether it's anchored.
    - With several items selected, a field shows `<<multiple>>` when the values differ, and
      editing it sets every item. This is the same model as the metadata editor's bulk editing.
@@ -1001,7 +1004,32 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **Star power** phrases. Every difficulty shares them, as MIDI stores them (pitch 116).
+   - *Settled in CM3:* the **Phrase tool** draws a phrase of the kind picked beside it in the
+     toolbar, from the grid step pressed to the one let go, either way, as one undoable step. A click
+     adds nothing. The picker offers only the kinds the part in focus can have: star power, solo and
+     big rock ending on 5-fret and GHL; star power, solo, drum fill, roll and trill on drums, where a
+     fill drawn at or after `[coda]` is made a big rock ending (item 4). When the focus moves to a
+     part that can't have the kind picked, it goes back to star power. New rolls and trills reach
+     Expert only ([C6](#c6-drums-4-lane-pro-and-5-lane) item 6).
+   - *Settled in CM3:* each lane draws its part's phrases as bars in a **phrase rail**: right of a
+     highway's forcing marks, and above a timeline's. The rail has a row for each kind the part can
+     have, in the picker's order, so overlapping phrases don't hide each other; a drums big rock
+     ending is in the fills' row. With any tool, pressing a bar selects its phrase (Shift adds it or
+     takes it away). Dragging a bar's body moves the selected phrases in time to the grid, keeping
+     their lengths; dragging within a few pixels of an end moves that end to the grid, never closer
+     than a grid step to the other. Each drag is one undoable step. Delete removes the selected
+     phrases, with any selected notes and tempo markers, in one step. Selecting notes or tempo markers
+     drops the selected phrases, and the other way round, unless Shift adds them.
+   - *Settled in CM3:* star power and solos also tint the lanes faintly behind the notes. Fills, big
+     rock endings, rolls and trills are drawn only in the rail.
+   - *Settled in CM3:* `S` ([§9](#9-keyboard-shortcuts)) puts star power over the selected notes:
+     from the first one's tick to where the last to end is let go, or a tick past it when it has no
+     sustain, so it covers every note as the games read markers. With no notes selected, it covers
+     the span selected, in the focused lane's part. When a star power phrase already starts and ends
+     exactly there, `S` removes it instead. With nothing selected, the status says so.
 2. **Solos** (pitch 103), drawn as a shaded band with a note count.
+   - *Settled in CM3:* the count is drawn at the solo's start. It counts the notes the solo covers on
+     the difficulty shown, a chord once.
 3. **Sections** in `EVENTS`. They are named freely and shown in the overview strip and in a new
    section list beside it. Sections can be renamed in the list, and **Insert section** takes the
    name from a menu of common ones (Intro, Verse 1, Chorus 1, Bridge, Solo, Outro…).

@@ -8,7 +8,7 @@
              x:Class="ChartBuilder.Views.PropertiesView"
              x:DataType="vm:PropertiesViewModel">
 
-    <!-- Properties (charter-spec C3 item 4): the selected notes, tempo markers and span. A field shows <<multiple>> when
+    <!-- Properties (charter-spec C3 item 4): the selected notes, phrases, tempo markers and span. A field shows <<multiple>> when
          the items differ, and a value typed there is applied to every item once the field loses focus. -->
     <UserControl.Styles>
         <Style Selector="TextBlock.section-heading">
@@ -64,6 +64,35 @@
                         <CheckBox Content="{x:Static res:Strings.PropertiesGhost}" IsChecked="{Binding IsGhost}" IsEnabled="{Binding CanDynamics}" />
                         <CheckBox Content="{x:Static res:Strings.PropertiesDoubleKick}" IsChecked="{Binding IsDoubleKick}" IsEnabled="{Binding CanDoubleKick}" />
                     </WrapPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Phrases: start and end, and for rolls and trills the lowest difficulty they reach (charter-spec C3 item 4). -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasPhrases}">
+            <TextBlock Classes="section-heading" Text="{Binding PhrasesHeading}" />
+            <Border Classes="section">
+                <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
+                    <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesKindLabel}" />
+                    <SelectableTextBlock Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding PhraseKindText}" />
+                    <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesStartLabel}" />
+                    <TextBox Grid.Row="1" Grid.Column="1"
+                             Text="{Binding PhraseStartText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesStartLabel}" />
+                    <TextBlock Grid.Row="2" Classes="muted" Text="{x:Static res:Strings.PropertiesTimeLabel}" />
+                    <SelectableTextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding PhraseTimeText}" />
+                    <TextBlock Grid.Row="3" Classes="muted" Text="{x:Static res:Strings.PropertiesEndLabel}" />
+                    <TextBox Grid.Row="3" Grid.Column="1"
+                             Text="{Binding PhraseEndText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesEndLabel}" />
+                    <TextBlock Grid.Row="4" Classes="muted" Text="{x:Static res:Strings.PropertiesLowestDifficultyLabel}" IsVisible="{Binding HasLowestDifficulty}" />
+                    <ComboBox Grid.Row="4" Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding HasLowestDifficulty}"
+                              ItemsSource="{Binding LowestDifficultyChoices}"
+                              SelectedItem="{Binding SelectedLowestDifficulty}"
+                              DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
+                              AutomationProperties.Name="{x:Static res:Strings.PropertiesLowestDifficultyLabel}" />
                 </Grid>
             </Border>
         </StackPanel>
