@@ -1,12 +1,14 @@
+using System.Runtime.Versioning;
 using ChartPacker.Audio.Playback;
 
 namespace ChartPacker.Core.Tests.Audio;
 
 [TestClass]
+[SupportedOSPlatform("windows")]
+[OSCondition(OperatingSystems.Windows)]
 public sealed class WindowsAudioEndpointTests
 {
     [TestMethod]
-    [OSCondition(OperatingSystems.Windows)]
     public void TheDefaultOutputsIdIsAnEndpointIdOrNone()
     {
         // Null on a machine with no output device, as a build server may be.
