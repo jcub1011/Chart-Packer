@@ -390,7 +390,7 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
-            if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { } session)
+            if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
                 return;
             e.Handled = EditorKeys.Handle(e.PhysicalKey, e.KeyModifiers, editor, lane, this);
         }
@@ -741,7 +741,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>A faint band across the lanes, behind the notes, over each of Generate fills' proposals on a drums lane.</summary>
-        private void DrawFillBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
+        private static void DrawFillBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
         {
             var fills = session.Fills;
             if (!fills.IsActive || key.Instrument != FillProposals.Part)

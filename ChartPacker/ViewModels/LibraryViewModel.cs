@@ -469,7 +469,7 @@ namespace ChartPacker.ViewModels
         // One song at a time, and not while a job may be writing it.
         private bool CanEditChart() => SelectedCount == 1 && !Job.IsRunning;
 
-        public string EditChartToolTip => Strings.EditChartToolTip;
+        public static string EditChartToolTip => Strings.EditChartToolTip;
 
         /// <summary>
         /// Asked before a song opens in Chart Builder, which can't see this app's drafts: whatever has to be done
@@ -864,7 +864,7 @@ namespace ChartPacker.ViewModels
         public void OnItemRealized(LibraryItemViewModel item) => _albumArt.Realized(item);
 
         /// <summary>The list let go of <paramref name="item"/>'s row.</summary>
-        public void OnItemUnrealized(LibraryItemViewModel item) => _albumArt.Unrealized(item);
+        public void OnItemUnrealized(LibraryItemViewModel item) => AlbumArtLoader.Unrealized(item);
 
         /// <summary>The song's unsaved changes, without creating an empty draft for every listed song.</summary>
         private MetadataDraft? DraftFor(string path) => _drafts.HasDrafts(path) ? _drafts.Get(path) : null;

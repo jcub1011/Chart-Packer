@@ -160,7 +160,7 @@ namespace ChartPacker.ViewModels
 
         public bool IsExcluded => CanExclude && !IsIncluded;
 
-        public string IncludeToolTip => Strings.MergeIncludeToolTip;
+        public static string IncludeToolTip => Strings.MergeIncludeToolTip;
 
         public string IncludeName => string.Format(CultureInfo.CurrentCulture, Strings.MergeIncludeNameFormat, Label);
 

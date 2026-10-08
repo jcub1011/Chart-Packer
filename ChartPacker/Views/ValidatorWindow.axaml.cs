@@ -52,20 +52,20 @@ namespace ChartPacker.Views
         /// </summary>
         private void OnSongListTapped(object? sender, TappedEventArgs e)
         {
-            if (DataContext is not ValidatorWindowViewModel viewModel || !IsOnSongHeader(e.Source))
+            if (DataContext is not ValidatorWindowViewModel || !IsOnSongHeader(e.Source))
                 return;
 
             var song = SongAt(e.Source);
             if (song is not null && ReferenceEquals(song, _pressedPicked))
-                viewModel.ToggleExpanded(song);
+                ValidatorWindowViewModel.ToggleExpanded(song);
         }
 
         private void OnSongListKeyDown(object? sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Enter || DataContext is not ValidatorWindowViewModel { SelectedSong: { } song } viewModel)
+            if (e.Key != Key.Enter || DataContext is not ValidatorWindowViewModel { SelectedSong: { } song })
                 return;
 
-            viewModel.ToggleExpanded(song);
+            ValidatorWindowViewModel.ToggleExpanded(song);
             e.Handled = true;
         }
 

@@ -314,7 +314,7 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Opens or closes a song's list of issues, as clicking the song again does once it's picked.</summary>
-        public void ToggleExpanded(ValidatorSongViewModel song) => song.IsExpanded = !song.IsExpanded;
+        public static void ToggleExpanded(ValidatorSongViewModel song) => song.IsExpanded = !song.IsExpanded;
 
         // Drafts mustn't change while either this window or the inspector is writing them.
         private bool CanFixSelected() => !IsSaving && !Inspector.IsSaving && SelectedFixCount > 0;
