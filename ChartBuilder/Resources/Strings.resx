@@ -289,11 +289,54 @@
   <data name="TimelineToolTip" xml:space="preserve">
     <value>Click or drag to move the playhead.</value>
   </data>
-  <data name="InspectorNoChart" xml:space="preserve">
-    <value>No chart open</value>
+  <data name="InspectorNewChartPath" xml:space="preserve">
+    <value>Not saved yet. Its song folder is made at its first save.</value>
   </data>
-  <data name="InspectorNoChartPath" xml:space="preserve">
-    <value>The song's folder shows here once it's saved.</value>
+  <data name="InspectorCharterPrefix" xml:space="preserve">
+    <value>Charted by </value>
+    <comment>Before the charter's name under the song's title; the name follows.</comment>
+  </data>
+  <data name="InspectorPickArtTitle" xml:space="preserve">
+    <value>Choose album art</value>
+  </data>
+  <data name="InspectorReplaceArtToolTip" xml:space="preserve">
+    <value>Replace the album art</value>
+  </data>
+  <data name="InspectorRemoveArtToolTip" xml:space="preserve">
+    <value>Remove the album art</value>
+  </data>
+  <data name="InspectorRevertArtToolTip" xml:space="preserve">
+    <value>Undo the album art change</value>
+  </data>
+  <data name="InspectorNoArt" xml:space="preserve">
+    <value>No album art</value>
+  </data>
+  <data name="InspectorArtRemoved" xml:space="preserve">
+    <value>Removed when saved</value>
+  </data>
+  <data name="InspectorArtUnreadable" xml:space="preserve">
+    <value>Can't be shown</value>
+  </data>
+  <data name="InspectorDelayLabel" xml:space="preserve">
+    <value>Audio offset (delay), ms</value>
+  </data>
+  <data name="InspectorDelayToolTip" xml:space="preserve">
+    <value>How much later than its notes the chart plays against the audio, in milliseconds: song.ini's delay. Find first downbeat sets it too.</value>
+  </data>
+  <data name="InspectorNoTracks" xml:space="preserve">
+    <value>No audio. The chart is made against a silent timeline.</value>
+  </data>
+  <data name="InspectorNoChartFiles" xml:space="preserve">
+    <value>None yet. notes.mid is written at the first save.</value>
+  </data>
+  <data name="InspectorImportNote" xml:space="preserve">
+    <value>The first save replaces notes.chart with notes.mid.</value>
+  </data>
+  <data name="InspectorNoOtherFiles" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="InspectorFilesReadOnlyNote" xml:space="preserve">
+    <value>Tracks and files can't be added or removed here yet.</value>
   </data>
   <data name="InspectorAlbumArt" xml:space="preserve">
     <value>Album art</value>
@@ -312,9 +355,6 @@
   </data>
   <data name="InspectorMetadataHeading" xml:space="preserve">
     <value>Metadata</value>
-  </data>
-  <data name="InspectorSectionPlaceholder" xml:space="preserve">
-    <value>Nothing here yet.</value>
   </data>
   <data name="HomeOpenChartToolTip" xml:space="preserve">
     <value>Open a song folder or .sng in the editor (Ctrl+O).</value>
@@ -1312,12 +1352,6 @@ Saving also makes these changes to song.ini:
   <data name="FirstSaveIntro" xml:space="preserve">
     <value>A new chart is saved as a song folder, holding notes.mid, song.ini and its audio. Its folder can't be one that's already there.</value>
   </data>
-  <data name="FirstSaveNameLabel" xml:space="preserve">
-    <value>Name</value>
-  </data>
-  <data name="FirstSaveArtistLabel" xml:space="preserve">
-    <value>Artist</value>
-  </data>
   <data name="FirstSaveParentLabel" xml:space="preserve">
     <value>Save in</value>
     <comment>The label of the folder the new song folder is made in.</comment>
@@ -1346,6 +1380,12 @@ Saving also makes these changes to song.ini:
   <data name="FirstSaveLockedFormat" xml:space="preserve">
     <value>{0} is open in another Chart Builder.</value>
   </data>
+  <data name="FirstSaveNeedsNameAndArtist" xml:space="preserve">
+    <value>Set the song's name and artist in the Chart Inspector before saving.</value>
+  </data>
+  <data name="FirstSaveSongLabel" xml:space="preserve">
+    <value>Song</value>
+  </data>
   <data name="NewChartInSongTitle" xml:space="preserve">
     <value>New chart in this song</value>
   </data>
@@ -1363,6 +1403,13 @@ Saving also makes these changes to song.ini:
   <data name="PendingChangeRemovedFormat" xml:space="preserve">
     <value>{0} removed</value>
     <comment>A pending song.ini change that removes a key. {0} is the key.</comment>
+  </data>
+  <data name="PendingAlbumArtFormat" xml:space="preserve">
+    <value>album art from {0}</value>
+    <comment>A pending change that replaces the album art. {0} is the image's file name.</comment>
+  </data>
+  <data name="PendingAlbumArtRemoved" xml:space="preserve">
+    <value>album art removed</value>
   </data>
   <data name="PendingChangeRevertButton" xml:space="preserve">
     <value>Revert</value>
@@ -2244,6 +2291,9 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="PendingReasonSuggestedRating" xml:space="preserve">
     <value>The suggested rating, which you chose to use</value>
+  </data>
+  <data name="PendingReasonUserEdit" xml:space="preserve">
+    <value>Edited in the Chart Inspector</value>
   </data>
   <data name="SuggestedRatingFormat" xml:space="preserve">
     <value>Suggested rating: {0}</value>

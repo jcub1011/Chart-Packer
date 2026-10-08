@@ -366,9 +366,10 @@
                  C8 items 3, 5 and 6). -->
             <bctl:EditorSidePanel Grid.Column="0"
                                   IsCollapsed="{Binding IsLeftPanelCollapsed}"
-                                  ToggleCommand="{Binding ToggleLeftPanelCommand}">
+                                  ToggleCommand="{Binding ToggleLeftPanelCommand}"
+                                  SelectedIndex="{Binding LeftPanelTab, Mode=TwoWay}">
                 <TabItem Header="{x:Static res:Strings.ChartInspectorTab}">
-                    <views:ChartInspectorView />
+                    <views:ChartInspectorView DataContext="{Binding Inspector}" />
                 </TabItem>
                 <TabItem Header="{x:Static res:Strings.ChartSettingsTab}">
                     <views:ChartSettingsView DataContext="{Binding ChartSettings}" />
@@ -533,35 +534,7 @@
                                        Text="{x:Static res:Strings.FindingsNone}"
                                        IsVisible="{Binding !Findings.HasFindings}" />
                             <ScrollViewer IsVisible="{Binding Findings.HasFindings}">
-                                <ItemsControl Margin="8,0,8,8" ItemsSource="{Binding Findings.Items}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:FindingItem">
-                                            <Border Classes="finding severity" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
-                                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
-                                                    <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12" TextWrapping="Wrap" Text="{Binding Message}" />
-                                                    <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
-                                                        <TextBlock Classes="muted" FontSize="11" Text="{Binding RuleId}" />
-                                                        <TextBlock Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Text="{Binding Where}" />
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                                                        <Button Classes="labelled"
-                                                                FontSize="12"
-                                                                Content="{x:Static res:Strings.FindingFixButton}"
-                                                                Command="{Binding FixCommand}"
-                                                                IsVisible="{Binding CanFix}"
-                                                                ToolTip.Tip="{x:Static res:Strings.FindingFixToolTip}" />
-                                                        <Button Classes="labelled"
-                                                                FontSize="12"
-                                                                Content="{x:Static res:Strings.FindingGoToButton}"
-                                                                Command="{Binding GoToCommand}"
-                                                                ToolTip.Tip="{x:Static res:Strings.FindingGoToToolTip}"
-                                                                AutomationProperties.Name="{x:Static res:Strings.FindingGoToToolTip}" />
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <ItemsControl Margin="8,0,8,8" ItemsSource="{Binding Findings.Items}" ItemTemplate="{StaticResource FindingItemTemplate}" />
                             </ScrollViewer>
                         </Panel>
                     </DockPanel>

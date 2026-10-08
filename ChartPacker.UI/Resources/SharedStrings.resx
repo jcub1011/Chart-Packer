@@ -291,4 +291,128 @@
   <data name="MergePartDance" xml:space="preserve">
     <value>Dance</value>
   </data>
+  <data name="AddButton" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="AddRowButton" xml:space="preserve">
+    <value>Add row</value>
+  </data>
+  <data name="AutoSetLengthButton" xml:space="preserve">
+    <value>Auto-set song length</value>
+  </data>
+  <data name="AutoSetLengthToolTip" xml:space="preserve">
+    <value>Set each song's length to its longest part (the chart's last note, the longest audio track or the background video) plus 1 second</value>
+  </data>
+  <data name="DifficultyDistinctBadge" xml:space="preserve">
+    <value>*</value>
+    <comment>The badge of an instrument whose difficulty differs between the selected songs.</comment>
+  </data>
+  <data name="DifficultyDistinctToolTip" xml:space="preserve">
+    <value>The selected songs have different difficulties.</value>
+  </data>
+  <data name="DifficultyOtherLabel" xml:space="preserve">
+    <value>Other</value>
+  </data>
+  <data name="DifficultyRevertButton" xml:space="preserve">
+    <value>Revert</value>
+  </data>
+  <data name="DifficultySetButton" xml:space="preserve">
+    <value>Set</value>
+  </data>
+  <data name="DifficultyStoredValueFormat" xml:space="preserve">
+    <value>Stored as "{0}", which isn't a difficulty.</value>
+    <comment>{0} is the value in song.ini.</comment>
+  </data>
+  <data name="DifficultyUnsetBadge" xml:space="preserve">
+    <value>?</value>
+    <comment>The badge of an instrument with no difficulty set.</comment>
+  </data>
+  <data name="DifficultyUnsetToolTip" xml:space="preserve">
+    <value>No difficulty (stored as -1)</value>
+  </data>
+  <data name="DistinctValues" xml:space="preserve">
+    <value>&lt;&lt;contains distinct values&gt;&gt;</value>
+    <comment>Shown for a metadata row whose value differs between the selected items, or that some of them don't have.</comment>
+  </data>
+  <data name="HiddenIssuesListName" xml:space="preserve">
+    <value>Difficulties that fail validation</value>
+  </data>
+  <data name="InstrumentAccessibleNameFormat" xml:space="preserve">
+    <value>{0}, difficulty {1}</value>
+    <comment>{0} is an instrument, {1} its song.ini difficulty, e.g. 'Guitar, difficulty 4'.</comment>
+  </data>
+  <data name="InstrumentCaptionSeparator" xml:space="preserve">
+    <value> - </value>
+    <comment>Between an instrument's name and its charted difficulties' letters, e.g. 'Guitar - EMHX'.</comment>
+  </data>
+  <data name="InstrumentNotCharted" xml:space="preserve">
+    <value>The chart has no notes for this part.</value>
+  </data>
+  <data name="InstrumentsListName" xml:space="preserve">
+    <value>Instrument difficulties</value>
+    <comment>Accessible name of the instrument icons above the metadata rows.</comment>
+  </data>
+  <data name="InstrumentsShowAllFormat" xml:space="preserve">
+    <value>Show all ({0} more)</value>
+    <comment>{0} is how many instruments are hidden: not charted, with no difficulty set.</comment>
+  </data>
+  <data name="InstrumentsShowFewer" xml:space="preserve">
+    <value>Show fewer</value>
+  </data>
+  <data name="IssueSongCountFormat" xml:space="preserve">
+    <value>{0} ({1} of {2} songs)</value>
+    <comment>A metadata row's validation message with several songs selected: {0} is the message, {1} how many of the songs fail, {2} how many are selected.</comment>
+  </data>
+  <data name="KeyEmpty" xml:space="preserve">
+    <value>Enter a key.</value>
+  </data>
+  <data name="KeyExists" xml:space="preserve">
+    <value>This key already exists. Edit its row instead.</value>
+  </data>
+  <data name="KeyForbidden" xml:space="preserve">
+    <value>Keys can't contain ;, = or line breaks.</value>
+  </data>
+  <data name="MetadataHeaderFormat" xml:space="preserve">
+    <value>Metadata ({0:N0})</value>
+    <comment>{0} is the number of metadata keys.</comment>
+  </data>
+  <data name="MetadataListName" xml:space="preserve">
+    <value>Metadata</value>
+  </data>
+  <data name="NewKeyToolTip" xml:space="preserve">
+    <value>Pick a known key, or type your own</value>
+  </data>
+  <data name="NewKeyWatermark" xml:space="preserve">
+    <value>Key</value>
+  </data>
+  <data name="NewValueWatermark" xml:space="preserve">
+    <value>Value</value>
+  </data>
+  <data name="NoMetadata" xml:space="preserve">
+    <value>No metadata</value>
+  </data>
+  <data name="QuickFixMenu" xml:space="preserve">
+    <value>Quick Fix</value>
+    <comment>Right-click menu item on a metadata row that applies the row's quick fix to the draft; disabled when it has none.</comment>
+  </data>
+  <data name="QuickFixMenuFormat" xml:space="preserve">
+    <value>Quick Fix: {0}</value>
+    <comment>Right-click menu item on a metadata row. {0} is what the fix does, e.g. "Change to True".</comment>
+  </data>
+  <data name="RemoveRowToolTip" xml:space="preserve">
+    <value>Remove this row</value>
+  </data>
+  <data name="RevertRowToolTip" xml:space="preserve">
+    <value>Undo the changes to this row</value>
+  </data>
+  <data name="StoredMillisecondsFormat" xml:space="preserve">
+    <value>Stored value: {0} (milliseconds)</value>
+    <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the value as stored, e.g. "225123".</comment>
+  </data>
+  <data name="ValueEmpty" xml:space="preserve">
+    <value>Enter a value, or remove the row instead.</value>
+  </data>
+  <data name="ValueForbidden" xml:space="preserve">
+    <value>Values can't contain ; or line breaks.</value>
+  </data>
 </root>

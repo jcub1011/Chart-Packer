@@ -140,16 +140,6 @@
   <data name="FindingsListName" xml:space="preserve">
     <value>Problems</value>
   </data>
-  <data name="MetadataListName" xml:space="preserve">
-    <value>Metadata</value>
-  </data>
-  <data name="MetadataHeaderFormat" xml:space="preserve">
-    <value>Metadata ({0:N0})</value>
-    <comment>{0} is the number of metadata keys.</comment>
-  </data>
-  <data name="NoMetadata" xml:space="preserve">
-    <value>No metadata</value>
-  </data>
   <data name="NoSongIni" xml:space="preserve">
     <value>This folder has no song.ini</value>
   </data>
@@ -168,10 +158,6 @@
   </data>
   <data name="NoOtherFiles" xml:space="preserve">
     <value>No other files</value>
-  </data>
-  <data name="StoredMillisecondsFormat" xml:space="preserve">
-    <value>Stored value: {0} (milliseconds)</value>
-    <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the value as stored, e.g. "225123".</comment>
   </data>
   <data name="OutputLabel" xml:space="preserve">
     <value>Output</value>
@@ -347,10 +333,6 @@
     <value>Skipped because {0} was already written by "{1}" in this job.</value>
     <comment>{0} is the output path; {1} the earlier item's path relative to the scanned folder.</comment>
   </data>
-  <data name="DistinctValues" xml:space="preserve">
-    <value>&lt;&lt;contains distinct values&gt;&gt;</value>
-    <comment>Shown for a metadata row whose value differs between the selected items, or that some of them don't have.</comment>
-  </data>
   <data name="BulkSubtitleFormat" xml:space="preserve">
     <value>{0:N0} .sng files · {1:N0} folders</value>
     <comment>{0} is the number of selected .sng files; {1} the number of selected song folders.</comment>
@@ -370,53 +352,11 @@
   <data name="UnsavedToolTip" xml:space="preserve">
     <value>This item has unsaved changes</value>
   </data>
-  <data name="AddRowButton" xml:space="preserve">
-    <value>Add row</value>
-  </data>
-  <data name="AddButton" xml:space="preserve">
-    <value>Add</value>
-  </data>
-  <data name="NewKeyWatermark" xml:space="preserve">
-    <value>Key</value>
-  </data>
-  <data name="NewKeyToolTip" xml:space="preserve">
-    <value>Pick a known key, or type your own</value>
-  </data>
-  <data name="NewValueWatermark" xml:space="preserve">
-    <value>Value</value>
-  </data>
   <data name="EditValueToolTip" xml:space="preserve">
     <value>Click to edit</value>
   </data>
-  <data name="RevertRowToolTip" xml:space="preserve">
-    <value>Undo the changes to this row</value>
-  </data>
-  <data name="RemoveRowToolTip" xml:space="preserve">
-    <value>Remove this row</value>
-  </data>
-  <data name="AutoSetLengthToolTip" xml:space="preserve">
-    <value>Set each song's length to its longest part (the chart's last note, the longest audio track or the background video) plus 1 second</value>
-  </data>
-  <data name="AutoSetLengthButton" xml:space="preserve">
-    <value>Auto-set song length</value>
-  </data>
   <data name="AutoSetLengthFailedFormat" xml:space="preserve">
     <value>Couldn't work out the length of {0} song(s); they were left as they are.</value>
-  </data>
-  <data name="ValueEmpty" xml:space="preserve">
-    <value>Enter a value, or remove the row instead.</value>
-  </data>
-  <data name="ValueForbidden" xml:space="preserve">
-    <value>Values can't contain ; or line breaks.</value>
-  </data>
-  <data name="KeyEmpty" xml:space="preserve">
-    <value>Enter a key.</value>
-  </data>
-  <data name="KeyForbidden" xml:space="preserve">
-    <value>Keys can't contain ;, = or line breaks.</value>
-  </data>
-  <data name="KeyExists" xml:space="preserve">
-    <value>This key already exists. Edit its row instead.</value>
   </data>
   <data name="SngHasErrorsFormat" xml:space="preserve">
     <value>Editing is off: "{0}" has structural errors.</value>
@@ -1256,28 +1196,6 @@
     <value>{0} {1}</value>
     <comment>{0} is a difficulty, {1} an instrument, e.g. 'Expert Guitar'.</comment>
   </data>
-  <data name="InstrumentsListName" xml:space="preserve">
-    <value>Instrument difficulties</value>
-    <comment>Accessible name of the instrument icons above the metadata rows.</comment>
-  </data>
-  <data name="InstrumentsShowAllFormat" xml:space="preserve">
-    <value>Show all ({0} more)</value>
-    <comment>{0} is how many instruments are hidden: not charted, with no difficulty set.</comment>
-  </data>
-  <data name="InstrumentsShowFewer" xml:space="preserve">
-    <value>Show fewer</value>
-  </data>
-  <data name="InstrumentCaptionSeparator" xml:space="preserve">
-    <value> - </value>
-    <comment>Between an instrument's name and its charted difficulties' letters, e.g. 'Guitar - EMHX'.</comment>
-  </data>
-  <data name="InstrumentNotCharted" xml:space="preserve">
-    <value>The chart has no notes for this part.</value>
-  </data>
-  <data name="InstrumentAccessibleNameFormat" xml:space="preserve">
-    <value>{0}, difficulty {1}</value>
-    <comment>{0} is an instrument, {1} its song.ini difficulty, e.g. 'Guitar, difficulty 4'.</comment>
-  </data>
   <data name="NoteCountLineFormat" xml:space="preserve">
     <value>{0}: {1}</value>
     <comment>One line of a note count tooltip: {0} is a difficulty or harmony line, {1} its count, e.g. 'Expert: 1,234 notes'.</comment>
@@ -1285,33 +1203,6 @@
   <data name="MergeNoteCountSeparator" xml:space="preserve">
     <value> · </value>
     <comment>Goes between a merge cell's note counts, e.g. '312 · 640 · 980 · 1,234'.</comment>
-  </data>
-  <data name="DifficultyUnsetBadge" xml:space="preserve">
-    <value>?</value>
-    <comment>The badge of an instrument with no difficulty set.</comment>
-  </data>
-  <data name="DifficultyDistinctBadge" xml:space="preserve">
-    <value>*</value>
-    <comment>The badge of an instrument whose difficulty differs between the selected songs.</comment>
-  </data>
-  <data name="DifficultyUnsetToolTip" xml:space="preserve">
-    <value>No difficulty (stored as -1)</value>
-  </data>
-  <data name="DifficultyDistinctToolTip" xml:space="preserve">
-    <value>The selected songs have different difficulties.</value>
-  </data>
-  <data name="DifficultyStoredValueFormat" xml:space="preserve">
-    <value>Stored as "{0}", which isn't a difficulty.</value>
-    <comment>{0} is the value in song.ini.</comment>
-  </data>
-  <data name="DifficultyOtherLabel" xml:space="preserve">
-    <value>Other</value>
-  </data>
-  <data name="DifficultySetButton" xml:space="preserve">
-    <value>Set</value>
-  </data>
-  <data name="DifficultyRevertButton" xml:space="preserve">
-    <value>Revert</value>
   </data>
   <data name="MergeButton" xml:space="preserve">
     <value>Merge</value>
@@ -2164,13 +2055,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>{0:0.0} ms/px</value>
     <comment>The Ctrl+drag speed setting's value: {0} is milliseconds of the song for each pixel dragged.</comment>
   </data>
-  <data name="IssueSongCountFormat" xml:space="preserve">
-    <value>{0} ({1} of {2} songs)</value>
-    <comment>A metadata row's validation message with several songs selected: {0} is the message, {1} how many of the songs fail, {2} how many are selected.</comment>
-  </data>
-  <data name="HiddenIssuesListName" xml:space="preserve">
-    <value>Difficulties that fail validation</value>
-  </data>
   <data name="SaveInvalidTitle" xml:space="preserve">
     <value>Save metadata that fails validation?</value>
   </data>
@@ -2337,14 +2221,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorTypeUnreadable" xml:space="preserve">
     <value>Couldn't be read</value>
     <comment>A song whose metadata couldn't be read at all.</comment>
-  </data>
-  <data name="QuickFixMenu" xml:space="preserve">
-    <value>Quick Fix</value>
-    <comment>Right-click menu item on a metadata row that applies the row's quick fix to the draft; disabled when it has none.</comment>
-  </data>
-  <data name="QuickFixMenuFormat" xml:space="preserve">
-    <value>Quick Fix: {0}</value>
-    <comment>Right-click menu item on a metadata row. {0} is what the fix does, e.g. "Change to True".</comment>
   </data>
   <data name="ChartBuilderMissingFormat" xml:space="preserve">
     <value>Chart Builder isn't installed. It should be at {0}.</value>

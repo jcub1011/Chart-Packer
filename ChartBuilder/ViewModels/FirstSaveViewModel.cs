@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
@@ -12,21 +11,17 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartBuilder.ViewModels
 {
     /// <summary>
-    /// A new chart's first save (charter-spec C1, The first save): the song's name and artist, and where its song folder
-    /// goes, a parent folder and a folder name. The folder name follows "artist - name" until it's edited, and an existing
-    /// folder can never be chosen.
+    /// A new chart's first save (charter-spec C1, The first save): where its song folder goes, a parent folder and a folder
+    /// name. The folder name starts as "artist - name", from the name and artist set in the Chart Inspector, and an
+    /// existing folder can never be chosen.
     /// </summary>
     public sealed partial class FirstSaveViewModel : ViewModelBase
     {
         private readonly IFolderPickerService _folders;
 
-        // Whether the user has typed a folder name of their own, which the name and artist then leave alone.
-        private bool _folderNameEdited;
-        private bool _following;
-
         /// <param name="folders">Picks the parent folder.</param>
-        /// <param name="name">The song's name to start with, such as the first stem's title tag.</param>
-        /// <param name="artist">The artist to start with.</param>
+        /// <param name="name">The song's name, as the Chart Inspector has it.</param>
+        /// <param name="artist">The artist, as the Chart Inspector has it.</param>
         /// <param name="parentFolder">The parent folder to start with: the last one used, or Chart Packer's library folder.</param>
         public FirstSaveViewModel(IFolderPickerService folders, string name, string artist, string? parentFolder)
         {
@@ -34,16 +29,17 @@ namespace ChartBuilder.ViewModels
             Name = name;
             Artist = artist;
             ParentFolder = parentFolder ?? "";
-            FollowName();
+            FolderName = NewChartFolder.NameFor(artist, name);
         }
 
         /// <summary>The song's name, <c>name</c> in <c>song.ini</c>.</summary>
-        [ObservableProperty]
-        public partial string Name { get; set; }
+        public string Name { get; }
 
         /// <summary>The artist, <c>artist</c> in <c>song.ini</c>.</summary>
-        [ObservableProperty]
-        public partial string Artist { get; set; }
+        public string Artist { get; }
+
+        /// <summary>The song being saved, as "Artist – Name".</summary>
+        public string SongTitle => $"{Artist} – {Name}";
 
         /// <summary>The folder the song's folder is made in.</summary>
         [ObservableProperty]
@@ -73,35 +69,11 @@ namespace ChartBuilder.ViewModels
 
         public bool HasProblem => Problem is not null;
 
-        /// <summary>The values the save writes to <c>song.ini</c>: the name and artist, those that aren't empty.</summary>
-        public IReadOnlyList<KeyValuePair<string, string>> Values
-        {
-            get
-            {
-                var values = new List<KeyValuePair<string, string>>();
-                if (Name.Trim() is { Length: > 0 } name)
-                    values.Add(KeyValuePair.Create("name", name));
-                if (Artist.Trim() is { Length: > 0 } artist)
-                    values.Add(KeyValuePair.Create("artist", artist));
-                return values;
-            }
-        }
-
         /// <summary>Where the song folder is made, once the user chose Save.</summary>
         public NewSongTarget Target => new(ParentFolder, FolderName);
 
         /// <summary>Raised when the user chooses Save, with a place that has no problem.</summary>
         public event System.EventHandler? Saved;
-
-        partial void OnNameChanged(string value) => FollowName();
-
-        partial void OnArtistChanged(string value) => FollowName();
-
-        partial void OnFolderNameChanged(string value)
-        {
-            if (!_following)
-                _folderNameEdited = value != NewChartFolder.NameFor(Artist ?? "", Name ?? "");
-        }
 
         [RelayCommand]
         private async Task BrowseAsync()
@@ -115,21 +87,5 @@ namespace ChartBuilder.ViewModels
         private void Save() => Saved?.Invoke(this, System.EventArgs.Empty);
 
         private bool CanSave() => !HasProblem;
-
-        // The folder name follows the name and artist until the user types their own.
-        private void FollowName()
-        {
-            if (_folderNameEdited || Name is null || Artist is null)
-                return;
-            _following = true;
-            try
-            {
-                FolderName = NewChartFolder.NameFor(Artist, Name);
-            }
-            finally
-            {
-                _following = false;
-            }
-        }
     }
 }

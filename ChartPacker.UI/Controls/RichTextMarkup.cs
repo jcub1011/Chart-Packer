@@ -4,7 +4,7 @@ using Avalonia.Controls.Documents;
 using Avalonia.Media;
 using ChartPacker.Core.Text;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// Shows text containing Clone Hero/YARG rich-text tags (<c>&lt;color=…&gt;</c>, <c>&lt;b&gt;</c>, …)

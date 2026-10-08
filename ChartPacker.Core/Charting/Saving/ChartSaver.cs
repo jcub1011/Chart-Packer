@@ -12,12 +12,14 @@ namespace ChartPacker.Core.Charting.Saving;
 /// <param name="SongIniChanges">The pending <c>song.ini</c> changes the save makes: those the user hasn't reverted.</param>
 /// <param name="ChartName">The name <c>notes.mid</c> is stored under: the song's own <c>notes.mid</c>'s, or <c>notes.mid</c>.</param>
 /// <param name="RemoveChart">An imported <c>notes.chart</c>'s stored name, when the save removes it; null otherwise.</param>
+/// <param name="AlbumArt">The album art the save puts in place of the song's, or removes; null to leave it as it is.</param>
 public sealed record ChartSaveRequest(
     EditableChart Snapshot,
     ChartReadOptions After,
     IReadOnlyList<PendingSongIniChange> SongIniChanges,
     string ChartName = ChartFiles.MidiName,
-    string? RemoveChart = null);
+    string? RemoveChart = null,
+    AlbumArtChange? AlbumArt = null);
 
 /// <summary>Where a new chart's first save makes its song folder (charter-spec C1, The first save).</summary>
 public sealed record NewSongTarget(string ParentFolder, string FolderName)
@@ -38,7 +40,7 @@ public static class ChartSaver
     /// <summary>
     /// What saving <paramref name="snapshot"/>, a clone of <paramref name="song"/>'s chart, writes: with
     /// <paramref name="changes"/> made to <c>song.ini</c>, which the read-back check reads the chart as, and the chart
-    /// stored under the song's own <c>notes.mid</c>'s name.
+    /// stored under the song's own <c>notes.mid</c>'s name, and the song's album art change.
     /// </summary>
     /// <param name="removeChart">An imported <c>notes.chart</c>'s stored name, when the save removes it.</param>
     public static ChartSaveRequest RequestFor(EditorSong song, EditableChart snapshot, IReadOnlyList<PendingSongIniChange> changes, string? removeChart = null)
@@ -50,7 +52,7 @@ public static class ChartSaver
         string chartName = song.Opened is { ChartName: var name } && name.Equals(ChartFiles.MidiName, StringComparison.OrdinalIgnoreCase)
             ? name
             : ChartFiles.MidiName;
-        return new ChartSaveRequest(snapshot, after, changes, chartName, removeChart);
+        return new ChartSaveRequest(snapshot, after, changes, chartName, removeChart, song.AlbumArt);
     }
 
     /// <summary>
@@ -66,9 +68,12 @@ public static class ChartSaver
         var pairs = PendingSongIniChanges.Apply(song.Pairs, request.SongIniChanges);
         var stored = (song.Opened?.StoredNames ?? StoredNamesOf(entry))
             .Where(n => request.RemoveChart is null || !n.Equals(request.RemoveChart, StringComparison.OrdinalIgnoreCase))
+            .Where(n => request.AlbumArt is null || !AlbumArt.IsAlbumArtName(n))
             .ToList();
         if (!stored.Contains(request.ChartName, StringComparer.OrdinalIgnoreCase))
             stored.Add(request.ChartName);
+        if (request.AlbumArt is { SourcePath: { } art } && AlbumArt.StoredNameFor(art) is { } artName && !stored.Contains(artName, StringComparer.OrdinalIgnoreCase))
+            stored.Add(artName);
 
         return new OpenedSong(
             entry,
@@ -92,7 +97,7 @@ public static class ChartSaver
 
     /// <summary>
     /// The draft that saves <paramref name="request"/>: the chart, staged at <paramref name="stagedChart"/>, replacing
-    /// the song's; the imported <c>notes.chart</c> removed, if it's to be; and the <c>song.ini</c> changes.
+    /// the song's; the imported <c>notes.chart</c> removed, if it's to be; the album art; and the <c>song.ini</c> changes.
     /// </summary>
     public static MetadataDraft DraftFor(ChartSaveRequest request, string stagedChart, long length)
     {
@@ -102,6 +107,13 @@ public static class ChartSaver
         draft.AddFile(new AddedFile(request.ChartName, stagedChart, length));
         if (request.RemoveChart is { } removed)
             draft.RemoveFile(removed);
+        if (request.AlbumArt is { } art)
+        {
+            if (art.SourcePath is { } source)
+                draft.SetAlbumArt(source);
+            else
+                draft.RemoveAlbumArt();
+        }
         foreach (var change in request.SongIniChanges)
         {
             if (change.Value is { } value)
@@ -168,6 +180,7 @@ public static class ChartSaver
                 NotesMid = written.Bytes,
                 SongIni = PendingSongIniChanges.Apply([], request.SongIniChanges),
                 Stems = stems,
+                AlbumArtPath = request.AlbumArt?.SourcePath,
             },
             cancellationToken);
     }

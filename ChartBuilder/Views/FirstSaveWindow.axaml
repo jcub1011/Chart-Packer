@@ -17,16 +17,15 @@
         ShowInTaskbar="False"
         Width="520">
 
-    <!-- A new chart's first save (charter-spec C1): the song's name and artist, and where its folder goes. -->
+    <!-- A new chart's first save (charter-spec C1): where its folder goes. Its name and artist are set in the Chart
+         Inspector, and shown here. -->
     <StackPanel Margin="20" Spacing="14">
         <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.FirstSaveIntro}" />
 
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-            <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" VerticalAlignment="Center" Text="{x:Static res:Strings.FirstSaveNameLabel}" />
-            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name}" AutomationProperties.Name="{x:Static res:Strings.FirstSaveNameLabel}" />
-            <TextBlock Grid.Row="1" Grid.Column="0" Classes="caption" VerticalAlignment="Center" Text="{x:Static res:Strings.FirstSaveArtistLabel}" />
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Artist}" AutomationProperties.Name="{x:Static res:Strings.FirstSaveArtistLabel}" />
-        </Grid>
+        <StackPanel Spacing="6">
+            <TextBlock Classes="caption" Text="{x:Static res:Strings.FirstSaveSongLabel}" />
+            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding SongTitle}" />
+        </StackPanel>
 
         <StackPanel Spacing="6">
             <TextBlock Classes="caption" Text="{x:Static res:Strings.FirstSaveParentLabel}" />

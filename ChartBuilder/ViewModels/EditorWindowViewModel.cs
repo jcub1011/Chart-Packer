@@ -76,6 +76,7 @@ namespace ChartBuilder.ViewModels
             Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);
             Sections = new SectionsViewModel(Editor);
+            Inspector = new ChartInspectorViewModel(song, _undo, Findings, services.ImagePicker);
             Findings.Changed += (_, _) => RefreshSaveState();
             Editor.AudioAssist.ShowMessagesRequested += (_, _) => _ = ShowMessagesAsync();
             Song.Changed += OnSongChanged;
@@ -145,6 +146,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>The Sections tab: the chart's sections and other text events.</summary>
         public SectionsViewModel Sections { get; }
 
+        /// <summary>The Chart Inspector tab: the song's metadata, album art, tracks and files (charter-spec C1, §4.5).</summary>
+        public ChartInspectorViewModel Inspector { get; }
+
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
         public LaneDockViewModel Lanes => Editor.Lanes;
 
@@ -159,6 +163,10 @@ namespace ChartBuilder.ViewModels
 
         [ObservableProperty]
         public partial bool IsLeftPanelCollapsed { get; set; }
+
+        /// <summary>The left panel's tab shown: the Chart Inspector (0), Chart settings or Sections.</summary>
+        [ObservableProperty]
+        public partial int LeftPanelTab { get; set; }
 
         [ObservableProperty]
         public partial bool IsRightPanelCollapsed { get; set; }
@@ -258,6 +266,7 @@ namespace ChartBuilder.ViewModels
             Song.Changed -= OnSongChanged;
             Findings.Dispose();
             Sections.Dispose();
+            Inspector.Dispose();
             Editor.Dispose();
             Audio.Dispose();
             Playback.Dispose();
@@ -305,7 +314,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// Measures the song's audio for <c>song_length</c>, off the UI thread, and for a new chart reads its first stem's
-        /// title and artist, which its first save starts from (charter-spec C1).
+        /// tags, which the Chart Inspector starts its name, artist, album, genre and year from (charter-spec C1).
         /// </summary>
         private async Task MeasureAudioAsync()
         {
@@ -327,7 +336,7 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        // The first stem's title and artist tags, as song.ini's name and artist.
+        // The first stem's tags, as song.ini's name, artist, album, genre and year.
         private static IReadOnlyList<KeyValuePair<string, string>> TagsOf(IReadOnlyList<SongTrack> tracks)
         {
             foreach (var track in tracks)
@@ -339,10 +348,12 @@ namespace ChartBuilder.ViewModels
                     if (AudioFileInfo.Read(path) is not { } info)
                         continue;
                     var tags = new List<KeyValuePair<string, string>>();
-                    if (!string.IsNullOrWhiteSpace(info.Title))
-                        tags.Add(KeyValuePair.Create("name", info.Title.Trim()));
-                    if (!string.IsNullOrWhiteSpace(info.Artist))
-                        tags.Add(KeyValuePair.Create("artist", info.Artist.Trim()));
+                    foreach (var (key, value) in (ReadOnlySpan<(string, string?)>)[("name", info.Title), ("artist", info.Artist), ("album", info.Album), ("genre", info.Genre), ("year", info.Year)])
+                    {
+                        if (!string.IsNullOrWhiteSpace(value))
+                            tags.Add(KeyValuePair.Create(key, value.Trim()));
+                    }
+
                     return tags;
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

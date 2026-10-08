@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
 
@@ -46,6 +47,12 @@ public sealed record RecoveryManifest(
 
     /// <summary>The suggested ratings chosen and not yet saved, by <c>diff_*</c> key (charter-spec C18 item 3).</summary>
     public IReadOnlyList<KeyValuePair<string, int>> Ratings { get; init; } = [];
+
+    /// <summary>The keys edited in the Chart Inspector and not yet saved, each with its value, or null when it's removed.</summary>
+    public IReadOnlyList<KeyValuePair<string, string?>> Edits { get; init; } = [];
+
+    /// <summary>The album art chosen and not yet saved, or a removal (a null path); null when it's left as it is.</summary>
+    public AlbumArtChange? AlbumArt { get; init; }
 }
 
 /// <summary>A recovery file found in the store.</summary>
@@ -266,6 +273,10 @@ public sealed class RecoveryStore(string folder)
             json["delayMs"] = delay;
         if (m.Ratings.Count > 0)
             json["ratings"] = new JsonArray([.. m.Ratings.Select(r => (JsonNode)new JsonArray(JsonValue.Create(r.Key), JsonValue.Create(r.Value)))]);
+        if (m.Edits.Count > 0)
+            json["edits"] = Pairs(m.Edits);
+        if (m.AlbumArt is { } art)
+            json["albumArt"] = new JsonObject { ["path"] = art.SourcePath };
         if (m.ChartFile is { } chart)
         {
             json["chartFile"] = new JsonObject
@@ -311,6 +322,8 @@ public sealed class RecoveryStore(string folder)
             {
                 DelayMs = json["delayMs"]?.GetValue<long>(),
                 Ratings = [.. (json["ratings"] as JsonArray ?? []).OfType<JsonArray>().Select(r => KeyValuePair.Create(r[0]!.GetValue<string>(), r[1]!.GetValue<int>()))],
+                Edits = Pairs(json["edits"]),
+                AlbumArt = json["albumArt"] is JsonObject art ? new AlbumArtChange(art["path"]?.GetValue<string>()) : null,
             };
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException or NullReferenceException or JsonException)

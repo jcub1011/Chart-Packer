@@ -36,6 +36,9 @@ public enum PendingChangeReason
 
     /// <summary>A part's suggested rating, which the user chose to use (charter-spec C18 item 3).</summary>
     SuggestedRating,
+
+    /// <summary>A value the user set or removed in the Chart Inspector.</summary>
+    UserEdit,
 }
 
 /// <summary>A change to <c>song.ini</c> that saving makes, and why.</summary>
@@ -81,6 +84,12 @@ public sealed record PendingSongIniInputs(IReadOnlySet<ChartInstrument> LoadedPa
     /// <c>song.ini</c> has; never written without the user's say-so.
     /// </summary>
     public IReadOnlyDictionary<string, int> Ratings { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>
+    /// The keys the user edited in the Chart Inspector, each with its new value or null when it's removed, in place of
+    /// what <c>song.ini</c> has and anything else would change it to, but for a key the chart decides.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string?>> Edits { get; init; } = [];
 }
 
 /// <summary>
@@ -108,10 +117,50 @@ public static class PendingSongIniChanges
 
     /// <summary>
     /// The changes <paramref name="chart"/> and <paramref name="inputs"/> call for, in the order they're listed: the
-    /// values the song has nowhere else, <c>charter</c>, <c>delay</c>, <c>song_length</c>, the parts' ratings in part
-    /// order, the drum keys, an import's sustain cutoff, then <c>multiplier_note</c>.
+    /// user's edits, the values the song has nowhere else, <c>charter</c>, <c>delay</c>, <c>song_length</c>, the parts'
+    /// ratings in part order, the drum keys, an import's sustain cutoff, then <c>multiplier_note</c>.
     /// </summary>
+    /// <remarks>
+    /// An edit takes the place of every other change to its key, but for a key the chart decides
+    /// (<see cref="IsChartOwned"/>), whose edit is left out. An edit that leaves the key as <c>song.ini</c> has it is
+    /// listed as no change at all.
+    /// </remarks>
     public static IReadOnlyList<PendingSongIniChange> Of(EditableChart chart, PendingSongIniInputs inputs)
+    {
+        var computed = Computed(chart, inputs);
+        if (inputs.Edits.Count == 0)
+            return computed;
+
+        var edits = new List<PendingSongIniChange>();
+        foreach (var (key, value) in inputs.Edits)
+        {
+            if (IsChartOwned(key, chart, inputs) || edits.Any(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)))
+                continue;
+            computed.RemoveAll(c => c.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+            if (value != SongIniValues.Last(inputs.Pairs, key))
+                edits.Add(new PendingSongIniChange(key, value, PendingChangeReason.UserEdit));
+        }
+
+        return [.. edits, .. computed];
+    }
+
+    /// <summary>
+    /// Whether <paramref name="key"/> is decided by the chart, so that an edit to it would save a chart that plays
+    /// differently from what the editor shows: <c>multiplier_note</c> (the chart's star power is saved on 116), the
+    /// drum layout keys while the chart has drums, and an import's <c>sustain_cutoff_threshold</c>.
+    /// </summary>
+    public static bool IsChartOwned(string key, EditableChart chart, PendingSongIniInputs inputs)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(inputs);
+        bool Is(params string[] keys) => keys.Any(k => k.Equals(key, StringComparison.OrdinalIgnoreCase));
+        return Is("multiplier_note", "star_power_note")
+            || (Is("pro_drum", "pro_drums", "five_lane_drums") && chart.PartOf(ChartInstrument.Drums) is not null && chart.DrumsVariant is not null)
+            || (Is("sustain_cutoff_threshold") && inputs.Import?.Options.SustainCutoff is not null);
+    }
+
+    private static List<PendingSongIniChange> Computed(EditableChart chart, PendingSongIniInputs inputs)
     {
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(inputs);

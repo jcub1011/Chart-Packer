@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// Focuses a control whenever it becomes visible, selecting a <see cref="TextBox"/>'s text, so an

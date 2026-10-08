@@ -59,6 +59,7 @@ namespace ChartBuilder.ViewModels
             PendingChangeReason.MultiplierNote => Strings.PendingReasonMultiplierNote,
             PendingChangeReason.DelayFromDownbeat => Strings.PendingReasonDelayFromDownbeat,
             PendingChangeReason.SuggestedRating => Strings.PendingReasonSuggestedRating,
+            PendingChangeReason.UserEdit => Strings.PendingReasonUserEdit,
             _ => "",
         };
     }

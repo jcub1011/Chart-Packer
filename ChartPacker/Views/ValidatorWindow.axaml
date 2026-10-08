@@ -357,8 +357,8 @@
                                                FontSize="11"
                                                VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
-                                               ctl:RichTextMarkup.Prefix="{Binding BylinePrefix}"
-                                               ctl:RichTextMarkup.Text="{Binding Charter}"
+                                               ui:RichTextMarkup.Prefix="{Binding BylinePrefix}"
+                                               ui:RichTextMarkup.Text="{Binding Charter}"
                                                IsVisible="{Binding ShowByline}" />
 
                                     <Border Grid.Row="0" Grid.Column="2"

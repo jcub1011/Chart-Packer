@@ -4,7 +4,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Media;
 using ChartPacker.Core.Charts;
 
-namespace ChartPacker.Converters
+namespace ChartPacker.UI.Converters
 {
     /// <summary>
     /// Maps a difficulty to its colour: a <see cref="ChartDifficulty"/>, or a song.ini tier (an

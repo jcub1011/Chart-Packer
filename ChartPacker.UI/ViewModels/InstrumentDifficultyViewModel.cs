@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -6,14 +5,13 @@ using ChartPacker.Core.Charts;
 using ChartPacker.Core.Library;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Resources;
-using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-namespace ChartPacker.ViewModels
+namespace ChartPacker.UI.ViewModels
 {
     /// <summary>A charted difficulty's letter under an instrument's icon, coloured by <see cref="Difficulty"/>.</summary>
-    public sealed record DifficultyLetter(ChartDifficulty Difficulty, string Text);
+    public sealed record ChartedDifficultyLetter(ChartDifficulty Difficulty, string Text);
 
     /// <summary>A line of an instrument's note counts: a difficulty or harmony line, and how many notes it has.</summary>
     public sealed record NoteCountRow(string Label, string Count);
@@ -28,24 +26,24 @@ namespace ChartPacker.ViewModels
 
         public IRelayCommand Command { get; } = command;
 
-        /// <summary>It's the difficulty every selected song has.</summary>
+        /// <summary>It's the difficulty every song shown has.</summary>
         [ObservableProperty]
         public partial bool IsCurrent { get; set; }
     }
 
     /// <summary>
-    /// An instrument's icon above the metadata rows: its song.ini difficulty, merged across the
-    /// selected songs, as a badge; its name and the difficulties its chart has notes for as a caption;
-    /// and a flyout that sets the difficulty through <see cref="SongDetailViewModel"/>.
+    /// An instrument's icon above the metadata rows: its song.ini difficulty, merged across the songs shown, as a badge;
+    /// its name and the difficulties its chart has notes for as a caption; and a flyout that sets the difficulty through
+    /// <see cref="MetadataEditorViewModel"/>.
     /// </summary>
     public sealed partial class InstrumentDifficultyViewModel : ObservableObject
     {
         /// <summary>The tiers offered as buttons; any other is typed.</summary>
         private const int MaxPresetTier = 6;
 
-        private readonly SongDetailViewModel _owner;
+        private readonly MetadataEditorViewModel _owner;
 
-        public InstrumentDifficultyViewModel(SongDetailViewModel owner, DifficultySlot slot)
+        public InstrumentDifficultyViewModel(MetadataEditorViewModel owner, DifficultySlot slot)
         {
             _owner = owner;
             Slot = slot;
@@ -53,7 +51,7 @@ namespace ChartPacker.ViewModels
             Tag = ChartLabels.ModifierTag(slot.Modifier);
             Presets =
             [
-                new DifficultyPresetViewModel(null, Strings.DifficultyUnsetBadge, UnsetCommand),
+                new DifficultyPresetViewModel(null, SharedStrings.DifficultyUnsetBadge, UnsetCommand),
                 .. Enumerable.Range(0, MaxPresetTier + 1).Select(t => new DifficultyPresetViewModel(t, t.ToString(CultureInfo.CurrentCulture), SetCommand)),
             ];
         }
@@ -76,13 +74,13 @@ namespace ChartPacker.ViewModels
 
         public IReadOnlyList<DifficultyPresetViewModel> Presets { get; }
 
-        /// <summary>The merged row for the key, or <see langword="null"/> when no selected song has it.</summary>
+        /// <summary>The merged row for the key, or <see langword="null"/> when no song shown has it.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsDistinct), nameof(Tier), nameof(BadgeText), nameof(ValueNote), nameof(HasValueNote), nameof(IsEdited), nameof(AccessibleName))]
         [NotifyCanExecuteChangedFor(nameof(RevertCommand))]
         public partial BulkMetadataRow? Row { get; private set; }
 
-        /// <summary>No selected song will have the difficulty set: each lacks it or holds a negative one.</summary>
+        /// <summary>No song shown will have the difficulty set: each lacks it or holds a negative one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsDistinct), nameof(BadgeText), nameof(ValueNote), nameof(HasValueNote), nameof(AccessibleName))]
         public partial bool IsAllUnset { get; private set; } = true;
@@ -94,7 +92,7 @@ namespace ChartPacker.ViewModels
         /// <summary>The charted difficulties' letters; none when they aren't known, or the part has none.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasLetters))]
-        public partial IReadOnlyList<DifficultyLetter> Letters { get; private set; } = [];
+        public partial IReadOnlyList<ChartedDifficultyLetter> Letters { get; private set; } = [];
 
         /// <summary>Tucked behind Show all: not charted, with no difficulty set, and nothing pending.</summary>
         [ObservableProperty]
@@ -117,37 +115,37 @@ namespace ChartPacker.ViewModels
 
         public bool HasNoteCounts => NoteCounts.Count > 0;
 
-        /// <summary>The selected songs don't all share one value, and not all of them leave it unset.</summary>
+        /// <summary>The songs shown don't all share one value, and not all of them leave it unset.</summary>
         public bool IsDistinct => Row is { IsDistinct: true } && !IsAllUnset;
 
-        /// <summary>The tier every selected song has, or <see langword="null"/> when it's unset, not a number, or differs.</summary>
+        /// <summary>The tier every song shown has, or <see langword="null"/> when it's unset, not a number, or differs.</summary>
         public int? Tier => Row is { Value: { } value } ? MetadataDifficulty.TierOf(value) : null;
 
-        public string BadgeText => IsDistinct ? Strings.DifficultyDistinctBadge
+        public string BadgeText => IsDistinct ? SharedStrings.DifficultyDistinctBadge
             : Tier is { } tier ? tier.ToString(CultureInfo.CurrentCulture)
-            : Strings.DifficultyUnsetBadge;
+            : SharedStrings.DifficultyUnsetBadge;
 
         /// <summary>A note on the value for the tooltip: it differs, or what's stored isn't a difficulty.</summary>
         public string? ValueNote =>
-            IsDistinct ? Strings.DifficultyDistinctToolTip
-            : IsAllUnset ? Strings.DifficultyUnsetToolTip
-            : Row is { Value: { } value } && Tier is null ? string.Format(CultureInfo.CurrentCulture, Strings.DifficultyStoredValueFormat, value)
+            IsDistinct ? SharedStrings.DifficultyDistinctToolTip
+            : IsAllUnset ? SharedStrings.DifficultyUnsetToolTip
+            : Row is { Value: { } value } && Tier is null ? string.Format(CultureInfo.CurrentCulture, SharedStrings.DifficultyStoredValueFormat, value)
             : null;
 
         public bool HasValueNote => ValueNote is not null;
 
-        /// <summary>A selected song has a pending change to the difficulty.</summary>
+        /// <summary>A song shown has a pending change to the difficulty.</summary>
         public bool IsEdited => Row is { State: not MetadataRowState.Unchanged };
 
-        public bool CanEdit => _owner.CanEdit;
+        public bool CanEdit => _owner.CanEdit && _owner.CanEditKey(Key);
 
-        public string AccessibleName => string.Format(CultureInfo.CurrentCulture, Strings.InstrumentAccessibleNameFormat, Name, BadgeText);
+        public string AccessibleName => string.Format(CultureInfo.CurrentCulture, SharedStrings.InstrumentAccessibleNameFormat, Name, BadgeText);
 
         /// <summary>
         /// Takes the merged state after the drafts or the chart changed. <paramref name="parts"/> is
         /// <see langword="null"/> when what the chart has isn't known, as for several songs.
         /// </summary>
-        internal void Update(BulkMetadataRow? row, bool isAllUnset, IReadOnlyDictionary<string, ChartPart>? parts)
+        public void Update(BulkMetadataRow? row, bool isAllUnset, IReadOnlyDictionary<string, ChartPart>? parts)
         {
             Row = row;
             IsAllUnset = isAllUnset;
@@ -163,7 +161,7 @@ namespace ChartPacker.ViewModels
                 bool charted = Slot.PartId is { } part ? parts.TryGetValue(part, out read) : parts.Count > 0;
                 IsCharted = charted;
                 var letters = (read?.Difficulties ?? LibraryDifficulties.None).ToDifficulties()
-                    .Select(d => new DifficultyLetter(d, ChartLabels.DifficultyLetter(d)))
+                    .Select(d => new ChartedDifficultyLetter(d, ChartLabels.DifficultyLetter(d)))
                     .ToList();
                 if (!letters.SequenceEqual(Letters))
                     Letters = letters;
@@ -187,10 +185,10 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Shows or hides the icon after Show all was toggled.</summary>
-        internal void RefreshShown() => IsShown = !IsHidden || _owner.ShowAllInstruments;
+        public void RefreshShown() => IsShown = !IsHidden || _owner.ShowAllInstruments;
 
-        /// <summary>Re-evaluates the commands after the panel's editability changed.</summary>
-        internal void RefreshCommands()
+        /// <summary>Re-evaluates the commands after the editor's editability changed.</summary>
+        public void RefreshCommands()
         {
             OnPropertyChanged(nameof(CanEdit));
             SetCommand.NotifyCanExecuteChanged();

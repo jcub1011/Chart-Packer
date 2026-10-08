@@ -151,9 +151,13 @@ engine. Its design decisions are recorded in the spec, as *Settled in CM2* and *
 - **Record mode**, which shifts key presses by the latency
   ([C15](charter-spec-v1.md#c15-editing-ergonomics)). Done in CM5.
 - **Ratings.** CHR083 can't be cleared in the editor until a part can be rated (the Chart
-  Inspector, or C18's suggested rating); CHR080 has no fix until C9's reduction.
-- **The Chart Inspector** is still a placeholder. A new chart's name and artist are asked for at
-  its first save.
+  Inspector, or C18's suggested rating); CHR080 has no fix until C9's reduction. Done since: the
+  Chart Inspector rates parts.
+- **The Chart Inspector** was a placeholder. Done since: it edits the song's metadata, ratings,
+  delay and album art, and lists its tracks and files, sharing Chart Packer's metadata section
+  (`MetadataEditorViewModel` in `ChartPacker.UI`). Adding, replacing and removing tracks and files
+  there is still to do. A new chart's name and artist are set in it, and its first save asks only
+  where the folder goes.
 - **Device IDs on macOS and Linux.** A Core Audio device UID and a PulseAudio or PipeWire sink
   name would make those platforms' keys survive renames. They need testing on those platforms.
 - **Space as a tap** in the tap test, should a later Avalonia make raw input timestamps public.

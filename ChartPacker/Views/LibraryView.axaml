@@ -485,8 +485,8 @@
                                            IsVisible="{Binding ShowDetails}" />
                                 <TextBlock Grid.Row="1" Grid.Column="0"
                                            Classes="muted"
-                                           ctl:RichTextMarkup.Prefix="{Binding BylinePrefix}"
-                                           ctl:RichTextMarkup.Text="{Binding Charter}"
+                                           ui:RichTextMarkup.Prefix="{Binding BylinePrefix}"
+                                           ui:RichTextMarkup.Text="{Binding Charter}"
                                            FontSize="11"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis"

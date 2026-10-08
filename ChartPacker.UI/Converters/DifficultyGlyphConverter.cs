@@ -4,7 +4,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Media;
 using ChartPacker.Core.Metadata;
 
-namespace ChartPacker.Converters
+namespace ChartPacker.UI.Converters
 {
     /// <summary>Maps a <see cref="DifficultyGlyph"/> to the icon geometry of its instrument.</summary>
     public sealed class DifficultyGlyphConverter : IValueConverter

@@ -6,17 +6,17 @@ using ChartPacker.Resources;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-namespace ChartPacker.ViewModels
+namespace ChartPacker.UI.ViewModels
 {
     /// <summary>
-    /// A metadata row in the detail panel, merged across every selected song. Clicking the value
-    /// edits it; the change goes into the songs' drafts through <see cref="SongDetailViewModel"/>.
+    /// A metadata row, merged across every song the editor shows. Clicking the value edits it; the change goes to the
+    /// songs through <see cref="MetadataEditorViewModel"/>.
     /// </summary>
     public sealed partial class MetadataRowViewModel : ObservableObject
     {
-        private readonly SongDetailViewModel _owner;
+        private readonly MetadataEditorViewModel _owner;
 
-        public MetadataRowViewModel(SongDetailViewModel owner, BulkMetadataRow row)
+        public MetadataRowViewModel(MetadataEditorViewModel owner, BulkMetadataRow row)
         {
             _owner = owner;
             Key = row.Key;
@@ -31,9 +31,9 @@ namespace ChartPacker.ViewModels
         public bool HasKeyDescription => KeyDescription is not null;
 
         /// <summary>The row is <c>song_length</c>, which can be worked out from the song's files.</summary>
-        public bool IsSongLength => Key.Equals(SongDetailViewModel.SongLengthKey, StringComparison.OrdinalIgnoreCase);
+        public bool IsSongLength => Key.Equals(MetadataEditRules.SongLengthKey, StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>The value as stored, or <see langword="null"/> when the selected songs don't share one.</summary>
+        /// <summary>The value as stored, or <see langword="null"/> when the songs shown don't share one.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsDistinct), nameof(DisplayValue), nameof(ToolTip), nameof(EditPlaceholder), nameof(ShowRichValue), nameof(ShowDistinct))]
         public partial string? Value { get; set; }
@@ -66,7 +66,7 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasHint))]
         public partial string? Hint { get; set; }
 
-        /// <summary>Some selected song has a quick fix for the key, a failure's or a hint's.</summary>
+        /// <summary>Some song shown has a quick fix for the key, a failure's or a hint's.</summary>
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(QuickFixCommand))]
         public partial bool HasQuickFix { get; set; }
@@ -78,8 +78,8 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The right-click menu's Quick Fix item, saying what it does when that's one thing.</summary>
         public string QuickFixHeader => QuickFixDescription is { } description
-            ? string.Format(CultureInfo.CurrentCulture, Strings.QuickFixMenuFormat, description)
-            : Strings.QuickFixMenu;
+            ? string.Format(CultureInfo.CurrentCulture, SharedStrings.QuickFixMenuFormat, description)
+            : SharedStrings.QuickFixMenu;
 
         public bool HasIssue => Issue is not null;
 
@@ -93,7 +93,7 @@ namespace ChartPacker.ViewModels
             get
             {
                 if (Value is null)
-                    return Strings.DistinctValues;
+                    return SharedStrings.DistinctValues;
                 return MetadataTimes.TryFormat(Key, Value, out string? time) ? time : Value;
             }
         }
@@ -106,13 +106,13 @@ namespace ChartPacker.ViewModels
                 if (Value is null)
                     return null;
                 if (MetadataTimes.TryFormat(Key, Value, out _))
-                    return string.Format(CultureInfo.CurrentCulture, Strings.StoredMillisecondsFormat, Value);
+                    return string.Format(CultureInfo.CurrentCulture, SharedStrings.StoredMillisecondsFormat, Value);
                 return RichText.HasMarkup(Value) ? Value : null;
             }
         }
 
         /// <summary>Shown in the empty edit box of a distinct row, so it's clear typing replaces every value.</summary>
-        public string? EditPlaceholder => IsDistinct ? Strings.DistinctValues : null;
+        public string? EditPlaceholder => IsDistinct ? SharedStrings.DistinctValues : null;
 
         /// <summary><c>*</c> for an edited row, <c>+</c> for an added one. Removed rows are struck through instead.</summary>
         public string Marker => State switch
@@ -134,6 +134,15 @@ namespace ChartPacker.ViewModels
 
         public bool ShowDistinct => !IsEditing && IsDistinct;
 
+        /// <summary>Whether the row's actions are shown: the songs can be edited.</summary>
+        public bool ShowActions => _owner.CanEdit;
+
+        /// <summary>The row's Auto Set button: Auto Set for a <c>song_length</c> row, where the editor offers it.</summary>
+        public bool ShowAutoSetLength => IsSongLength && _owner.AutoSetSongLengthCommand is not null;
+
+        /// <summary>Works out <c>song_length</c> from the songs' files; none where the editor doesn't offer it.</summary>
+        public IRelayCommand? AutoSetSongLengthCommand => _owner.AutoSetSongLengthCommand;
+
         /// <summary>Takes the merged state after the drafts changed, keeping this row's identity so its view survives.</summary>
         public MetadataRowViewModel Update(BulkMetadataRow row)
         {
@@ -142,7 +151,7 @@ namespace ChartPacker.ViewModels
             return this;
         }
 
-        /// <summary>Takes the row's validation, from the drafted metadata of every selected song.</summary>
+        /// <summary>Takes the row's validation, from the drafted metadata of every song shown.</summary>
         /// <param name="quickFix">Whether there's a quick fix, and what it does when that's one thing.</param>
         public void SetValidation(string? issue, string? hint, (bool Available, string? Description) quickFix)
         {
@@ -152,16 +161,20 @@ namespace ChartPacker.ViewModels
             QuickFixDescription = quickFix.Available ? quickFix.Description : null;
         }
 
-        /// <summary>Re-evaluates the commands after the panel's editability changed.</summary>
+        /// <summary>Re-evaluates the commands after the editor's editability changed.</summary>
         public void RefreshCommands()
         {
+            OnPropertyChanged(nameof(ShowActions));
             BeginEditCommand.NotifyCanExecuteChanged();
             RemoveCommand.NotifyCanExecuteChanged();
             RevertCommand.NotifyCanExecuteChanged();
             QuickFixCommand.NotifyCanExecuteChanged();
         }
 
-        private bool CanBeginEdit() => _owner.CanEdit && !IsRemoved;
+        // A key the songs decide otherwise, such as a chart's drum layout, reads as any other but can't be changed.
+        private bool CanChange() => _owner.CanEdit && _owner.CanEditKey(Key);
+
+        private bool CanBeginEdit() => CanChange() && !IsRemoved;
 
         [RelayCommand(CanExecute = nameof(CanBeginEdit))]
         private void BeginEdit()
@@ -189,7 +202,7 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            if (SongDetailViewModel.ValidateValue(text) is { } error)
+            if (MetadataEditRules.ValidateValue(text) is { } error)
             {
                 Error = error;
                 return;
@@ -208,7 +221,7 @@ namespace ChartPacker.ViewModels
             Error = null;
         }
 
-        private bool CanRemoveRow() => _owner.CanEdit && CanRemove;
+        private bool CanRemoveRow() => CanChange() && CanRemove;
 
         [RelayCommand(CanExecute = nameof(CanRemoveRow))]
         private void Remove()
@@ -217,7 +230,7 @@ namespace ChartPacker.ViewModels
             _owner.RemoveKey(Key);
         }
 
-        private bool CanRevert() => _owner.CanEdit && IsChanged;
+        private bool CanRevert() => CanChange() && IsChanged;
 
         [RelayCommand(CanExecute = nameof(CanRevert))]
         private void Revert()
@@ -226,9 +239,9 @@ namespace ChartPacker.ViewModels
             _owner.RevertKey(Key);
         }
 
-        private bool CanQuickFix() => _owner.CanEdit && HasQuickFix && !IsRemoved;
+        private bool CanQuickFix() => CanChange() && HasQuickFix && !IsRemoved;
 
-        /// <summary>Applies the key's quick fixes to the selected songs' drafts. Nothing is saved.</summary>
+        /// <summary>Applies the key's quick fixes to the songs' drafts. Nothing is saved.</summary>
         [RelayCommand(CanExecute = nameof(CanQuickFix))]
         private void QuickFix()
         {

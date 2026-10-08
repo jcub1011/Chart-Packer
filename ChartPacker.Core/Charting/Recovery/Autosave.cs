@@ -62,6 +62,8 @@ public static class Autosave
         {
             DelayMs = song.DelayMs,
             Ratings = [.. song.Ratings],
+            Edits = [.. song.Edits],
+            AlbumArt = song.AlbumArt,
         };
     }
 
@@ -78,6 +80,7 @@ public static class Autosave
         var song = EditorSong.Of(opened with { Load = RecoveryStore.ReadChart(file) }, onDisk);
         song.DelayMs = file.Manifest.DelayMs;
         song.SetRatings(file.Manifest.Ratings);
+        song.SetEdits(file.Manifest.Edits, file.Manifest.AlbumArt);
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }
@@ -97,6 +100,7 @@ public static class Autosave
         song.Values = file.Manifest.Values;
         song.DelayMs = file.Manifest.DelayMs;
         song.SetRatings(file.Manifest.Ratings);
+        song.SetEdits(file.Manifest.Edits, file.Manifest.AlbumArt);
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }

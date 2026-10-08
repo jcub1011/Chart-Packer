@@ -1,0 +1,32 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:ChartBuilder.ViewModels"
+                    xmlns:res="using:ChartBuilder.Resources">
+    <!-- A finding's row, as the Findings tab and the Chart Inspector list it: its message, rule and place, with Fix where
+         it has one and Go to. The Editor window styles Border.finding. -->
+    <DataTemplate x:Key="FindingItemTemplate" x:DataType="vm:FindingItem">
+        <Border Classes="finding severity" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
+                <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12" TextWrapping="Wrap" Text="{Binding Message}" />
+                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="muted" FontSize="11" Text="{Binding RuleId}" />
+                    <TextBlock Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Text="{Binding Where}" />
+                </StackPanel>
+                <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <Button Classes="labelled"
+                            FontSize="12"
+                            Content="{x:Static res:Strings.FindingFixButton}"
+                            Command="{Binding FixCommand}"
+                            IsVisible="{Binding CanFix}"
+                            ToolTip.Tip="{x:Static res:Strings.FindingFixToolTip}" />
+                    <Button Classes="labelled"
+                            FontSize="12"
+                            Content="{x:Static res:Strings.FindingGoToButton}"
+                            Command="{Binding GoToCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.FindingGoToToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.FindingGoToToolTip}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </DataTemplate>
+</ResourceDictionary>

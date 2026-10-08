@@ -10,6 +10,7 @@ namespace ChartBuilder.Services
     /// <param name="SettingsWindow">Opens Program settings.</param>
     /// <param name="Confirmations">Asks before a change that loses something, and Save, Discard or Cancel on closing.</param>
     /// <param name="FolderPicker">Picks the folder Export copy writes to, and a new chart's parent folder.</param>
+    /// <param name="ImagePicker">Picks the album art the Chart Inspector puts in place of the song's.</param>
     /// <param name="FirstSave">Asks where a new chart's first save makes its folder.</param>
     /// <param name="MessagesDialog">Shows what the Editor has said this session, from its message bar.</param>
     /// <param name="OpenOutput">Opens the audio output, for playback.</param>
@@ -24,6 +25,7 @@ namespace ChartBuilder.Services
         ISettingsWindowService SettingsWindow,
         IConfirmationService Confirmations,
         IFolderPickerService FolderPicker,
+        IImagePickerService ImagePicker,
         IFirstSaveDialogService FirstSave,
         IMessagesDialogService MessagesDialog,
         Func<int, IAudioOutput> OpenOutput,

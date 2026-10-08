@@ -535,6 +535,14 @@ In the Chart Inspector, a new chart's name and artist are filled from the first 
 has them (`AudioFileInfo.Read`), and its charter from the **Default charter name** setting
 ([§10](#10-settings)).
 
+*Settled after CM5:* the album, genre and year are filled from the tags too. The Chart Inspector's
+edits are pending changes ([C17](#c17-save-and-export) item 2), not undo steps: each is taken back
+with its row's Revert or in Pending changes, as Chart Packer's inspector's are. An edit takes the
+place of whatever else would change its key (the default charter, `song_length`, a rating or a
+delay), and the keys the chart decides (the drum layout keys, `multiplier_note` and an import's
+`sustain_cutoff_threshold`) can't be edited. Its edits count as unsaved changes, so closing asks
+first and autosave keeps them, and nothing in it can be edited while a save runs.
+
 **The tab.** Chart settings is a tab in the Editor's left panel, beside the Chart Inspector. Its
 sections, **Timing** and **Parts**, are one under the other, with each field's label above it, as
 the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on the Chart Inspector.
@@ -607,13 +615,14 @@ the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on th
 
 **The first save** of a new chart ([C17](#c17-save-and-export)).
 
-- It asks for the song's **name and artist**, filled from the first stem's title and artist tags,
-  as there's no Chart Inspector to set them in yet. They're written to `song.ini`.
+- The song's **name and artist** are set in the Chart Inspector. The save can't go ahead until
+  both are set: it says so and brings the Chart Inspector up. The dialog shows them, and starts
+  the folder name from them.
 - It asks where the song folder goes: a parent folder and a folder name.
   - The parent folder is by default the last one used for a new chart, otherwise Chart Packer's
     library root (read from Chart Packer's settings, never written).
-  - The folder name follows `<artist> - <name>` until it is edited, with characters that aren't
-    allowed in a path replaced (`NewChartFolder.NameFor`). It is checked against the `.sng` filename
+  - The folder name starts as `<artist> - <name>`, with characters that aren't allowed in a path
+    replaced (`NewChartFolder.NameFor`). It is checked against the `.sng` filename
     rules (`NewChartFolder.ProblemOf`).
   - An **existing folder is never used or overwritten**. If the name is taken, the save can't go
     ahead, and the dialog says why.
@@ -1794,7 +1803,10 @@ Acceptance criteria:
    - `delay`, from a `.chart` import's Offset ([C2](#c2-open-and-import)), or **Find first downbeat**
      ([C14](#c14-onset-and-beat-assist));
    - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import));
-   - a new chart's name and artist, from its first save ([C1](#c1-new-chart-and-chart-settings));
+   - a new chart's name, artist, album, genre and year, from its first stem's tags
+     ([C1](#c1-new-chart-and-chart-settings));
+   - the Chart Inspector's edits ([C1](#c1-new-chart-and-chart-settings)): any key, a part's rating
+     and `delay`. Its album art change is listed with them when Save asks first;
    - `sustain_cutoff_threshold`, on an import whose sustains need it to stay sustains once they're
      MIDI ([C2](#c2-open-and-import)).
 
