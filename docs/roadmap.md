@@ -21,7 +21,7 @@ its exit criteria. This file owns only the order and the status.
 | 1 | [CM0: Split](#cm0-split) | Done | Exit criteria met | — |
 | 2 | [CM1: Model, writer and lint engine](#cm1-model-writer-and-lint-engine) | Done | Exit criteria met | CM0 |
 | 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | Done | Exit criteria met | CM1 |
-| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | In progress | Core commands, lint, drums in the editor | CM2 |
+| 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | In progress | Core commands, lint, drums in the editor, GHL | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Not started | — | CM2 |
 | 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
 
@@ -176,7 +176,7 @@ It is built in six phases, each reviewed before the next:
 5. **Phrases and events:** the Phrase tool, the `S` key, phrase bands, and the Sections tab.
 6. **Generate fills.**
 
-Phases 1 to 3 are done. Phase 5 also takes disco flip in the editor: drawing a range's notes on the
+Phases 1 to 4 are done. Phase 5 also takes disco flip in the editor: drawing a range's notes on the
 pads the player hits ([C6](charter-spec-v1.md#c6-drums-4-lane-pro-and-5-lane) item 7), and adding
 and resizing ranges. Until then, notes are drawn on the pads the file uses.
 

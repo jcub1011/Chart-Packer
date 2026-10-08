@@ -479,6 +479,10 @@ namespace ChartBuilder.Controls.Editing
                     context.FillRectangle(AlternateRowBrush, Box(from, to, edge, edge + projection.LaneSize));
                 if (i > 0)
                     context.DrawLine(DividerPen, At(from, edge), At(to, edge));
+
+                // A shared column's halves, which a click picks between: GHL's black fret, then its white.
+                if (slots.SharedOf(i) is not null)
+                    context.DrawLine(GridPen, At(from, edge + (projection.LaneSize / 2)), At(to, edge + (projection.LaneSize / 2)));
             }
         }
 
@@ -639,35 +643,52 @@ namespace ChartBuilder.Controls.Editing
                     if (across != bars)
                         continue;
 
-                    var shown = Shown(game, note, drums);
-                    var color = HighwayPalette.NoteColor(kind, laneCount, shown);
-                    double along = projection.AlongOf(session.AudioAt(note.Tick));
-                    Rect rect;
-                    if (across)
+                    // A GHL barre: the black fret covers the top half of its column's white one, as in the game, so it's
+                    // drawn just after it.
+                    if (slots.IsShared(note.Lane) && slots.PartnerOf(note.Lane) is { } white && track.TryGetNote(note.Tick, white, false, out _))
+                        continue;
+                    DrawNote(note, across, barre: false);
+                    if (!across && slots.SharedOf(slots.IndexOf(note.Lane)) is { } black && black != note.Lane && track.TryGetNote(note.Tick, black, false, out var shared))
+                        DrawNote(shared, across: false, barre: true);
+                }
+            }
+
+            void DrawNote(EditableNote note, bool across, bool barre)
+            {
+                var shown = Shown(game, note, drums);
+                var color = HighwayPalette.NoteColor(kind, laneCount, shown);
+                double along = projection.AlongOf(session.AudioAt(note.Tick));
+                Rect rect;
+                if (across)
+                {
+                    double thickness = Math.Max(4, size * 0.45);
+                    rect = Box(along - (thickness / 2), along + (thickness / 2), across1 + 4, across2 - 4);
+                    _gems.DrawBar(context, shown, color, rect, outlined: isGhost);
+                }
+                else
+                {
+                    int column = slots.IndexOf(note.Lane);
+                    if (column < 0)
+                        return;
+                    rect = GemRect(projection, column, along, size);
+                    if (column == slots.Slots.Count - 1 && slots.Across is null && note.Lane == EditorTools.ApartLane(slots))
                     {
-                        double thickness = Math.Max(4, size * 0.45);
-                        rect = Box(along - (thickness / 2), along + (thickness / 2), across1 + 4, across2 - 4);
                         _gems.DrawBar(context, shown, color, rect, outlined: isGhost);
                     }
                     else
                     {
-                        int column = slots.IndexOf(note.Lane);
-                        if (column < 0)
-                            continue;
-                        rect = GemRect(projection, column, along, size);
-                        if (column == slots.Slots.Count - 1 && slots.Across is null && note.Lane == EditorTools.ApartLane(slots))
-                            _gems.DrawBar(context, shown, color, rect, outlined: isGhost);
-                        else
-                            _gems.DrawGem(context, kind, shown, color, rect, outlined: isGhost);
+                        if (barre)
+                            rect = rect.WithHeight(rect.Height / 2);
+                        _gems.DrawGem(context, kind, shown, color, rect, outlined: isGhost);
                     }
-
-                    if (isGhost)
-                        continue;
-                    if (session.Selection.Contains(key, note))
-                        context.DrawRectangle(null, selectedPen, rect.Inflate(2), 3, 3);
-                    if (!bars && kind != ChartInstrumentKind.Drums && flagged.Add(note.Tick) && track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
-                        DrawForcing(context, projection, slots, along, flags);
                 }
+
+                if (isGhost)
+                    return;
+                if (session.Selection.Contains(key, note))
+                    context.DrawRectangle(null, selectedPen, rect.Inflate(2), 3, 3);
+                if (!across && kind != ChartInstrumentKind.Drums && flagged.Add(note.Tick) && track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
+                    DrawForcing(context, projection, slots, along, flags);
             }
         }
 
@@ -703,8 +724,13 @@ namespace ChartBuilder.Controls.Editing
                 && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
             var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, cymbal ? NoteFlags.Cymbal : NoteFlags.None);
             var color = HighwayPalette.NoteColor(track.Kind, laneCount, placed);
+            var rect = GemRect(projection, column, along, GemSize(projection));
+
+            // A GHL black fret on a white one makes a barre, drawn over the white's top half.
+            if (slots.IsShared(lane) && slots.PartnerOf(lane) is { } white && track.TryGetNote(tick, white, false, out _))
+                rect = rect.WithHeight(rect.Height / 2);
             using (context.PushOpacity(0.45))
-                _gems.DrawGem(context, track.Kind, placed, color, GemRect(projection, column, along, GemSize(projection)), outlined: true);
+                _gems.DrawGem(context, track.Kind, placed, color, rect, outlined: true);
         }
 
         /// <summary>The strike line's band, on the cursor, behind the notes: dark across the lanes, as in the games.</summary>

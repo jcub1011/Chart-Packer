@@ -978,6 +978,13 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **Lanes:** white 1–3 and black 1–3 (drawn stacked per column, as in the game), plus open.
+   - *Settled in CM3:* both views have three columns (a timeline's rows), plus the open note's. A
+     column's black fret has its first half across the view, the left of a highway's column and the
+     top of a timeline's row, and its white fret the second. A click places or picks the fret of the
+     half it's in, or the other fret when that's the only one there, and a drag into the other half
+     switches the selected notes between white and black when they're all one or the other. A gem
+     alone fills its column; in a barre, the black covers the top half of the white. The keys `1`–`6`
+     are white 1–3, then black 1–3.
 2. **Chords**, including the "barre" chords where a white and a black share a column. As in
    5-fret, an open note can't be placed in a chord with frets (CHR022).
 3. **Sustains, forced HOPO, forced strum and tap**, as for 5-fret ([C5](#c5-5-fret-notes)),

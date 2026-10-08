@@ -59,8 +59,8 @@ namespace ChartBuilder.Controls.Editing
                 return true;
             }
 
-            // 1 to 5 (6 for GHL) are the lanes in a highway's order, and 0 the open note or the kick; Shift+0 is the 2× kick
-            // (§9).
+            // 1 to 5 are the lanes in a highway's order (GHL's 1 to 6 white 1–3, then black 1–3), and 0 the open note or the
+            // kick; Shift+0 is the 2× kick (§9).
             if (shift && !ctrl && !alt && LaneKey(key) == 0 && lane.Track is { Instrument: var instrument } && ChartInstruments.KindOf(instrument) == ChartInstrumentKind.Drums)
             {
                 tools.ToggleDoubleKickAtCursor();
@@ -72,8 +72,8 @@ namespace ChartBuilder.Controls.Editing
                 var placeable = LaneSlots.Of(ChartInstruments.KindOf(lane.Track!.Value.Instrument), LaneView.Highway, session.IsFiveLaneDrums);
                 if (number == 0)
                     tools.ToggleNoteAtCursor(EditorTools.ApartLane(placeable));
-                else if (number <= placeable.Slots.Count)
-                    tools.ToggleNoteAtCursor(placeable.Slots[number - 1]);
+                else if (number <= placeable.KeyLanes.Count)
+                    tools.ToggleNoteAtCursor(placeable.KeyLanes[number - 1]);
                 return true;
             }
 

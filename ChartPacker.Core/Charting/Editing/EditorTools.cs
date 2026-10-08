@@ -399,34 +399,41 @@ public sealed class EditorTools
         return null;
     }
 
-    /// <summary>The note whose start or tail is under <paramref name="point"/>, the start first, or null for none.</summary>
+    /// <summary>
+    /// The note whose start or tail is under <paramref name="point"/>, the start first, or null for none. In a shared
+    /// column (GHL's), a note in the half the pointer is in comes first, then the other half's, whose gem fills the column
+    /// when it's alone.
+    /// </summary>
     public static (EditableNote Note, bool IsTail)? HitTest(EditableTrack track, ChartPoint point, int? across)
     {
         ArgumentNullException.ThrowIfNull(track);
         long from = (long)Math.Floor(point.Tick - point.Tolerance);
         long to = (long)Math.Ceiling(point.Tick + point.Tolerance);
-        EditableNote? best = null, bestAcross = null;
-        double bestDistance = double.MaxValue, bestAcrossDistance = double.MaxValue;
+        int? partner = point.Lane is { } pointed ? point.Slots.PartnerOf(pointed) : null;
+        EditableNote? best = null, bestPartner = null, bestAcross = null;
+        double bestDistance = double.MaxValue, bestPartnerDistance = double.MaxValue, bestAcrossDistance = double.MaxValue;
         foreach (var note in track.Notes.Between(Math.Max(0, from), to))
         {
             double distance = Math.Abs(note.Tick - point.Tick);
             if (note.Lane == point.Lane && distance < bestDistance)
                 (best, bestDistance) = (note, distance);
+            else if (note.Lane == partner && distance < bestPartnerDistance)
+                (bestPartner, bestPartnerDistance) = (note, distance);
             else if (note.Lane == across && distance < bestAcrossDistance)
                 (bestAcross, bestAcrossDistance) = (note, distance);
         }
 
-        if ((best ?? bestAcross) is { } head)
+        if ((best ?? bestPartner ?? bestAcross) is { } head)
             return (head, false);
 
-        // A tail: the latest note in the lane held past the pointer.
+        // A tail: the latest note in the lane (or its column) held past the pointer.
         if (point.Lane is not { } lane)
             return null;
         var notes = track.Notes;
         for (int i = notes.FirstAfter((long)Math.Floor(point.Tick)) - 1; i >= 0; i--)
         {
             var note = notes[i];
-            if (note.Lane == lane && note.Length > EditableNote.PlainLength && note.Tick + note.Length >= point.Tick)
+            if ((note.Lane == lane || note.Lane == partner) && note.Length > EditableNote.PlainLength && note.Tick + note.Length >= point.Tick)
                 return (note, true);
         }
 
@@ -530,8 +537,32 @@ public sealed class EditorTools
         int lowest = notes.Min(n => slots.IndexOf(n.Lane));
         int highest = notes.Max(n => slots.IndexOf(n.Lane));
 
-        // The lanes are numbered in their column order, so a move across columns is a move across lane numbers.
+        // The lanes are numbered in their column order, so a move across columns is a move across lane numbers. A
+        // column's shared lanes are numbered in the same order (GHL's black frets), so they move with them.
         return Math.Clamp(wanted, -lowest, movable - 1 - highest);
+    }
+
+    /// <summary>
+    /// How many lanes <paramref name="notes"/> move by between the halves of shared columns (GHL's white and black frets),
+    /// as the pointer has gone from <paramref name="from"/>'s half to <paramref name="to"/>'s: none when it hasn't, when
+    /// either isn't a shared column's (an open note's row), or when the notes aren't all in the half it left.
+    /// </summary>
+    private static int RowDelta(IReadOnlyList<EditableNote> notes, int? from, int? to, LaneSlots slots)
+    {
+        if (from is not { } a || to is not { } b || slots.PartnerOf(a) is null || slots.PartnerOf(b) is null || slots.IsShared(a) == slots.IsShared(b))
+            return 0;
+        bool toShared = slots.IsShared(b);
+        int? delta = null;
+        foreach (var note in notes)
+        {
+            if (slots.IsShared(note.Lane) == toShared || slots.PartnerOf(note.Lane) is not { } partner)
+                return 0;
+            if (delta is { } d && d != partner - note.Lane)
+                return 0;
+            delta = partner - note.Lane;
+        }
+
+        return delta ?? 0;
     }
 
     /// <summary>
@@ -599,7 +630,7 @@ public sealed class EditorTools
             int wanted = point.Lane is { } lane && _pressed.Lane is { } from && lane != apart && from != apart
                 ? point.Slots.IndexOf(lane) - point.Slots.IndexOf(from)
                 : 0;
-            int laneDelta = LaneDelta(_notes, wanted, point.Slots);
+            int laneDelta = LaneDelta(_notes, wanted, point.Slots) + RowDelta(_notes, _pressed.Lane, point.Lane, point.Slots);
             if (_move is { } current && current.TickDelta == tickDelta && current.LaneDelta == laneDelta)
                 return;
 
