@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
+using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
@@ -126,6 +127,10 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial IReadOnlyList<LaneMenuItem> GhostMenu { get; private set; } = [];
 
+        /// <summary>The lane's authoring tools: Copy difficulty and the rest (charter-spec C9, C15).</summary>
+        [ObservableProperty]
+        public partial IReadOnlyList<LaneMenuItem> EditMenu { get; private set; } = [];
+
         /// <summary>The parts this lane can show instead: each part not shown in another lane.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<LaneMenuItem> PartMenu { get; private set; } = [];
@@ -179,6 +184,7 @@ namespace ChartBuilder.ViewModels
             {
                 Difficulties = [];
                 GhostMenu = [];
+                EditMenu = [];
                 return;
             }
 
@@ -194,6 +200,45 @@ namespace ChartBuilder.ViewModels
                 LaneMenuItem.Choice(Strings.LaneGhostNone, Ghost is null, () => Ghost = null),
                 .. Enum.GetValues<ChartDifficulty>().Where(d => d != track.Difficulty)
                     .Select(d => LaneMenuItem.Choice(ChartLabels.DifficultyName(d), Ghost == d, () => Ghost = d)),
+            ];
+            EditMenu = BuildEditMenu(track, part);
+        }
+
+        private IReadOnlyList<LaneMenuItem> BuildEditMenu(ChartTrackKey track, EditablePart? part)
+        {
+            if (Editor is not { } editor || part is null)
+                return [];
+            bool hasNotes = part[track.Difficulty].Notes.Count > 0;
+            var others = Enum.GetValues<ChartDifficulty>().Where(d => d != track.Difficulty).Reverse();
+            return
+            [
+                LaneMenuItem.Submenu(
+                    string.Format(CultureInfo.CurrentCulture, Strings.LaneCopyToFormat, ChartLabels.DifficultyName(track.Difficulty)),
+                    [.. others.Select(d => LaneMenuItem.Action(ChartLabels.DifficultyName(d), hasNotes, () => _ = editor.CopyDifficultyAsync(track, d)))]),
+                LaneMenuItem.Action(Strings.LaneReduce, part.HasNotes, () => _ = editor.ReduceAsync(track)),
+                LaneMenuItem.Action(Strings.LaneSelectLane, hasNotes, () => editor.Session.Tools.SelectLane(track)),
+                LaneMenuItem.Action(Strings.LaneSelectSection, true, () => editor.Session.Tools.SelectSectionAtCursor()),
+                LaneMenuItem.Action(Strings.LaneCut, true, editor.Cut),
+                LaneMenuItem.Action(Strings.LaneCopy, true, editor.Copy),
+                LaneMenuItem.Action(Strings.LanePaste, true, () => _ = editor.PasteAsync(PasteMode.Overwrite)),
+                LaneMenuItem.Action(Strings.LanePasteMerge, true, () => _ = editor.PasteAsync(PasteMode.Merge)),
+                LaneMenuItem.Submenu(Strings.LaneTransform,
+                [
+                    LaneMenuItem.Action(Strings.TransformLeftyFlip, true, editor.Session.Tools.LeftyFlip),
+                    LaneMenuItem.Action(Strings.TransformShiftUp, true, () => editor.Session.Tools.ShiftLanes(1)),
+                    LaneMenuItem.Action(Strings.TransformShiftDown, true, () => editor.Session.Tools.ShiftLanes(-1)),
+                    LaneMenuItem.Action(Strings.TransformClearSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.Clear)),
+                    LaneMenuItem.Action(Strings.TransformGridSustains, true, () => editor.Session.Tools.SetSustains(SustainChange.GridStep)),
+                    LaneMenuItem.Action(Strings.TransformSustainsUntilNext, true, () => editor.Session.Tools.SetSustains(SustainChange.UntilNextNote)),
+                ]),
+                LaneMenuItem.Submenu(Strings.LaneStretch,
+                [
+                    LaneMenuItem.Action(Strings.StretchDouble, true, () => editor.Session.Tools.StretchSelection(2)),
+                    LaneMenuItem.Action(Strings.StretchThreeHalves, true, () => editor.Session.Tools.StretchSelection(1.5)),
+                    LaneMenuItem.Action(Strings.StretchTwoThirds, true, () => editor.Session.Tools.StretchSelection(2.0 / 3)),
+                    LaneMenuItem.Action(Strings.StretchHalf, true, () => editor.Session.Tools.StretchSelection(0.5)),
+                    LaneMenuItem.Action(Strings.StretchToCursor, true, () => editor.Session.Tools.StretchSelection(null)),
+                ]),
             ];
         }
 

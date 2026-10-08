@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Settings;
@@ -62,6 +63,8 @@ namespace ChartBuilder.Services
             settings.AutosaveMinutes = Math.Clamp(settings.AutosaveMinutes, BuilderSettings.MinAutosaveMinutes, BuilderSettings.MaxAutosaveMinutes);
             settings.MetronomeVolume = Math.Clamp(settings.MetronomeVolume, 0, 100);
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
+            settings.ReductionRules = (settings.ReductionRules ?? ReductionDefaults.Shipped).Normalized();
+            settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
 
             settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);

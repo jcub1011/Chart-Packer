@@ -248,7 +248,8 @@ namespace ChartBuilder.ViewModels
         private void Show(ChartLintResult result)
         {
             var map = _song.Chart.TempoMap.ToTempoMap();
-            var fixable = QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Append(ChrRules.Chr084).ToHashSet(StringComparer.Ordinal);
+            // CHR084's fix restores song_length's correction; CHR083's uses the suggested rating (charter-spec C18 item 3).
+            var fixable = QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Append(ChrRules.Chr084).Append(ChrRules.Chr083).ToHashSet(StringComparer.Ordinal);
 
             // What the load left out of the chart file is listed too, until a save writes the file without it.
             var findings = ChartLoadFindings.Merge(result.Findings, ChartLoadFindings.Of(_song.Opened?.Load.Issues ?? []));
@@ -309,6 +310,21 @@ namespace ChartBuilder.ViewModels
             }
 
             var session = _editor.Session;
+            if (finding.RuleId == ChrRules.Chr083)
+            {
+                if (PendingSongIniFixes.SuggestedRating(finding, _song.Chart, session.ReadOptions) is { } rating)
+                {
+                    _song.SetRating(rating.Key, rating.Tier);
+                    _editor.Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUsedFormat, rating.Tier, rating.Key));
+                }
+                else
+                {
+                    session.Status = Strings.FindingNoFixStatus;
+                }
+
+                return;
+            }
+
             if (QuickFixRegistry.ProposeChartFix(finding, session.Chart, session.ReadOptions) is { } command)
                 session.Execute(command);
             else

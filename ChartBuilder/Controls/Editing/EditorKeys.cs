@@ -25,6 +25,38 @@ namespace ChartBuilder.Controls.Editing
             bool plain = (modifiers & (KeyModifiers.Control | KeyModifiers.Shift | KeyModifiers.Alt | KeyModifiers.Meta)) == 0;
             bool highway = canvas.CanvasView == LaneView.Highway;
 
+            // Record mode (charter-spec C15 item 5): number keys play notes, R or Space ends the pass, Esc cancels it, and a
+            // difficulty key ends it before switching.
+            if (session.Recording is not null)
+            {
+                if (plain && ShownLaneOf(key, lane, session) is { } shown)
+                {
+                    editor.RecordPress(shown);
+                    return true;
+                }
+
+                if (shift && !ctrl && !alt && LaneKey(key) == 0)
+                {
+                    editor.RecordPress(0, doubleKick: true);
+                    return true;
+                }
+
+                if (plain && key == PhysicalKey.Escape)
+                {
+                    editor.CancelRecording();
+                    return true;
+                }
+
+                if (ctrl && !alt && DifficultyOf(key) is not null)
+                    editor.FinishRecording();
+            }
+
+            if (plain && key == PhysicalKey.R)
+            {
+                editor.ToggleRecord();
+                return true;
+            }
+
             // Later and earlier: up and down a highway, right and left along a timeline.
             int later = (key, highway) switch
             {
@@ -52,6 +84,13 @@ namespace ChartBuilder.Controls.Editing
             if (ctrl && !alt && !shift && key is PhysicalKey.ArrowUp or PhysicalKey.ArrowDown)
             {
                 tools.StepCursorSections(key == PhysicalKey.ArrowUp ? 1 : -1);
+                return true;
+            }
+
+            // Alt+Shift across shifts the selected notes a lane, each stopping at the edge (charter-spec C15 item 4).
+            if (alt && shift && !ctrl && across != 0)
+            {
+                tools.ShiftLanes(across);
                 return true;
             }
 
@@ -157,6 +196,20 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.A when ctrl && !shift && !alt:
                     tools.SelectAll();
                     return true;
+                // The section the cursor is in, across the lanes shown (charter-spec C15 item 2).
+                case PhysicalKey.A when ctrl && shift && !alt:
+                    tools.SelectSectionAtCursor();
+                    return true;
+                // The clipboard (charter-spec C15 item 3); Ctrl+Shift+V merges rather than overwrites.
+                case PhysicalKey.X when ctrl && !shift && !alt:
+                    editor.Cut();
+                    return true;
+                case PhysicalKey.C when ctrl && !shift && !alt:
+                    editor.Copy();
+                    return true;
+                case PhysicalKey.V when ctrl && !alt:
+                    _ = editor.PasteAsync(shift ? PasteMode.Merge : PasteMode.Overwrite);
+                    return true;
                 case PhysicalKey.Delete or PhysicalKey.Backspace when plain:
                     tools.DeleteSelection();
                     return true;
@@ -172,6 +225,34 @@ namespace ChartBuilder.Controls.Editing
                 default:
                     return false;
             }
+        }
+
+        /// <summary>Lets go of what <paramref name="key"/> held in record mode (charter-spec C15 item 5).</summary>
+        /// <returns>Whether the key does something here.</returns>
+        public static bool HandleUp(PhysicalKey key, ChartEditorViewModel editor, EditorLaneViewModel lane)
+        {
+            if (editor.Session.Recording is null)
+                return false;
+            if (LaneKey(key) == 0)
+                editor.RecordRelease(0, doubleKick: true);
+            if (ShownLaneOf(key, lane, editor.Session) is not { } shown)
+                return false;
+            editor.RecordRelease(shown);
+            return true;
+        }
+
+        /// <summary>
+        /// The lane drawn in the column a number key places in (§9): 1 to 5 in a highway's order (GHL's 1 to 6), 0 the open
+        /// note or the kick. Null for another key.
+        /// </summary>
+        private static int? ShownLaneOf(PhysicalKey key, EditorLaneViewModel lane, EditorSession session)
+        {
+            if (LaneKey(key) is not { } number || lane.Track is not { } track)
+                return null;
+            var placeable = LaneSlots.Of(ChartInstruments.KindOf(track.Instrument), LaneView.Highway, session.IsFiveLaneDrums);
+            if (number == 0)
+                return EditorTools.ApartLane(placeable);
+            return number <= placeable.KeyLanes.Count ? placeable.KeyLanes[number - 1] : null;
         }
 
         /// <summary>The digit of a number key, or null for another key.</summary>

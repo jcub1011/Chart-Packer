@@ -80,7 +80,7 @@ public sealed class CommandSequenceTests
     /// <returns>The kinds of command executed.</returns>
     private static HashSet<string> Run(ChartUndoStack stack, Random random)
     {
-        var generator = new RandomCommands(random);
+        var generator = new RandomCommands(random, authoring: true);
         var kinds = new HashSet<string>();
         int executed = 0;
         for (int attempt = 0; executed < Steps && attempt < Steps * 20; attempt++)
@@ -116,13 +116,36 @@ public sealed class CommandSequenceTests
     /// Makes random commands of every kind from what a chart holds, keeping to what saves and reads back as it is (no
     /// fifth pad on drums that aren't 5-lane, and drum fills and big rock endings as <c>[coda]</c> makes them).
     /// </summary>
-    internal sealed class RandomCommands(Random random)
+    /// <param name="authoring">
+    /// Whether to make the authoring tools' commands too (charter-spec C9, C15): Copy difficulty, the replacements a paste or
+    /// Reduce makes, and stretching. Off, the commands are drawn exactly as before they were added, so other tests' seeded
+    /// runs are unchanged.
+    /// </param>
+    internal sealed class RandomCommands(Random random, bool authoring = false)
     {
         private const int Snap = 60;
         private const int Snaps = 256;
         private int _texts;
 
-        public IChartCommand? Next(EditableChart chart) => random.Next(110) switch
+        public IChartCommand? Next(EditableChart chart) => !authoring ? Next(chart, random.Next(110)) : random.Next(118) switch
+        {
+            < 2 => CopyDifficulty(chart),
+            < 4 => ReplaceNotes(chart),
+            < 6 => ReplaceTrack(chart),
+            < 8 => Stretch(chart),
+            var n => Next(chart, n - 8),
+        };
+
+        // The timing between two points stretched or squeezed, everything keeping its time (charter-spec C15 item 4).
+        private IChartCommand? Stretch(EditableChart chart)
+        {
+            long from = Tick();
+            long to = from + (random.Next(1, 16) * Snap);
+            long newTo = from + (random.Next(1, 16) * Snap);
+            return ChartPacker.Core.Charting.Editing.TempoMapEdits.Stretch(chart, from, to, newTo).Command;
+        }
+
+        private IChartCommand? Next(EditableChart chart, int roll) => roll switch
         {
             < 16 => AddNotes(chart),
             < 23 => RemoveNotes(chart),
@@ -168,6 +191,42 @@ public sealed class CommandSequenceTests
             }
 
             return notes.Count > 0 ? new AddNotes(part.Instrument, track.Difficulty, notes) : null;
+        }
+
+        private IChartCommand? CopyDifficulty(EditableChart chart)
+        {
+            if (TrackWithNotes(chart) is not var (part, track))
+                return null;
+            var to = (ChartDifficulty)random.Next(4);
+            return to == track.Difficulty ? null : new CopyDifficulty(part, track.Difficulty, to);
+        }
+
+        // Some notes taken out and others put in, the way a paste or a recorded pass does.
+        private IChartCommand? ReplaceNotes(EditableChart chart)
+        {
+            if (TrackWithNotes(chart) is not var (part, track))
+                return null;
+            var remove = SomeNotes(track);
+            var add = new List<EditableNote>();
+            for (int i = random.Next(0, 3); i > 0; i--)
+            {
+                var note = NoteFor(chart, track);
+                if (!add.Any(n => n.Tick == note.Tick && n.Lane == note.Lane && n.DoubleKick == note.DoubleKick))
+                    add.Add(note);
+            }
+
+            return new ReplaceNotes(part, track.Difficulty, remove, add);
+        }
+
+        // A track's notes put back thinned, as Reduce does, keeping its marking where a chord stays.
+        private IChartCommand? ReplaceTrack(EditableChart chart)
+        {
+            if (TrackWithNotes(chart) is not var (part, track))
+                return null;
+            var notes = track.Notes.Where((_, i) => i % 2 == 0).ToList();
+            var ticks = notes.Select(n => n.Tick).ToHashSet();
+            var flags = track.FlaggedChords.Where(f => ticks.Contains(f.Tick)).ToList();
+            return new ReplaceTrack(part, track.Difficulty, notes, flags, track.Kind == ChartInstrumentKind.Drums ? [] : null);
         }
 
         private IChartCommand? RemoveNotes(EditableChart chart) =>

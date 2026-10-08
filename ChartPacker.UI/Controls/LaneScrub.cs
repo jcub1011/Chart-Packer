@@ -8,7 +8,7 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartPacker.Core.Metadata;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>Where a lane is being scrubbed to: a time in the song, in seconds.</summary>
     public sealed class ScrubEventArgs(double seconds) : EventArgs
@@ -17,10 +17,10 @@ namespace ChartPacker.Controls
     }
 
     /// <summary>
-    /// What <see cref="NoteHighwayView"/> and <see cref="LyricLaneView"/> share as they show a whole chart to be scrubbed
+    /// What <see cref="Highway.NoteHighwayView"/> and Chart Packer's lyric lane share as they show a whole chart to be scrubbed
     /// through: the part already played shaded, a line where the audio is and another where the pointer is, with its time.
     /// </summary>
-    internal static class LaneScrub
+    public static class LaneScrub
     {
         /// <summary>
         /// How far a pixel dragged with Ctrl held moves the audio on the seek bar, in seconds, unless the settings say otherwise:
@@ -102,14 +102,14 @@ namespace ChartPacker.Controls
     }
 
     /// <summary>
-    /// How a lane is scrubbed, for <see cref="NoteHighwayView"/> and <see cref="LyricLaneView"/>: a drag grabs the notes and
+    /// How a lane is scrubbed, for <see cref="Highway.NoteHighwayView"/> and Chart Packer's lyric lane: a drag grabs the notes and
     /// moves them as far as the pointer goes; with Ctrl held it's fine; either way the pointer is held still, so a drag can go
     /// on as far as it needs. With Shift held (and not Ctrl) the lane shows its whole chart, to scrub through. The keys are
     /// watched in the window's while <paramref name="watchesKeys"/> says so (the pointer is over the lane, or it's being
     /// scrubbed), so they're seen with the pointer still, whatever has focus.
     /// </summary>
     /// <param name="owner">The lane, drawn again whenever its mode changes.</param>
-    internal sealed class LaneScrubMode(Control owner, Func<bool> watchesKeys)
+    public sealed class LaneScrubMode(Control owner, Func<bool> watchesKeys)
     {
         private readonly FineDrag _drag = new(owner);
 
@@ -180,7 +180,7 @@ namespace ChartPacker.Controls
     /// A lane's whole chart fading in as Shift is pressed over it, and out as it's let go: stepped toward whether it's shown
     /// each frame the lane is drawn, eased at both ends.
     /// </summary>
-    internal sealed class OverviewFade
+    public sealed class OverviewFade
     {
         // How long a fade takes from one end to the other.
         private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(160);

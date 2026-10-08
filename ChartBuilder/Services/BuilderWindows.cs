@@ -97,7 +97,8 @@ namespace ChartBuilder.Services
             () => _ = ShowCalibrationAsync(),
             lockFolder,
             chartPackerSettingsFile,
-            recovery);
+            recovery,
+            new AvaloniaAuthoringDialogService(() => editor));
 
         /// <summary>Shows the Editor in place of the launcher, and starts its audio.</summary>
         private void OpenEditor(EditorWindow editor, EditorWindowViewModel viewModel)
@@ -255,6 +256,13 @@ namespace ChartBuilder.Services
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,
             settingsPicker => new SettingsWindowViewModel(
-                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync()), settingsPicker, settings.Save));
+                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync()), settingsPicker, settings.Save));
+
+        /// <summary>Opens the Reduce dialog's Settings mode over the window in front, which edits the default rules (charter-spec §10).</summary>
+        private async Task ShowReductionDefaultsAsync()
+        {
+            var owner = desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow;
+            await new AvaloniaAuthoringDialogService(() => owner).ShowReduceAsync(ReduceViewModel.ForDefaults(settings));
+        }
     }
 }

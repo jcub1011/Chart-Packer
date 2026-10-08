@@ -327,7 +327,18 @@ namespace ChartBuilder.Controls.Editing
                         DrawNotes(context, session, new ChartTrackKey(key.Instrument, ghost), part[ghost], projection, slots, fromTick, toTick, isGhost: true);
                 }
 
-                DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, isGhost: false);
+                // A draft not yet added (Reduce, record mode) over the notes it would replace, which fade behind it.
+                if (session.GhostTrack(key) is { } draft)
+                {
+                    using (context.PushOpacity(0.3))
+                        DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, isGhost: false);
+                    DrawNotes(context, session, key, draft, projection, slots, fromTick, toTick, isGhost: true);
+                }
+                else
+                {
+                    DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, isGhost: false);
+                }
+
                 DrawSoloCounts(context, session, track, projection, fromTick, toTick);
                 DrawHover(context, session, key, track, projection, slots);
             }
@@ -488,6 +499,14 @@ namespace ChartBuilder.Controls.Editing
             if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
                 return;
             e.Handled = EditorKeys.Handle(e.PhysicalKey, e.KeyModifiers, editor, lane, this);
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
+                return;
+            e.Handled = EditorKeys.HandleUp(e.PhysicalKey, editor, lane);
         }
 
         /// <summary>Moves focus to the lane's other canvas, once it's shown in place of this one.</summary>
@@ -1294,7 +1313,7 @@ namespace ChartBuilder.Controls.Editing
             bool drums = kind == ChartInstrumentKind.Drums;
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
             var game = isGhost ? null : session.GameTrack(key).Notes;
-            long longest = LongestOf(key, track);
+            long longest = isGhost ? track.Notes.Select(static n => n.Length).DefaultIfEmpty().Max() : LongestOf(key, track);
             var notes = track.Notes.Between((long)Math.Max(0, Math.Floor(fromTick) - longest), (long)Math.Ceiling(toTick) + 1);
             var accent = AccentBrush ?? DefaultAccentBrush;
             var selectedPen = new ImmutablePen((accent as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF, 2);
@@ -1385,7 +1404,7 @@ namespace ChartBuilder.Controls.Editing
 
                 if (isGhost)
                     return;
-                if (session.Selection.Contains(key, note))
+                if (session.Selection.IsMarked(key, note))
                     context.DrawRectangle(null, selectedPen, rect.Inflate(2), 3, 3);
                 if (!across && kind != ChartInstrumentKind.Drums && flagged.Add(note.Tick) && track.FlagsAt(note.Tick) is var flags and not ChordFlags.None)
                     DrawForcing(context, projection, slots, along, flags);

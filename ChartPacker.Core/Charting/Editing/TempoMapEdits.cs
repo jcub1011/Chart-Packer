@@ -361,6 +361,69 @@ public static class TempoMapEdits
         return -1;
     }
 
+    /// <summary>
+    /// Stretches or squeezes the timing from <paramref name="from"/> to <paramref name="to"/> so it ends at
+    /// <paramref name="newTo"/> (charter-spec C15 item 4), for the double- or half-time sections imported charts often have.
+    /// Everything keeps its time: the ticks inside the span are scaled and the tempos there with them, everything after it
+    /// moves by the change in length, and the passthrough tracks are re-ticked to match (§4.2). Anchors move with their
+    /// markers and keep their times.
+    /// </summary>
+    public static TempoEdit Stretch(EditableChart chart, long from, long to, long newTo)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        if (from < 0 || to <= from)
+            return TempoEdit.Refused("Select a span to stretch or squeeze.");
+        if (newTo <= from)
+            return TempoEdit.Refused("A span can't be squeezed to nothing.");
+        if (newTo == to)
+            return TempoEdit.Refused("The span already ends there.");
+
+        var map = chart.TempoMap;
+        var move = TickMaps.Stretch(from, to, newTo);
+        double scale = (double)(to - from) / (newTo - from);
+        var old = map.Tempos.AsSpan().ToArray();
+        var tempos = new List<TempoChange>(old.Length + 2);
+        foreach (var tempo in old)
+        {
+            long us = tempo.Tick >= from && tempo.Tick < to ? (long)Math.Round(tempo.MicrosecondsPerQuarter * scale) : tempo.MicrosecondsPerQuarter;
+            tempos.Add(new TempoChange(move(tempo.Tick), us));
+        }
+
+        // The span starts and ends on markers of its own, so the tempos before and after it are kept as they were.
+        if (!old.Any(t => t.Tick == from))
+            tempos.Add(new TempoChange(from, (long)Math.Round(TempoAt(old, from) * scale)));
+        if (!old.Any(t => t.Tick == to))
+            tempos.Add(new TempoChange(newTo, TempoAt(old, to)));
+        if (tempos.Any(static t => t.MicrosecondsPerQuarter is < 1 or > EditableTempoMap.MaxMicrosecondsPerQuarter))
+            return TempoEdit.Refused("That would make a tempo too fast or too slow for MIDI to hold.");
+        tempos = [.. tempos.OrderBy(static t => t.Tick)];
+
+        var signatures = map.TimeSignatures.AsSpan().ToArray().Select(s => s with { Tick = move(s.Tick) }).ToList();
+        var anchors = map.Anchors.AsSpan().ToArray().Select(a => a with { Tick = move(a.Tick) }).ToList();
+        try
+        {
+            return new TempoEdit(new ChangeTempoMap(tempos, signatures, anchors, move));
+        }
+        catch (ArgumentException e)
+        {
+            return TempoEdit.Refused(e.Message);
+        }
+    }
+
+    // The tempo in force at a tick: the last marker at or before it.
+    private static long TempoAt(TempoChange[] tempos, long tick)
+    {
+        long tempo = TempoMap.DefaultMicrosecondsPerQuarter;
+        foreach (var t in tempos)
+        {
+            if (t.Tick > tick)
+                break;
+            tempo = t.MicrosecondsPerQuarter;
+        }
+
+        return tempo;
+    }
+
     private static int LastAt(TempoChange[] tempos, long tick)
     {
         for (int i = tempos.Length - 1; i >= 0; i--)

@@ -111,6 +111,7 @@ namespace ChartPacker.ViewModels
         private readonly Func<string, bool>? _isOpenInChartBuilder;
         private readonly DraftSaver _saver;
         private CancellationTokenSource? _loadCts;
+        private CancellationTokenSource? _chartLintCts;
 
         // This panel is telling the draft store about its own change, which it needn't hear back.
         private bool _notifyingDrafts;
@@ -1584,6 +1585,8 @@ namespace ChartPacker.ViewModels
             NotifyDrafts(_songs);
             RebuildRows();
             RefreshArt();
+            if (!IsBulk && _songs.Count == 1)
+                _ = LoadChartFindingsAsync(_songs[0]);
         }
 
         /// <summary>Tells the draft store that <paramref name="songs"/>' drafts changed, without this panel hearing it back.</summary>
@@ -1865,6 +1868,47 @@ namespace ChartPacker.ViewModels
             Findings.AddRange(loaded.Findings);
             RebuildRows();
             RefreshArt();
+            if (!IsBulk && _songs.Count == 1)
+                _ = LoadChartFindingsAsync(_songs[0]);
+        }
+
+        /// <summary>
+        /// Lints the song's chart with its <c>song.ini</c> as drafted (charter-spec C16 item 5), off the UI thread, and lists
+        /// what it finds after the song's own findings. A newer load or lint takes its place.
+        /// </summary>
+        private async Task LoadChartFindingsAsync(EditableSong song)
+        {
+            _chartLintCts?.Cancel();
+            using var cts = new CancellationTokenSource();
+            _chartLintCts = cts;
+            try
+            {
+                var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
+                var entry = song.Entry;
+                var report = await Task.Run(() => SongChartLint.LintAsync(entry, pairs, null, LibraryChartLint.Cache, cts.Token), cts.Token);
+                if (_chartLintCts != cts || _songs.Count != 1 || !ReferenceEquals(_songs[0], song))
+                    return;
+
+                for (int i = Findings.Count - 1; i >= 0; i--)
+                {
+                    if (ChrRules.IsChartRule(Findings[i].RuleId))
+                        Findings.RemoveAt(i);
+                }
+
+                Findings.AddRange(report.Findings.Select(f => new FindingRow(
+                    f.Finding.RuleId,
+                    LibraryChartLint.Where(f) is { } where ? string.Format(CultureInfo.CurrentCulture, Strings.ChartFindingWhereFormat, f.Finding.Message, where) : f.Finding.Message,
+                    f.Finding.Severity == Severity.Error)));
+                OnPropertyChanged(nameof(HasFindings));
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                if (_chartLintCts == cts)
+                    _chartLintCts = null;
+            }
         }
 
         /// <summary>

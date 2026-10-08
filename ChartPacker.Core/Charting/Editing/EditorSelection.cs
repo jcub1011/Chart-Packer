@@ -14,6 +14,11 @@ public readonly record struct NotePlace(long Tick, int Lane, bool DoubleKick = f
 /// note keeps its selection when its length changes, and loses it when it goes. Phrases and disco flip sections are kept
 /// as they are, so one changed is selected again as what it became.
 /// </summary>
+/// <remarks>
+/// A time range can also be selected across lanes (<see cref="SelectRange"/>): every note of those tracks inside it, as
+/// the chart has them, which delete, cut and copy, moves in time and the transforms act on (<see cref="NotesByTrack"/>).
+/// The note set stays one track's, so Properties and the keys that change one note at a time keep to it.
+/// </remarks>
 public sealed class EditorSelection
 {
     private readonly EditableChart _chart;
@@ -21,6 +26,7 @@ public sealed class EditorSelection
     private readonly SortedSet<long> _tempos = [];
     private readonly HashSet<Phrase> _phrases = [];
     private readonly HashSet<DiscoFlipSection> _discoFlips = [];
+    private readonly List<ChartTrackKey> _rangeTracks = [];
 
     public EditorSelection(EditableChart chart)
     {
@@ -42,6 +48,12 @@ public sealed class EditorSelection
 
     /// <summary>The span selected across the lanes, in ticks, both ends included; null for none.</summary>
     public (long From, long To)? Range { get; private set; }
+
+    /// <summary>The tracks a range across lanes covers (<see cref="SelectRange"/>); none when the range is a box's alone.</summary>
+    public IReadOnlyList<ChartTrackKey> RangeTracks => _rangeTracks;
+
+    /// <summary>Whether a range across lanes is selected, rather than notes.</summary>
+    public bool HasRangeAcrossLanes => _notes.Count == 0 && Range is not null && _rangeTracks.Count > 0;
 
     /// <summary>The part the selected phrases are of, or null when no phrases are selected.</summary>
     public ChartInstrument? PhrasePart { get; private set; }
@@ -90,6 +102,33 @@ public sealed class EditorSelection
     }
 
     /// <summary>
+    /// The notes selected, by track: the note set's, or with none, every note of the tracks a range across lanes covers
+    /// inside it, as the chart has them now. Tracks with none are left out.
+    /// </summary>
+    public IReadOnlyList<(ChartTrackKey Track, IReadOnlyList<EditableNote> Notes)> NotesByTrack()
+    {
+        if (Track is { } key)
+        {
+            var notes = Notes;
+            return notes.Count > 0 ? [(key, notes)] : [];
+        }
+
+        if (Range is not { } range || _rangeTracks.Count == 0)
+            return [];
+        var tracks = new List<(ChartTrackKey, IReadOnlyList<EditableNote>)>();
+        foreach (var track in _rangeTracks)
+        {
+            if (_chart.PartOf(track.Instrument)?[track.Difficulty] is not { } notes)
+                continue;
+            var inside = notes.Notes.Between(range.From, range.To).ToArray();
+            if (inside.Length > 0)
+                tracks.Add((track, inside));
+        }
+
+        return tracks;
+    }
+
+    /// <summary>
     /// The span of ticks the selection covers, for playing it, looping it or fitting a tempo to it: the span selected,
     /// or else from the first selected note to where the last is let go, or else from the first selected phrase's or
     /// disco flip section's start to the last one's end (a section without one adding only its start), or else from the
@@ -126,6 +165,13 @@ public sealed class EditorSelection
     /// <summary>Whether <paramref name="note"/> of <paramref name="track"/> is selected.</summary>
     public bool Contains(ChartTrackKey track, EditableNote note) => Track == track && _notes.Contains(NotePlace.Of(note));
 
+    /// <summary>
+    /// Whether <paramref name="note"/> of <paramref name="track"/> is drawn as selected: in the note set, or inside a range
+    /// selected across lanes that covers its track.
+    /// </summary>
+    public bool IsMarked(ChartTrackKey track, EditableNote note) =>
+        Contains(track, note) || (HasRangeAcrossLanes && Range is { } range && note.Tick >= range.From && note.Tick <= range.To && _rangeTracks.Contains(track));
+
     /// <summary>Whether <paramref name="phrase"/> of <paramref name="part"/> is selected.</summary>
     public bool Contains(ChartInstrument part, Phrase phrase) => PhrasePart == part && _phrases.Contains(phrase);
 
@@ -141,8 +187,27 @@ public sealed class EditorSelection
         _tempos.Clear();
         ClearPhraseSet();
         _discoFlips.Clear();
+        _rangeTracks.Clear();
         Track = null;
         Range = null;
+        Raise();
+    }
+
+    /// <summary>
+    /// Selects the span from <paramref name="from"/> to <paramref name="to"/> across <paramref name="tracks"/>, in place of
+    /// what was selected (charter-spec C15 item 2): a time range across lanes, a whole lane's or a section's.
+    /// </summary>
+    public void SelectRange(long from, long to, IEnumerable<ChartTrackKey> tracks)
+    {
+        ArgumentNullException.ThrowIfNull(tracks);
+        _notes.Clear();
+        _tempos.Clear();
+        ClearPhraseSet();
+        _discoFlips.Clear();
+        Track = null;
+        _rangeTracks.Clear();
+        _rangeTracks.AddRange(tracks.Distinct());
+        Range = (Math.Max(0, Math.Min(from, to)), Math.Max(0, Math.Max(from, to)));
         Raise();
     }
 
@@ -164,6 +229,7 @@ public sealed class EditorSelection
             _tempos.Clear();
             ClearPhraseSet();
             _discoFlips.Clear();
+            _rangeTracks.Clear();
             Range = null;
         }
         else if (Track != track)
@@ -202,6 +268,7 @@ public sealed class EditorSelection
             _tempos.Clear();
             ClearPhraseSet();
             _discoFlips.Clear();
+            _rangeTracks.Clear();
             Track = null;
             Range = null;
         }
@@ -220,6 +287,7 @@ public sealed class EditorSelection
             _notes.Clear();
             _tempos.Clear();
             _discoFlips.Clear();
+            _rangeTracks.Clear();
             Track = null;
             Range = null;
         }
@@ -283,6 +351,7 @@ public sealed class EditorSelection
             _tempos.Clear();
             ClearPhraseSet();
             _discoFlips.Clear();
+            _rangeTracks.Clear();
             Track = null;
             Range = null;
         }
@@ -324,9 +393,10 @@ public sealed class EditorSelection
     public void SetRange(long from, long to)
     {
         var range = (Math.Min(from, to), Math.Max(from, to));
-        if (Range == range)
+        if (Range == range && _rangeTracks.Count == 0)
             return;
         Range = range;
+        _rangeTracks.Clear();
         Raise();
     }
 
@@ -337,7 +407,8 @@ public sealed class EditorSelection
     /// <returns>Whether anything was dropped.</returns>
     public bool Reconcile()
     {
-        int before = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count;
+        int before = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count + _rangeTracks.Count;
+        _rangeTracks.RemoveAll(k => _chart.PartOf(k.Instrument) is null);
         if (Track is { } key && _chart.PartOf(key.Instrument) is { } part)
         {
             var track = part[key.Difficulty];
@@ -361,7 +432,7 @@ public sealed class EditorSelection
             _discoFlips.RemoveWhere(s => !Charting.DiscoFlips.RangesOf(drums[s.Difficulty]).Contains(s.Range));
         else
             _discoFlips.Clear();
-        bool dropped = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count != before;
+        bool dropped = _notes.Count + _tempos.Count + _phrases.Count + _discoFlips.Count + _rangeTracks.Count != before;
         if (dropped)
             Raise();
         return dropped;

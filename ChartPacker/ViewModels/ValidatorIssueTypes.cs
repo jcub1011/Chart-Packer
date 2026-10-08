@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
+using ChartPacker.Services;
 
 namespace ChartPacker.ViewModels
 {
@@ -23,6 +24,14 @@ namespace ChartPacker.ViewModels
             (SngRules.Sng024, () => Strings.ValidatorTypeWrongType),
             (SngRules.Sng060, () => Strings.ValidatorTypeBoolean),
             (SngRules.Sng061, () => Strings.ValidatorTypeEmptyValue),
+
+            // Chart lint (charter-spec C16 item 5), by the catalogue's groups.
+            (ValidatorIssueTypesIds.ChartTiming, () => Strings.ValidatorTypeChartTiming),
+            (ValidatorIssueTypesIds.ChartFrets, () => Strings.ValidatorTypeChartFrets),
+            (ValidatorIssueTypesIds.ChartDrums, () => Strings.ValidatorTypeChartDrums),
+            (ValidatorIssueTypesIds.ChartPhrases, () => Strings.ValidatorTypeChartPhrases),
+            (ValidatorIssueTypesIds.ChartSong, () => Strings.ValidatorTypeChartSong),
+            (ValidatorIssueTypesIds.ChartLoad, () => Strings.ValidatorTypeChartLoad),
             (Unreadable, () => Strings.ValidatorTypeUnreadable),
         ];
 

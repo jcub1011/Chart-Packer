@@ -53,6 +53,7 @@ namespace ChartBuilder.ViewModels
 
         private readonly BuilderSettingsService _settings;
         private readonly IConfirmationService _confirmations;
+        private readonly IAuthoringDialogService? _dialogs;
         private readonly DispatcherTimer _refresh;
         private readonly DispatcherTimer _tapEnd;
         private readonly TapTempo _taps = new();
@@ -62,10 +63,12 @@ namespace ChartBuilder.ViewModels
 
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
         /// <param name="audio">The song's audio as the lanes draw and analyse it.</param>
-        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, EditorAudio audio, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout)
+        /// <param name="dialogs">Shows the authoring tools' dialogs; null where there are none to show.</param>
+        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, EditorAudio audio, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout, IAuthoringDialogService? dialogs = null)
         {
             _settings = settings;
             _confirmations = confirmations;
+            _dialogs = dialogs;
             Song = song;
             Playback = playback;
             Audio = audio;
@@ -79,10 +82,13 @@ namespace ChartBuilder.ViewModels
             SnapChoices = [.. SnapGrid.CommonDivisions.Select(d => new SnapChoice(d, BuilderSettingsCatalog.SnapLabel(d)))];
             FillEndChoices = [new FillEndChoice(FillEnd.Crash, Strings.GenerateFillsEndCrash), new FillEndChoice(FillEnd.AnyNote, Strings.GenerateFillsEndAnyNote)];
             SelectedFillEnd = FillEndChoices[0];
+            SelectedRecordMode = RecordModeChoices[0];
             Lanes = new LaneDockViewModel(layout, this);
             Properties = new PropertiesViewModel(this);
             Session.Onsets = new LaneOnsetSource(this);
+            Session.VisibleTracks = () => [.. Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>()];
             AudioAssist = new AudioAssistViewModel(this);
+            Preview = new PreviewViewModel(this, settings);
 
             _refresh = new DispatcherTimer(DispatcherPriority.Background) { Interval = RefreshDelay };
             _refresh.Tick += (_, _) => RefreshDerived();
@@ -115,6 +121,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Snap to onset, Nudge to onsets, and the proposed tempo map (charter-spec C14).</summary>
         public AudioAssistViewModel AudioAssist { get; }
+
+        /// <summary>The highway preview, docked in the side panel or in a window of its own (charter-spec C18).</summary>
+        public PreviewViewModel Preview { get; }
 
         /// <summary>What a lane draws its audio as until it's switched: the setting's.</summary>
         public LaneBackdrop DefaultBackdrop => _settings.Settings.DefaultLaneBackdrop;
@@ -433,6 +442,7 @@ namespace ChartBuilder.ViewModels
             Playback.PropertyChanged -= OnPlaybackChanged;
             Playback.Scrubbed -= OnScrubbed;
             Lanes.LayoutChanged -= OnLayoutChanged;
+            Preview.Dispose();
             Session.Detach();
         }
 
@@ -455,6 +465,8 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsSustainTool));
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
+            OnPropertyChanged(nameof(IsRecording));
+            OnPropertyChanged(nameof(RecordToolTip));
             RefreshFills();
             RefreshPhraseChoices();
             RefreshVisibleSpan();
@@ -568,6 +580,11 @@ namespace ChartBuilder.ViewModels
                     break;
                 case nameof(PlaybackViewModel.LengthSeconds):
                     ScheduleRefresh();
+                    break;
+
+                // A pass of record mode ends when the song stops (charter-spec C15 item 5).
+                case nameof(PlaybackViewModel.IsPlaying) when !Playback.IsPlaying && IsRecording:
+                    FinishRecording();
                     break;
             }
         }

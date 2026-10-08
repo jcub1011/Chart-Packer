@@ -270,6 +270,16 @@
                         </Button.Flyout>
                     </Button>
                     <Button Classes="tool"
+                            IsVisible="{Binding HasCanvas}"
+                            ToolTip.Tip="{x:Static res:Strings.LaneEditToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneEditToolTip}">
+                        <ctl:LineIcon Data="{StaticResource EditChartStroke}" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                        ItemsSource="{Binding EditMenu, Converter={StaticResource LaneMenu}}" />
+                        </Button.Flyout>
+                    </Button>
+                    <Button Classes="tool"
                             IsVisible="{Binding !IsVocal}"
                             ToolTip.Tip="{x:Static res:Strings.LaneGhostToolTip}"
                             AutomationProperties.Name="{x:Static res:Strings.LaneGhostToolTip}">

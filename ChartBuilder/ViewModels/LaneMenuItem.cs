@@ -63,6 +63,14 @@ namespace ChartBuilder.ViewModels
         public static LaneMenuItem Choice(string header, bool isChecked, Action run) =>
             new(header, null, new RelayCommand(run), isEnabled: true, isChecked);
 
+        /// <summary>An item that runs <paramref name="run"/>, greyed out unless <paramref name="isEnabled"/>.</summary>
+        public static LaneMenuItem Action(string header, bool isEnabled, Action run) =>
+            new(header, null, new RelayCommand(run), isEnabled, isChecked: false);
+
+        /// <summary>A submenu of <paramref name="items"/>, greyed out when none of them can be picked.</summary>
+        public static LaneMenuItem Submenu(string header, IReadOnlyList<LaneMenuItem> items) =>
+            new(header, items, null, items.Any(static i => i.IsEnabled), isChecked: false);
+
         /// <summary>What a lane showing <paramref name="part"/> is headed, e.g. "Guitar · Expert" or "Harmony 2".</summary>
         public static string TitleOf(LanePart part) => part.Track is { } track
             ? string.Format(CultureInfo.CurrentCulture, Strings.LaneTitleFormat, ChartLabels.InstrumentName(track.Instrument), ChartLabels.DifficultyName(track.Difficulty))

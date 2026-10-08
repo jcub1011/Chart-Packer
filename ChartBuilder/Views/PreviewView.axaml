@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:hw="using:ChartPacker.UI.Controls.Highway"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="600"
+             x:Class="ChartBuilder.Views.PreviewView"
+             x:DataType="vm:PreviewViewModel">
+
+    <!-- The highway preview (charter-spec C18): the part shown, practice and its speed, how far ahead it looks, and the
+         game-style highway, played with the editor's clock. -->
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="10,8" Spacing="6">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <ComboBox Grid.Column="0"
+                          HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding TrackChoices}"
+                          SelectedItem="{Binding SelectedTrack}"
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:PreviewTrackChoice}"
+                          ToolTip.Tip="{x:Static res:Strings.PreviewTrackToolTip}"
+                          AutomationProperties.Name="{x:Static res:Strings.PreviewTrackToolTip}" />
+                <Button Grid.Column="1"
+                        Content="{x:Static res:Strings.PreviewOpenWindow}"
+                        Command="{Binding OpenWindowCommand}"
+                        ToolTip.Tip="{x:Static res:Strings.PreviewOpenWindowToolTip}" />
+            </Grid>
+            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                <ToggleButton Grid.Column="0"
+                              Content="{x:Static res:Strings.PreviewPractice}"
+                              IsChecked="{Binding IsPractice}"
+                              ToolTip.Tip="{x:Static res:Strings.PreviewPracticeToolTip}" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding Playback.SpeedPercents}"
+                          SelectedItem="{Binding Playback.SpeedPercent}"
+                          IsEnabled="{Binding Playback.IsReady}"
+                          ToolTip.Tip="{x:Static res:Strings.SpeedToolTip}"
+                          AutomationProperties.Name="{x:Static res:Strings.SpeedToolTip}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="x:Int32">
+                            <TextBlock Text="{Binding StringFormat={x:Static res:Strings.SpeedPercentFormat}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Slider Grid.Column="2"
+                        Minimum="{x:Static vm:PreviewViewModel.MinLookAhead}"
+                        Maximum="{x:Static vm:PreviewViewModel.MaxLookAhead}"
+                        SmallChange="0.1"
+                        LargeChange="0.5"
+                        Value="{Binding LookAhead}"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{x:Static res:Strings.LaneLookAheadToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}" />
+            </Grid>
+            <!-- The suggested rating (charter-spec C18 item 3), with what it was worked out from in its tooltip. -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasSuggestion}">
+                <TextBlock Grid.Column="0"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding SuggestionText}"
+                           ToolTip.Tip="{Binding SuggestionBasis}" />
+                <Button Grid.Column="1"
+                        Classes="labelled"
+                        FontSize="12"
+                        Content="{Binding UseSuggestionText}"
+                        Command="{Binding UseSuggestionCommand}"
+                        IsVisible="{Binding UseSuggestionText, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        ToolTip.Tip="{x:Static res:Strings.SuggestedRatingUseToolTip}" />
+            </Grid>
+        </StackPanel>
+
+        <Panel>
+            <hw:NoteHighwayView x:Name="Highway"
+                                Scene="{Binding Scene}"
+                                Clock="{Binding Clock}"
+                                LookAhead="{Binding LookAhead}"
+                                LengthSeconds="{Binding Playback.LengthSeconds}" />
+            <TextBlock Classes="muted centered"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Margin="16"
+                       Text="{x:Static res:Strings.PreviewNothingToShow}"
+                       IsVisible="{Binding !HasScene}" />
+        </Panel>
+    </DockPanel>
+</UserControl>

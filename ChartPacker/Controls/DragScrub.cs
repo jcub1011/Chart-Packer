@@ -9,6 +9,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using ChartPacker.UI.Controls;
 
 namespace ChartPacker.Controls
 {

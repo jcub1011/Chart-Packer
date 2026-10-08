@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <!-- For the highway preview's scene (charter-spec C18), whose timing is checked against the editor's. -->
+    <ProjectReference Include="..\ChartPacker.UI\ChartPacker.UI.csproj" />
   </ItemGroup>
 
   <!-- Shared with ChartPacker.Core.Tests rather than copied: the MIDI fixture builder, and the guard that fails the

@@ -2408,4 +2408,40 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="CalibrateButton" xml:space="preserve">
     <value>Calibrate…</value>
   </data>
+  <data name="ChartFindingFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="ChartFindingTimesFormat" xml:space="preserve">
+    <value>{0} (×{1})</value>
+  </data>
+  <data name="ChartFindingWhereFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="ChartFindingPlaceFormat" xml:space="preserve">
+    <value>m{0} beat {1:0.##}</value>
+  </data>
+  <data name="ChartFindingTrackFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+  </data>
+  <data name="ChartFindingPartPlaceFormat" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="ValidatorTypeChartTiming" xml:space="preserve">
+    <value>Chart: timing</value>
+  </data>
+  <data name="ValidatorTypeChartFrets" xml:space="preserve">
+    <value>Chart: frets</value>
+  </data>
+  <data name="ValidatorTypeChartDrums" xml:space="preserve">
+    <value>Chart: drums</value>
+  </data>
+  <data name="ValidatorTypeChartPhrases" xml:space="preserve">
+    <value>Chart: phrases and events</value>
+  </data>
+  <data name="ValidatorTypeChartSong" xml:space="preserve">
+    <value>Chart: song</value>
+  </data>
+  <data name="ValidatorTypeChartLoad" xml:space="preserve">
+    <value>Chart: load</value>
+  </data>
 </root>

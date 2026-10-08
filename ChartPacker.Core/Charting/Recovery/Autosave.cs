@@ -61,6 +61,7 @@ public static class Autosave
             title)
         {
             DelayMs = song.DelayMs,
+            Ratings = [.. song.Ratings],
         };
     }
 
@@ -76,6 +77,7 @@ public static class Autosave
         var onDisk = opened.HasChartFile ? opened.Chart.Parts.Select(p => p.Instrument).ToHashSet() : [];
         var song = EditorSong.Of(opened with { Load = RecoveryStore.ReadChart(file) }, onDisk);
         song.DelayMs = file.Manifest.DelayMs;
+        song.SetRatings(file.Manifest.Ratings);
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }
@@ -94,6 +96,7 @@ public static class Autosave
         var song = EditorSong.New(RecoveryStore.ReadChart(file).Chart, tracks);
         song.Values = file.Manifest.Values;
         song.DelayMs = file.Manifest.DelayMs;
+        song.SetRatings(file.Manifest.Ratings);
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }

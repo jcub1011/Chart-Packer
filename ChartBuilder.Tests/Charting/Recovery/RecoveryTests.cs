@@ -175,6 +175,21 @@ public sealed class RecoveryTests
         Assert.AreEqual(TimeSpan.FromMilliseconds(1250), recovered.Delay);
     }
 
+    [TestMethod]
+    public async Task ASuggestedRatingUsedIsRecovered()
+    {
+        // charter-spec C18 item 3: a rating used is a pending change, kept by autosave until it's saved.
+        string folder = _folders.Song("Song", ("notes.mid", MidiFixtures.LeadGuitar()), ("song.ini", Ini("name = Song", "diff_guitar = -1")));
+        var song = EditorSong.Of(await OpenAsync(folder, Token));
+        song.SetRating("diff_guitar", 4);
+        await AutosaveAsync(song);
+
+        var recovered = Autosave.Recover(await OpenAsync(folder, Token), _store.Find(folder)!);
+
+        Assert.AreEqual(4, recovered.Ratings["diff_guitar"]);
+        Assert.IsTrue(recovered.PendingChanges().Any(c => c.Key == "diff_guitar" && c.Value == "4"));
+    }
+
     private Task AutosaveAsync(EditorSong song) =>
         _store.WriteAsync(RecoveryStore.KeyOf(song.Entry!.FullPath), MidiChartWriter.Write(song.Chart), Autosave.ManifestFor(song, song.Title ?? "", DateTimeOffset.Now), Token);
 }

@@ -86,6 +86,7 @@ public sealed class EditorSession
         Tools = new EditorTools(this);
         Fills = new FillProposals(this);
         TempoProposal = new TempoProposals(this);
+        Reduce = new ReduceProposals(this);
         undo.Changed += OnUndoChanged;
     }
 
@@ -145,6 +146,42 @@ public sealed class EditorSession
     /// <summary>The proposed tempo map being looked at, if there's one (charter-spec C14 item 4).</summary>
     public TempoProposals TempoProposal { get; }
 
+    /// <summary>The run of Reduce going on, if there's one (charter-spec C9 item 2).</summary>
+    public ReduceProposals Reduce { get; }
+
+    /// <summary>
+    /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a Reduce run's, or null for
+    /// none.
+    /// </summary>
+    public EditableTrack? GhostTrack(ChartTrackKey key) =>
+        Recording?.Track == key ? Recording.Ghost : Reduce.Target == key ? Reduce.Ghost : null;
+
+    /// <summary>The pass of record mode going on, if there's one (charter-spec C15 item 5).</summary>
+    public RecordPass? Recording { get; private set; }
+
+    /// <summary>
+    /// Starts a pass of record mode into <paramref name="track"/>, in place of any going on, which is cancelled: from
+    /// <paramref name="startSeconds"/> of audio, as the editor draws the song.
+    /// </summary>
+    /// <param name="punch">The range to record into when overwriting; null for the stretch the pass plays over.</param>
+    public RecordPass StartRecording(ChartTrackKey track, RecordMode mode, double startSeconds, (long From, long To)? punch = null)
+    {
+        Tools.Cancel();
+        Recording?.Cancel();
+        Recording = new RecordPass(this, track, mode, startSeconds, mode == RecordMode.Overwrite ? punch : null);
+        RaiseState();
+        return Recording;
+    }
+
+    /// <summary>Forgets <paramref name="pass"/>, as it ends.</summary>
+    internal void EndRecording(RecordPass pass)
+    {
+        if (!ReferenceEquals(Recording, pass))
+            return;
+        Recording = null;
+        RaiseState();
+    }
+
     /// <summary>The tempo map the chart's ticks are timed by.</summary>
     public TempoMap TempoMap => Chart.TempoMap.ToTempoMap();
 
@@ -192,6 +229,9 @@ public sealed class EditorSession
 
     /// <summary>Whether notes keep their times rather than their ticks when the tempo changes (charter-spec C4 item 3).</summary>
     public bool KeepTimes { get; set; }
+
+    /// <summary>The tracks of the lanes shown, which a range selected across lanes covers (charter-spec C15 item 2); null for none known.</summary>
+    public Func<IReadOnlyList<ChartTrackKey>>? VisibleTracks { get; set; }
 
     /// <summary>The onsets found in the lanes' audio, for snapping and nudging to them; null without audio (charter-spec C14).</summary>
     public IOnsetSource? Onsets { get; set; }
@@ -318,6 +358,20 @@ public sealed class EditorSession
 
     /// <summary>The cursor's tick: the nearest step of the grid (or tick, with snap off), never before the start.</summary>
     public long CursorTick => Snap.Nearest(TickAt(Viewport.Cursor), TempoMap);
+
+    /// <summary>
+    /// Where a note placed, moved, pasted or recorded at <paramref name="tick"/> of <paramref name="key"/>'s track goes:
+    /// the nearest onset within half a grid step with snap to onset on, otherwise the grid (charter-spec C14 item 2, C15
+    /// item 5).
+    /// </summary>
+    public long Quantize(double tick, ChartTrackKey key)
+    {
+        var map = TempoMap;
+        if (SnapToOnset && Onsets?.OnsetsFor(key) is { Count: > 0 } onsets
+            && OnsetSnap.Nearest(tick, onsets, map, Delay.TotalSeconds, Snap) is { } onset)
+            return onset;
+        return Snap.Nearest(tick, map);
+    }
 
     /// <summary>Moves the cursor to <paramref name="tick"/>.</summary>
     public void MoveCursorTo(long tick) => Viewport.MoveCursor(AudioAt(Math.Max(0, tick)));
@@ -498,6 +552,7 @@ public sealed class EditorSession
             Selection.Reconcile();
             KeepPhraseKindOffered();
             Fills.OnChanged();
+            Reduce.OnChanged();
         }
 
         ChartChanged?.Invoke(this, new EditorChartChangedEventArgs(affected, isPreview));
@@ -513,7 +568,7 @@ public sealed class EditorSession
     // Drops the game view of every track the change touched.
     private void Forget(ChartChange affected)
     {
-        if ((affected.Song & (SongChanges.Parts | SongChanges.DrumsVariant | SongChanges.TempoMap)) != 0)
+        if (affected.RebuildsAllTracks)
         {
             _readOptions = null;
             _game.Clear();
@@ -521,18 +576,10 @@ public sealed class EditorSession
             return;
         }
 
-        foreach (var region in affected.Regions)
-        {
-            bool drums = ChartInstruments.KindOf(region.Part) == ChartInstrumentKind.Drums;
-            if (drums)
-                ForgetDiscoFlips();
-            bool wholePart = region.Difficulty is null || drums;
-            foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
-            {
-                if (wholePart || region.Difficulty == difficulty)
-                    _game.Remove(new ChartTrackKey(region.Part, difficulty));
-            }
-        }
+        if (affected.Regions.Any(static r => ChartInstruments.KindOf(r.Part) == ChartInstrumentKind.Drums))
+            ForgetDiscoFlips();
+        foreach (var key in _game.Keys.Where(affected.Touches).ToList())
+            _game.Remove(key);
     }
 
     // Drops the flips and the sections worked out from the drums, once an edit has touched them or the song's settings changed.

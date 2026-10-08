@@ -1,5 +1,27 @@
 namespace ChartPacker.Core.Validation;
 
+/// <summary>The groups of the chart lint rule catalogue (charter-spec §6), by the range their IDs are in.</summary>
+public enum ChrCategory
+{
+    /// <summary>CHR001 to CHR019: the tempo map and the grid.</summary>
+    Timing,
+
+    /// <summary>CHR020 to CHR039: 5-fret and GHL.</summary>
+    Frets,
+
+    /// <summary>CHR040 to CHR059: drums.</summary>
+    Drums,
+
+    /// <summary>CHR060 to CHR079: phrases and events.</summary>
+    Phrases,
+
+    /// <summary>CHR080 to CHR085: the song as a whole.</summary>
+    Song,
+
+    /// <summary>CHR086: what the chart file held that couldn't be loaded.</summary>
+    Load,
+}
+
 /// <summary>
 /// Rule IDs from the chart lint rule catalogue (charter-spec §6), for <see cref="Charting.Lint.IChartLintRule"/>. IDs are
 /// stable: a rule may be retired, but its ID is never reused.
@@ -108,4 +130,34 @@ public static class ChrRules
     /// (<see cref="Charting.Lint.ChartLoadFindings"/>).
     /// </summary>
     public const string Chr086 = "CHR086";
+
+    /// <summary>Every rule ID, in order.</summary>
+    public static IReadOnlyList<string> All { get; } =
+    [
+        Chr001, Chr002, Chr003, Chr004, Chr005,
+        Chr020, Chr021, Chr022, Chr023, Chr024, Chr025, Chr026,
+        Chr040, Chr041, Chr042, Chr043, Chr044, Chr045, Chr046, Chr048,
+        Chr060, Chr061, Chr062, Chr063,
+        Chr080, Chr081, Chr082, Chr083, Chr084, Chr085, Chr086,
+    ];
+
+    /// <summary>Whether <paramref name="ruleId"/> is a chart lint rule's: CHR and three digits.</summary>
+    public static bool IsChartRule(string ruleId) => CategoryOf(ruleId) is not null;
+
+    /// <summary>The group of the catalogue <paramref name="ruleId"/> is in, by its number; null for an ID that isn't a CHR one.</summary>
+    public static ChrCategory? CategoryOf(string ruleId)
+    {
+        if (ruleId is not { Length: 6 } || !ruleId.StartsWith("CHR", StringComparison.Ordinal)
+            || !int.TryParse(ruleId.AsSpan(3), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int number))
+            return null;
+        return number switch
+        {
+            < 20 => ChrCategory.Timing,
+            < 40 => ChrCategory.Frets,
+            < 60 => ChrCategory.Drums,
+            < 80 => ChrCategory.Phrases,
+            < 86 => ChrCategory.Song,
+            _ => ChrCategory.Load,
+        };
+    }
 }

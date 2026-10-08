@@ -19,6 +19,7 @@ public sealed class EditorSong
     private long? _audioLengthMs;
     private long? _delayMs;
     private string _defaultCharter = "";
+    private readonly Dictionary<string, int> _ratings = new(StringComparer.OrdinalIgnoreCase);
 
     private EditorSong(OpenedSong? opened, EditableChart chart, IReadOnlyList<SongTrack> tracks, IReadOnlySet<ChartInstrument> loadedParts)
     {
@@ -105,6 +106,33 @@ public sealed class EditorSong
         }
     }
 
+    /// <summary>
+    /// The suggested ratings the user chose to use (charter-spec C18 item 3), by <c>diff_*</c> key: pending changes, which
+    /// Revert takes back, cleared once saved.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> Ratings => _ratings;
+
+    /// <summary>Uses <paramref name="tier"/> as <paramref name="key"/>'s rating, a pending change until saved; not an undo step.</summary>
+    public void SetRating(string key, int tier)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        ArgumentOutOfRangeException.ThrowIfNegative(tier);
+        bool restored = _reverted.Remove(key);
+        if (_ratings.TryGetValue(key, out int was) && was == tier && !restored)
+            return;
+        _ratings[key] = tier;
+        OnChanged();
+    }
+
+    /// <summary>Sets each of <paramref name="ratings"/>, as a recovered chart had them.</summary>
+    public void SetRatings(IEnumerable<KeyValuePair<string, int>> ratings)
+    {
+        ArgumentNullException.ThrowIfNull(ratings);
+        foreach (var (key, tier) in ratings)
+            _ratings[key] = tier;
+        OnChanged();
+    }
+
     /// <summary>The Default charter name setting, which fills an empty <c>charter</c>.</summary>
     public string DefaultCharter
     {
@@ -148,6 +176,7 @@ public sealed class EditorSong
         Import = Import,
         Values = _values,
         DelayMs = _delayMs,
+        Ratings = new Dictionary<string, int>(_ratings, StringComparer.OrdinalIgnoreCase),
     };
 
     /// <summary>Every change the chart and the song call for, reverted or not, in the order they're listed.</summary>
@@ -200,6 +229,7 @@ public sealed class EditorSong
         LoadedParts = savedParts;
         _values = [];
         _delayMs = null;
+        _ratings.Clear();
         OnChanged();
     }
 

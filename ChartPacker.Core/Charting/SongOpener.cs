@@ -185,22 +185,35 @@ public static class SongOpener
             if (bytes is null)
                 return SongOpenResult.Failed(SongOpenProblemKind.ChartTooLarge);
 
-            var options = ChartReadOptions.From(pairs);
-            if (chartName.Equals(ChartFiles.MidiName, StringComparison.OrdinalIgnoreCase))
-            {
-                var load = MidiChartLoader.Load(bytes, options);
-                return new SongOpenResult(new OpenedSong(entry, pairs, stored, chartName, load, options, SongChartSettings.DelayOf(pairs, (TimeSpan?)null), null, stamp), null);
-            }
-
-            var import = MidiChartLoader.LoadChart(bytes, options);
-            var song = new OpenedSong(entry, pairs, stored, chartName, import.Load, import.Options, SongChartSettings.DelayOf(pairs, import.Offset), import, stamp);
-            return new SongOpenResult(song, null);
+            var chart = LoadChart(chartName, bytes, pairs);
+            return new SongOpenResult(new OpenedSong(entry, pairs, stored, chartName, chart.Load, chart.Options, chart.Delay, chart.Import, stamp), null);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             // A malformed chart is a ChartFormatException, which is an IOException.
             return SongOpenResult.Failed(SongOpenProblemKind.Unreadable, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// The chart <paramref name="bytes"/> hold, read as the games read it with <paramref name="pairs"/>: <c>notes.mid</c>
+    /// as it is, or <c>notes.chart</c> converted in memory. Both apps read charts this way: Chart Builder to edit one, Chart
+    /// Packer to lint it (charter-spec C16 item 5).
+    /// </summary>
+    /// <param name="chartName">The chart file's name: <c>notes.mid</c> or <c>notes.chart</c>.</param>
+    /// <exception cref="ChartFormatException">The chart is malformed.</exception>
+    public static (ChartLoadResult Load, ChartReadOptions Options, TimeSpan Delay, ChartImportResult? Import) LoadChart(
+        string chartName, byte[] bytes, IReadOnlyList<KeyValuePair<string, string>> pairs)
+    {
+        ArgumentNullException.ThrowIfNull(chartName);
+        ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(pairs);
+        var options = ChartReadOptions.From(pairs);
+        if (chartName.Equals(ChartFiles.MidiName, StringComparison.OrdinalIgnoreCase))
+            return (MidiChartLoader.Load(bytes, options), options, SongChartSettings.DelayOf(pairs, (TimeSpan?)null), null);
+
+        var import = MidiChartLoader.LoadChart(bytes, options);
+        return (import.Load, import.Options, SongChartSettings.DelayOf(pairs, import.Offset), import);
     }
 
     private static async Task<IReadOnlyList<KeyValuePair<string, string>>> ReadPairsAsync(SongEntry entry, IReadOnlyList<string> stored, CancellationToken cancellationToken)

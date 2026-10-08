@@ -13,6 +13,7 @@ using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.Controls.Highway;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -592,13 +593,7 @@ namespace ChartPacker.ViewModels
                         continue;
 
                     var kind = ChartInstruments.KindOf(row.Instrument);
-                    int laneCount = kind switch
-                    {
-                        ChartInstrumentKind.FiveFret => 5,
-                        ChartInstrumentKind.Drums => chart.IsFiveLaneDrums ? 5 : 4,
-                        _ => 3,
-                    };
-                    lanes.Add(new HighwayLane(kind, laneCount, TrackName(row.Key), track.Notes, chart.Tempo, _delay));
+                    lanes.Add(new HighwayLane(kind, HighwayLane.LaneCountOf(kind, chart.IsFiveLaneDrums), TrackName(row.Key), track.Notes, chart.Tempo, _delay));
                     instruments.Add(row.Instrument);
                 }
             }

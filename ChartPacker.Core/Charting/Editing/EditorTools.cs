@@ -36,13 +36,7 @@ public sealed partial class EditorTools
     /// Where a note placed or moved to <paramref name="tick"/> of <paramref name="key"/>'s track goes: the nearest onset
     /// within half a grid step with snap to onset on, otherwise the grid (charter-spec C14 item 2).
     /// </summary>
-    private long SnapTick(double tick, ChartTrackKey key)
-    {
-        if (_session.SnapToOnset && _session.Onsets?.OnsetsFor(key) is { Count: > 0 } onsets
-            && OnsetSnap.Nearest(tick, onsets, Map, _session.Delay.TotalSeconds, Snap) is { } onset)
-            return onset;
-        return Snap.Nearest(tick, Map);
-    }
+    private long SnapTick(double tick, ChartTrackKey key) => _session.Quantize(tick, key);
 
     /// <summary>
     /// Moves the selected notes to their nearest onsets, chord by chord, as one step (charter-spec C14 item 3), and keeps
@@ -79,6 +73,13 @@ public sealed partial class EditorTools
         if (point.Rail is not null)
         {
             _gesture = PressRail(point, shift);
+            return;
+        }
+
+        // Alt+drag selects a time range across the lanes (charter-spec C15 item 2).
+        if (_session.Tool == EditorTool.Select && modifiers.HasFlag(EditorModifiers.Alt))
+        {
+            _gesture = new RangeGesture(this, point);
             return;
         }
 
@@ -163,6 +164,12 @@ public sealed partial class EditorTools
     public void MoveSelection(int steps, int lanes, LaneSlots slots)
     {
         ArgumentNullException.ThrowIfNull(slots);
+        if (_session.Selection.HasRangeAcrossLanes)
+        {
+            MoveRange(steps);
+            return;
+        }
+
         if (_session.Selection.Track is not { } key)
             return;
         var notes = _session.Selection.Notes;
@@ -199,6 +206,8 @@ public sealed partial class EditorTools
         var steps = new List<Func<(IChartCommand?, string?)>>();
         if (selection.Track is { } key && selection.Notes is { Count: > 0 } notes)
             steps.Add(() => (new RemoveNotes(key.Instrument, key.Difficulty, notes), null));
+        else if (selection.HasRangeAcrossLanes)
+            steps.AddRange(RemoveRangeSteps());
         if (selection.PhrasePart is { } part)
         {
             foreach (var phrase in selection.Phrases)
@@ -397,6 +406,12 @@ public sealed partial class EditorTools
     public void ToggleChordFlag(ChordFlags flag)
     {
         var selection = _session.Selection;
+        if (selection.HasRangeAcrossLanes)
+        {
+            ToggleRangeChordFlag(flag);
+            return;
+        }
+
         if (selection.Track is not { } key || _session.TrackOf(key) is not { } track)
             return;
         var ticks = selection.Notes.Select(static n => n.Tick).Distinct().ToList();

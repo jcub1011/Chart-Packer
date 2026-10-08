@@ -1960,4 +1960,322 @@ Saving also makes these changes to song.ini:
   <data name="SpectrogramBudgetFullFormat" xml:space="preserve">
     <value>The spectrogram of {0} ({1:0} MB) doesn't fit in the spectrogram memory budget beside the ones shown. Raise the budget in Settings, or show fewer spectrograms.</value>
   </data>
+  <data name="LaneEditToolTip" xml:space="preserve">
+    <value>Edit: copy, reduce and transform this lane</value>
+  </data>
+  <data name="LaneCopyToFormat" xml:space="preserve">
+    <value>Copy {0} to</value>
+  </data>
+  <data name="CopyDifficultyTitle" xml:space="preserve">
+    <value>Copy difficulty</value>
+  </data>
+  <data name="CopyDifficultyConfirmFormat" xml:space="preserve">
+    <value>{0} has {1} notes, which {2} will replace. Undo puts them back.</value>
+  </data>
+  <data name="CopyDifficultyConfirmButton" xml:space="preserve">
+    <value>Replace</value>
+  </data>
+  <data name="CopyDifficultyDoneFormat" xml:space="preserve">
+    <value>Copied {0} to {1}.</value>
+  </data>
+  <data name="CopyDifficultyDroppedKicksFormat" xml:space="preserve">
+    <value>Copied {0} to {1}, leaving out {2} 2× kicks, which only Expert has.</value>
+  </data>
+  <data name="LaneReduce" xml:space="preserve">
+    <value>Reduce…</value>
+  </data>
+  <data name="ReduceTitleFormat" xml:space="preserve">
+    <value>Reduce {0}</value>
+  </data>
+  <data name="ReduceDefaultsTitle" xml:space="preserve">
+    <value>Default reduction rules</value>
+  </data>
+  <data name="ReduceIntro" xml:space="preserve">
+    <value>Makes a draft of a lower difficulty from a higher one, drawn over the target as you change the rules. The changes here are for this run only.</value>
+  </data>
+  <data name="ReduceDefaultsIntro" xml:space="preserve">
+    <value>The rules Reduce starts from for each family and difficulty. Each run can change them for itself.</value>
+  </data>
+  <data name="ReduceFamilyLabel" xml:space="preserve">
+    <value>Part</value>
+  </data>
+  <data name="ReduceFamilyFiveFret" xml:space="preserve">
+    <value>5-fret</value>
+  </data>
+  <data name="ReduceFamilyGhl" xml:space="preserve">
+    <value>GHL (6-fret)</value>
+  </data>
+  <data name="ReduceFamilyDrums" xml:space="preserve">
+    <value>Drums</value>
+  </data>
+  <data name="ReduceFromLabel" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="ReduceToLabel" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="ReduceChordSizeLabel" xml:space="preserve">
+    <value>Max chord size</value>
+  </data>
+  <data name="ReduceFretsLabel" xml:space="preserve">
+    <value>Frets used</value>
+  </data>
+  <data name="ReduceFretsFormat" xml:space="preserve">
+    <value>Green to {0}</value>
+  </data>
+  <data name="ReduceColumnsLabel" xml:space="preserve">
+    <value>Columns used</value>
+  </data>
+  <data name="ReduceColumnsFormat" xml:space="preserve">
+    <value>1 to {0}</value>
+  </data>
+  <data name="ReduceThinningLabel" xml:space="preserve">
+    <value>No closer than</value>
+  </data>
+  <data name="ReduceNoThinning" xml:space="preserve">
+    <value>No thinning</value>
+  </data>
+  <data name="ReduceKickLabel" xml:space="preserve">
+    <value>Kick no closer than</value>
+  </data>
+  <data name="ReduceKickKept" xml:space="preserve">
+    <value>Kept</value>
+  </data>
+  <data name="ReducePadsLabel" xml:space="preserve">
+    <value>Pads per hit (plus kick)</value>
+  </data>
+  <data name="ReduceKeepForcing" xml:space="preserve">
+    <value>Keep forced HOPOs and taps</value>
+  </data>
+  <data name="ReduceKeepShortSustains" xml:space="preserve">
+    <value>Keep sustains shorter than a beat</value>
+  </data>
+  <data name="ReduceApplyButton" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="ReduceSaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="ReduceResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="ReduceResetToolTip" xml:space="preserve">
+    <value>Put back the shipped rules for this part and difficulty</value>
+  </data>
+  <data name="ReduceNothingToReduce" xml:space="preserve">
+    <value>There are no notes to reduce.</value>
+  </data>
+  <data name="ReduceSummaryFormat" xml:space="preserve">
+    <value>{0} to {1}: {2} notes, {3} left out.</value>
+  </data>
+  <data name="FretGreen" xml:space="preserve">
+    <value>green</value>
+  </data>
+  <data name="FretRed" xml:space="preserve">
+    <value>red</value>
+  </data>
+  <data name="FretYellow" xml:space="preserve">
+    <value>yellow</value>
+  </data>
+  <data name="FretBlue" xml:space="preserve">
+    <value>blue</value>
+  </data>
+  <data name="FretOrange" xml:space="preserve">
+    <value>orange</value>
+  </data>
+  <data name="ReductionRulesLabel" xml:space="preserve">
+    <value>Default reduction rules</value>
+  </data>
+  <data name="ReductionRulesDescription" xml:space="preserve">
+    <value>The rules Reduce starts from: chord size, frets used, thinning, forcing and sustains, and the drums' pads and kick. Each run can change them for itself.</value>
+  </data>
+  <data name="ReductionRulesKeywords" xml:space="preserve">
+    <value>reduce reduction difficulty easy medium hard thinning chords</value>
+  </data>
+  <data name="ReductionRulesEditButton" xml:space="preserve">
+    <value>Edit…</value>
+  </data>
+  <data name="ReductionRulesResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="CopiedFormat" xml:space="preserve">
+    <value>Copied {0} notes.</value>
+  </data>
+  <data name="CutFormat" xml:space="preserve">
+    <value>Cut {0} notes.</value>
+  </data>
+  <data name="ClipboardEmpty" xml:space="preserve">
+    <value>The clipboard is empty: copy some notes first.</value>
+  </data>
+  <data name="PasteDroppedKicksFormat" xml:space="preserve">
+    <value>Pasted, leaving out {0} 2× kicks, which only Expert has.</value>
+  </data>
+  <data name="LaneMappingTitle" xml:space="preserve">
+    <value>Lane mapping</value>
+  </data>
+  <data name="LaneMappingIntroFormat" xml:space="preserve">
+    <value>Where each {0} lane goes in {1}. Open notes stay open.</value>
+  </data>
+  <data name="LaneMappingPasteButton" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <data name="LaneSelectLane" xml:space="preserve">
+    <value>Select lane</value>
+  </data>
+  <data name="LaneSelectSection" xml:space="preserve">
+    <value>Select section at cursor (Ctrl+Shift+A)</value>
+  </data>
+  <data name="LaneCut" xml:space="preserve">
+    <value>Cut (Ctrl+X)</value>
+  </data>
+  <data name="LaneCopy" xml:space="preserve">
+    <value>Copy (Ctrl+C)</value>
+  </data>
+  <data name="LanePaste" xml:space="preserve">
+    <value>Paste at cursor (Ctrl+V)</value>
+  </data>
+  <data name="LanePasteMerge" xml:space="preserve">
+    <value>Paste and merge (Ctrl+Shift+V)</value>
+  </data>
+  <data name="LaneTransform" xml:space="preserve">
+    <value>Transform</value>
+  </data>
+  <data name="TransformLeftyFlip" xml:space="preserve">
+    <value>Lefty flip</value>
+  </data>
+  <data name="TransformShiftUp" xml:space="preserve">
+    <value>Shift up a lane (Alt+Shift+→)</value>
+  </data>
+  <data name="TransformShiftDown" xml:space="preserve">
+    <value>Shift down a lane (Alt+Shift+←)</value>
+  </data>
+  <data name="TransformClearSustains" xml:space="preserve">
+    <value>Clear sustains</value>
+  </data>
+  <data name="TransformGridSustains" xml:space="preserve">
+    <value>Sustain for one grid step</value>
+  </data>
+  <data name="TransformSustainsUntilNext" xml:space="preserve">
+    <value>Sustain until the next note</value>
+  </data>
+  <data name="LaneStretch" xml:space="preserve">
+    <value>Stretch timing</value>
+  </data>
+  <data name="StretchDouble" xml:space="preserve">
+    <value>Twice as long (×2)</value>
+  </data>
+  <data name="StretchThreeHalves" xml:space="preserve">
+    <value>Half as long again (×1.5)</value>
+  </data>
+  <data name="StretchTwoThirds" xml:space="preserve">
+    <value>Two thirds as long (×⅔)</value>
+  </data>
+  <data name="StretchHalf" xml:space="preserve">
+    <value>Half as long (×½)</value>
+  </data>
+  <data name="StretchToCursor" xml:space="preserve">
+    <value>To end at the cursor</value>
+  </data>
+  <data name="RecordButton" xml:space="preserve">
+    <value>Record</value>
+  </data>
+  <data name="RecordStartToolTip" xml:space="preserve">
+    <value>Record (R): play notes with the number keys while the song plays; hold a key for a sustain</value>
+  </data>
+  <data name="RecordStopToolTip" xml:space="preserve">
+    <value>Stop recording (R), adding the pass as one step</value>
+  </data>
+  <data name="RecordModeToolTip" xml:space="preserve">
+    <value>How a recorded pass goes in: merged with what's there, or over the selected range or the stretch played</value>
+  </data>
+  <data name="RecordModeMerge" xml:space="preserve">
+    <value>Merge</value>
+  </data>
+  <data name="RecordModeOverwrite" xml:space="preserve">
+    <value>Overwrite</value>
+  </data>
+  <data name="RecordNoLane" xml:space="preserve">
+    <value>Click a lane to record into first.</value>
+  </data>
+  <data name="RecordNoAudio" xml:space="preserve">
+    <value>Record mode plays the song, and it has no audio yet.</value>
+  </data>
+  <data name="RecordingMergeFormat" xml:space="preserve">
+    <value>Recording into {0} · {1}, merging. Press R or Space to stop, Esc to cancel.</value>
+  </data>
+  <data name="RecordingOverwriteFormat" xml:space="preserve">
+    <value>Recording into {0} · {1}, overwriting. Press R or Space to stop, Esc to cancel.</value>
+  </data>
+  <data name="RecordedFormat" xml:space="preserve">
+    <value>Recorded {0} notes, as one step.</value>
+  </data>
+  <data name="RecordedNothing" xml:space="preserve">
+    <value>Nothing was recorded.</value>
+  </data>
+  <data name="RecordCancelled" xml:space="preserve">
+    <value>Recording cancelled; nothing was added.</value>
+  </data>
+  <data name="PreviewTab" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="PreviewWindowTitle" xml:space="preserve">
+    <value>Preview - Chart Builder</value>
+  </data>
+  <data name="PreviewFollowLane" xml:space="preserve">
+    <value>The lane in focus</value>
+  </data>
+  <data name="PreviewTrackToolTip" xml:space="preserve">
+    <value>What the preview shows: the lane in focus, or a part and difficulty</value>
+  </data>
+  <data name="PreviewOpenWindow" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="PreviewOpenWindowToolTip" xml:space="preserve">
+    <value>Open the preview in a window of its own; F11 there for full screen</value>
+  </data>
+  <data name="PreviewPractice" xml:space="preserve">
+    <value>Practice</value>
+  </data>
+  <data name="PreviewPracticeToolTip" xml:space="preserve">
+    <value>Play the loop region over and over at the speed picked; with no loop, the selection's</value>
+  </data>
+  <data name="PreviewNothingToShow" xml:space="preserve">
+    <value>Click a lane, or pick a part and difficulty, to preview it.</value>
+  </data>
+  <data name="PendingReasonSuggestedRating" xml:space="preserve">
+    <value>The suggested rating, which you chose to use</value>
+  </data>
+  <data name="SuggestedRatingFormat" xml:space="preserve">
+    <value>Suggested rating: {0}</value>
+  </data>
+  <data name="SuggestedRatingFromFormat" xml:space="preserve">
+    <value>From {0}, the part's highest difficulty</value>
+  </data>
+  <data name="SuggestedRatingNpsFormat" xml:space="preserve">
+    <value>Notes per second: {0:0.0} at peak, {1:0.0} on average</value>
+  </data>
+  <data name="SuggestedRatingChordsFormat" xml:space="preserve">
+    <value>Chords: {0:P0}</value>
+  </data>
+  <data name="SuggestedRatingHopoFormat" xml:space="preserve">
+    <value>HOPOs and taps: {0:P0}</value>
+  </data>
+  <data name="SuggestedRatingKickFormat" xml:space="preserve">
+    <value>Kicks apart from the hands: {0:P0}</value>
+  </data>
+  <data name="SuggestedRatingDifficultyFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="SuggestedRatingOnlySuggestion" xml:space="preserve">
+    <value>Only a suggestion, from hand-set weights.</value>
+  </data>
+  <data name="SuggestedRatingUseFormat" xml:space="preserve">
+    <value>Use as {0}</value>
+  </data>
+  <data name="SuggestedRatingUseToolTip" xml:space="preserve">
+    <value>Write the suggested rating to song.ini on the next save; Pending changes can take it back</value>
+  </data>
+  <data name="SuggestedRatingUsedFormat" xml:space="preserve">
+    <value>Rating {0} will be saved as {1}.</value>
+  </data>
 </root>

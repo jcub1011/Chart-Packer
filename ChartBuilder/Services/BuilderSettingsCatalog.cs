@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Settings;
@@ -18,7 +19,8 @@ namespace ChartBuilder.Services
     public static class BuilderSettingsCatalog
     {
         /// <param name="calibrate">Opens the calibration tool, which edits the audio latency (charter-spec C11).</param>
-        public static SettingsCatalog Create(BuilderSettingsService settings, Action calibrate)
+        /// <param name="editReductionRules">Opens the Reduce dialog's Settings mode, which edits the default rules (charter-spec C9).</param>
+        public static SettingsCatalog Create(BuilderSettingsService settings, Action calibrate, Action editReductionRules)
         {
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
@@ -92,6 +94,24 @@ namespace ChartBuilder.Services
                         ],
                         Get = () => settings.Settings.TempoEdits,
                         Set = mode => settings.Settings.TempoEdits = mode,
+                    },
+                    // The rules are per family and difficulty, so they're edited in the Reduce dialog (charter-spec §10).
+                    new ActionSetting
+                    {
+                        Id = "charter.reductionRules",
+                        Category = editing,
+                        Label = Strings.ReductionRulesLabel,
+                        Description = Strings.ReductionRulesDescription,
+                        Keywords = SettingKeywords.Split(Strings.ReductionRulesKeywords),
+                        Actions =
+                        [
+                            new SettingAction(Strings.ReductionRulesEditButton, editReductionRules),
+                            new SettingAction(Strings.ReductionRulesResetButton, () =>
+                            {
+                                settings.Settings.ReductionRules = ReductionDefaults.Shipped;
+                                settings.Save();
+                            }),
+                        ],
                     },
                     new ChoiceSetting<int>
                     {

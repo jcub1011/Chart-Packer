@@ -48,6 +48,9 @@ namespace ChartBuilder.Views
                 ApplyLayout();
             };
             SizeChanged += (_, _) => ApplyLayout();
+
+            // Keys held in record mode are let go when the window loses focus, as their key-ups won't come here.
+            Deactivated += (_, _) => _viewModel?.Editor.RecordReleaseAll();
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             Closing += (_, _) => CaptureLayout();
         }

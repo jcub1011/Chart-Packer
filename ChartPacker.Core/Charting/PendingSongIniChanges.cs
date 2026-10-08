@@ -33,6 +33,9 @@ public enum PendingChangeReason
 
     /// <summary>The delay Find first downbeat set, so the chart starts on the downbeat (charter-spec C14 item 5).</summary>
     DelayFromDownbeat,
+
+    /// <summary>A part's suggested rating, which the user chose to use (charter-spec C18 item 3).</summary>
+    SuggestedRating,
 }
 
 /// <summary>A change to <c>song.ini</c> that saving makes, and why.</summary>
@@ -72,6 +75,12 @@ public sealed record PendingSongIniInputs(IReadOnlySet<ChartInstrument> LoadedPa
     /// has; null for none.
     /// </summary>
     public long? DelayMs { get; init; }
+
+    /// <summary>
+    /// The suggested ratings the user chose to use (charter-spec C18 item 3), by <c>diff_*</c> key, in place of what
+    /// <c>song.ini</c> has; never written without the user's say-so.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> Ratings { get; init; } = new Dictionary<string, int>();
 }
 
 /// <summary>
@@ -149,9 +158,19 @@ public static class PendingSongIniChanges
                 continue;
             foreach (var key in SongIniPartKeys.DifficultyKeysOf(part.Instrument, chart.DrumsVariant))
             {
-                if (SongIniValues.Last(pairs, key) is null)
+                if (SongIniValues.Last(pairs, key) is null && !inputs.Ratings.ContainsKey(key))
                     changes.Add(new PendingSongIniChange(key, MetadataDifficulty.UnsetValue, PendingChangeReason.PartRating));
             }
+        }
+
+        // A suggested rating chosen, for a part the chart has, where song.ini rates it otherwise.
+        foreach (var (key, tier) in inputs.Ratings.OrderBy(static r => r.Key, StringComparer.Ordinal))
+        {
+            bool rated = chart.Parts.Any(p => NewChartSettings.Instruments.Contains(p.Instrument)
+                && SongIniPartKeys.DifficultyKeysOf(p.Instrument, chart.DrumsVariant).Contains(key, StringComparer.OrdinalIgnoreCase));
+            string value = tier.ToString(CultureInfo.InvariantCulture);
+            if (rated && SongIniValues.Integer(SongIniValues.Last(pairs, key)) != tier)
+                changes.Add(new PendingSongIniChange(key, value, PendingChangeReason.SuggestedRating));
         }
 
         var song = ChartReadOptions.From(pairs);

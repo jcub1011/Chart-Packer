@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Current as of 2026-10-08 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
-| **Next up** | [CM5: Authoring tools](#cm5-authoring-tools) |
+| **Next up** | v1 is built: the manual checks of CM5, then the release |
 
 ---
 
@@ -23,7 +23,7 @@ its exit criteria. This file owns only the order and the status.
 | 3 | [CM2: Calibration, chart settings and 5-fret editing](#cm2-calibration-chart-settings-and-5-fret-editing) | Done | Exit criteria met | CM1 |
 | 4 | [CM3: Drums and GHL](#cm3-drums-and-ghl) | Done | Exit criteria met | CM2 |
 | 5 | [CM4: Audio assist](#cm4-audio-assist) | Done | Exit criteria met | CM2 |
-| 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Not started | — | CM3, CM4 |
+| 6 | [CM5: Authoring tools](#cm5-authoring-tools) | Done | Exit criteria met by tests; manual checks to do | CM3, CM4 |
 
 ---
 
@@ -149,7 +149,7 @@ engine. Its design decisions are recorded in the spec, as *Settled in CM2* and *
 - **Phrases and drums in the editor.** Done in CM3: the Phrase tool, solos and the `S` key; cymbal
   and tom (`C`), accents and ghosts (`A`) and the 2× kick (`Shift`+`0`); GHL's stacked columns.
 - **Record mode**, which shifts key presses by the latency
-  ([C15](charter-spec-v1.md#c15-editing-ergonomics)), with CM5.
+  ([C15](charter-spec-v1.md#c15-editing-ergonomics)). Done in CM5.
 - **Ratings.** CHR083 can't be cleared in the editor until a part can be rated (the Chart
   Inspector, or C18's suggested rating); CHR080 has no fix until C9's reduction.
 - **The Chart Inspector** is still a placeholder. A new chart's name and artist are asked for at
@@ -246,16 +246,59 @@ decisions are recorded in the spec, as *Settled in CM4*.
   sharing work between them, or a vectorised FFT, would make the first analysis of a song quicker.
 - **A proposal's beats** are re-spaced evenly when one is dragged, rather than estimated again
   round it.
-- **Snap to onset** applies to the mouse only; record mode (CM5) will use it for key presses.
+- **Snap to onset** applies to the mouse only; record mode (CM5) will use it for key presses. Done in
+  CM5.
 - **The bottom timeline** shows the mix's waveform, not the lane's audio, and not the proposal.
 - **Tests of the view models** that draw and analyse (`StemWaveforms`, `AudioAnalysis`), which need
   the UI thread.
 
 ## CM5: Authoring tools
 
-**Status: not started.**
+**Status: done.**
 
-It covers:
+AC C9.1, C15.1 to C15.3, C16.1 and C16.2, and C18.1 have automated tests. The UI was built in eight
+phases, each tested before the next, and its manual checks are still to do. Its design decisions are
+recorded in the spec, as *Settled in CM5*.
+
+**What was built:**
+
+- **Copy difficulty and Reduce** ([C9](charter-spec-v1.md#c9-difficulty-authoring)). `CopyDifficulty`,
+  and `Reducer` with the rules of `ReductionRules`: thinning by strong beats, chords kept to their
+  outer columns and moved into range, forcing and short sustains, drums' pads, kick and 2× kick. A
+  run (`ReduceProposals`) is drawn as a ghost over the target from the Reduce dialog and added as
+  one `ReplaceTrack`. The defaults are in Settings (`BuilderSettings.ReductionRules`).
+- **Selection across lanes** ([C15](charter-spec-v1.md#c15-editing-ergonomics) item 2). A range over
+  the lanes shown (Alt+drag), a section (Ctrl+Shift+A), a whole lane; delete, moves, H/G/T and the
+  transforms act on every track a range covers (`EditorSelection.NotesByTrack`).
+- **The clipboard** (C15 item 3). `ChartClip` and `ClipboardEdits`: passages in ticks, lanes as
+  shown, overwrite or merge (`NoteMerge`, `ReplaceNotes`), 5-fret ↔ GHL through a lane mapping, drums
+  only into the same variant.
+- **Transforms** (C15 item 4). Lefty flip, shift lanes, sustains, and stretching the timing between
+  two points (`TempoMapEdits.Stretch`, `TickMaps.Stretch`), which re-ticks the passthrough tracks.
+- **Record mode** (C15 item 5). `RecordPass`: presses timed by the playback clock when handled,
+  quantised to the grid or onsets, held for sustains, drawn as a ghost and added as one step;
+  Merge or Overwrite on the transport bar.
+- **Lint in the library** ([C16](charter-spec-v1.md#c16-chart-lint) item 5). `SongChartLint` and its
+  session cache, on the Validator's workers; a song's chart findings in the Validator and the detail
+  panel. Packing is never blocked. `SongOpener.LoadChart` reads a chart the same way in both apps.
+- **Preview** ([C18](charter-spec-v1.md#c18-preview)). `NoteHighwayView` moved to `ChartPacker.UI`;
+  the Preview tab and window, practice over the loop, and the suggested rating
+  (`DifficultyEstimator`), used through a pending change (`EditorSong.SetRating`) or CHR083's fix.
+
+**Left for later:**
+
+- **Record mode** times a press when its key event is handled, as Avalonia's key events have no
+  timestamp; a Win32 hook could take the time the key was pressed.
+- **The library** has no fix for chart findings (CHR084's could be one), can't open Chart Builder at
+  a finding (`BuilderArgs --at`), and some messages (CHR045, CHR085, CHR086) talk about saving, which
+  fits Chart Builder better.
+- **The clipboard** doesn't copy phrases or disco flip sections; a stretch always changes the
+  tempos, never only the ticks.
+- **Sections tab.** Select section is on Ctrl+Shift+A and the lane's Edit menu, not on the tab's rows.
+- **The suggested rating's weights** are set by hand, to be fitted to rated charts (spec §14).
+- **The preview** rebuilds the whole track after an edit, not only the range it touched.
+
+It covered:
 
 - [C9](charter-spec-v1.md#c9-difficulty-authoring), reduction;
 - [C15](charter-spec-v1.md#c15-editing-ergonomics) record mode, the clipboard and transforms;

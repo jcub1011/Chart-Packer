@@ -616,6 +616,10 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
+                <!-- The highway preview (charter-spec C18), docked; it also opens in a window of its own. -->
+                <TabItem Header="{x:Static res:Strings.PreviewTab}">
+                    <views:PreviewView DataContext="{Binding Editor.Preview}" />
+                </TabItem>
             </bctl:EditorSidePanel>
         </Grid>
 
@@ -644,6 +648,19 @@
                                 <PathIcon Width="12" Height="12" Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Playback.IsPlaying}" />
                             </Panel>
                         </Button>
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Editor.IsRecording, Mode=OneWay}"
+                                      Command="{Binding Editor.ToggleRecordCommand}"
+                                      ToolTip.Tip="{Binding Editor.RecordToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.RecordButton}">
+                            <Ellipse Width="10" Height="10" Fill="{DynamicResource DifficultyHardBrush}" />
+                        </ToggleButton>
+                        <ComboBox ItemsSource="{Binding Editor.RecordModeChoices}"
+                                  SelectedItem="{Binding Editor.SelectedRecordMode}"
+                                  DisplayMemberBinding="{Binding Label, x:DataType=vm:RecordModeChoice}"
+                                  MinWidth="100"
+                                  ToolTip.Tip="{x:Static res:Strings.RecordModeToolTip}"
+                                  AutomationProperties.Name="{x:Static res:Strings.RecordModeToolTip}" />
                         <ComboBox ItemsSource="{Binding Playback.SpeedPercents}"
                                   SelectedItem="{Binding Playback.SpeedPercent}"
                                   IsEnabled="{Binding Playback.IsReady}"

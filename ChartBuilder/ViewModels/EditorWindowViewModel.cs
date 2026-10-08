@@ -72,7 +72,7 @@ namespace ChartBuilder.ViewModels
             TimelineHeight = saved.EditorTimelineHeight;
             IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
-            Editor = new ChartEditorViewModel(song, _undo, Playback, Audio, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault());
+            Editor = new ChartEditorViewModel(song, _undo, Playback, Audio, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault(), services.Authoring);
             Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);
             Sections = new SectionsViewModel(Editor);

@@ -4,13 +4,13 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// Holds the pointer still while something is dragged, so a drag can go on as far as it needs without the pointer reaching
     /// the edge of the screen. Only on Windows, where the pointer can be put back where it was; elsewhere it moves as usual.
     /// </summary>
-    internal static class HeldPointer
+    public static class HeldPointer
     {
         /// <summary>The pointer while it's held, so it isn't seen jumping back.</summary>
         public static readonly Cursor Hidden = new(StandardCursorType.None);
@@ -54,7 +54,7 @@ namespace ChartPacker.Controls
     /// A drag of a scrubbed lane, or a fine one of the seek bar: how far the pointer moves each time, with it held where the
     /// drag began, hidden, so it doesn't run off as the drag goes on.
     /// </summary>
-    internal sealed class FineDrag(InputElement owner)
+    public sealed class FineDrag(InputElement owner)
     {
         // Where the pointer was last, in the owner; while it's held, where it's held.
         private Point _last;

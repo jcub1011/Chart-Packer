@@ -43,6 +43,9 @@ public sealed record RecoveryManifest(
 
     /// <summary>The delay Find first downbeat set and the song hadn't saved yet, in milliseconds; null for none.</summary>
     public long? DelayMs { get; init; }
+
+    /// <summary>The suggested ratings chosen and not yet saved, by <c>diff_*</c> key (charter-spec C18 item 3).</summary>
+    public IReadOnlyList<KeyValuePair<string, int>> Ratings { get; init; } = [];
 }
 
 /// <summary>A recovery file found in the store.</summary>
@@ -261,6 +264,8 @@ public sealed class RecoveryStore(string folder)
         };
         if (m.DelayMs is { } delay)
             json["delayMs"] = delay;
+        if (m.Ratings.Count > 0)
+            json["ratings"] = new JsonArray([.. m.Ratings.Select(r => (JsonNode)new JsonArray(JsonValue.Create(r.Key), JsonValue.Create(r.Value)))]);
         if (m.ChartFile is { } chart)
         {
             json["chartFile"] = new JsonObject
@@ -305,6 +310,7 @@ public sealed class RecoveryStore(string folder)
                 json["title"]?.GetValue<string>() ?? "")
             {
                 DelayMs = json["delayMs"]?.GetValue<long>(),
+                Ratings = [.. (json["ratings"] as JsonArray ?? []).OfType<JsonArray>().Select(r => KeyValuePair.Create(r[0]!.GetValue<string>(), r[1]!.GetValue<int>()))],
             };
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException or NullReferenceException or JsonException)

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Launching;
@@ -124,5 +125,14 @@ namespace ChartBuilder.Services
         /// offered it once.
         /// </summary>
         public List<string> CalibrationPrompted { get; set; } = [];
+
+        /// <summary>
+        /// The default rules Reduce starts from, per family and target difficulty (charter-spec C9 item 2, §10). The Reduce
+        /// dialog's changes apply to one run; its Settings mode changes these.
+        /// </summary>
+        public ReductionDefaults ReductionRules { get; set; } = ReductionDefaults.Shipped;
+
+        /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
+        public double PreviewLookAhead { get; set; } = 1.4;
     }
 }

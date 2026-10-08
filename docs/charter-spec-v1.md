@@ -1174,6 +1174,28 @@ Acceptance criteria:
 3. **Difficulty letters** in the part picker show which difficulties have notes
    ([C3](#c3-editor-layout)).
 
+*Settled in CM5:*
+
+- **Where they are.** Copy difficulty and Reduce are in each lane's **Edit** menu. Copy difficulty
+  asks first when the target has notes, leaves out 2× kicks below Expert, and copies the drum
+  mixes, which hold disco flip. Tom markers and phrases are the part's, so they're shared already.
+- **The dialog.** Reduce opens over the Editor with the rules for the part's family and target,
+  from the defaults. Each change draws the draft again over the target, whose own notes fade
+  behind it. Apply (Enter) adds it in place of what the target had, as one step; Cancel (Esc) adds
+  nothing. An edit to the chart while it's shown drops the draft. Settings' **Default reduction
+  rules** opens the same dialog on the defaults, with **Reset** beside it.
+- **Thinning** ranks each chord by where it falls (a measure's first beat, a beat, then each
+  halving, triplets just after the halving they're nearest) and takes them in that order where no
+  chord taken is closer than the grid, on either side.
+- **Chords** keep their lowest and highest columns, then inner ones up to the limit. A chord past
+  the highest column moves down as a whole; only notes it would push below green are pressed
+  together, the longer sustain kept. GHL notes keep their colour. Sustains a reduction runs into
+  the next note on their lane end there.
+- **Drums** are thinned kick and pads together, then the kicks on their own grid. Each hit keeps
+  red first, then cymbals, then toms, by the pads as shown inside a disco flip.
+- **GHL's columns.** The table's Hard "all" and Medium "1–3" are the same, as GHL has three
+  columns; the table ships as written.
+
 Acceptance criteria:
 
 - **AC C9.1** Reducing Expert to Easy never makes a chord or a note closer than the Easy thinning
@@ -1623,6 +1645,42 @@ Acceptance criteria:
 7. **Closing** Chart Builder, or the app, with unsaved changes asks: Save, Discard or Cancel.
 8. **Keyboard shortcuts** are listed in [§9](#9-keyboard-shortcuts).
 
+*Settled in CM5:*
+
+- **Selection.** The notes selected stay one track's, so Properties and the keys that change notes
+  one at a time keep to it. A **range across lanes** (Alt+drag, or Ctrl+Shift+A for the section
+  the cursor is in, from its start to the tick before the next) covers the lanes shown; delete,
+  cut and copy, Alt+arrow moves in time, H, G and T, and the transforms act on every track it
+  covers. **Select lane** is in the lane's Edit menu.
+- **The clipboard** is the app's own, not the OS's, so a passage pastes into the next chart too. It
+  holds notes in ticks from the passage's start, scaled when the resolutions differ, so a passage
+  lands on the grid at any tempo. It keeps the lanes as shown, so a passage from inside a disco
+  flip keeps the pads the player sees, and Pro drums keep which pads were toms. Phrases and disco
+  flip sections aren't copied.
+- **Paste.** Ctrl+V clears the span the passage covers, then puts it in; Ctrl+Shift+V merges: on
+  frets each chord pasted takes the place of the chord at its tick, and on drums each note takes
+  the place only of the note at its place. A passage of one track pastes into the focused lane; one
+  of several, into the same parts and difficulties. 5-fret and GHL paste into each other through a
+  lane mapping the user confirms, starting from the one last confirmed that way.
+- **Transforms** are in the lane's Edit menu: lefty flip, shift a lane (also Alt+Shift+arrows
+  across), and sustains cleared, one grid step, or until the next chord. Lefty flip mirrors GHL's
+  columns, each note keeping its colour; drums aren't flipped, as that would change their cymbals,
+  toms and disco flip. Shifting stops each note at the edge, joining notes that meet; opens and
+  kicks stay.
+- **Stretch timing** (×2, ×1.5, ×⅔, ×½, or to end at the cursor) works on the selection's span. It's
+  a tempo-map edit: the tempos inside the span are scaled, everything keeps its time, and what's
+  after the span moves by the change in its length. The passthrough tracks are re-ticked to match
+  (§4.2), and anchors keep their times.
+- **Record mode.** R starts a pass into the focused lane, playing from the cursor if the song isn't
+  playing; R, Space or the song stopping ends it, as one step, and Esc cancels it. The transport
+  bar has the Record button and Merge or Overwrite. Overwrite clears the range selected, or the
+  stretch played, and leaves out presses outside a range selected. Presses on one tick make a
+  chord, and a fret takes an open note's place. A key let go less than a grid step after it was
+  pressed leaves a plain note; drums ignore holds. The pass is drawn as a ghost until it ends.
+- **Press times** are read from the playback clock when the key event is handled, on every OS, as
+  key events carry no timestamp. The wait before an event is handled isn't corrected; at 50% speed
+  it's halved in song time. Keys held when the window loses focus are let go then.
+
 Acceptance criteria:
 
 - **AC C15.1** Any sequence of commands followed by the same number of undos gives a model equal to
@@ -1677,6 +1735,23 @@ Acceptance criteria:
      whose chart is unchanged since it was last linted.
    - CHR004 uses only the common grids, never the editor's current snap, so it gives the same
      result in the library and in Chart Builder.
+
+*Settled in CM5:*
+
+- **What's read.** The library lints the chart as stored, with `song.ini` as drafted, and reads it
+  with the options as loaded, as the games read it today, not as a Chart Builder save would write
+  them. The audio is measured for CHR003 and CHR084; a `.sng`'s from inside it.
+- **The cache** is in memory, for the session (`SongChartLintCache`): a song whose chart file,
+  drafted `song.ini`, audio files and language are as they were is answered from it, and the audio
+  isn't measured again when only `song.ini` changed. Nothing is written to disk.
+- **In the Validator,** a song's chart findings follow its metadata issues, one line per rule and
+  key with how many and where the first is, coloured by severity, and filtered by six chart types,
+  one per group of the catalogue. They have no fix there. A song is listed for a chart Warning or
+  Error, not for Info alone, and counts as failing until both its metadata and its chart pass.
+  Save all asks only about metadata that still fails. A drafted song is linted again a moment after
+  its draft changes.
+- **In the detail panel,** the chart findings of the one song shown follow its own, with where
+  each is.
 
 Acceptance criteria:
 
@@ -1771,6 +1846,23 @@ Acceptance criteria:
      (and, for drums, independence between hands and kick).
    - It is shown with what it was based on, and is only a suggestion.
    - The weights are fixed in v1 and will be tuned against rated charts.
+
+*Settled in CM5:*
+
+- **Where the preview is.** A **Preview** tab in the Editor's right panel, and a window of its own
+  (**Window**), which F11 makes full screen. Both show the lane in focus, or a part and difficulty
+  picked, with practice, the speed and how far ahead it looks. A scrub on the highway moves
+  playback there. The control is Chart Packer's inspector's, moved to `ChartPacker.UI`.
+- **Rebuilt by track.** After an edit that touches the track shown, the whole track's scene is
+  built again from its game view, at most once a frame and only while it's shown, not only the
+  range the edit touched, as the game view is worked out a track at a time.
+- **Practice** turns the loop on, from the selection when there's none yet, and plays it from its
+  start; turning the loop off ends practice.
+- **The suggested rating** is the part's highest charted difficulty's, as one `diff_*` key rates the
+  whole part. It's shown in the preview's header, with what it was worked out from and each
+  difficulty's own tier in its tooltip. **Use as diff_…** sets the part's keys that `song.ini`
+  rates otherwise, as pending changes Revert takes back; it's never written otherwise. It's also
+  CHR083's fix. Peak density is over any two seconds; the weights are `DifficultyWeights`.
 
 Acceptance criteria:
 
@@ -2171,6 +2263,8 @@ These are the defaults. Rebinding is future work.
 | `Shift`+`Space` | Play the selection |
 | `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
 | `Alt`+arrows | Move the selection one grid step in time, or one lane across |
+| `Alt`+`Shift`+arrows across | Shift the selected notes a lane, each stopping at the edge |
+| `Alt`+drag | Select a time range across the lanes shown |
 | `PgUp` / `PgDn` | Move the cursor one measure |
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
 | `[` / `]` | Coarser or finer snap |
@@ -2185,13 +2279,16 @@ These are the defaults. Rebinding is future work.
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
 | `L` | Set the loop region to the selection |
-| `R` | Start or stop record mode |
+| `R` | Start or stop record mode; while it records, Space ends the pass too, and Esc cancels it |
 | `W` | Switch the lane between waveform and spectrogram |
 | `Ctrl`+`A` | Select all in the current difficulty |
+| `Ctrl`+`Shift`+`A` | Select the section the cursor is in, across the lanes shown |
 | `Ctrl`+`Z`; `Ctrl`+`Y` or `Ctrl`+`Shift`+`Z` | Undo; redo |
-| `Ctrl`+`X` / `C` / `V` | Cut, copy, paste |
+| `Ctrl`+`X` / `C` / `V` | Cut, copy, paste over the span the passage covers |
+| `Ctrl`+`Shift`+`V` | Paste, merged with what's there |
 | `Delete` | Delete the selection |
-| `Esc` | Take back a drag; else end a run of Generate fills, adding nothing; else clear the selection |
+| `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills, adding nothing; else clear the selection |
+| `F11` | In the preview's window, full screen on or off; Esc leaves it |
 | `Ctrl`+`S` | Save |
 
 ## 10. Settings
@@ -2206,7 +2303,7 @@ save writes its own temp file and renames it into place.
 | File | Owner | Holds |
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
-| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, and the last parent folder used for a new chart |
+| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
 | `audio-latency.json` | Chart Builder's calibration tool | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when its window is activated ([§4.8](#48-launching-and-coordination)). |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window

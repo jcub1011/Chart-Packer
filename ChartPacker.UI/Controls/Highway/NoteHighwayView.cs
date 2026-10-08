@@ -11,9 +11,8 @@ using Avalonia.Media.Immutable;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
 using ChartPacker.UI.Controls;
-using ChartPacker.UI.Controls.Highway;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls.Highway
 {
     /// <summary>One highway: an instrument difficulty's notes with their song times worked out.</summary>
     public sealed class HighwayLane
@@ -42,6 +41,14 @@ namespace ChartPacker.Controls
         }
 
         public ChartInstrumentKind Kind { get; }
+
+        /// <summary>How many lanes a highway of <paramref name="kind"/> has: five frets, four or five pads, or three six-fret columns.</summary>
+        public static int LaneCountOf(ChartInstrumentKind kind, bool fiveLaneDrums) => kind switch
+        {
+            ChartInstrumentKind.FiveFret => 5,
+            ChartInstrumentKind.Drums => fiveLaneDrums ? 5 : 4,
+            _ => 3,
+        };
 
         /// <summary>How many lanes the highway has: five frets, four or five pads, or three six-fret columns.</summary>
         public int LaneCount { get; }
@@ -97,7 +104,7 @@ namespace ChartPacker.Controls
     /// follow the audio whether it's playing, paused or being dragged. Behind each highway's notes it
     /// can draw a track's <see cref="Waveforms"/>, falling with them.
     /// <para>Pressing on a highway and dragging scrubs: from <see cref="ScrubStarted"/> to <see cref="ScrubEnded"/>,
-    /// <see cref="Scrubbed"/> says where to, and the owner seeks when it ends, as it does for <see cref="WaveformView"/>. A drag
+    /// <see cref="Scrubbed"/> says where to, and the owner seeks when it ends, as it does for Chart Packer's waveform. A drag
     /// grabs the notes: down moves the audio later, as far as the notes fall for it, as if pulling them down. With Ctrl held
     /// it's fine, <see cref="FineScrubFactor"/> times less far. Either way the pointer is held still, so a drag can go
     /// on as far as it needs, and a press leaves the audio where it is.</para>

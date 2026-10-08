@@ -5,6 +5,7 @@
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:res="using:ChartPacker.Resources"
              xmlns:ctl="using:ChartPacker.Controls"
+             xmlns:hw="using:ChartPacker.UI.Controls.Highway"
              xmlns:meta="using:ChartPacker.Core.Metadata"
              xmlns:conv="using:ChartPacker.Converters"
              mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
@@ -575,7 +576,7 @@
         </Style>
         <!-- While the highway's options are open, its notes are drawn as outlines, so the waveform behind them shows
              and a note can be lined up with its sound as offsets are set. -->
-        <Style Selector="ctl|NoteHighwayView.tuning">
+        <Style Selector="hw|NoteHighwayView.tuning">
             <Setter Property="AreNotesOutlined" Value="True" />
         </Style>
         <Style Selector="ToggleButton.trackSwitch">
@@ -914,7 +915,7 @@
                                     <!-- The chart's notes over whatever the background is, as a game draws them, unless the
                                          settings put them in their own row below the lyrics. A highway under the pointer shows
                                          its whole chart while Shift is held, to scrub through. -->
-                                    <ctl:NoteHighwayView x:Name="HighwayOverlayView"
+                                    <hw:NoteHighwayView x:Name="HighwayOverlayView"
                                                          Scene="{Binding Highway.Scene}"
                                                          Clock="{Binding Highway.Clock}"
                                                          LookAhead="{Binding Highway.LookAhead}"
@@ -1103,7 +1104,7 @@
                                     Height="240"
                                     IsVisible="{Binding Highway.IsTileShown}"
                                     AutomationProperties.Name="{x:Static res:Strings.HighwayInstrumentsHeader}">
-                                <ctl:NoteHighwayView x:Name="HighwayRowView"
+                                <hw:NoteHighwayView x:Name="HighwayRowView"
                                                      Scene="{Binding Highway.Scene}"
                                                      Clock="{Binding Highway.Clock}"
                                                      LookAhead="{Binding Highway.LookAhead}"

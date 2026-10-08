@@ -293,6 +293,7 @@ public sealed class ChangeTempoMap : ChartCommand
     private TimeSignatureMarker[] _oldSignatures = [];
     private TempoAnchor[] _oldAnchors = [];
     private ChartTickSnapshot? _retick;
+    private readonly Func<long, long>? _map;
 
     /// <param name="tempos">The tempo markers, in the order they're kept at a tick.</param>
     /// <param name="timeSignatures">The time-signature markers, in the order they're kept at a tick.</param>
@@ -316,6 +317,18 @@ public sealed class ChangeTempoMap : ChartCommand
         }
 
         KeepTimes = keepTimes;
+    }
+
+    /// <summary>
+    /// A change of the tempo map that moves everything else by <paramref name="map"/>, rather than to keep its time under
+    /// the new map: a stretch of the timing between two points, which moves the markers too (charter-spec C15 item 4).
+    /// </summary>
+    /// <param name="map">The tick each tick moves to: never decreasing, never negative.</param>
+    internal ChangeTempoMap(IEnumerable<TempoChange> tempos, IEnumerable<TimeSignatureMarker> timeSignatures, IEnumerable<TempoAnchor> anchors, Func<long, long> map)
+        : this(tempos, timeSignatures, anchors, keepTimes: true)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        _map = map;
     }
 
     public IReadOnlyList<TempoChange> Tempos => _tempos;
@@ -363,7 +376,7 @@ public sealed class ChangeTempoMap : ChartCommand
         {
             try
             {
-                (report, retick) = ChartRetick.Apply(chart, TickMaps.KeepTimes(from, map.ToTempoMap()));
+                (report, retick) = ChartRetick.Apply(chart, _map ?? TickMaps.KeepTimes(from, map.ToTempoMap()));
             }
             catch
             {

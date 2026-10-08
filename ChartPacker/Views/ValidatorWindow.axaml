@@ -131,6 +131,13 @@
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+        <!-- A chart lint finding (charter-spec C16 item 5): coloured as the detail panel colours findings. -->
+        <Style Selector="TextBlock.issue.chartWarning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.issue.chartError">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
         <Style Selector="TextBlock.fix">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Opacity" Value="0.65" />
@@ -398,7 +405,11 @@
                                                             <Border Grid.Column="0" Classes="key" IsVisible="{Binding HasKey}">
                                                                 <TextBlock Text="{Binding Key}" />
                                                             </Border>
-                                                            <TextBlock Grid.Column="1" Classes="issue" Text="{Binding Message}" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Classes="issue"
+                                                                       Classes.chartWarning="{Binding IsChartWarning}"
+                                                                       Classes.chartError="{Binding IsChartError}"
+                                                                       Text="{Binding Message}" />
                                                         </Grid>
                                                         <TextBlock Classes="fix" IsVisible="{Binding IsFixable}" Text="{Binding FixText}" />
                                                     </StackPanel>
