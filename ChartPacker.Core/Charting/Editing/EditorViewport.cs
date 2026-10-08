@@ -26,7 +26,7 @@ public sealed class EditorViewport
     /// <summary>Raised when the cursor moves, by the user or with the playhead.</summary>
     public event EventHandler? Changed;
 
-    /// <summary>Raised when the user moves the cursor (a key, a click or scrolling), for playback to seek there.</summary>
+    /// <summary>Raised when the user moves the cursor (a key or scrolling), for playback to seek there.</summary>
     public event EventHandler? Moved;
 
     /// <summary>The cursor, in audio seconds: the strike line, where keys place notes and playback starts, and the playhead while playing.</summary>

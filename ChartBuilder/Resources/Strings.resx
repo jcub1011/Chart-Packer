@@ -991,7 +991,7 @@ Open it anyway?</value>
     <comment>The Phrase tool's tooltip while it's not built yet.</comment>
   </data>
   <data name="ToolSelectToolTip" xml:space="preserve">
-    <value>Select notes and drag them in time or across lanes; drag a tail to set a sustain; drag in an empty place to select a span. Click an empty place to move the cursor.</value>
+    <value>Select notes and drag them in time or across lanes; drag a tail to set a sustain; drag in an empty place to select a span. Click an empty place to clear the selection.</value>
     <comment>The Select tool's tooltip.</comment>
   </data>
   <data name="ToolPlaceToolTip" xml:space="preserve">

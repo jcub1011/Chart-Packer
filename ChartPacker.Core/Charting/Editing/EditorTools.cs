@@ -708,7 +708,7 @@ public sealed class EditorTools
         }
     }
 
-    /// <summary>Drags a box over notes, selecting them and the span of ticks it covers; a click in an empty place moves the cursor.</summary>
+    /// <summary>Drags a box over notes, selecting them and the span of ticks it covers; a click in an empty place clears the selection.</summary>
     private sealed class BoxGesture : Gesture
     {
         private readonly ChartPoint _pressed;
@@ -760,10 +760,9 @@ public sealed class EditorTools
             if (_moved)
                 return;
 
-            // A click in an empty place.
+            // A click in an empty place; the cursor stays where playback is.
             if (!_add)
                 Session.Selection.Clear();
-            Session.MoveCursorTo(Tools.Snap.Nearest(_pressed.Tick, Tools.Map));
         }
     }
 }

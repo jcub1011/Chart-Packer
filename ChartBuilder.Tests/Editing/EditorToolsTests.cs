@@ -114,16 +114,17 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void ClickingAnEmptyPlaceMovesTheCursorToTheGridAndSelectsNothing(LaneView view)
+    public void ClickingAnEmptyPlaceSelectsNothingAndLeavesTheCursor(LaneView view)
     {
         var session = Of(Guitar());
         Expert(session).Notes.Add(new EditableNote(480, 1, 0));
         session.Selection.Select(GuitarExpert, Expert(session).Notes);
+        long cursor = session.CursorTick;
 
         Click(session, At(session, 1000, 3, view));
 
         Assert.IsTrue(session.Selection.IsEmpty);
-        Assert.AreEqual(960, session.CursorTick);
+        Assert.AreEqual(cursor, session.CursorTick);
     }
 
     [TestMethod]
