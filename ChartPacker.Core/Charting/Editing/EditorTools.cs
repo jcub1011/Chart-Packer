@@ -869,7 +869,8 @@ public sealed partial class EditorTools
         int placed = _session.StoredLane(point.Track, tick, shown);
         if (track.TryGetNote(tick, placed, doubleKick: false, out var there))
         {
-            _session.Selection.Select(point.Track, [there]);
+            if (!_session.Selection.Contains(point.Track, there))
+                _session.Selection.Select(point.Track, [there]);
             return new MoveGesture(this, point, there);
         }
 

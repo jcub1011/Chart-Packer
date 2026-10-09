@@ -181,6 +181,29 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
+    public void DraggingASelectedNoteWithThePlaceToolMovesTheSelection(LaneView view)
+    {
+        var session = Of(Guitar());
+        EditableNote first = new(0, 1, 2), second = new(480, 1, 3);
+        Expert(session).Notes.Add(first);
+        Expert(session).Notes.Add(second);
+        session.Selection.Select(GuitarExpert, [first, second]);
+        session.Tool = EditorTool.Place;
+
+        Click(session, At(session, 0, 2, view));
+        Assert.AreSequenceEqual([first, second], session.Selection.Notes.ToList(), "A click on a selected note keeps the selection.");
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+
+        DragFromTo(session, At(session, 0, 2, view), At(session, 240, 2, view));
+
+        EditableNote[] moved = [new(240, 1, 2), new(720, 1, 3)];
+        Assert.AreSequenceEqual(moved, Expert(session).Notes.ToList());
+        Assert.AreSequenceEqual(moved, session.Selection.Notes.ToList());
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
     public void AShiftBoxWithThePlaceToolSelectsAfresh(LaneView view)
     {
         var session = Of(Guitar());
