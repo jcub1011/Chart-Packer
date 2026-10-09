@@ -115,6 +115,13 @@ namespace ChartBuilder.Controls.Editing
                 return true;
             }
 
+            // Ctrl+Shift+↑ and Ctrl+Shift+↓: the next tempo or time signature change and the previous one, in either view.
+            if (ctrl && shift && !alt && key is PhysicalKey.ArrowUp or PhysicalKey.ArrowDown)
+            {
+                tools.StepCursorTempoChanges(key == PhysicalKey.ArrowUp ? 1 : -1);
+                return true;
+            }
+
             // Alt+Shift across shifts the selected notes a lane, each stopping at the edge (charter-spec C15 item 4).
             if (alt && shift && !ctrl && across != 0)
             {

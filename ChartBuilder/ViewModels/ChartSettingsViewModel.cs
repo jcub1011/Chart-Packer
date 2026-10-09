@@ -172,6 +172,7 @@ namespace ChartBuilder.ViewModels
         private bool _delayTyped;
         private long _chartMicroseconds;
         private decimal _chartBpm;
+        private int _chartNumerator;
 
         // While the fields are being set from the chart, or a change put back, which applies nothing.
         private bool _loading;
@@ -546,6 +547,7 @@ namespace ChartBuilder.ViewModels
                 _chartMicroseconds = values.MicrosecondsPerQuarter;
                 _chartBpm = Math.Round((decimal)EditableTempoMap.BpmOf(_chartMicroseconds), 3);
                 Bpm = _chartBpm;
+                _chartNumerator = values.Numerator;
                 Numerator = values.Numerator;
                 Denominator = values.Denominator;
                 foreach (var part in Parts)
@@ -591,12 +593,16 @@ namespace ChartBuilder.ViewModels
             };
         }
 
-        /// <summary>Works out what stops a change being applied: a BPM or time signature out of range.</summary>
+        /// <summary>
+        /// Works out what stops a change being applied: a BPM or time signature out of range. Only one that differs from the
+        /// chart's is, as the chart's own starting tempo is edited in the Tempo map tab, so one out of range there doesn't
+        /// hold up the resolution, the parts or the drums.
+        /// </summary>
         private void Refresh()
         {
-            if (Bpm is not { } bpm || bpm < MinBpm || bpm > MaxBpm)
+            if (Bpm != _chartBpm && (Bpm is not { } bpm || bpm < MinBpm || bpm > MaxBpm))
                 Problem = string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsBadBpmFormat, NewChartSettings.MinBpm, NewChartSettings.MaxBpm);
-            else if (Numerator is not { } numerator || numerator < 1 || numerator > MaxNumerator || numerator != Math.Floor(numerator))
+            else if (Numerator != _chartNumerator && (Numerator is not { } numerator || numerator < 1 || numerator > MaxNumerator || numerator != Math.Floor(numerator)))
                 Problem = string.Format(CultureInfo.CurrentCulture, Strings.ChartSettingsBadNumeratorFormat, MaxNumerator);
             else
                 Problem = null;

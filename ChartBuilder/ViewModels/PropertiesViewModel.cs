@@ -411,19 +411,18 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
+            // Only the markers whose signature changes, so a run of them that are all set already is no step at all.
             var map = Session.Chart.TempoMap;
-            var commands = new List<IChartCommand>();
-            foreach (long tick in ticks)
+            ticks = [.. ticks.Where(t => map.TimeSignatures.At(t) is var at && (at.IsEmpty || at[^1].Numerator != numerator || at[^1].Denominator != denominator))];
+            if (ticks.Count > 0)
             {
-                var at = map.TimeSignatures.At(tick);
-                if (at.IsEmpty)
-                    commands.Add(new AddTimeSignature(new TimeSignatureMarker(tick, numerator, denominator)));
-                else if (at[^1].Numerator != numerator || at[^1].Denominator != denominator)
-                    commands.Add(new SetTimeSignature(at[^1], numerator, denominator));
+                Session.ExecuteAsOne(ticks.Select<long, Func<(IChartCommand?, string?)>>(tick => () =>
+                {
+                    var edit = TempoMapEdits.PlaceSignature(Session.Chart, tick, numerator, denominator);
+                    return (edit.Command, edit.Refusal);
+                }));
             }
 
-            if (commands.Count > 0)
-                Session.Execute(commands.Count == 1 ? commands[0] : new CompositeCommand(commands));
             Refresh();
         }
 

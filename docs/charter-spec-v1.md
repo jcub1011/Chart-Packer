@@ -342,9 +342,10 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
     **Program settings**, the editing tools, and **Undo** and **Redo**. Its groups wrap onto more
     rows as the window narrows rather than scrolling.
   - **Side panels, tabbed and docked like Visual Studio's tool windows.** The left one has the
-    **Chart settings** tab, with everything a chart needs: its timing, parts and ratings, metadata
-    and tracks; the **Art** tab, with its album art and backgrounds
-    ([C1](#c1-new-chart-and-chart-settings)); and the **Sections** tab. The right one has the
+    **Chart settings** tab, with its parts and ratings, metadata and tracks; the **Art** tab, with
+    its album art and backgrounds ([C1](#c1-new-chart-and-chart-settings)); the **Sections** tab;
+    and the **Tempo map** tab, with the resolution, the delay and the tempo map
+    ([C4](#c4-tempo-map-and-grid)). The right one has the
     **Properties** tab, which shows
     the selection ([C3](#c3-editor-layout)), the **Pending changes** tab
     ([C17](#c17-save-and-export)) and the **Findings** tab ([C3](#c3-editor-layout) item 5).
@@ -606,6 +607,11 @@ one FFmpeg can play.
   *Settled in CM4:* it's a button under Starting BPM. The BPM is the first confident stretch's,
   tidied to a whole BPM when it's within 0.05 of one (`BpmTidy`), and set as one undoable step, as
   a BPM typed is. The proposal for the whole song then shows in the editor, as C14 item 4's does.
+- *Settled after CM4:* the timing is in the Tempo map tab ([C4](#c4-tempo-map-and-grid) item 9),
+  not Chart settings. Its **Timing** has the resolution and the audio delay; the starting BPM and
+  time signature are the first row of its list, the song's start; and **Detect from audio** is in
+  its **From the audio**. A starting BPM or time signature out of range that the chart already has
+  doesn't hold up the other settings.
 
 **Parts.**
 
@@ -627,7 +633,7 @@ one FFmpeg can play.
 - Each change is applied as it is made, so the starting BPM and time signature can be found by ear
   while the song plays; playback goes on, and its beats follow. A BPM or beats per measure being
   typed is applied once the typing (or the spinner) pauses for 0.6 s, so a burst of typing is one
-  step. A value out of range is said under the timing and applies nothing.
+  step. A value out of range is said under the field and applies nothing.
 - Each applied change (resolution, tempo, time signature, parts or drum variant) is **one undoable
   command**. Undo and redo show in the tab.
 - Their `song.ini` effects are added to Chart Builder's pending changes
@@ -933,6 +939,21 @@ Acceptance criteria:
 7. **Proposed tempo maps** from [C14](#c14-onset-and-beat-assist) arrive as one undoable command.
 8. **Beat lines** come from `TempoMap.BeatLines`. Measure lines are stronger, and measure numbers
    are shown.
+9. **The Tempo map tab** in the left panel lists every tick where the tempo or the time signature
+   changes, the song's start among them, in time order, each with its time and its measure and
+   beat. The change in force at the cursor is marked.
+   - Each row has a BPM field and a time signature's beats and note value. A field with nothing
+     placed at its tick shows what's in force there, greyed. Typing in it places a marker there;
+     emptying it removes the marker. Each edit is one undoable step, with the anchor offer
+     (item 2) when it needs one.
+   - A row can be gone to, anchored, moved by its tick (its tempo marker and time signature
+     together) and removed. Where both are at one tick, removing asks which.
+   - **Add tempo change** adds a marker at the cursor, on the grid. **Add time signature** puts one
+     at the start of the measure the cursor is in.
+   - A time signature stands on its own: it needs no tempo marker at its tick.
+   - Above the list, **Timing** has the resolution and the audio delay
+     ([C1](#c1-new-chart-and-chart-settings)), and **From the audio** has **Detect from audio**,
+     **Propose tempo map** and **Find first downbeat** ([C14](#c14-onset-and-beat-assist)).
 
 Acceptance criteria:
 
@@ -1635,6 +1656,9 @@ Acceptance criteria:
      that the next measure starts on the downbeat.
    - **Delay**: `delay` is changed so that tick 0 lands on the downbeat. This is shown as a pending
      change ([C17](#c17-save-and-export)).
+   - *Settled after CM4:* **Propose tempo map** and **Find first downbeat** are in the Tempo map
+     tab's **From the audio** ([C4](#c4-tempo-map-and-grid) item 9), with **Detect from audio**,
+     not the toolbar.
 6. Everything here is a hint. Nothing changes the chart without an explicit action, and every
    action can be undone.
 
@@ -2329,17 +2353,8 @@ it is made):
 
 ```txt
 ┌──────────────────────────────────────┐
-│ Chart settings │ Art │ Sections     «│
+│ Chart settings │ Art │ Sections │ … «│
 ├──────────────────────────────────────┤
-│ Timing                               │
-│ ┌──────────────────────────────────┐ │
-│ │ Resolution                       │ │
-│ │ [ 480 ▾                      ]   │ │
-│ │ Starting BPM                     │ │
-│ │ [ 120.000 ]                      │ │
-│ │ Time signature                   │ │
-│ │ [ 4 ] / [ 4 ▾ ]                  │ │
-│ └──────────────────────────────────┘ │
 │ Parts                                │
 │ ┌──────────────────────────────────┐ │
 │ │                    Difficulty    │ │
@@ -2410,6 +2425,7 @@ These are the defaults. Rebinding is future work.
 | `Alt`+drag (Select tool, not on a selected note) | Select a time range across the lanes shown |
 | `PgUp` / `PgDn` | Move the cursor one measure |
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
+| `Ctrl`+`Shift`+`↑` / `Ctrl`+`Shift`+`↓` | Next or previous tempo or time signature change |
 | `[` / `]` | Coarser or finer snap |
 | `O` | Snap to onset on or off |
 | `Shift`+`O` | Nudge the selected notes to their onsets |

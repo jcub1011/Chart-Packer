@@ -14,9 +14,9 @@
              FocusAdorner="{x:Null}"
              ui:CommitOnClickAway.IsEnabled="True">
 
-    <!-- Chart settings (charter-spec C1): everything a chart needs, each change an undo step as it's made. The timing and
-         the delay; the parts, a row each with its rating; the song's metadata, as Chart Packer's inspector edits it; and
-         its tracks, with their mix. Each field's label is above it, as the panel can be narrow. Focusable so a click on
+    <!-- Chart settings (charter-spec C1): everything a chart needs, each change an undo step as it's made: the parts, a
+         row each with its rating; the song's metadata, as Chart Packer's inspector edits it; and its tracks, with their
+         mix. The timing (the resolution, the delay and the tempo map) is in the Tempo map tab. Each field's label is above it, as the panel can be narrow. Focusable so a click on
          empty space can take focus from an edit box, which commits it. -->
     <UserControl.Styles>
         <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
@@ -75,83 +75,6 @@
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="16,14" Spacing="10">
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionTiming}" />
-            <Border Classes="section">
-                <StackPanel Spacing="10">
-                    <StackPanel Classes="field">
-                        <TextBlock Text="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
-                        <ComboBox HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding ChartSettings.Resolutions}"
-                                  SelectedItem="{Binding ChartSettings.SelectedResolution}"
-                                  AutomationProperties.Name="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
-                    </StackPanel>
-                    <StackPanel Classes="field">
-                        <TextBlock Text="{x:Static res:Strings.ChartSettingsBpmLabel}" />
-                        <NumericUpDown HorizontalAlignment="Left"
-                                       Width="140"
-                                       Value="{Binding ChartSettings.Bpm}"
-                                       Minimum="{x:Static vm:ChartSettingsViewModel.MinBpm}"
-                                       Maximum="{x:Static vm:ChartSettingsViewModel.MaxBpm}"
-                                       Increment="1"
-                                       FormatString="0.000"
-                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsBpmLabel}" />
-                        <!-- Detect from audio (charter-spec C1, C14): the starting BPM from the mix, and a tempo map to review. -->
-                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                            <Button Content="{x:Static res:Strings.DetectFromAudioButton}"
-                                    Command="{Binding ChartSettings.DetectFromAudioCommand}"
-                                    IsEnabled="{Binding ChartSettings.CanDetect}"
-                                    ToolTip.Tip="{x:Static res:Strings.DetectFromAudioToolTip}"
-                                    ToolTip.ShowOnDisabled="True" />
-                            <ProgressBar IsIndeterminate="True"
-                                         Width="60"
-                                         VerticalAlignment="Center"
-                                         IsVisible="{Binding ChartSettings.IsDetecting}" />
-                        </StackPanel>
-                        <TextBlock Classes="muted"
-                                   TextWrapping="Wrap"
-                                   IsVisible="{Binding ChartSettings.HasDetectStatus}"
-                                   Text="{Binding ChartSettings.DetectStatus}" />
-                    </StackPanel>
-                    <StackPanel Classes="field">
-                        <TextBlock Text="{x:Static res:Strings.ChartSettingsTimeSignatureLabel}" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <NumericUpDown Width="110"
-                                           Value="{Binding ChartSettings.Numerator}"
-                                           Minimum="1"
-                                           Maximum="{x:Static vm:ChartSettingsViewModel.MaxNumerator}"
-                                           Increment="1"
-                                           FormatString="0"
-                                           ParsingNumberStyle="Integer"
-                                           AutomationProperties.Name="{x:Static res:Strings.ChartSettingsNumeratorName}" />
-                            <TextBlock VerticalAlignment="Center" Text="/" />
-                            <ComboBox MinWidth="70"
-                                      ItemsSource="{Binding ChartSettings.Denominators}"
-                                      SelectedItem="{Binding ChartSettings.Denominator}"
-                                      AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDenominatorName}" />
-                        </StackPanel>
-                    </StackPanel>
-                    <!-- How much later than its notes the chart plays against the audio: song.ini's delay. -->
-                    <StackPanel Classes="field">
-                        <TextBlock Text="{x:Static res:Strings.ChartSettingsDelayLabel}" />
-                        <NumericUpDown HorizontalAlignment="Left"
-                                       Width="160"
-                                       Value="{Binding ChartSettings.DelayMs}"
-                                       Minimum="{x:Static vm:ChartSettingsViewModel.MinDelayMs}"
-                                       Maximum="{x:Static vm:ChartSettingsViewModel.MaxDelayMs}"
-                                       Increment="1"
-                                       FormatString="0"
-                                       IsEnabled="{Binding ChartSettings.CanEditSong}"
-                                       ToolTip.Tip="{x:Static res:Strings.ChartSettingsDelayToolTip}"
-                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDelayLabel}" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-            <!-- What stops a change being applied, such as a BPM out of range. -->
-            <TextBlock TextWrapping="Wrap"
-                       Foreground="{DynamicResource WarningTextBrush}"
-                       Text="{Binding ChartSettings.Problem}"
-                       IsVisible="{Binding ChartSettings.HasProblem}" />
-
             <!-- A row per part: ticked when the chart has it, with its rating beside it, which opens the inspector's
                  difficulty flyout. -->
             <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />

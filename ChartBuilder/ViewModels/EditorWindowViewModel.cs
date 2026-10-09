@@ -90,6 +90,7 @@ namespace ChartBuilder.ViewModels
             Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);
             Sections = new SectionsViewModel(Editor);
+            TempoMap = new TempoMapViewModel(Editor, ChartSettings);
             Findings.Changed += (_, _) => RefreshSaveState();
             Editor.AudioAssist.ShowMessagesRequested += (_, _) => _ = ShowMessagesAsync();
             Song.Changed += OnSongChanged;
@@ -137,7 +138,10 @@ namespace ChartBuilder.ViewModels
 
         public bool HasPendingChanges => PendingChanges.Count > 0;
 
-        /// <summary>The chart's timing, the delay, and the parts and their ratings, in the Chart settings tab (charter-spec C1).</summary>
+        /// <summary>
+        /// The chart's resolution, the delay, and the parts and their ratings, in the Chart settings tab, and the starting tempo
+        /// and time signature, in the Tempo map tab (charter-spec C1).
+        /// </summary>
         public ChartSettingsViewModel ChartSettings { get; }
 
         /// <summary>The song's metadata, in the Chart settings tab.</summary>
@@ -169,6 +173,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>The Sections tab: the chart's sections and other text events.</summary>
         public SectionsViewModel Sections { get; }
 
+        /// <summary>The Tempo map tab: the chart's tempo and time signature changes.</summary>
+        public TempoMapViewModel TempoMap { get; }
+
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
         public LaneDockViewModel Lanes => Editor.Lanes;
 
@@ -184,7 +191,7 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial bool IsLeftPanelCollapsed { get; set; }
 
-        /// <summary>The left panel's tab shown: Chart settings (<see cref="ChartSettingsTab"/>), Art or Sections.</summary>
+        /// <summary>The left panel's tab shown: Chart settings (<see cref="ChartSettingsTab"/>), Art, Sections or Tempo map.</summary>
         [ObservableProperty]
         public partial int LeftPanelTab { get; set; }
 
@@ -301,6 +308,7 @@ namespace ChartBuilder.ViewModels
             _tracksTimer.Stop();
             Findings.Dispose();
             Sections.Dispose();
+            TempoMap.Dispose();
             ChartSettings.Dispose();
             Metadata.Dispose();
             Tracks.Dispose();

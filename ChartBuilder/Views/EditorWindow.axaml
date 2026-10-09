@@ -254,8 +254,8 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Audio assist (charter-spec C14): snap to onset (O), Nudge to onsets (Shift+O), a proposed tempo
-                         map to review, and Find first downbeat, each with its options in its flyout. -->
+                    <!-- Audio assist (charter-spec C14): snap to onset (O) and Nudge to onsets (Shift+O). A proposed tempo
+                         map and Find first downbeat are in the Tempo map tab. -->
                     <Border Classes="toolbar-group" IsVisible="{Binding Editor.AudioAssist.HasAudio}">
                         <StackPanel Orientation="Horizontal" Spacing="6" Height="28">
                             <CheckBox VerticalAlignment="Center"
@@ -268,61 +268,6 @@
                                     Content="{x:Static res:Strings.NudgeToOnsetsButton}"
                                     Command="{Binding Editor.AudioAssist.NudgeCommand}"
                                     ToolTip.Tip="{x:Static res:Strings.NudgeToOnsetsToolTip}" />
-                            <Button x:Name="ProposeTempoMapButton"
-                                    Classes="labelled"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Content="{x:Static res:Strings.ProposeTempoMapButton}"
-                                    ToolTip.Tip="{x:Static res:Strings.ProposeTempoMapToolTip}">
-                                <Button.Flyout>
-                                    <Flyout Placement="BottomEdgeAlignedLeft">
-                                        <StackPanel Spacing="10" MinWidth="280" DataContext="{Binding Editor.AudioAssist}" x:DataType="vm:AudioAssistViewModel">
-                                            <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.ProposeTempoMapHeading}" />
-                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalListenLabel}" />
-                                                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
-                                                    <RadioButton Content="{x:Static res:Strings.ProposalListenMix}" IsChecked="{Binding ListenToMix}" />
-                                                    <RadioButton Content="{x:Static res:Strings.ProposalListenLane}" IsChecked="{Binding ListenToLane}" />
-                                                </StackPanel>
-                                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalAnchorEveryLabel}" />
-                                                <NumericUpDown Grid.Row="1"
-                                                               Grid.Column="1"
-                                                               Value="{Binding AnchorEvery}"
-                                                               Minimum="0"
-                                                               Maximum="64"
-                                                               Increment="1"
-                                                               FormatString="0"
-                                                               ParsingNumberStyle="Integer"
-                                                               ToolTip.Tip="{x:Static res:Strings.ProposalAnchorEveryToolTip}"
-                                                               AutomationProperties.Name="{x:Static res:Strings.ProposalAnchorEveryLabel}" />
-                                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalMergeLabel}" />
-                                                <NumericUpDown Grid.Row="2"
-                                                               Grid.Column="1"
-                                                               Value="{Binding MergeMs}"
-                                                               Minimum="0"
-                                                               Maximum="20"
-                                                               Increment="1"
-                                                               FormatString="0"
-                                                               ToolTip.Tip="{x:Static res:Strings.ProposalMergeToolTip}"
-                                                               AutomationProperties.Name="{x:Static res:Strings.ProposalMergeLabel}" />
-                                                <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ProposalScopeLabel}" />
-                                                <TextBlock Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding ProposalScopeText}" />
-                                            </Grid>
-                                            <Button Classes="accent"
-                                                    HorizontalAlignment="Right"
-                                                    Content="{x:Static res:Strings.ProposalGenerate}"
-                                                    Command="{Binding ProposeTempoMapCommand}"
-                                                    Click="OnProposeTempoMapClick" />
-                                        </StackPanel>
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                            <Button Classes="labelled"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Content="{x:Static res:Strings.FindDownbeatButton}"
-                                    Command="{Binding Editor.AudioAssist.FindFirstDownbeatCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.FindDownbeatToolTip}" />
                         </StackPanel>
                     </Border>
 
@@ -358,8 +303,9 @@
                 <ColumnDefinition Width="280" MinWidth="180" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left panel: Chart settings (the timing, parts, metadata and tracks), the Art, and the sections and other
-                 text events (charter-spec C1; C8 items 3, 5 and 6). Their order is EditorWindowViewModel's tab indices. -->
+            <!-- Left panel: Chart settings (the timing, parts, metadata and tracks), the Art, the sections and other text
+                 events, and the tempo and time signature changes (charter-spec C1; C8 items 3, 5 and 6; C4). Their order is
+                 EditorWindowViewModel's tab indices. -->
             <bctl:EditorSidePanel Grid.Column="0"
                                   IsCollapsed="{Binding IsLeftPanelCollapsed}"
                                   ToggleCommand="{Binding ToggleLeftPanelCommand}"
@@ -372,6 +318,9 @@
                 </TabItem>
                 <TabItem Header="{x:Static res:Strings.SectionsTab}">
                     <views:SectionsView DataContext="{Binding Sections}" />
+                </TabItem>
+                <TabItem Header="{x:Static res:Strings.TempoMapTab}">
+                    <views:TempoMapView DataContext="{Binding TempoMap}" />
                 </TabItem>
             </bctl:EditorSidePanel>
 

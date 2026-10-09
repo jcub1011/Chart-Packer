@@ -1605,6 +1605,76 @@ Saving also makes these changes to song.ini:
   <data name="SectionsKeysHint" xml:space="preserve">
     <value>Ctrl+↑ and Ctrl+↓ move the cursor to the next section and the previous one.</value>
   </data>
+  <data name="TempoMapTab" xml:space="preserve">
+    <value>Tempo Map</value>
+    <comment>The left panel's tab listing the chart's tempo and time signature changes.</comment>
+  </data>
+  <data name="TempoMapFromAudioHeading" xml:space="preserve">
+    <value>From the audio</value>
+    <comment>The heading over the Tempo map tab's Propose tempo map and Find first downbeat.</comment>
+  </data>
+  <data name="TempoMapAddTempoButton" xml:space="preserve">
+    <value>Add tempo change</value>
+  </data>
+  <data name="TempoMapAddTempoToolTip" xml:space="preserve">
+    <value>Add a tempo change at the cursor, on the grid, then type its BPM</value>
+  </data>
+  <data name="TempoMapAddSignatureButton" xml:space="preserve">
+    <value>Add time signature</value>
+  </data>
+  <data name="TempoMapAddSignatureToolTip" xml:space="preserve">
+    <value>Add a time signature change at the start of the measure the cursor is in</value>
+  </data>
+  <data name="TempoMapCustomSignature" xml:space="preserve">
+    <value>Custom…</value>
+    <comment>Add time signature's entry that adds the signature in force, to be typed over.</comment>
+  </data>
+  <data name="TempoMapHeading" xml:space="preserve">
+    <value>Tempo and time signature changes</value>
+    <comment>The heading over the Tempo map tab's list.</comment>
+  </data>
+  <data name="TempoMapAtCursorFormat" xml:space="preserve">
+    <value>At the cursor: {0} BPM · {1}/{2}</value>
+    <comment>What's in force at the cursor. {0} is the BPM; {1}/{2} the time signature.</comment>
+  </data>
+  <data name="TempoMapBpmLabel" xml:space="preserve">
+    <value>BPM</value>
+    <comment>Beside a tempo change's BPM field.</comment>
+  </data>
+  <data name="TempoMapBpmToolTip" xml:space="preserve">
+    <value>The tempo from here on. Type a BPM and press Enter; empty it to remove the tempo change. Greyed, it's the tempo carried on from before.</value>
+  </data>
+  <data name="TempoMapNumeratorToolTip" xml:space="preserve">
+    <value>Beats in a measure from here on. Type a number and press Enter; empty it to remove the time signature change. Greyed, it's carried on from before.</value>
+  </data>
+  <data name="TempoMapDenominatorToolTip" xml:space="preserve">
+    <value>The note value of a beat from here on</value>
+  </data>
+  <data name="TempoMapAnchorToolTip" xml:space="preserve">
+    <value>Anchored: the marker stays at its time in the audio when tempos before it change</value>
+  </data>
+  <data name="TempoMapRemoveToolTip" xml:space="preserve">
+    <value>Remove this change, as one step to undo</value>
+  </data>
+  <data name="TempoMapRemoveTempo" xml:space="preserve">
+    <value>Remove the tempo change</value>
+  </data>
+  <data name="TempoMapRemoveSignature" xml:space="preserve">
+    <value>Remove the time signature change</value>
+  </data>
+  <data name="TempoMapRemoveBoth" xml:space="preserve">
+    <value>Remove both</value>
+  </data>
+  <data name="TempoMapTickToolTip" xml:space="preserve">
+    <value>Where it is, in ticks. Type another tick and press Enter to move the change there.</value>
+  </data>
+  <data name="TempoMapBadNumerator" xml:space="preserve">
+    <value>Type a whole number of beats, from 1 to 64.</value>
+    <comment>Said when a time signature's beats typed in the Tempo map tab aren't a whole number.</comment>
+  </data>
+  <data name="TempoMapKeysHint" xml:space="preserve">
+    <value>Ctrl+Shift+↑ and Ctrl+Shift+↓ move the cursor to the next tempo or time signature change and the previous one. The Tempo tool adds and drags tempo markers on the lanes.</value>
+  </data>
   <data name="GenerateFillsButton" xml:space="preserve">
     <value>Generate fills…</value>
     <comment>The toolbar button, beside the Phrase tool, that opens Generate fills' options.</comment>

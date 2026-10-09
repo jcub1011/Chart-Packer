@@ -67,6 +67,135 @@ public static class TempoMapEdits
         return Fitted(chart, [.. tempos], [.. map.Anchors], tick, absorbFrom: tick + 1, delay, keepTimes, blocked);
     }
 
+    /// <summary>
+    /// Sets the tempo from <paramref name="tick"/> on: the marker there is changed, or one is added when there's none, as
+    /// the Tempo map tab's BPM field does.
+    /// </summary>
+    public static TempoEdit PlaceBpm(EditableChart chart, long tick, long microsecondsPerQuarter, TimeSpan delay, bool keepTimes, BlockedAnchor blocked = BlockedAnchor.Refuse)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        var map = chart.TempoMap;
+        if (!map.Tempos.At(tick).IsEmpty)
+            return SetBpm(chart, tick, microsecondsPerQuarter, delay, keepTimes, blocked);
+        if (tick < 0)
+            return TempoEdit.Refused("A tempo marker can't be before the start of the song.");
+        if (microsecondsPerQuarter is < 1 or > EditableTempoMap.MaxMicrosecondsPerQuarter)
+            return TempoEdit.Refused("That tempo is too fast or too slow for MIDI to hold.");
+
+        var tempos = map.Tempos.AsSpan().ToArray().Append(new TempoChange(tick, microsecondsPerQuarter)).OrderBy(static t => t.Tick).ToList();
+        return Fitted(chart, tempos, [.. map.Anchors], tick, absorbFrom: tick + 1, delay, keepTimes, blocked);
+    }
+
+    /// <summary>
+    /// Moves the tempo marker and the time signature at <paramref name="tick"/>, whichever are there, to
+    /// <paramref name="to"/>, together. A tempo marker moves as <see cref="MoveMarker"/> moves it: not when it's anchored,
+    /// not past an anchor, and not onto another; nor does a time signature move onto another. Nothing moves off tick 0.
+    /// </summary>
+    public static TempoEdit MoveChange(EditableChart chart, long tick, long to, TimeSpan delay, bool keepTimes, BlockedAnchor blocked = BlockedAnchor.Refuse)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        var map = chart.TempoMap;
+        bool hasTempo = !map.Tempos.At(tick).IsEmpty;
+        bool hasSignature = !map.TimeSignatures.At(tick).IsEmpty;
+        if (!hasTempo && !hasSignature)
+            return TempoEdit.Refused(Invariant($"There's no tempo or time signature change at tick {tick}."));
+        if (to == tick)
+            return TempoEdit.Refused("The change is already there.");
+        if (tick == 0)
+            return TempoEdit.Refused("The tempo and time signature the song starts with stay at the start.");
+        if (to <= 0)
+            return TempoEdit.Refused("A change can't be moved onto or before the start of the song: change the starting tempo or time signature instead.");
+        if (hasSignature && !map.TimeSignatures.At(to).IsEmpty)
+            return TempoEdit.Refused(Invariant($"There's already a time signature at tick {to}."));
+        if (!hasTempo)
+        {
+            // A time signature moves nothing in time, so nothing's re-ticked.
+            var moved = MovedSignatures(map, tick, to);
+            return new TempoEdit(new ChangeTempoMap(map.Tempos.AsSpan().ToArray(), moved, map.Anchors.AsSpan().ToArray(), keepTimes: false));
+        }
+
+        if (!map.Anchors.At(tick).IsEmpty)
+            return TempoEdit.Refused("An anchored marker is moved in time, not in ticks.");
+        if (!map.Tempos.At(to).IsEmpty)
+            return TempoEdit.Refused(Invariant($"There's already a tempo marker at tick {to}."));
+        long from = Math.Min(tick, to), last = Math.Max(tick, to);
+        if (map.Anchors.Any(a => a.Tick > from && a.Tick < last))
+            return TempoEdit.Refused("A tempo marker can't be moved past an anchor.");
+
+        var tempos = map.Tempos.AsSpan().ToArray().Select(t => t.Tick == tick ? t with { Tick = to } : t).OrderBy(static t => t.Tick).ToList();
+        var signatures = hasSignature ? MovedSignatures(map, tick, to) : null;
+        return Fitted(chart, tempos, [.. map.Anchors], from, absorbFrom: last + 1, delay, keepTimes, blocked, signatures);
+    }
+
+    /// <summary>
+    /// Removes the tempo marker (and its anchor) and the time signature at <paramref name="tick"/>, together, as one step.
+    /// The tempo marker's removal is taken up before the next anchor as <see cref="RemoveMarker"/>'s is.
+    /// </summary>
+    public static TempoEdit RemoveChange(EditableChart chart, long tick, TimeSpan delay, bool keepTimes, BlockedAnchor blocked = BlockedAnchor.Refuse)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        var map = chart.TempoMap;
+        bool hasTempo = !map.Tempos.At(tick).IsEmpty;
+        bool hasSignature = !map.TimeSignatures.At(tick).IsEmpty;
+        if (!hasTempo)
+            return hasSignature ? RemoveSignature(chart, tick) : TempoEdit.Refused(Invariant($"There's no tempo or time signature change at tick {tick}."));
+        if (!hasSignature)
+            return RemoveMarker(chart, tick, delay, keepTimes, blocked);
+        if (tick == 0)
+            return TempoEdit.Refused("The tempo and time signature the song starts with can be changed but not removed.");
+
+        var tempos = map.Tempos.Where(t => t.Tick != tick).ToList();
+        var anchors = map.Anchors.Where(a => a.Tick != tick).ToList();
+        var signatures = map.TimeSignatures.Where(s => s.Tick != tick).ToList();
+        return Fitted(chart, tempos, anchors, tick, absorbFrom: tick + 1, delay, keepTimes, blocked, signatures);
+    }
+
+    /// <summary>
+    /// Sets the time signature from <paramref name="tick"/> on: the one there is changed, or one is added when there's
+    /// none (charter-spec C4 item 1). A time signature moves nothing in time.
+    /// </summary>
+    public static TempoEdit PlaceSignature(EditableChart chart, long tick, int numerator, int denominator)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        if (tick < 0)
+            return TempoEdit.Refused("A time signature can't be before the start of the song.");
+        if (numerator is < 1 or > AddTimeSignature.MaxNumerator)
+            return TempoEdit.Refused(Invariant($"A time signature has 1 to {AddTimeSignature.MaxNumerator} beats."));
+        if (denominator is < 1 or > 64 || (denominator & (denominator - 1)) != 0)
+            return TempoEdit.Refused("A time signature's beat is a whole, half, quarter, eighth, 16th, 32nd or 64th note.");
+
+        var at = chart.TempoMap.TimeSignatures.At(tick);
+        if (at.IsEmpty)
+            return new TempoEdit(new AddTimeSignature(new TimeSignatureMarker(tick, numerator, denominator)));
+        if (at[^1].Numerator == numerator && at[^1].Denominator == denominator)
+            return TempoEdit.Refused(Invariant($"The time signature there is already {numerator}/{denominator}."));
+        return new TempoEdit(new SetTimeSignature(at[^1], numerator, denominator));
+    }
+
+    /// <summary>
+    /// Removes the time signature at <paramref name="tick"/>, every one there when a loaded chart has more than one; the
+    /// signature before it runs on in its place. The one the song starts with can be changed but not removed.
+    /// </summary>
+    public static TempoEdit RemoveSignature(EditableChart chart, long tick)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        var at = chart.TempoMap.TimeSignatures.At(tick);
+        if (at.IsEmpty)
+            return TempoEdit.Refused(Invariant($"There's no time signature at tick {tick}."));
+        if (tick == 0)
+            return TempoEdit.Refused("The time signature the song starts with can be changed but not removed.");
+
+        // The last first, so each is found where it was.
+        var removes = new List<IChartCommand>(at.Length);
+        for (int i = at.Length - 1; i >= 0; i--)
+            removes.Add(new RemoveTimeSignature(at[i]));
+        return new TempoEdit(removes.Count == 1 ? removes[0] : new CompositeCommand(removes));
+    }
+
+    /// <summary>The time signatures with those at <paramref name="tick"/> moved to <paramref name="to"/>, in order.</summary>
+    private static List<TimeSignatureMarker> MovedSignatures(EditableTempoMap map, long tick, long to) =>
+        [.. map.TimeSignatures.AsSpan().ToArray().Select(s => s.Tick == tick ? s with { Tick = to } : s).OrderBy(static s => s.Tick)];
+
     /// <summary>Adds a tempo marker at <paramref name="tick"/> with the tempo in force there, which moves nothing.</summary>
     public static TempoEdit AddMarker(EditableChart chart, long tick)
     {
@@ -290,11 +419,12 @@ public static class TempoMapEdits
     /// <summary>
     /// The edit the new <paramref name="tempos"/> and <paramref name="anchors"/> make, with the first anchor after
     /// <paramref name="edited"/> kept where it is by the last segment before it that starts at or after
-    /// <paramref name="absorbFrom"/>.
+    /// <paramref name="absorbFrom"/>. The time signatures are <paramref name="signatures"/>, or kept as they are when null.
     /// </summary>
-    internal static TempoEdit Fitted(EditableChart chart, List<TempoChange> tempos, List<TempoAnchor> anchors, long edited, long absorbFrom, TimeSpan delay, bool keepTimes, BlockedAnchor blocked)
+    internal static TempoEdit Fitted(EditableChart chart, List<TempoChange> tempos, List<TempoAnchor> anchors, long edited, long absorbFrom, TimeSpan delay, bool keepTimes, BlockedAnchor blocked, IReadOnlyList<TimeSignatureMarker>? signatures = null)
     {
         var map = chart.TempoMap;
+        signatures ??= [.. map.TimeSignatures];
         var anchor = anchors.Where(a => a.Tick > edited).OrderBy(static a => a.Tick).Cast<TempoAnchor?>().FirstOrDefault();
         if (anchor is { } kept)
         {
@@ -307,9 +437,9 @@ public static class TempoMapEdits
                     case BlockedAnchor.Unanchor:
                         // The next anchor, if there's one, is the one to keep now.
                         anchors.Remove(kept);
-                        return Fitted(chart, tempos, anchors, edited, absorbFrom, delay, keepTimes, BlockedAnchor.Refuse);
+                        return Fitted(chart, tempos, anchors, edited, absorbFrom, delay, keepTimes, BlockedAnchor.Refuse, signatures);
                     case BlockedAnchor.AddMarkerBefore when oneBeatBefore is { } at:
-                        var edits = new TempoMap(map.Resolution, tempos, map.TimeSignatures.Select(static s => s.ToTimeSignature()));
+                        var edits = new TempoMap(map.Resolution, tempos, signatures.Select(static s => s.ToTimeSignature()));
                         tempos.Add(new TempoChange(at, TempoAt(edits, at)));
                         tempos.Sort(static (a, b) => a.Tick.CompareTo(b.Tick));
                         absorber = LastSegmentBetween(tempos, absorbFrom, kept.Tick);
@@ -323,7 +453,7 @@ public static class TempoMapEdits
             }
 
             // The absorber runs straight into the anchor, as it's the last segment before it.
-            var unfitted = new TempoMap(map.Resolution, tempos, map.TimeSignatures.Select(static s => s.ToTimeSignature()));
+            var unfitted = new TempoMap(map.Resolution, tempos, signatures.Select(static s => s.ToTimeSignature()));
             double start = unfitted.SecondsAt(tempos[absorber].Tick);
             double target = (kept.AudioMicroseconds / 1_000_000.0) - delay.TotalSeconds;
             long tempo = MicrosecondsFor(target - start, kept.Tick - tempos[absorber].Tick, map.Resolution);
@@ -338,7 +468,7 @@ public static class TempoMapEdits
             tempos[absorber] = tempos[absorber] with { MicrosecondsPerQuarter = tempo };
         }
 
-        return new TempoEdit(new ChangeTempoMap(tempos, map.TimeSignatures, anchors, keepTimes));
+        return new TempoEdit(new ChangeTempoMap(tempos, signatures, anchors, keepTimes));
     }
 
     /// <summary>The tick one beat before <paramref name="anchor"/>, when it's at or after <paramref name="from"/>.</summary>

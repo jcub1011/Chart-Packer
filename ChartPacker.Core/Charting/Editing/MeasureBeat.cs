@@ -46,4 +46,27 @@ public readonly record struct MeasureBeat(long Measure, double Beat)
         double beatTicks = map.Resolution * 4.0 / current.Denominator;
         return new MeasureBeat(Math.Max(1, measures), 1 + ((tick - measureStart) / beatTicks));
     }
+
+    /// <summary>
+    /// The tick of the measure line at or before <paramref name="tick"/>: the start of the measure it's in, counted from
+    /// the time signature in force, as <see cref="TempoMap.BeatLines"/> draws the lines.
+    /// </summary>
+    public static long MeasureStart(TempoMap map, long tick)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        if (tick <= 0)
+            return 0;
+        TimeSignature? at = null;
+        foreach (var signature in map.TimeSignatures)
+        {
+            if (signature.Tick > tick)
+                break;
+            at = signature;
+        }
+
+        if (at is not { } current)
+            return 0;
+        long measure = Math.Max(1, map.Resolution * 4L / current.Denominator) * Math.Max(1, current.Numerator);
+        return current.Tick + ((tick - current.Tick) / measure * measure);
+    }
 }
