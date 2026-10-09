@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Media.Immutable;
 using ChartBuilder.ViewModels;
 using ChartPacker.Audio.Waveforms;
@@ -24,8 +25,12 @@ namespace ChartBuilder.Controls
     /// </summary>
     /// <remarks>
     /// <para>The playhead is drawn by a layer of its own over the rest, so it moves without the ruler, waveform and beat
-    /// lines being drawn again. While <see cref="IsPlaying"/>, it's drawn every frame at <see cref="Clock"/>, which is
-    /// smoother than <see cref="Position"/>; otherwise at <see cref="Position"/>.</para>
+    /// lines being drawn again. While <see cref="IsPlaying"/>, it follows <see cref="Clock"/>, which is smoother than
+    /// <see cref="Position"/>; otherwise <see cref="Position"/>. It's drawn again only when it, or the span box, moves to
+    /// another pixel: each time it is, the screen under it is drawn again too, the timeline's picture included.</para>
+    /// <para>The ruler, waveform, overview and beat lines are drawn once into a picture at the screen's pixels, and drawn
+    /// again only when what they show or the timeline's size changes, so the screen under the playhead is one picture to
+    /// draw again rather than thousands of lines.</para>
     /// <para>Beat lines closer than a few pixels are left out, then measure lines, so a long song doesn't turn into a block.</para>
     /// </remarks>
     public sealed class TimelineView : Control
@@ -55,6 +60,13 @@ namespace ChartBuilder.Controls
         private Pen? _measurePen;
         private Pen? _waveformPen;
         private bool _frameRequested;
+
+        // The picture of everything but the playhead, the size and scaling it was drawn at, and whether what it shows has
+        // changed since.
+        private RenderTargetBitmap? _content;
+        private Size _contentSize;
+        private double _contentScaling;
+        private bool _isContentStale = true;
 
         public static readonly StyledProperty<double> PositionProperty =
             AvaloniaProperty.Register<TimelineView, double>(nameof(Position), defaultBindingMode: BindingMode.TwoWay);
@@ -104,11 +116,16 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<IReadOnlyList<FindingMark>?> FindingMarksProperty =
             AvaloniaProperty.Register<TimelineView, IReadOnlyList<FindingMark>?>(nameof(FindingMarks));
 
+        // What the picture of the ruler, waveform, overview and beat lines shows: when one changes, it's drawn again.
+        private static readonly AvaloniaProperty[] ContentProperties =
+        [
+            LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty,
+            OverviewProperty, FindingMarksProperty,
+        ];
+
         static TimelineView()
         {
-            AffectsRender<TimelineView>(
-                LengthProperty, WaveformProperty, BeatsProperty, WaveformBrushProperty, TickBrushProperty, BeatBrushProperty, MeasureBrushProperty, OverviewProperty,
-                FindingMarksProperty);
+            AffectsRender<TimelineView>(ContentProperties);
             ClipToBoundsProperty.OverrideDefaultValue<TimelineView>(true);
         }
 
@@ -232,9 +249,13 @@ namespace ChartBuilder.Controls
             else if (change.Property == WaveformBrushProperty)
                 _waveformPen = null;
 
-            if (change.Property == PositionProperty || change.Property == LengthProperty || change.Property == PlayheadBrushProperty
-                || change.Property == VisibleStartProperty || change.Property == VisibleEndProperty || change.Property == SpanBrushProperty)
+            if (Array.IndexOf(ContentProperties, change.Property) >= 0)
+                _isContentStale = true;
+
+            if (change.Property == LengthProperty || change.Property == PlayheadBrushProperty || change.Property == SpanBrushProperty)
                 _playhead.InvalidateVisual();
+            else if (change.Property == PositionProperty || change.Property == VisibleStartProperty || change.Property == VisibleEndProperty)
+                InvalidatePlayheadIfMoved();
             if (change.Property == IsPlayingProperty)
             {
                 _playhead.InvalidateVisual();
@@ -248,6 +269,14 @@ namespace ChartBuilder.Controls
             RequestFrame();
         }
 
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
+            _content?.Dispose();
+            _content = null;
+            _isContentStale = true;
+        }
+
         protected override Size ArrangeOverride(Size finalSize)
         {
             _playhead.Arrange(new Rect(finalSize));
@@ -258,14 +287,39 @@ namespace ChartBuilder.Controls
         {
             var bounds = new Rect(Bounds.Size);
             context.FillRectangle(Brushes.Transparent, bounds); // Hit-testable everywhere, for scrubbing.
-            if (Length <= 0 || bounds.Width <= 0)
+            if (Length <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
                 return;
 
-            DrawWaveform(context, bounds);
-            DrawOverview(context, bounds);
-            DrawBeats(context, bounds);
-            DrawRuler(context, bounds);
-            DrawFindingMarks(context, bounds);
+            double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
+            if (_isContentStale || _content is null || _contentSize != bounds.Size || _contentScaling != scaling)
+                DrawContent(bounds, scaling);
+
+            // Pixel for pixel, as it was drawn at the screen's pixels: smoothing would only blur it.
+            var pixels = _content!.PixelSize;
+            using (context.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = BitmapInterpolationMode.None }))
+                context.DrawImage(_content, new Rect(0, 0, pixels.Width, pixels.Height), new Rect(0, 0, pixels.Width / scaling, pixels.Height / scaling));
+        }
+
+        /// <summary>Draws the ruler, waveform, overview, beat lines and lint marks into the picture again, at the screen's pixels.</summary>
+        private void DrawContent(Rect bounds, double scaling)
+        {
+            // A frame already drawn with the old one keeps what it needs of it.
+            _content?.Dispose();
+            var pixels = new PixelSize(Math.Max(1, (int)Math.Ceiling(bounds.Width * scaling)), Math.Max(1, (int)Math.Ceiling(bounds.Height * scaling)));
+            _content = new RenderTargetBitmap(pixels, new Vector(96, 96));
+            _contentSize = bounds.Size;
+            _contentScaling = scaling;
+            _isContentStale = false;
+
+            using var context = _content.CreateDrawingContext();
+            using (context.PushTransform(Matrix.CreateScale(scaling, scaling)))
+            {
+                DrawWaveform(context, bounds);
+                DrawOverview(context, bounds);
+                DrawBeats(context, bounds);
+                DrawRuler(context, bounds);
+                DrawFindingMarks(context, bounds);
+            }
         }
 
         /// <summary>The lint findings of the lane in focus, and the song-wide ones (charter-spec C3 item 2), as marks on the ruler.</summary>
@@ -468,7 +522,7 @@ namespace ChartBuilder.Controls
             top.RequestAnimationFrame(_ =>
             {
                 _frameRequested = false;
-                _playhead.InvalidateVisual();
+                InvalidatePlayheadIfMoved();
                 RequestFrame();
             });
         }
@@ -507,6 +561,19 @@ namespace ChartBuilder.Controls
         /// <summary>Where the playhead is drawn: at the clock while playing, otherwise at <see cref="Position"/>.</summary>
         private double PlayheadSeconds => IsPlaying && Clock is { } clock ? clock().TotalSeconds : Position;
 
+        /// <summary>Has the playhead layer drawn again if the playhead or the span box is now at another pixel.</summary>
+        private void InvalidatePlayheadIfMoved()
+        {
+            if (Bounds.Width <= 0 || Length <= 0 || PlaceOfPlayhead(Bounds.Width) != _playhead.Drawn)
+                _playhead.InvalidateVisual();
+        }
+
+        /// <summary>Where the playhead's line is drawn, and the span box's edges, in whole pixels across <paramref name="width"/>.</summary>
+        private (double Line, double SpanLeft, double SpanRight) PlaceOfPlayhead(double width) =>
+            (Math.Round(XOf(Math.Clamp(PlayheadSeconds, 0, Length), width)) + 0.5,
+             Math.Round(XOf(Math.Clamp(VisibleStart, 0, Length), width)),
+             Math.Round(XOf(Math.Clamp(VisibleEnd, 0, Length), width)));
+
         private double XOf(double seconds, double width) => seconds / Length * width;
 
         private double TimeOf(double x, double width) => x / width * Length;
@@ -514,31 +581,46 @@ namespace ChartBuilder.Controls
         /// <summary>The playhead's line, over the rest, which its owner redraws only when it moves.</summary>
         private sealed class PlayheadLayer(TimelineView owner) : Control
         {
-            private Pen? _pen;
+            // Immutable, so drawing them doesn't make them resources of the frame.
+            private IPen? _pen;
             private IBrush? _penBrush;
+            private IBrush? _span;
+            private IBrush? _spanBrush;
+
+            /// <summary>Where the playhead and the span box were last drawn: nowhere, before they've been drawn.</summary>
+            public (double Line, double SpanLeft, double SpanRight) Drawn { get; private set; } = (double.NaN, double.NaN, double.NaN);
 
             public override void Render(DrawingContext context)
             {
                 double width = Bounds.Width;
                 if (owner.PlayheadBrush is not { } brush || owner.Length <= 0 || width <= 0)
+                {
+                    Drawn = (double.NaN, double.NaN, double.NaN);
                     return;
+                }
 
                 if (!ReferenceEquals(_penBrush, brush))
                 {
-                    _pen = new Pen(brush, 1.5);
+                    _pen = new ImmutablePen(brush.ToImmutable(), 1.5);
                     _penBrush = brush;
                 }
+
+                var place = owner.PlaceOfPlayhead(width);
+                Drawn = place;
 
                 // The span the lanes show, boxed, so the overview says where in the song the editor is.
                 if (owner.SpanBrush is { } span && owner.VisibleEnd > owner.VisibleStart)
                 {
-                    double left = owner.XOf(Math.Clamp(owner.VisibleStart, 0, owner.Length), width);
-                    double right = owner.XOf(Math.Clamp(owner.VisibleEnd, 0, owner.Length), width);
-                    context.FillRectangle(span, new Rect(left, 0, Math.Max(2, right - left), Bounds.Height));
+                    if (!ReferenceEquals(_spanBrush, span))
+                    {
+                        _span = span.ToImmutable();
+                        _spanBrush = span;
+                    }
+
+                    context.FillRectangle(_span!, new Rect(place.SpanLeft, 0, Math.Max(2, place.SpanRight - place.SpanLeft), Bounds.Height));
                 }
 
-                double x = Math.Round(owner.XOf(Math.Clamp(owner.PlayheadSeconds, 0, owner.Length), width)) + 0.5;
-                context.DrawLine(_pen!, new Point(x, 0), new Point(x, Bounds.Height));
+                context.DrawLine(_pen!, new Point(place.Line, 0), new Point(place.Line, Bounds.Height));
             }
         }
     }

@@ -49,12 +49,16 @@ internal sealed class SpectrogramJob : AnalysisJob
     private readonly Lock _lock = new();
     private int _focus;
 
+    // How many of _claimed are still false. Under _lock.
+    private int _unclaimed;
+
     public SpectrogramJob(AnalysisInput input, Spectrogram spectrogram, AnalysisWorkers workers)
         : base(input)
     {
         _spectrogram = spectrogram;
         _workers = workers;
         _claimed = new bool[spectrogram.ChunkCount];
+        _unclaimed = _claimed.Length;
         Expect(spectrogram.ChunkCount);
     }
 
@@ -77,12 +81,23 @@ internal sealed class SpectrogramJob : AnalysisJob
         }
     }
 
+    /// <remarks>
+    /// Asked every frame a spectrogram is drawn, so the workers are woken only when there's somewhere new to start from
+    /// and something left to compute: once every chunk is claimed, waking them would only have them look for work again.
+    /// </remarks>
     public void Focus(int chunk)
     {
+        bool wake;
         lock (_lock)
-            _focus = Math.Clamp(chunk, 0, Math.Max(0, _claimed.Length - 1));
+        {
+            int focus = Math.Clamp(chunk, 0, Math.Max(0, _claimed.Length - 1));
+            wake = focus != _focus && _unclaimed > 0;
+            _focus = focus;
+        }
+
         FocusStamp = Interlocked.Increment(ref _focusClock);
-        _workers.Wake();
+        if (wake)
+            _workers.Wake();
     }
 
     public override int ClaimNext()
@@ -97,6 +112,7 @@ internal sealed class SpectrogramJob : AnalysisJob
                     if (chunk >= 0 && chunk < _claimed.Length && !_claimed[chunk])
                     {
                         _claimed[chunk] = true;
+                        _unclaimed--;
                         return chunk;
                     }
                 }

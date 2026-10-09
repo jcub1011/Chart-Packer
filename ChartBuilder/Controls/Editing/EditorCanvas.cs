@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Media.TextFormatting;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ChartBuilder.Resources;
@@ -58,7 +59,9 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush AlternateRowBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x0A, 0xFF, 0xFF, 0xFF));
         private static readonly IPen DividerPen = new ImmutablePen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IPen BeatPen = new ImmutablePen(Color.FromArgb(0x2A, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
-        private static readonly IPen GridPen = new ImmutablePen(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF).ToUInt32(), 1, new ImmutableDashStyle([2, 3], 0));
+        // Solid and fainter rather than dashed: drawn once a grid step across every lane, every frame, and a dashed line is
+        // dashed afresh each time it's drawn.
+        private static readonly IPen GridPen = new ImmutablePen(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IPen MeasurePen = new ImmutablePen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF).ToUInt32(), 2);
         private static readonly IPen TempoPen = new ImmutablePen(Color.FromArgb(0xB0, 0xFF, 0xB0, 0x40).ToUInt32(), 1.5);
         private static readonly IBrush TempoBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x40));
@@ -131,7 +134,8 @@ namespace ChartBuilder.Controls.Editing
         private static readonly Typeface LabelFace = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
         private readonly GemPainter _gems = new();
-        private readonly Dictionary<string, FormattedText> _labels = [];
+        private readonly Dictionary<(string Text, double Size, IBrush Brush, double? MaxWidth), TextLayout> _labels = [];
+        private readonly List<string> _measureNumbers = [];
 
         // How brightly each column is lit as the song plays through the strike line.
         private double[] _hits = [];
@@ -907,7 +911,7 @@ namespace ChartBuilder.Controls.Editing
                     double a = projection.AlongOf(beats[first]), b = projection.AlongOf(beats[last]);
                     context.FillRectangle(UnsureBrush, Box(a, b, across1, across2));
                     var text = Label(Strings.ProposalUnsureLabel, 10, UnsureLabelBrush, highway ? Math.Max(1, labels.Width - 4) : null);
-                    context.DrawText(text, highway ? new Point(labels.X + 2, Math.Max(a, b) - text.Height) : new Point(Math.Min(a, b) + 3, labels.Bottom - text.Height));
+                    text.Draw(context, highway ? new Point(labels.X + 2, Math.Max(a, b) - text.Height) : new Point(Math.Min(a, b) + 3, labels.Bottom - text.Height));
                 }
 
                 int perMeasure = Math.Max(1, proposal.BeatsPerMeasure);
@@ -930,7 +934,7 @@ namespace ChartBuilder.Controls.Editing
                 double along = projection.AlongOf(downbeat);
                 context.DrawLine(DownbeatPen, At(along, highway ? labels.Left : labels.Top), At(along, across2));
                 var text = Label(Strings.DownbeatGhostLabel, 10, DownbeatLabelBrush);
-                context.DrawText(text, highway ? new Point(labels.X + 2, along - text.Height - 2) : new Point(along + 3, labels.Y));
+                text.Draw(context, highway ? new Point(labels.X + 2, along - text.Height - 2) : new Point(along + 3, labels.Y));
             }
         }
 
@@ -1137,7 +1141,7 @@ namespace ChartBuilder.Controls.Editing
                     ? new Point(projection.LaneFrom + 3, along - text.Height - 2)
                     : new Point(along + 3, projection.LaneFrom + 2);
                 context.FillRectangle(BadgeBrush, new Rect(at, new Size(text.Width, text.Height)).Inflate(1));
-                context.DrawText(text, at);
+                text.Draw(context, at);
             }
         }
 
@@ -1220,11 +1224,11 @@ namespace ChartBuilder.Controls.Editing
                 int number = _measures.BinarySearch(line.Tick);
                 if (number < 0)
                     continue;
-                var text = Label((number + 1).ToString(CultureInfo.CurrentCulture), 10, LabelBrush ?? DefaultLabelBrush);
+                var text = Label(MeasureNumber(number), 10, LabelBrush ?? DefaultLabelBrush);
                 var at = View == LaneView.Highway
                     ? new Point(labels.Right - text.Width - 4, along - text.Height)
                     : new Point(along + 3, labels.Bottom - text.Height - 1);
-                context.DrawText(text, at);
+                text.Draw(context, at);
             }
         }
 
@@ -1247,7 +1251,7 @@ namespace ChartBuilder.Controls.Editing
                     : new Point(along + 3, labels.Y + 1);
                 if (selected)
                     context.FillRectangle(BadgeBrush, new Rect(at, new Size(text.Width, text.Height)).Inflate(1));
-                context.DrawText(text, at);
+                text.Draw(context, at);
             }
 
             // Time signatures with no tempo marker at their tick.
@@ -1257,7 +1261,7 @@ namespace ChartBuilder.Controls.Editing
                     continue;
                 double along = projection.AlongOf(session.AudioAt(signature.Tick));
                 var text = Label(SignatureText(signature), 10, TempoBrush);
-                context.DrawText(text, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
+                text.Draw(context, View == LaneView.Highway ? new Point(labels.X + 2, along + 1) : new Point(along + 3, labels.Y + 1));
             }
         }
 
@@ -1296,11 +1300,11 @@ namespace ChartBuilder.Controls.Editing
 
                 // The measure number drawn at its tick, when it starts a measure.
                 int measure = _measures.BinarySearch(e.Tick);
-                var number = measure >= 0 ? Label((measure + 1).ToString(CultureInfo.CurrentCulture), 10, LabelBrush ?? DefaultLabelBrush) : null;
+                var number = measure >= 0 ? Label(MeasureNumber(measure), 10, LabelBrush ?? DefaultLabelBrush) : null;
                 if (highway)
                 {
                     var text = Label(name, 10, SectionBrush, Math.Max(1, labels.Width - 4));
-                    context.DrawText(text, new Point(labels.X + 2, along - (number?.Height ?? 0) - text.Height));
+                    text.Draw(context, new Point(labels.X + 2, along - (number?.Height ?? 0) - text.Height));
                     continue;
                 }
 
@@ -1314,7 +1318,7 @@ namespace ChartBuilder.Controls.Editing
                 var label = Label(name, 10, SectionBrush);
                 var at = new Point(along + 3 + (before > 0 ? before + 6 : 0), labels.Y + Math.Max(0, (labels.Height - label.Height) / 2));
                 context.FillRectangle(BadgeBrush, new Rect(at, new Size(label.Width, label.Height)).Inflate(1));
-                context.DrawText(label, at);
+                label.Draw(context, at);
             }
         }
 
@@ -1432,7 +1436,7 @@ namespace ChartBuilder.Controls.Editing
                 ? new Point(edge + 2, along - (text.Height / 2))
                 : new Point(along - (text.Width / 2), projection.LaneFrom - text.Height);
             context.FillRectangle(BadgeBrush, new Rect(at, new Size(text.Width, text.Height)).Inflate(1));
-            context.DrawText(text, at);
+            text.Draw(context, at);
         }
 
         /// <summary>The note the place tool would put down where the pointer is, as it would be drawn.</summary>
@@ -1673,25 +1677,38 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>A label, made once and kept; cut short with an ellipsis at <paramref name="maxWidth"/> when it's given.</summary>
-        private FormattedText Label(string text, double size, IBrush brush, double? maxWidth = null)
+        /// <remarks>
+        /// A <see cref="TextLayout"/>, not a <see cref="FormattedText"/>: that lays its text out again each time it's drawn
+        /// or measured, which, for the measure numbers alone, was most of the time a frame took to draw. Drawn in an
+        /// immutable copy of <paramref name="brush"/>, so it isn't one of the frame's resources.
+        /// </remarks>
+        private TextLayout Label(string text, double size, IBrush brush, double? maxWidth = null)
         {
-            string key = string.Create(CultureInfo.InvariantCulture, $"{text}|{size}|{brush.GetHashCode()}|{maxWidth}");
+            var key = (text, size, brush, maxWidth);
             if (!_labels.TryGetValue(key, out var label))
             {
                 if (_labels.Count > 512)
-                    _labels.Clear();
-                label = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, LabelFace, size, brush);
-                if (maxWidth is { } width)
                 {
-                    label.MaxTextWidth = width;
-                    label.MaxLineCount = 1;
-                    label.Trimming = TextTrimming.CharacterEllipsis;
+                    foreach (var old in _labels.Values)
+                        old.Dispose();
+                    _labels.Clear();
                 }
 
+                label = maxWidth is { } width
+                    ? new TextLayout(text, LabelFace, size, brush.ToImmutable(), textTrimming: TextTrimming.CharacterEllipsis, maxWidth: width, maxLines: 1)
+                    : new TextLayout(text, LabelFace, size, brush.ToImmutable());
                 _labels[key] = label;
             }
 
             return label;
+        }
+
+        /// <summary>Measure <paramref name="index"/>'s number, counting from one, made once.</summary>
+        private string MeasureNumber(int index)
+        {
+            while (_measureNumbers.Count <= index)
+                _measureNumbers.Add((_measureNumbers.Count + 1).ToString(CultureInfo.CurrentCulture));
+            return _measureNumbers[index];
         }
     }
 }

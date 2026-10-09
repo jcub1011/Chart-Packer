@@ -152,8 +152,22 @@ namespace ChartBuilder.ViewModels
         /// </summary>
         public void RefreshVisibleSpan()
         {
-            var lane = Lanes.All.FirstOrDefault(l => l.Track is { } track && track == Session.Focused)
-                ?? Lanes.All.FirstOrDefault(l => l.HasCanvas);
+            // A loop, not a query: this runs every frame while the song plays.
+            EditorLaneViewModel? focused = null, first = null;
+            var key = Session.Focused;
+            foreach (var each in Lanes.All)
+            {
+                if (each.Track is { } track && track == key)
+                {
+                    focused = each;
+                    break;
+                }
+
+                if (first is null && each.HasCanvas)
+                    first = each;
+            }
+
+            var lane = focused ?? first;
             var (start, end) = Session.Viewport.SpanOf(lane?.LookAhead ?? DefaultLookAhead);
             VisibleStart = start;
             VisibleEnd = end;

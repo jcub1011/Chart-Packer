@@ -61,6 +61,9 @@ namespace ChartBuilder.ViewModels
         private bool _seeking;
         private bool _disposed;
 
+        // Clock, made once: it's read every frame.
+        private Func<TimeSpan>? _clock;
+
         /// <summary>No song: an empty timeline, with nothing to play.</summary>
         public PlaybackViewModel()
             : this(null, null, null)
@@ -177,7 +180,7 @@ namespace ChartBuilder.ViewModels
         /// is, less the calibrated latency times the speed (charter-spec C10 item 5).
         /// </summary>
         /// <remarks>While paused, nothing heard lags behind, so it's the audio's position.</remarks>
-        public Func<TimeSpan> Clock => () => _player is { } player
+        public Func<TimeSpan> Clock => _clock ??= () => _player is { } player
             ? player.IsPlaying ? LatencyCompensation.Drawn(player.SmoothPosition, _latency?.Milliseconds ?? 0, player.Speed) : player.Position
             : TimeSpan.FromSeconds(PositionSeconds);
 

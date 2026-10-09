@@ -695,7 +695,8 @@
                             </StackPanel>
                         </Button>
                     </WrapPanel>
-                    <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
+                    <!-- Figures all one width, so the bar isn't laid out again each time the position changes while it plays. -->
+                    <TextBlock Grid.Column="1" FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
                 </Grid>
             </Border>
             <bctl:TimelineView Margin="8,4,8,8"
