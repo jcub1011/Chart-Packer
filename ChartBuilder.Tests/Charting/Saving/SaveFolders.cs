@@ -99,16 +99,19 @@ internal sealed class SaveFolders : IDisposable
 
     /// <summary>
     /// Saves <paramref name="song"/> as the editor's Save does: every pending change but the reverted ones, the chart
-    /// checked, then written through the song's draft. Fails the test if it doesn't go through.
+    /// checked, then written through the song's draft. With <paramref name="stash"/>, the files the save replaces or
+    /// removes are kept there first, as the editor keeps them for undo. Fails the test if it doesn't go through.
     /// </summary>
-    public static async Task<ChartSaveRequest> SaveAsync(EditorSong song, CancellationToken cancellationToken, string? removeChart = null)
+    public static async Task<ChartSaveRequest> SaveAsync(EditorSong song, CancellationToken cancellationToken, string? removeChart = null, MediaStash? stash = null)
     {
         var request = ChartSaver.RequestFor(song, song.Chart.Clone(), song.PendingChanges(), removeChart);
         var written = ChartSaver.Check(request);
         Assert.IsTrue(written.IsValid, Describe(written));
+        var slots = request.Media!.Keys.ToList();
+        var kept = stash is null ? new Dictionary<MediaSlot, string>() : await stash.KeepAsync(song, slots, cancellationToken);
         var findings = await ChartSaver.SaveAsync(song.Entry!, request, written, cancellationToken);
         Assert.IsFalse(findings.Any(f => f.Severity == ChartPacker.Core.Validation.Severity.Error), string.Join("; ", findings.Select(f => f.Message)));
-        song.Saved(ChartSaver.SavedSong(song, song.Entry!, request), song.Chart.Parts.Select(p => p.Instrument).ToHashSet());
+        song.Saved(ChartSaver.SavedSong(song, song.Entry!, request), song.Chart.Parts.Select(p => p.Instrument).ToHashSet(), new MediaSaveResult(slots, kept));
         return request;
     }
 

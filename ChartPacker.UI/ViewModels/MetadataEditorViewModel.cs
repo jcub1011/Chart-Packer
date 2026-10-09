@@ -36,11 +36,21 @@ namespace ChartPacker.UI.ViewModels
         private readonly Dictionary<string, IRelayCommand> _quickFixKeyCommands = new(StringComparer.OrdinalIgnoreCase);
         private HashSet<string> _keysWithQuickFix = new(StringComparer.OrdinalIgnoreCase);
 
-        public MetadataEditorViewModel(IMetadataEditorHost host)
+        /// <param name="showDifficulties">Whether the difficulties are shown as icons above the rows; Chart Builder edits them with its parts.</param>
+        /// <param name="actionsInContextMenu">Whether a row's Revert and Remove are on its right-click menu rather than buttons on it.</param>
+        public MetadataEditorViewModel(IMetadataEditorHost host, bool showDifficulties = true, bool actionsInContextMenu = false)
         {
             _host = host;
+            ShowDifficulties = showDifficulties;
+            ActionsInContextMenu = actionsInContextMenu;
             Instruments = [.. DifficultySlots.All.Select(s => new InstrumentDifficultyViewModel(this, s))];
         }
+
+        /// <summary>Whether the difficulties are shown as icons above the rows, which leave them out either way.</summary>
+        public bool ShowDifficulties { get; }
+
+        /// <summary>Whether a row's Revert and Remove are on its right-click menu rather than buttons on it.</summary>
+        public bool ActionsInContextMenu { get; }
 
         public AvaloniaList<MetadataRowViewModel> Metadata { get; } = [];
 
@@ -79,8 +89,8 @@ namespace ChartPacker.UI.ViewModels
         [ObservableProperty]
         public partial IReadOnlyList<KnownKey> AvailableKeys { get; set; } = [];
 
-        /// <summary>The instruments' icons are shown: some song's metadata was read.</summary>
-        public bool ShowInstruments => _host.Items.Count > 0;
+        /// <summary>The instruments' icons are shown: some song's metadata was read, and the editor shows them.</summary>
+        public bool ShowInstruments => ShowDifficulties && _host.Items.Count > 0;
 
         /// <summary>Some icons are hidden until Show all.</summary>
         public bool HasHiddenInstruments => Instruments.Any(i => i.IsHidden);

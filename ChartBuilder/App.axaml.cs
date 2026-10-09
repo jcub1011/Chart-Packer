@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -5,6 +6,7 @@ using ChartBuilder.Services;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Core;
 using ChartPacker.Core.Charting.Recovery;
+using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Settings;
 
@@ -24,6 +26,9 @@ namespace ChartBuilder
                 // Composition root: services are wired by hand, as in Chart Packer. BuilderWindows wires each window
                 // as it opens: the launcher first, then the Editor in its place.
                 var settings = BuilderSettingsService.Load(UserConfigPaths.BuilderSettingsFile);
+
+                // An Editor that didn't close cleanly leaves the copies it kept for undo; a day on, no session needs them.
+                MediaStash.SweepStale(TimeSpan.FromDays(1));
 
                 // SDL's audio starts on the main thread. It never throws: a device that can't start says so when a
                 // song is played.

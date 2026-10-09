@@ -499,4 +499,63 @@
   <data name="FindingFixToolTip" xml:space="preserve">
     <value>Apply the quick fix, as one step to undo</value>
   </data>
+  <data name="MuteButton" xml:space="preserve">
+    <value>M</value>
+    <comment>Short label for the mute toggle on a track row.</comment>
+  </data>
+  <data name="SoloButton" xml:space="preserve">
+    <value>S</value>
+    <comment>Short label for the solo toggle on a track row.</comment>
+  </data>
+  <data name="MuteToolTip" xml:space="preserve">
+    <value>Mute this track</value>
+  </data>
+  <data name="SoloToolTip" xml:space="preserve">
+    <value>Play only the soloed tracks</value>
+  </data>
+  <data name="TrackVolumeName" xml:space="preserve">
+    <value>Track volume in the mix</value>
+  </data>
+  <data name="ReplaceTrackToolTip" xml:space="preserve">
+    <value>Replace this track</value>
+  </data>
+  <data name="RemoveTrackToolTip" xml:space="preserve">
+    <value>Remove this track</value>
+  </data>
+  <data name="UndoRemoveTrackToolTip" xml:space="preserve">
+    <value>Keep this track</value>
+  </data>
+  <data name="AddTrackButton" xml:space="preserve">
+    <value>Add track</value>
+  </data>
+  <data name="TracksListName" xml:space="preserve">
+    <value>Audio tracks</value>
+  </data>
+  <data name="RemovedTracksListName" xml:space="preserve">
+    <value>Removed tracks</value>
+  </data>
+  <data name="ReplaceTrackFormat" xml:space="preserve">
+    <value>Replace {0}</value>
+    <comment>{0} is the stem, e.g. "guitar".</comment>
+  </data>
+  <data name="TrackNotAudioFormat" xml:space="preserve">
+    <value>{0} isn't an ogg, opus, mp3 or wav file.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
+  <data name="TrackUnusableFormat" xml:space="preserve">
+    <value>{0} can't be used as a track: {1}</value>
+    <comment>{0} is the file name; {1} is the reason.</comment>
+  </data>
+  <data name="PickTrackTitleFormat" xml:space="preserve">
+    <value>Choose the {0} track</value>
+    <comment>{0} is the stem, e.g. "guitar".</comment>
+  </data>
+  <data name="TrackRowMenuToolTip" xml:space="preserve">
+    <value>Right-click to replace or remove this track</value>
+    <comment>A track row's tooltip where Replace and Remove are on its right-click menu.</comment>
+  </data>
+  <data name="RemovedTrackRowMenuToolTip" xml:space="preserve">
+    <value>Right-click to keep this track</value>
+    <comment>A removed track row's tooltip where Keep is on its right-click menu.</comment>
+  </data>
 </root>

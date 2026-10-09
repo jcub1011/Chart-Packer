@@ -212,10 +212,6 @@
   <data name="RedoToolTip" xml:space="preserve">
     <value>Redo (Ctrl+Y)</value>
   </data>
-  <data name="ChartInspectorTab" xml:space="preserve">
-    <value>Chart Inspector</value>
-    <comment>The left panel's tab.</comment>
-  </data>
   <data name="PropertiesTab" xml:space="preserve">
     <value>Properties</value>
     <comment>The right panel's tab.</comment>
@@ -288,70 +284,6 @@
   </data>
   <data name="TimelineToolTip" xml:space="preserve">
     <value>Click or drag to move the playhead.</value>
-  </data>
-  <data name="InspectorNewChartPath" xml:space="preserve">
-    <value>Not saved yet. Its song folder is made at its first save.</value>
-  </data>
-  <data name="InspectorCharterPrefix" xml:space="preserve">
-    <value>Charted by </value>
-    <comment>Before the charter's name under the song's title; the name follows.</comment>
-  </data>
-  <data name="InspectorPickArtTitle" xml:space="preserve">
-    <value>Choose album art</value>
-  </data>
-  <data name="InspectorReplaceArtToolTip" xml:space="preserve">
-    <value>Replace the album art</value>
-  </data>
-  <data name="InspectorRemoveArtToolTip" xml:space="preserve">
-    <value>Remove the album art</value>
-  </data>
-  <data name="InspectorRevertArtToolTip" xml:space="preserve">
-    <value>Undo the album art change</value>
-  </data>
-  <data name="InspectorNoArt" xml:space="preserve">
-    <value>No album art</value>
-  </data>
-  <data name="InspectorArtRemoved" xml:space="preserve">
-    <value>Removed when saved</value>
-  </data>
-  <data name="InspectorArtUnreadable" xml:space="preserve">
-    <value>Can't be shown</value>
-  </data>
-  <data name="InspectorDelayLabel" xml:space="preserve">
-    <value>Audio offset (delay), ms</value>
-  </data>
-  <data name="InspectorDelayToolTip" xml:space="preserve">
-    <value>How much later than its notes the chart plays against the audio, in milliseconds: song.ini's delay. Find first downbeat sets it too.</value>
-  </data>
-  <data name="InspectorNoTracks" xml:space="preserve">
-    <value>No audio. The chart is made against a silent timeline.</value>
-  </data>
-  <data name="InspectorNoChartFiles" xml:space="preserve">
-    <value>None yet. notes.mid is written at the first save.</value>
-  </data>
-  <data name="InspectorImportNote" xml:space="preserve">
-    <value>The first save replaces notes.chart with notes.mid.</value>
-  </data>
-  <data name="InspectorNoOtherFiles" xml:space="preserve">
-    <value>None</value>
-  </data>
-  <data name="InspectorFilesReadOnlyNote" xml:space="preserve">
-    <value>Tracks and files can't be added or removed here yet.</value>
-  </data>
-  <data name="InspectorAlbumArt" xml:space="preserve">
-    <value>Album art</value>
-  </data>
-  <data name="InspectorTracksHeading" xml:space="preserve">
-    <value>Tracks</value>
-  </data>
-  <data name="InspectorChartFilesHeading" xml:space="preserve">
-    <value>Chart files</value>
-  </data>
-  <data name="InspectorOtherFilesHeading" xml:space="preserve">
-    <value>Other files</value>
-  </data>
-  <data name="InspectorFindingsHeading" xml:space="preserve">
-    <value>Findings</value>
   </data>
   <data name="InspectorMetadataHeading" xml:space="preserve">
     <value>Metadata</value>
@@ -1198,26 +1130,6 @@ Open it anyway?</value>
     <value>Play a sound on each note of the lanes shown as it reaches the strike line.</value>
     <comment>The hit sounds checkbox's tooltip.</comment>
   </data>
-  <data name="StemsButton" xml:space="preserve">
-    <value>Stems</value>
-    <comment>The transport bar's button: each stem's mute, solo and volume.</comment>
-  </data>
-  <data name="StemsToolTip" xml:space="preserve">
-    <value>Mute, solo or turn down each stem.</value>
-    <comment>The Stems button's tooltip.</comment>
-  </data>
-  <data name="StemMuteLabel" xml:space="preserve">
-    <value>Mute</value>
-    <comment>A checkbox in the Stems menu: the stem isn't heard.</comment>
-  </data>
-  <data name="StemSoloLabel" xml:space="preserve">
-    <value>Solo</value>
-    <comment>A checkbox in the Stems menu: only soloed stems are heard.</comment>
-  </data>
-  <data name="StemVolumeToolTip" xml:space="preserve">
-    <value>Volume</value>
-    <comment>The Stems menu's volume slider.</comment>
-  </data>
   <data name="LatencyLabel" xml:space="preserve">
     <value>Latency</value>
     <comment>The transport bar's latency button's label, before the value.</comment>
@@ -1381,7 +1293,7 @@ Saving also makes these changes to song.ini:
     <value>{0} is open in another Chart Builder.</value>
   </data>
   <data name="FirstSaveNeedsNameAndArtist" xml:space="preserve">
-    <value>Set the song's name and artist in the Chart Inspector before saving.</value>
+    <value>Set the song's name and artist in Chart Settings' Metadata before saving.</value>
   </data>
   <data name="FirstSaveSongLabel" xml:space="preserve">
     <value>Song</value>
@@ -1403,13 +1315,6 @@ Saving also makes these changes to song.ini:
   <data name="PendingChangeRemovedFormat" xml:space="preserve">
     <value>{0} removed</value>
     <comment>A pending song.ini change that removes a key. {0} is the key.</comment>
-  </data>
-  <data name="PendingAlbumArtFormat" xml:space="preserve">
-    <value>album art from {0}</value>
-    <comment>A pending change that replaces the album art. {0} is the image's file name.</comment>
-  </data>
-  <data name="PendingAlbumArtRemoved" xml:space="preserve">
-    <value>album art removed</value>
   </data>
   <data name="PendingChangeRevertButton" xml:space="preserve">
     <value>Revert</value>
@@ -2307,5 +2212,122 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="SuggestedRatingUsedFormat" xml:space="preserve">
     <value>Rating {0} will be saved as {1}.</value>
+  </data>
+  <data name="ArtTab" xml:space="preserve">
+    <value>Art</value>
+  </data>
+  <data name="ArtAlbumArtTitle" xml:space="preserve">
+    <value>Album art</value>
+  </data>
+  <data name="ArtBackgroundImageTitle" xml:space="preserve">
+    <value>Background image</value>
+  </data>
+  <data name="ArtBackgroundVideoTitle" xml:space="preserve">
+    <value>Background video</value>
+  </data>
+  <data name="ArtPickAlbumArtTitle" xml:space="preserve">
+    <value>Choose the album art</value>
+  </data>
+  <data name="ArtPickBackgroundImageTitle" xml:space="preserve">
+    <value>Choose the background image</value>
+  </data>
+  <data name="ArtPickBackgroundVideoTitle" xml:space="preserve">
+    <value>Choose the background video</value>
+  </data>
+  <data name="ArtChooseButton" xml:space="preserve">
+    <value>Choose…</value>
+    <comment>On an empty Art tile: picks a file for it.</comment>
+  </data>
+  <data name="ArtReplaceMenu" xml:space="preserve">
+    <value>Replace…</value>
+    <comment>An Art tile's right-click menu.</comment>
+  </data>
+  <data name="ArtRemoveMenu" xml:space="preserve">
+    <value>Remove</value>
+    <comment>An Art tile's right-click menu.</comment>
+  </data>
+  <data name="ArtRevertMenu" xml:space="preserve">
+    <value>Revert to saved</value>
+    <comment>An Art tile's right-click menu: puts back the song's own file.</comment>
+  </data>
+  <data name="ArtNoneNote" xml:space="preserve">
+    <value>None</value>
+    <comment>In an empty Art tile.</comment>
+  </data>
+  <data name="ArtRemovedNote" xml:space="preserve">
+    <value>Removed at the next save</value>
+    <comment>In an Art tile whose file a pending change removes.</comment>
+  </data>
+  <data name="ArtUnreadable" xml:space="preserve">
+    <value>Can't be shown</value>
+    <comment>In an Art tile whose file can't be read or decoded.</comment>
+  </data>
+  <data name="ArtNotImageFormat" xml:space="preserve">
+    <value>{0} isn't a png, jpg or jpeg image.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
+  <data name="ArtNotVideoFormat" xml:space="preserve">
+    <value>{0} isn't an mp4, avi, webm, vp8, ogv or mpeg video.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
+  <data name="ArtVideoUnusableFormat" xml:space="preserve">
+    <value>{0} can't be played: {1}</value>
+    <comment>{0} is the file name; {1} is the reason.</comment>
+  </data>
+  <data name="ArtVideoNeedsFfmpeg" xml:space="preserve">
+    <value>The video can't be previewed, as FFmpeg isn't installed with Chart Builder. It's still saved with the song.</value>
+  </data>
+  <data name="ChartSettingsDelayLabel" xml:space="preserve">
+    <value>Audio delay (ms)</value>
+  </data>
+  <data name="ChartSettingsDelayToolTip" xml:space="preserve">
+    <value>How much later than its notes the chart plays against the audio: song.ini's delay</value>
+  </data>
+  <data name="ChartSettingsDifficultyHeader" xml:space="preserve">
+    <value>Difficulty</value>
+    <comment>Above the Parts rows' rating boxes.</comment>
+  </data>
+  <data name="ChartSettingsPartToolTip" xml:space="preserve">
+    <value>Whether the chart has this part. Unticking a part with notes asks first.</value>
+  </data>
+  <data name="ChartSettingsDifficultyToolTip" xml:space="preserve">
+    <value>The part's difficulty rating, 0 to 6 as the games show it; empty while it's unrated</value>
+  </data>
+  <data name="ChartSettingsClearDifficultyToolTip" xml:space="preserve">
+    <value>Clear the rating</value>
+  </data>
+  <data name="ChartSettingsProDrumsDifficultyLabel" xml:space="preserve">
+    <value>Pro drums</value>
+    <comment>Beside Pro drums' own rating, diff_drums_real.</comment>
+  </data>
+  <data name="ChartSettingsSectionMetadata" xml:space="preserve">
+    <value>Metadata</value>
+  </data>
+  <data name="ChartSettingsSectionTracks" xml:space="preserve">
+    <value>Tracks</value>
+  </data>
+  <data name="ChartSettingsTracksNote" xml:space="preserve">
+    <value>Mute, solo and volume are only for listening: they aren't saved or undone.</value>
+  </data>
+  <data name="PendingFileFormat" xml:space="preserve">
+    <value>{0} from {1}</value>
+    <comment>A pending change that puts a file in the song. {0} is what, e.g. "album art" or "guitar track"; {1} is the file's name.</comment>
+  </data>
+  <data name="PendingFileRemovedFormat" xml:space="preserve">
+    <value>{0} removed</value>
+    <comment>A pending change that removes a file. {0} is what, e.g. "album art" or "guitar track".</comment>
+  </data>
+  <data name="PendingAlbumArtName" xml:space="preserve">
+    <value>album art</value>
+  </data>
+  <data name="PendingBackgroundImageName" xml:space="preserve">
+    <value>background image</value>
+  </data>
+  <data name="PendingBackgroundVideoName" xml:space="preserve">
+    <value>background video</value>
+  </data>
+  <data name="PendingTrackNameFormat" xml:space="preserve">
+    <value>{0} track</value>
+    <comment>{0} is the stem, e.g. "guitar".</comment>
   </data>
 </root>

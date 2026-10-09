@@ -13,6 +13,7 @@ using ChartBuilder.Services;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Metadata;
 using ChartPacker.UI.Services;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -32,35 +33,102 @@ namespace ChartBuilder.ViewModels
         public override string ToString() => Label;
     }
 
-    /// <summary>A part Chart settings can tick.</summary>
-    public sealed partial class ChartPartChoice(ChartInstrument instrument, string label, bool isChecked) : ObservableObject
+    /// <summary>
+    /// A part in Chart settings' Parts: ticked when the chart has it, with its difficulty rating, and for Pro drums their
+    /// own rating too, each set or cleared as an undo step.
+    /// </summary>
+    public sealed partial class ChartPartRowViewModel : ObservableObject
     {
-        public ChartInstrument Instrument { get; } = instrument;
+        private readonly ChartSettingsViewModel _owner;
 
-        public string Label { get; } = label;
+        internal ChartPartRowViewModel(ChartSettingsViewModel owner, ChartInstrument instrument, string label, bool isChecked)
+        {
+            _owner = owner;
+            Instrument = instrument;
+            Label = label;
+            DifficultyKey = SongIniPartKeys.DifficultyKeysOf(instrument, null)[0];
+            ClearDifficultyCommand = new RelayCommand(() => _owner.ClearDifficulty(DifficultyKey), () => IsChecked && Difficulty is not null);
+            ClearProDifficultyCommand = new RelayCommand(() => _owner.ClearDifficulty(SongIniPartKeys.ProDrumsDifficulty), () => IsChecked && ProDifficulty is not null);
+            IsChecked = isChecked;
+        }
 
-        [ObservableProperty]
-        public partial bool IsChecked { get; set; } = isChecked;
+        public ChartInstrument Instrument { get; }
+
+        public string Label { get; }
 
         public bool IsDrums => Instrument == ChartInstrument.Drums;
+
+        /// <summary>The <c>song.ini</c> key of the part's rating, e.g. <c>diff_guitar</c>.</summary>
+        public string DifficultyKey { get; }
+
+        [ObservableProperty]
+        public partial bool IsChecked { get; set; }
+
+        /// <summary>The part's rating as the next save leaves it, or what's being typed; null while it's unrated.</summary>
+        [ObservableProperty]
+        public partial decimal? Difficulty { get; set; }
+
+        /// <summary>Pro drums' own rating (<c>diff_drums_real</c>), for drums charted as Pro; null while it's unrated.</summary>
+        [ObservableProperty]
+        public partial decimal? ProDifficulty { get; set; }
+
+        /// <summary>Whether the part has Pro drums' rating as well: drums, charted as Pro.</summary>
+        [ObservableProperty]
+        public partial bool HasProDifficulty { get; internal set; }
+
+        /// <summary><c>*</c> while a rating has a pending change, as an edited metadata row has.</summary>
+        [ObservableProperty]
+        public partial string? Marker { get; internal set; }
+
+        public RelayCommand ClearDifficultyCommand { get; }
+
+        public RelayCommand ClearProDifficultyCommand { get; }
+
+        partial void OnIsCheckedChanged(bool value) => RefreshCommands();
+
+        partial void OnDifficultyChanged(decimal? value)
+        {
+            ClearDifficultyCommand.NotifyCanExecuteChanged();
+            _owner.DifficultyTyped(DifficultyKey, value);
+        }
+
+        partial void OnProDifficultyChanged(decimal? value)
+        {
+            ClearProDifficultyCommand.NotifyCanExecuteChanged();
+            _owner.DifficultyTyped(SongIniPartKeys.ProDrumsDifficulty, value);
+        }
+
+        private void RefreshCommands()
+        {
+            ClearDifficultyCommand.NotifyCanExecuteChanged();
+            ClearProDifficultyCommand.NotifyCanExecuteChanged();
+        }
     }
 
     /// <summary>
-    /// Chart settings (charter-spec C1), a tab in the Editor's left panel: the chart's timing and parts. Each change is
-    /// applied as it's made, as one undoable command, so the tempo can be found by ear while the song plays; a number
-    /// being typed is applied once the typing pauses. It works the same on a new chart and on a song opened.
+    /// Chart settings (charter-spec C1), a tab in the Editor's left panel: the chart's timing and the audio's delay, its
+    /// parts and their ratings. Each change is applied as it's made, as one undoable command, so the tempo can be found by
+    /// ear while the song plays; a number being typed is applied once the typing pauses. It works the same on a new chart
+    /// and on a song opened. The tab's Metadata and Tracks are <see cref="ChartMetadataViewModel"/> and
+    /// <see cref="EditorTracksViewModel"/>.
     /// </summary>
-    public sealed partial class ChartSettingsViewModel : ViewModelBase
+    public sealed partial class ChartSettingsViewModel : ViewModelBase, IDisposable
     {
-        // A BPM or beats per measure is applied this long after the last keystroke or spin, as one undo step.
+        // A BPM, beats per measure, delay or rating is applied this long after the last keystroke or spin, as one undo step.
         private static readonly TimeSpan TypingDelay = TimeSpan.FromMilliseconds(600);
 
         private readonly BuilderSettingsService _settings;
         private readonly IConfirmationService _confirmations;
+        private readonly EditorSong _song;
         private readonly EditableChart _chart;
         private readonly Action<IChartCommand> _apply;
         private readonly Func<ITempoDetector?>? _detector;
         private readonly DispatcherTimer _typingTimer;
+        private readonly DispatcherTimer _songTypingTimer;
+
+        // The ratings being typed, by key, and whether the delay is: applied once the typing pauses, and not shown over meanwhile.
+        private readonly Dictionary<string, int?> _typedRatings = new(StringComparer.OrdinalIgnoreCase);
+        private bool _delayTyped;
         private long _chartMicroseconds;
         private decimal _chartBpm;
 
@@ -73,28 +141,32 @@ namespace ChartBuilder.ViewModels
 
         /// <param name="settings">Whether a tempo change keeps ticks or times.</param>
         /// <param name="confirmations">Asks before a part with notes is removed, and before a resolution change that moves items.</param>
-        /// <param name="chart">The chart open in the Editor.</param>
-        /// <param name="apply">Applies a change to <paramref name="chart"/>, as one undo step.</param>
+        /// <param name="song">The song open in the Editor, whose chart and ratings these are.</param>
+        /// <param name="apply">Applies a change to the song, as one undo step.</param>
         /// <param name="detector">Finds the tempo in the song's audio, for Detect from audio; asked each time, as the editor comes after.</param>
-        public ChartSettingsViewModel(BuilderSettingsService settings, IConfirmationService confirmations, EditableChart chart, Action<IChartCommand> apply, Func<ITempoDetector?>? detector = null)
+        public ChartSettingsViewModel(BuilderSettingsService settings, IConfirmationService confirmations, EditorSong song, Action<IChartCommand> apply, Func<ITempoDetector?>? detector = null)
         {
-            ArgumentNullException.ThrowIfNull(chart);
+            ArgumentNullException.ThrowIfNull(song);
             ArgumentNullException.ThrowIfNull(apply);
             _settings = settings;
             _confirmations = confirmations;
-            _chart = chart;
+            _song = song;
+            _chart = song.Chart;
             _apply = apply;
             _detector = detector;
             _typingTimer = new DispatcherTimer(TypingDelay, DispatcherPriority.Background, (_, _) => ApplyNow());
             _typingTimer.Stop();
+            _songTypingTimer = new DispatcherTimer(TypingDelay, DispatcherPriority.Background, (_, _) => ApplyTyped());
+            _songTypingTimer.Stop();
 
             // Only this changes the resolution and the time signature, so the chart's can only be these or what it had.
-            var values = ChartSettingsValues.Of(chart);
+            var values = ChartSettingsValues.Of(_chart);
             Resolutions = [.. NewChartSettings.Resolutions.Append(values.Resolution).Distinct().Order().Select(r => new ResolutionChoice(r, BuilderSettingsCatalog.ResolutionLabel(r)))];
             Denominators = [.. NewChartSettings.Denominators.Append(values.Denominator).Distinct().Order()];
-            Parts = [.. NewChartSettings.Instruments.Select(i => new ChartPartChoice(i, PartName(i), values.Parts.Contains(i)))];
+            Parts = [.. NewChartSettings.Instruments.Select(i => new ChartPartRowViewModel(this, i, PartName(i), values.Parts.Contains(i)))];
             foreach (var part in Parts)
                 part.PropertyChanged += OnPartChanged;
+            _song.Changed += OnSongChanged;
             Load();
         }
 
@@ -122,9 +194,28 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial int Denominator { get; set; }
 
+        /// <summary>
+        /// The <c>delay</c> in milliseconds, how much later than its notes the chart plays against the audio, as the box
+        /// shows it: the song's as the next save leaves it, or what's being typed.
+        /// </summary>
+        [ObservableProperty]
+        public partial decimal? DelayMs { get; set; }
+
+        /// <summary>Whether a save is running, which the ratings and the delay, the song's own, can't be changed during.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanEditSong))]
+        public partial bool IsSaving { get; set; }
+
+        /// <summary>Whether the ratings and the delay can be changed now: not while the song is being saved.</summary>
+        public bool CanEditSong => !IsSaving;
+
+        public static decimal MinDelayMs => -86_399_999;
+
+        public static decimal MaxDelayMs => 86_399_999;
+
         // Parts.
 
-        public IReadOnlyList<ChartPartChoice> Parts { get; }
+        public IReadOnlyList<ChartPartRowViewModel> Parts { get; }
 
         public IReadOnlyList<DrumsVariantChoice> DrumsVariants { get; } =
         [
@@ -208,9 +299,80 @@ namespace ChartBuilder.ViewModels
 
         partial void OnSelectedDrumsChanged(DrumsVariantChoice value) => ApplyNow();
 
+        partial void OnDelayMsChanged(decimal? value)
+        {
+            if (_loading)
+                return;
+            _delayTyped = true;
+            _songTypingTimer.Stop();
+            _songTypingTimer.Start();
+        }
+
+        public void Dispose()
+        {
+            _typingTimer.Stop();
+            _songTypingTimer.Stop();
+            _song.Changed -= OnSongChanged;
+        }
+
+        /// <summary>Clears the rating <paramref name="key"/> to unrated, at once, as one undo step.</summary>
+        internal void ClearDifficulty(string key)
+        {
+            if (IsSaving)
+                return;
+            _typedRatings.Remove(key);
+            if (SongCommands.SetDifficulty(_song, key, null) is { } command)
+                _apply(command);
+        }
+
+        /// <summary>A rating typed or spun to, applied once the typing pauses; an empty box clears it.</summary>
+        internal void DifficultyTyped(string key, decimal? value)
+        {
+            if (_loading)
+                return;
+            _typedRatings[key] = value is { } tier ? (int)Math.Clamp(decimal.Round(tier), 0, int.MaxValue) : null;
+            _songTypingTimer.Stop();
+            _songTypingTimer.Start();
+        }
+
+        /// <summary>Applies the ratings and the delay typed, together as one undo step.</summary>
+        private void ApplyTyped()
+        {
+            _songTypingTimer.Stop();
+            if (IsSaving)
+            {
+                // Typed just as a save began: applied once it's done.
+                _songTypingTimer.Start();
+                return;
+            }
+
+            var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, tier) in _typedRatings)
+            {
+                if (SongCommands.SetDifficulty(_song, key, tier) is { } rating)
+                    values[key] = rating.Values[key];
+            }
+
+            if (_delayTyped && DelayMs is { } typed && SongCommands.SetDelay(_song, (long)decimal.Round(typed, MidpointRounding.AwayFromZero)) is { } delay)
+            {
+                foreach (var (key, value) in delay.Values)
+                    values[key] = value;
+            }
+
+            _typedRatings.Clear();
+            _delayTyped = false;
+            if (SongCommands.SetValues(_song, values) is { } command)
+                _apply(command);
+            else
+                LoadSong();
+        }
+
+        // The ratings and the delay follow the song: an edit's undo, a save, or another tab's edit.
+        private void OnSongChanged(object? sender, EventArgs e) => LoadSong();
+
         private async void OnPartChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(ChartPartChoice.IsChecked) || sender is not ChartPartChoice part)
+            if (e.PropertyName != nameof(ChartPartRowViewModel.IsChecked) || sender is not ChartPartRowViewModel part)
                 return;
 
             if (part.IsDrums)
@@ -324,7 +486,38 @@ namespace ChartBuilder.ViewModels
                 Strings.ResolutionWarningTitle, WarningText(report), Strings.ResolutionWarningConfirm);
         }
 
-        /// <summary>Sets the fields from the chart.</summary>
+        /// <summary>
+        /// Sets the ratings and the delay from the song as the next save leaves them, but those being typed, and marks each
+        /// rating with a pending change.
+        /// </summary>
+        private void LoadSong()
+        {
+            var pending = _song.PendingChanges().Select(c => c.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            bool pro = _chart.DrumsVariant == DrumsVariant.Pro;
+            _loading = true;
+            try
+            {
+                foreach (var part in Parts)
+                {
+                    if (!_typedRatings.ContainsKey(part.DifficultyKey))
+                        part.Difficulty = MetadataDifficulty.TierOf(_song.EffectiveValue(part.DifficultyKey));
+                    part.HasProDifficulty = part.IsDrums && pro;
+                    if (part.HasProDifficulty && !_typedRatings.ContainsKey(SongIniPartKeys.ProDrumsDifficulty))
+                        part.ProDifficulty = MetadataDifficulty.TierOf(_song.EffectiveValue(SongIniPartKeys.ProDrumsDifficulty));
+                    bool changed = pending.Contains(part.DifficultyKey) || (part.HasProDifficulty && pending.Contains(SongIniPartKeys.ProDrumsDifficulty));
+                    part.Marker = changed ? "*" : null;
+                }
+
+                if (!_delayTyped)
+                    DelayMs = (long)Math.Round(_song.Delay.TotalMilliseconds, MidpointRounding.AwayFromZero);
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+
+        /// <summary>Sets the fields from the chart and the song.</summary>
         [MemberNotNull(nameof(SelectedResolution), nameof(SelectedDrums))]
         private void Load()
         {
@@ -348,6 +541,7 @@ namespace ChartBuilder.ViewModels
                 _loading = false;
             }
 
+            LoadSong();
             Refresh();
         }
 

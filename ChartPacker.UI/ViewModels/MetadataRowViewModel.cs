@@ -39,7 +39,7 @@ namespace ChartPacker.UI.ViewModels
         public partial string? Value { get; set; }
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove))]
+        [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove), nameof(ShowRevertButton), nameof(ShowRemoveButton))]
         [NotifyCanExecuteChangedFor(nameof(BeginEditCommand), nameof(RemoveCommand), nameof(RevertCommand), nameof(QuickFixCommand))]
         public partial MetadataRowState State { get; set; }
 
@@ -137,6 +137,15 @@ namespace ChartPacker.UI.ViewModels
         /// <summary>Whether the row's actions are shown: the songs can be edited.</summary>
         public bool ShowActions => _owner.CanEdit;
 
+        /// <summary>The Revert button: the row has a change, and the editor doesn't put Revert on the right-click menu.</summary>
+        public bool ShowRevertButton => IsChanged && !_owner.ActionsInContextMenu;
+
+        /// <summary>The Remove button: the key isn't removed, and the editor doesn't put Remove on the right-click menu.</summary>
+        public bool ShowRemoveButton => CanRemove && !_owner.ActionsInContextMenu;
+
+        /// <summary>Whether the row's right-click menu has Revert and Remove: the editor puts them there, and the songs can be edited.</summary>
+        public bool ShowMenuActions => _owner.ActionsInContextMenu && _owner.CanEdit;
+
         /// <summary>The row's Auto Set button: Auto Set for a <c>song_length</c> row, where the editor offers it.</summary>
         public bool ShowAutoSetLength => IsSongLength && _owner.AutoSetSongLengthCommand is not null;
 
@@ -165,6 +174,7 @@ namespace ChartPacker.UI.ViewModels
         public void RefreshCommands()
         {
             OnPropertyChanged(nameof(ShowActions));
+            OnPropertyChanged(nameof(ShowMenuActions));
             BeginEditCommand.NotifyCanExecuteChanged();
             RemoveCommand.NotifyCanExecuteChanged();
             RevertCommand.NotifyCanExecuteChanged();

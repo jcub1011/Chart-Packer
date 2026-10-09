@@ -12,14 +12,23 @@ namespace ChartPacker.Core.Charting.Saving;
 /// <param name="SongIniChanges">The pending <c>song.ini</c> changes the save makes: those the user hasn't reverted.</param>
 /// <param name="ChartName">The name <c>notes.mid</c> is stored under: the song's own <c>notes.mid</c>'s, or <c>notes.mid</c>.</param>
 /// <param name="RemoveChart">An imported <c>notes.chart</c>'s stored name, when the save removes it; null otherwise.</param>
-/// <param name="AlbumArt">The album art the save puts in place of the song's, or removes; null to leave it as it is.</param>
+/// <param name="Media">The files the save puts in place of the song's, or removes, by slot: art, backgrounds and tracks.</param>
+/// <param name="StoredNames">The song's files as it was opened or last saved, which a track's change replaces those of its stem among.</param>
 public sealed record ChartSaveRequest(
     EditableChart Snapshot,
     ChartReadOptions After,
     IReadOnlyList<PendingSongIniChange> SongIniChanges,
     string ChartName = ChartFiles.MidiName,
     string? RemoveChart = null,
-    AlbumArtChange? AlbumArt = null);
+    IReadOnlyDictionary<MediaSlot, MediaChange>? Media = null,
+    IReadOnlyList<string>? StoredNames = null)
+{
+    /// <summary>The album art the save puts in place of the song's, or removes; null to leave it as it is.</summary>
+    public AlbumArtChange? AlbumArt => MediaChangeOf(MediaSlot.AlbumArt) is { } change ? new AlbumArtChange(change.SourcePath) : null;
+
+    /// <summary>The change the save makes to <paramref name="slot"/>; null to leave it as it is.</summary>
+    public MediaChange? MediaChangeOf(MediaSlot slot) => Media is not null && Media.TryGetValue(slot, out var change) ? change : null;
+}
 
 /// <summary>Where a new chart's first save makes its song folder (charter-spec C1, The first save).</summary>
 public sealed record NewSongTarget(string ParentFolder, string FolderName)
@@ -40,7 +49,7 @@ public static class ChartSaver
     /// <summary>
     /// What saving <paramref name="snapshot"/>, a clone of <paramref name="song"/>'s chart, writes: with
     /// <paramref name="changes"/> made to <c>song.ini</c>, which the read-back check reads the chart as, and the chart
-    /// stored under the song's own <c>notes.mid</c>'s name, and the song's album art change.
+    /// stored under the song's own <c>notes.mid</c>'s name, and the song's changes to its art, backgrounds and tracks.
     /// </summary>
     /// <param name="removeChart">An imported <c>notes.chart</c>'s stored name, when the save removes it.</param>
     public static ChartSaveRequest RequestFor(EditorSong song, EditableChart snapshot, IReadOnlyList<PendingSongIniChange> changes, string? removeChart = null)
@@ -52,7 +61,14 @@ public static class ChartSaver
         string chartName = song.Opened is { ChartName: var name } && name.Equals(ChartFiles.MidiName, StringComparison.OrdinalIgnoreCase)
             ? name
             : ChartFiles.MidiName;
-        return new ChartSaveRequest(snapshot, after, changes, chartName, removeChart, song.AlbumArt);
+        return new ChartSaveRequest(
+            snapshot,
+            after,
+            changes,
+            chartName,
+            removeChart,
+            new Dictionary<MediaSlot, MediaChange>(song.Media),
+            song.Opened?.StoredNames ?? []);
     }
 
     /// <summary>
@@ -66,14 +82,18 @@ public static class ChartSaver
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(request);
         var pairs = PendingSongIniChanges.Apply(song.Pairs, request.SongIniChanges);
+        var media = request.Media ?? new Dictionary<MediaSlot, MediaChange>();
         var stored = (song.Opened?.StoredNames ?? StoredNamesOf(entry))
             .Where(n => request.RemoveChart is null || !n.Equals(request.RemoveChart, StringComparison.OrdinalIgnoreCase))
-            .Where(n => request.AlbumArt is null || !AlbumArt.IsAlbumArtName(n))
+            .Where(n => !media.Keys.Any(slot => slot.Holds(n)))
             .ToList();
         if (!stored.Contains(request.ChartName, StringComparer.OrdinalIgnoreCase))
             stored.Add(request.ChartName);
-        if (request.AlbumArt is { SourcePath: { } art } && AlbumArt.StoredNameFor(art) is { } artName && !stored.Contains(artName, StringComparer.OrdinalIgnoreCase))
-            stored.Add(artName);
+        foreach (var (slot, change) in media)
+        {
+            if (change.SourcePath is { } source && slot.StoredNameFor(source) is { } name && !stored.Contains(name, StringComparer.OrdinalIgnoreCase))
+                stored.Add(name);
+        }
 
         return new OpenedSong(
             entry,
@@ -97,7 +117,8 @@ public static class ChartSaver
 
     /// <summary>
     /// The draft that saves <paramref name="request"/>: the chart, staged at <paramref name="stagedChart"/>, replacing
-    /// the song's; the imported <c>notes.chart</c> removed, if it's to be; the album art; and the <c>song.ini</c> changes.
+    /// the song's; the imported <c>notes.chart</c> removed, if it's to be; the album art, backgrounds and tracks; and the
+    /// <c>song.ini</c> changes. A track put in place of its stem's replaces every file of the stem, in any format.
     /// </summary>
     public static MetadataDraft DraftFor(ChartSaveRequest request, string stagedChart, long length)
     {
@@ -107,13 +128,8 @@ public static class ChartSaver
         draft.AddFile(new AddedFile(request.ChartName, stagedChart, length));
         if (request.RemoveChart is { } removed)
             draft.RemoveFile(removed);
-        if (request.AlbumArt is { } art)
-        {
-            if (art.SourcePath is { } source)
-                draft.SetAlbumArt(source);
-            else
-                draft.RemoveAlbumArt();
-        }
+        foreach (var (slot, change) in request.Media ?? new Dictionary<MediaSlot, MediaChange>())
+            AddMediaChange(draft, slot, change, request.StoredNames ?? []);
         foreach (var change in request.SongIniChanges)
         {
             if (change.Value is { } value)
@@ -181,6 +197,8 @@ public static class ChartSaver
                 SongIni = PendingSongIniChanges.Apply([], request.SongIniChanges),
                 Stems = stems,
                 AlbumArtPath = request.AlbumArt?.SourcePath,
+                BackgroundImagePath = request.MediaChangeOf(MediaSlot.BackgroundImage)?.SourcePath,
+                BackgroundVideoPath = request.MediaChangeOf(MediaSlot.BackgroundVideo)?.SourcePath,
             },
             cancellationToken);
     }
@@ -211,6 +229,54 @@ public static class ChartSaver
         finally
         {
             StagingPath.TryDeleteDirectory(temp.FullName);
+        }
+    }
+
+    // A slot's change, as the draft makes it: the art and backgrounds each replace the file of their kind, in any format,
+    // as the draft writer does; a track replaces its stem's files, as Chart Packer's Add track does.
+    private static void AddMediaChange(MetadataDraft draft, MediaSlot slot, MediaChange change, IReadOnlyList<string> storedNames)
+    {
+        switch (slot.Kind)
+        {
+            case MediaKind.AlbumArt when change.SourcePath is { } source:
+                draft.SetAlbumArt(source);
+                break;
+            case MediaKind.AlbumArt:
+                draft.RemoveAlbumArt();
+                break;
+            case MediaKind.BackgroundImage or MediaKind.BackgroundVideo when change.SourcePath is { } source:
+                draft.SetBackground(slot.BackgroundKind!.Value, source);
+                break;
+            case MediaKind.BackgroundImage or MediaKind.BackgroundVideo:
+                draft.RemoveBackground(slot.BackgroundKind!.Value);
+                break;
+            case MediaKind.Track:
+                var files = SongTracks.FilesOfStem(storedNames, slot.Stem!);
+                if (change.SourcePath is { } path && slot.StoredNameFor(path) is { } name)
+                {
+                    // A stored file that differs only in case is still replaced, on a case-sensitive file system too.
+                    draft.AddFile(new AddedFile(name, path, LengthOf(path)), files.Where(f => !f.Equals(name, StringComparison.Ordinal)));
+                }
+                else
+                {
+                    foreach (string file in files)
+                        draft.RemoveFile(file);
+                }
+
+                break;
+        }
+    }
+
+    // For display only: saving reads the size afresh.
+    private static long LengthOf(string path)
+    {
+        try
+        {
+            return new FileInfo(path).Length;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
         }
     }
 

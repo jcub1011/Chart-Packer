@@ -23,90 +23,6 @@ using PreviewStartTime = ChartPacker.Core.Metadata.PreviewStart;
 
 namespace ChartPacker.ViewModels
 {
-    /// <summary>One of the selected song's audio tracks, with its mute and solo switches.</summary>
-    public sealed partial class TrackRowViewModel : ViewModelBase
-    {
-        private readonly PlayerViewModel _owner;
-
-        internal TrackRowViewModel(PlayerViewModel owner, SongTrack track)
-        {
-            _owner = owner;
-            Track = track;
-            IsMuted = track.Stem == AudioStems.Preview;
-        }
-
-        public SongTrack Track { get; }
-
-        public string Name => Track.StoredName;
-
-        /// <summary><c>+</c> for a track a staged change adds, like an added file.</summary>
-        public string? Marker => Track.IsStaged ? "+" : null;
-
-        /// <summary>The track's file size, formatted; set by whoever knows the song's files.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasSize))]
-        public partial string? Size { get; set; }
-
-        public bool HasSize => Size is not null;
-
-        /// <summary>Saves a copy of the track's file, from its right-click menu; set by whoever knows where to save it. None, no menu.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(CanDownload))]
-        public partial IAsyncRelayCommand? DownloadCommand { get; set; }
-
-        public bool CanDownload => DownloadCommand is not null;
-
-        public string DownloadHeader => SongFileSource.DownloadHeaderFor(Name);
-
-        [ObservableProperty]
-        public partial bool IsMuted { get; set; }
-
-        /// <summary>While any track is soloed, only soloed tracks are heard. A track is muted or soloed, never both.</summary>
-        [ObservableProperty]
-        public partial bool IsSolo { get; set; }
-
-        /// <summary>How loud the track is in the mix, from 0 to 1. Remembered for the song until the app closes.</summary>
-        [ObservableProperty]
-        public partial double Volume { get; set; } = 1;
-
-        /// <summary>Why the track can't be played, once that's known.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasError))]
-        public partial string? Error { get; set; }
-
-        public bool HasError => Error is not null;
-
-        /// <summary>The track's own waveform, at full level; empty until its audio has been read.</summary>
-        [ObservableProperty]
-        public partial Waveform Waveform { get; set; } = Waveform.Empty;
-
-        /// <summary>Whether the track is in the mix as it's switched now: soloed, or unmuted with nothing soloed, and not turned all the way down.</summary>
-        [ObservableProperty]
-        public partial bool IsHeard { get; set; } = true;
-
-        // Solo overrides mute in the mix, so having both on would read as if both applied. Turning
-        // one on turns the other off.
-        partial void OnIsMutedChanged(bool value)
-        {
-            if (value)
-                IsSolo = false;
-            _owner.ApplySwitches(this);
-        }
-
-        partial void OnIsSoloChanged(bool value)
-        {
-            if (value)
-                IsMuted = false;
-            _owner.ApplySwitches(this);
-        }
-
-        partial void OnVolumeChanged(double value)
-        {
-            _owner.RememberVolume(this);
-            _owner.ApplySwitches(this);
-        }
-    }
-
     /// <summary>What <see cref="PlayerViewModel.TrackWaveformsChanged"/> is about.</summary>
     public sealed class TrackWaveformsChangedEventArgs(IReadOnlySet<string>? stems) : EventArgs
     {
@@ -127,7 +43,7 @@ namespace ChartPacker.ViewModels
     /// Plays the selected song's audio tracks together, in step, with each track muted or soloed
     /// as asked. Nothing is opened until the first play; <see cref="Unload"/> closes every file.
     /// </summary>
-    public sealed partial class PlayerViewModel : ViewModelBase, IDisposable, ISpectrumSource
+    public sealed partial class PlayerViewModel : ViewModelBase, IDisposable, ISpectrumSource, ITrackMixer
     {
         private static readonly TimeSpan PeaksDelay = TimeSpan.FromMilliseconds(300);
         private static readonly TimeSpan FilesClosedTimeout = TimeSpan.FromSeconds(2);
@@ -707,14 +623,14 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Keeps <paramref name="row"/>'s volume for its song, so it is back when the song is shown again.</summary>
-        internal void RememberVolume(TrackRowViewModel row)
+        public void RememberVolume(TrackRowViewModel row)
         {
             // The row is not yet in Tracks while it is being filled from what was remembered, when _entry is still the old song.
             if (_entry is { } entry && Tracks.Contains(row))
                 _trackVolumes[(entry.FullPath, row.Track.Stem)] = row.Volume;
         }
 
-        internal void ApplySwitches(TrackRowViewModel row)
+        public void ApplySwitches(TrackRowViewModel row)
         {
             ScheduleWaveformRebuild();
             RefreshHeard();
@@ -730,12 +646,7 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>Marks each track heard or not, the way the mixer and <see cref="WaveformPeaks.Mix"/> decide it.</summary>
-        private void RefreshHeard()
-        {
-            bool anySolo = Tracks.Any(t => t.IsSolo);
-            foreach (var row in Tracks)
-                row.IsHeard = (anySolo ? row.IsSolo : !row.IsMuted) && row.Volume > 0;
-        }
+        private void RefreshHeard() => TrackRowViewModel.RefreshHeard(Tracks);
 
         private bool CanPlay() => HasTracks && !IsOpening;
 

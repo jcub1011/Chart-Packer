@@ -29,6 +29,10 @@ public static class NewChartCreator
     {
         ArgumentNullException.ThrowIfNull(song);
         Check(song.Stems, song.AlbumArtPath);
+        if (song.BackgroundImagePath is { } imagePath && SongBackgrounds.StoredNameFor(BackgroundKind.Image, imagePath) is null)
+            throw new ArgumentException($"'{imagePath}' isn't a background image.", nameof(song));
+        if (song.BackgroundVideoPath is { } videoPath && SongBackgrounds.StoredNameFor(BackgroundKind.Video, videoPath) is null)
+            throw new ArgumentException($"'{videoPath}' isn't a background video.", nameof(song));
 
         string parent = Path.GetFullPath(song.ParentFolder);
         switch (NewChartFolder.ProblemOf(parent, song.FolderName))
@@ -57,6 +61,10 @@ public static class NewChartCreator
 
             if (song.AlbumArtPath is { } art)
                 await CopyAsync(art, Path.Combine(staging, AlbumArt.StoredNameFor(art)!), cancellationToken).ConfigureAwait(false);
+            if (song.BackgroundImagePath is { } image)
+                await CopyAsync(image, Path.Combine(staging, SongBackgrounds.StoredNameFor(BackgroundKind.Image, image)!), cancellationToken).ConfigureAwait(false);
+            if (song.BackgroundVideoPath is { } video)
+                await CopyAsync(video, Path.Combine(staging, SongBackgrounds.StoredNameFor(BackgroundKind.Video, video)!), cancellationToken).ConfigureAwait(false);
 
             await File.WriteAllBytesAsync(Path.Combine(staging, ChartFiles.MidiName), song.NotesMid, cancellationToken).ConfigureAwait(false);
             await SongIni.WriteAsync(Path.Combine(staging, SongIni.FileName), song.SongIni, cancellationToken).ConfigureAwait(false);

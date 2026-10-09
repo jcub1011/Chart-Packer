@@ -5,11 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Layout;
+using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
@@ -22,10 +24,10 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartBuilder.ViewModels
 {
     /// <summary>
-    /// The Editor window: a toolbar, the lanes in the middle with the Chart Inspector and Properties panels either side,
-    /// and the transport bar and the timeline along the bottom, where the song plays. It has a song opened, or a new chart
-    /// that has no folder until it's first saved. The lanes' canvases and Chart settings, a tab beside the Chart Inspector,
-    /// edit the chart, and undo and redo step through its edits.
+    /// The Editor window: a toolbar, the lanes in the middle with Chart settings and Properties panels either side, and
+    /// the transport bar and the timeline along the bottom, where the song plays. It has a song opened, or a new chart that
+    /// has no folder until it's first saved. The lanes' canvases edit the chart, and Chart settings and the Art tab the
+    /// chart and the song around it; undo and redo step through every edit, the song's as well as the chart's.
     /// </summary>
     /// <remarks>
     /// The panels' sizes are view state, applied and captured by the window; they're kept here between the two so
@@ -40,7 +42,14 @@ namespace ChartBuilder.ViewModels
         private readonly IConfirmationService _confirmations;
         private readonly ChartUndoStack _undo;
         private readonly CancellationTokenSource _closing = new();
+        private readonly DispatcherTimer _tracksTimer;
         private SongLock? _songLock;
+
+        // The copies of the files saves replace or remove, kept for undo; made by the first save that needs one.
+        private MediaStash? _stash;
+
+        // How long the tracks must be still before the audio is opened again, so a burst of undos opens it once.
+        private static readonly TimeSpan TracksDelay = TimeSpan.FromMilliseconds(250);
 
         private EditorWindowViewModel(EditorServices services, EditorSong song, SongLock? songLock, bool startsSaved = true)
         {
@@ -56,7 +65,12 @@ namespace ChartBuilder.ViewModels
             Playback = new PlaybackViewModel(song, services.OpenOutput, services.Latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), services.Calibrate, Audio);
             _undo = new ChartUndoStack(song.Chart, startsSaved);
             _undo.Changed += OnChartChanged;
-            ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song.Chart, ApplyChartSettings, () => Editor?.AudioAssist);
+            ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song, ApplyChartSettings, () => Editor?.AudioAssist);
+            Metadata = new ChartMetadataViewModel(song, ApplyChartSettings);
+            Tracks = new EditorTracksViewModel(song, Playback, services.FilePicker, ApplyChartSettings);
+            Art = new ArtViewModel(song, services.ImagePicker, services.FilePicker, ApplyChartSettings, Playback.Clock);
+            _tracksTimer = new DispatcherTimer(TracksDelay, DispatcherPriority.Background, (_, _) => _ = ReloadAudioAsync());
+            _tracksTimer.Stop();
             PendingChanges = PendingChangesOf();
             Title = TitleOf();
             Playback.PropertyChanged += (_, e) =>
@@ -76,10 +90,10 @@ namespace ChartBuilder.ViewModels
             Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);
             Sections = new SectionsViewModel(Editor);
-            Inspector = new ChartInspectorViewModel(song, _undo, Findings, services.ImagePicker, services.ChartIssues);
             Findings.Changed += (_, _) => RefreshSaveState();
             Editor.AudioAssist.ShowMessagesRequested += (_, _) => _ = ShowMessagesAsync();
             Song.Changed += OnSongChanged;
+            Song.TracksChanged += OnTracksChanged;
             _ = MeasureAudioAsync();
             StartAutosave();
         }
@@ -123,8 +137,17 @@ namespace ChartBuilder.ViewModels
 
         public bool HasPendingChanges => PendingChanges.Count > 0;
 
-        /// <summary>The chart's timing and parts, in the Chart settings tab (charter-spec C1).</summary>
+        /// <summary>The chart's timing, the delay, and the parts and their ratings, in the Chart settings tab (charter-spec C1).</summary>
         public ChartSettingsViewModel ChartSettings { get; }
+
+        /// <summary>The song's metadata, in the Chart settings tab.</summary>
+        public ChartMetadataViewModel Metadata { get; }
+
+        /// <summary>The song's audio tracks and their mix, in the Chart settings tab.</summary>
+        public EditorTracksViewModel Tracks { get; }
+
+        /// <summary>The Art tab: the album art, background image and background video.</summary>
+        public ArtViewModel Art { get; }
 
         /// <summary>The song's audio, and the timeline's playhead, waveform and beats.</summary>
         public PlaybackViewModel Playback { get; }
@@ -146,13 +169,10 @@ namespace ChartBuilder.ViewModels
         /// <summary>The Sections tab: the chart's sections and other text events.</summary>
         public SectionsViewModel Sections { get; }
 
-        /// <summary>The Chart Inspector tab: the song's metadata, album art, tracks and files (charter-spec C1, §4.5).</summary>
-        public ChartInspectorViewModel Inspector { get; }
-
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
         public LaneDockViewModel Lanes => Editor.Lanes;
 
-        /// <summary>The Chart Inspector panel's width while expanded, as the user last set it.</summary>
+        /// <summary>The left panel's width while expanded, as the user last set it.</summary>
         public double LeftPanelWidth { get; set; }
 
         /// <summary>The Properties panel's width while expanded, as the user last set it.</summary>
@@ -164,9 +184,19 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial bool IsLeftPanelCollapsed { get; set; }
 
-        /// <summary>The left panel's tab shown: the Chart Inspector (0), Chart settings or Sections.</summary>
+        /// <summary>The left panel's tab shown: Chart settings (<see cref="ChartSettingsTab"/>), Art or Sections.</summary>
         [ObservableProperty]
         public partial int LeftPanelTab { get; set; }
+
+        /// <summary>The left panel's tab index of Chart settings.</summary>
+        public const int ChartSettingsTab = 0;
+
+        /// <summary>The left panel's tab index of Art.</summary>
+        public const int ArtTab = 1;
+
+        partial void OnLeftPanelTabChanged(int value) => Art.IsShown = value == ArtTab && !IsLeftPanelCollapsed;
+
+        partial void OnIsLeftPanelCollapsedChanged(bool value) => Art.IsShown = LeftPanelTab == ArtTab && !value;
 
         [ObservableProperty]
         public partial bool IsRightPanelCollapsed { get; set; }
@@ -192,8 +222,8 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// A change from Chart settings (charter-spec C1), as one undoable step. Playback goes on, so the tempo can be
-        /// found by ear; the beats follow the change.
+        /// A change from Chart settings or the Art tab (charter-spec C1), as one undoable step. Playback goes on, so the
+        /// tempo can be found by ear; the beats follow the change.
         /// </summary>
         private void ApplyChartSettings(IChartCommand command)
         {
@@ -236,9 +266,12 @@ namespace ChartBuilder.ViewModels
         [RelayCommand(CanExecute = nameof(CanRedo))]
         private void Redo() => Editor.Session.Redo();
 
-        private bool CanUndo() => _undo.CanUndo;
+        // An edit of the song's own isn't undone or redone while a save runs, as the save moves the song on to what it wrote.
+        private bool CanUndo() => _undo.CanUndo && !(IsSaving && IsSongEdit(_undo.NextUndo));
 
-        private bool CanRedo() => _undo.CanRedo;
+        private bool CanRedo() => _undo.CanRedo && !(IsSaving && IsSongEdit(_undo.NextRedo));
+
+        private static bool IsSongEdit(IChartCommand? command) => command is SongValueCommand or MediaCommand;
 
         /// <summary>Saves the panels' sizes and whether they're collapsed, and the lanes, for the next Editor window.</summary>
         public void SaveLayout()
@@ -264,14 +297,23 @@ namespace ChartBuilder.ViewModels
             _closing.Cancel();
             _undo.Changed -= OnChartChanged;
             Song.Changed -= OnSongChanged;
+            Song.TracksChanged -= OnTracksChanged;
+            _tracksTimer.Stop();
             Findings.Dispose();
             Sections.Dispose();
-            Inspector.Dispose();
+            ChartSettings.Dispose();
+            Metadata.Dispose();
+            Tracks.Dispose();
+            Art.Dispose();
             Editor.Dispose();
             Audio.Dispose();
             Playback.Dispose();
             _songLock?.Dispose();
             _songLock = null;
+
+            // Nothing can be undone once the window has closed, so the copies kept for undo go.
+            _stash?.Dispose();
+            _stash = null;
         }
 
         /// <summary>
@@ -297,11 +339,36 @@ namespace ChartBuilder.ViewModels
         /// </summary>
         private void OnSongChanged(object? sender, EventArgs e)
         {
+            UndoCommand.NotifyCanExecuteChanged();
+            RedoCommand.NotifyCanExecuteChanged();
             RefreshPendingChanges();
             Editor.Session.SetSongSettings(Song.EffectivePairs(), Song.Delay);
             Playback.RefreshTempoMap();
             CountChange();
             RefreshSaveState();
+        }
+
+        // A track added, replaced or removed, or a save: the audio is opened again once the tracks are still.
+        private void OnTracksChanged(object? sender, EventArgs e)
+        {
+            _tracksTimer.Stop();
+            _tracksTimer.Start();
+        }
+
+        /// <summary>
+        /// Plays and draws the song's tracks as they are now: the waveforms, analysis and playback start again on them,
+        /// playing on from where they were, and <c>song_length</c> is measured again.
+        /// </summary>
+        private async Task ReloadAudioAsync()
+        {
+            _tracksTimer.Stop();
+            if (_closing.IsCancellationRequested)
+                return;
+            Audio.SetTracks(Song.Entry, Song.Tracks);
+            foreach (var lane in Lanes.All)
+                lane.Audio.Refresh();
+            await Playback.ReloadAsync(Song.Tracks);
+            _ = MeasureAudioAsync();
         }
 
         /// <summary>Lists what's pending again, only when it's changed, so an edit that changes none of it doesn't remake the list.</summary>

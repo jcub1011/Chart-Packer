@@ -24,11 +24,23 @@ public sealed class EditorSong
     private string _defaultCharter = "";
     private readonly Dictionary<string, int> _ratings = new(StringComparer.OrdinalIgnoreCase);
 
+    // A new chart's tracks as it was given them, which its track changes are made over until it's first saved.
+    private readonly IReadOnlyList<SongTrack> _newTracks;
+    private readonly Dictionary<MediaSlot, MediaChange> _media = [];
+
+    // The save from which each slot holds what it's stored with now; none, from the first.
+    private readonly Dictionary<MediaSlot, int> _storedSince = [];
+
+    // The session's copy of each file a save replaced or removed, and the saves it was the slot's file through.
+    private readonly List<KeptMedia> _kept = [];
+    private IReadOnlyList<SongTrack> _tracks;
+
     private EditorSong(OpenedSong? opened, EditableChart chart, IReadOnlyList<SongTrack> tracks, IReadOnlySet<ChartInstrument> loadedParts)
     {
         Opened = opened;
         Chart = chart;
-        Tracks = tracks;
+        _newTracks = opened is null ? tracks : [];
+        _tracks = tracks;
         LoadedParts = loadedParts;
     }
 
@@ -37,6 +49,9 @@ public sealed class EditorSong
     /// a revert or restore, the audio's length, a value or the default charter.
     /// </summary>
     public event EventHandler? Changed;
+
+    /// <summary>Raised after <see cref="Changed"/> when <see cref="Tracks"/> changed: a track added, replaced or removed, or a save.</summary>
+    public event EventHandler? TracksChanged;
 
     /// <summary>The song as it was opened or last saved, or null for a new chart not yet saved.</summary>
     public OpenedSong? Opened { get; private set; }
@@ -85,8 +100,11 @@ public sealed class EditorSong
     /// </summary>
     public bool IsImport => Opened?.Import is not null;
 
-    /// <summary>The audio tracks: the song's stems, or a new chart's files, each played from where it is.</summary>
-    public IReadOnlyList<SongTrack> Tracks { get; }
+    /// <summary>
+    /// The audio tracks as the next save leaves them: the song's stems, or a new chart's files, with the tracks added,
+    /// replaced or removed since; each played from where it is, a staged one from the file it's copied from.
+    /// </summary>
+    public IReadOnlyList<SongTrack> Tracks => _tracks;
 
     /// <summary>The parts the chart had when it was opened or last saved, which need no rating added; none for a new chart.</summary>
     public IReadOnlySet<ChartInstrument> LoadedParts { get; private set; }
@@ -135,13 +153,44 @@ public sealed class EditorSong
     public IReadOnlyList<KeyValuePair<string, string?>> Edits => _edits;
 
     /// <summary>The album art the next save puts in place of the song's, or removes; null when it's left as it is.</summary>
-    public AlbumArtChange? AlbumArt { get; private set; }
+    public AlbumArtChange? AlbumArt => _media.TryGetValue(MediaSlot.AlbumArt, out var change) ? new AlbumArtChange(change.SourcePath) : null;
+
+    /// <summary>The files the next save puts in place of the song's, or removes, by slot: art, backgrounds and tracks.</summary>
+    public IReadOnlyDictionary<MediaSlot, MediaChange> Media => _media;
+
+    /// <summary>How many times the song has been saved since it was opened, which <see cref="MediaRef.Stored"/> counts by.</summary>
+    public int SaveGeneration { get; private set; }
 
     /// <summary>
     /// Whether the user has changed the song itself, beside the chart, since it was opened or last saved: an edit,
-    /// album art, a delay or a rating. Changes Chart Builder works out on its own don't count.
+    /// album art, a background, a track, a delay or a rating. Changes Chart Builder works out on its own don't count.
     /// </summary>
-    public bool HasUserChanges => _edits.Count > 0 || AlbumArt is not null || _delayMs is not null || _ratings.Count > 0;
+    public bool HasUserChanges => _edits.Count > 0 || _media.Count > 0 || _delayMs is not null || _ratings.Count > 0;
+
+    /// <summary>The song's stored files in <paramref name="slot"/>, as it was opened or last saved; none for a new chart.</summary>
+    public IReadOnlyList<string> StoredFilesOf(MediaSlot slot) => Opened is { } opened ? [.. opened.StoredNames.Where(slot.Holds)] : [];
+
+    /// <summary>What <paramref name="slot"/> holds as the next save leaves it.</summary>
+    public MediaRef EffectiveMedia(MediaSlot slot) => _media.TryGetValue(slot, out var change)
+        ? change.SourcePath is { } path ? MediaRef.Source(path) : MediaRef.None
+        : BaseMedia(slot);
+
+    /// <summary>
+    /// Makes the next save leave <paramref name="slot"/> holding <paramref name="target"/>: no change when that's what the
+    /// song holds already, and otherwise the file to copy in, or a removal. A file the song had stored before a save that
+    /// has since replaced it is copied back in from the session's copy. For undoable edits (<see cref="Commands.MediaCommand"/>).
+    /// </summary>
+    internal void SetEffectiveMedia(MediaSlot slot, MediaRef target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        var resolved = Resolve(slot, target);
+        MediaChange? change = resolved == BaseMedia(slot) ? null : resolved switch
+        {
+            MediaRef.SourceRef source => new MediaChange(source.Path),
+            _ => new MediaChange(null),
+        };
+        SetMedia(slot, change);
+    }
 
     /// <summary>
     /// Whether <paramref name="key"/> can be edited: not when the chart decides it, as for the drum layout keys, an
@@ -192,27 +241,30 @@ public sealed class EditorSong
             OnChanged();
     }
 
-    /// <summary>Puts the image at <paramref name="sourcePath"/> in place of the song's album art at the next save.</summary>
+    /// <summary>Puts the image at <paramref name="sourcePath"/> in place of the song's album art at the next save; not an undo step.</summary>
     public void SetAlbumArt(string sourcePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(sourcePath);
-        SetArt(new AlbumArtChange(sourcePath));
+        SetMedia(MediaSlot.AlbumArt, new MediaChange(sourcePath));
     }
 
-    /// <summary>Removes the song's album art at the next save.</summary>
-    public void RemoveAlbumArt() => SetArt(new AlbumArtChange(null));
+    /// <summary>Removes the song's album art at the next save; not an undo step.</summary>
+    public void RemoveAlbumArt() => SetMedia(MediaSlot.AlbumArt, new MediaChange(null));
 
-    /// <summary>Leaves the song's album art as it is.</summary>
-    public void RevertAlbumArt() => SetArt(null);
+    /// <summary>Leaves the song's album art as it is; not an undo step.</summary>
+    public void RevertAlbumArt() => SetMedia(MediaSlot.AlbumArt, null);
 
-    /// <summary>Sets each of <paramref name="edits"/> and the album art, as a recovered chart had them.</summary>
-    public void SetEdits(IEnumerable<KeyValuePair<string, string?>> edits, AlbumArtChange? albumArt)
+    /// <summary>Sets each of <paramref name="edits"/> and the file changes <paramref name="media"/>, as a recovered chart had them.</summary>
+    public void SetEdits(IEnumerable<KeyValuePair<string, string?>> edits, IEnumerable<KeyValuePair<MediaSlot, MediaChange>> media)
     {
         ArgumentNullException.ThrowIfNull(edits);
+        ArgumentNullException.ThrowIfNull(media);
         foreach (var (key, value) in edits)
             SetEdit(key, value);
-        AlbumArt = albumArt;
+        foreach (var (slot, change) in media)
+            _media[slot] = change;
         OnChanged();
+        RefreshTracks();
     }
 
     /// <summary>
@@ -303,6 +355,58 @@ public sealed class EditorSong
     /// <summary>The song's <c>song.ini</c> as the next save leaves it: <see cref="Pairs"/> with <see cref="PendingChanges"/> applied.</summary>
     public IReadOnlyList<KeyValuePair<string, string>> EffectivePairs() => PendingSongIniChanges.Apply(Pairs, PendingChanges());
 
+    /// <summary>The value of <paramref name="key"/> as the next save leaves it; null when it has none.</summary>
+    public string? EffectiveValue(string key)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        return SongIniValues.Last(EffectivePairs(), key);
+    }
+
+    /// <summary>
+    /// Makes the next save leave each key of <paramref name="values"/> with its value, or without it for null, in place of
+    /// whatever else would change it: a rating, the delay Find first downbeat set, or a revert. A key left as Chart Builder
+    /// would leave it on its own has no edit. Keys the chart decides are passed over. For undoable edits
+    /// (<see cref="Commands.SongValueCommand"/>), which work from what the save would write, so they still hold once the
+    /// song has been saved since.
+    /// </summary>
+    internal void SetEffectiveValues(IReadOnlyDictionary<string, string?> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        var targets = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in values)
+        {
+            if (!PendingSongIniChanges.IsChartOwned(key, Chart, PendingInputs))
+                targets[key] = value;
+        }
+
+        if (targets.Count == 0)
+            return;
+
+        // The delay Find first downbeat set covers both delay keys, so one set here holds the other where it is.
+        if (_delayMs is not null && targets.Keys.Any(IsDelayKey))
+        {
+            foreach (string key in new[] { "delay", "delay_seconds" })
+                targets.TryAdd(key, EffectiveValue(key));
+            _delayMs = null;
+        }
+
+        foreach (string key in targets.Keys)
+        {
+            _ratings.Remove(key);
+            _reverted.Remove(key);
+            RemoveEdit(key);
+        }
+
+        var without = EffectivePairs();
+        foreach (var (key, value) in targets)
+        {
+            if (SongIniValues.Last(without, key) != value)
+                _edits.Add(KeyValuePair.Create(key, value));
+        }
+
+        OnChanged();
+    }
+
     /// <summary>
     /// Leaves the change to <paramref name="key"/> out of saves, until it's restored; or, for a key the user edited,
     /// takes the edit back. Not an undo step.
@@ -334,22 +438,36 @@ public sealed class EditorSong
     }
 
     /// <summary>
-    /// Moves on to the song as it was saved: <paramref name="saved"/>, whose <c>song.ini</c> is now the one changes are
-    /// worked out from, with <paramref name="savedParts"/> the parts it was saved with. A new chart becomes a song
-    /// opened from its folder. Reverted changes stay reverted.
+    /// Moves on to the song as it was saved: <paramref name="saved"/>, whose <c>song.ini</c> and files are now the ones
+    /// changes are worked out from, with <paramref name="savedParts"/> the parts it was saved with. A new chart becomes a
+    /// song opened from its folder. Reverted changes stay reverted.
     /// </summary>
-    public void Saved(OpenedSong saved, IReadOnlySet<ChartInstrument> savedParts)
+    /// <param name="media">
+    /// The slots the save wrote, and the session's copy of each file it replaced or removed, which an undo of an edit made
+    /// before the save copies back in; by default, the slots with changes, without copies.
+    /// </param>
+    public void Saved(OpenedSong saved, IReadOnlySet<ChartInstrument> savedParts, MediaSaveResult? media = null)
     {
         ArgumentNullException.ThrowIfNull(saved);
         ArgumentNullException.ThrowIfNull(savedParts);
+        int generation = SaveGeneration;
+        foreach (var slot in media?.Changed ?? [.. _media.Keys])
+        {
+            if (media is not null && media.Kept.TryGetValue(slot, out string? kept))
+                _kept.Add(new KeptMedia(slot, _storedSince.GetValueOrDefault(slot), generation, kept));
+            _storedSince[slot] = generation + 1;
+        }
+
+        SaveGeneration = generation + 1;
         Opened = saved;
         LoadedParts = savedParts;
         _values = [];
         _delayMs = null;
         _ratings.Clear();
         _edits.Clear();
-        AlbumArt = null;
+        _media.Clear();
         OnChanged();
+        RefreshTracks();
     }
 
     /// <summary>A song opened from a folder or <c>.sng</c>, with its stems.</summary>
@@ -405,13 +523,70 @@ public sealed class EditorSong
 
     private bool RemoveEdit(string key) => _edits.RemoveAll(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) > 0;
 
-    private void SetArt(AlbumArtChange? art)
+    private static bool IsDelayKey(string key) =>
+        key.Equals("delay", StringComparison.OrdinalIgnoreCase) || key.Equals("delay_seconds", StringComparison.OrdinalIgnoreCase);
+
+    private void SetMedia(MediaSlot slot, MediaChange? change)
     {
-        if (AlbumArt == art)
+        bool had = _media.TryGetValue(slot, out var was);
+        if (change is { } now ? had && was == now : !had)
             return;
-        AlbumArt = art;
+        if (change is { } set)
+            _media[slot] = set;
+        else
+            _media.Remove(slot);
         OnChanged();
+        if (slot.Kind == MediaKind.Track)
+            RefreshTracks();
+    }
+
+    // What the slot holds with no change: a new chart's track as it was given, or the song's stored file.
+    private MediaRef BaseMedia(MediaSlot slot)
+    {
+        if (Opened is null)
+        {
+            return slot.Kind == MediaKind.Track && _newTracks.FirstOrDefault(t => t.Stem.Equals(slot.Stem, StringComparison.OrdinalIgnoreCase)) is { StagedSourcePath: { } path }
+                ? MediaRef.Source(path)
+                : MediaRef.None;
+        }
+
+        return StoredFilesOf(slot).Count > 0 ? MediaRef.Stored(SaveGeneration) : MediaRef.None;
+    }
+
+    // What target means now: a file stored since, as it's stored now; one a save replaced since, as the copy kept of it.
+    private MediaRef Resolve(MediaSlot slot, MediaRef target)
+    {
+        if (target is not MediaRef.StoredRef { Generation: var generation })
+            return target;
+        if (generation >= _storedSince.GetValueOrDefault(slot))
+            return BaseMedia(slot);
+        return _kept.LastOrDefault(k => k.Slot == slot && k.From <= generation && generation <= k.To) is { } kept
+            ? MediaRef.Source(kept.Path)
+            : MediaRef.None;
+    }
+
+    /// <summary>Works out the tracks again, raising <see cref="TracksChanged"/> when they differ.</summary>
+    private void RefreshTracks()
+    {
+        var tracks = (Opened is { } opened ? SongTracks.Resolve(opened.StoredNames, null) : _newTracks)
+            .Where(t => !_media.ContainsKey(new MediaSlot(MediaKind.Track, t.Stem)))
+            .ToList();
+        foreach (var (slot, change) in _media)
+        {
+            if (slot.Kind == MediaKind.Track && change.SourcePath is { } path && slot.StoredNameFor(path) is { } name)
+                tracks.Add(new SongTrack(name, slot.Stem!, path));
+        }
+
+        IReadOnlyList<SongTrack> sorted = [.. tracks.OrderBy(t => AudioStems.OrderOf(t.Stem)).ThenBy(t => t.StoredName, StringComparer.OrdinalIgnoreCase)];
+        if (sorted.SequenceEqual(_tracks))
+            return;
+        _tracks = sorted;
+        TracksChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnChanged() => Changed?.Invoke(this, EventArgs.Empty);
+
+    /// <param name="From">The first save it was the slot's stored file as of.</param>
+    /// <param name="To">The last.</param>
+    private sealed record KeptMedia(MediaSlot Slot, int From, int To, string Path);
 }

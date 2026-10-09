@@ -51,8 +51,14 @@ public sealed record RecoveryManifest(
     /// <summary>The keys edited in the Chart Inspector and not yet saved, each with its value, or null when it's removed.</summary>
     public IReadOnlyList<KeyValuePair<string, string?>> Edits { get; init; } = [];
 
+    /// <summary>
+    /// The files chosen and not yet saved, or removals (a null path), by slot: art, backgrounds, and an opened song's
+    /// tracks. A new chart's tracks are its <see cref="Stems"/>.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<MediaSlot, MediaChange>> Media { get; init; } = [];
+
     /// <summary>The album art chosen and not yet saved, or a removal (a null path); null when it's left as it is.</summary>
-    public AlbumArtChange? AlbumArt { get; init; }
+    public AlbumArtChange? AlbumArt => Media.Where(m => m.Key == MediaSlot.AlbumArt).Select(m => (AlbumArtChange?)new AlbumArtChange(m.Value.SourcePath)).FirstOrDefault();
 }
 
 /// <summary>A recovery file found in the store.</summary>
@@ -275,8 +281,15 @@ public sealed class RecoveryStore(string folder)
             json["ratings"] = new JsonArray([.. m.Ratings.Select(r => (JsonNode)new JsonArray(JsonValue.Create(r.Key), JsonValue.Create(r.Value)))]);
         if (m.Edits.Count > 0)
             json["edits"] = Pairs(m.Edits);
-        if (m.AlbumArt is { } art)
-            json["albumArt"] = new JsonObject { ["path"] = art.SourcePath };
+        if (m.Media.Count > 0)
+        {
+            json["media"] = new JsonArray([.. m.Media.Select(p => (JsonNode)new JsonObject
+            {
+                ["kind"] = p.Key.Kind.ToString(),
+                ["stem"] = p.Key.Stem,
+                ["path"] = p.Value.SourcePath,
+            })]);
+        }
         if (m.ChartFile is { } chart)
         {
             json["chartFile"] = new JsonObject
@@ -288,6 +301,22 @@ public sealed class RecoveryStore(string folder)
         }
 
         return json;
+    }
+
+    // The file changes, or for a manifest written before there were others, the album art's alone.
+    private static List<KeyValuePair<MediaSlot, MediaChange>> MediaOf(JsonObject json)
+    {
+        if (json["media"] is JsonArray media)
+        {
+            return [.. media.OfType<JsonObject>().Select(m =>
+            {
+                var kind = Enum.Parse<MediaKind>(m["kind"]!.GetValue<string>());
+                var slot = kind == MediaKind.Track ? MediaSlot.Track(m["stem"]!.GetValue<string>()) : new MediaSlot(kind);
+                return KeyValuePair.Create(slot, new MediaChange(m["path"]?.GetValue<string>()));
+            })];
+        }
+
+        return json["albumArt"] is JsonObject art ? [KeyValuePair.Create(MediaSlot.AlbumArt, new MediaChange(art["path"]?.GetValue<string>()))] : [];
     }
 
     private static RecoveryManifest? FromJson(JsonObject json)
@@ -323,7 +352,7 @@ public sealed class RecoveryStore(string folder)
                 DelayMs = json["delayMs"]?.GetValue<long>(),
                 Ratings = [.. (json["ratings"] as JsonArray ?? []).OfType<JsonArray>().Select(r => KeyValuePair.Create(r[0]!.GetValue<string>(), r[1]!.GetValue<int>()))],
                 Edits = Pairs(json["edits"]),
-                AlbumArt = json["albumArt"] is JsonObject art ? new AlbumArtChange(art["path"]?.GetValue<string>()) : null,
+                Media = MediaOf(json),
             };
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException or NullReferenceException or JsonException)

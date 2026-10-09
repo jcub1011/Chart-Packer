@@ -7,7 +7,7 @@ using Avalonia.Platform;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Video;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// Draws a <see cref="VideoPlayback"/>, fitted inside the control like an image with

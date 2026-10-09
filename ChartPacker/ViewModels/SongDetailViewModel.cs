@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using ChartPacker.Audio.Decoding;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Library;
@@ -53,14 +52,8 @@ namespace ChartPacker.ViewModels
         public string DownloadHeader => SongFileSource.DownloadHeaderFor(Name);
     }
 
-    /// <summary>A track a staged change removes, shown struck through so that its removal can be undone.</summary>
-    public sealed record RemovedTrackRow(string Name, string Size);
-
     /// <summary>A structural problem found in a <c>.sng</c>.</summary>
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
-
-    /// <summary>An entry of the Add track menu: a stem, labelled to say whether choosing it replaces the song's track for it.</summary>
-    public sealed record StemOption(string Stem, string Label, IAsyncRelayCommand Command);
 
     /// <summary>
     /// The right panel: the album art, background and metadata of the songs selected in the
@@ -1131,53 +1124,29 @@ namespace ChartPacker.ViewModels
         private async Task AddTrackAsync(string stem)
         {
             var songs = _songs;
-            string? path = await _filePicker.PickAudioAsync(string.Format(CultureInfo.CurrentCulture, Strings.PickTrackTitleFormat, stem));
+            string? path = await _filePicker.PickAudioAsync(TrackStaging.PickTitleFor(stem));
             if (path is null || !ReferenceEquals(songs, _songs) || !CanChangeFiles())
                 return;
 
-            string fileName = Path.GetFileName(path);
-            string extension = Path.GetExtension(path).ToLowerInvariant();
             TracksError = null;
-            if (!AudioStems.IsAudioExtension(extension))
-            {
-                TracksError = string.Format(CultureInfo.CurrentCulture, Strings.TrackNotAudioFormat, fileName);
-                return;
-            }
-
-            // Decoding a little of it now catches a file that isn't what its extension says.
-            var (length, problem) = await Task.Run(() =>
-            {
-                try
-                {
-                    AudioDecoder.Check(path);
-                    return (new FileInfo(path).Length, (string?)null);
-                }
-                catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
-                {
-                    return (0L, ex.Message);
-                }
-            });
-
+            var check = await TrackStaging.CheckAsync(path);
             if (!ReferenceEquals(songs, _songs) || !CanChangeFiles())
                 return;
-            if (problem is not null)
+            if (check.Error is { } error)
             {
-                TracksError = string.Format(CultureInfo.CurrentCulture, Strings.TrackUnusableFormat, fileName, problem);
+                TracksError = error;
                 return;
             }
 
-            string storedName = stem + extension;
+            string storedName = TrackStaging.StoredNameFor(stem, path);
             var draft = songs[0].Item.Draft;
             foreach (string added in SongTracks.FilesOfStem(draft.AddedFiles.Select(f => f.StoredName), stem))
                 draft.RevertFile(added);
 
-            // A stored file that differs only in case is still replaced, on a case-sensitive file system too.
             // Recorded as replaced by the add, so removing the added track brings them back.
-            var replaced = SongTracks.FilesOfStem(_diskFiles.Select(f => f.Path), stem)
-                .Where(stored => !stored.Equals(storedName, StringComparison.Ordinal))
-                .ToList();
+            var replaced = TrackStaging.Replaced(_diskFiles.Select(f => f.Path), stem, storedName);
 
-            draft.AddFile(new AddedFile(storedName, path, length), replaced);
+            draft.AddFile(new AddedFile(storedName, path, check.Length), replaced);
             OnDraftsChanged();
         }
 
@@ -2080,6 +2049,7 @@ namespace ChartPacker.ViewModels
             {
                 row.Size = TrackSize(row.Track, draft);
                 row.DownloadCommand = DownloadCommandFor(_entries[0], row.Track.StoredName, row.Track.StagedSourcePath);
+                row.DownloadHeader = SongFileSource.DownloadHeaderFor(row.Name);
             }
 
             // A stem with a track staged to replace it isn't missing a track, so what it replaces isn't listed.
@@ -2101,12 +2071,7 @@ namespace ChartPacker.ViewModels
 
             OnPropertyChanged(nameof(HasRemovedTracks));
 
-            var stems = tracks.Select(t => t.Stem).ToHashSet(StringComparer.Ordinal);
-            AddTrackOptions = [.. AudioStems.Stems
-                .Select(stem => new StemOption(
-                    stem,
-                    stems.Contains(stem) ? string.Format(CultureInfo.CurrentCulture, Strings.ReplaceTrackFormat, stem) : stem,
-                    _addTrackCommands[stem]))];
+            AddTrackOptions = TrackStaging.OptionsFor(tracks.Select(t => t.Stem), stem => _addTrackCommands[stem]);
         }
 
         /// <summary><paramref name="track"/>'s file size, formatted: the file to be added, or the one stored.</summary>

@@ -75,8 +75,12 @@ namespace ChartBuilder.ViewModels
             return choices;
         }
 
+        /// <summary>One track on its own, as its row in Chart settings' Tracks draws it.</summary>
+        public static AudioSource Single(SongTrack track) => Of([track], isMix: false);
+
+        // A staged track is keyed by the file it plays too, so one replacing a stored track of the same name isn't taken for it.
         private static AudioSource Of(IReadOnlyList<SongTrack> tracks, bool isMix) =>
-            new(string.Join("|", tracks.Select(t => t.StoredName).Order(StringComparer.OrdinalIgnoreCase)), tracks, isMix);
+            new(string.Join("|", tracks.Select(t => t.StagedSourcePath is { } staged ? t.StoredName + ">" + staged : t.StoredName).Order(StringComparer.OrdinalIgnoreCase)), tracks, isMix);
     }
 
     /// <summary>One of a lane's audio picker's choices: <see cref="LaneAudioOptions.Source"/>'s value, and its name.</summary>

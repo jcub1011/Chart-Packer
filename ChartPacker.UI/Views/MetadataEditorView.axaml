@@ -236,9 +236,17 @@
                 <DataTemplate x:DataType="vm:MetadataRowViewModel">
                     <!-- A value that fails validation is marked orange, with why under it. -->
                     <Border Classes="metadataRow" Classes.invalid="{Binding HasIssue}" Margin="0,1">
-                        <!-- Quick Fix puts the key's fix in the drafts; it's there on every row, disabled where there's none. -->
+                        <!-- Quick Fix puts the key's fix in the drafts; it's there on every row, disabled where there's none.
+                             Where the editor asks for it, Revert and Remove are here too rather than buttons on the row. -->
                         <Border.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="{x:Static res:SharedStrings.RevertRowToolTip}"
+                                          Command="{Binding RevertCommand}"
+                                          IsVisible="{Binding ShowMenuActions}" />
+                                <MenuItem Header="{x:Static res:SharedStrings.RemoveRowToolTip}"
+                                          Command="{Binding RemoveCommand}"
+                                          IsVisible="{Binding ShowMenuActions}" />
+                                <Separator IsVisible="{Binding ShowMenuActions}" />
                                 <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
                             </ContextMenu>
                         </Border.ContextMenu>
@@ -318,14 +326,14 @@
                                 </Button>
                                 <Button Classes="icon"
                                         Command="{Binding RevertCommand}"
-                                        IsVisible="{Binding IsChanged}"
+                                        IsVisible="{Binding ShowRevertButton}"
                                         ToolTip.Tip="{x:Static res:SharedStrings.RevertRowToolTip}"
                                         AutomationProperties.Name="{x:Static res:SharedStrings.RevertRowToolTip}">
                                     <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
                                 </Button>
                                 <Button Classes="icon"
                                         Command="{Binding RemoveCommand}"
-                                        IsVisible="{Binding CanRemove}"
+                                        IsVisible="{Binding ShowRemoveButton}"
                                         ToolTip.Tip="{x:Static res:SharedStrings.RemoveRowToolTip}"
                                         AutomationProperties.Name="{x:Static res:SharedStrings.RemoveRowToolTip}">
                                     <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />

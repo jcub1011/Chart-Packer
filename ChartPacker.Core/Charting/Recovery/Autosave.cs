@@ -63,7 +63,9 @@ public static class Autosave
             DelayMs = song.DelayMs,
             Ratings = [.. song.Ratings],
             Edits = [.. song.Edits],
-            AlbumArt = song.AlbumArt,
+
+            // A new chart's tracks are its stems, as they are now.
+            Media = [.. song.Media.Where(m => !song.IsNew || m.Key.Kind != MediaKind.Track)],
         };
     }
 
@@ -80,7 +82,7 @@ public static class Autosave
         var song = EditorSong.Of(opened with { Load = RecoveryStore.ReadChart(file) }, onDisk);
         song.DelayMs = file.Manifest.DelayMs;
         song.SetRatings(file.Manifest.Ratings);
-        song.SetEdits(file.Manifest.Edits, file.Manifest.AlbumArt);
+        song.SetEdits(file.Manifest.Edits, file.Manifest.Media);
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }
@@ -100,7 +102,7 @@ public static class Autosave
         song.Values = file.Manifest.Values;
         song.DelayMs = file.Manifest.DelayMs;
         song.SetRatings(file.Manifest.Ratings);
-        song.SetEdits(file.Manifest.Edits, file.Manifest.AlbumArt);
+        song.SetEdits(file.Manifest.Edits, file.Manifest.Media.Where(m => m.Key.Kind != MediaKind.Track));
         song.RevertAll(file.Manifest.Reverted);
         return song;
     }

@@ -25,6 +25,12 @@ public enum SongChanges
 
     /// <summary>The song's drum variant.</summary>
     DrumsVariant = 8,
+
+    /// <summary>A <c>song.ini</c> value of the song, set in Chart settings; the chart itself is as it was.</summary>
+    SongIni = 16,
+
+    /// <summary>The song's album art, a background or an audio track, staged for the next save; the chart is as it was.</summary>
+    Media = 32,
 }
 
 /// <summary>

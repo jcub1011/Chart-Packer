@@ -2,15 +2,23 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
+             xmlns:ui="using:ChartPacker.UI.Controls"
+             xmlns:uiviews="using:ChartPacker.UI.Views"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="600"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="900"
              x:Class="ChartBuilder.Views.ChartSettingsView"
-             x:DataType="vm:ChartSettingsViewModel">
+             x:DataType="vm:EditorWindowViewModel"
+             Focusable="True"
+             FocusAdorner="{x:Null}"
+             ui:CommitOnClickAway.IsEnabled="True">
 
-    <!-- Chart settings (charter-spec C1): the chart's timing and parts, each change applied as it's made. Each field's
-         label is above it, as the panel can be narrow. -->
+    <!-- Chart settings (charter-spec C1): everything a chart needs, each change an undo step as it's made. The timing and
+         the delay; the parts, a row each with its rating; the song's metadata, as Chart Packer's inspector edits it; and
+         its tracks, with their mix. Each field's label is above it, as the panel can be narrow. Focusable so a click on
+         empty space can take focus from an edit box, which commits it. -->
     <UserControl.Styles>
+        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
         <Style Selector="TextBlock.section-heading">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -27,6 +35,15 @@
         <Style Selector="StackPanel.field">
             <Setter Property="Spacing" Value="4" />
         </Style>
+        <!-- A part's rating: a narrow box, empty while the part is unrated. -->
+        <Style Selector="NumericUpDown.rating">
+            <Setter Property="Width" Value="96" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="99" />
+            <Setter Property="Increment" Value="1" />
+            <Setter Property="FormatString" Value="0" />
+            <Setter Property="ParsingNumberStyle" Value="Integer" />
+        </Style>
     </UserControl.Styles>
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
@@ -37,15 +54,15 @@
                     <StackPanel Classes="field">
                         <TextBlock Text="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
                         <ComboBox HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding Resolutions}"
-                                  SelectedItem="{Binding SelectedResolution}"
+                                  ItemsSource="{Binding ChartSettings.Resolutions}"
+                                  SelectedItem="{Binding ChartSettings.SelectedResolution}"
                                   AutomationProperties.Name="{x:Static res:Strings.ChartSettingsResolutionLabel}" />
                     </StackPanel>
                     <StackPanel Classes="field">
                         <TextBlock Text="{x:Static res:Strings.ChartSettingsBpmLabel}" />
                         <NumericUpDown HorizontalAlignment="Left"
                                        Width="140"
-                                       Value="{Binding Bpm}"
+                                       Value="{Binding ChartSettings.Bpm}"
                                        Minimum="{x:Static vm:ChartSettingsViewModel.MinBpm}"
                                        Maximum="{x:Static vm:ChartSettingsViewModel.MaxBpm}"
                                        Increment="1"
@@ -54,25 +71,25 @@
                         <!-- Detect from audio (charter-spec C1, C14): the starting BPM from the mix, and a tempo map to review. -->
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                             <Button Content="{x:Static res:Strings.DetectFromAudioButton}"
-                                    Command="{Binding DetectFromAudioCommand}"
-                                    IsEnabled="{Binding CanDetect}"
+                                    Command="{Binding ChartSettings.DetectFromAudioCommand}"
+                                    IsEnabled="{Binding ChartSettings.CanDetect}"
                                     ToolTip.Tip="{x:Static res:Strings.DetectFromAudioToolTip}"
                                     ToolTip.ShowOnDisabled="True" />
                             <ProgressBar IsIndeterminate="True"
                                          Width="60"
                                          VerticalAlignment="Center"
-                                         IsVisible="{Binding IsDetecting}" />
+                                         IsVisible="{Binding ChartSettings.IsDetecting}" />
                         </StackPanel>
                         <TextBlock Classes="muted"
                                    TextWrapping="Wrap"
-                                   IsVisible="{Binding HasDetectStatus}"
-                                   Text="{Binding DetectStatus}" />
+                                   IsVisible="{Binding ChartSettings.HasDetectStatus}"
+                                   Text="{Binding ChartSettings.DetectStatus}" />
                     </StackPanel>
                     <StackPanel Classes="field">
                         <TextBlock Text="{x:Static res:Strings.ChartSettingsTimeSignatureLabel}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <NumericUpDown Width="110"
-                                           Value="{Binding Numerator}"
+                                           Value="{Binding ChartSettings.Numerator}"
                                            Minimum="1"
                                            Maximum="{x:Static vm:ChartSettingsViewModel.MaxNumerator}"
                                            Increment="1"
@@ -81,42 +98,143 @@
                                            AutomationProperties.Name="{x:Static res:Strings.ChartSettingsNumeratorName}" />
                             <TextBlock VerticalAlignment="Center" Text="/" />
                             <ComboBox MinWidth="70"
-                                      ItemsSource="{Binding Denominators}"
-                                      SelectedItem="{Binding Denominator}"
+                                      ItemsSource="{Binding ChartSettings.Denominators}"
+                                      SelectedItem="{Binding ChartSettings.Denominator}"
                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDenominatorName}" />
                         </StackPanel>
+                    </StackPanel>
+                    <!-- How much later than its notes the chart plays against the audio: song.ini's delay. -->
+                    <StackPanel Classes="field">
+                        <TextBlock Text="{x:Static res:Strings.ChartSettingsDelayLabel}" />
+                        <NumericUpDown HorizontalAlignment="Left"
+                                       Width="160"
+                                       Value="{Binding ChartSettings.DelayMs}"
+                                       Minimum="{x:Static vm:ChartSettingsViewModel.MinDelayMs}"
+                                       Maximum="{x:Static vm:ChartSettingsViewModel.MaxDelayMs}"
+                                       Increment="1"
+                                       FormatString="0"
+                                       IsEnabled="{Binding ChartSettings.CanEditSong}"
+                                       ToolTip.Tip="{x:Static res:Strings.ChartSettingsDelayToolTip}"
+                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDelayLabel}" />
                     </StackPanel>
                 </StackPanel>
             </Border>
             <!-- What stops a change being applied, such as a BPM out of range. -->
             <TextBlock TextWrapping="Wrap"
                        Foreground="{DynamicResource WarningTextBrush}"
-                       Text="{Binding Problem}"
-                       IsVisible="{Binding HasProblem}" />
+                       Text="{Binding ChartSettings.Problem}"
+                       IsVisible="{Binding ChartSettings.HasProblem}" />
 
+            <!-- A row per part: ticked when the chart has it, with its rating beside it, which the box's x clears. -->
             <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />
             <Border Classes="section">
-                <StackPanel Spacing="8">
-                    <ItemsControl ItemsSource="{Binding Parts}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel ItemSpacing="16" LineSpacing="4" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                <StackPanel Spacing="8" Grid.IsSharedSizeScope="True">
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartRating" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartClear" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="2" Classes="muted" FontSize="12" Text="{x:Static res:Strings.ChartSettingsDifficultyHeader}" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding ChartSettings.Parts}"
+                                  AutomationProperties.Name="{x:Static res:Strings.ChartSettingsSectionParts}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ChartPartChoice">
-                                <CheckBox MinWidth="120" Content="{Binding Label}" IsChecked="{Binding IsChecked}" />
+                            <DataTemplate x:DataType="vm:ChartPartRowViewModel">
+                                <StackPanel Spacing="4" Margin="0,2">
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartRating" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartClear" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Classes="marker" VerticalAlignment="Center" Text="{Binding Marker}" />
+                                        <CheckBox Grid.Column="1"
+                                                  VerticalAlignment="Center"
+                                                  Content="{Binding Label}"
+                                                  IsChecked="{Binding IsChecked}"
+                                                  ToolTip.Tip="{x:Static res:Strings.ChartSettingsPartToolTip}" />
+                                        <NumericUpDown Grid.Column="2"
+                                                       Classes="rating"
+                                                       Value="{Binding Difficulty}"
+                                                       IsEnabled="{Binding IsChecked}"
+                                                       ToolTip.Tip="{x:Static res:Strings.ChartSettingsDifficultyToolTip}"
+                                                       AutomationProperties.Name="{Binding Label}" />
+                                        <Button Grid.Column="3"
+                                                Classes="icon"
+                                                VerticalAlignment="Center"
+                                                Command="{Binding ClearDifficultyCommand}"
+                                                ToolTip.Tip="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}">
+                                            <PathIcon Width="10" Height="10" Data="{StaticResource RemoveIconGeometry}" />
+                                        </Button>
+                                    </Grid>
+                                    <!-- Pro drums have a rating of their own, diff_drums_real, beside the drums'. -->
+                                    <Grid ColumnSpacing="6" IsVisible="{Binding HasProDifficulty}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartRating" />
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartClear" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="28,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Text="{x:Static res:Strings.ChartSettingsProDrumsDifficultyLabel}" />
+                                        <NumericUpDown Grid.Column="2"
+                                                       Classes="rating"
+                                                       Value="{Binding ProDifficulty}"
+                                                       IsEnabled="{Binding IsChecked}"
+                                                       ToolTip.Tip="{x:Static res:Strings.ChartSettingsDifficultyToolTip}"
+                                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsProDrumsDifficultyLabel}" />
+                                        <Button Grid.Column="3"
+                                                Classes="icon"
+                                                VerticalAlignment="Center"
+                                                Command="{Binding ClearProDifficultyCommand}"
+                                                ToolTip.Tip="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}"
+                                                AutomationProperties.Name="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}">
+                                            <PathIcon Width="10" Height="10" Data="{StaticResource RemoveIconGeometry}" />
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <StackPanel Classes="field" IsVisible="{Binding HasDrums}">
+                    <StackPanel Classes="field" IsVisible="{Binding ChartSettings.HasDrums}">
                         <TextBlock Text="{x:Static res:Strings.ChartSettingsDrumsLabel}" />
                         <ComboBox MinWidth="120"
-                                  ItemsSource="{Binding DrumsVariants}"
-                                  SelectedItem="{Binding SelectedDrums}"
+                                  ItemsSource="{Binding ChartSettings.DrumsVariants}"
+                                  SelectedItem="{Binding ChartSettings.SelectedDrums}"
                                   ToolTip.Tip="{x:Static res:Strings.ChartSettingsDrumsToolTip}"
                                   AutomationProperties.Name="{x:Static res:Strings.ChartSettingsDrumsLabel}" />
                     </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- The song's metadata, as Chart Packer's inspector edits it; Revert and Remove are on a row's right-click menu. -->
+            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionMetadata}" />
+            <Border Classes="section">
+                <uiviews:MetadataEditorView DataContext="{Binding Metadata.MetadataEditor}" />
+            </Border>
+
+            <!-- The song's tracks, with their mix; Replace and Remove are on a row's right-click menu. -->
+            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionTracks}" />
+            <Border Classes="section">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12" Text="{x:Static res:Strings.ChartSettingsTracksNote}" />
+                    <uiviews:TrackListView Tracks="{Binding Tracks.Tracks}"
+                                           RemovedTracks="{Binding Tracks.RemovedTracks}"
+                                           AddTrackOptions="{Binding Tracks.AddTrackOptions}"
+                                           CanEdit="{Binding Tracks.CanEdit}"
+                                           ActionsInContextMenu="True"
+                                           PositionSeconds="{Binding Playback.PositionSeconds}"
+                                           LengthSeconds="{Binding Playback.LengthSeconds}"
+                                           ReplaceTrackCommand="{Binding Tracks.ReplaceTrackCommand}"
+                                           RemoveTrackCommand="{Binding Tracks.RemoveTrackCommand}"
+                                           RestoreTrackCommand="{Binding Tracks.RestoreTrackCommand}" />
+                    <TextBlock Classes="error" Text="{Binding Tracks.Error}" IsVisible="{Binding Tracks.HasError}" />
                 </StackPanel>
             </Border>
         </StackPanel>

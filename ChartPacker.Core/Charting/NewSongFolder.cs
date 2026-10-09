@@ -28,4 +28,10 @@ public sealed record NewSongFolder
 
     /// <summary>The album art to copy in, a png, jpg or jpeg; <see langword="null"/> for none.</summary>
     public string? AlbumArtPath { get; init; }
+
+    /// <summary>The background image to copy in, as <c>background.&lt;ext&gt;</c>; <see langword="null"/> for none.</summary>
+    public string? BackgroundImagePath { get; init; }
+
+    /// <summary>The background video to copy in, as <c>video.&lt;ext&gt;</c>; <see langword="null"/> for none.</summary>
+    public string? BackgroundVideoPath { get; init; }
 }

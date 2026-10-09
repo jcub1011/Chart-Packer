@@ -6,9 +6,8 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using ChartPacker.Audio.Waveforms;
-using ChartPacker.UI.Controls;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// A song's waveform with a playhead, which can be clicked or dragged to seek. The part already

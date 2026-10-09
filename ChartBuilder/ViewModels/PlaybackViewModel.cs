@@ -33,7 +33,7 @@ namespace ChartBuilder.ViewModels
     /// drawn against the audio while it plays is drawn the calibrated latency earlier, times the speed (C10 item 5),
     /// for the device the audio is on (C11).
     /// </remarks>
-    public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable
+    public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable, ITrackMixer
     {
         /// <summary>How long the timeline is when there's no audio to say.</summary>
         private const double PlaceholderLengthSeconds = 180;
@@ -46,7 +46,6 @@ namespace ChartBuilder.ViewModels
         private readonly AudioLatencyService? _latency;
         private readonly Func<(int Metronome, int Hits)> _volumes;
         private readonly Action? _calibrate;
-        private readonly IReadOnlyList<SongTrack> _tracks;
         private readonly DispatcherTimer _timer;
         private readonly CancellationTokenSource _cancel = new();
         private readonly EditorAudio? _editorAudio;
@@ -57,9 +56,16 @@ namespace ChartBuilder.ViewModels
         private HitSoundSchedule? _hits;
         private IReadOnlyList<NoteHit> _noteHits = [];
         private IDisposable? _followingDevice;
+        private IReadOnlyList<SongTrack> _tracks;
         private bool _settingPosition;
         private bool _seeking;
         private bool _disposed;
+
+        // Counts the opens, so an open that finishes after a later one began is let go of.
+        private int _openings;
+
+        // Each stem's mute, solo and volume as last set, kept as the tracks are opened again; a stem not set has its default.
+        private readonly Dictionary<string, (bool IsMuted, bool IsSolo, double Volume)> _switches = new(StringComparer.Ordinal);
 
         // Clock, made once: it's read every frame.
         private Func<TimeSpan>? _clock;
@@ -91,7 +97,7 @@ namespace ChartBuilder.ViewModels
                 latency.Changed += OnLatencyChanged;
             _editorAudio = editorAudio;
             if (editorAudio is not null)
-                editorAudio.Waveforms.Changed += OnWaveformsChanged;
+                editorAudio.Changed += OnWaveformsChanged;
         }
 
         /// <summary>Raised when the playhead is moved by hand, on the timeline, rather than by playing or by <see cref="SeekTo"/>.</summary>
@@ -158,9 +164,12 @@ namespace ChartBuilder.ViewModels
             ? string.Format(CultureInfo.CurrentCulture, Strings.LoopToolTipFormat, FormatTime(loop.Start), FormatTime(loop.End))
             : Strings.LoopNoneToolTip;
 
-        /// <summary>Each stem, with its mute, solo and volume.</summary>
+        /// <summary>
+        /// Each track, with its mute, solo and volume and its waveform, for Chart settings' Tracks. The switches are for
+        /// listening: not undone, and not saved.
+        /// </summary>
         [ObservableProperty]
-        public partial IReadOnlyList<StemRowViewModel> Stems { get; private set; } = [];
+        public partial IReadOnlyList<TrackRowViewModel> Tracks { get; private set; } = [];
 
         /// <summary>The calibrated latency, as the transport bar shows it, e.g. "42 ms".</summary>
         public string LatencyText => string.Format(CultureInfo.CurrentCulture, Strings.LatencyFormat, _latency?.Milliseconds ?? 0);
@@ -261,6 +270,9 @@ namespace ChartBuilder.ViewModels
                 return;
 
             Beats = BeatsOf(_song, LengthOf(_song, null));
+            int opening = ++_openings;
+            Tracks = [.. _tracks.Select(RowOf)];
+            RefreshTrackWaveforms();
             if (_tracks.Count == 0)
             {
                 // A new chart may start with no audio, against a silent timeline (charter-spec C1).
@@ -272,8 +284,10 @@ namespace ChartBuilder.ViewModels
             try
             {
                 var token = _cancel.Token;
-                var (audio, player, output) = await Task.Run(() => Open(_song.Entry, _tracks, _openOutput, token), token);
-                if (_disposed)
+                var tracks = _tracks;
+                var switches = Tracks.ToDictionary(r => r.Name, r => (r.IsMuted, r.IsSolo, r.Volume), StringComparer.Ordinal);
+                var (audio, player, output) = await Task.Run(() => Open(_song.Entry, tracks, switches, _openOutput, token), token);
+                if (_disposed || opening != _openings)
                 {
                     player.Dispose();
                     audio.Dispose();
@@ -292,8 +306,12 @@ namespace ChartBuilder.ViewModels
                 _metronome = new MetronomeSchedule(_song.Chart.TempoMap.ToTempoMap(), _song.Delay, TimeSpan.FromSeconds(LengthSeconds), player.Mixer.OutputRate);
                 _hits = new HitSoundSchedule(_noteHits, player.Mixer.OutputRate);
                 UpdateSounds();
-                Stems = [.. player.Mixer.Stems.Select(stem => new StemRowViewModel(stem))];
                 IsReady = true;
+                foreach (var opened in audio.Tracks)
+                {
+                    if (opened.Error is { } trackError && Tracks.FirstOrDefault(r => r.Track == opened.Track) is { } row)
+                        row.Error = trackError;
+                }
 
                 if (audio.Tracks.FirstOrDefault(t => t.Error is not null) is { } failed)
                     Message = string.Format(CultureInfo.CurrentCulture, Strings.AudioTrackFailedFormat, failed.Track.StoredName, failed.Error);
@@ -306,8 +324,92 @@ namespace ChartBuilder.ViewModels
                 // Nothing awaits this, so anything not caught here would be lost; the chart still opens without audio.
                 if (ex is not (AudioDeviceException or IOException or UnauthorizedAccessException or InvalidDataException))
                     Trace.TraceError($"Opening the audio failed: {ex}");
-                Message = string.Format(CultureInfo.CurrentCulture, Strings.AudioUnavailableFormat, ex.Message);
+                if (opening == _openings)
+                    Message = string.Format(CultureInfo.CurrentCulture, Strings.AudioUnavailableFormat, ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Lets go of the audio and its files, as a save that replaces or removes a track needs; <see cref="ReloadAsync"/>
+        /// opens it again. Playback stops.
+        /// </summary>
+        public void Release()
+        {
+            ++_openings;
+            if (_player is { IsPlaying: true } playing)
+            {
+                playing.Pause();
+                SetPlaying(false);
+            }
+
+            IsReady = false;
+            _followingDevice?.Dispose();
+            _followingDevice = null;
+            _player?.Dispose();
+            _audio?.Dispose();
+            _player = null;
+            _audio = null;
+        }
+
+        /// <summary>
+        /// Plays <paramref name="tracks"/> from now on, after a track was added, replaced or removed, or the song saved:
+        /// opens them at the same place, playing on if it was, with each stem's mute, solo and volume as they were.
+        /// </summary>
+        public async Task ReloadAsync(IReadOnlyList<SongTrack> tracks)
+        {
+            ArgumentNullException.ThrowIfNull(tracks);
+            if (_disposed)
+                return;
+
+            bool wasPlaying = IsPlaying;
+            double position = PositionSeconds;
+            Release();
+            _tracks = tracks;
+            Message = null;
+            await OpenAsync();
+            if (_disposed || _player is null)
+                return;
+
+            SeekTo(Math.Min(position, LengthSeconds));
+            if (wasPlaying)
+                PlayPauseCommand.Execute(null);
+        }
+
+        /// <inheritdoc/>
+        public void ApplySwitches(TrackRowViewModel row)
+        {
+            ArgumentNullException.ThrowIfNull(row);
+            _switches[row.Track.Stem] = (row.IsMuted, row.IsSolo, row.Volume);
+            TrackRowViewModel.RefreshHeard(Tracks);
+            if (_player is null)
+                return;
+
+            foreach (var stem in _player.Mixer.Stems.Where(s => s.Name == row.Name))
+            {
+                stem.IsMuted = row.IsMuted;
+                stem.IsSolo = row.IsSolo;
+                stem.Volume = (float)row.Volume;
+            }
+        }
+
+        /// <inheritdoc/>
+        public void RememberVolume(TrackRowViewModel row)
+        {
+            // ApplySwitches keeps it, with the switches, for as long as the chart is open.
+        }
+
+        // A track's row, switched as its stem last was; the preview starts muted, as in Chart Packer's inspector.
+        private TrackRowViewModel RowOf(SongTrack track)
+        {
+            var row = new TrackRowViewModel(this, track);
+            if (_switches.TryGetValue(track.Stem, out var kept))
+            {
+                row.IsMuted = kept.IsMuted;
+                row.IsSolo = kept.IsSolo;
+                row.Volume = kept.Volume;
+            }
+
+            return row;
         }
 
         [RelayCommand(CanExecute = nameof(IsReady))]
@@ -402,7 +504,7 @@ namespace ChartBuilder.ViewModels
             if (_latency is not null)
                 _latency.Changed -= OnLatencyChanged;
             if (_editorAudio is not null)
-                _editorAudio.Waveforms.Changed -= OnWaveformsChanged;
+                _editorAudio.Changed -= OnWaveformsChanged;
 
             // The player before the sources it reads.
             _followingDevice?.Dispose();
@@ -448,8 +550,8 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        /// <summary>Opens the tracks and a player for them, the preview muted, as in Chart Packer's inspector.</summary>
-        private static (SongAudio Audio, StemPlayer Player, IAudioOutput Output) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, Func<int, IAudioOutput> openOutput, CancellationToken cancellationToken)
+        /// <summary>Opens the tracks and a player for them, each stem switched as its row is.</summary>
+        private static (SongAudio Audio, StemPlayer Player, IAudioOutput Output) Open(SongEntry? entry, IReadOnlyList<SongTrack> tracks, IReadOnlyDictionary<string, (bool IsMuted, bool IsSolo, double Volume)> switches, Func<int, IAudioOutput> openOutput, CancellationToken cancellationToken)
         {
             var audio = SongAudio.Open(entry, tracks, cancellationToken);
             try
@@ -459,7 +561,10 @@ namespace ChartBuilder.ViewModels
 
                 var mixer = new StemMixer(audio.Sources);
                 foreach (var stem in mixer.Stems)
-                    stem.IsMuted = tracks.Any(t => t.StoredName == stem.Name && t.Stem == AudioStems.Preview);
+                {
+                    if (switches.TryGetValue(stem.Name, out var set))
+                        (stem.IsMuted, stem.IsSolo, stem.Volume) = (set.IsMuted, set.IsSolo, (float)set.Volume);
+                }
 
                 var output = openOutput(mixer.OutputRate);
                 return (audio, new StemPlayer(mixer, output), output);
@@ -501,11 +606,25 @@ namespace ChartBuilder.ViewModels
             return beats;
         }
 
-        /// <summary>Draws the mix of the peaks read so far, the preview left out as it's muted.</summary>
+        /// <summary>Draws the mix of the peaks read so far, the preview left out as it's muted, and each track's own.</summary>
         private void OnWaveformsChanged(object? sender, EventArgs e)
         {
-            if (!_disposed && _editorAudio is { Mix: { } mix } audio)
-                Waveform = audio.Waveforms.Mono(mix);
+            if (_disposed || _editorAudio is not { } audio)
+                return;
+            Waveform = audio.Mix is { } mix ? audio.Waveforms.Mono(mix) : null;
+            RefreshTrackWaveforms();
+        }
+
+        private void RefreshTrackWaveforms()
+        {
+            if (_editorAudio is not { } audio)
+                return;
+            foreach (var row in Tracks)
+            {
+                // A row whose track the editor's audio doesn't have yet keeps what it shows until it does.
+                if (audio.Tracks.Contains(row.Track) && audio.Waveforms.Mono(AudioSource.Single(row.Track)) is { } waveform)
+                    row.Waveform = waveform;
+            }
         }
 
         /// <summary>A time as m:ss.f, or h:mm:ss.f from an hour, e.g. 3:05.2.</summary>

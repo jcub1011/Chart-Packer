@@ -331,9 +331,10 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
     **Program settings**, the editing tools, and **Undo** and **Redo**. Its groups wrap onto more
     rows as the window narrows rather than scrolling.
   - **Side panels, tabbed and docked like Visual Studio's tool windows.** The left one has the
-    **Chart Inspector** tab: Chart Packer's inspector without the background video or image, the
-    note highway or the lyric lane, which the editor itself shows; and the **Chart settings** tab
-    ([C1](#c1-new-chart-and-chart-settings)). The right one has the **Properties** tab, which shows
+    **Chart settings** tab, with everything a chart needs: its timing, parts and ratings, metadata
+    and tracks; the **Art** tab, with its album art and backgrounds
+    ([C1](#c1-new-chart-and-chart-settings)); and the **Sections** tab. The right one has the
+    **Properties** tab, which shows
     the selection ([C3](#c3-editor-layout)), the **Pending changes** tab
     ([C17](#c17-save-and-export)) and the **Findings** tab ([C3](#c3-editor-layout) item 5).
   - Each panel can be resized, and collapsed to a strip along the window's edge showing its tabs'
@@ -489,12 +490,12 @@ shown in the app's findings panel. Chart lint rules are listed in [§6](#lint-ru
 **New chart** opens a new chart in the Editor straight away. There is no wizard or dialog before it:
 the chart starts on defaults, and everything about it is set in the Editor.
 
-- **Chart settings** is a tab in the Editor's left panel, beside the Chart Inspector, that sets the
-  chart's timing and parts. It is the same for a new chart and a song that was opened.
-- Everything else about the song (name, artist, charter, album, genre, year, album art, stems,
-  `delay`, the difficulty ratings and any other `song.ini` key) is edited in the **Chart
-  Inspector**, as in Chart Packer's inspector ([§4.5](#45-app-chartbuilder)). Chart settings doesn't
-  repeat it.
+- **Chart settings** is a tab in the Editor's left panel that sets everything a chart needs: its
+  timing and `delay`, its parts and their difficulty ratings, the song's metadata (name, artist,
+  charter, album, genre, year and any other `song.ini` key) and its tracks. It is the same for a new
+  chart and a song that was opened.
+- The **Art** tab beside it sets the album art, the background image and the background video.
+- Every edit in either tab is an undo step, as the chart's edits are.
 - A new chart has no song folder until it is first saved. The first save asks where it goes
   ([C17](#c17-save-and-export)).
 
@@ -533,23 +534,52 @@ into it is **Edit chart** ([C2](#c2-open-and-import)).
   - Until the first save, each stem is played from where it is. A file that doesn't decode is said
     by playback, as for any song ([C10](#c10-playback)).
 - **No audio is allowed.** The chart is made against a silent timeline. The song then has finding
-  SNG052 (no audio stem) until a stem is added in the Chart Inspector.
+  SNG052 (no audio stem) until a stem is added in Chart settings' Tracks.
 
-In the Chart Inspector, a new chart's name and artist are filled from the first stem's tags where it
-has them (`AudioFileInfo.Read`), and its charter from the **Default charter name** setting
+In Chart settings' Metadata, a new chart's name and artist are filled from the first stem's tags
+where it has them (`AudioFileInfo.Read`), and its charter from the **Default charter name** setting
 ([§10](#10-settings)).
 
-*Settled after CM5:* the album, genre and year are filled from the tags too. The Chart Inspector's
-edits are pending changes ([C17](#c17-save-and-export) item 2), not undo steps: each is taken back
-with its row's Revert or in Pending changes, as Chart Packer's inspector's are. An edit takes the
-place of whatever else would change its key (the default charter, `song_length`, a rating or a
-delay), and the keys the chart decides (the drum layout keys, `multiplier_note` and an import's
-`sustain_cutoff_threshold`) can't be edited. Its edits count as unsaved changes, so closing asks
-first and autosave keeps them, and nothing in it can be edited while a save runs.
+*Settled after CM5:* the album, genre and year are filled from the tags too. An edit to the song
+takes the place of whatever else would change its key (the default charter, `song_length`, a rating
+or a delay), and the keys the chart decides (the drum layout keys, `multiplier_note` and an import's
+`sustain_cutoff_threshold`) can't be edited. The song's edits count as unsaved changes, so closing
+asks first and autosave keeps them, and none can be made, undone or redone while a save runs.
 
-**The tab.** Chart settings is a tab in the Editor's left panel, beside the Chart Inspector. Its
-sections, **Timing** and **Parts**, are one under the other, with each field's label above it, as
-the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on the Chart Inspector.
+*Revised after CM5:* the Chart Inspector, which edited the song as Chart Packer's inspector does, is
+gone. Its edits were pending changes taken back with Revert rather than undo steps, and its tracks
+were only listed. Chart settings and the Art tab take its place:
+
+- Each edit to the song (a `song.ini` value, a rating, the delay, the art, a background or a track)
+  is an **undo step** on the chart's undo stack, and still a pending change until saved
+  ([C17](#c17-save-and-export) item 2). It is kept as the values the save would write, before and
+  after (`SongValueCommand`, `MediaCommand`), so undoing an edit made before a save gives back what
+  the song had, as a new pending change.
+- A file a save replaces or removes (art, a background or a track) is copied first to a temp folder
+  of the Editor window's own (`MediaStash`), deleted as the window closes, so an undo past the save
+  can put the file back. The copies a crash leaves are swept a day later.
+- The tracks are played and drawn as they'll be saved: adding, replacing or removing one, or undoing
+  it, opens the audio again, keeping the playhead, playing on, and each stem's mute, solo and volume.
+
+**The tab.** Chart settings is a tab in the Editor's left panel, the first. Its sections,
+**Timing**, **Parts**, **Metadata** and **Tracks**, are one under the other, with each field's label
+above it, as the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on it.
+
+**Metadata** is Chart Packer's inspector's metadata, shared with it (`MetadataEditorView`): a row per
+`song.ini` key, edited in place, and a row to add one. The ratings are left to Parts. A row's
+**Revert** (back to the song as saved) and **Remove** are on its right-click menu, with Quick Fix.
+
+**Tracks** is Chart Packer's inspector's track list, shared with it (`TrackListView`): a row per
+track with its mute, solo, volume and waveform, the tracks a pending change removes, and **Add
+track**. A row's **Replace** and **Remove**, and a removed track's **Keep**, are on its right-click
+menu. It takes the place of the transport bar's Stems menu ([C10](#c10-playback)). The mute, solo
+and volume are only for listening: they aren't undo steps and aren't saved.
+
+**The Art tab** has a tile each for the album art, the background image and the background video,
+showing what the song will have once saved; the video plays against the song while the tab is shown.
+An empty tile has **Choose…**; a tile's right-click menu has **Replace…**, **Remove** and **Revert
+to saved**. A file is checked before it's used: an image is decoded, and a video is checked to be
+one FFmpeg can play.
 
 **Timing.**
 
@@ -568,8 +598,11 @@ the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on th
 
 **Parts.**
 
-- A tick box for each v1 part: 5-fret Lead, Bass, Rhythm and Co-op; GHL Guitar, Bass, Rhythm and
-  Co-op; Drums, with a choice of 4-lane, Pro or 5-lane.
+- A row for each v1 part: 5-fret Lead, Bass, Rhythm and Co-op; GHL Guitar, Bass, Rhythm and Co-op;
+  Drums, with a choice of 4-lane, Pro or 5-lane. Each row has a tick box, ticked when the chart has
+  the part, and the part's difficulty rating (`diff_<part>`), empty while it's unrated, with an ✕ that
+  clears it to `-1`. Pro drums have a second rating, `diff_drums_real`. A rating typed is applied
+  once the typing pauses, as a BPM is, and each is an undo step.
 - MIDI has no empty difficulties, so a new part starts with all four difficulties empty. Each one
   exists as soon as it has a note.
 - Unticking a part that has notes asks for confirmation, as **Remove part** does
@@ -619,9 +652,9 @@ the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on th
 
 **The first save** of a new chart ([C17](#c17-save-and-export)).
 
-- The song's **name and artist** are set in the Chart Inspector. The save can't go ahead until
-  both are set: it says so and brings the Chart Inspector up. The dialog shows them, and starts
-  the folder name from them.
+- The song's **name and artist** are set in Chart settings' Metadata. The save can't go ahead until
+  both are set: it says so and brings Chart settings up. The dialog shows them, and starts the
+  folder name from them.
 - It asks where the song folder goes: a parent folder and a folder name.
   - The parent folder is by default the last one used for a new chart, otherwise Chart Packer's
     library root (read from Chart Packer's settings, never written).
@@ -1809,8 +1842,8 @@ Acceptance criteria:
    - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import));
    - a new chart's name, artist, album, genre and year, from its first stem's tags
      ([C1](#c1-new-chart-and-chart-settings));
-   - the Chart Inspector's edits ([C1](#c1-new-chart-and-chart-settings)): any key, a part's rating
-     and `delay`. Its album art change is listed with them when Save asks first;
+   - Chart settings' edits ([C1](#c1-new-chart-and-chart-settings)): any key, a part's rating and
+     `delay`. The Art tab's and Tracks' file changes are listed with them when Save asks first;
    - `sustain_cutoff_threshold`, on an import whose sustains need it to stay sustains once they're
      MIDI ([C2](#c2-open-and-import)).
 
@@ -2156,8 +2189,8 @@ Editor straight away, with no dialog before it.
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- ⚙ opens **Program settings** (Ctrl+,). The left panel's tabs are the **Chart Inspector**,
-  **Chart settings** and **Sections** ([C8](#c8-phrases-and-events) item 3). The ◉ (View) menu will choose which lanes are shown; it is a placeholder so
+- ⚙ opens **Program settings** (Ctrl+,). The left panel's tabs are **Chart settings**, **Art** and
+  **Sections** ([C8](#c8-phrases-and-events) item 3). The ◉ (View) menu will choose which lanes are shown; it is a placeholder so
   far. The toolbar's groups wrap onto more rows as the
   window narrows.
 - The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part. They are
@@ -2193,7 +2226,7 @@ layout, so their part picker, findings and transport bar have still to be placed
 │ [+ Add part] │ ══════╪══╪══╪══╪══╪══╪═ strike ═══════   │ FINDINGS  0 ⨯ · 2 ⚠ · 1 ℹ │
 │              │ ▁▂▅▇█▇▅▃▂▁▂▃▅▇▅▃▁▂▃▅▇█▇▅  overview  ▕▮▕   │ ⚠ CHR020 sustain cut  →  │
 ├──────────────┴────────────────────────────────────────────┴──────────────────────────┤
-│ ▶ 1:38.4 / 4:12.0   Speed [75%] ♪PC   ⟲Loop  ♩Metro  🔊Hits   Stems ▾   Latency 42 ms │
+│ ▶ 1:38.4 / 4:12.0   Speed [75%] ♪PC   ⟲Loop  ♩Metro  🔊Hits   Latency 42 ms           │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -2217,7 +2250,7 @@ it is made):
 
 ```txt
 ┌──────────────────────────────────────┐
-│ Chart Inspector │ Chart settings    «│
+│ Chart settings │ Art │ Sections     «│
 ├──────────────────────────────────────┤
 │ Timing                               │
 │ ┌──────────────────────────────────┐ │
@@ -2230,13 +2263,26 @@ it is made):
 │ └──────────────────────────────────┘ │
 │ Parts                                │
 │ ┌──────────────────────────────────┐ │
-│ │ ☑ Lead        ☐ Bass             │ │
-│ │ ☐ Rhythm      ☐ Co-op            │ │
-│ │ ☐ GHL Guitar  ☐ GHL Bass         │ │
-│ │ ☐ GHL Rhythm  ☐ GHL Co-op        │ │
-│ │ ☑ Drums                          │ │
+│ │                    Difficulty    │ │
+│ │ ☑ Lead              [ 3  ] ✕     │ │
+│ │ ☐ Bass              [    ] ✕     │ │
+│ │ ☐ Rhythm  …                      │ │
+│ │ ☑ Drums             [ 4  ] ✕     │ │
+│ │     Pro drums       [ 5  ] ✕     │ │
 │ │ Drums                            │ │
 │ │ [ Pro ▾ ]                        │ │
+│ └──────────────────────────────────┘ │
+│ Metadata                             │
+│ ┌──────────────────────────────────┐ │
+│ │ name      Song                   │ │
+│ │ artist    Band                   │ │
+│ │ + Add                            │ │
+│ └──────────────────────────────────┘ │
+│ Tracks                               │
+│ ┌──────────────────────────────────┐ │
+│ │ M S 3.1 MB song.ogg ▁▃▅▃▁ ━━●━   │ │
+│ │ M S 1.2 MB guitar.ogg ▂▅▂ ━━●━   │ │
+│ │ + Add track                      │ │
 │ └──────────────────────────────────┘ │
 └──────────────────────────────────────┘
 ```
@@ -2438,10 +2484,11 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   Editor straight away, and its first save asks where the song folder goes
   ([C1](#c1-new-chart-and-chart-settings)). Chart Packer has no **New chart**. Its only way into
   Chart Builder is **Edit chart**, for exactly one selected song.
-- **Chart settings and the Chart Inspector:** Chart settings, a tab beside the Chart Inspector in
-  the Editor's left panel, holds only the chart's timing and parts, and applies each change as it is
-  made. The name, artist, charter, every other `song.ini` key, the album art, the
-  stems and `delay` are edited in the Chart Inspector.
+- **Chart settings and Art:** Chart settings, the first tab in the Editor's left panel, holds the
+  chart's timing and `delay`, its parts and their ratings, the song's metadata and its tracks; the
+  Art tab holds the album art and backgrounds. Each change is applied as it is made, as an undo
+  step. (*Revised after CM5:* these were in a Chart Inspector tab, as pending changes, not undo
+  steps.)
 - **Changing the resolution:** allowed at any time. It re-ticks the chart keeping times, and warns
   first when anything would move in time or be left out ([C1](#c1-new-chart-and-chart-settings)).
 - **Windows:** the launcher and the Editor are separate windows, and only one is open at a time

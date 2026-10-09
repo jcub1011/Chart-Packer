@@ -36,8 +36,8 @@ namespace ChartBuilder.ViewModels
         public partial bool IsSaving { get; private set; }
 
         /// <summary>
-        /// Whether the chart, or the song in the Chart Inspector, has edits that aren't saved: closing asks first. A chart
-        /// recovered from an autosave has, until it's saved.
+        /// Whether the chart, or the song around it, has edits that aren't saved: closing asks first. A chart recovered from
+        /// an autosave has, until it's saved.
         /// </summary>
         public bool HasUnsavedChanges => (_undo.IsDirty || Song.HasUserChanges) && !_discarded;
 
@@ -92,7 +92,7 @@ namespace ChartBuilder.ViewModels
         [RelayCommand(CanExecute = nameof(CanSaveAndPack))]
         private async Task SaveAndPackAsync()
         {
-            if ((HasUnsavedChanges || Song.IsNew || Song.PendingChanges().Count > 0 || Song.AlbumArt is not null) && !await SaveCoreAsync())
+            if ((HasUnsavedChanges || Song.IsNew || Song.PendingChanges().Count > 0 || Song.Media.Count > 0) && !await SaveCoreAsync())
                 return;
             if (Song.Entry is not { Kind: SongEntryKind.SongFolder } entry)
                 return;
@@ -193,7 +193,7 @@ namespace ChartBuilder.ViewModels
                 // A .chart's first save replaces it with a notes.mid, so the games don't pick between two charts (C2 item 3).
                 var choice = await _confirmations.ChooseAsync(
                     Strings.SaveImportTitle,
-                    string.Format(CultureInfo.CurrentCulture, Strings.SaveImportMessageFormat, Song.Opened!.ChartName, ChangesText(changes, Song.AlbumArt)),
+                    string.Format(CultureInfo.CurrentCulture, Strings.SaveImportMessageFormat, Song.Opened!.ChartName, ChangesText(changes, Song.Media)),
                     Strings.SaveImportRemoveButton,
                     Strings.SaveImportKeepButton);
                 if (choice == ConfirmChoice.Cancel)
@@ -201,9 +201,9 @@ namespace ChartBuilder.ViewModels
                 if (choice == ConfirmChoice.First)
                     removeChart = Song.Opened.ChartName;
             }
-            else if ((changes.Count > 0 || Song.AlbumArt is not null) && !await _confirmations.ConfirmAsync(
+            else if ((changes.Count > 0 || Song.Media.Count > 0) && !await _confirmations.ConfirmAsync(
                          Strings.SaveConfirmTitle,
-                         string.Format(CultureInfo.CurrentCulture, Strings.SaveConfirmMessageFormat, ChangesText(changes, Song.AlbumArt)),
+                         string.Format(CultureInfo.CurrentCulture, Strings.SaveConfirmMessageFormat, ChangesText(changes, Song.Media)),
                          Strings.SaveButton))
             {
                 return false;
@@ -214,6 +214,8 @@ namespace ChartBuilder.ViewModels
             var point = _undo.Mark();
             int version = _version;
             var request = ChartSaver.RequestFor(Song, Song.Chart.Clone(), changes, removeChart);
+            var slots = request.Media?.Keys.ToList() ?? [];
+            bool released = false;
             IsSaving = true;
             try
             {
@@ -227,6 +229,12 @@ namespace ChartBuilder.ViewModels
                 }
 
                 await WriteRecoveryForSaveAsync(written.Bytes, version);
+
+                // The files the save replaces or removes are kept first, so undo can still bring them back, and the editor
+                // lets go of the ones it has open, which couldn't be replaced while it held them.
+                var stash = _stash ??= MediaStash.Create();
+                var kept = await Task.Run(() => stash.KeepAsync(Song, slots));
+                released = ReleaseFilesFor(slots);
                 var findings = await Task.Run(() => ChartSaver.SaveAsync(entry, request, written));
                 if (FirstError(findings) is { } error)
                 {
@@ -235,7 +243,7 @@ namespace ChartBuilder.ViewModels
                 }
 
                 _undo.MarkSaved(point);
-                Song.Saved(ChartSaver.SavedSong(Song, entry, request), PartsOf(request.Snapshot));
+                Song.Saved(ChartSaver.SavedSong(Song, entry, request), PartsOf(request.Snapshot), new MediaSaveResult(slots, kept));
                 AfterSaved(null);
                 Messages.Info(Strings.SavedStatus);
                 return true;
@@ -249,11 +257,41 @@ namespace ChartBuilder.ViewModels
             finally
             {
                 IsSaving = false;
+                if (released)
+                    ReopenFiles();
             }
         }
 
         /// <summary>
-        /// A new chart's first save (charter-spec C1): once the Chart Inspector has its name and artist, asks where its
+        /// Lets go of the song's files the save of <paramref name="slots"/> replaces or removes, which are held open while
+        /// they're played and drawn: the audio, when a track changes, and the background video, when it does.
+        /// </summary>
+        /// <returns>Whether anything was let go of, to be opened again once the save is done.</returns>
+        private bool ReleaseFilesFor(IReadOnlyCollection<MediaSlot> slots)
+        {
+            bool tracks = slots.Any(s => s.Kind == MediaKind.Track);
+            bool video = slots.Contains(MediaSlot.BackgroundVideo);
+            if (tracks)
+            {
+                _tracksTimer.Stop();
+                Playback.Release();
+                Audio.SetTracks(Song.Entry, []);
+            }
+
+            if (video)
+                Art.Release();
+            return tracks || video;
+        }
+
+        /// <summary>Opens what <see cref="ReleaseFilesFor"/> let go of again, as the song is now: saved, or as it was.</summary>
+        private void ReopenFiles()
+        {
+            _ = ReloadAudioAsync();
+            Art.Refresh();
+        }
+
+        /// <summary>
+        /// A new chart's first save (charter-spec C1): once Chart settings has its name and artist, asks where its
         /// song folder goes, makes the folder, then locks the song, puts it on the recent songs and goes on with it as a
         /// song opened from there.
         /// </summary>
@@ -265,9 +303,9 @@ namespace ChartBuilder.ViewModels
             string artist = Value("artist");
             if (name.Length == 0 || artist.Length == 0)
             {
-                // They're set in the Chart Inspector, which is brought up to set them in.
+                // They're set in Chart settings' Metadata, which is brought up to set them in.
                 Messages.Error(Strings.FirstSaveNeedsNameAndArtist);
-                LeftPanelTab = 0;
+                LeftPanelTab = ChartSettingsTab;
                 IsLeftPanelCollapsed = false;
                 return false;
             }
@@ -314,6 +352,7 @@ namespace ChartBuilder.ViewModels
                     return false;
                 }
 
+                // Nothing of the song's own is replaced, so nothing need be kept; the tracks are read from where they are.
                 string folder = await Task.Run(() => ChartSaver.SaveNewAsync(target, request, written, stems));
                 var entry = SongOpener.EntryOf(folder)!;
                 _songLock?.Dispose();
@@ -356,8 +395,17 @@ namespace ChartBuilder.ViewModels
                 Editor.Session.Execute(moveEnd);
         }
 
-        // Nothing in the Chart Inspector can be edited while a save runs, as the save moves the song on to what it wrote.
-        partial void OnIsSavingChanged(bool value) => Inspector.IsSaving = value;
+        // Nothing of the song's own can be edited, undone or redone while a save runs, as the save moves the song on to
+        // what it wrote.
+        partial void OnIsSavingChanged(bool value)
+        {
+            ChartSettings.IsSaving = value;
+            Metadata.IsSaving = value;
+            Tracks.IsSaving = value;
+            Art.IsSaving = value;
+            UndoCommand.NotifyCanExecuteChanged();
+            RedoCommand.NotifyCanExecuteChanged();
+        }
 
         /// <summary>Refreshes what follows whether the chart is saved: the title's mark.</summary>
         private void RefreshSaveState()
@@ -370,21 +418,31 @@ namespace ChartBuilder.ViewModels
             ExportCopyCommand.NotifyCanExecuteChanged();
         }
 
-        // The save's song.ini changes, then its album art change, a line each.
-        private static string ChangesText(IReadOnlyList<PendingSongIniChange> changes, AlbumArtChange? albumArt)
+        // The save's song.ini changes, then its changes to the art, backgrounds and tracks, a line each.
+        private static string ChangesText(IReadOnlyList<PendingSongIniChange> changes, IReadOnlyDictionary<MediaSlot, MediaChange> media)
         {
             var lines = changes.Select(c => c.Value is { } value
                 ? string.Format(CultureInfo.CurrentCulture, Strings.PendingChangeFormat, c.Key, value)
                 : string.Format(CultureInfo.CurrentCulture, Strings.PendingChangeRemovedFormat, c.Key)).ToList();
-            if (albumArt is { } art)
+            foreach (var (slot, change) in media.OrderBy(m => m.Key.Kind).ThenBy(m => AudioStems.OrderOf(m.Key.Stem ?? "")))
             {
-                lines.Add(art.SourcePath is { } source
-                    ? string.Format(CultureInfo.CurrentCulture, Strings.PendingAlbumArtFormat, Path.GetFileName(source))
-                    : Strings.PendingAlbumArtRemoved);
+                string what = MediaName(slot);
+                lines.Add(change.SourcePath is { } source
+                    ? string.Format(CultureInfo.CurrentCulture, Strings.PendingFileFormat, what, Path.GetFileName(source))
+                    : string.Format(CultureInfo.CurrentCulture, Strings.PendingFileRemovedFormat, what));
             }
 
             return lines.Count == 0 ? Strings.PendingChangesNone : string.Join(Environment.NewLine, lines);
         }
+
+        /// <summary>A slot as the save's confirmation names it: "album art", "background video", or a track's stem.</summary>
+        private static string MediaName(MediaSlot slot) => slot.Kind switch
+        {
+            MediaKind.AlbumArt => Strings.PendingAlbumArtName,
+            MediaKind.BackgroundImage => Strings.PendingBackgroundImageName,
+            MediaKind.BackgroundVideo => Strings.PendingBackgroundVideoName,
+            _ => string.Format(CultureInfo.CurrentCulture, Strings.PendingTrackNameFormat, slot.Stem),
+        };
 
         /// <summary>That the chart didn't read back as it was written, and where (charter-spec §4.3), so it wasn't saved.</summary>
         private static string ReadBackFailedNotice(ChartWriteResult written)

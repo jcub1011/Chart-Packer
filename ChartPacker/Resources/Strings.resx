@@ -518,9 +518,6 @@
   <data name="NoTracks" xml:space="preserve">
     <value>No audio tracks.</value>
   </data>
-  <data name="TracksListName" xml:space="preserve">
-    <value>Audio tracks</value>
-  </data>
   <data name="PlayToolTip" xml:space="preserve">
     <value>Play</value>
   </data>
@@ -564,45 +561,6 @@
   <data name="PitchCorrectionToolTip" xml:space="preserve">
     <value>Keep the pitch when playing faster or slower. When off, the pitch rises and falls with the speed.</value>
   </data>
-  <data name="TrackVolumeName" xml:space="preserve">
-    <value>Track volume in the mix</value>
-  </data>
-  <data name="MuteToolTip" xml:space="preserve">
-    <value>Mute this track</value>
-  </data>
-  <data name="SoloToolTip" xml:space="preserve">
-    <value>Play only the soloed tracks</value>
-  </data>
-  <data name="MuteButton" xml:space="preserve">
-    <value>M</value>
-    <comment>Short label for the mute toggle on a track row.</comment>
-  </data>
-  <data name="SoloButton" xml:space="preserve">
-    <value>S</value>
-    <comment>Short label for the solo toggle on a track row.</comment>
-  </data>
-  <data name="RemoveTrackToolTip" xml:space="preserve">
-    <value>Remove this track</value>
-  </data>
-  <data name="AddTrackButton" xml:space="preserve">
-    <value>Add track</value>
-  </data>
-  <data name="ReplaceTrackFormat" xml:space="preserve">
-    <value>Replace {0}</value>
-    <comment>{0} is the stem, e.g. "guitar".</comment>
-  </data>
-  <data name="PickTrackTitleFormat" xml:space="preserve">
-    <value>Choose the {0} track</value>
-    <comment>{0} is the stem, e.g. "guitar".</comment>
-  </data>
-  <data name="TrackNotAudioFormat" xml:space="preserve">
-    <value>{0} isn't an ogg, opus, mp3 or wav file.</value>
-    <comment>{0} is the file name.</comment>
-  </data>
-  <data name="TrackUnusableFormat" xml:space="preserve">
-    <value>{0} can't be used as a track: {1}</value>
-    <comment>{0} is the file name; {1} is the reason.</comment>
-  </data>
   <data name="TrackUnplayableFormat" xml:space="preserve">
     <value>Can't be played: {0}</value>
     <comment>{0} is the reason.</comment>
@@ -627,15 +585,6 @@
   </data>
   <data name="CharterToolTip" xml:space="preserve">
     <value>Charter</value>
-  </data>
-  <data name="ReplaceTrackToolTip" xml:space="preserve">
-    <value>Replace this track</value>
-  </data>
-  <data name="RemovedTracksListName" xml:space="preserve">
-    <value>Removed tracks</value>
-  </data>
-  <data name="UndoRemoveTrackToolTip" xml:space="preserve">
-    <value>Keep this track</value>
   </data>
   <data name="ChartHeader" xml:space="preserve">
     <value>Chart</value>

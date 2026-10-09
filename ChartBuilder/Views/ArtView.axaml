@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:ui="using:ChartPacker.UI.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="900"
+             x:Class="ChartBuilder.Views.ArtView"
+             x:DataType="vm:ArtViewModel">
+
+    <!-- The Art tab (charter-spec C1): the album art, the background image and the background video, a tile each, the
+         video playing against the song. An empty tile has Choose; a tile's right-click menu has Replace, Remove and Revert
+         to saved. Each change is an undo step, saved with the song. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <Style Selector="TextBlock.section-heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <ItemsControl Margin="16,14" ItemsSource="{Binding Slots}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="10" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ArtSlotViewModel">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="section-heading" Text="{Binding Title}" />
+                        <Border Classes="artTile" AutomationProperties.Name="{Binding Title}">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{x:Static res:Strings.ArtReplaceMenu}" Command="{Binding ChooseCommand}" />
+                                    <MenuItem Header="{x:Static res:Strings.ArtRemoveMenu}" Command="{Binding RemoveCommand}" />
+                                    <MenuItem Header="{x:Static res:Strings.ArtRevertMenu}" Command="{Binding RevertCommand}" />
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <!-- A square's height for the art, a 16:9 frame's for a background; the picture fits inside it. -->
+                            <Panel Height="{Binding TileHeight}">
+                                <Image Source="{Binding Image}" Stretch="Uniform" IsVisible="{Binding HasImage}" />
+                                <ui:VideoFrameView Playback="{Binding Video}"
+                                                   Timeline="{Binding Timeline}"
+                                                   Clock="{Binding Clock}"
+                                                   IsVisible="{Binding HasVideo}" />
+                                <StackPanel VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            Margin="8"
+                                            Spacing="8"
+                                            IsVisible="{Binding HasNote}">
+                                    <TextBlock Classes="muted note"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               Text="{Binding Note}" />
+                                    <Button HorizontalAlignment="Center"
+                                            Content="{x:Static res:Strings.ArtChooseButton}"
+                                            Command="{Binding ChooseCommand}"
+                                            IsVisible="{Binding IsEmpty}" />
+                                </StackPanel>
+                            </Panel>
+                        </Border>
+                        <!-- The file's name, marked while it's a pending change, and its size. -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4" IsVisible="{Binding HasFile}">
+                            <TextBlock Grid.Column="0" Classes="marker" VerticalAlignment="Center" Text="{Binding Marker}" />
+                            <TextBlock Grid.Column="1"
+                                       Classes="muted note artName"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding FileName}"
+                                       ToolTip.Tip="{Binding FileName}" />
+                            <Border Grid.Column="2" Classes="chip" IsVisible="{Binding FileSize, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <TextBlock Text="{Binding FileSize}" />
+                            </Border>
+                        </Grid>
+                        <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
+</UserControl>

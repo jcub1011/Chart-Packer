@@ -349,7 +349,7 @@
 
         <Grid x:Name="PanelsGrid" Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <!-- Chart Inspector (0), splitter (1), the chart (2), splitter (3), Properties (4).
+                <!-- Chart settings and Art (0), splitter (1), the chart (2), splitter (3), Properties (4).
                      EditorWindow.axaml.cs indexes these, and sizes the side columns. -->
                 <ColumnDefinition Width="300" MinWidth="180" />
                 <ColumnDefinition Width="Auto" />
@@ -358,17 +358,17 @@
                 <ColumnDefinition Width="280" MinWidth="180" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left panel: the Chart Inspector, Chart settings, and the sections and other text events (charter-spec
-                 C8 items 3, 5 and 6). -->
+            <!-- Left panel: Chart settings (the timing, parts, metadata and tracks), the Art, and the sections and other
+                 text events (charter-spec C1; C8 items 3, 5 and 6). Their order is EditorWindowViewModel's tab indices. -->
             <bctl:EditorSidePanel Grid.Column="0"
                                   IsCollapsed="{Binding IsLeftPanelCollapsed}"
                                   ToggleCommand="{Binding ToggleLeftPanelCommand}"
                                   SelectedIndex="{Binding LeftPanelTab, Mode=TwoWay}">
-                <TabItem Header="{x:Static res:Strings.ChartInspectorTab}">
-                    <views:ChartInspectorView DataContext="{Binding Inspector}" />
-                </TabItem>
                 <TabItem Header="{x:Static res:Strings.ChartSettingsTab}">
-                    <views:ChartSettingsView DataContext="{Binding ChartSettings}" />
+                    <views:ChartSettingsView />
+                </TabItem>
+                <TabItem Header="{x:Static res:Strings.ArtTab}">
+                    <views:ArtView DataContext="{Binding Art}" />
                 </TabItem>
                 <TabItem Header="{x:Static res:Strings.SectionsTab}">
                     <views:SectionsView DataContext="{Binding Sections}" />
@@ -654,37 +654,6 @@
                                   IsChecked="{Binding Playback.IsHitSoundsOn}"
                                   IsEnabled="{Binding Playback.IsReady}"
                                   ToolTip.Tip="{x:Static res:Strings.HitSoundsToolTip}" />
-                        <Button Classes="labelled"
-                                IsEnabled="{Binding Playback.IsReady}"
-                                ToolTip.Tip="{x:Static res:Strings.StemsToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.StemsButton}">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.StemsButton}" />
-                                <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
-                            </StackPanel>
-                            <Button.Flyout>
-                                <Flyout Placement="TopEdgeAlignedLeft">
-                                    <ItemsControl ItemsSource="{Binding Playback.Stems}" MinWidth="280">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:StemRowViewModel">
-                                                <Grid ColumnDefinitions="*,Auto,Auto,100" ColumnSpacing="8" Margin="0,2">
-                                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Text="{Binding Name}" />
-                                                    <CheckBox Grid.Column="1" Content="{x:Static res:Strings.StemMuteLabel}" IsChecked="{Binding IsMuted}" />
-                                                    <CheckBox Grid.Column="2" Content="{x:Static res:Strings.StemSoloLabel}" IsChecked="{Binding IsSolo}" />
-                                                    <Slider Grid.Column="3"
-                                                            Minimum="0"
-                                                            Maximum="100"
-                                                            Value="{Binding VolumePercent}"
-                                                            VerticalAlignment="Center"
-                                                            ToolTip.Tip="{x:Static res:Strings.StemVolumeToolTip}"
-                                                            AutomationProperties.Name="{x:Static res:Strings.StemVolumeToolTip}" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Flyout>
-                            </Button.Flyout>
-                        </Button>
                         <Button Classes="labelled"
                                 Command="{Binding Playback.OpenCalibrationCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.LatencyToolTip}"
