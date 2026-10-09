@@ -14,18 +14,17 @@ public readonly record struct VocalLaneLyric(long Tick, string Text, bool JoinsN
 
 /// <summary>
 /// One vocal part as an editor lane shows it: its notes with their syllables worked out, the syllables it shows, its
-/// phrases, and the pitches its rows span. Everything is in ticks, as the chart has it, so the lane's projection places
+/// phrases, and the pitches its rows are. Everything is in ticks, as the chart has it, so the lane's projection places
 /// it, and the pointer is mapped back to a tick and a pitch.
 /// </summary>
 /// <remarks>Read from the passthrough track by <see cref="EditorSession.VocalsOf"/>; it never changes.</remarks>
 public sealed class VocalLane
 {
-    // The rows reach this many semitones past the highest and lowest notes, and span at least an octave.
-    private const int PitchPadding = 2;
-    private const int MinPitchSpan = 12;
+    /// <summary>The pitch whose row a note that isn't sung is drawn along: middle C, the middle of <see cref="Pitches"/>.</summary>
+    public const int SpokenPitch = 60;
 
-    // Where a part with no pitched notes is centred: middle C.
-    private const int DefaultPitch = 60;
+    // Every pitch a part sings, from the highest down.
+    private static readonly int[] AllPitches = [.. Enumerable.Range(0, VocalTrackContent.HighestPitch - VocalTrackContent.LowestPitch + 1).Select(static i => VocalTrackContent.HighestPitch - i)];
 
     public VocalLane(VocalPart part)
     {
@@ -53,8 +52,7 @@ public sealed class VocalLane
         Phrases = part.Phrases;
 
         var pitched = notes.Where(static n => !n.IsUnpitched).Select(static n => n.Pitch).ToList();
-        (LowestPitch, HighestPitch) = pitched.Count > 0 ? (pitched.Min(), pitched.Max()) : (DefaultPitch, DefaultPitch);
-        Pitches = PitchesOf(LowestPitch, HighestPitch);
+        (LowestPitch, HighestPitch) = pitched.Count > 0 ? (pitched.Min(), pitched.Max()) : (SpokenPitch, SpokenPitch);
     }
 
     /// <summary>The MIDI track the part was read from, e.g. <c>PART VOCALS</c>.</summary>
@@ -76,10 +74,10 @@ public sealed class VocalLane
     public int HighestPitch { get; }
 
     /// <summary>
-    /// The pitches the lane's rows are, from the highest down: the notes' range, a little past it either way, and at least
-    /// an octave.
+    /// The pitches the lane's rows are, from the highest down: every pitch a part sings, 36 to 84, whatever its notes, so
+    /// any pitch can be placed and the rows never move as notes are edited.
     /// </summary>
-    public IReadOnlyList<int> Pitches { get; }
+    public IReadOnlyList<int> Pitches => AllPitches;
 
     /// <summary>The longest note, in ticks, so the notes held into a span from before it are found.</summary>
     public long LongestNote { get; }
@@ -140,21 +138,5 @@ public sealed class VocalLane
         }
 
         return low;
-    }
-
-    private static int[] PitchesOf(int lowest, int highest)
-    {
-        int low = lowest - PitchPadding, high = highest + PitchPadding;
-        while (high - low < MinPitchSpan)
-        {
-            high++;
-            if (high - low < MinPitchSpan)
-                low--;
-        }
-
-        var pitches = new int[high - low + 1];
-        for (int i = 0; i < pitches.Length; i++)
-            pitches[i] = high - i;
-        return pitches;
     }
 }

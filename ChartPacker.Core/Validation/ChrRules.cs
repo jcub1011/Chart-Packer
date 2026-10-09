@@ -20,13 +20,19 @@ public enum ChrCategory
 
     /// <summary>CHR086: what the chart file held that couldn't be loaded.</summary>
     Load,
+
+    /// <summary>CHR090 to CHR109: the vocal parts.</summary>
+    Vocals,
 }
 
 /// <summary>
 /// Rule IDs from the chart lint rule catalogue (charter-spec §6), for <see cref="Charting.Lint.IChartLintRule"/>. IDs are
 /// stable: a rule may be retired, but its ID is never reused.
 /// </summary>
-/// <remarks>The timing, 5-fret and song rules came with CM2, and the drums and phrase rules with CM3.</remarks>
+/// <remarks>
+/// The timing, 5-fret and song rules came with CM2, the drums and phrase rules with CM3, and the vocal rules with vocal
+/// editing.
+/// </remarks>
 public static class ChrRules
 {
     /// <summary>No time signature at tick 0; the games assume 4/4.</summary>
@@ -131,6 +137,24 @@ public static class ChrRules
     /// </summary>
     public const string Chr086 = "CHR086";
 
+    /// <summary>A vocal note runs into the next one.</summary>
+    public const string Chr090 = "CHR090";
+
+    /// <summary>A vocal note has no lyric.</summary>
+    public const string Chr091 = "CHR091";
+
+    /// <summary>A vocal note is outside every phrase.</summary>
+    public const string Chr092 = "CHR092";
+
+    /// <summary>A lyric isn't on any vocal note's start.</summary>
+    public const string Chr093 = "CHR093";
+
+    /// <summary>A slide has no sung note before it in its phrase.</summary>
+    public const string Chr094 = "CHR094";
+
+    /// <summary><c>HARM2</c> or <c>HARM3</c> without <c>HARM1</c>.</summary>
+    public const string Chr095 = "CHR095";
+
     /// <summary>Every rule ID, in order.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -139,6 +163,7 @@ public static class ChrRules
         Chr040, Chr041, Chr042, Chr043, Chr044, Chr045, Chr046, Chr048,
         Chr060, Chr061, Chr062, Chr063,
         Chr080, Chr081, Chr082, Chr083, Chr084, Chr085, Chr086,
+        Chr090, Chr091, Chr092, Chr093, Chr094, Chr095,
     ];
 
     /// <summary>Whether <paramref name="ruleId"/> is a chart lint rule's: CHR and three digits.</summary>
@@ -157,6 +182,7 @@ public static class ChrRules
             < 60 => ChrCategory.Drums,
             < 80 => ChrCategory.Phrases,
             < 86 => ChrCategory.Song,
+            >= 90 and < 110 => ChrCategory.Vocals,
             _ => ChrCategory.Load,
         };
     }

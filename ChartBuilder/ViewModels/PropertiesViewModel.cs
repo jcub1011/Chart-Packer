@@ -18,8 +18,8 @@ namespace ChartBuilder.ViewModels
 
     /// <summary>
     /// The Properties panel (charter-spec C3 item 4): the selected notes, phrases, disco flip sections, tempo markers and
-    /// span. A field shows <see cref="Multiple"/> when the items differ, and editing it sets every item, as one undoable
-    /// step.
+    /// span, or a vocal part's notes and phrases (C3 item 7). A field shows <see cref="Multiple"/> when the items differ,
+    /// and editing it sets every item, as one undoable step.
     /// </summary>
     public sealed partial class PropertiesViewModel : ViewModelBase
     {
@@ -58,7 +58,7 @@ namespace ChartBuilder.ViewModels
         [NotifyPropertyChangedFor(nameof(IsEmpty))]
         public partial bool HasSpan { get; private set; }
 
-        public bool IsEmpty => !HasNotes && !HasPhrases && !HasDiscoFlips && !HasTempos && !HasSpan;
+        public bool IsEmpty => !HasNotes && !HasPhrases && !HasDiscoFlips && !HasTempos && !HasSpan && !HasVocalNotes && !HasVocalPhrases;
 
         [ObservableProperty]
         public partial string NotesHeading { get; private set; } = "";
@@ -194,7 +194,9 @@ namespace ChartBuilder.ViewModels
             try
             {
                 RefreshNotes();
+                RefreshVocalNotes();
                 RefreshPhrases();
+                RefreshVocalPhrases();
                 RefreshDiscoFlips();
                 RefreshTempos();
                 RefreshSpan();

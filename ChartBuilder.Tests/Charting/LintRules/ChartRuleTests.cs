@@ -1,6 +1,7 @@
 using System.Globalization;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charting.Lint;
 using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
@@ -57,6 +58,12 @@ public sealed class ChartRuleTests
         [ChrRules.Chr083, 1],
         [ChrRules.Chr084, 1],
         [ChrRules.Chr085, 1],
+        [ChrRules.Chr090, 1],
+        [ChrRules.Chr091, 1],
+        [ChrRules.Chr092, 1],
+        [ChrRules.Chr093, 1],
+        [ChrRules.Chr094, 1],
+        [ChrRules.Chr095, 1],
     ];
 
     /// <summary>The rules that have a chart fix.</summary>
@@ -76,6 +83,27 @@ public sealed class ChartRuleTests
         var findings = new ChartLinter().LintAll(Clean([], drums: true).Input).Findings;
 
         Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+    }
+
+    [TestMethod]
+    public void ACleanChartWithVocalsTriggersNoRule()
+    {
+        var (chart, input) = Clean();
+        AddVocals(chart, VocalTrack.Vocals, CleanVocalNotes, CleanVocalLyrics, CleanVocalPhrases);
+        AddVocals(chart, VocalTrack.Harmony1, CleanVocalNotes, CleanVocalLyrics, CleanVocalPhrases);
+
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).Findings;
+
+        Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+    }
+
+    [TestMethod]
+    public void AVocalFindingNamesItsTrack()
+    {
+        var findings = new ChartLinter().LintAll(Triggered(ChrRules.Chr091).Input).Findings;
+
+        Assert.AreEqual("PART VOCALS", findings.Single().Track);
+        Assert.AreEqual(Beat, findings.Single().Tick);
     }
 
     [TestMethod]
@@ -108,7 +136,7 @@ public sealed class ChartRuleTests
 
         Assert.HasCount(count, findings, string.Join("; ", findings.Select(Describe)));
         Assert.IsTrue(findings.All(f => f.RuleId == ruleId), string.Join("; ", findings.Select(Describe)));
-        Assert.IsTrue(findings.All(f => f.Location is not null || f.Tick is not null || f.Key is not null), "Every finding says where it is.");
+        Assert.IsTrue(findings.All(f => f.Location is not null || f.Tick is not null || f.Key is not null || f.Track is not null), "Every finding says where it is.");
     }
 
     [TestMethod]
@@ -331,6 +359,24 @@ public sealed class ChartRuleTests
             case ChrRules.Chr082:
                 new RemoveTextEvent(null, TextEvent.Of(0, "[section Intro]")).Apply(chart);
                 break;
+            case ChrRules.Chr090:
+                AddVocals(chart, VocalTrack.Vocals, [new(0, Beat + 10, 60), new(Beat, 240, 62)], CleanVocalLyrics, CleanVocalPhrases);
+                break;
+            case ChrRules.Chr091:
+                AddVocals(chart, VocalTrack.Vocals, CleanVocalNotes, [CleanVocalLyrics[0]], CleanVocalPhrases);
+                break;
+            case ChrRules.Chr092:
+                AddVocals(chart, VocalTrack.Vocals, CleanVocalNotes, CleanVocalLyrics, [new(0, Beat - 1)]);
+                break;
+            case ChrRules.Chr093:
+                AddVocals(chart, VocalTrack.Vocals, CleanVocalNotes, [.. CleanVocalLyrics, new(2 * Beat, "stray")], CleanVocalPhrases);
+                break;
+            case ChrRules.Chr094:
+                AddVocals(chart, VocalTrack.Vocals, CleanVocalNotes, [new(0, "+"), CleanVocalLyrics[1]], CleanVocalPhrases);
+                break;
+            case ChrRules.Chr095:
+                new AddVocalPart(VocalTrack.Harmony2).Apply(chart);
+                break;
             case ChrRules.Chr085:
                 var end = chart.Events.AsSpan().ToArray().Single(e => e.Text == ChartSaveFixups.EndText);
                 new RemoveTextEvent(null, end).Apply(chart);
@@ -340,6 +386,18 @@ public sealed class ChartRuleTests
         return (chart, Snapshot(chart, input));
     }
 
+    // A vocal part that triggers no rule: two sung notes with their lyrics, in one phrase.
+    private static readonly VocalNoteEvent[] CleanVocalNotes = [new(0, 240, 60), new(Beat, 240, 62)];
+    private static readonly VocalLyricEvent[] CleanVocalLyrics = [new(0, "Hel-"), new(Beat, "lo")];
+    private static readonly VocalPhraseEvent[] CleanVocalPhrases = [new(0, 4 * Beat)];
+
+    private static void AddVocals(EditableChart chart, VocalTrack track, VocalNoteEvent[] notes, VocalLyricEvent[] lyrics, VocalPhraseEvent[] phrases)
+    {
+        new AddVocalPart(track).Apply(chart);
+        var content = VocalTrackContent.Of(chart.Passthrough[VocalTracks.IndexIn(chart, track)]);
+        new ChangeVocals(track, content.With(notes, lyrics, phrases)).Apply(chart);
+    }
+
     private static ChartLintInput Snapshot(EditableChart chart, ChartLintInput settings) =>
         new(chart.Clone(), settings.SongIni, settings.Options, settings.AudioLength, settings.Delay);
 
@@ -347,5 +405,5 @@ public sealed class ChartRuleTests
         new(chart.Clone(), songIni, MidiChartWriter.SettingsAfterSave(chart, ChartReadOptions.From(songIni)), audio);
 
     private static string Describe(Finding f) =>
-        string.Create(CultureInfo.InvariantCulture, $"{f.RuleId} {f.Location} {f.Tick} {f.Key}: {f.Message}");
+        string.Create(CultureInfo.InvariantCulture, $"{f.RuleId} {f.Location} {f.Track} {f.Tick} {f.Key}: {f.Message}");
 }

@@ -74,6 +74,33 @@ namespace ChartBuilder.Controls.Editing
                 _ => 0,
             };
 
+            // A vocal part's lane (charter-spec C3 item 7): Alt and the arrows move the selected notes a grid step in time,
+            // or a semitone in pitch (with Shift, an octave); Ctrl+A selects its notes, and Ctrl+V pastes into it. The keys
+            // that change a highway's notes or its part do nothing here.
+            if (lane.Vocal is { } vocal)
+            {
+                if (alt && !ctrl && (later != 0 || across != 0))
+                {
+                    tools.MoveVocalSelection(shift ? 0 : later, -across * (shift ? 12 : 1));
+                    return true;
+                }
+
+                if (ctrl && !shift && !alt && key == PhysicalKey.A)
+                {
+                    tools.SelectAllVocals(vocal);
+                    return true;
+                }
+
+                if (ctrl && !alt && key == PhysicalKey.V)
+                {
+                    _ = editor.PasteAsync(shift ? PasteMode.Merge : PasteMode.Overwrite, vocal);
+                    return true;
+                }
+
+                if (IsHighwayOnly(key, plain, shift && !ctrl && !alt, ctrl && shift && !alt))
+                    return false;
+            }
+
             if (later != 0 && !alt && !ctrl)
             {
                 tools.StepCursor(later);
@@ -255,6 +282,18 @@ namespace ChartBuilder.Controls.Editing
                 return EditorTools.ApartLane(placeable);
             return number <= placeable.KeyLanes.Count ? placeable.KeyLanes[number - 1] : null;
         }
+
+        /// <summary>
+        /// Whether <paramref name="key"/>, plain, with Shift alone or with Ctrl and Shift, changes a highway's notes, its
+        /// part's audio or the lanes across, which a vocal part's lane hasn't.
+        /// </summary>
+        private static bool IsHighwayOnly(PhysicalKey key, bool plain, bool shiftOnly, bool ctrlShift) => key switch
+        {
+            PhysicalKey.H or PhysicalKey.G or PhysicalKey.T or PhysicalKey.C or PhysicalKey.S or PhysicalKey.W => plain,
+            PhysicalKey.O => plain || shiftOnly,
+            PhysicalKey.A => plain || shiftOnly || ctrlShift,
+            _ => false,
+        };
 
         /// <summary>The digit of a number key, or null for another key.</summary>
         private static int? LaneKey(PhysicalKey key) => key switch

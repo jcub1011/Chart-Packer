@@ -8,8 +8,9 @@
              x:Class="ChartBuilder.Views.PropertiesView"
              x:DataType="vm:PropertiesViewModel">
 
-    <!-- Properties (charter-spec C3 item 4): the selected notes, phrases, disco flip sections, tempo markers and span. A field
-         shows <<multiple>> when the items differ, and a value typed there is applied to every item once the field loses focus. -->
+    <!-- Properties (charter-spec C3 item 4): the selected notes, phrases, disco flip sections, tempo markers and span, or a
+         vocal part's notes and phrases (C3 item 7). A field shows <<multiple>> when the items differ, and a value typed there
+         is applied to every item when Enter is pressed or the field loses focus. -->
     <UserControl.Styles>
         <Style Selector="TextBlock.section-heading">
             <Setter Property="FontSize" Value="13" />
@@ -68,6 +69,69 @@
             </Border>
         </StackPanel>
 
+        <!-- A vocal part's notes (charter-spec C3 item 7): where, the pitch, the length and the lyric, and Type lyrics, which
+             gives a typed line's syllables to the selected notes in turn. -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasVocalNotes}">
+            <TextBlock Classes="section-heading" Text="{Binding VocalNotesHeading}" />
+            <Border Classes="section">
+                <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
+                    <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesTickLabel}" />
+                    <TextBox Grid.Row="0" Grid.Column="1"
+                             Text="{Binding VocalTickText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesTickLabel}" />
+                    <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesTimeLabel}" />
+                    <SelectableTextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding VocalTimeText}" />
+                    <TextBlock Grid.Row="2" Classes="muted" Text="{x:Static res:Strings.PropertiesMeasureLabel}" />
+                    <SelectableTextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding VocalMeasureBeatText}" />
+                    <TextBlock Grid.Row="3" Classes="muted" Text="{x:Static res:Strings.PropertiesPitchLabel}" />
+                    <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Text="{Binding PitchText, UpdateSourceTrigger=LostFocus}"
+                                 ToolTip.Tip="{x:Static res:Strings.PropertiesPitchToolTip}"
+                                 AutomationProperties.Name="{x:Static res:Strings.PropertiesPitchLabel}" />
+                        <TextBlock Grid.Column="1" Classes="muted" VerticalAlignment="Center" FontSize="12" Text="{Binding PitchNameText}" />
+                    </Grid>
+                    <TextBlock Grid.Row="4" Classes="muted" Text="{x:Static res:Strings.PropertiesLengthLabel}" />
+                    <TextBox Grid.Row="4" Grid.Column="1"
+                             Text="{Binding VocalLengthText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesLengthLabel}" />
+                    <TextBlock Grid.Row="5" Classes="muted" Text="{x:Static res:Strings.PropertiesLyricLabel}" />
+                    <TextBox Grid.Row="5" Grid.Column="1"
+                             Text="{Binding LyricText, UpdateSourceTrigger=LostFocus}"
+                             ToolTip.Tip="{x:Static res:Strings.PropertiesLyricToolTip}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesLyricLabel}" />
+                    <TextBlock Grid.Row="6" Classes="muted" Text="{x:Static res:Strings.PropertiesSungLabel}" />
+                    <WrapPanel Grid.Row="6" Grid.Column="1" ItemSpacing="8">
+                        <CheckBox Content="{x:Static res:Strings.PropertiesSlide}" IsChecked="{Binding IsSlide}"
+                                  ToolTip.Tip="{x:Static res:Strings.PropertiesSlideToolTip}" />
+                        <CheckBox Content="{x:Static res:Strings.PropertiesSpoken}" IsChecked="{Binding IsSpoken}"
+                                  ToolTip.Tip="{x:Static res:Strings.PropertiesSpokenToolTip}" />
+                    </WrapPanel>
+                    <Button Name="TypeLyricsButton"
+                            Grid.Row="7" Grid.ColumnSpan="2"
+                            Classes="labelled"
+                            HorizontalAlignment="Left"
+                            Content="{x:Static res:Strings.PropertiesTypeLyricsButton}"
+                            ToolTip.Tip="{x:Static res:Strings.PropertiesTypeLyricsToolTip}">
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedLeft">
+                                <StackPanel Width="280" Spacing="8">
+                                    <TextBlock FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.PropertiesTypeLyricsHint}" />
+                                    <TextBox Text="{Binding TypedLyricsText}"
+                                             PlaceholderText="{x:Static res:Strings.PropertiesTypeLyricsPlaceholder}"
+                                             KeyDown="OnTypedLyricsKeyDown"
+                                             AutomationProperties.Name="{x:Static res:Strings.PropertiesTypeLyricsButton}" />
+                                    <Button Classes="labelled"
+                                            HorizontalAlignment="Right"
+                                            Content="{x:Static res:Strings.PropertiesTypeLyricsApply}"
+                                            Command="{Binding ApplyTypedLyricsCommand}" />
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                </Grid>
+            </Border>
+        </StackPanel>
+
         <!-- Phrases: start and end, and for rolls and trills the lowest difficulty they reach (charter-spec C3 item 4). -->
         <StackPanel Spacing="6" IsVisible="{Binding HasPhrases}">
             <TextBlock Classes="section-heading" Text="{Binding PhrasesHeading}" />
@@ -93,6 +157,25 @@
                               SelectedItem="{Binding SelectedLowestDifficulty}"
                               DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
                               AutomationProperties.Name="{x:Static res:Strings.PropertiesLowestDifficultyLabel}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- A vocal part's phrases: start and end (charter-spec C3 item 7). -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasVocalPhrases}">
+            <TextBlock Classes="section-heading" Text="{Binding VocalPhrasesHeading}" />
+            <Border Classes="section">
+                <Grid Classes="fields" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
+                    <TextBlock Grid.Row="0" Classes="muted" Text="{x:Static res:Strings.PropertiesStartLabel}" />
+                    <TextBox Grid.Row="0" Grid.Column="1"
+                             Text="{Binding VocalPhraseStartText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesStartLabel}" />
+                    <TextBlock Grid.Row="1" Classes="muted" Text="{x:Static res:Strings.PropertiesTimeLabel}" />
+                    <SelectableTextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="12" Text="{Binding VocalPhraseTimeText}" />
+                    <TextBlock Grid.Row="2" Classes="muted" Text="{x:Static res:Strings.PropertiesEndLabel}" />
+                    <TextBox Grid.Row="2" Grid.Column="1"
+                             Text="{Binding VocalPhraseEndText, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{x:Static res:Strings.PropertiesEndLabel}" />
                 </Grid>
             </Border>
         </StackPanel>

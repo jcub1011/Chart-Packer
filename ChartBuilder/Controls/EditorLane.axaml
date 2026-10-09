@@ -326,6 +326,13 @@
                                        LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <StackPanel Classes="placeholder" IsVisible="{Binding HasPlaceholder}">
                 <TextBlock Classes="muted centered" TextWrapping="Wrap" Text="{Binding Placeholder}" />
+                <!-- A vocal part the chart hasn't can be added here, to chart it from nothing (charter-spec C3 item 7). -->
+                <Button Classes="labelled"
+                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0"
+                        IsVisible="{Binding CanAddVocalPart}"
+                        Content="{Binding AddVocalPartText}"
+                        Command="{Binding AddVocalPartCommand}" />
             </StackPanel>
         </Panel>
     </DockPanel>

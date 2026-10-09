@@ -50,10 +50,11 @@ This spec **supersedes** the "editing charts" non-goal in
 
 ## 2. Non-goals for v1
 
-- **Vocals and harmonies editing.** `PART VOCALS` and `HARM1`–`HARM3` are kept byte for byte on
-  save ([§4.2](#lossless-passthrough)). The editor's vocal lanes show them, read-only
-  ([C3](#c3-editor-layout) item 7). The existing vocals tools (`VocalsEditor`, lyrics lane) are
-  unchanged.
+- **Vocal percussion, overdrive and lyric shifts.** The editor's vocal lanes edit the notes, lyrics
+  and phrases of `PART VOCALS` and `HARM1`–`HARM3` ([C3](#c3-editor-layout) item 7). Their
+  percussion notes (96, 97), overdrive (116), lyric and range shifts and any other events are kept
+  as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are imported only. The
+  existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
 - **Pro keys, keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are.
 - **Venue, lighting, camera and crowd events.** Kept as they are.
 - **Writing `.chart`.** `.chart` is imported only ([C2](#c2-open-and-import)).
@@ -215,6 +216,15 @@ The tracks Chart Builder does edit are rebuilt from the model:
 - **The part tracks** are rebuilt from the model, with their `RawEvent`s written back at their
   ticks.
 - **`BEAT`** is not kept. It is regenerated from the tempo map on every save.
+
+**Vocal tracks.** `PART VOCALS` and `HARM1`–`HARM3` are passthrough tracks that the vocal lanes edit
+([C3](#c3-editor-layout) item 7). An edit replaces the track with one written again
+(`VocalTrackContent`): its sung notes (36–84), phrases (105, 106) and lyrics are written from what
+was edited, and every other event (its name, percussion, overdrive, animations) is kept with its
+bytes, at its tick, in its order. A vocal track that hasn't been edited is still written byte for
+byte. One that has reads back as what was edited, though its bytes differ: running status isn't
+kept, the notes are on the first channel, and at a tick the kept events come first, then the
+lyrics, after the note-offs and before the note-ons.
 
 **When the tempo map changes in a way that keeps times.** Passthrough tracks hold ticks, so a tempo
 edit with *keep times* on ([C4](#c4-tempo-map-and-grid)), or a stretch
@@ -814,23 +824,54 @@ Acceptance criteria:
 6. **Transport bar**: play and pause, position, speed, pitch correction, loop, metronome, hit
    sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)).
 7. **Vocal lanes.** A lane showing `PART VOCALS` or `HARM1`–`HARM3` is always drawn along a
-   timeline, as a piano roll, read-only:
-   - one row per semitone, from a little above the part's highest sung note to a little below its
-     lowest, at least an octave, with black keys' rows darker and each C named at the left edge;
+   timeline, as a piano roll:
+   - one row per semitone, every pitch a part sings (36 to 84) whatever its notes, so any pitch can
+     be placed and the rows never move as notes are edited, with black keys' rows darker and each C
+     named at the left edge;
    - each sung note a bar on its pitch's row; a slide (`+`) a line from the note before; a spoken
-     note (`#`, `^`) an outline along the middle row;
-   - the phrases shaded behind the rows, and the lyrics in a band under them, each syllable at its
-     tick, with a hyphen where it joins the next. A syllable that would run into the one before is
-     left out, as the lane is zoomed out;
+     note (`#`, `^`) an outline along the middle row, middle C's;
+   - the phrases shaded behind the rows, and as bars in a strip above them; and the lyrics in a band
+     under the rows, each syllable at its tick, with a hyphen where it joins the next. A syllable
+     that would run into the one before is left out, as the lane is zoomed out;
    - the beats, sections, tempo markers, loop and selection as a highway's lane has them;
    - what's on the strike line lit, as Chart Packer's lyrics lane lights it, wherever the cursor is,
      playing or not: the note being sung near white with a glow where it crosses the line, its
      syllable in the same tint, and its phrase shaded a little more than the others.
 
    Scrolling, zoom (look-ahead) and the keys that move the cursor or play work as in any lane. A
-   lane whose track the chart hasn't says so. The part is read from its passthrough track
-   ([§4.2](#lossless-passthrough)) by `EditorSession.VocalsOf` into a `VocalLane`, in ticks, and
-   read again when the track is re-ticked or put back by an undo.
+   lane whose track the chart hasn't says so, and offers to add it, empty. The part is read from its
+   passthrough track ([§4.2](#lossless-passthrough)) by `EditorSession.VocalsOf` into a `VocalLane`,
+   in ticks, and read again when the track is edited, re-ticked or put back by an undo.
+
+   *Settled with vocal editing:* the lane edits its part with the editor's tools, each edit one
+   undoable step that replaces the part's track ([§4.2](#lossless-passthrough)):
+   - **Select** picks a note (Shift adds it or takes it away), and dragging it moves the selected
+     notes in time, to the grid, and in pitch, by the rows crossed, never past 36 or 84. A note's
+     end resizes the selected notes. A press between notes draws a box over ticks and rows. As the
+     rows are thin, a note is hit on the row either side of its own when no note is on the
+     pointer's.
+   - **Place** puts a note a grid step long on the grid step and row pressed, and a drag stretches
+     it, never past the next note's start; Shift places a slide. On a note, it moves it.
+   - **Erase** removes each note passed over, **Sustain** drags the selected notes' end, **Phrase**
+     draws a phrase from the grid step pressed, and **Tempo** adds and drags tempo markers as in a
+     highway's lane.
+   - **The phrase strip** works with any tool, as a highway's phrase rail does: a press on a bar
+     selects its phrase (Shift adds it or takes it away), and a drag moves the selected phrases, or
+     resizes one by the end grabbed. A part's phrases never overlap. A new phrase is written as
+     105, or as 105 and 106 when every phrase the part has is.
+   - **Lyrics** belong to the notes that start on their tick: a note moved or deleted takes its
+     lyric with it, unless a note that stays starts there. A lyric on no note's start stays where
+     it is.
+   - **Properties** shows the selected notes' tick, pitch (a MIDI number, or a name such as `F#3`),
+     length and lyric, symbols included, with Slide and Spoken, and the selected phrases' start and
+     end. **Type lyrics…** gives a typed line's syllables to the selected notes in turn, a slide
+     skipped, split at spaces and after hyphens (`Hel-lo world`).
+   - **Keys** ([§9](#9-keyboard-shortcuts)): Alt and the arrows move the selected notes a grid step or
+     a semitone, an octave with Shift; Ctrl+A selects the part's notes; Delete and Ctrl+X, C and V
+     work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
+     highway's never into one. The keys that change a highway's notes or a part's audio do nothing.
+   - The vocal findings ([§6](#lint-rules)) name their part, and going to one opens its lane and
+     selects the notes on its tick.
 
 Acceptance criteria:
 
@@ -2021,6 +2062,20 @@ merges the group into its first phrase.
 | CHR085 | Info | `[end]` is missing or before the last note; it is moved on save | — |
 | CHR086 | Info | Something in the chart file couldn't be loaded as written, and was left out, as the games leave it out ([§4.1](#editable-model)). Saving writes the file without it. | — |
 
+### Vocals
+
+| ID | Sev. | Rule | Fix |
+| --- | --- | --- | --- |
+| CHR090 | Warning | A vocal note runs into the next one; a part sings one note at a time | — |
+| CHR091 | Warning | A vocal note has no lyric (a slide's is `+`) | — |
+| CHR092 | Warning | A vocal note is outside every phrase, so the games don't show it | — |
+| CHR093 | Info | A lyric isn't on a vocal note's start | — |
+| CHR094 | Warning | A slide has no sung note before it in its phrase to carry on from | — |
+| CHR095 | Warning | `HARM2` or `HARM3` without `HARM1`, which the games need to show harmonies | — |
+
+*Settled with vocal editing:* the vocal rules check the whole song after any edit, as a vocal part isn't one of the
+model's parts. Each finding names its part's track and the tick at fault.
+
 ---
 
 <a id="midi-layout"></a>
@@ -2346,6 +2401,8 @@ These are the defaults. Rebinding is future work.
 | `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
 | `Alt`+arrows | Move the selection one grid step in time, or one lane across |
 | `Alt`+`Shift`+arrows across | Shift the selected notes a lane, each stopping at the edge |
+| `Alt`+`→` / `←`, `Alt`+`↑` / `↓` (vocal lane) | Move the selected vocal notes one grid step, or one semitone |
+| `Alt`+`Shift`+`↑` / `↓` (vocal lane) | Move the selected vocal notes an octave |
 | `Alt`+drag | Select a time range across the lanes shown |
 | `PgUp` / `PgDn` | Move the cursor one measure |
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
@@ -2363,7 +2420,7 @@ These are the defaults. Rebinding is future work.
 | `L` | Set the loop region to the selection |
 | `R` | Start or stop record mode; while it records, Space ends the pass too, and Esc cancels it |
 | `W` | Switch the lane between waveform and spectrogram |
-| `Ctrl`+`A` | Select all in the current difficulty |
+| `Ctrl`+`A` | Select all in the current difficulty, or a vocal lane's part |
 | `Ctrl`+`Shift`+`A` | Select the section the cursor is in, across the lanes shown |
 | `Ctrl`+`Z`; `Ctrl`+`Y` or `Ctrl`+`Shift`+`Z` | Undo; redo |
 | `Ctrl`+`X` / `C` / `V` | Cut, copy, paste over the span the passage covers |
@@ -2474,9 +2531,8 @@ fails the run if anything there changes anyway.
 
 ## 14. Future (after v1)
 
-- Vocals and harmonies editing (lyrics, pitches, phrases), building on `VocalLane`, the vocal
-  lanes' piano roll ([C3](#c3-editor-layout) item 7), `VocalChart` and `VocalsEditor`. It needs a
-  command that replaces a passthrough track and a vocal track writer.
+- Vocal percussion and overdrive, lyric and range shifts, and pitch detection from the vocals stem,
+  building on the vocal lanes' editing ([C3](#c3-editor-layout) item 7).
 - Keys, pro keys, pro guitar/bass and Elite drums.
 - Venue, lighting and camera events.
 - `.chart` export.

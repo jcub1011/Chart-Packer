@@ -441,6 +441,24 @@
   <data name="ChrLoadDuplicateStarPower" xml:space="preserve">
     <value>A second star power phrase starting at one tick was left out, as the games leave it out.</value>
   </data>
+  <data name="ChrVocalNotesOverlap" xml:space="preserve">
+    <value>The vocal note runs into the next one; a part sings one note at a time.</value>
+  </data>
+  <data name="ChrVocalNoteWithoutLyric" xml:space="preserve">
+    <value>The vocal note has no lyric.</value>
+  </data>
+  <data name="ChrVocalNoteOutsidePhrase" xml:space="preserve">
+    <value>The vocal note is outside every phrase, so the games don't show it.</value>
+  </data>
+  <data name="ChrLyricWithoutNote" xml:space="preserve">
+    <value>The lyric isn't on a vocal note's start.</value>
+  </data>
+  <data name="ChrSlideWithoutNote" xml:space="preserve">
+    <value>The slide has no sung note before it in its phrase to carry on from.</value>
+  </data>
+  <data name="ChrHarmonyWithoutFirst" xml:space="preserve">
+    <value>The chart has this harmony without HARM1, which the games need to show harmonies.</value>
+  </data>
   <data name="ChrLoadWithPitchFormat" xml:space="preserve">
     <value>{0} (MIDI note {1})</value>
     <comment>{0} is what was left out; {1} is its MIDI note number.</comment>

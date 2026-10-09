@@ -1,8 +1,6 @@
 using System;
 using System.Linq;
 using Avalonia.Controls;
-using Avalonia.Data;
-using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ChartBuilder.ViewModels;
@@ -20,7 +18,7 @@ namespace ChartBuilder.Views
         public SectionsView()
         {
             InitializeComponent();
-            AddHandler(KeyDownEvent, OnFieldKeyDown);
+            AddHandler(KeyDownEvent, FieldKeys.OnKeyDown);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -31,28 +29,6 @@ namespace ChartBuilder.Views
             _viewModel = DataContext as SectionsViewModel;
             if (_viewModel is not null)
                 _viewModel.EditRequested += OnEditRequested;
-        }
-
-        // After the field has had the key: Enter applies it, Escape puts it back. Space is the field's, so typing a name
-        // doesn't play or pause the song (the window's Space).
-        private static void OnFieldKeyDown(object? sender, KeyEventArgs e)
-        {
-            if (e.Source is not TextBox box)
-                return;
-            switch (e.Key)
-            {
-                case Key.Enter:
-                    BindingOperations.GetBindingExpressionBase(box, TextBox.TextProperty)?.UpdateSource();
-                    e.Handled = true;
-                    break;
-                case Key.Escape:
-                    BindingOperations.GetBindingExpressionBase(box, TextBox.TextProperty)?.UpdateTarget();
-                    e.Handled = true;
-                    break;
-                case Key.Space:
-                    e.Handled = true;
-                    break;
-            }
         }
 
         // A row inserted to be renamed: brought into view, as the list only makes the rows on screen, and once it's laid out,

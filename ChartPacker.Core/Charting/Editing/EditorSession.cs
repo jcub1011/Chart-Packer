@@ -74,7 +74,7 @@ public sealed class EditorSession
 
     // Each vocal part as last read, with the track it was read from: a track is never changed, only replaced (re-ticked,
     // or put back by an undo), so a part is read again only when its track isn't the one it was read from.
-    private readonly Dictionary<VocalTrack, (PassthroughTrack Track, VocalLane Lane)> _vocals = [];
+    private readonly Dictionary<VocalTrack, (PassthroughTrack Track, VocalTrackContent? Content, VocalLane Lane)> _vocals = [];
 
     /// <param name="undo">The chart's undo stack.</param>
     /// <param name="delay">The song's delay: how much later than its ticks say the chart plays against the audio.</param>
@@ -87,7 +87,7 @@ public sealed class EditorSession
         Delay = delay;
         _songIni = songIni;
         Viewport = new EditorViewport();
-        Selection = new EditorSelection(Chart);
+        Selection = new EditorSelection(Chart, VocalContentOf);
         Tools = new EditorTools(this);
         Fills = new FillProposals(this);
         TempoProposal = new TempoProposals(this);
@@ -403,44 +403,46 @@ public sealed class EditorSession
     public EditableTrack? TrackOf(ChartTrackKey key) => Chart.PartOf(key.Instrument)?[key.Difficulty];
 
     /// <summary>
-    /// The vocal part <paramref name="track"/> as its lane draws it, read from the chart's first track of that name, which
-    /// the editor keeps as it was loaded (charter-spec §4.2); null when the chart hasn't the track. A track that can't be
-    /// read is an empty part. Read again only after its track is replaced.
+    /// The vocal part <paramref name="track"/> as its lane draws it, read from the chart's first track of that name
+    /// (<see cref="VocalTracks.IndexIn"/>); null when the chart hasn't the track. A track that can't be read is an empty
+    /// part. Read again only after its track is replaced: edited, re-ticked, or put back by an undo.
     /// </summary>
-    public VocalLane? VocalsOf(VocalTrack track)
-    {
-        string name = VocalTracks.NameOf(track);
-        PassthroughTrack? found = null;
-        foreach (var each in Chart.Passthrough)
-        {
-            if (each.IsTrack && each.Name is { } eachName && eachName.Trim().Equals(name, StringComparison.OrdinalIgnoreCase))
-            {
-                found = each;
-                break;
-            }
-        }
+    public VocalLane? VocalsOf(VocalTrack track) => VocalOf(track)?.Lane;
 
-        if (found is null)
+    /// <summary>
+    /// The vocal part <paramref name="track"/> as it's edited (charter-spec C3 item 7); null when the chart hasn't the
+    /// track, or it can't be read, so it's kept as it is.
+    /// </summary>
+    public VocalTrackContent? VocalContentOf(VocalTrack track) => VocalOf(track)?.Content;
+
+    private (VocalTrackContent? Content, VocalLane Lane)? VocalOf(VocalTrack track)
+    {
+        int index = VocalTracks.IndexIn(Chart, track);
+        if (index < 0)
         {
             _vocals.Remove(track);
             return null;
         }
 
+        var found = Chart.Passthrough[index];
         if (_vocals.TryGetValue(track, out var known) && ReferenceEquals(known.Track, found))
-            return known.Lane;
+            return (known.Content, known.Lane);
 
+        VocalTrackContent? content;
         VocalLane lane;
         try
         {
-            lane = new VocalLane(VocalReader.ReadPart(found));
+            content = VocalTrackContent.Of(found);
+            lane = new VocalLane(content.ToPart());
         }
         catch (ChartFormatException)
         {
-            lane = new VocalLane(new VocalPart(name, [], [], []));
+            content = null;
+            lane = new VocalLane(new VocalPart(VocalTracks.NameOf(track), [], [], []));
         }
 
-        _vocals[track] = (found, lane);
-        return lane;
+        _vocals[track] = (found, content, lane);
+        return (content, lane);
     }
 
     /// <summary>Does <paramref name="command"/> as one undoable step. A refusal is said in <see cref="Status"/>.</summary>

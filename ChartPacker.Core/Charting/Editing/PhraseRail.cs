@@ -91,7 +91,7 @@ public static class PhraseRail
                 (best, bestDistance) = (phrase, distance);
         }
 
-        return best is { } hit ? new PhraseHit(hit, GripOf(point, hit.Tick, hit.Tick + hit.Length)) : null;
+        return best is { } hit ? new PhraseHit(hit, GripOf(point.Tick, point.Tolerance, hit.Tick, hit.Tick + hit.Length)) : null;
     }
 
     /// <summary>
@@ -131,7 +131,7 @@ public static class PhraseRail
         if (best is not { } hit)
             return null;
         var section = new DiscoFlipSection(difficulty, hit);
-        return new DiscoFlipHit(section, GripOf(point, hit.Tick, hit.EndTick ?? long.MaxValue));
+        return new DiscoFlipHit(section, GripOf(point.Tick, point.Tolerance, hit.Tick, hit.EndTick ?? long.MaxValue));
     }
 
     /// <summary>
@@ -154,12 +154,15 @@ public static class PhraseRail
         return count;
     }
 
-    // Which part of a bar from start to end the point grabs: an end within the tolerance of it, but never more than a
-    // quarter of the bar, which leaves a short bar a body to grab; otherwise the body.
-    private static PhraseGrip GripOf(ChartPoint point, long start, long end)
+    /// <summary>
+    /// Which part of a bar from <paramref name="start"/> to <paramref name="end"/> a press at <paramref name="tick"/>
+    /// grabs: an end within <paramref name="tolerance"/> ticks of it, but never more than a quarter of the bar, which
+    /// leaves a short bar a body to grab; otherwise the body.
+    /// </summary>
+    internal static PhraseGrip GripOf(double tick, double tolerance, long start, long end)
     {
-        double grip = Math.Min(point.Tolerance, (end - (double)start) / 4.0);
-        double fromStart = Math.Abs(point.Tick - start), fromEnd = Math.Abs(point.Tick - end);
+        double grip = Math.Min(tolerance, (end - (double)start) / 4.0);
+        double fromStart = Math.Abs(tick - start), fromEnd = Math.Abs(tick - end);
         return fromEnd <= grip && fromEnd < fromStart ? PhraseGrip.End
             : fromStart <= grip ? PhraseGrip.Start
             : PhraseGrip.Body;

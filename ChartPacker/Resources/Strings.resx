@@ -2266,6 +2266,9 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorTypeChartSong" xml:space="preserve">
     <value>Chart: song</value>
   </data>
+  <data name="ValidatorTypeChartVocals" xml:space="preserve">
+    <value>Chart: vocals</value>
+  </data>
   <data name="ValidatorTypeChartLoad" xml:space="preserve">
     <value>Chart: load</value>
   </data>

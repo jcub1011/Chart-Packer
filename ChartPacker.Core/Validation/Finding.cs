@@ -11,5 +11,16 @@ namespace ChartPacker.Core.Validation;
 /// For a chart finding about the song as a whole rather than a part, such as a tempo marker, the tick at fault; null
 /// otherwise.
 /// </param>
+/// <param name="Track">
+/// For a chart finding about a vocal part, the name of its MIDI track, such as <c>HARM2</c>, with
+/// <paramref name="Tick"/> the tick at fault in it; null otherwise.
+/// </param>
 public sealed record Finding(
-    string RuleId, Severity Severity, string Message, long? Offset = null, string? Key = null, ChartLocation? Location = null, long? Tick = null);
+    string RuleId,
+    Severity Severity,
+    string Message,
+    long? Offset = null,
+    string? Key = null,
+    ChartLocation? Location = null,
+    long? Tick = null,
+    string? Track = null);

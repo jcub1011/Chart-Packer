@@ -141,6 +141,8 @@ public sealed class SongChartLintTests
         Assert.AreEqual(ChrCategory.Phrases, ChrRules.CategoryOf(ChrRules.Chr060));
         Assert.AreEqual(ChrCategory.Song, ChrRules.CategoryOf(ChrRules.Chr085));
         Assert.AreEqual(ChrCategory.Load, ChrRules.CategoryOf(ChrRules.Chr086));
+        Assert.AreEqual(ChrCategory.Vocals, ChrRules.CategoryOf(ChrRules.Chr090));
+        Assert.AreEqual(ChrCategory.Vocals, ChrRules.CategoryOf(ChrRules.Chr095));
         Assert.IsNull(ChrRules.CategoryOf("SNG021"));
         Assert.IsNull(ChrRules.CategoryOf("CHRX01"));
     }

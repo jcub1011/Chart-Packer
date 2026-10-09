@@ -23,6 +23,38 @@ public static class VocalTracks
 {
     /// <summary>The name of <paramref name="track"/>'s MIDI track: <c>PART VOCALS</c>, or <c>HARM1</c> to <c>HARM3</c>.</summary>
     public static string NameOf(VocalTrack track) => VocalReader.TrackNames[(int)track];
+
+    /// <summary>
+    /// The index in <paramref name="chart"/>'s passthrough tracks of <paramref name="track"/>'s part: the first track of
+    /// its name, ignoring case and surrounding space, as the reader takes it; -1 when the chart hasn't one.
+    /// </summary>
+    public static int IndexIn(EditableChart chart, VocalTrack track)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        string name = NameOf(track);
+        for (int i = 0; i < chart.Passthrough.Count; i++)
+        {
+            var each = chart.Passthrough[i];
+            if (each.IsTrack && each.Name is { } eachName && eachName.Trim().Equals(name, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>The vocal part a track of <paramref name="name"/> is, ignoring case and surrounding space; null for any other track.</summary>
+    public static VocalTrack? Of(string? name)
+    {
+        if (name is null)
+            return null;
+        for (int i = 0; i < VocalReader.TrackNames.Count; i++)
+        {
+            if (VocalReader.TrackNames[i].Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))
+                return (VocalTrack)i;
+        }
+
+        return null;
+    }
 }
 
 /// <summary>What an editor lane shows: one instrument's highway at one difficulty, or one vocal part.</summary>

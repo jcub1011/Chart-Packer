@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
@@ -16,7 +17,7 @@ namespace ChartBuilder.ViewModels
     /// <summary>
     /// One of the Editor's lanes: a part's highway at one difficulty, or a vocal part. Its header picks the part, the
     /// difficulty and a ghost difficulty, and closes the lane; its body is the part's editor canvas, as a highway or a
-    /// timeline (charter-spec C3). A vocal part is always drawn along a timeline, and isn't edited yet.
+    /// timeline (charter-spec C3). A vocal part is always drawn along a timeline (C3 item 7).
     /// </summary>
     public sealed partial class EditorLaneViewModel : ViewModelBase
     {
@@ -55,15 +56,16 @@ namespace ChartBuilder.ViewModels
         public LaneAudioViewModel Audio { get; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(AddVocalPartText))]
         public partial string Title { get; private set; } = "";
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline))]
+        [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline), nameof(CanAddVocalPart))]
         public partial bool IsVocal { get; private set; }
 
         /// <summary>The vocal part the lane shows; null for a highway.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline), nameof(ShowsEditMenu))]
+        [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline), nameof(ShowsEditMenu), nameof(CanAddVocalPart), nameof(AddVocalPartText))]
         public partial VocalTrack? Vocal { get; private set; }
 
         /// <summary>The part and difficulty the lane shows; null for a vocal part.</summary>
@@ -128,6 +130,12 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether the header offers the authoring tools, which edit a part's notes.</summary>
         public bool ShowsEditMenu => HasCanvas && !IsVocal;
 
+        /// <summary>Whether the lane offers to add its vocal part, which the chart hasn't (charter-spec C3 item 7).</summary>
+        public bool CanAddVocalPart => IsVocal && !HasCanvas && Editor is not null;
+
+        /// <summary>What the button that adds the lane's vocal part says, e.g. "Add Harmony 2".</summary>
+        public string AddVocalPartText => string.Format(CultureInfo.CurrentCulture, Strings.LaneAddVocalPartFormat, Title);
+
         /// <summary>Stands in for the lane's editor: a part or a vocal track the chart hasn't.</summary>
         public string Placeholder => IsVocal ? string.Format(CultureInfo.CurrentCulture, Strings.LaneNoVocalsFormat, Title)
             : Track is { } track ? string.Format(CultureInfo.CurrentCulture, Strings.LaneNoPartFormat, ChartLabels.InstrumentName(track.Instrument))
@@ -154,6 +162,14 @@ namespace ChartBuilder.ViewModels
 
         [RelayCommand]
         private void Close() => _dock.Layout.Close(Lane);
+
+        /// <summary>Adds the lane's vocal part to the chart, empty, as one undoable step (charter-spec C3 item 7).</summary>
+        [RelayCommand]
+        private void AddVocalPart()
+        {
+            if (Editor is { } editor && Vocal is { } vocal)
+                editor.Session.Execute(new AddVocalPart(vocal));
+        }
 
         /// <summary>Switches the lane between highway and timeline (<c>V</c>).</summary>
         [RelayCommand]
@@ -214,6 +230,7 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(ShowsTimeline));
             OnPropertyChanged(nameof(ShowsEditMenu));
             OnPropertyChanged(nameof(Placeholder));
+            OnPropertyChanged(nameof(CanAddVocalPart));
             if (Track is not { } track)
             {
                 Difficulties = [];

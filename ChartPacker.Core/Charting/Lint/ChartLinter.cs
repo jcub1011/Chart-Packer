@@ -285,4 +285,30 @@ internal sealed class LintRun(ChartLintInput input, Func<EditableChart, ChartRea
 
     /// <summary>The chart's tempo map, made the first time it's asked for.</summary>
     public TempoMap TempoMap => _tempoMap ??= Input.Chart.TempoMap.ToTempoMap();
+
+    /// <summary>The chart's vocal parts, read the first time they're asked for.</summary>
+    public IReadOnlyList<(Layout.VocalTrack Track, VocalTrackContent Content)> VocalParts => _vocalParts ??= ReadVocalParts(Input.Chart);
+
+    private IReadOnlyList<(Layout.VocalTrack Track, VocalTrackContent Content)>? _vocalParts;
+
+    private static List<(Layout.VocalTrack, VocalTrackContent)> ReadVocalParts(EditableChart chart)
+    {
+        var parts = new List<(Layout.VocalTrack, VocalTrackContent)>();
+        foreach (var track in Enum.GetValues<Layout.VocalTrack>())
+        {
+            int index = Layout.VocalTracks.IndexIn(chart, track);
+            if (index < 0)
+                continue;
+            try
+            {
+                parts.Add((track, VocalTrackContent.Of(chart.Passthrough[index])));
+            }
+            catch (ChartFormatException)
+            {
+                // Kept as it is, and not checked.
+            }
+        }
+
+        return parts;
+    }
 }

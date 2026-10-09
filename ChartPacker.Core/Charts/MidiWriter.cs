@@ -61,12 +61,12 @@ internal static class MidiWriter
 
     /// <summary>
     /// Writes an <c>MTrk</c> of <paramref name="messages"/>, sorted by tick with ties kept in order,
-    /// and ended by a single End-of-Track no earlier than the last of them.
+    /// and ended by a single End-of-Track no earlier than the last of them, nor than <paramref name="endAtLeast"/>.
     /// </summary>
-    public static void WriteTrack(Stream output, IEnumerable<MidiMessage> messages)
+    public static void WriteTrack(Stream output, IEnumerable<MidiMessage> messages, long endAtLeast = 0)
     {
         var placed = messages.Where(m => !m.IsEndOfTrack).OrderBy(m => m.Tick).ToList();
-        long end = Math.Max(0, placed.Count > 0 ? placed[^1].Tick : 0);
+        long end = Math.Max(endAtLeast, Math.Max(0, placed.Count > 0 ? placed[^1].Tick : 0));
 
         using var track = new MemoryStream();
         long tick = 0;
@@ -96,11 +96,11 @@ internal static class MidiWriter
         return output.ToArray();
     }
 
-    /// <summary>An <c>MTrk</c> chunk of <paramref name="messages"/>; see <see cref="WriteTrack(Stream, IEnumerable{MidiMessage})"/>.</summary>
-    public static byte[] Track(IEnumerable<MidiMessage> messages)
+    /// <summary>An <c>MTrk</c> chunk of <paramref name="messages"/>; see <see cref="WriteTrack(Stream, IEnumerable{MidiMessage}, long)"/>.</summary>
+    public static byte[] Track(IEnumerable<MidiMessage> messages, long endAtLeast = 0)
     {
         using var output = new MemoryStream();
-        WriteTrack(output, messages);
+        WriteTrack(output, messages, endAtLeast);
         return output.ToArray();
     }
 

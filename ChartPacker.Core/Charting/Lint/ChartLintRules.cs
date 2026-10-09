@@ -5,7 +5,8 @@ namespace ChartPacker.Core.Charting.Lint;
 /// <summary>The chart lint rules there are (charter-spec §6), which <see cref="ChartLinter"/> runs by default.</summary>
 /// <remarks>
 /// Rules are listed here rather than found by reflection, which Native AOT can't do safely, each with its ID in
-/// <see cref="Validation.ChrRules"/>. CM2 added the timing, 5-fret and song rules, and CM3 the drums and phrase rules.
+/// <see cref="Validation.ChrRules"/>. CM2 added the timing, 5-fret and song rules, CM3 the drums and phrase rules, and
+/// vocal editing the vocal rules.
 /// </remarks>
 public static class ChartLintRules
 {
@@ -42,5 +43,11 @@ public static class ChartLintRules
         new UnratedPartRule(),
         new SongLengthRule(),
         new EndEventRule(),
+        new VocalNotesOverlapRule(),
+        new VocalNoteWithoutLyricRule(),
+        new VocalNoteOutsidePhraseRule(),
+        new LyricWithoutNoteRule(),
+        new SlideWithoutNoteRule(),
+        new HarmonyWithoutFirstRule(),
     ];
 }

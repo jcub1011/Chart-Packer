@@ -161,6 +161,7 @@ namespace ChartBuilder.Controls.Editing
         private Point? _boxFrom;
         private Point _boxTo;
         private ChartPoint _lastPoint;
+        private VocalPoint _lastVocalPoint;
 
         // The longest note of the track drawn, so the notes held into view from before it are found; worked out again after an edit.
         private (ChartTrackKey Track, long Length)? _longest;
@@ -318,6 +319,9 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>Where a vocal part's lyrics are drawn, under its pitch rows.</summary>
         protected virtual Rect LyricsArea(Size size, LaneProjection projection) => default;
+
+        /// <summary>Where a vocal part's phrases are drawn as bars to select and drag, above its pitch rows.</summary>
+        protected virtual Rect VocalPhraseArea(Size size, LaneProjection projection) => default;
 
         /// <summary>How thick the phrase rail of <paramref name="phraseRows"/> rows is across the view, in pixels.</summary>
         protected static double PhraseRailSize(int phraseRows) =>
@@ -533,14 +537,17 @@ namespace ChartBuilder.Controls.Editing
                 DrawHover(context, session, key, track, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
-            if (_boxFrom is { } from)
-            {
-                var box = new Rect(from, _boxTo).Normalize();
-                context.DrawRectangle(BoxBrush, BoxPen, box);
-            }
+            DrawBox(context);
 
             if (IsFocused)
                 context.DrawRectangle(null, AccentPens().Focus, new Rect(Bounds.Size).Deflate(0.5));
+        }
+
+        /// <summary>The box being drawn out to select notes, if one is.</summary>
+        private void DrawBox(DrawingContext context)
+        {
+            if (_boxFrom is { } from)
+                context.DrawRectangle(BoxBrush, BoxPen, new Rect(from, _boxTo).Normalize());
         }
 
         /// <summary>
@@ -768,17 +775,9 @@ namespace ChartBuilder.Controls.Editing
             if (!current.Properties.IsLeftButtonPressed || Session is not { } session)
                 return;
 
-            // A vocal part isn't edited yet: a press takes the keys, or drags a proposed beat's handle.
             if (_lane is { Vocal: not null })
             {
-                Focus();
-                if (ProposalHandleAt(current.Position) is { } handle)
-                {
-                    e.Pointer.Capture(this);
-                    _proposalDrag = handle;
-                }
-
-                e.Handled = true;
+                PressVocals(session, current.Position, e);
                 return;
             }
 
@@ -820,15 +819,27 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
-            if (_isPressed && Session is { } session && PointAt(position) is { } point)
+            if (_isPressed && Session is { } session && _lane is { Vocal: not null })
+            {
+                if (VocalPointAt(position, clamp: true) is { } vocalPoint)
+                {
+                    _lastVocalPoint = vocalPoint;
+                    _boxTo = position;
+                    session.Tools.Drag(vocalPoint);
+                }
+            }
+            else if (_isPressed && Session is { } highway && PointAt(position) is { } point)
             {
                 _lastPoint = point;
                 _boxTo = position;
-                session.Tools.Drag(point);
+                highway.Tools.Drag(point);
             }
             else if (!_isPressed)
             {
-                ShowRailCursor(position);
+                if (_lane is { Vocal: not null })
+                    ShowVocalCursor(position);
+                else
+                    ShowRailCursor(position);
             }
 
             _overlay.Redraw();
@@ -849,8 +860,10 @@ namespace ChartBuilder.Controls.Editing
             _isPressed = false;
             _boxFrom = null;
             e.Pointer.Capture(null);
-            if (Session is { } session)
-                session.Tools.Release(PointAt(e.GetPosition(this)) ?? _lastPoint);
+            if (Session is { } session && _lane is { Vocal: not null })
+                session.Tools.Release(VocalPointAt(e.GetPosition(this), clamp: true) ?? _lastVocalPoint);
+            else if (Session is { } highway)
+                highway.Tools.Release(PointAt(e.GetPosition(this)) ?? _lastPoint);
             _overlay.Redraw();
         }
 
@@ -862,7 +875,10 @@ namespace ChartBuilder.Controls.Editing
                 return;
             _isPressed = false;
             _boxFrom = null;
-            Session?.Tools.Release(_lastPoint);
+            if (_lane is { Vocal: not null })
+                Session?.Tools.Release(_lastVocalPoint);
+            else
+                Session?.Tools.Release(_lastPoint);
             _overlay.Redraw();
         }
 
@@ -995,6 +1011,12 @@ namespace ChartBuilder.Controls.Editing
                 }
             }
 
+            SetCursor(wanted);
+        }
+
+        /// <summary>Shows <paramref name="wanted"/> as the pointer's cursor, or the usual one for null.</summary>
+        private void SetCursor(StandardCursorType? wanted)
+        {
             if (wanted == _cursorType)
                 return;
             _cursorType = wanted;

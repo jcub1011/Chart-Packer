@@ -29,8 +29,10 @@ namespace ChartPacker.Services
         public static string? Where(SongChartFinding finding)
         {
             if (finding.Place is not { } place)
-                return null;
+                return finding.Finding.Track;
             string at = string.Format(CultureInfo.CurrentCulture, Strings.ChartFindingPlaceFormat, place.Measure, place.Beat);
+            if (finding.Finding.Track is { } track)
+                return string.Format(CultureInfo.CurrentCulture, Strings.ChartFindingPartPlaceFormat, track, at);
             if (finding.Finding.Location is not { } location)
                 return at;
             string part = location.Difficulty is { } difficulty
@@ -47,6 +49,7 @@ namespace ChartPacker.Services
             ChrCategory.Drums => ValidatorIssueTypesIds.ChartDrums,
             ChrCategory.Phrases => ValidatorIssueTypesIds.ChartPhrases,
             ChrCategory.Song => ValidatorIssueTypesIds.ChartSong,
+            ChrCategory.Vocals => ValidatorIssueTypesIds.ChartVocals,
             _ => ValidatorIssueTypesIds.ChartLoad,
         };
     }
@@ -59,8 +62,9 @@ namespace ChartPacker.Services
         public const string ChartDrums = "chr-drums";
         public const string ChartPhrases = "chr-phrases";
         public const string ChartSong = "chr-song";
+        public const string ChartVocals = "chr-vocals";
         public const string ChartLoad = "chr-load";
 
-        public static IReadOnlyList<string> All { get; } = [ChartTiming, ChartFrets, ChartDrums, ChartPhrases, ChartSong, ChartLoad];
+        public static IReadOnlyList<string> All { get; } = [ChartTiming, ChartFrets, ChartDrums, ChartPhrases, ChartSong, ChartVocals, ChartLoad];
     }
 }

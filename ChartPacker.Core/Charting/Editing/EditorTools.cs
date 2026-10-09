@@ -199,11 +199,16 @@ public sealed partial class EditorTools
         _session.Selection.Select(key, track.Notes);
     }
 
-    /// <summary>Deletes the selected notes, phrases, disco flip sections and tempo markers (Delete), as one step.</summary>
+    /// <summary>
+    /// Deletes the selected notes, phrases, disco flip sections and tempo markers (Delete), or a vocal part's notes and
+    /// phrases, as one step.
+    /// </summary>
     public void DeleteSelection()
     {
         var selection = _session.Selection;
         var steps = new List<Func<(IChartCommand?, string?)>>();
+        if (DeleteVocalsStep() is { } vocals)
+            steps.Add(vocals);
         if (selection.Track is { } key && selection.Notes is { Count: > 0 } notes)
             steps.Add(() => (new RemoveNotes(key.Instrument, key.Difficulty, notes), null));
         else if (selection.HasRangeAcrossLanes)
@@ -758,26 +763,30 @@ public sealed partial class EditorTools
         return new SustainGesture(this, point.Track, notes);
     }
 
-    private Gesture? PressTempo(ChartPoint point)
+    private Gesture? PressTempo(ChartPoint point) => PressTempo(point.Tick, point.Tolerance);
+
+    // The Tempo tool's press at a tick, in any lane: on a marker within the tolerance, a drag of it; elsewhere, a marker
+    // added on the grid.
+    private Gesture? PressTempo(double pressed, double tolerance)
     {
         var map = Chart.TempoMap;
-        long from = (long)Math.Floor(point.Tick - point.Tolerance), to = (long)Math.Ceiling(point.Tick + point.Tolerance);
+        long from = (long)Math.Floor(pressed - tolerance), to = (long)Math.Ceiling(pressed + tolerance);
         var near = map.Tempos.Between(Math.Max(0, from), to);
         if (!near.IsEmpty)
         {
             long tick = near[0].Tick;
-            double best = Math.Abs(tick - point.Tick);
+            double best = Math.Abs(tick - pressed);
             foreach (var marker in near)
             {
-                if (Math.Abs(marker.Tick - point.Tick) < best)
-                    (tick, best) = (marker.Tick, Math.Abs(marker.Tick - point.Tick));
+                if (Math.Abs(marker.Tick - pressed) < best)
+                    (tick, best) = (marker.Tick, Math.Abs(marker.Tick - pressed));
             }
 
             _session.Selection.SelectTempos([tick]);
             return new TempoDragGesture(this, tick, anchored: !map.Anchors.At(tick).IsEmpty);
         }
 
-        long at = Snap.Nearest(point.Tick, Map);
+        long at = Snap.Nearest(pressed, Map);
         var edit = TempoMapEdits.AddMarker(Chart, at);
         if (edit.IsRefused)
         {
@@ -944,7 +953,7 @@ public sealed partial class EditorTools
     private string? MoveRefusal(ChartTrackKey key, IReadOnlyList<EditableNote> notes, IReadOnlyList<EditableNote> moved) =>
         PlacementRefusal(_session.TrackOf(key)!, moved, notes as IReadOnlyCollection<EditableNote>);
 
-    /// <summary>A gesture of one tool, from a press to its release.</summary>
+    /// <summary>A gesture of one tool, from a press to its release, in a highway's lane or a vocal part's.</summary>
     private abstract class Gesture(EditorTools tools)
     {
         protected EditorTools Tools { get; } = tools;
@@ -954,6 +963,17 @@ public sealed partial class EditorTools
         public abstract void Drag(ChartPoint point);
 
         public virtual void Release(ChartPoint point)
+        {
+            Drag(point);
+            Session.CommitPreview();
+        }
+
+        /// <summary>Moves on to <paramref name="point"/> in a vocal part's lane; a highway's gesture ignores it.</summary>
+        public virtual void Drag(VocalPoint point)
+        {
+        }
+
+        public virtual void Release(VocalPoint point)
         {
             Drag(point);
             Session.CommitPreview();
@@ -1116,11 +1136,19 @@ public sealed partial class EditorTools
     {
         private double _last = double.NaN;
 
-        public override void Drag(ChartPoint point)
+        public override void Drag(ChartPoint point) => DragTo(point.Tick);
+
+        public override void Drag(VocalPoint point) => DragTo(point.Tick);
+
+        public override void Release(ChartPoint point) => ReleaseAt(point.Tick);
+
+        public override void Release(VocalPoint point) => ReleaseAt(point.Tick);
+
+        private void DragTo(double pointer)
         {
             // Where the pointer is, in audio seconds for an anchored marker, or in ticks: as the chart is with the
             // preview, which the pointer was mapped through.
-            double target = anchored ? Session.AudioAt(point.Tick) : Tools.Snap.Nearest(point.Tick, Tools.Map);
+            double target = anchored ? Session.AudioAt(pointer) : Tools.Snap.Nearest(pointer, Tools.Map);
             if (target == _last)
                 return;
             _last = target;
@@ -1148,12 +1176,12 @@ public sealed partial class EditorTools
                 Session.Preview(edit.Command);
         }
 
-        public override void Release(ChartPoint point)
+        private void ReleaseAt(double pointer)
         {
-            Drag(point);
+            DragTo(pointer);
             var command = Session.CommitPreview();
             if (command is ChangeTempoMap && !anchored)
-                Session.Selection.SelectTempos([Tools.Snap.Nearest(point.Tick, Tools.Map)]);
+                Session.Selection.SelectTempos([Tools.Snap.Nearest(pointer, Tools.Map)]);
         }
     }
 

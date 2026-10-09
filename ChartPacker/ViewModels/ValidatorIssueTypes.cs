@@ -31,6 +31,7 @@ namespace ChartPacker.ViewModels
             (ValidatorIssueTypesIds.ChartDrums, () => Strings.ValidatorTypeChartDrums),
             (ValidatorIssueTypesIds.ChartPhrases, () => Strings.ValidatorTypeChartPhrases),
             (ValidatorIssueTypesIds.ChartSong, () => Strings.ValidatorTypeChartSong),
+            (ValidatorIssueTypesIds.ChartVocals, () => Strings.ValidatorTypeChartVocals),
             (ValidatorIssueTypesIds.ChartLoad, () => Strings.ValidatorTypeChartLoad),
             (Unreadable, () => Strings.ValidatorTypeUnreadable),
         ];

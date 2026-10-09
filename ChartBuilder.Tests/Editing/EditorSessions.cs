@@ -1,6 +1,7 @@
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Editing;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
 
 namespace ChartBuilder.Tests.Editing;
@@ -61,4 +62,47 @@ internal static class EditorSessions
     }
 
     public static EditableTrack Expert(EditorSession session) => session.Chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert];
+
+    /// <summary>
+    /// An empty Lead guitar chart, as <see cref="Guitar"/>, with the vocal part <paramref name="track"/> holding
+    /// <paramref name="notes"/>, <paramref name="lyrics"/> and <paramref name="phrases"/>.
+    /// </summary>
+    public static EditableChart WithVocals(
+        VocalNoteEvent[] notes, VocalLyricEvent[]? lyrics = null, VocalPhraseEvent[]? phrases = null, VocalTrack track = VocalTrack.Vocals, EditableChart? chart = null)
+    {
+        chart ??= Guitar();
+        new AddVocalPart(track).Apply(chart);
+        var content = VocalTrackContent.Of(chart.Passthrough[VocalTracks.IndexIn(chart, track)]);
+        var edited = content.With(notes, lyrics ?? [], phrases ?? []);
+        if (!ReferenceEquals(edited, content))
+            new ChangeVocals(track, edited).Apply(chart);
+        return chart;
+    }
+
+    /// <summary>The point at <paramref name="tick"/> on <paramref name="pitch"/>'s row of <paramref name="track"/>'s lane.</summary>
+    public static VocalPoint VocalAt(double tick, int? pitch, VocalTrack track = VocalTrack.Vocals, double tolerance = 10) =>
+        new(track, tick, pitch, tolerance);
+
+    /// <summary>The point at <paramref name="tick"/> in the phrase strip of <paramref name="track"/>'s lane.</summary>
+    public static VocalPoint PhraseStripAt(double tick, VocalTrack track = VocalTrack.Vocals, double tolerance = 10) =>
+        new(track, tick, null, tolerance, InPhrases: true);
+
+    /// <summary>Clicks at a point in a vocal part's lane.</summary>
+    public static void Click(EditorSession session, VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        session.Tools.Press(point, modifiers);
+        session.Tools.Release(point);
+    }
+
+    /// <summary>Drags from one point in a vocal part's lane to another through a point between them.</summary>
+    public static void DragFromTo(EditorSession session, VocalPoint start, VocalPoint end, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        session.Tools.Press(start, modifiers);
+        session.Tools.Drag(start with { Tick = (start.Tick + end.Tick) / 2 });
+        session.Tools.Drag(end);
+        session.Tools.Release(end);
+    }
+
+    /// <summary>The vocal part <paramref name="track"/> as the session edits it now.</summary>
+    public static VocalTrackContent Vocals(EditorSession session, VocalTrack track = VocalTrack.Vocals) => session.VocalContentOf(track)!;
 }

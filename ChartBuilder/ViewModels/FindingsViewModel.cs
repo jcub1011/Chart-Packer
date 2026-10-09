@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charting.Lint;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Scanning;
@@ -247,6 +248,12 @@ namespace ChartBuilder.ViewModels
                 return string.Format(CultureInfo.CurrentCulture, Strings.FindingWhereFormat, part, PropertiesViewModel.MeasureBeat(map, location.Tick));
             }
 
+            if (VocalTracks.Of(finding.Track) is { } vocal)
+            {
+                string part = LaneMenuItem.TitleOf(LanePart.Vocals(vocal));
+                return finding.Tick is { } at ? string.Format(CultureInfo.CurrentCulture, Strings.FindingWhereFormat, part, PropertiesViewModel.MeasureBeat(map, at)) : part;
+            }
+
             if (finding.Tick is { } tick)
                 return PropertiesViewModel.MeasureBeat(map, tick);
             return finding.Key ?? Strings.FindingWhereSong;
@@ -267,6 +274,21 @@ namespace ChartBuilder.ViewModels
                     var notes = part[difficulty].Notes.Between(location.Tick, location.EndTick).ToArray();
                     if (notes.Length > 0)
                         session.Selection.Select(key, notes);
+                }
+            }
+            else if (VocalTracks.Of(finding.Track) is { } vocal)
+            {
+                // A vocal part's lane is opened if it isn't, and the notes starting on the tick selected (charter-spec C3 item 7).
+                _editor.Lanes.Layout.Add(LanePart.Vocals(vocal));
+                if (finding.Tick is { } at)
+                {
+                    session.MoveCursorTo(at);
+                    if (session.VocalContentOf(vocal) is { } content)
+                    {
+                        var places = content.Notes.Where(n => n.Tick == at).Select(n => n.Place).ToList();
+                        if (places.Count > 0)
+                            session.Selection.SelectVocalNotes(vocal, places);
+                    }
                 }
             }
             else if (finding.Tick is { } tick)

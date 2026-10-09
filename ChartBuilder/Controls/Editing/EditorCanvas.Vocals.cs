@@ -1,19 +1,22 @@
 using System;
 using System.Globalization;
 using Avalonia;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartBuilder.ViewModels;
+using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls.Editing
 {
-    // A vocal part's lane: its notes on rows of pitch, as a piano roll, with the lyrics under them and its phrases shaded
-    // behind, over the same beats, sections and tempo markers as a highway's lane, on the same pages. Only a timeline
-    // draws one (ProjectVocals), and it isn't edited yet: the rows are slots, one a semitone from the highest pitch down,
-    // so the pointer maps to a tick and a pitch as it does to a tick and a lane.
+    // A vocal part's lane (charter-spec C3 item 7): its notes on rows of pitch, as a piano roll, with the lyrics under them,
+    // its phrases shaded behind and as bars in a strip above, over the same beats, sections and tempo markers as a
+    // highway's lane, on the same pages. Only a timeline draws one (ProjectVocals). The rows are slots, one a semitone from
+    // the highest sung pitch down, so the pointer maps to a tick and a pitch (VocalPointAt) as it does to a tick and a
+    // lane, and the tools edit the part from there.
     public abstract partial class EditorCanvas
     {
         // The parts' colours: the lead and the first harmony as the games colour them, the others apart from it.
@@ -44,20 +47,91 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IPen PhraseEdgePen = new ImmutablePen(Color.FromArgb(0x48, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IBrush LyricsBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xFF, 0x0C, 0x0D, 0x14));
 
-        // The rows the last vocal part drawn has, made once for it.
-        private (VocalLane Lane, LaneSlots Slots)? _vocalSlots;
+        // A vocal phrase's bar in the strip, and a selected one's.
+        private static readonly IBrush VocalPhraseBarBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF));
+        private static readonly IBrush VocalPhraseBarSelectedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF));
+
+        // The rows every vocal part has: every sung pitch, from the highest down.
+        private static LaneSlots? _vocalSlots;
 
         // The pitch classes of the black keys, from C.
         private static bool IsBlackKey(int pitch) => (pitch % 12) is 1 or 3 or 6 or 8 or 10;
 
-        /// <summary>The rows of <paramref name="vocals"/>: one a semitone, from the highest pitch down.</summary>
-        private LaneSlots VocalSlotsOf(VocalLane vocals)
+        /// <summary>The rows of <paramref name="vocals"/>: one a semitone, from the highest pitch down, the same for every part.</summary>
+        private static LaneSlots VocalSlotsOf(VocalLane vocals) => _vocalSlots ??= new LaneSlots(vocals.Pitches, null);
+
+        /// <summary>
+        /// The point in a vocal part's lane under <paramref name="position"/>, or null when there's no part to edit. Its
+        /// pitch is the row's, or null outside the rows; with <paramref name="clamp"/>, as a drag goes on, the nearest row's.
+        /// </summary>
+        private VocalPoint? VocalPointAt(Point position, bool clamp)
         {
-            if (_vocalSlots is { } known && ReferenceEquals(known.Lane, vocals))
-                return known.Slots;
-            var slots = new LaneSlots(vocals.Pitches, null);
-            _vocalSlots = (vocals, slots);
-            return slots;
+            if (Session is not { } session || _lane is not { Vocal: { } vocal } lane || session.VocalsOf(vocal) is not { } vocals)
+                return null;
+            var size = Bounds.Size;
+            if (ProjectVocals(size, VocalSlotsOf(vocals), session.Viewport, lane.LookAhead) is not { } projection)
+                return null;
+            double seconds = projection.SecondsAt(AlongOf(position));
+            double tick = session.TickAt(seconds);
+            double tolerance = Math.Max(1, projection.TicksOf(HitPixels, Math.Max(0, tick), session.TempoMap));
+            double across = AcrossOf(position);
+            var strip = VocalPhraseArea(size, projection);
+            bool inPhrases = strip.Height > 0 && across >= strip.Top && across < strip.Bottom;
+            var pitches = vocals.Pitches;
+            int row = (int)Math.Floor((across - projection.LaneFrom) / projection.LaneSize);
+            int? pitch = row >= 0 && row < pitches.Count ? pitches[row]
+                : clamp ? pitches[Math.Clamp(row, 0, pitches.Count - 1)]
+                : null;
+            return new VocalPoint(vocal, tick, inPhrases ? null : pitch, tolerance, inPhrases);
+        }
+
+        /// <summary>
+        /// A press in a vocal part's lane: on a proposed beat's handle, while a proposed tempo map is reviewed, a drag of it;
+        /// otherwise the current tool's gesture, which draws a box from a press on no note with the select tool.
+        /// </summary>
+        private void PressVocals(EditorSession session, Point position, PointerPressedEventArgs e)
+        {
+            Focus();
+            e.Handled = true;
+            if (ProposalHandleAt(position) is { } handle)
+            {
+                e.Pointer.Capture(this);
+                _proposalDrag = handle;
+                return;
+            }
+
+            if (VocalPointAt(position, clamp: false) is not { } point)
+                return;
+            e.Pointer.Capture(this);
+            _isPressed = true;
+            _lastVocalPoint = point;
+            _boxFrom = session.Tool == EditorTool.Select && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
+            _boxTo = position;
+            session.Tools.Press(point, ModifiersOf(e.KeyModifiers));
+            _overlay.Redraw();
+        }
+
+        /// <summary>
+        /// Shows a resize arrow over a vocal note's end with the tools that drag it, and over a phrase bar's end in the
+        /// strip, and a hand over a phrase bar's body.
+        /// </summary>
+        private void ShowVocalCursor(Point position)
+        {
+            StandardCursorType? wanted = null;
+            if (Session is { } session && VocalPointAt(position, clamp: false) is { } point)
+            {
+                if (point.InPhrases)
+                {
+                    if (session.Tools.HitTestPhrase(point) is { } phrase)
+                        wanted = phrase.Grip == PhraseGrip.Body ? StandardCursorType.Hand : StandardCursorType.SizeWestEast;
+                }
+                else if (session.Tool is EditorTool.Select or EditorTool.Sustain && session.Tools.HitTest(point) is { Grip: VocalNoteGrip.End })
+                {
+                    wanted = StandardCursorType.SizeWestEast;
+                }
+            }
+
+            SetCursor(wanted);
         }
 
         /// <summary>Draws <paramref name="layer"/> of a vocal part's lane, as <see cref="RenderLayer"/> does a highway's.</summary>
@@ -88,6 +162,7 @@ namespace ChartBuilder.Controls.Editing
                 {
                     DrawPitchRows(context, vocals, projection);
                     DrawVocalPhrases(context, session, vocals, projection, fromTick, toTick);
+                    DrawVocalPhraseStrip(context, session, vocal, projection, fromTick, toTick, size);
                     DrawSpans(context, session, projection);
                     DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
                     DrawTempoMarkers(context, session, projection, fromTick, toTick, size);
@@ -144,12 +219,36 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
+        /// Each phrase as a bar in the strip above the rows, to select, drag and resize as a highway's phrase rail's are; a
+        /// selected one lit, with the accent's edge.
+        /// </summary>
+        private void DrawVocalPhraseStrip(DrawingContext context, EditorSession session, VocalTrack vocal, LaneProjection projection, double fromTick, double toTick, Size size)
+        {
+            var strip = VocalPhraseArea(size, projection);
+            if (strip.Height <= 0 || session.VocalContentOf(vocal) is not { } content)
+                return;
+            var selectedPen = AccentPens().Selected;
+            double across1 = strip.Top + 2, across2 = strip.Bottom - 2;
+            foreach (var phrase in content.Phrases)
+            {
+                if (phrase.EndTick < fromTick || phrase.Tick > toTick)
+                    continue;
+                double a = projection.AlongOf(session.AudioAt(phrase.Tick)), b = projection.AlongOf(session.AudioAt(phrase.EndTick));
+                var bar = Box(a, Math.Max(b, a + 2), across1, across2);
+                bool selected = session.Selection.Contains(vocal, phrase);
+                context.DrawRectangle(selected ? VocalPhraseBarSelectedBrush : VocalPhraseBarBrush, selected ? selectedPen : null, bar, 2, 2);
+            }
+        }
+
+        /// <summary>
         /// The notes: a bar on its pitch's row for each sung one, a line from the note before for a slide, and an outline
-        /// along the middle row for a spoken one, which has no pitch.
+        /// along the middle row for a spoken one, which has no pitch. A selected note has the accent's edge around it.
         /// </summary>
         private void DrawVocalNotes(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection projection, double fromTick, double toTick)
         {
             int color = (int)vocal;
+            var selection = session.Selection;
+            var selectedPen = AccentPens().Selected;
             double thickness = VocalNoteThickness(projection);
             var notes = vocals.Notes;
             var (first, last) = vocals.NotesBetween(fromTick, toTick);
@@ -172,6 +271,8 @@ namespace ChartBuilder.Controls.Editing
                     context.DrawRectangle(null, VocalUnpitchedPens[color], bar, radius, radius);
                 else
                     context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], bar, radius, radius);
+                if (selection.Contains(vocal, new VocalNotePlace(note.Tick, note.Pitch)))
+                    context.DrawRectangle(null, selectedPen, bar.Inflate(2), radius + 2, radius + 2);
             }
         }
 
@@ -279,10 +380,14 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        /// <summary>What's on the strike line, lit; the octaves' names at the rows' left edge; the cursor; and the focus's edge.</summary>
+        /// <summary>
+        /// What's on the strike line, lit; the place tool's ghost; the octaves' names at the rows' left edge; the cursor; a
+        /// box being drawn; and the focus's edge.
+        /// </summary>
         private void RenderVocalOverlay(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen, Size size)
         {
             DrawVocalSinging(context, session, vocal, vocals, screen, size);
+            DrawVocalHover(context, session, vocal, vocals, screen);
             var pitches = vocals.Pitches;
             var brush = LabelBrush ?? DefaultLabelBrush;
             for (int i = 0; i < pitches.Count; i++)
@@ -299,8 +404,26 @@ namespace ChartBuilder.Controls.Editing
             var lyrics = LyricsArea(size, screen);
             var reach = new Rect(RowsOf(screen).TopLeft, new Point(screen.TimeFrom + screen.TimeLength, Math.Max(RowsOf(screen).Bottom, lyrics.Bottom)));
             DrawCursor(context, session, screen, reach);
+            DrawBox(context);
             if (IsFocused)
                 context.DrawRectangle(null, AccentPens().Focus, new Rect(Bounds.Size).Deflate(0.5));
+        }
+
+        /// <summary>The note the place tool would place under the pointer, faint: on the grid, a grid step long.</summary>
+        private void DrawVocalHover(DrawingContext context, EditorSession session, VocalTrack vocal, VocalLane vocals, LaneProjection screen)
+        {
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place
+                || VocalPointAt(hover, clamp: false) is not { Pitch: { } pitch } point || session.Tools.HitTest(point) is not null)
+                return;
+            var map = session.TempoMap;
+            long tick = session.Snap.Nearest(Math.Max(0, point.Tick), map);
+            long end = Math.Max(tick + 1, session.Snap.Step(tick, 1, map));
+            double thickness = VocalNoteThickness(screen);
+            var bar = VocalNoteRect(session, vocals, screen, new VocalLaneNote(tick, end, pitch, false, false), thickness);
+            int color = (int)vocal;
+            using (context.PushClip(RowsOf(screen)))
+            using (context.PushOpacity(0.45))
+                context.DrawRectangle(VocalNoteBrushes[color], VocalEdgePens[color], bar, thickness / 2, thickness / 2);
         }
 
         /// <summary>The name of a C's pitch, with its octave as MIDI numbers them from middle C, C4 (60).</summary>

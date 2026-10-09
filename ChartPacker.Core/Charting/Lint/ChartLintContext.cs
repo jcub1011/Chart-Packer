@@ -75,6 +75,12 @@ public sealed class ChartLintContext
     /// <summary>The parts to check, in <see cref="ChartInstrument"/> order.</summary>
     public IReadOnlyList<EditablePart> Parts => _parts;
 
+    /// <summary>
+    /// The vocal parts the chart has, in <see cref="Layout.VocalTrack"/> order, each read from the first track of its
+    /// name as the editor edits it; one that can't be read is left out. Read once in a run.
+    /// </summary>
+    public IReadOnlyList<(Layout.VocalTrack Track, VocalTrackContent Content)> VocalParts => _run.VocalParts;
+
     /// <summary>The tracks of <paramref name="part"/> to check, Easy to Expert: the region's difficulty, or every one.</summary>
     public IReadOnlyList<EditableTrack> TracksOf(EditablePart part)
     {

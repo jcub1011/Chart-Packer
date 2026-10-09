@@ -111,17 +111,15 @@ public sealed class VocalLaneTests
     }
 
     [TestMethod]
-    public void TheRowsReachPastTheNotesAndSpanAtLeastAnOctaveFromTheHighestDown()
+    public void TheRowsAreEverySungPitchFromTheHighestDownWhateverTheNotes()
     {
+        // Charter-spec C3 item 7: any pitch can be placed, and the rows never move as notes are edited.
         var narrow = new VocalLane(Part([new(0, 100, 60), new(120, 100, 62)], []));
-        var wide = new VocalLane(Part([new(0, 100, 40), new(120, 100, 70)], []));
         var empty = new VocalLane(Part([], []));
 
-        Assert.AreEqual(13, narrow.Pitches.Count);
-        Assert.IsGreaterThanOrEqualTo(64, narrow.Pitches[0]);
-        Assert.IsLessThanOrEqualTo(58, narrow.Pitches[^1]);
-        Assert.AreSequenceEqual(Enumerable.Range(38, 35).Reverse().ToArray(), wide.Pitches.ToArray());
-        Assert.HasCount(13, empty.Pitches);
+        Assert.AreSequenceEqual(Enumerable.Range(36, 49).Reverse().ToArray(), narrow.Pitches.ToArray());
+        Assert.AreSequenceEqual(narrow.Pitches.ToArray(), empty.Pitches.ToArray());
+        Assert.AreEqual(VocalLane.SpokenPitch, narrow.Pitches[narrow.Pitches.Count / 2]);
         Assert.IsTrue(empty.IsEmpty);
     }
 

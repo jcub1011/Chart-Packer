@@ -6,6 +6,7 @@ using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Editing;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -172,9 +173,10 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// Pastes the clipboard at the cursor (Ctrl+V, or Ctrl+Shift+V to merge), keeping its timing in ticks, as one step,
-        /// and selects what it put in. Between 5-fret and GHL it asks for the lane mapping first.
+        /// and selects what it put in. Between 5-fret and GHL it asks for the lane mapping first. In a vocal part's lane,
+        /// <paramref name="into"/> is its part, which only a vocal part's notes paste into (charter-spec C3 item 7).
         /// </summary>
-        public async Task PasteAsync(PasteMode mode)
+        public async Task PasteAsync(PasteMode mode, VocalTrack? into = null)
         {
             Session.Tools.Cancel();
             var clipboard = ChartClipboard.Shared;
@@ -184,9 +186,19 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            if (ClipboardEdits.CanPaste(Session, clip, out var needed) is { } refusal)
+            if (ClipboardEdits.CanPaste(Session, clip, into, out var needed) is { } refusal)
             {
                 Session.Status = refusal;
+                return;
+            }
+
+            if (into is { } vocal)
+            {
+                var vocals = ClipboardEdits.PasteVocals(Session, clip, vocal, Session.CursorTick, mode);
+                if (vocals.Refusal is { } vocalRefusal)
+                    Session.Status = vocalRefusal;
+                else if (vocals.Command is { } vocalCommand && Session.Execute(vocalCommand))
+                    Session.Selection.SelectVocalNotes(vocal, vocals.Placed);
                 return;
             }
 

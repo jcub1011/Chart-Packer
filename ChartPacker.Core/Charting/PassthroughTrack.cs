@@ -43,6 +43,14 @@ public sealed class PassthroughTrack : IEquatable<PassthroughTrack>
         IsOriginal = isOriginal;
     }
 
+    /// <summary>
+    /// A track written again from what was read of one, such as an edited vocal part (charter-spec §4.2): not
+    /// <see cref="IsOriginal"/>.
+    /// </summary>
+    /// <param name="chunk">The whole chunk, header included, which the track takes over.</param>
+    /// <param name="name">The name of the track it was written from.</param>
+    internal static PassthroughTrack Rewritten(byte[] chunk, string? name) => new(chunk, name, isOriginal: false);
+
     /// <summary>The whole chunk, header included.</summary>
     public ReadOnlyMemory<byte> Chunk => _chunk;
 

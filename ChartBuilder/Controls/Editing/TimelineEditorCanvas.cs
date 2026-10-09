@@ -18,8 +18,9 @@ namespace ChartBuilder.Controls.Editing
         private const double MaxStripHeight = 48;
         private const double MarkHeight = 14;
 
-        // A vocal part's band of lyrics, under its rows.
+        // A vocal part's band of lyrics, under its rows, and its strip of phrases, above them.
         private const double LyricsHeight = 18;
+        private const double VocalPhraseHeight = 10;
 
         protected override LaneView View => LaneView.Timeline;
 
@@ -48,12 +49,15 @@ namespace ChartBuilder.Controls.Editing
         // Above the forcing marks.
         protected override double PhraseRailFrom(LaneProjection projection, int phraseRows) => projection.LaneFrom - MarkHeight - PhraseRailSize(phraseRows);
 
-        // A vocal part's rows are under the ruler, and its lyrics under them.
+        // A vocal part's phrase strip is under the ruler, its rows under that, and its lyrics under them.
         protected override LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead)
         {
-            double height = Math.Max(1, size.Height - RulerHeight - LyricsHeight);
-            return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), RulerHeight, height / slots.Slots.Count, slots, viewport, lookAhead);
+            double height = Math.Max(1, size.Height - RulerHeight - VocalPhraseHeight - LyricsHeight);
+            return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), RulerHeight + VocalPhraseHeight, height / slots.Slots.Count, slots, viewport, lookAhead);
         }
+
+        protected override Rect VocalPhraseArea(Size size, LaneProjection projection) =>
+            new(projection.TimeFrom, RulerHeight, projection.TimeLength, VocalPhraseHeight);
 
         protected override Rect LyricsArea(Size size, LaneProjection projection) =>
             new(projection.TimeFrom, projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count), projection.TimeLength, LyricsHeight);

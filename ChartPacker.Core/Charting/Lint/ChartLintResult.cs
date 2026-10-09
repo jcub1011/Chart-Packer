@@ -72,6 +72,8 @@ internal static class FindingOrder
 
         int c = CompareLocations(a.Location, b.Location);
         if (c == 0)
+            c = string.CompareOrdinal(a.Track, b.Track);
+        if (c == 0)
             c = Nullable.Compare(a.Tick, b.Tick);
         if (c == 0)
             c = string.CompareOrdinal(a.RuleId, b.RuleId);

@@ -31,6 +31,9 @@ public enum SongChanges
 
     /// <summary>The song's album art, a background or an audio track, staged for the next save; the chart is as it was.</summary>
     Media = 32,
+
+    /// <summary>A vocal part's track: added, or its notes, lyrics or phrases changed (charter-spec C3 item 7).</summary>
+    Vocals = 64,
 }
 
 /// <summary>

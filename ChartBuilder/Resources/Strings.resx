@@ -262,6 +262,94 @@
     <value>The highway goes here.</value>
     <comment>Stands in for a highway lane's editor.</comment>
   </data>
+  <data name="LaneAddVocalPartFormat" xml:space="preserve">
+    <value>Add {0}</value>
+    <comment>The button in a vocal lane whose part the chart hasn't, which adds it empty, with the lane's title, e.g. "Add Harmony 2".</comment>
+  </data>
+  <data name="PropertiesVocalNoteHeadingFormat" xml:space="preserve">
+    <value>Vocal note · {0}</value>
+    <comment>Properties' heading for one selected vocal note, with its part, e.g. "Vocal note · Harmony 1".</comment>
+  </data>
+  <data name="PropertiesVocalNotesHeadingFormat" xml:space="preserve">
+    <value>{0} vocal notes · {1}</value>
+    <comment>Properties' heading for several selected vocal notes: {0} is how many; {1} their part.</comment>
+  </data>
+  <data name="PropertiesVocalPhraseHeadingFormat" xml:space="preserve">
+    <value>Vocal phrase · {0}</value>
+    <comment>Properties' heading for one selected vocal phrase, with its part.</comment>
+  </data>
+  <data name="PropertiesVocalPhrasesHeadingFormat" xml:space="preserve">
+    <value>{0} vocal phrases · {1}</value>
+    <comment>Properties' heading for several selected vocal phrases: {0} is how many; {1} their part.</comment>
+  </data>
+  <data name="PropertiesPitchLabel" xml:space="preserve">
+    <value>Pitch</value>
+    <comment>A Properties field: a vocal note's MIDI pitch.</comment>
+  </data>
+  <data name="PropertiesPitchToolTip" xml:space="preserve">
+    <value>The MIDI pitch, 36 to 84, or a note name such as C4 or F#3.</value>
+    <comment>The tooltip of Properties' pitch field for vocal notes.</comment>
+  </data>
+  <data name="PropertiesSpokenPitch" xml:space="preserve">
+    <value>spoken</value>
+    <comment>Shown beside a spoken vocal note's pitch, which the games don't sing.</comment>
+  </data>
+  <data name="PropertiesBadPitch" xml:space="preserve">
+    <value>Enter a pitch from 36 to 84, or a note name such as C4 or F#3.</value>
+    <comment>Said when the pitch typed for vocal notes isn't one.</comment>
+  </data>
+  <data name="PropertiesLyricLabel" xml:space="preserve">
+    <value>Lyric</value>
+    <comment>A Properties field: a vocal note's lyric.</comment>
+  </data>
+  <data name="PropertiesLyricToolTip" xml:space="preserve">
+    <value>The syllable as the chart has it. A hyphen at the end joins it to the next; # marks it spoken; + is a slide from the note before.</value>
+    <comment>The tooltip of Properties' lyric field.</comment>
+  </data>
+  <data name="PropertiesSungLabel" xml:space="preserve">
+    <value>Sung</value>
+    <comment>A Properties field: how a vocal note is sung (slide, spoken).</comment>
+  </data>
+  <data name="PropertiesSlide" xml:space="preserve">
+    <value>Slide</value>
+    <comment>A Properties check box: the vocal note slides on from the one before (its lyric is +).</comment>
+  </data>
+  <data name="PropertiesSlideToolTip" xml:space="preserve">
+    <value>The note carries the one before it on to its pitch, with no syllable of its own.</value>
+    <comment>The tooltip of Properties' Slide check box.</comment>
+  </data>
+  <data name="PropertiesSpoken" xml:space="preserve">
+    <value>Spoken</value>
+    <comment>A Properties check box: the vocal note is spoken or shouted, not sung (its lyric ends #).</comment>
+  </data>
+  <data name="PropertiesSpokenToolTip" xml:space="preserve">
+    <value>The note is spoken or shouted, so the games don't score its pitch.</value>
+    <comment>The tooltip of Properties' Spoken check box.</comment>
+  </data>
+  <data name="PropertiesTypeLyricsButton" xml:space="preserve">
+    <value>Type lyrics…</value>
+    <comment>The Properties button that opens a box to type a line of lyrics for the selected vocal notes.</comment>
+  </data>
+  <data name="PropertiesTypeLyricsToolTip" xml:space="preserve">
+    <value>Type a line of lyrics to give the selected notes one syllable each, in order.</value>
+    <comment>The tooltip of the Type lyrics button.</comment>
+  </data>
+  <data name="PropertiesTypeLyricsHint" xml:space="preserve">
+    <value>One syllable a note, from the first selected; a slide is skipped. Spaces split words, and a hyphen splits a word into syllables: Hel-lo world.</value>
+    <comment>Type lyrics' explanation, above its box.</comment>
+  </data>
+  <data name="PropertiesTypeLyricsPlaceholder" xml:space="preserve">
+    <value>Hel-lo world</value>
+    <comment>Type lyrics' box when it's empty.</comment>
+  </data>
+  <data name="PropertiesTypeLyricsApply" xml:space="preserve">
+    <value>Apply</value>
+    <comment>The button that gives the typed lyrics to the selected notes.</comment>
+  </data>
+  <data name="PropertiesTypedLyricsLeftFormat" xml:space="preserve">
+    <value>{0} syllables had no note to go on.</value>
+    <comment>Said after Type lyrics when the line had more syllables than the selected notes, with how many were left.</comment>
+  </data>
   <data name="LaneNoVocalsFormat" xml:space="preserve">
     <value>The chart has no {0} part.</value>
     <comment>A vocals lane's placeholder when the chart hasn't the vocal track it shows, with the lane's title, e.g. "Harmony 2".</comment>
