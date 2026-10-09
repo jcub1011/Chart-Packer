@@ -17,15 +17,17 @@ namespace ChartPacker.UI.Controls.Highway
         private static readonly IBrush HopoMarkBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
         private static readonly IBrush TapBodyBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x16, 0x16, 0x1B));
 
-        // How opaque a ghost note's face is.
+        // How opaque a ghost note's face is, and its edge's dashes and the gaps between them, in pixels.
         private const double GhostOpacity = 0.45;
+        private const double GhostDash = 2;
+        private const double GhostGap = 1.5;
 
         private readonly Dictionary<Color, IBrush> _brushes = [];
         private readonly Dictionary<(Color, double), IPen> _pens = [];
-        private readonly Dictionary<Color, IPen> _dashedPens = [];
 
-        // A cymbal's shape for each size of gem, at the origin, moved to each gem drawn.
+        // A cymbal's shape for each size of gem, and a ghost cymbal's dashed edge, at the origin, moved to each gem drawn.
         private readonly Dictionary<Size, StreamGeometry> _cymbals = [];
+        private readonly Dictionary<Size, Geometry> _ghostCymbals = [];
 
         /// <summary>
         /// Draws a gem in <paramref name="rect"/>: a cymbal, a tap, or a flat gem with a HOPO's mark, as its flags say.
@@ -39,7 +41,7 @@ namespace ChartPacker.UI.Controls.Highway
             {
                 using (context.PushOpacity(GhostOpacity))
                     DrawFace(context, kind, note, color, rect, outlined);
-                DrawEdge(context, note, rect.Deflate(0.5), DashedPen(color));
+                DrawGhostEdge(context, note, rect.Deflate(0.5), color);
             }
             else
             {
@@ -164,12 +166,24 @@ namespace ChartPacker.UI.Controls.Highway
                 context.DrawGeometry(null, pen, Cymbal(rect.Size));
         }
 
-        /// <summary>A dashed pen of <paramref name="color"/>, for a ghost's edge, made once.</summary>
-        private IPen DashedPen(Color color)
+        /// <summary>Draws a ghost's dashed edge in <paramref name="color"/> round its shape in <paramref name="rect"/>.</summary>
+        private void DrawGhostEdge(DrawingContext context, ChartNote note, Rect rect, Color color)
         {
-            if (!_dashedPens.TryGetValue(color, out var pen))
-                _dashedPens[color] = pen = new ImmutablePen(color.ToUInt32(), 1, new ImmutableDashStyle([2, 1.5], 0));
-            return pen;
+            if ((note.Flags & NoteFlags.Cymbal) == 0)
+            {
+                DashedOutline.DrawRectangle(context, Pen(color, 1), rect, CornerOf(rect), GhostDash, GhostGap);
+                return;
+            }
+
+            if (!_ghostCymbals.TryGetValue(rect.Size, out var dashes))
+            {
+                if (_ghostCymbals.Count > 16)
+                    _ghostCymbals.Clear();
+                _ghostCymbals[rect.Size] = dashes = DashedOutline.Along(CymbalCorners(rect.Size), GhostDash, GhostGap);
+            }
+
+            using (context.PushTransform(Matrix.CreateTranslation(rect.X, rect.Y)))
+                context.DrawGeometry(null, Pen(color, 1), dashes);
         }
 
         /// <summary>A brush of <paramref name="color"/>, made once.</summary>
@@ -205,21 +219,33 @@ namespace ChartPacker.UI.Controls.Highway
             if (_cymbals.Count > 16)
                 _cymbals.Clear();
 
-            double point = Math.Min(size.Height * 0.6, size.Width * 0.25);
+            var corners = CymbalCorners(size);
             hexagon = new StreamGeometry();
             using (var g = hexagon.Open())
             {
-                g.BeginFigure(new Point(0, size.Height / 2), true);
-                g.LineTo(new Point(point, 0));
-                g.LineTo(new Point(size.Width - point, 0));
-                g.LineTo(new Point(size.Width, size.Height / 2));
-                g.LineTo(new Point(size.Width - point, size.Height));
-                g.LineTo(new Point(point, size.Height));
+                g.BeginFigure(corners[0], true);
+                for (int i = 1; i < corners.Length; i++)
+                    g.LineTo(corners[i]);
                 g.EndFigure(true);
             }
 
             _cymbals[size] = hexagon;
             return hexagon;
+        }
+
+        /// <summary>The corners of a cymbal's hexagon filling <paramref name="size"/> from the origin, in order round it.</summary>
+        private static Point[] CymbalCorners(Size size)
+        {
+            double point = Math.Min(size.Height * 0.6, size.Width * 0.25);
+            return
+            [
+                new Point(0, size.Height / 2),
+                new Point(point, 0),
+                new Point(size.Width - point, 0),
+                new Point(size.Width, size.Height / 2),
+                new Point(size.Width - point, size.Height),
+                new Point(point, size.Height),
+            ];
         }
     }
 }

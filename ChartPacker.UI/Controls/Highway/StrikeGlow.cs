@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
-using Avalonia.Media.Immutable;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 
 namespace ChartPacker.UI.Controls.Highway
 {
@@ -35,7 +37,15 @@ namespace ChartPacker.UI.Controls.Highway
         /// <summary>How opaque a column's beam is at full brightness.</summary>
         public const double BeamOpacity = 0.8;
 
-        private static readonly Dictionary<(Color, bool), IBrush> Beams = [];
+        // How opaque a beam is at the strike line, at full brightness, before BeamOpacity, out of 255; and how many steps its
+        // picture fades over, which smoothing stretches over any column without banding.
+        private const int BeamAlpha = 0x70;
+        private const int BeamSteps = 256;
+
+        // A gradient's pixels, smoothed between when stretched.
+        private static readonly RenderOptions Smooth = new() { BitmapInterpolationMode = BitmapInterpolationMode.LowQuality };
+
+        private static readonly Dictionary<(Color, bool), Bitmap> Beams = [];
 
         /// <summary>
         /// How brightly a note lights its column, from 0 to 1, <paramref name="since"/> seconds after it reached the strike
@@ -63,24 +73,52 @@ namespace ChartPacker.UI.Controls.Highway
         public static Color TargetEdge(Color color) => HighwayPalette.Lighten(color, 0.4);
 
         /// <summary>
-        /// A struck column's beam, made once: the column's colour at the strike line, clear at the far end. Vertical for a
-        /// highway, with the strike line at the bottom; across for a timeline, with the strike line on the left.
+        /// Draws a struck column's beam over <paramref name="rect"/>: the column's colour at the strike line, clear at the
+        /// far end. Vertical for a highway, with the strike line at the bottom; across for a timeline, with the strike line
+        /// on the left.
         /// </summary>
-        public static IBrush Beam(Color color, bool isVertical)
+        /// <remarks>
+        /// A picture of the beam, made once and stretched over the column, rather than a gradient brush: a gradient has
+        /// its shader made again each time it's drawn, and a beam is drawn every frame for every lit column.
+        /// </remarks>
+        public static void DrawBeam(DrawingContext context, Color color, bool isVertical, Rect rect)
         {
-            if (!Beams.TryGetValue((color, isVertical), out var brush))
+            using (context.PushRenderOptions(Smooth))
+                context.DrawImage(BeamOf(color, isVertical), rect);
+        }
+
+        /// <summary>The beam's picture: <see cref="BeamSteps"/> pixels from clear to the strike line's end, one across.</summary>
+        private static Bitmap BeamOf(Color color, bool isVertical)
+        {
+            if (Beams.TryGetValue((color, isVertical), out var beam))
+                return beam;
+
+            // Premultiplied BGRA, from the top of a highway down, or from a timeline's left across.
+            var pixels = new uint[BeamSteps];
+            for (int i = 0; i < BeamSteps; i++)
             {
-                var stops = new[]
-                {
-                    new ImmutableGradientStop(0, HighwayPalette.WithAlpha(color, 0)),
-                    new ImmutableGradientStop(1, HighwayPalette.WithAlpha(color, 0x70)),
-                };
-                Beams[(color, isVertical)] = brush = isVertical
-                    ? new ImmutableLinearGradientBrush(stops, startPoint: new RelativePoint(0.5, 0, RelativeUnit.Relative), endPoint: new RelativePoint(0.5, 1, RelativeUnit.Relative))
-                    : new ImmutableLinearGradientBrush(stops, startPoint: new RelativePoint(1, 0.5, RelativeUnit.Relative), endPoint: new RelativePoint(0, 0.5, RelativeUnit.Relative));
+                double along = (double)i / (BeamSteps - 1);
+                double share = (isVertical ? along : 1 - along) * BeamAlpha / 255;
+                uint alpha = (uint)Math.Round(share * 255);
+                uint red = (uint)Math.Round(color.R * share);
+                uint green = (uint)Math.Round(color.G * share);
+                uint blue = (uint)Math.Round(color.B * share);
+                pixels[i] = (alpha << 24) | (red << 16) | (green << 8) | blue;
             }
 
-            return brush;
+            var size = isVertical ? new PixelSize(1, BeamSteps) : new PixelSize(BeamSteps, 1);
+            var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+            try
+            {
+                beam = new Bitmap(PixelFormat.Bgra8888, AlphaFormat.Premul, handle.AddrOfPinnedObject(), size, new Vector(96, 96), size.Width * sizeof(uint));
+            }
+            finally
+            {
+                handle.Free();
+            }
+
+            Beams[(color, isVertical)] = beam;
+            return beam;
         }
     }
 }

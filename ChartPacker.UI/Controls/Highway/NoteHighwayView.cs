@@ -670,7 +670,7 @@ namespace ChartPacker.UI.Controls.Highway
                     if (hits[column] > 0)
                     {
                         using (context.PushOpacity(hits[column] * StrikeGlow.BeamOpacity))
-                            context.FillRectangle(StrikeGlow.Beam(HitColor(lane, column), isVertical: true), new Rect(bounds.X + (column * laneWidth), strike * (1 - StrikeGlow.BeamReach), laneWidth, strike * StrikeGlow.BeamReach));
+                            StrikeGlow.DrawBeam(context, HitColor(lane, column), isVertical: true, new Rect(bounds.X + (column * laneWidth), strike * (1 - StrikeGlow.BeamReach), laneWidth, strike * StrikeGlow.BeamReach));
                     }
                 }
 

@@ -48,6 +48,9 @@ namespace ChartBuilder.Controls.Editing
         // How near a note's start, or a phrase bar's end in the rail, the pointer hits it, in pixels.
         private const double HitPixels = 7;
 
+        // A short sustain's dashed outline's dashes, and the gaps between them, in pixels.
+        private const double ShortTailDash = 2;
+
         // The phrase rail's rows, across the view, in pixels: each one's thickness, the gap between them, and the margin
         // either side of the rail.
         private const double PhraseRowSize = 6;
@@ -160,9 +163,9 @@ namespace ChartBuilder.Controls.Editing
         private (ChartTrackKey Track, long Length)? _ghostLongest;
 
         // What's drawn every frame that would otherwise be made every frame: the pens in the accent, as of which accent,
-        // a short sustain's dashed outline by colour, and the chords whose forcing marks are drawn.
+        // a short sustain's outline's pen by colour, and the chords whose forcing marks are drawn.
         private (IBrush Accent, IPen Selected, IPen Cursor, IPen Focus)? _accentPens;
-        private readonly Dictionary<Color, IPen> _dashedPens = [];
+        private readonly Dictionary<Color, IPen> _shortTailPens = [];
         private readonly HashSet<long> _flagged = [];
 
         // The ticks of the measures' first beats, for numbering them; kept for the tempo map they're for.
@@ -1354,7 +1357,7 @@ namespace ChartBuilder.Controls.Editing
                 if (!isGhost && shown.Length == 0)
                 {
                     // Shorter than the sustain cutoff: the games read a plain note, so the tail is only dashed (C5 item 3).
-                    context.DrawRectangle(null, DashedPen(color), tail.Deflate(0.5));
+                    DashedOutline.DrawRectangle(context, ShortTailPen(color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
                 }
                 else
                 {
@@ -1508,7 +1511,7 @@ namespace ChartBuilder.Controls.Editing
                     : HighwayPalette.HitColor(kind, laneCount, column);
                 double edge = projection.LaneFrom + (column * projection.LaneSize);
                 using (context.PushOpacity(hit * StrikeGlow.BeamOpacity))
-                    context.FillRectangle(StrikeGlow.Beam(color, View == LaneView.Highway), Box(strike, strike + reach, edge, edge + projection.LaneSize));
+                    StrikeGlow.DrawBeam(context, color, View == LaneView.Highway, Box(strike, strike + reach, edge, edge + projection.LaneSize));
 
                 // The target, as opaque as the column is lit.
                 var rect = GemRect(projection, column, strike, size);
@@ -1649,11 +1652,14 @@ namespace ChartBuilder.Controls.Editing
             return made;
         }
 
-        /// <summary>A short sustain's dashed outline in <paramref name="color"/>, made once.</summary>
-        private IPen DashedPen(Color color)
+        /// <summary>
+        /// The pen of a short sustain's outline in <paramref name="color"/>, made once: plain, as the outline's dashes are
+        /// drawn as shapes (<see cref="DashedOutline"/>).
+        /// </summary>
+        private IPen ShortTailPen(Color color)
         {
-            if (!_dashedPens.TryGetValue(color, out var pen))
-                _dashedPens[color] = pen = new ImmutablePen(HighwayPalette.WithAlpha(color, 0xC0).ToUInt32(), 1, new ImmutableDashStyle([2, 2], 0));
+            if (!_shortTailPens.TryGetValue(color, out var pen))
+                _shortTailPens[color] = pen = new ImmutablePen(HighwayPalette.WithAlpha(color, 0xC0).ToUInt32(), 1);
             return pen;
         }
 
