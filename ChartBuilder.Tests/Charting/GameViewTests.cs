@@ -29,7 +29,7 @@ public sealed class GameViewTests
 
             var differences = ChartReadBack.Compare(view, read, GameView.Instruments);
             Assert.IsEmpty(differences, $"At a HOPO threshold of {threshold}: {Describe(differences)}");
-            Assert.AreSequenceEqual(read.Instruments.Where(i => i != ChartInstrument.Keys).ToList(), view.Instruments.ToList());
+            Assert.AreSequenceEqual(read.Instruments.Where(i => i != ChartInstrument.Keys).ToList(), [.. view.Instruments]);
         }
 
         Assert.HasCount(2, thresholds);
@@ -173,7 +173,7 @@ public sealed class GameViewTests
         // accents and ghosts, so they're read all the same.
         drums.ChartDynamics = false;
         var edited = GameView.Project(chart, ChartReadOptions.Default).Tracks[new ChartTrackKey(ChartInstrument.Drums, Expert)].Notes;
-        Assert.AreSequenceEqual(view.Tracks[new ChartTrackKey(ChartInstrument.Drums, Expert)].Notes.ToList(), edited.ToList());
+        Assert.AreSequenceEqual(view.Tracks[new ChartTrackKey(ChartInstrument.Drums, Expert)].Notes.ToList(), [.. edited]);
     }
 
     [TestMethod]

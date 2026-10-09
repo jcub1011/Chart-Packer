@@ -73,7 +73,7 @@ public sealed class InspectorEditsTests
     {
         var song = Opened([KeyValuePair.Create("name", "Same"), KeyValuePair.Create("song_length", "1000")]);
         song.AudioLengthMs = 90_000;
-        Assert.IsTrue(song.PendingChanges().Any(c => c.Key == "song_length"));
+        Assert.Contains(c => c.Key == "song_length", song.PendingChanges());
 
         song.SetValue("name", "Same");
         song.SetValue("song_length", "1000");
@@ -96,7 +96,7 @@ public sealed class InspectorEditsTests
         Assert.IsFalse(song.CanEdit("multiplier_note"));
         Assert.IsTrue(song.CanEdit("name"));
         Assert.AreEqual("True", song.PendingChanges().Single(c => c.Key == "pro_drums").Value);
-        Assert.IsFalse(song.PendingChanges().Any(c => c.Key == "multiplier_note"));
+        Assert.DoesNotContain(c => c.Key == "multiplier_note", song.PendingChanges());
     }
 
     [TestMethod]
@@ -142,7 +142,7 @@ public sealed class InspectorEditsTests
         song.SetDelay(0);
 
         Assert.AreEqual(TimeSpan.Zero, song.Delay);
-        Assert.IsFalse(song.EffectivePairs().Any(p => p.Key == "delay_seconds"));
+        Assert.DoesNotContain(p => p.Key == "delay_seconds", song.EffectivePairs());
     }
 
     [TestMethod]
@@ -196,7 +196,7 @@ public sealed class InspectorEditsTests
         Assert.AreEqual("Band", reopened.Value("artist"));
         Assert.IsNull(reopened.Value("album"));
         Assert.IsFalse(File.Exists(Path.Combine(folder, "album.jpg")));
-        CollectionAssert.AreEqual(new byte[] { 9, 8, 7 }, await File.ReadAllBytesAsync(Path.Combine(folder, "album.png"), Token));
+        Assert.AreSequenceEqual(new byte[] { 9, 8, 7 }, await File.ReadAllBytesAsync(Path.Combine(folder, "album.png"), Token));
         Assert.IsFalse(song.HasUserChanges);
         Assert.IsEmpty(song.PendingChanges());
         Assert.Contains("album.png", song.Opened!.StoredNames);
@@ -225,7 +225,7 @@ public sealed class InspectorEditsTests
 
         string folder = await ChartSaver.SaveNewAsync(new NewSongTarget(_folders.Root, "New"), request, ChartSaver.Check(request), [], Token);
 
-        CollectionAssert.AreEqual(new byte[] { 4, 5, 6 }, await File.ReadAllBytesAsync(Path.Combine(folder, "album.jpeg"), Token));
+        Assert.AreSequenceEqual(new byte[] { 4, 5, 6 }, await File.ReadAllBytesAsync(Path.Combine(folder, "album.jpeg"), Token));
         Assert.AreEqual("Song", (await OpenAsync(folder, Token)).Value("name"));
     }
 
@@ -244,7 +244,7 @@ public sealed class InspectorEditsTests
 
         var recovered = Autosave.Recover(await OpenAsync(folder, Token), store.Find(folder)!);
 
-        Assert.AreSequenceEqual(song.Edits.ToList(), recovered.Edits.ToList());
+        Assert.AreSequenceEqual(song.Edits.ToList(), [.. recovered.Edits]);
         Assert.AreEqual(new AlbumArtChange(@"C:\Pictures\cover.png"), recovered.AlbumArt);
         Assert.AreEqual("Renamed", recovered.PendingChanges().Single(c => c.Key == "name").Value);
     }

@@ -71,9 +71,17 @@ namespace ChartBuilder.ViewModels
         public static LaneMenuItem Submenu(string header, IReadOnlyList<LaneMenuItem> items) =>
             new(header, items, null, items.Any(static i => i.IsEnabled), isChecked: false);
 
-        /// <summary>What a lane showing <paramref name="part"/> is headed, e.g. "Guitar · Expert" or "Harmony 2".</summary>
+        /// <summary>A line between groups of items.</summary>
+        public static LaneMenuItem Separator { get; } = new(string.Empty, null, null, isEnabled: false, isChecked: false);
+
+        public bool IsSeparator => ReferenceEquals(this, Separator);
+
+        /// <summary>
+        /// What a lane showing <paramref name="part"/> is headed, e.g. "Guitar" or "Harmony 2": a highway's difficulty is
+        /// shown beside it, by its letters.
+        /// </summary>
         public static string TitleOf(LanePart part) => part.Track is { } track
-            ? string.Format(CultureInfo.CurrentCulture, Strings.LaneTitleFormat, ChartLabels.InstrumentName(track.Instrument), ChartLabels.DifficultyName(track.Difficulty))
+            ? ChartLabels.InstrumentName(track.Instrument)
             : VocalName(part.Vocal!.Value);
 
         private static string VocalName(VocalTrack vocal) => vocal switch

@@ -108,7 +108,7 @@ public sealed class FillGeneratorTests
         var generated = Propose(chart, DrumsVariant.Pro);
 
         Assert.AreSequenceEqual([2L, 6L, 11L, 15L, 19L], StartMeasures(generated));
-        Assert.IsFalse(generated.Proposals.Any(p => p.Fill.Overlaps(third)));
+        Assert.DoesNotContain(p => p.Fill.Overlaps(third), generated.Proposals);
     }
 
     [TestMethod]

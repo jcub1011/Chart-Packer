@@ -42,16 +42,15 @@ public sealed class EditorSessionStatusTests
     }
 
     [TestMethod]
-    public void ARefusedPlacementIsPosted()
+    public void ARefusedEditIsPosted()
     {
-        // An open note can't join a chord with frets (C5 item 2), which the session says why.
-        var session = Of(Guitar());
-        session.Tool = EditorTool.Place;
-        Click(session, At(session, 0, 1));
+        // A 2x kick is on Expert only (C6 item 2), which the session says why.
+        var hard = new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Hard);
+        var session = Of(Drums(), focused: hard);
         var posted = new List<string>();
         session.StatusPosted += (_, status) => posted.Add(status);
 
-        Click(session, At(session, 0, ChartNote.OpenLane), EditorModifiers.Shift);
+        session.Tools.ToggleDoubleKickAtCursor();
 
         Assert.HasCount(1, posted);
         Assert.AreEqual(session.Status, posted[0]);

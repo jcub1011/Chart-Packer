@@ -37,7 +37,7 @@ public sealed class EditorViewportTests
         double timelineFraction = (timeline.StrikeAlong - timeline.TimeFrom) / timeline.TimeLength;
         Assert.AreEqual(EditorViewport.StrikeFraction, highwayFraction, 1e-9);
         Assert.AreEqual(EditorViewport.StrikeFraction, timelineFraction, 1e-9);
-        Assert.AreSequenceEqual(selected, session.Selection.Places.ToList());
+        Assert.AreSequenceEqual(selected, [.. session.Selection.Places]);
     }
 
     [TestMethod]

@@ -58,7 +58,7 @@ public sealed class TrackStagingTests
     {
         var options = TrackStaging.OptionsFor(["guitar"], _ => new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }));
 
-        Assert.AreEqual(ChartPacker.Core.Scanning.AudioStems.Stems.Count, options.Count);
+        Assert.HasCount(ChartPacker.Core.Scanning.AudioStems.Stems.Count, options);
         Assert.AreNotEqual("guitar", options.Single(o => o.Stem == "guitar").Label);
         Assert.AreEqual("bass", options.Single(o => o.Stem == "bass").Label);
     }

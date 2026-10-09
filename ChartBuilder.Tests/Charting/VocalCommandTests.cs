@@ -50,7 +50,7 @@ public sealed class VocalCommandTests
 
         var after = AppliesRevertsAndRedoes(chart, new AddVocalPart(VocalTrack.Harmony2));
 
-        Assert.AreEqual(before + 1, after.Passthrough.Count);
+        Assert.HasCount(before + 1, after.Passthrough);
         Assert.AreEqual("HARM2", chart.Passthrough[^1].Name);
         Assert.IsEmpty(Content(chart, VocalTrack.Harmony2).Notes);
         Refuses<InvalidOperationException>(chart, new AddVocalPart(VocalTrack.Harmony2));
@@ -90,11 +90,11 @@ public sealed class VocalCommandTests
 
         Assert.IsTrue(result.IsValid, DescribeModel(result.ModelDifferences));
         var vocals = VocalReader.Read(result.Bytes, "notes.mid");
-        Assert.AreSequenceEqual(new[] { "PART VOCALS", "HARM1" }, vocals.Parts.Select(p => p.TrackName).ToArray());
+        Assert.AreSequenceEqual(new[] { "PART VOCALS", "HARM1" }, [.. vocals.Parts.Select(p => p.TrackName)]);
         var main = vocals.Parts[0];
-        Assert.AreSequenceEqual(new[] { new VocalNote(0, 240, 60), new VocalNote(480, 240, 64) }, main.Notes.ToArray());
-        Assert.AreSequenceEqual(new[] { new VocalLyric(0, "Hel-"), new VocalLyric(480, "lo") }, main.Lyrics.ToArray());
-        Assert.AreSequenceEqual(new[] { new VocalPhrase(0, 960) }, main.Phrases.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNote(0, 240, 60), new VocalNote(480, 240, 64) }, [.. main.Notes]);
+        Assert.AreSequenceEqual(new[] { new VocalLyric(0, "Hel-"), new VocalLyric(480, "lo") }, [.. main.Lyrics]);
+        Assert.AreSequenceEqual(new[] { new VocalPhrase(0, 960) }, [.. main.Phrases]);
     }
 
     private static VocalTrackContent Content(EditableChart chart, VocalTrack track) =>

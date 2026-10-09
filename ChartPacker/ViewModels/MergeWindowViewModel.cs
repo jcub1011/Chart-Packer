@@ -571,7 +571,7 @@ namespace ChartPacker.ViewModels
                     difficultyItems: has && difficulties is not null
                         ? difficulties(i).Select(d => new MergeDifficultyItem(d, ChartLabels.DifficultyLetter(d))).ToList()
                         : [],
-                    noteCountItems: noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture))).ToList(),
+                    noteCountItems: [.. noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture)))],
                     warning: warning?.Invoke(i)));
             }
 

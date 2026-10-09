@@ -47,21 +47,33 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void AnOpenNoteIsNotPlacedInAChordWithFretsNorAFretOnAnOpen(LaneView view)
+    public void AnOpenNoteIsPlacedInAChordWithFretsAndAFretOnAnOpen(LaneView view)
     {
-        // C5 item 2.
+        // C5 item 2: YARG plays an open note in a chord with frets, and charts have them.
         var session = Of(Guitar());
         session.Tool = EditorTool.Place;
         Click(session, At(session, 0, 1, view));
-        Click(session, At(session, 480, 1, view), EditorModifiers.Shift);
+        Click(session, At(session, 480, 1, view), EditorModifiers.Control);
 
-        Click(session, At(session, 0, 0, view), EditorModifiers.Shift);
-        Assert.IsNotNull(session.Status);
+        Click(session, At(session, 0, 0, view), EditorModifiers.Control);
         Click(session, At(session, 480, 3, view));
-        Assert.IsNotNull(session.Status);
 
-        Assert.AreSequenceEqual([new EditableNote(0, 1, 1), new EditableNote(480, 1, Open)], Expert(session).Notes.ToList());
-        Assert.AreEqual(2, session.UndoStack.UndoCount);
+        Assert.AreSequenceEqual(
+            [new EditableNote(0, 1, Open), new EditableNote(0, 1, 1), new EditableNote(480, 1, Open), new EditableNote(480, 1, 3)],
+            Expert(session).Notes.ToList());
+        Assert.AreEqual(4, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void ShiftWithThePlaceToolPlacesInTheColumnClicked(LaneView view)
+    {
+        var session = Of(Guitar());
+        session.Tool = EditorTool.Place;
+
+        Click(session, At(session, 0, 2, view), EditorModifiers.Shift);
+
+        Assert.AreSequenceEqual([new EditableNote(0, 1, 2)], Expert(session).Notes.ToList());
     }
 
     [TestMethod]
@@ -156,8 +168,10 @@ public sealed class EditorToolsTests
         var track = Expert(session);
         track.Notes.Add(new EditableNote(0, 1, 0));
         track.Notes.Add(new EditableNote(240, 1, 1));
-        session.Selection.Select(GuitarExpert, track.Notes);
+
+        // Selected with the tool picked, as Ctrl+A selects: leaving the select tool selects nothing.
         session.Tool = EditorTool.Sustain;
+        session.Selection.Select(GuitarExpert, track.Notes);
 
         DragFromTo(session, At(session, 0, 0, view), At(session, 950, 0, view));
 
@@ -219,10 +233,11 @@ public sealed class EditorToolsTests
         session.Tools.ToggleNoteAtCursor(2);
         Assert.AreSequenceEqual([new EditableNote(960, 1, 2)], Expert(session).Notes.ToList());
         session.Tools.ToggleNoteAtCursor(Open);
-        Assert.IsNotNull(session.Status, "An open can't join the chord.");
+        Assert.AreSequenceEqual([new EditableNote(960, 1, Open), new EditableNote(960, 1, 2)], Expert(session).Notes.ToList(), "An open joins the chord.");
         session.Tools.ToggleNoteAtCursor(2);
+        session.Tools.ToggleNoteAtCursor(Open);
         Assert.IsEmpty(Expert(session).Notes);
-        Assert.AreEqual(2, session.UndoStack.UndoCount);
+        Assert.AreEqual(4, session.UndoStack.UndoCount);
     }
 
     [TestMethod]

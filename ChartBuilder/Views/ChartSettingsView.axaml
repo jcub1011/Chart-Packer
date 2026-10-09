@@ -4,6 +4,7 @@
              xmlns:res="using:ChartBuilder.Resources"
              xmlns:ui="using:ChartPacker.UI.Controls"
              xmlns:uiviews="using:ChartPacker.UI.Views"
+             xmlns:conv="using:ChartPacker.UI.Converters"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="900"
@@ -35,16 +36,42 @@
         <Style Selector="StackPanel.field">
             <Setter Property="Spacing" Value="4" />
         </Style>
-        <!-- A part's rating: a narrow box, empty while the part is unrated. -->
-        <Style Selector="NumericUpDown.rating">
-            <Setter Property="Width" Value="96" />
-            <Setter Property="Minimum" Value="0" />
-            <Setter Property="Maximum" Value="99" />
-            <Setter Property="Increment" Value="1" />
-            <Setter Property="FormatString" Value="0" />
-            <Setter Property="ParsingNumberStyle" Value="Integer" />
+        <!-- A part's rating while the part is unticked: faded, as it can't be picked. -->
+        <Style Selector="Button.preset:disabled Border.presetFace">
+            <Setter Property="Opacity" Value="0.4" />
         </Style>
     </UserControl.Styles>
+
+    <UserControl.Resources>
+        <!-- A song.ini tier, 0 to 6 and up; unset is grey. -->
+        <conv:DifficultyBrushConverter x:Key="DifficultyTierBrush"
+                                       Level0="{StaticResource DifficultyTier0Brush}"
+                                       Level1="{StaticResource DifficultyTier1Brush}"
+                                       Level2="{StaticResource DifficultyTier2Brush}"
+                                       Level3="{StaticResource DifficultyTier3Brush}"
+                                       Level4="{StaticResource DifficultyTier4Brush}"
+                                       Level5="{StaticResource DifficultyTier5Brush}"
+                                       Level6="{StaticResource DifficultyTier6Brush}"
+                                       Fallback="{StaticResource DifficultyUnsetBrush}" />
+        <!-- A part's rating: its tier's swatch, ? while it's unrated, as the flyout it opens shows each tier. -->
+        <DataTemplate x:Key="RatingTemplate" x:DataType="vm:ChartRatingViewModel">
+            <Button Classes="preset"
+                    VerticalAlignment="Center"
+                    ToolTip.Tip="{x:Static res:Strings.ChartSettingsDifficultyToolTip}"
+                    AutomationProperties.Name="{Binding Name}">
+                <Border Classes="presetFace"
+                        Classes.unset="{Binding Tier, Converter={x:Static ObjectConverters.IsNull}}"
+                        Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}">
+                    <TextBlock Text="{Binding Text}" />
+                </Border>
+                <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedRight">
+                        <uiviews:DifficultyPicker />
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="16,14" Spacing="10">
@@ -125,7 +152,8 @@
                        Text="{Binding ChartSettings.Problem}"
                        IsVisible="{Binding ChartSettings.HasProblem}" />
 
-            <!-- A row per part: ticked when the chart has it, with its rating beside it, which the box's x clears. -->
+            <!-- A row per part: ticked when the chart has it, with its rating beside it, which opens the inspector's
+                 difficulty flyout. -->
             <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />
             <Border Classes="section">
                 <StackPanel Spacing="8" Grid.IsSharedSizeScope="True">
@@ -134,7 +162,6 @@
                             <ColumnDefinition Width="14" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" SharedSizeGroup="PartRating" />
-                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartClear" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="2" Classes="muted" FontSize="12" Text="{x:Static res:Strings.ChartSettingsDifficultyHeader}" />
                     </Grid>
@@ -148,7 +175,6 @@
                                             <ColumnDefinition Width="14" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="PartRating" />
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartClear" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Classes="marker" VerticalAlignment="Center" Text="{Binding Marker}" />
                                         <CheckBox Grid.Column="1"
@@ -156,20 +182,10 @@
                                                   Content="{Binding Label}"
                                                   IsChecked="{Binding IsChecked}"
                                                   ToolTip.Tip="{x:Static res:Strings.ChartSettingsPartToolTip}" />
-                                        <NumericUpDown Grid.Column="2"
-                                                       Classes="rating"
-                                                       Value="{Binding Difficulty}"
-                                                       IsEnabled="{Binding IsChecked}"
-                                                       ToolTip.Tip="{x:Static res:Strings.ChartSettingsDifficultyToolTip}"
-                                                       AutomationProperties.Name="{Binding Label}" />
-                                        <Button Grid.Column="3"
-                                                Classes="icon"
-                                                VerticalAlignment="Center"
-                                                Command="{Binding ClearDifficultyCommand}"
-                                                ToolTip.Tip="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}">
-                                            <PathIcon Width="10" Height="10" Data="{StaticResource RemoveIconGeometry}" />
-                                        </Button>
+                                        <ContentControl Grid.Column="2"
+                                                        Content="{Binding Rating}"
+                                                        ContentTemplate="{StaticResource RatingTemplate}"
+                                                        IsEnabled="{Binding IsChecked}" />
                                     </Grid>
                                     <!-- Pro drums have a rating of their own, diff_drums_real, beside the drums'. -->
                                     <Grid ColumnSpacing="6" IsVisible="{Binding HasProDifficulty}">
@@ -177,26 +193,15 @@
                                             <ColumnDefinition Width="14" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="PartRating" />
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="PartClear" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="1"
                                                    Margin="28,0,0,0"
                                                    VerticalAlignment="Center"
                                                    Text="{x:Static res:Strings.ChartSettingsProDrumsDifficultyLabel}" />
-                                        <NumericUpDown Grid.Column="2"
-                                                       Classes="rating"
-                                                       Value="{Binding ProDifficulty}"
-                                                       IsEnabled="{Binding IsChecked}"
-                                                       ToolTip.Tip="{x:Static res:Strings.ChartSettingsDifficultyToolTip}"
-                                                       AutomationProperties.Name="{x:Static res:Strings.ChartSettingsProDrumsDifficultyLabel}" />
-                                        <Button Grid.Column="3"
-                                                Classes="icon"
-                                                VerticalAlignment="Center"
-                                                Command="{Binding ClearProDifficultyCommand}"
-                                                ToolTip.Tip="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}"
-                                                AutomationProperties.Name="{x:Static res:Strings.ChartSettingsClearDifficultyToolTip}">
-                                            <PathIcon Width="10" Height="10" Data="{StaticResource RemoveIconGeometry}" />
-                                        </Button>
+                                        <ContentControl Grid.Column="2"
+                                                        Content="{Binding ProRating}"
+                                                        ContentTemplate="{StaticResource RatingTemplate}"
+                                                        IsEnabled="{Binding IsChecked}" />
                                     </Grid>
                                 </StackPanel>
                             </DataTemplate>

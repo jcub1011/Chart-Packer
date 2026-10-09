@@ -182,9 +182,9 @@ public sealed class TempoAndPartCommandTests
 
         var after = AppliesRevertsAndRedoes(chart, command);
 
-        Assert.AreSequenceEqual(command.Tempos, after.TempoMap.Tempos.ToList());
-        Assert.AreSequenceEqual(command.TimeSignatures, after.TempoMap.TimeSignatures.ToList());
-        Assert.AreSequenceEqual(command.Anchors, after.TempoMap.Anchors.ToList());
+        Assert.AreSequenceEqual(command.Tempos, [.. after.TempoMap.Tempos]);
+        Assert.AreSequenceEqual(command.TimeSignatures, [.. after.TempoMap.TimeSignatures]);
+        Assert.AreSequenceEqual(command.Anchors, [.. after.TempoMap.Anchors]);
         Assert.IsNull(command.Report);
         Assert.IsEmpty(command.Collisions);
         ChartTickSnapshot.Refill(after.TempoMap.Tempos, [.. before.TempoMap.Tempos]);
@@ -206,7 +206,7 @@ public sealed class TempoAndPartCommandTests
 
         Assert.IsNotNull(command.Report);
         Assert.IsGreaterThan(0, command.Report.PassthroughTracks);
-        Assert.IsTrue(after.Passthrough.Any(p => !p.IsOriginal));
+        Assert.Contains(p => !p.IsOriginal, after.Passthrough);
         Assert.IsTrue(command.Affected.TempoMapChanged);
         command.Revert(chart);
         Assert.AreSequenceEqual(original, chart.Passthrough);

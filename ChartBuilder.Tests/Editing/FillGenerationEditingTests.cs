@@ -27,7 +27,7 @@ public sealed class FillGenerationEditingTests
         Assert.HasCount(5, session.Fills.Proposals);
         Assert.AreEqual(5, session.Fills.KeptCount);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
-        Assert.IsFalse(Fills(session).Any());
+        Assert.IsEmpty(Fills(session));
         Assert.IsNull(session.Status);
     }
 
@@ -91,7 +91,7 @@ public sealed class FillGenerationEditingTests
         Assert.IsNull(session.Status);
 
         session.Undo();
-        Assert.IsFalse(Fills(session).Any());
+        Assert.IsEmpty(Fills(session));
         session.Redo();
         Assert.HasCount(3, Fills(session).ToList());
     }
@@ -121,7 +121,7 @@ public sealed class FillGenerationEditingTests
         Assert.IsFalse(session.Fills.IsActive);
         Assert.IsEmpty(session.Fills.Proposals);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
-        Assert.IsFalse(Fills(session).Any());
+        Assert.IsEmpty(Fills(session));
     }
 
     [TestMethod]
@@ -137,7 +137,7 @@ public sealed class FillGenerationEditingTests
 
         Assert.IsFalse(session.Fills.IsActive);
         Assert.HasCount(1, said);
-        StringAssert.Contains(said[0], "dropped");
+        Assert.Contains("dropped", said[0]);
 
         // An undo is a change too.
         session.Fills.Start(FillOptions.Default, null);
@@ -154,7 +154,7 @@ public sealed class FillGenerationEditingTests
         session.SetSongSettings([], TimeSpan.FromSeconds(1));
 
         Assert.IsFalse(session.Fills.IsActive);
-        StringAssert.Contains(session.Status, "dropped");
+        Assert.Contains("dropped", session.Status);
     }
 
     [TestMethod]
@@ -175,7 +175,7 @@ public sealed class FillGenerationEditingTests
         Assert.HasCount(1, said);
         Assert.IsNotNull(session.Status);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
-        Assert.IsFalse(Fills(session).Any());
+        Assert.IsEmpty(Fills(session));
     }
 
     [TestMethod]
@@ -218,7 +218,7 @@ public sealed class FillGenerationEditingTests
         Assert.IsFalse(session.Fills.Start(FillOptions.Default, null));
 
         Assert.IsFalse(session.Fills.IsActive);
-        StringAssert.Contains(session.Status, "second star power phrase");
+        Assert.Contains("second star power phrase", session.Status);
     }
 
     [TestMethod]

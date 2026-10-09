@@ -1,9 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ChartPacker.UI.ViewModels;
@@ -29,20 +27,6 @@ namespace ChartPacker.UI.Views
             };
             NewKeyBox.AddHandler(PointerReleasedEvent, OnKeyBoxPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
             NewKeyBox.AddHandler(KeyDownEvent, OnKeyBoxKeyDown, RoutingStrategies.Tunnel);
-        }
-
-        /// <summary>
-        /// Choosing a difficulty in an instrument's flyout closes it. The flyout is a popup of its own,
-        /// so the button it belongs to is found through the popup it's shown in.
-        /// </summary>
-        /// <remarks>
-        /// A button raises Click before it runs its command, and closing the flyout takes the button
-        /// out of the tree, which clears its bound command. So the flyout closes once the command has run.
-        /// </remarks>
-        private void OnDifficultyChosen(object? sender, RoutedEventArgs e)
-        {
-            if (sender is ILogical control && control.FindLogicalAncestorOfType<Popup>() is { PlacementTarget: Button { Flyout: { } flyout } })
-                Dispatcher.UIThread.Post(flyout.Hide);
         }
 
         /// <summary>Clicking away from a value's edit box keeps what was typed, like pressing Enter.</summary>

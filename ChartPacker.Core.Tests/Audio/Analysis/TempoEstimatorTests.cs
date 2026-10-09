@@ -93,7 +93,7 @@ public sealed class TempoEstimatorTests
 
         var unsure = proposal.Regions.Where(r => r.IsLowConfidence).ToList();
         Assert.IsNotEmpty(unsure, string.Join("; ", proposal.Regions));
-        Assert.IsTrue(unsure.Any(r => proposal.Beats[r.LastBeat] > middleFrom + 1 && proposal.Beats[r.FirstBeat] < middleFrom + 9),
+        Assert.Contains(r => proposal.Beats[r.LastBeat] > middleFrom + 1 && proposal.Beats[r.FirstBeat] < middleFrom + 9, unsure,
             "The stretch without a steady beat is marked.");
         Assert.AreEqual(120, proposal.Bpm!.Value, 0.1);
     }

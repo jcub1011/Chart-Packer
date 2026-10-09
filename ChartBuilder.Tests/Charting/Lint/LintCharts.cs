@@ -101,7 +101,7 @@ internal static class LintCharts
             Assert.Fail($"{rule} {when}: {want.Count} findings expected, {got.Count} found. Missing: {string.Join("; ", missing)}. Extra: {string.Join("; ", extra)}.");
         }
 
-        Assert.AreSequenceEqual(expected.Findings.ToList(), actual.Findings.ToList(), when);
+        Assert.AreSequenceEqual(expected.Findings.ToList(), [.. actual.Findings], when);
     }
 
     public static string Describe(Finding finding) => finding.Location is { } l

@@ -36,7 +36,7 @@ public sealed class ChartSettingsCommandTests
         Assert.AreSequenceEqual([new TempoAnchor(3840, 2_000_000)], after.TempoMap.Anchors.ToList());
         Assert.AreEqual(7680, after.TempoMap.TimeSignatures[^1].Tick);
         var notes = before.PartOf(Guitar)![Expert].Notes.Select(n => n with { Tick = n.Tick * 2, Length = n.Length * 2 }).ToList();
-        Assert.AreSequenceEqual(notes, after.PartOf(Guitar)![Expert].Notes.ToList());
+        Assert.AreSequenceEqual(notes, [.. after.PartOf(Guitar)![Expert].Notes]);
         Assert.AreEqual(1920, after.Events.Single(e => e.Text == "[section Intro]").Tick);
         Assert.AreEqual(3840, after.PartOf(Drums)!.Phrases.Single(p => p.Kind == PhraseKind.DrumFill).Tick);
         Assert.AreSame(before.Passthrough[0], after.Passthrough[0], "A track with nothing after tick 0 isn't re-ticked.");
@@ -201,7 +201,7 @@ public sealed class ChartSettingsCommandTests
 
         Assert.AreEqual(new TempoChange(0, 400_000), after.TempoMap.Tempos[0]);
         Assert.AreEqual(new TimeSignatureMarker(0, 3, 4), after.TempoMap.TimeSignatures[0]);
-        Assert.AreSequenceEqual(before.PartOf(Guitar)![Expert].Notes.ToList(), after.PartOf(Guitar)![Expert].Notes.ToList());
+        Assert.AreSequenceEqual(before.PartOf(Guitar)![Expert].Notes.ToList(), [.. after.PartOf(Guitar)![Expert].Notes]);
     }
 
     [TestMethod]
@@ -268,8 +268,8 @@ public sealed class ChartSettingsCommandTests
         Assert.AreEqual(DrumsVariant.FourLane, after.DrumsVariant);
         var afterDrums = after.PartOf(Drums)!;
         for (int i = 0; i < notes.Count; i++)
-            Assert.AreSequenceEqual(notes[i], afterDrums.Tracks[i].Notes.ToList());
-        Assert.AreSequenceEqual(markers, afterDrums.TomMarkers.ToList());
+            Assert.AreSequenceEqual(notes[i], [.. afterDrums.Tracks[i].Notes]);
+        Assert.AreSequenceEqual(markers, [.. afterDrums.TomMarkers]);
     }
 
     [TestMethod]

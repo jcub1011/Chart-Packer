@@ -85,7 +85,7 @@ public sealed class CalibrationScheduleTests
         CollectionAssert.AllItemsAreUnique(frames);
         Assert.AreEqual(schedule.FrameOf(0), frames[0]);
         Assert.AreEqual((long)Math.Round((2 + 0.3 - 0.25) * Rate), frames[0]);
-        CollectionAssert.AreEqual(Enumerable.Range(0, frames.Count).Select(k => schedule.FrameOf(k)).ToList(), frames);
+        Assert.AreSequenceEqual(Enumerable.Range(0, frames.Count).Select(k => schedule.FrameOf(k)).ToList(), frames);
     }
 
     [TestMethod]
@@ -112,7 +112,7 @@ public sealed class CalibrationScheduleTests
     {
         var beats = new CalibrationBeats(FirstBeat: 0, Period: CalibrationBeats.TapPeriod, BeatsPerBar: 0, Count: 16);
 
-        Assert.IsFalse(Enumerable.Range(0, 16).Any(b => beats.IsMarked(b)));
+        Assert.DoesNotContain(b => beats.IsMarked(b), Enumerable.Range(0, 16));
     }
 
     private sealed record Played(float[] Written, CalibrationBeats Beats, double AnchorClock);

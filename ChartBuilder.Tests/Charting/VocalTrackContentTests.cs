@@ -77,12 +77,12 @@ public sealed class VocalTrackContentTests
     public void TheVelocitiesAndHowLyricsAreWrittenAreKept()
     {
         var content = VocalTrackContent.Of(Track("note-off events"));
-        Assert.AreSequenceEqual(new[] { 100, 90 }, content.Notes.Select(n => n.Velocity).ToArray());
+        Assert.AreSequenceEqual(new[] { 100, 90 }, [.. content.Notes.Select(n => n.Velocity)]);
 
         var text = VocalTrackContent.Of(Track("text lyrics"));
         Assert.IsTrue(text.Lyrics.All(l => l.Type == VocalTrackContent.TextType));
         var rewritten = VocalTrackContent.Of(text.With(notes: text.Notes.Select(n => n with { Pitch = n.Pitch + 1 })).Write());
-        Assert.AreSequenceEqual(text.Lyrics.ToArray(), rewritten.Lyrics.ToArray());
+        Assert.AreSequenceEqual([.. text.Lyrics], [.. rewritten.Lyrics]);
     }
 
     [TestMethod]
@@ -107,7 +107,7 @@ public sealed class VocalTrackContentTests
 
         Assert.AreSequenceEqual(
             new[] { new VocalNoteEvent(0, 480, 60), new VocalNoteEvent(240, 240, 62), new VocalNoteEvent(480, 240, 60) },
-            edited.Notes.ToArray());
+            [.. edited.Notes]);
         AssertSamePart(edited.ToPart(), VocalReader.ReadPart(edited.Write()));
     }
 
@@ -150,8 +150,8 @@ public sealed class VocalTrackContentTests
 
         Assert.IsTrue(result.IsValid, DescribeModel(result.ModelDifferences));
         var vocals = VocalReader.Read(result.Bytes, "notes.mid").Main!;
-        Assert.AreSequenceEqual(new[] { 62, 64 }, vocals.Notes.Select(n => n.Pitch).ToArray());
-        Assert.AreSequenceEqual(new[] { "Hel-", "lo" }, vocals.Lyrics.Select(l => l.Text).ToArray());
+        Assert.AreSequenceEqual(new[] { 62, 64 }, [.. vocals.Notes.Select(n => n.Pitch)]);
+        Assert.AreSequenceEqual(new[] { "Hel-", "lo" }, [.. vocals.Lyrics.Select(l => l.Text)]);
     }
 
     private static PassthroughTrack Track(string shape)
@@ -163,9 +163,9 @@ public sealed class VocalTrackContentTests
     private static void AssertSamePart(VocalPart expected, VocalPart actual)
     {
         Assert.AreEqual(expected.TrackName, actual.TrackName);
-        Assert.AreSequenceEqual(expected.Notes.ToArray(), actual.Notes.ToArray(), "notes");
-        Assert.AreSequenceEqual(expected.Lyrics.ToArray(), actual.Lyrics.ToArray(), "lyrics");
-        Assert.AreSequenceEqual(expected.Phrases.ToArray(), actual.Phrases.ToArray(), "phrases");
+        Assert.AreSequenceEqual([.. expected.Notes], [.. actual.Notes], "notes");
+        Assert.AreSequenceEqual([.. expected.Lyrics], [.. actual.Lyrics], "lyrics");
+        Assert.AreSequenceEqual([.. expected.Phrases], [.. actual.Phrases], "phrases");
     }
 
     // The events kept, each as its tick and bytes.

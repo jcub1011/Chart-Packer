@@ -108,7 +108,7 @@ public sealed class TrackCommandTests
 
         var after = AppliesRevertsAndRedoes(chart, new ReplaceTrack(Drums, Hard, [Note(240, 3)], []));
 
-        Assert.AreSequenceEqual(mixes, after.PartOf(Drums)![Hard].Mixes.ToList());
+        Assert.AreSequenceEqual(mixes, [.. after.PartOf(Drums)![Hard].Mixes]);
     }
 
     [TestMethod]
@@ -133,7 +133,7 @@ public sealed class TrackCommandTests
         var after = AppliesRevertsAndRedoes(chart, new CopyDifficulty(Guitar, Expert, Hard));
 
         var hard = after.PartOf(Guitar)![Hard];
-        Assert.AreSequenceEqual(after.PartOf(Guitar)![Expert].Notes.ToList(), hard.Notes.ToList());
+        Assert.AreSequenceEqual(after.PartOf(Guitar)![Expert].Notes.ToList(), [.. hard.Notes]);
         Assert.AreSequenceEqual([new FlaggedChord(480, ChordFlags.ForceHopo)], hard.FlaggedChords.ToList());
     }
 
@@ -149,7 +149,7 @@ public sealed class TrackCommandTests
 
         var hard = after.PartOf(Drums)![Hard];
         Assert.AreSequenceEqual([Note(0, 0), Note(240, 1)], hard.Notes.ToList());
-        Assert.AreSequenceEqual(after.PartOf(Drums)![Expert].Mixes.ToList(), hard.Mixes.ToList());
+        Assert.AreSequenceEqual(after.PartOf(Drums)![Expert].Mixes.ToList(), [.. hard.Mixes]);
         Assert.AreEqual(1, command.DroppedDoubleKicks);
     }
 
@@ -199,7 +199,6 @@ public sealed class TrackCommandTests
 
         Assert.AreSequenceEqual([Note(0, 0), Note(0, 2)], plan.Remove.ToList());
         Assert.AreSequenceEqual([new FlaggedChord(0, ChordFlags.None)], plan.Flags.ToList());
-        Assert.IsNull(EditorTools.PlacementRefusal(track, plan.Add, plan.Remove as IReadOnlyCollection<EditableNote>));
     }
 
     [TestMethod]

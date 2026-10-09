@@ -54,11 +54,11 @@ public sealed class DiscoFlipEditingTests
         foreach (var note in session.TrackOf(DrumsExpert)!.Notes)
         {
             int shown = session.ShownLane(DrumsExpert, note);
-            Assert.IsTrue(game.Any(g => g.Tick == note.Tick && g.Lane == shown - 1), $"The pad at {note.Tick} on lane {note.Lane} is drawn on {shown}.");
+            Assert.Contains(g => g.Tick == note.Tick && g.Lane == shown - 1, game, $"The pad at {note.Tick} on lane {note.Lane} is drawn on {shown}.");
         }
 
-        Assert.IsTrue((game.Single(g => g.Tick == 480).Flags & NoteFlags.Cymbal) != 0, "Red inside the section is a yellow cymbal.");
-        Assert.IsFalse((game.Single(g => g.Tick == 600).Flags & NoteFlags.Cymbal) != 0, "Yellow inside it is a red pad, tom or not.");
+        Assert.AreNotEqual(NoteFlags.None, game.Single(g => g.Tick == 480).Flags & NoteFlags.Cymbal, "Red inside the section is a yellow cymbal.");
+        Assert.AreEqual(NoteFlags.None, game.Single(g => g.Tick == 600).Flags & NoteFlags.Cymbal, "Yellow inside it is a red pad, tom or not.");
     }
 
     [TestMethod]
@@ -182,10 +182,10 @@ public sealed class DiscoFlipEditingTests
 
         session.Selection.Select(DrumsExpert, [Pad(480, Red)]);
         session.Tools.ToggleCymbal();
-        StringAssert.Contains(session.Status!, "disco flip");
+        Assert.Contains("disco flip", session.Status!);
         session.Selection.Select(DrumsExpert, [Pad(480, Yellow)]);
         session.Tools.SetTom(true);
-        StringAssert.Contains(session.Status!, "disco flip");
+        Assert.Contains("disco flip", session.Status!);
         Assert.IsEmpty(drums.TomMarkers);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
 

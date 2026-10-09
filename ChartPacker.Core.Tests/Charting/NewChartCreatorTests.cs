@@ -117,13 +117,13 @@ public sealed class NewChartCreatorTests
 
         var plan = await PackPlanner.PlanAsync(folder, cancellationToken: TestContext.CancellationToken);
         Assert.IsFalse(plan.HasErrors, string.Join(Environment.NewLine, plan.Findings));
-        Assert.IsFalse(plan.Findings.Any(f => f.RuleId == SngRules.Sng052));
+        Assert.DoesNotContain(f => f.RuleId == SngRules.Sng052, plan.Findings);
         Assert.IsEmpty(MetadataValidator.Validate(plan.Metadata).Where(MetadataValidator.IsFailing));
 
         string sng = Path.Combine(_root.FullName, "Artist - Song.sng");
         var findings = await Packer.PackAsync(plan, sng, overwrite: false, cancellationToken: TestContext.CancellationToken);
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        Assert.IsTrue(SngReader.Read(sng, TestContext.CancellationToken).Files.Any(f => f.Name == "notes.mid"));
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        Assert.Contains(f => f.Name == "notes.mid", SngReader.Read(sng, TestContext.CancellationToken).Files);
     }
 
     [TestMethod]
@@ -232,7 +232,7 @@ public sealed class NewChartCreatorTests
         Source(name, TestAudio.Wav((int)(seconds * SampleRate), SampleRate, 1, (_, _) => 0));
 
     private void AssertNothingStaged() =>
-        Assert.IsFalse(Directory.EnumerateFileSystemEntries(_library).Any(p => p.EndsWith(StagingPath.Suffix, StringComparison.Ordinal)));
+        Assert.DoesNotContain(p => p.EndsWith(StagingPath.Suffix, StringComparison.Ordinal), Directory.EnumerateFileSystemEntries(_library));
 
     public TestContext TestContext { get; set; }
 }

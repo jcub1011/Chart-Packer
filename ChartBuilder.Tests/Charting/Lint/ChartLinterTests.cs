@@ -182,14 +182,14 @@ public sealed class ChartLinterTests
         var linter = new ChartLinter(TestLintRules.All);
         var stack = new ChartUndoStack(chart);
         var start = linter.LintAll(Input(chart));
-        Assert.IsTrue(start.Findings.Any(f => f.Location?.Part == ChartInstrument.Bass), "The chart should have findings on bass.");
+        Assert.Contains(f => f.Location?.Part == ChartInstrument.Bass, start.Findings, "The chart should have findings on bass.");
 
         stack.Execute(new RemovePart(ChartInstrument.Bass));
         var removed = linter.Relint(start, Input(chart), stack.NextUndo!.Affected);
         stack.Undo();
         var restored = linter.Relint(removed, Input(chart), stack.NextRedo!.Affected);
 
-        Assert.IsFalse(removed.Findings.Any(f => f.Location?.Part == ChartInstrument.Bass));
+        Assert.DoesNotContain(f => f.Location?.Part == ChartInstrument.Bass, removed.Findings);
         AssertSameFindings(start, restored, "after undoing the removal");
     }
 
@@ -277,7 +277,7 @@ public sealed class ChartLinterTests
             .ThenBy(f => f.RuleId, StringComparer.Ordinal)
             .ThenBy(f => f.Message, StringComparer.Ordinal)
             .ToList();
-        Assert.AreSequenceEqual(expected, result.Findings.ToList());
+        Assert.AreSequenceEqual(expected, [.. result.Findings]);
     }
 
     // The game view.
@@ -331,7 +331,7 @@ public sealed class ChartLinterTests
         var linter = new ChartLinter();
 
         Assert.IsNotEmpty(ChartLintRules.All);
-        Assert.AreSequenceEqual(ChartLintRules.All.Select(r => r.RuleId).ToList(), linter.Rules.Select(r => r.RuleId).ToList());
+        Assert.AreSequenceEqual(ChartLintRules.All.Select(r => r.RuleId).ToList(), [.. linter.Rules.Select(r => r.RuleId)]);
         Assert.IsTrue(linter.Rules.All(r => r.RuleId.StartsWith("CHR", StringComparison.Ordinal)));
     }
 

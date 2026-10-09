@@ -105,7 +105,7 @@ public sealed class SongEditCommandsTests
         undo.Execute(SongCommands.SetDifficulty(song, "diff_bass", 4)!);
         undo.Undo();
         Assert.AreEqual(MetadataDifficulty.UnsetValue, song.EffectiveValue("diff_bass"));
-        Assert.IsFalse(song.Edits.Any(e => e.Key == "diff_bass"), "Back to the rating the part calls for, there's no edit.");
+        Assert.DoesNotContain(e => e.Key == "diff_bass", song.Edits, "Back to the rating the part calls for, there's no edit.");
 
         undo.Undo();
         Assert.IsNull(song.EffectiveValue("diff_bass"));
@@ -319,7 +319,7 @@ public sealed class SongEditCommandsTests
 
         var recovered = Autosave.Recover(await OpenAsync(folder, Token), store.Find(folder)!);
 
-        CollectionAssert.AreEquivalent(song.Media.ToList(), recovered.Media.ToList());
+        Assert.AreSequenceEqual(song.Media.ToList(), [.. recovered.Media], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         Assert.IsEmpty(recovered.Tracks);
     }
 

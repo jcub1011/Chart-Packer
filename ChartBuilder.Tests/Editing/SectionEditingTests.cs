@@ -112,7 +112,7 @@ public sealed class SectionEditingTests
         session.MoveCursorTo(960);
 
         Assert.IsNotNull(session.Tools.InsertSection("Outro"));
-        Assert.AreEqual(1, SectionEvents.All(session.Chart).Count);
+        Assert.HasCount(1, SectionEvents.All(session.Chart));
     }
 
     [TestMethod]
@@ -254,7 +254,7 @@ public sealed class SectionEditingTests
 
         Assert.IsNull(session.Tools.InsertEvent(null, text));
 
-        Assert.AreSequenceEqual(before, session.Chart.Events.ToList());
+        Assert.AreSequenceEqual(before, [.. session.Chart.Events]);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
         Assert.Contains(text, session.Status!);
     }
@@ -491,7 +491,7 @@ public sealed class SectionEditingTests
         Assert.IsNull(session.Tools.ChangeEventText(null, free, text));
 
         Assert.Contains(text, session.Status!);
-        Assert.AreSequenceEqual(before, session.Chart.Events.ToList());
+        Assert.AreSequenceEqual(before, [.. session.Chart.Events]);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
     }
 

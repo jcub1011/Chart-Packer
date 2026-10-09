@@ -22,7 +22,7 @@ public sealed class FiveFretEditingTests
         Click(session, At(session, 120, 1, view));
         Click(session, At(session, 960, 2, view));
         Click(session, At(session, 1920, 3, view));
-        Click(session, At(session, 2880, 0, view), EditorModifiers.Shift);
+        Click(session, At(session, 2880, 0, view), EditorModifiers.Control);
         DragFromTo(session, At(session, 3840, 0, view), At(session, 4320, 0, view));
         DragFromTo(session, At(session, 3840, 1, view), At(session, 4080, 1, view));
 

@@ -32,7 +32,7 @@ public sealed class EditableChartTests
             }
         }
 
-        Assert.AreSequenceEqual(expected.ToList(), track.Notes.Select(n => (n.Tick, n.Lane, n.DoubleKick)).ToList());
+        Assert.AreSequenceEqual(expected.ToList(), [.. track.Notes.Select(n => (n.Tick, n.Lane, n.DoubleKick))]);
     }
 
     [TestMethod]
@@ -69,7 +69,7 @@ public sealed class EditableChartTests
             track.Notes.Add(new EditableNote(tick, 1, lane));
 
         Assert.AreSequenceEqual([240L, 480, 480, 720], track.Notes.Between(240, 720).ToArray().Select(n => n.Tick).ToList());
-        Assert.AreEqual(2, track.Notes.At(480).Length);
+        Assert.HasCount(2, track.Notes.At(480));
         Assert.IsTrue(track.Notes.Between(721, 959).IsEmpty);
         Assert.AreEqual(2, track.Notes.FirstAtOrAfter(480));
         Assert.AreEqual(4, track.Notes.FirstAfter(480));

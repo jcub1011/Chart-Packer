@@ -227,7 +227,7 @@ public sealed class TimeStretcherTests
         input.Position = stretcher.ForgetInput();
         float[] rest = ReadAll(stretcher);
 
-        CollectionAssert.AreEqual(whole, first.Concat(rest).ToArray());
+        Assert.AreSequenceEqual(whole, [.. first, .. rest]);
     }
 
     [TestMethod]

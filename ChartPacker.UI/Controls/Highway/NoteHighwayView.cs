@@ -760,14 +760,23 @@ namespace ChartPacker.UI.Controls.Highway
             int first = LowerBound(lane.Starts, from - lane.MaxLength);
             int last = LowerBound(lane.Starts, to + 0.001);
 
-            // In layers: tails at the back, then kick and open bars, then the gems in front of them.
-            // Within a layer, latest first, so an earlier note is drawn over a later one.
-            for (int i = last - 1; i >= first; i--)
+            // In layers: tails at the back, an open note's across the lanes behind the frets', then kick and open bars, then
+            // the gems in front of them. Within a layer, latest first, so an earlier note is drawn over a later one.
+            foreach (bool wide in (ReadOnlySpan<bool>)[true, false])
             {
-                // A sustain's tail is eaten from the strike line as it's held.
-                var note = lane.Notes[i];
-                if (lane.Ends[i] > lane.Starts[i] && lane.Ends[i] > now && note.Lane >= 0)
-                    DrawTail(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(Math.Min(lane.Ends[i], to)), y(Math.Max(lane.Starts[i], now)), outlined);
+                for (int i = last - 1; i >= first; i--)
+                {
+                    // A sustain's tail is eaten from the strike line as it's held. A kick has none.
+                    var note = lane.Notes[i];
+                    bool open = note.Lane == ChartNote.OpenLane;
+                    if (open != wide || lane.Ends[i] <= lane.Starts[i] || lane.Ends[i] <= now || (open && lane.Kind == ChartInstrumentKind.Drums))
+                        continue;
+                    double top = y(Math.Min(lane.Ends[i], to)), bottom = y(Math.Max(lane.Starts[i], now));
+                    if (!open)
+                        DrawTail(context, lane, note, NoteColor(lane, note), bounds, laneWidth, top, bottom, outlined);
+                    else if (bottom > top)
+                        _gems.DrawWideTail(context, NoteColor(lane, note), new Rect(bounds.X + 4, top, bounds.Width - 8, bottom - top), outlined);
+                }
             }
 
             foreach (bool bars in (ReadOnlySpan<bool>)[true, false])

@@ -58,7 +58,7 @@ public sealed class DrumCommandTests
         var after = AppliesRevertsAndRedoes(chart, new SetToms([(Blue, tick)], tom));
 
         var afterDrums = after.PartOf(Drums)!;
-        Assert.AreSequenceEqual(Markers(expected).ToList(), afterDrums.TomMarkers.ToList());
+        Assert.AreSequenceEqual(Markers(expected).ToList(), [.. afterDrums.TomMarkers]);
         for (int i = 0; i < notes.Length; i++)
             Assert.AreEqual(notes[i].Tick == tick ? tom : states[i], DrumCymbals.IsTom(afterDrums, Blue, notes[i].Tick), $"tick {notes[i].Tick}");
     }
@@ -157,7 +157,7 @@ public sealed class DrumCommandTests
 
         var after = AppliesRevertsAndRedoes(chart, new AddDiscoFlip(Expert, tick, end));
 
-        Assert.AreSequenceEqual(Mixes(expected).ToList(), after.PartOf(Drums)![Expert].Mixes.ToList());
+        Assert.AreSequenceEqual(Mixes(expected).ToList(), [.. after.PartOf(Drums)![Expert].Mixes]);
     }
 
     [TestMethod]
@@ -185,8 +185,8 @@ public sealed class DrumCommandTests
         var removed = AppliesRevertsAndRedoes(chart.Clone(), new RemoveDiscoFlip(Expert, range));
         var moved = AppliesRevertsAndRedoes(chart.Clone(), new ChangeDiscoFlip(Expert, range, 960, 1920));
 
-        Assert.AreSequenceEqual(Mixes("0:2:").ToList(), removed.PartOf(Drums)![Expert].Mixes.ToList());
-        Assert.AreSequenceEqual(Mixes("0:2:;960:2:d;1920:2:").ToList(), moved.PartOf(Drums)![Expert].Mixes.ToList());
+        Assert.AreSequenceEqual(Mixes("0:2:").ToList(), [.. removed.PartOf(Drums)![Expert].Mixes]);
+        Assert.AreSequenceEqual(Mixes("0:2:;960:2:d;1920:2:").ToList(), [.. moved.PartOf(Drums)![Expert].Mixes]);
         Refuses<InvalidOperationException>(chart, new RemoveDiscoFlip(Expert, range with { EndTick = 1000 }));
     }
 
@@ -200,7 +200,7 @@ public sealed class DrumCommandTests
 
         new AddDiscoFlip(Expert, 480, 960).Apply(chart);
 
-        Assert.AreSequenceEqual(notes, chart.PartOf(Drums)![Expert].Notes.ToList());
+        Assert.AreSequenceEqual(notes, [.. chart.PartOf(Drums)![Expert].Notes]);
         Assert.AreSequenceEqual([0, 1, 0], Game(chart, Expert).Select(n => n.Lane).ToList());
     }
 

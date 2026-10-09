@@ -29,7 +29,7 @@ public sealed class VocalToolsTests
 
         Assert.AreEqual(new VocalNoteEvent(120, Step, 64), Vocals(session).Notes.Single());
         Assert.AreEqual(1, session.UndoStack.UndoCount);
-        Assert.AreSequenceEqual(new[] { new VocalNotePlace(120, 64) }, session.Selection.VocalPlaces.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNotePlace(120, 64) }, [.. session.Selection.VocalPlaces]);
     }
 
     [TestMethod]
@@ -82,7 +82,7 @@ public sealed class VocalToolsTests
         Assert.HasCount(2, session.Selection.VocalPlaces);
 
         Click(session, VocalAt(100, 60), EditorModifiers.Shift);
-        Assert.AreSequenceEqual(new[] { new VocalNotePlace(480, 62) }, session.Selection.VocalPlaces.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNotePlace(480, 62) }, [.. session.Selection.VocalPlaces]);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
     }
 
@@ -106,7 +106,7 @@ public sealed class VocalToolsTests
         var content = Vocals(session);
         Assert.AreEqual(new VocalNoteEvent(480, 240, 63), content.Notes.Single());
         Assert.AreEqual(new VocalLyricEvent(480, "word"), content.Lyrics.Single());
-        Assert.AreSequenceEqual(new[] { new VocalNotePlace(480, 63) }, session.Selection.VocalPlaces.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNotePlace(480, 63) }, [.. session.Selection.VocalPlaces]);
         Assert.AreEqual(1, session.UndoStack.UndoCount);
     }
 
@@ -129,7 +129,7 @@ public sealed class VocalToolsTests
 
         DragFromTo(session, VocalAt(10, 60), VocalAt(10, 64));
 
-        Assert.AreSequenceEqual(new[] { 61, 84 }, Vocals(session).Notes.Select(n => n.Pitch).ToArray());
+        Assert.AreSequenceEqual(new[] { 61, 84 }, [.. Vocals(session).Notes.Select(n => n.Pitch)]);
     }
 
     [TestMethod]
@@ -149,7 +149,7 @@ public sealed class VocalToolsTests
 
         DragFromTo(session, VocalAt(0, 58), VocalAt(500, 66));
 
-        Assert.AreSequenceEqual(new[] { new VocalNotePlace(0, 60), new VocalNotePlace(240, 64) }, session.Selection.VocalPlaces.OrderBy(p => p.Tick).ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNotePlace(0, 60), new VocalNotePlace(240, 64) }, [.. session.Selection.VocalPlaces.OrderBy(p => p.Tick)]);
     }
 
     [TestMethod]
@@ -160,7 +160,7 @@ public sealed class VocalToolsTests
         session.Tools.SelectAllVocals(VocalTrack.Vocals);
         session.Tools.MoveVocalSelection(1, 5);
 
-        Assert.AreSequenceEqual(new[] { new VocalNoteEvent(120, 100, 61), new VocalNoteEvent(360, 100, 84) }, Vocals(session).Notes.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNoteEvent(120, 100, 61), new VocalNoteEvent(360, 100, 84) }, [.. Vocals(session).Notes]);
         Assert.HasCount(2, session.Selection.VocalPlaces);
     }
 
@@ -175,7 +175,7 @@ public sealed class VocalToolsTests
         session.Tools.Cancel();
 
         Assert.AreSame(before, Vocals(session));
-        Assert.AreSequenceEqual(new[] { new VocalNotePlace(0, 60) }, session.Selection.VocalPlaces.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNotePlace(0, 60) }, [.. session.Selection.VocalPlaces]);
     }
 
     // Erasing and deleting.
@@ -222,7 +222,7 @@ public sealed class VocalToolsTests
         DragFromTo(session, VocalAt(5, 60), VocalAt(950, 60));
 
         Assert.AreEqual(new VocalPhraseEvent(0, 960), Vocals(session).Phrases.Single());
-        Assert.AreSequenceEqual(new[] { new VocalPhraseEvent(0, 960) }, session.Selection.VocalPhrases.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalPhraseEvent(0, 960) }, [.. session.Selection.VocalPhrases]);
     }
 
     [TestMethod]
@@ -250,7 +250,7 @@ public sealed class VocalToolsTests
 
         DragFromTo(session, PhraseStripAt(1440), PhraseStripAt(1920));
         Assert.AreEqual(new VocalPhraseEvent(480, 1440, both), Vocals(session).Phrases.Single());
-        Assert.AreSequenceEqual(new[] { new VocalPhraseEvent(480, 1440, both) }, session.Selection.VocalPhrases.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalPhraseEvent(480, 1440, both) }, [.. session.Selection.VocalPhrases]);
         Assert.AreEqual(2, session.UndoStack.UndoCount);
     }
 
@@ -277,7 +277,7 @@ public sealed class VocalToolsTests
         Click(session, VocalAt(965, 60));
 
         Assert.IsFalse(session.Chart.TempoMap.Tempos.At(960).IsEmpty);
-        Assert.AreSequenceEqual(new long[] { 960 }, session.Selection.TempoTicks.ToArray());
+        Assert.AreSequenceEqual(new long[] { 960 }, [.. session.Selection.TempoTicks]);
     }
 
     // Lyrics, slides and spoken notes.
@@ -293,7 +293,7 @@ public sealed class VocalToolsTests
         Assert.AreEqual(1, left);
         Assert.AreSequenceEqual(
             new[] { new VocalLyricEvent(0, "Hel-"), new VocalLyricEvent(120, "+"), new VocalLyricEvent(240, "lo"), new VocalLyricEvent(360, "world") },
-            Vocals(session).Lyrics.ToArray());
+            [.. Vocals(session).Lyrics]);
         Assert.AreEqual(1, session.UndoStack.UndoCount);
     }
 
@@ -304,10 +304,10 @@ public sealed class VocalToolsTests
         session.Tools.SelectAllVocals(VocalTrack.Vocals);
 
         session.Tools.SetVocalSpoken(true);
-        Assert.AreSequenceEqual(new[] { "hey-#", "#" }, Vocals(session).Lyrics.Select(l => l.Text).ToArray());
+        Assert.AreSequenceEqual(new[] { "hey-#", "#" }, [.. Vocals(session).Lyrics.Select(l => l.Text)]);
 
         session.Tools.SetVocalSpoken(false);
-        Assert.AreSequenceEqual(new[] { "hey-" }, Vocals(session).Lyrics.Select(l => l.Text).ToArray());
+        Assert.AreSequenceEqual(new[] { "hey-" }, [.. Vocals(session).Lyrics.Select(l => l.Text)]);
 
         session.Selection.SelectVocalNotes(VocalTrack.Vocals, [new(240, 62)]);
         session.Tools.SetVocalSlide(true);
@@ -377,9 +377,9 @@ public sealed class VocalToolsTests
         Assert.IsTrue(session.Execute(paste.Command!));
 
         var harmony = Vocals(session, VocalTrack.Harmony1);
-        Assert.AreSequenceEqual(new[] { new VocalNoteEvent(960, 100, 60), new VocalNoteEvent(1200, 100, 62) }, harmony.Notes.ToArray());
-        Assert.AreSequenceEqual(new[] { "Hel-", "lo" }, harmony.Lyrics.Select(l => l.Text).ToArray());
-        Assert.AreSequenceEqual(new[] { new VocalNotePlace(960, 60), new VocalNotePlace(1200, 62) }, paste.Placed.ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNoteEvent(960, 100, 60), new VocalNoteEvent(1200, 100, 62) }, [.. harmony.Notes]);
+        Assert.AreSequenceEqual(new[] { "Hel-", "lo" }, [.. harmony.Lyrics.Select(l => l.Text)]);
+        Assert.AreSequenceEqual(new[] { new VocalNotePlace(960, 60), new VocalNotePlace(1200, 62) }, [.. paste.Placed]);
     }
 
     [TestMethod]

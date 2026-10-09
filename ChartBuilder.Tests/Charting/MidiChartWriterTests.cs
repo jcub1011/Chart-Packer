@@ -47,7 +47,7 @@ public sealed class MidiChartWriterTests
         var passthrough = chunks.Where(c => chart.Passthrough.Any(p => p.Chunk.Span.SequenceEqual(c))).ToList();
         Assert.AreSequenceEqual(
             chart.Passthrough.Select(p => Convert.ToHexString(p.Chunk.Span)).ToList(),
-            passthrough.Select(Convert.ToHexString).ToList());
+            [.. passthrough.Select(Convert.ToHexString)]);
 
         var instruments = chart.Parts.Select(p => p.Instrument).ToList();
         var differences = ChartReadBack.Compare(MidiChartReader.Read(fixture.Midi, fixture.Options), MidiChartReader.Read(written, after), instruments);
@@ -55,10 +55,10 @@ public sealed class MidiChartWriterTests
 
         // Every raw event is back at its tick.
         var reload = MidiChartLoader.Load(written, after).Chart;
-        Assert.AreSequenceEqual(chart.TempoTrackRaw.ToList(), reload.TempoTrackRaw.ToList());
-        Assert.AreSequenceEqual(chart.EventsRaw.ToList(), reload.EventsRaw.ToList());
+        Assert.AreSequenceEqual(chart.TempoTrackRaw.ToList(), [.. reload.TempoTrackRaw]);
+        Assert.AreSequenceEqual(chart.EventsRaw.ToList(), [.. reload.EventsRaw]);
         foreach (var part in chart.Parts)
-            Assert.AreSequenceEqual(part.RawEvents.ToList(), reload.PartOf(part.Instrument)!.RawEvents.ToList(), $"{part.Instrument}");
+            Assert.AreSequenceEqual(part.RawEvents.ToList(), [.. reload.PartOf(part.Instrument)!.RawEvents], $"{part.Instrument}");
     }
 
     [TestMethod]
@@ -144,7 +144,7 @@ public sealed class MidiChartWriterTests
         Assert.AreSequenceEqual(
             ["Song", "PART GUITAR", "PART GUITAR", "PART BASS", "EVENTS", "BEAT", "PART BASS"],
             TrackNames(result.Bytes));
-        Assert.AreSequenceEqual(chart.Passthrough.ToList(), result.Saved.Passthrough.ToList());
+        Assert.AreSequenceEqual(chart.Passthrough.ToList(), [.. result.Saved.Passthrough]);
     }
 
     [TestMethod]
@@ -188,9 +188,9 @@ public sealed class MidiChartWriterTests
         {
             var reload = MidiChartLoader.Load(MidiChartWriter.Write(written), options).Chart.TempoMap;
 
-            Assert.AreSequenceEqual(written.TempoMap.Tempos.ToList(), reload.Tempos.ToList());
-            Assert.AreSequenceEqual(written.TempoMap.TimeSignatures.ToList(), reload.TimeSignatures.ToList());
-            Assert.AreSequenceEqual(written.TempoMap.Anchors.ToList(), reload.Anchors.ToList());
+            Assert.AreSequenceEqual(written.TempoMap.Tempos.ToList(), [.. reload.Tempos]);
+            Assert.AreSequenceEqual(written.TempoMap.TimeSignatures.ToList(), [.. reload.TimeSignatures]);
+            Assert.AreSequenceEqual(written.TempoMap.Anchors.ToList(), [.. reload.Anchors]);
         }
 
         // Two tempos at a tick keep their order: the games play the last.
@@ -414,7 +414,7 @@ public sealed class MidiChartWriterTests
         {
             var chunk = chunks[parts[part.Instrument].Chunk];
             byte[] chosen = written[chunk.Start..chunk.End];
-            Assert.IsFalse(chart.Passthrough.Any(p => p.Chunk.Span.SequenceEqual(chosen)), $"{part.Instrument} was read from a passthrough track.");
+            Assert.DoesNotContain(p => p.Chunk.Span.SequenceEqual(chosen), chart.Passthrough, $"{part.Instrument} was read from a passthrough track.");
             Assert.AreEqual(ChartToMidi.TrackNames[part.Instrument], parts[part.Instrument].Name);
         }
     }

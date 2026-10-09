@@ -187,7 +187,7 @@ public sealed class PackPlannerTests
 
         var plan = await PackPlanner.PlanAsync(_root.FullName, cancellationToken: TestContext.CancellationToken);
 
-        Assert.IsFalse(plan.Findings.Any(f => f.RuleId == SngRules.Sng052));
+        Assert.DoesNotContain(f => f.RuleId == SngRules.Sng052, plan.Findings);
     }
 
     private void Write(string relative, string content)

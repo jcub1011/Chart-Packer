@@ -70,6 +70,32 @@
             <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
         </Style>
 
+        <!-- The drop-down in their place in a narrow lane: the lane's letter, and the difficulties' names, coloured alike. -->
+        <Style Selector="ComboBox.difficulty">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="8,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.difficulty">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyUnsetBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.easy">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyEasyBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.medium">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyMediumBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.hard">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyHardBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.expert">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyExpertBrush}" />
+        </Style>
+
         <!-- The lane being dragged, while it is. -->
         <Style Selector="bctl|EditorLane.dragging">
             <Setter Property="Opacity" Value="0.45" />
@@ -86,8 +112,9 @@
                 BorderThickness="0,0,0,1"
                 Cursor="DragMove"
                 ToolTip.Tip="{x:Static res:Strings.LaneDragToolTip}">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <Button Grid.Column="0"
+            <Grid x:Name="HeaderGrid" ColumnDefinitions="Auto,*,Auto">
+                <Button x:Name="PartButton"
+                        Grid.Column="0"
                         Classes="lane-part"
                         ToolTip.Tip="{x:Static res:Strings.LanePartToolTip}"
                         AutomationProperties.Name="{Binding Title}">
@@ -105,8 +132,39 @@
                     </Button.Flyout>
                 </Button>
 
+                <!-- The letters, or where the lane is too narrow for them, a drop-down (EditorLane.axaml.cs). -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="1" Margin="6,0,0,0" VerticalAlignment="Center">
-                    <ItemsControl ItemsSource="{Binding Difficulties}">
+                    <ComboBox x:Name="DifficultyPicker"
+                              Classes="difficulty"
+                              IsVisible="False"
+                              ItemsSource="{Binding Difficulties}"
+                              SelectedItem="{Binding CurrentDifficulty}"
+                              ToolTip.Tip="{x:Static res:Strings.LaneDifficultyPickerToolTip}"
+                              AutomationProperties.Name="{x:Static res:Strings.LaneDifficultyPickerToolTip}">
+                        <ComboBox.SelectionBoxItemTemplate>
+                            <DataTemplate x:DataType="vm:DifficultyLetter">
+                                <TextBlock Classes="difficulty"
+                                           Classes.has="{Binding HasNotes}"
+                                           Classes.easy="{Binding IsEasy}"
+                                           Classes.medium="{Binding IsMedium}"
+                                           Classes.hard="{Binding IsHard}"
+                                           Classes.expert="{Binding IsExpert}"
+                                           Text="{Binding Letter}" />
+                            </DataTemplate>
+                        </ComboBox.SelectionBoxItemTemplate>
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DifficultyLetter">
+                                <TextBlock Classes="difficulty"
+                                           Classes.has="{Binding HasNotes}"
+                                           Classes.easy="{Binding IsEasy}"
+                                           Classes.medium="{Binding IsMedium}"
+                                           Classes.hard="{Binding IsHard}"
+                                           Classes.expert="{Binding IsExpert}"
+                                           Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ItemsControl x:Name="DifficultyLetters" ItemsSource="{Binding Difficulties}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Horizontal" Spacing="1" />
@@ -130,7 +188,7 @@
                     </ItemsControl>
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                <StackPanel x:Name="LaneTools" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                     <!-- The lane's audio (charter-spec C12–C14): which, as a waveform or a spectrogram, where, and its onsets. -->
                     <Button Classes="tool"
                             IsVisible="{Binding !IsVocal}"

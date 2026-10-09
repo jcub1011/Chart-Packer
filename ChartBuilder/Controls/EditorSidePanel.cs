@@ -1,14 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Metadata;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace ChartBuilder.Controls
 {
@@ -48,6 +52,7 @@ namespace ChartBuilder.Controls
         private IReadOnlyList<EditorSidePanelStripTab> _stripTabs = [];
         private ItemsControl? _strip;
         private ScrollViewer? _tabScroller;
+        private ItemsPresenter? _tabs;
 
         public EditorSidePanel() => Items.CollectionChanged += (_, _) => RefreshStripTabs();
 
@@ -87,9 +92,20 @@ namespace ChartBuilder.Controls
             _strip = e.NameScope.Find<ItemsControl>("PART_StripTabs");
             _strip?.AddHandler(Button.ClickEvent, OnStripTabClick);
 
-            _tabScroller?.RemoveHandler(PointerWheelChangedEvent, OnTabScrollerWheel);
+            if (_tabScroller is { } old)
+            {
+                old.RemoveHandler(PointerWheelChangedEvent, OnTabScrollerWheel);
+                old.ScrollChanged -= OnTabScrollerChanged;
+            }
+
             _tabScroller = e.NameScope.Find<ScrollViewer>("PART_TabScroller");
-            _tabScroller?.AddHandler(PointerWheelChangedEvent, OnTabScrollerWheel, RoutingStrategies.Tunnel);
+            _tabs = e.NameScope.Find<ItemsPresenter>("PART_ItemsPresenter");
+            if (_tabScroller is { } scroller)
+            {
+                scroller.AddHandler(PointerWheelChangedEvent, OnTabScrollerWheel, RoutingStrategies.Tunnel);
+                scroller.ScrollChanged += OnTabScrollerChanged;
+            }
+
             RefreshStripTabs();
         }
 
@@ -150,6 +166,27 @@ namespace ChartBuilder.Controls
             double most = Math.Max(0, scroller.Extent.Width - scroller.Viewport.Width);
             scroller.Offset = scroller.Offset.WithX(Math.Clamp(scroller.Offset.X - e.Delta.Y * WheelStep, 0, most));
             e.Handled = true;
+        }
+
+        // The scroll bar, always shown whole while the tabs don't fit, lies over the band's foot, so the tabs are lifted
+        // clear of it then, and sit on the band's foot again once they fit.
+        private void OnTabScrollerChanged(object? sender, ScrollChangedEventArgs e)
+        {
+            // Once the scroll bar shown or hidden is laid out, so its height is known.
+            if (e.ExtentDelta.X != 0 || e.ViewportDelta.X != 0)
+                Dispatcher.UIThread.Post(LiftTabs, DispatcherPriority.Loaded);
+        }
+
+        private void LiftTabs()
+        {
+            if (_tabScroller is not { } scroller || _tabs is not { } tabs)
+                return;
+            bool overflows = scroller.Extent.Width > scroller.Viewport.Width + 0.5;
+            double bar = overflows
+                ? scroller.GetVisualDescendants().OfType<ScrollBar>().FirstOrDefault(static b => b.Orientation == Orientation.Horizontal)?.Bounds.Height ?? 0
+                : 0;
+            if (tabs.Margin.Bottom != bar)
+                tabs.Margin = new Thickness(0, 0, 0, bar);
         }
     }
 }

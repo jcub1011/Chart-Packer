@@ -122,9 +122,8 @@ public sealed class ChartRuleTests
     [TestMethod]
     public void EveryRuleHasATriggerHere()
     {
-        CollectionAssert.AreEquivalent(
-            ChartLintRules.All.Select(r => r.RuleId).ToList(),
-            Triggers.Select(t => (string)t[0]).ToList());
+        Assert.AreSequenceEqual(
+            ChartLintRules.All.Select(r => r.RuleId).ToList(), [.. Triggers.Select(t => (string)t[0])], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -157,7 +156,7 @@ public sealed class ChartRuleTests
 
         Assert.IsEmpty(fixedFindings, string.Join("; ", fixedFindings.Select(Describe)));
         Assert.AreEqual(1, stack.RedoCount, "One step.");
-        Assert.AreSequenceEqual(before.Findings.Select(Describe).ToList(), undone.Findings.Select(Describe).ToList());
+        Assert.AreSequenceEqual(before.Findings.Select(Describe).ToList(), [.. undone.Findings.Select(Describe)]);
     }
 
     [TestMethod]
@@ -212,7 +211,7 @@ public sealed class ChartRuleTests
 
         var findings = new ChartLinter().LintAll(Snapshot(chart, input)).Findings;
 
-        Assert.IsFalse(findings.Any(f => f.RuleId == ChrRules.Chr023), string.Join("; ", findings.Select(Describe)));
+        Assert.DoesNotContain(f => f.RuleId == ChrRules.Chr023, findings, string.Join("; ", findings.Select(Describe)));
     }
 
     /// <summary>

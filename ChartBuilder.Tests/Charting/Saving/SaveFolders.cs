@@ -110,7 +110,7 @@ internal sealed class SaveFolders : IDisposable
         var slots = request.Media!.Keys.ToList();
         var kept = stash is null ? new Dictionary<MediaSlot, string>() : await stash.KeepAsync(song, slots, cancellationToken);
         var findings = await ChartSaver.SaveAsync(song.Entry!, request, written, cancellationToken);
-        Assert.IsFalse(findings.Any(f => f.Severity == ChartPacker.Core.Validation.Severity.Error), string.Join("; ", findings.Select(f => f.Message)));
+        Assert.DoesNotContain(f => f.Severity == ChartPacker.Core.Validation.Severity.Error, findings, string.Join("; ", findings.Select(f => f.Message)));
         song.Saved(ChartSaver.SavedSong(song, song.Entry!, request), song.Chart.Parts.Select(p => p.Instrument).ToHashSet(), new MediaSaveResult(slots, kept));
         return request;
     }

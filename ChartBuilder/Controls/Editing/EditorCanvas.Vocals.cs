@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
@@ -86,14 +87,15 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// A press in a vocal part's lane: on a proposed beat's handle, while a proposed tempo map is reviewed, a drag of it;
-        /// otherwise the current tool's gesture, which draws a box from a press on no note with the select tool.
+        /// A press in a vocal part's lane: with the left button on a proposed beat's handle, while a proposed tempo map is
+        /// reviewed, a drag of it; otherwise the button's gesture, as in a highway's lane, the select tool's drawing a box
+        /// from a press on no note.
         /// </summary>
         private void PressVocals(EditorSession session, Point position, PointerPressedEventArgs e)
         {
             Focus();
             e.Handled = true;
-            if (ProposalHandleAt(position) is { } handle)
+            if (_pressButton == MouseButton.Left && ProposalHandleAt(position) is { } handle)
             {
                 e.Pointer.Capture(this);
                 _proposalDrag = handle;
@@ -105,25 +107,35 @@ namespace ChartBuilder.Controls.Editing
             e.Pointer.Capture(this);
             _isPressed = true;
             _lastVocalPoint = point;
-            _boxFrom = session.Tool == EditorTool.Select && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
+            _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
             _boxTo = position;
-            session.Tools.Press(point, ModifiersOf(e.KeyModifiers));
+            var modifiers = ModifiersOf(e.KeyModifiers);
+            if (_pressButton == MouseButton.Middle)
+                session.Tools.PressErase(point);
+            else if (_pressButton == MouseButton.Right)
+                session.Tools.PressContext(point, modifiers);
+            else
+                session.Tools.Press(point, modifiers);
             _overlay.Redraw();
         }
 
         /// <summary>
         /// Shows a resize arrow over a vocal note's end with the tools that drag it, and over a phrase bar's end in the
-        /// strip, and a hand over a phrase bar's body.
+        /// strip, and a hand over a phrase bar's body, with a tip saying what it is.
         /// </summary>
         private void ShowVocalCursor(Point position)
         {
             StandardCursorType? wanted = null;
+            string? tip = null;
             if (Session is { } session && VocalPointAt(position, clamp: false) is { } point)
             {
                 if (point.InPhrases)
                 {
                     if (session.Tools.HitTestPhrase(point) is { } phrase)
+                    {
                         wanted = phrase.Grip == PhraseGrip.Body ? StandardCursorType.Hand : StandardCursorType.SizeWestEast;
+                        tip = Strings.RailVocalPhraseToolTip;
+                    }
                 }
                 else if (session.Tool is EditorTool.Select or EditorTool.Sustain && session.Tools.HitTest(point) is { Grip: VocalNoteGrip.End })
                 {
@@ -132,6 +144,7 @@ namespace ChartBuilder.Controls.Editing
             }
 
             SetCursor(wanted);
+            ShowTip(tip);
         }
 
         /// <summary>Draws <paramref name="layer"/> of a vocal part's lane, as <see cref="RenderLayer"/> does a highway's.</summary>

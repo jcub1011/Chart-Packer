@@ -232,7 +232,7 @@
   </data>
   <data name="LaneTitleFormat" xml:space="preserve">
     <value>{0} · {1}</value>
-    <comment>A highway lane's title: its instrument and difficulty, e.g. "Guitar · Expert".</comment>
+    <comment>A part's name: its instrument and difficulty, e.g. "Guitar · Expert".</comment>
   </data>
   <data name="LaneVocals" xml:space="preserve">
     <value>Vocals</value>
@@ -2379,10 +2379,7 @@ Saving also makes these changes to song.ini:
     <value>Whether the chart has this part. Unticking a part with notes asks first.</value>
   </data>
   <data name="ChartSettingsDifficultyToolTip" xml:space="preserve">
-    <value>The part's difficulty rating, 0 to 6 as the games show it; empty while it's unrated</value>
-  </data>
-  <data name="ChartSettingsClearDifficultyToolTip" xml:space="preserve">
-    <value>Clear the rating</value>
+    <value>The part's difficulty rating, 0 to 6 as the games show it; ? while it's unrated. Click to change it</value>
   </data>
   <data name="ChartSettingsProDrumsDifficultyLabel" xml:space="preserve">
     <value>Pro drums</value>
@@ -2417,5 +2414,41 @@ Saving also makes these changes to song.ini:
   <data name="PendingTrackNameFormat" xml:space="preserve">
     <value>{0} track</value>
     <comment>{0} is the stem, e.g. "guitar".</comment>
+  </data>
+  <data name="NoteMenuNatural" xml:space="preserve">
+    <value>Natural</value>
+    <comment>The note menu: the chords are neither forced nor tapped, so the games decide strum or HOPO.</comment>
+  </data>
+  <data name="NoteMenuForceHopo" xml:space="preserve">
+    <value>Force HOPO</value>
+    <comment>The note menu: the chords are forced to hammer-ons (H).</comment>
+  </data>
+  <data name="NoteMenuForceStrum" xml:space="preserve">
+    <value>Force strum</value>
+    <comment>The note menu: the chords are forced to strums (G).</comment>
+  </data>
+  <data name="NoteMenuOpen" xml:space="preserve">
+    <value>Open note</value>
+    <comment>The note menu: each chord is one open note; unticking puts open notes on the first fret.</comment>
+  </data>
+  <data name="NoteMenuTom" xml:space="preserve">
+    <value>Tom</value>
+    <comment>The note menu: the Pro drums notes are toms, not cymbals.</comment>
+  </data>
+  <data name="NoteMenuNormalHit" xml:space="preserve">
+    <value>Normal hit</value>
+    <comment>The note menu: the drum notes are neither accents nor ghosts.</comment>
+  </data>
+  <data name="NoteMenuSung" xml:space="preserve">
+    <value>Sung</value>
+    <comment>The note menu: the vocal notes are sung, not spoken.</comment>
+  </data>
+  <data name="RailVocalPhraseToolTip" xml:space="preserve">
+    <value>Vocal phrase</value>
+    <comment>Shown over a vocal phrase's bar in the phrase strip.</comment>
+  </data>
+  <data name="LaneDifficultyPickerToolTip" xml:space="preserve">
+    <value>Difficulty shown (Ctrl+1–4)</value>
+    <comment>The drop-down that stands in for the difficulty letters in a lane's header when the lane is too narrow for them.</comment>
   </data>
 </root>

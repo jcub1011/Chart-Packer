@@ -147,12 +147,6 @@ public sealed class RecordPass
         var plan = NoteMerge.Plan(track, notes, [], clear);
         if (plan.IsEmpty)
             return false;
-        if (EditorTools.PlacementRefusal(track, plan.Add, plan.Remove as IReadOnlyCollection<EditableNote>) is { } why)
-        {
-            _session.Status = why;
-            return false;
-        }
-
         bool added = _session.Execute(new ReplaceNotes(Track.Instrument, Track.Difficulty, plan.Remove, plan.Add, plan.Flags));
         if (added)
             _session.Selection.Select(Track, notes);

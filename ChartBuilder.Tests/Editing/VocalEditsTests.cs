@@ -19,7 +19,7 @@ public sealed class VocalEditsTests
     [DataRow("", new string[0])]
     public void ATypedLineSplitsAtSpacesAndAfterHyphens(string line, string[] syllables)
     {
-        Assert.AreSequenceEqual(syllables, VocalEdits.SplitLyrics(line).ToArray());
+        Assert.AreSequenceEqual(syllables, [.. VocalEdits.SplitLyrics(line)]);
     }
 
     [TestMethod]
@@ -30,9 +30,9 @@ public sealed class VocalEditsTests
         var alone = VocalEdits.Change(content, [new(240, 62)], n => n with { Tick = 480 }, out var moved);
         var shared = VocalEdits.Change(content, [new(0, 60)], n => n with { Tick = 120 }, out _);
 
-        Assert.AreSequenceEqual(new[] { new VocalNotePlace(480, 62) }, moved.ToArray());
-        Assert.AreSequenceEqual(new long[] { 0, 480 }, alone.Lyrics.Select(l => l.Tick).ToArray());
-        Assert.AreSequenceEqual(new long[] { 0, 240 }, shared.Lyrics.Select(l => l.Tick).ToArray());
+        Assert.AreSequenceEqual(new[] { new VocalNotePlace(480, 62) }, [.. moved]);
+        Assert.AreSequenceEqual(new long[] { 0, 480 }, [.. alone.Lyrics.Select(l => l.Tick)]);
+        Assert.AreSequenceEqual(new long[] { 0, 240 }, [.. shared.Lyrics.Select(l => l.Tick)]);
     }
 
     [TestMethod]
@@ -53,7 +53,7 @@ public sealed class VocalEditsTests
 
         var removed = VocalEdits.Remove(content, [new(0, 60), new(240, 62)]);
 
-        Assert.AreSequenceEqual(new[] { "a", "stray" }, removed.Lyrics.Select(l => l.Text).ToArray());
+        Assert.AreSequenceEqual(new[] { "a", "stray" }, [.. removed.Lyrics.Select(l => l.Text)]);
     }
 
     [TestMethod]
@@ -75,8 +75,8 @@ public sealed class VocalEditsTests
         var spoken = VocalEdits.SetSpoken(content, [0, 120], on: true);
         var sung = VocalEdits.SetSpoken(spoken, [0, 240], on: false);
 
-        Assert.AreSequenceEqual(new[] { "yeah-#", "+", "shout^" }, spoken.Lyrics.Select(l => l.Text).ToArray());
-        Assert.AreSequenceEqual(new[] { "yeah-", "+", "shout" }, sung.Lyrics.Select(l => l.Text).ToArray());
+        Assert.AreSequenceEqual(new[] { "yeah-#", "+", "shout^" }, [.. spoken.Lyrics.Select(l => l.Text)]);
+        Assert.AreSequenceEqual(new[] { "yeah-", "+", "shout" }, [.. sung.Lyrics.Select(l => l.Text)]);
         Assert.IsTrue(VocalEdits.IsSpoken(spoken, 0));
         Assert.IsTrue(VocalEdits.IsSlide(spoken, 120));
     }

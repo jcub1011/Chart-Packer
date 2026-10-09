@@ -128,7 +128,7 @@ public sealed class DifficultyEstimatorTests
     public void NothingIsWrittenUntilARatingIsUsedAndRevertTakesItBack()
     {
         var song = Song();
-        Assert.IsFalse(song.PendingChanges().Any(c => c.Key == "diff_guitar"));
+        Assert.DoesNotContain(c => c.Key == "diff_guitar", song.PendingChanges());
 
         song.SetRating("diff_guitar", 5);
         Assert.AreEqual("5", Value(song.EffectivePairs(), "diff_guitar"));
@@ -151,7 +151,7 @@ public sealed class DifficultyEstimatorTests
         Assert.AreEqual("diff_guitar", rating.Value.Key);
         song.SetRating(rating.Value.Key, rating.Value.Tier);
         var lint = new ChartLinter().LintAll(new ChartLintInput(song.Chart, song.EffectivePairs()));
-        Assert.IsFalse(lint.Findings.Any(f => f.RuleId == ChrRules.Chr083));
+        Assert.DoesNotContain(f => f.RuleId == ChrRules.Chr083, lint.Findings);
     }
 
     [TestMethod]

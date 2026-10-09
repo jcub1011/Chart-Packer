@@ -24,9 +24,12 @@
                                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                                 BorderThickness="0,0,0,1">
                             <Grid ColumnDefinitions="*,Auto">
-                                <!-- EditorSidePanel.cs scrolls it sideways with the mouse wheel. -->
+                                <!-- EditorSidePanel.cs scrolls it sideways with the mouse wheel. Its scroll bar is
+                                     shown whole whenever the tabs don't fit, rather than growing under the pointer, and
+                                     EditorSidePanel.cs makes room for it below them. -->
                                 <ScrollViewer Name="PART_TabScroller"
                                               Grid.Column="0"
+                                              AllowAutoHide="False"
                                               HorizontalScrollBarVisibility="Auto"
                                               VerticalScrollBarVisibility="Disabled">
                                     <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />

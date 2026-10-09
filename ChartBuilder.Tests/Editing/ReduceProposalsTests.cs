@@ -44,8 +44,8 @@ public sealed class ReduceProposalsTests
 
         for (int i = 1; i < chords.Count; i++)
             Assert.IsGreaterThanOrEqualTo(480L, chords[i].Key - chords[i - 1].Key, $"Chords at {chords[i - 1].Key} and {chords[i].Key}.");
-        Assert.IsFalse(easy.FlaggedChords.Any(f => (f.Flags & (ChordFlags.ForceHopo | ChordFlags.Tap)) != 0));
-        Assert.IsFalse(easy.Notes.Any(n => n.Length > EditableNote.PlainLength && n.Length < 480));
+        Assert.DoesNotContain(f => (f.Flags & (ChordFlags.ForceHopo | ChordFlags.Tap)) != 0, easy.FlaggedChords);
+        Assert.DoesNotContain(n => n.Length > EditableNote.PlainLength && n.Length < 480, easy.Notes);
         Assert.IsFalse(session.Reduce.IsActive);
 
         session.Undo();
@@ -72,7 +72,7 @@ public sealed class ReduceProposalsTests
             Assert.IsLessThanOrEqualTo(1, hit.Count(n => n.Lane > 0), $"The hit at {hit.Key} has more than one pad.");
         for (int i = 1; i < hits.Count; i++)
             Assert.IsGreaterThanOrEqualTo(480L, hits[i].Key - hits[i - 1].Key);
-        Assert.IsFalse(easy.Notes.Any(n => n.DoubleKick));
+        Assert.DoesNotContain(n => n.DoubleKick, easy.Notes);
 
         session.Undo();
         AssertSame(start, chart, "after one undo");

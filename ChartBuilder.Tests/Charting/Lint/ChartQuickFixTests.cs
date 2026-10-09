@@ -54,8 +54,8 @@ public sealed class ChartQuickFixTests
     public void ChartFixesAreKeptApartFromMetadataFixes()
     {
         Assert.IsTrue(QuickFixRegistry.ChartStrategies.All(s => s.RuleId.StartsWith("CHR", StringComparison.Ordinal)));
-        Assert.AreEqual(QuickFixRegistry.ChartStrategies.Count, QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Distinct().Count(), "At most one per rule.");
-        Assert.IsFalse(QuickFixRegistry.ChartStrategies.Any(s => QuickFixRegistry.IsSupported(s.RuleId)));
+        Assert.HasCount(QuickFixRegistry.ChartStrategies.Count, QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Distinct(), "At most one per rule.");
+        Assert.DoesNotContain(s => QuickFixRegistry.IsSupported(s.RuleId), QuickFixRegistry.ChartStrategies);
         Assert.IsFalse(QuickFixRegistry.IsSupported(LongSustainRule.Id));
         Assert.IsTrue(QuickFixRegistry.Strategies.All(s => s.RuleId.StartsWith("SNG", StringComparison.Ordinal)));
     }

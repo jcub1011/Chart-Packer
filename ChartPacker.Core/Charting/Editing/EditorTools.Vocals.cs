@@ -34,6 +34,7 @@ public sealed partial class EditorTools
     public void Press(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
         Cancel();
+        _modifiers = modifiers;
         if (VocalContentOrSay(point.Track) is not { } content)
             return;
         bool shift = modifiers.HasFlag(EditorModifiers.Shift);
@@ -55,8 +56,44 @@ public sealed partial class EditorTools
         };
     }
 
-    /// <summary>Moves the gesture on to <paramref name="point"/> in a vocal part's lane.</summary>
-    public void Drag(VocalPoint point) => _gesture?.Drag(point);
+    /// <summary>
+    /// Starts erasing at <paramref name="point"/> in a vocal part's lane whatever the tool, as the middle button does: each
+    /// note the pointer passes over goes, with its lyrics, and in the phrase strip each phrase, as one step.
+    /// </summary>
+    public void PressErase(VocalPoint point)
+    {
+        Cancel();
+        _modifiers = EditorModifiers.None;
+        if (VocalContentOrSay(point.Track) is { } content)
+            _gesture = new VocalEraseGesture(this, point, content);
+    }
+
+    /// <summary>
+    /// Starts the right button's gesture at <paramref name="point"/> in a vocal part's lane, as
+    /// <see cref="PressContext(ChartPoint, EditorModifiers)"/> does in a highway's: a note there that isn't selected is
+    /// selected alone, and a drag lengthens or shortens the selected notes, each by the same grid steps, or with Ctrl ends
+    /// them all where the pointer is.
+    /// </summary>
+    public void PressContext(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        Cancel();
+        _modifiers = modifiers;
+        if (point.InPhrases || VocalContentOrSay(point.Track) is not { } content)
+            return;
+
+        var selection = _session.Selection;
+        if (HitTest(content, point) is { } hit && !selection.Contains(point.Track, hit.Note.Place))
+            selection.SelectVocalNotes(point.Track, [hit.Note.Place]);
+        if (selection.Vocal == point.Track && selection.HasVocalNotes)
+            _gesture = new VocalLengthGesture(this, point.Track, content, [.. selection.VocalPlaces], point.Tick);
+    }
+
+    /// <summary>Moves the gesture on to <paramref name="point"/> in a vocal part's lane, with <paramref name="modifiers"/> held.</summary>
+    public void Drag(VocalPoint point, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        _modifiers = modifiers;
+        _gesture?.Drag(point);
+    }
 
     /// <summary>Ends the gesture at <paramref name="point"/> in a vocal part's lane, as one undoable step.</summary>
     public void Release(VocalPoint point)
@@ -512,6 +549,34 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
+    /// Lengthens or shortens vocal notes as the right button drags (<see cref="PressContext(VocalPoint, EditorModifiers)"/>):
+    /// each by the ticks the pointer has moved on the grid, or with Ctrl each to end where the pointer is; each lasts at
+    /// least a tick.
+    /// </summary>
+    private sealed class VocalLengthGesture(EditorTools tools, VocalTrack track, VocalTrackContent content, IReadOnlyList<VocalNotePlace> places, double pressed)
+        : VocalGesture(tools, track, content)
+    {
+        private (long At, bool Match)? _last;
+
+        public override void Drag(VocalPoint point)
+        {
+            if (point.Track != Track)
+                return;
+            long at = Tools.Snap.Nearest(point.Tick, Tools.Map);
+            bool match = Tools._modifiers.HasFlag(EditorModifiers.Control);
+            if (_last == (at, match))
+                return;
+            _last = (at, match);
+
+            long delta = at - Tools.Snap.Nearest(pressed, Tools.Map);
+            if (!match && delta == 0)
+                Session.Preview(null);
+            else
+                Preview(c => VocalEdits.Change(c, places, n => n with { Length = Math.Max(1, match ? at - n.Tick : n.Length + delta) }, out _));
+        }
+    }
+
+    /// <summary>
     /// Places a vocal note at the grid step pressed, a grid step long, and stretches it to the grid as the pointer drags;
     /// it never reaches past the next note's start.
     /// </summary>
@@ -552,19 +617,24 @@ public sealed partial class EditorTools
         }
     }
 
-    /// <summary>Removes each vocal note the pointer passes over, with its lyrics.</summary>
+    /// <summary>Removes each vocal note the pointer passes over, with its lyrics, and in the phrase strip each phrase.</summary>
     private sealed class VocalEraseGesture : VocalGesture
     {
         private readonly HashSet<VocalNotePlace> _erased = [];
+        private readonly HashSet<VocalPhraseEvent> _phrases = [];
 
         public VocalEraseGesture(EditorTools tools, VocalPoint pressed, VocalTrackContent content)
             : base(tools, pressed.Track, content) => Drag(pressed);
 
         public override void Drag(VocalPoint point)
         {
-            if (point.Track != Track || HitTest(Content, point) is not { } hit || !_erased.Add(hit.Note.Place))
+            if (point.Track != Track)
                 return;
-            Preview(c => VocalEdits.Remove(c, _erased));
+            bool added = point.InPhrases
+                ? HitTestPhrase(Content, point) is { } phrase && _phrases.Add(phrase.Phrase)
+                : HitTest(Content, point) is { } hit && _erased.Add(hit.Note.Place);
+            if (added)
+                Preview(c => VocalEdits.RemovePhrases(VocalEdits.Remove(c, _erased), _phrases));
         }
     }
 

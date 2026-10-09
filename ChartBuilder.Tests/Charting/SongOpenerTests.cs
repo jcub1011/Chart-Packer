@@ -56,7 +56,7 @@ public sealed class SongOpenerTests
         Assert.AreEqual(TimeSpan.FromMilliseconds(40), song.Delay);
         Assert.IsNull(song.Import);
         Assert.IsNotNull(song.Chart.PartOf(ChartInstrument.Guitar));
-        CollectionAssert.AreEquivalent(new[] { "song.ini", "notes.mid", "guitar.ogg" }, song.StoredNames.ToArray());
+        Assert.AreSequenceEqual(new[] { "song.ini", "notes.mid", "guitar.ogg" }, [.. song.StoredNames], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]

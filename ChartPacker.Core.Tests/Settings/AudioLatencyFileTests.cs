@@ -126,7 +126,7 @@ public sealed class AudioLatencyFileTests
     {
         Open().Save("Speakers", "{speakers}", 20);
 
-        CollectionAssert.AreEqual(new[] { "audio-latency.json" }, _root.GetFiles().Select(f => f.Name).ToArray());
+        Assert.AreSequenceEqual(new[] { "audio-latency.json" }, [.. _root.GetFiles().Select(f => f.Name)]);
     }
 
     [TestMethod]

@@ -34,7 +34,7 @@ public sealed class ChartLintSchedulerTests
         Assert.IsFalse(scheduler.HasWork);
         Assert.AreSequenceEqual(
             linter.LintAll(Input(chart)).Findings.ToList(),
-            scheduler.Current.Findings.ToList());
+            [.. scheduler.Current.Findings]);
         Assert.HasCount(2, scheduler.Current.FindingsOf(ChrRules.Chr004));
     }
 

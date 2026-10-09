@@ -32,7 +32,7 @@ public sealed class DrumEditingTests
         var drums = session.Chart.PartOf(ChartInstrument.Drums)!;
         Assert.AreSequenceEqual([new TomMarker(Blue, 480, 1)], drums.TomMarkers.ToList());
         Assert.HasCount(1, posted);
-        StringAssert.Contains(posted[0], "Hard and Medium");
+        Assert.Contains("Hard and Medium", posted[0]);
     }
 
     [TestMethod]

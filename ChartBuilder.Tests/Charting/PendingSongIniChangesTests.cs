@@ -57,7 +57,7 @@ public sealed class PendingSongIniChangesTests
 
         var changes = PendingSongIniChanges.Of(chart, JustGuitar, []);
 
-        Assert.AreSequenceEqual(expected.Chunk(2).Select(p => new MetadataChange(p[0], p[1])).ToList(), changes.ToList());
+        Assert.AreSequenceEqual(expected.Chunk(2).Select(p => new MetadataChange(p[0], p[1])).ToList(), [.. changes]);
     }
 
     [TestMethod]
@@ -109,7 +109,7 @@ public sealed class PendingSongIniChangesTests
             .. new[] { Guitar, Drums }.SelectMany(p => SongIniPartKeys.DifficultyKeysOf(p, variant)).Select(k => new MetadataChange(k, MetadataDifficulty.UnsetValue)),
             new MetadataChange(drums.Key, drums.Value),
         ];
-        CollectionAssert.AreEquivalent(expected, changes.ToList());
+        Assert.AreSequenceEqual(expected, [.. changes], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]

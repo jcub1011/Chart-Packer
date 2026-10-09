@@ -143,7 +143,19 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The part's four difficulties, as the header's letters (charter-spec C3 item 3).</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CurrentDifficulty))]
         public partial IReadOnlyList<DifficultyLetter> Difficulties { get; private set; } = [];
+
+        /// <summary>The difficulty shown, of <see cref="Difficulties"/>, as the header's drop-down picks it when the lane is too narrow for the letters.</summary>
+        public DifficultyLetter? CurrentDifficulty
+        {
+            get => Difficulties.FirstOrDefault(static d => d.IsCurrent);
+            set
+            {
+                if (value is not null)
+                    ShowDifficulty(value.Difficulty);
+            }
+        }
 
         /// <summary>The difficulties a ghost can be, and none.</summary>
         [ObservableProperty]

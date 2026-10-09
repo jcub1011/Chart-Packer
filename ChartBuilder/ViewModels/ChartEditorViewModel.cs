@@ -473,9 +473,12 @@ namespace ChartBuilder.ViewModels
 
         private void SetTool(EditorTool tool, bool on)
         {
-            // A tool's button pressed again stays down: one tool is always picked.
+            // A tool's button pressed again lets it go for the select tool, whose own button stays down: one tool is always
+            // picked.
             if (on)
                 Session.Tool = tool;
+            else if (tool != EditorTool.Select && Session.Tool == tool)
+                Session.Tool = EditorTool.Select;
             else
                 OnSessionState(this, EventArgs.Empty);
         }

@@ -112,6 +112,20 @@ namespace ChartPacker.UI.Controls.Highway
         }
 
         /// <summary>
+        /// Draws an open note's sustain filling <paramref name="tail"/>: a band across the lanes, faint, so the frets' tails
+        /// drawn over it show through.
+        /// </summary>
+        public void DrawWideTail(DrawingContext context, Color color, Rect tail, bool outlined)
+        {
+            if (tail.Width <= 0 || tail.Height <= 0)
+                return;
+            if (outlined)
+                context.DrawRectangle(null, Pen(color, 1), tail.Deflate(0.5), 2, 2);
+            else
+                context.DrawRectangle(Brush(HighwayPalette.WithAlpha(color, 0x55)), Pen(HighwayPalette.WithAlpha(color, 0xCC), 1), tail.Deflate(0.5), 2, 2);
+        }
+
+        /// <summary>
         /// A flat gem: its face in the colour over a darker lower edge, like a key seen from the front, with a thin dark
         /// outline so it reads over any background. Outlined, only its edge is drawn, in the colour.
         /// </summary>

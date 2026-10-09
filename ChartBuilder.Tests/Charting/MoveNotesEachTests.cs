@@ -21,7 +21,7 @@ public sealed class MoveNotesEachTests
 
         var after = AppliesRevertsAndRedoes(chart, new MoveNotes(Guitar, Expert, [(notes[0], 5), (notes[1], -10), (notes[2], 0)]));
 
-        CollectionAssert.AreEqual(new long[] { 485, 950, 1440 }, after.PartOf(Guitar)![Expert].Notes.Select(n => n.Tick).ToArray());
+        Assert.AreSequenceEqual(new long[] { 485, 950, 1440 }, [.. after.PartOf(Guitar)![Expert].Notes.Select(n => n.Tick)]);
     }
 
     [TestMethod]

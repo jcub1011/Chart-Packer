@@ -952,11 +952,12 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **Lanes:** green, red, yellow, blue and orange, plus **open**, which is drawn across the whole
-   highway. *Settled in CM2:* on a highway, the Place tool puts an open note with Shift-click or
+   highway. *Settled in CM2:* on a highway, the Place tool puts an open note with Ctrl-click or
    `0`. A timeline gives open notes a row of their own.
-2. **Chords:** several frets on one tick. The editor won't place an open note in a chord with frets,
-   or a fret on an open. A loaded chart that has one is flagged (CHR022, an Error). The editor shows
-   the chord as the games read it, so the read-back check still passes and the chart can be saved
+2. **Chords:** several frets on one tick. An open note can be placed in a chord with frets, and a
+   fret on an open: YARG plays them, and charts in the wild have them. Such a chord is still flagged
+   (CHR022, an Error), as other games read it differently. The editor shows the chord as the games
+   read it, so the read-back check still passes and the chart can be saved
    ([§4.3](#43-writing-midichartwriter)).
 3. **Sustains:**
    - A sustain is drawn by dragging the note's tail, or set with the sustain tool.
@@ -1147,7 +1148,7 @@ Acceptance criteria:
      alone fills its column; in a barre, the black covers the top half of the white. The keys `1`–`6`
      are white 1–3, then black 1–3.
 2. **Chords**, including the "barre" chords where a white and a black share a column. As in
-   5-fret, an open note can't be placed in a chord with frets (CHR022).
+   5-fret, an open note can be placed in a chord with frets, which CHR022 flags.
 3. **Sustains, forced HOPO, forced strum and tap**, as for 5-fret ([C5](#c5-5-fret-notes)),
    including forcing per chord.
 4. Star power, solos and sections work as for 5-fret.

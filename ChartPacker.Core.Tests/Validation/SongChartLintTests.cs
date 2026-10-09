@@ -60,7 +60,7 @@ public sealed class SongChartLintTests
         var report = await SongChartLint.LintAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
 
         Assert.AreEqual(SongChartLintStatus.Linted, report.Status);
-        Assert.IsTrue(report.Findings.Any(f => f.Finding.RuleId == ChrRules.Chr083));
+        Assert.Contains(f => f.Finding.RuleId == ChrRules.Chr083, report.Findings);
     }
 
     [TestMethod]
@@ -74,7 +74,7 @@ public sealed class SongChartLintTests
 
         var report = await SongChartLint.LintAsync(entry, [KeyValuePair.Create("name", "Song")], null, null, TestContext.CancellationToken);
 
-        Assert.IsTrue(report.Findings.Any(f => f.Finding.RuleId == ChrRules.Chr022));
+        Assert.Contains(f => f.Finding.RuleId == ChrRules.Chr022, report.Findings);
     }
 
     [TestMethod]
@@ -122,11 +122,11 @@ public sealed class SongChartLintTests
         // charter-spec C16 item 5: a song with a chart Error still plans and packs as it did.
         var entry = Folder(OpenInAChord(), "[song]\nname = Song\nartist = Artist\n", ("song.wav", Wav(1000)));
         var report = await SongChartLint.LintAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
-        Assert.IsTrue(report.Findings.Any(f => f.Finding.Severity == Severity.Error));
+        Assert.Contains(f => f.Finding.Severity == Severity.Error, report.Findings);
 
         var plan = await PackPlanner.PlanAsync(entry.FullPath, cancellationToken: TestContext.CancellationToken);
 
-        Assert.IsFalse(plan.Findings.Any(f => ChrRules.IsChartRule(f.RuleId)));
+        Assert.DoesNotContain(f => ChrRules.IsChartRule(f.RuleId), plan.Findings);
         Assert.IsFalse(plan.HasErrors, string.Join("; ", plan.Findings.Select(f => f.Message)));
     }
 

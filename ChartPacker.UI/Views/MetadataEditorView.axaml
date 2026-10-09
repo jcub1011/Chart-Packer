@@ -7,6 +7,7 @@
              xmlns:ui="using:ChartPacker.UI.Controls"
              xmlns:conv="using:ChartPacker.UI.Converters"
              xmlns:meta="using:ChartPacker.Core.Metadata"
+             xmlns:views="using:ChartPacker.UI.Views"
              mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="400"
              x:Class="ChartPacker.UI.Views.MetadataEditorView"
              x:DataType="vm:MetadataEditorViewModel">
@@ -95,68 +96,7 @@
                             </ToolTip.Tip>
                             <Button.Flyout>
                                 <Flyout Placement="BottomEdgeAlignedLeft">
-                                    <StackPanel Spacing="8">
-                                        <StackPanel>
-                                            <TextBlock Classes="highwayHeader" Text="{Binding Name}" />
-                                            <TextBlock Classes="muted" FontSize="12" Text="{Binding Key}" />
-                                        </StackPanel>
-                                        <ItemsControl Grid.IsSharedSizeScope="True"
-                                                      ItemsSource="{Binding NoteCounts}"
-                                                      ItemTemplate="{StaticResource NoteCountRowTemplate}"
-                                                      IsVisible="{Binding HasNoteCounts}" />
-                                        <!-- ? unsets it; 0 to 6 set it, closing the flyout. -->
-                                        <ItemsControl ItemsSource="{Binding Presets}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" Spacing="4" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:DifficultyPresetViewModel">
-                                                    <Button Classes="preset"
-                                                            Classes.current="{Binding IsCurrent}"
-                                                            Command="{Binding Command}"
-                                                            CommandParameter="{Binding Tier}"
-                                                            Click="OnDifficultyChosen"
-                                                            AutomationProperties.Name="{Binding Text}">
-                                                        <Border Classes="presetFace"
-                                                                Classes.unset="{Binding Tier, Converter={x:Static ObjectConverters.IsNull}}"
-                                                                Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}">
-                                                            <TextBlock Text="{Binding Text}" />
-                                                        </Border>
-                                                    </Button>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        <!-- A tier past the buttons. Enter sets it and leaves the flyout open. -->
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:SharedStrings.DifficultyOtherLabel}" />
-                                            <NumericUpDown Width="110"
-                                                           VerticalAlignment="Center"
-                                                           Value="{Binding OtherValue}"
-                                                           Increment="1"
-                                                           Minimum="0"
-                                                           Maximum="2147483647"
-                                                           FormatString="0"
-                                                           AutomationProperties.Name="{x:Static res:SharedStrings.DifficultyOtherLabel}">
-                                                <NumericUpDown.KeyBindings>
-                                                    <KeyBinding Gesture="Enter" Command="{Binding ApplyOtherCommand}" />
-                                                </NumericUpDown.KeyBindings>
-                                            </NumericUpDown>
-                                            <Button Classes="nudge"
-                                                    Content="{x:Static res:SharedStrings.DifficultySetButton}"
-                                                    Command="{Binding ApplyOtherCommand}"
-                                                    Click="OnDifficultyChosen" />
-                                            <Button Classes="nudge"
-                                                    Command="{Binding RevertCommand}"
-                                                    IsVisible="{Binding IsEdited}"
-                                                    Click="OnDifficultyChosen"
-                                                    ToolTip.Tip="{x:Static res:SharedStrings.DifficultyRevertButton}"
-                                                    AutomationProperties.Name="{x:Static res:SharedStrings.DifficultyRevertButton}">
-                                                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
-                                            </Button>
-                                        </StackPanel>
-                                    </StackPanel>
+                                    <views:DifficultyPicker />
                                 </Flyout>
                             </Button.Flyout>
                             <StackPanel Classes="instrumentFace" Spacing="4">

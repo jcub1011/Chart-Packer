@@ -41,7 +41,7 @@ public sealed class ChartLoadFindingsTests
         Assert.AreEqual(480L, findings[0].Tick);
         Assert.AreEqual(new ChartLocation(Guitar, Expert, 960, 960), findings[1].Location);
         Assert.IsNull(findings[1].Tick);
-        StringAssert.Contains(findings[1].Message, "96");
+        Assert.Contains("96", findings[1].Message);
     }
 
     [TestMethod]

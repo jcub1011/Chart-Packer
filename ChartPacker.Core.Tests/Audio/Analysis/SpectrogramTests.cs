@@ -83,7 +83,7 @@ public sealed class SpectrogramTests
         Assert.AreEqual(1, chunked.ColumnCount % 2);
         Assert.IsTrue(chunked.IsComplete && whole.IsComplete);
         for (int c = 0; c < chunked.ColumnCount; c++)
-            CollectionAssert.AreEqual(whole.Column(c).ToArray(), chunked.Column(c).ToArray(), $"Column {c}");
+            Assert.AreSequenceEqual(whole.Column(c).ToArray(), chunked.Column(c).ToArray(), $"Column {c}");
     }
 
     [TestMethod]

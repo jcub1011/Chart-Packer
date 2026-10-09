@@ -40,7 +40,7 @@ public sealed class SectionEventsTests
 
         var sections = SectionEvents.All(chart);
 
-        Assert.AreSequenceEqual(SectionEvents.CommonNames, sections.Select(e => SectionEvents.NameOf(e.Text)!).ToList());
+        Assert.AreSequenceEqual(SectionEvents.CommonNames, [.. sections.Select(e => SectionEvents.NameOf(e.Text)!)]);
     }
 
     [TestMethod]

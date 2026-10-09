@@ -62,7 +62,7 @@ public sealed class LatencyCalibrationTests
         calibration.Cancel();
 
         Assert.AreEqual(25, calibration.Value);
-        CollectionAssert.AreEqual(before, File.ReadAllBytes(_path));
+        Assert.AreSequenceEqual(before, File.ReadAllBytes(_path));
     }
 
     [TestMethod]

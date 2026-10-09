@@ -36,7 +36,7 @@ namespace ChartPacker.UI.ViewModels
     /// its name and the difficulties its chart has notes for as a caption; and a flyout that sets the difficulty through
     /// <see cref="MetadataEditorViewModel"/>.
     /// </summary>
-    public sealed partial class InstrumentDifficultyViewModel : ObservableObject
+    public sealed partial class InstrumentDifficultyViewModel : ObservableObject, IDifficultyPicker
     {
         /// <summary>The tiers offered as buttons; any other is typed.</summary>
         private const int MaxPresetTier = 6;

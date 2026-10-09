@@ -79,7 +79,7 @@ public sealed class ClipboardTests
 
         session.Execute(ClipboardEdits.Paste(session, clip, 0, PasteMode.Overwrite).Command!);
 
-        Assert.AreSequenceEqual(Expert(session).Notes.Take(3).ToList(), session.Chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Hard].Notes.ToList());
+        Assert.AreSequenceEqual(Expert(session).Notes.Take(3).ToList(), [.. session.Chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Hard].Notes]);
     }
 
     [TestMethod]

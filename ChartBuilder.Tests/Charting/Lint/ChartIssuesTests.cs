@@ -83,8 +83,8 @@ public sealed class ChartIssuesTests
         var issues = new ChartIssuesViewModel { FileName = "notes.mid" };
         Show(issues, [GuitarExpert, GuitarExpertLater]);
 
-        StringAssert.Contains(issues.Headline, "notes.mid");
-        StringAssert.Contains(issues.Headline, "1");
+        Assert.Contains("notes.mid", issues.Headline);
+        Assert.Contains("1", issues.Headline);
         Assert.IsTrue(issues.HasErrors);
     }
 
@@ -101,7 +101,7 @@ public sealed class ChartIssuesTests
         Assert.AreSequenceEqual((object[])[a, e, d], rows.ToList());
         Assert.HasCount(2, changes);
         Assert.AreEqual(1, changes[0].OldStartingIndex);
-        Assert.AreEqual(2, changes[0].OldItems!.Count);
+        Assert.HasCount(2, changes[0].OldItems);
         Assert.AreEqual(1, changes[1].NewStartingIndex);
     }
 

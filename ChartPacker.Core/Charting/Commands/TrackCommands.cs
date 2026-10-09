@@ -196,7 +196,7 @@ public sealed class CopyDifficulty : ChartCommand
         }
 
         var flags = source.FlaggedChords.AsSpan().ToArray();
-        DrumMix[]? mixes = part.Kind == ChartInstrumentKind.Drums ? source.Mixes.AsSpan().ToArray() : null;
+        DrumMix[]? mixes = part.Kind == ChartInstrumentKind.Drums ? [.. source.Mixes] : null;
         TrackFill.Check(target, notes, flags, mixes);
         _old = TrackFill.Take(target);
         TrackFill.Fill(target, notes, flags, mixes);

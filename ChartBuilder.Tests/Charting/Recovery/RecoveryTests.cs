@@ -187,7 +187,7 @@ public sealed class RecoveryTests
         var recovered = Autosave.Recover(await OpenAsync(folder, Token), _store.Find(folder)!);
 
         Assert.AreEqual(4, recovered.Ratings["diff_guitar"]);
-        Assert.IsTrue(recovered.PendingChanges().Any(c => c.Key == "diff_guitar" && c.Value == "4"));
+        Assert.Contains(c => c.Key == "diff_guitar" && c.Value == "4", recovered.PendingChanges());
     }
 
     private Task AutosaveAsync(EditorSong song) =>

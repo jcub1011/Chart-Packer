@@ -194,9 +194,8 @@ public sealed class HarmonyWithoutFirstRule : IChartLintRule
         var chart = context.Chart;
         if (VocalTracks.IndexIn(chart, VocalTrack.Harmony1) >= 0)
             return [];
-        return ((VocalTrack[])[VocalTrack.Harmony2, VocalTrack.Harmony3])
+        return [.. ((VocalTrack[])[VocalTrack.Harmony2, VocalTrack.Harmony3])
             .Where(t => VocalTracks.IndexIn(chart, t) >= 0)
-            .Select(t => VocalFindings.At(this, t, null, FindingMessages.ChrHarmonyWithoutFirst))
-            .ToList();
+            .Select(t => VocalFindings.At(this, t, null, FindingMessages.ChrHarmonyWithoutFirst))];
     }
 }

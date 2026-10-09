@@ -64,6 +64,6 @@ public sealed class HitSoundScheduleTests
 
         float[] written = output.WrittenLeft();
         Assert.IsTrue(written[..(Rate / 2)].All(sample => sample == 0f), "A hit sounded before its note.");
-        Assert.IsTrue(written[(Rate / 2)..((Rate / 2) + 10)].Any(sample => sample != 0f), "The hit didn't start on its note.");
+        Assert.Contains(sample => sample != 0f, written[(Rate / 2)..((Rate / 2) + 10)], "The hit didn't start on its note.");
     }
 }

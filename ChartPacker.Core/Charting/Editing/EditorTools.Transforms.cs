@@ -176,12 +176,6 @@ public sealed partial class EditorTools
 
             if (moved is not null)
             {
-                if (PlacementRefusal(track, moved, notes as IReadOnlyCollection<EditableNote> ?? [.. notes]) is { } refusal)
-                {
-                    _session.Status = refusal;
-                    return;
-                }
-
                 var plan = NoteMergeOf(track, notes, moved);
                 if (plan is not null)
                     commands.Add(new ReplaceNotes(key.Instrument, key.Difficulty, plan.Value.Remove, plan.Value.Add));

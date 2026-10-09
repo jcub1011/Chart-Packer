@@ -74,15 +74,15 @@ public sealed class ChartSaveTests
 
         string folder = await SaveNewAsync(song, "Band - Song");
 
-        CollectionAssert.AreEquivalent(new[] { "notes.mid", "song.ini", "song.wav" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(new[] { "notes.mid", "song.ini", "song.wav" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         var plan = await PackPlanner.PlanAsync(folder, cancellationToken: Token);
         Assert.IsFalse(plan.HasErrors, string.Join("; ", plan.Findings.Select(f => $"{f.RuleId} {f.Message}")));
         var packed = await Packer.PackAsync(plan, Path.Combine(_folders.Root, "Band - Song.sng"), overwrite: false, cancellationToken: Token);
-        Assert.IsFalse(packed.Any(f => f.Severity == Severity.Error));
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, packed);
 
         var reopened = await OpenAsync(folder, Token);
-        Assert.AreSequenceEqual(song.Chart.TempoMap.Tempos.ToList(), reopened.Chart.TempoMap.Tempos.ToList());
-        Assert.AreSequenceEqual(song.Chart.Parts.Select(p => p.Instrument).ToList(), reopened.Chart.Parts.Select(p => p.Instrument).ToList());
+        Assert.AreSequenceEqual(song.Chart.TempoMap.Tempos.ToList(), [.. reopened.Chart.TempoMap.Tempos]);
+        Assert.AreSequenceEqual(song.Chart.Parts.Select(p => p.Instrument).ToList(), [.. reopened.Chart.Parts.Select(p => p.Instrument)]);
         Assert.AreEqual("Song", reopened.Value("name"));
         Assert.AreEqual("Band", reopened.Value("artist"));
         Assert.AreEqual("Me", reopened.Value("charter"));
@@ -126,7 +126,7 @@ public sealed class ChartSaveTests
         await Assert.ThrowsAsync<IOException>(() => ChartSaver.SaveNewAsync(new NewSongTarget(_folders.Root, "Taken"), request, ChartSaver.Check(request), [], Token));
 
         Assert.IsEmpty(before.DiffTo(FolderSnapshot.Take(existing)));
-        Assert.AreEqual(1, Directory.GetDirectories(_folders.Root).Length, "No temp folder was left beside it.");
+        Assert.HasCount(1, Directory.GetDirectories(_folders.Root), "No temp folder was left beside it.");
     }
 
     // AC C2.1–C2.3 and C2.6: saving a song that was opened.
@@ -157,9 +157,9 @@ public sealed class ChartSaveTests
         var chunks = MidiFile.ReadChunks(saved).Chunks.Select(c => Convert.ToHexString(saved[c.Start..c.End])).ToHashSet();
         foreach (var passthrough in original.Passthrough)
             Assert.Contains(Convert.ToHexString(passthrough.Chunk.Span), chunks, "Every passthrough track is written byte for byte.");
-        Assert.AreSequenceEqual(original.EventsRaw.ToList(), reload.Chart.EventsRaw.ToList());
+        Assert.AreSequenceEqual(original.EventsRaw.ToList(), [.. reload.Chart.EventsRaw]);
         foreach (var part in original.Parts)
-            Assert.AreSequenceEqual(part.RawEvents.ToList(), reload.Chart.PartOf(part.Instrument)!.RawEvents.ToList(), $"{part.Instrument}");
+            Assert.AreSequenceEqual(part.RawEvents.ToList(), [.. reload.Chart.PartOf(part.Instrument)!.RawEvents], $"{part.Instrument}");
     }
 
     [TestMethod]
@@ -173,7 +173,7 @@ public sealed class ChartSaveTests
 
         await SaveAsync(song, Token, removeChart: opened.ChartName);
 
-        CollectionAssert.AreEquivalent(new[] { "notes.mid", "song.ini" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray());
+        Assert.AreSequenceEqual(new[] { "notes.mid", "song.ini" }, Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
         var pairs = SongIni.Read(Path.Combine(folder, "song.ini"), Token).Pairs;
         Assert.AreEqual("Converted", SongIniValuesOf(pairs, "name"));
         Assert.AreEqual("Kept", SongIniValuesOf(pairs, "artist"), "A value song.ini has is kept.");
@@ -416,9 +416,9 @@ public sealed class ChartSaveTests
         await Packer.PackAsync(plan, sng, overwrite: false, cancellationToken: Token);
         var reopened = (await OpenAsync(sng, Token)).Chart.TempoMap;
 
-        Assert.AreSequenceEqual(tempos, reopened.Tempos.ToList());
-        Assert.AreSequenceEqual(signatures, reopened.TimeSignatures.ToList());
-        Assert.AreSequenceEqual(anchors, reopened.Anchors.ToList());
+        Assert.AreSequenceEqual(tempos, [.. reopened.Tempos]);
+        Assert.AreSequenceEqual(signatures, [.. reopened.TimeSignatures]);
+        Assert.AreSequenceEqual(anchors, [.. reopened.Anchors]);
     }
 
     [TestMethod]

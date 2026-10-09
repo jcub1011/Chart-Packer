@@ -125,12 +125,12 @@ public sealed class SavePiecesTests
         song.DefaultCharter = "Me";
 
         song.Revert("charter");
-        Assert.IsTrue(song.AllPendingChanges().Any(c => c.Key == "charter"));
-        Assert.IsFalse(song.PendingChanges().Any(c => c.Key == "charter"));
-        Assert.IsFalse(song.EffectivePairs().Any(p => p.Key == "charter"));
+        Assert.Contains(c => c.Key == "charter", song.AllPendingChanges());
+        Assert.DoesNotContain(c => c.Key == "charter", song.PendingChanges());
+        Assert.DoesNotContain(p => p.Key == "charter", song.EffectivePairs());
 
         song.Restore("charter");
-        Assert.IsTrue(song.PendingChanges().Any(c => c.Key == "charter"));
+        Assert.Contains(c => c.Key == "charter", song.PendingChanges());
         Assert.AreEqual(3, changed);
     }
 
@@ -142,7 +142,7 @@ public sealed class SavePiecesTests
 
         song.Revert("pro_drums");
 
-        Assert.IsTrue(song.PendingChanges().Any(c => c.Key == "pro_drums"));
+        Assert.Contains(c => c.Key == "pro_drums", song.PendingChanges());
     }
 
     [TestMethod]

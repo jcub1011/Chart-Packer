@@ -250,8 +250,6 @@ public static class ClipboardEdits
             var notes = incoming.Values.ToList();
             var flags = drums ? [] : source.Flags.Select(f => f with { Tick = atTick + Scale(f.Tick) }).ToList();
             var plan = NoteMerge.Plan(track, notes, flags, mode == PasteMode.Overwrite ? (atTick, atTick + length) : null);
-            if (EditorTools.PlacementRefusal(track, plan.Add, plan.Remove as IReadOnlyCollection<EditableNote>) is { } placement)
-                return Refused(placement);
             if (!plan.IsEmpty || plan.Flags.Count > 0)
                 commands.Add(new ReplaceNotes(target.Instrument, target.Difficulty, plan.Remove, plan.Add, plan.Flags));
             if (toms.Count > 0)

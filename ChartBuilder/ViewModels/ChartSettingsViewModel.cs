@@ -14,6 +14,7 @@ using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
+using ChartPacker.Resources;
 using ChartPacker.UI.Services;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -35,20 +36,17 @@ namespace ChartBuilder.ViewModels
 
     /// <summary>
     /// A part in Chart settings' Parts: ticked when the chart has it, with its difficulty rating, and for Pro drums their
-    /// own rating too, each set or cleared as an undo step.
+    /// own rating too, each picked from a flyout as Chart Packer's inspector picks one.
     /// </summary>
     public sealed partial class ChartPartRowViewModel : ObservableObject
     {
-        private readonly ChartSettingsViewModel _owner;
-
         internal ChartPartRowViewModel(ChartSettingsViewModel owner, ChartInstrument instrument, string label, bool isChecked)
         {
-            _owner = owner;
             Instrument = instrument;
             Label = label;
             DifficultyKey = SongIniPartKeys.DifficultyKeysOf(instrument, null)[0];
-            ClearDifficultyCommand = new RelayCommand(() => _owner.ClearDifficulty(DifficultyKey), () => IsChecked && Difficulty is not null);
-            ClearProDifficultyCommand = new RelayCommand(() => _owner.ClearDifficulty(SongIniPartKeys.ProDrumsDifficulty), () => IsChecked && ProDifficulty is not null);
+            Rating = new ChartRatingViewModel(owner, DifficultyKey, label);
+            ProRating = new ChartRatingViewModel(owner, SongIniPartKeys.ProDrumsDifficulty, Strings.ChartSettingsProDrumsDifficultyLabel);
             IsChecked = isChecked;
         }
 
@@ -64,13 +62,11 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial bool IsChecked { get; set; }
 
-        /// <summary>The part's rating as the next save leaves it, or what's being typed; null while it's unrated.</summary>
-        [ObservableProperty]
-        public partial decimal? Difficulty { get; set; }
+        /// <summary>The part's rating.</summary>
+        public ChartRatingViewModel Rating { get; }
 
-        /// <summary>Pro drums' own rating (<c>diff_drums_real</c>), for drums charted as Pro; null while it's unrated.</summary>
-        [ObservableProperty]
-        public partial decimal? ProDifficulty { get; set; }
+        /// <summary>Pro drums' own rating (<c>diff_drums_real</c>), for drums charted as Pro.</summary>
+        public ChartRatingViewModel ProRating { get; }
 
         /// <summary>Whether the part has Pro drums' rating as well: drums, charted as Pro.</summary>
         [ObservableProperty]
@@ -79,29 +75,75 @@ namespace ChartBuilder.ViewModels
         /// <summary><c>*</c> while a rating has a pending change, as an edited metadata row has.</summary>
         [ObservableProperty]
         public partial string? Marker { get; internal set; }
+    }
 
-        public RelayCommand ClearDifficultyCommand { get; }
+    /// <summary>
+    /// A part's rating in Chart settings: a number, unset as <c>?</c>, that opens a flyout as Chart Packer's inspector's
+    /// instrument icons do (<see cref="ChartPacker.UI.Views.DifficultyPicker"/>). <c>?</c> clears it, 0 to 6 set it, and Other sets any other
+    /// tier, each at once as one undo step.
+    /// </summary>
+    public sealed partial class ChartRatingViewModel : ObservableObject, IDifficultyPicker
+    {
+        /// <summary>The tiers offered as buttons; any other is typed.</summary>
+        private const int MaxPresetTier = 6;
 
-        public RelayCommand ClearProDifficultyCommand { get; }
+        private readonly ChartSettingsViewModel _owner;
 
-        partial void OnIsCheckedChanged(bool value) => RefreshCommands();
-
-        partial void OnDifficultyChanged(decimal? value)
+        internal ChartRatingViewModel(ChartSettingsViewModel owner, string key, string name)
         {
-            ClearDifficultyCommand.NotifyCanExecuteChanged();
-            _owner.DifficultyTyped(DifficultyKey, value);
+            _owner = owner;
+            Key = key;
+            Name = name;
+            var set = new RelayCommand<int?>(tier => _owner.SetDifficulty(Key, tier));
+            Presets =
+            [
+                new DifficultyPresetViewModel(null, SharedStrings.DifficultyUnsetBadge, set),
+                .. Enumerable.Range(0, MaxPresetTier + 1).Select(t => new DifficultyPresetViewModel(t, t.ToString(CultureInfo.CurrentCulture), set)),
+            ];
         }
 
-        partial void OnProDifficultyChanged(decimal? value)
+        public string Name { get; }
+
+        /// <summary>The rating's <c>song.ini</c> key, e.g. <c>diff_guitar</c>.</summary>
+        public string Key { get; }
+
+        /// <summary>None: the parts' rows don't count notes.</summary>
+        public IReadOnlyList<NoteCountRow> NoteCounts => [];
+
+        public bool HasNoteCounts => false;
+
+        public IReadOnlyList<DifficultyPresetViewModel> Presets { get; }
+
+        [ObservableProperty]
+        public partial decimal? OtherValue { get; set; }
+
+        /// <summary>The tier as the next save leaves it; null while it's unrated, or what's kept isn't a tier.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(Text))]
+        public partial int? Tier { get; private set; }
+
+        /// <summary>The tier as the rating's button shows it: its number, or <c>?</c> while it's unrated.</summary>
+        public string Text => Tier is { } tier ? tier.ToString(CultureInfo.CurrentCulture) : SharedStrings.DifficultyUnsetBadge;
+
+        /// <summary>Never: an undo puts a rating back.</summary>
+        public bool IsEdited => false;
+
+        public IRelayCommand RevertCommand { get; } = new RelayCommand(static () => { }, static () => false);
+
+        /// <summary>Takes the tier the song has now.</summary>
+        internal void Update(int? tier)
         {
-            ClearProDifficultyCommand.NotifyCanExecuteChanged();
-            _owner.DifficultyTyped(SongIniPartKeys.ProDrumsDifficulty, value);
+            Tier = tier;
+            OtherValue = tier;
+            foreach (var preset in Presets)
+                preset.IsCurrent = preset.Tier == tier;
         }
 
-        private void RefreshCommands()
+        [RelayCommand]
+        private void ApplyOther()
         {
-            ClearDifficultyCommand.NotifyCanExecuteChanged();
-            ClearProDifficultyCommand.NotifyCanExecuteChanged();
+            if (OtherValue is { } value && value >= 0 && value <= int.MaxValue)
+                _owner.SetDifficulty(Key, (int)decimal.Truncate(value));
         }
     }
 
@@ -114,7 +156,7 @@ namespace ChartBuilder.ViewModels
     /// </summary>
     public sealed partial class ChartSettingsViewModel : ViewModelBase, IDisposable
     {
-        // A BPM, beats per measure, delay or rating is applied this long after the last keystroke or spin, as one undo step.
+        // A BPM, beats per measure or delay is applied this long after the last keystroke or spin, as one undo step.
         private static readonly TimeSpan TypingDelay = TimeSpan.FromMilliseconds(600);
 
         private readonly BuilderSettingsService _settings;
@@ -126,8 +168,7 @@ namespace ChartBuilder.ViewModels
         private readonly DispatcherTimer _typingTimer;
         private readonly DispatcherTimer _songTypingTimer;
 
-        // The ratings being typed, by key, and whether the delay is: applied once the typing pauses, and not shown over meanwhile.
-        private readonly Dictionary<string, int?> _typedRatings = new(StringComparer.OrdinalIgnoreCase);
+        // Whether the delay is being typed: applied once the typing pauses, and not shown over meanwhile.
         private bool _delayTyped;
         private long _chartMicroseconds;
         private decimal _chartBpm;
@@ -315,27 +356,16 @@ namespace ChartBuilder.ViewModels
             _song.Changed -= OnSongChanged;
         }
 
-        /// <summary>Clears the rating <paramref name="key"/> to unrated, at once, as one undo step.</summary>
-        internal void ClearDifficulty(string key)
+        /// <summary>Sets the rating <paramref name="key"/> to <paramref name="tier"/>, or unrated for null, at once, as one undo step.</summary>
+        internal void SetDifficulty(string key, int? tier)
         {
             if (IsSaving)
                 return;
-            _typedRatings.Remove(key);
-            if (SongCommands.SetDifficulty(_song, key, null) is { } command)
+            if (SongCommands.SetDifficulty(_song, key, tier) is { } command)
                 _apply(command);
         }
 
-        /// <summary>A rating typed or spun to, applied once the typing pauses; an empty box clears it.</summary>
-        internal void DifficultyTyped(string key, decimal? value)
-        {
-            if (_loading)
-                return;
-            _typedRatings[key] = value is { } tier ? (int)Math.Clamp(decimal.Round(tier), 0, int.MaxValue) : null;
-            _songTypingTimer.Stop();
-            _songTypingTimer.Start();
-        }
-
-        /// <summary>Applies the ratings and the delay typed, together as one undo step.</summary>
+        /// <summary>Applies the delay typed, as one undo step.</summary>
         private void ApplyTyped()
         {
             _songTypingTimer.Stop();
@@ -346,23 +376,10 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (key, tier) in _typedRatings)
-            {
-                if (SongCommands.SetDifficulty(_song, key, tier) is { } rating)
-                    values[key] = rating.Values[key];
-            }
-
-            if (_delayTyped && DelayMs is { } typed && SongCommands.SetDelay(_song, (long)decimal.Round(typed, MidpointRounding.AwayFromZero)) is { } delay)
-            {
-                foreach (var (key, value) in delay.Values)
-                    values[key] = value;
-            }
-
-            _typedRatings.Clear();
+            bool typed = _delayTyped;
             _delayTyped = false;
-            if (SongCommands.SetValues(_song, values) is { } command)
-                _apply(command);
+            if (typed && DelayMs is { } ms && SongCommands.SetDelay(_song, (long)decimal.Round(ms, MidpointRounding.AwayFromZero)) is { } delay)
+                _apply(delay);
             else
                 LoadSong();
         }
@@ -487,8 +504,8 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// Sets the ratings and the delay from the song as the next save leaves them, but those being typed, and marks each
-        /// rating with a pending change.
+        /// Sets the ratings and the delay from the song as the next save leaves them, but the delay while it's being typed,
+        /// and marks each rating with a pending change.
         /// </summary>
         private void LoadSong()
         {
@@ -499,11 +516,10 @@ namespace ChartBuilder.ViewModels
             {
                 foreach (var part in Parts)
                 {
-                    if (!_typedRatings.ContainsKey(part.DifficultyKey))
-                        part.Difficulty = MetadataDifficulty.TierOf(_song.EffectiveValue(part.DifficultyKey));
+                    part.Rating.Update(MetadataDifficulty.TierOf(_song.EffectiveValue(part.DifficultyKey)));
                     part.HasProDifficulty = part.IsDrums && pro;
-                    if (part.HasProDifficulty && !_typedRatings.ContainsKey(SongIniPartKeys.ProDrumsDifficulty))
-                        part.ProDifficulty = MetadataDifficulty.TierOf(_song.EffectiveValue(SongIniPartKeys.ProDrumsDifficulty));
+                    if (part.HasProDifficulty)
+                        part.ProRating.Update(MetadataDifficulty.TierOf(_song.EffectiveValue(SongIniPartKeys.ProDrumsDifficulty)));
                     bool changed = pending.Contains(part.DifficultyKey) || (part.HasProDifficulty && pending.Contains(SongIniPartKeys.ProDrumsDifficulty));
                     part.Marker = changed ? "*" : null;
                 }

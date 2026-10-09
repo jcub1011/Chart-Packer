@@ -19,7 +19,7 @@ public sealed class DashedOutlineTests
         var dashes = DashedOutline.Dashes(Square, 2, 3);
 
         // 40 pixels round: a dash every 5, the first from the corner it starts at.
-        Assert.AreEqual(8, dashes.Count);
+        Assert.HasCount(8, dashes);
         AssertPoints([new(0, 0), new(2, 0)], dashes[0]);
         AssertPoints([new(5, 0), new(7, 0)], dashes[1]);
         AssertPoints([new(10, 0), new(10, 2)], dashes[2]);
@@ -56,7 +56,7 @@ public sealed class DashedOutlineTests
 
         var dashes = DashedOutline.Dashes(repeated, 3, 1);
 
-        Assert.AreEqual(DashedOutline.Dashes(Square, 3, 1).Count, dashes.Count);
+        Assert.HasCount(DashedOutline.Dashes(Square, 3, 1).Count, dashes);
         AssertPoints([new(8, 0), new(10, 0), new(10, 1)], dashes[2]);
     }
 
@@ -69,7 +69,7 @@ public sealed class DashedOutlineTests
 
     private static void AssertPoints(Point[] expected, IReadOnlyList<Point> actual)
     {
-        Assert.AreEqual(expected.Length, actual.Count, $"Expected {string.Join(", ", expected)}; got {string.Join(", ", actual)}.");
+        Assert.HasCount(expected.Length, actual, $"Expected {string.Join(", ", expected)}; got {string.Join(", ", actual)}.");
         for (int i = 0; i < expected.Length; i++)
         {
             Assert.AreEqual(expected[i].X, actual[i].X, 1e-9, $"Point {i}'s X.");

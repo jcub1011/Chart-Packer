@@ -30,7 +30,7 @@ public sealed class EditableTempoMapTests
                 Assert.AreEqual(tick, map.TickAt(map.SecondsAt(tick)), 0.5);
             }
 
-            Assert.AreSequenceEqual(reference.BeatLines(0, 50_000).ToList(), map.BeatLines(0, 50_000).ToList());
+            Assert.AreSequenceEqual(reference.BeatLines(0, 50_000).ToList(), [.. map.BeatLines(0, 50_000)]);
         }
     }
 

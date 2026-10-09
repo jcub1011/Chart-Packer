@@ -116,6 +116,6 @@ public sealed class ChartModelComparerTests
         var differences = ChartModelComparer.Differences(expected, actual);
 
         Assert.HasCount(ChartModelComparer.MaxDifferences, differences);
-        Assert.IsFalse(differences.Any(d => d.Kind == ModelDifferenceKind.More));
+        Assert.DoesNotContain(d => d.Kind == ModelDifferenceKind.More, differences);
     }
 }

@@ -34,8 +34,8 @@ public sealed class BeatMathTests
 
         var doubled = BeatMath.Doubled(proposal);
 
-        CollectionAssert.AreEqual(new[] { 1.0, 1.25, 1.5, 1.75, 2.0 }, doubled.Beats.ToArray());
-        CollectionAssert.AreEqual(new[] { 1f, 0.5f, 0.5f, 0.5f, 1f }, doubled.BeatConfidence.ToArray());
+        Assert.AreSequenceEqual(new[] { 1.0, 1.25, 1.5, 1.75, 2.0 }, [.. doubled.Beats]);
+        Assert.AreSequenceEqual(new[] { 1f, 0.5f, 0.5f, 0.5f, 1f }, [.. doubled.BeatConfidence]);
         Assert.AreEqual(new TempoRegion(0, 4, 240, 0.9f), doubled.Regions.Single());
         Assert.AreEqual(240, doubled.Bpm);
         Assert.IsFalse(doubled.MayBeHalfTempo);
@@ -49,9 +49,9 @@ public sealed class BeatMathTests
         var even = BeatMath.Halved(proposal, 0);
         var odd = BeatMath.Halved(proposal, 1);
 
-        CollectionAssert.AreEqual(new[] { 1.0, 1.5, 2.0 }, even.Beats.ToArray());
+        Assert.AreSequenceEqual(new[] { 1.0, 1.5, 2.0 }, [.. even.Beats]);
         Assert.AreEqual(new TempoRegion(0, 2, 120, 1f), even.Regions.Single());
-        CollectionAssert.AreEqual(new[] { 1.25, 1.75 }, odd.Beats.ToArray());
+        Assert.AreSequenceEqual(new[] { 1.25, 1.75 }, [.. odd.Beats]);
         Assert.AreEqual(new TempoRegion(0, 1, 120, 1f), odd.Regions.Single());
     }
 

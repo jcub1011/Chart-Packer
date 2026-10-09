@@ -53,9 +53,9 @@ public sealed class StemPeaksChannelTests
         var chunked = reader.Finish();
 
         Assert.IsGreaterThan(1, reader.ChunkCount);
-        CollectionAssert.AreEqual(whole.Left.Max.ToArray(), chunked.Left.Max.ToArray());
-        CollectionAssert.AreEqual(whole.Right.Min.ToArray(), chunked.Right.Min.ToArray());
-        CollectionAssert.AreEqual(whole.Max.ToArray(), chunked.Max.ToArray());
+        Assert.AreSequenceEqual([.. whole.Left.Max], [.. chunked.Left.Max]);
+        Assert.AreSequenceEqual([.. whole.Right.Min], [.. chunked.Right.Min]);
+        Assert.AreSequenceEqual([.. whole.Max], [.. chunked.Max]);
     }
 
     [TestMethod]

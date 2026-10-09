@@ -52,6 +52,9 @@ namespace ChartBuilder.Controls.Editing
         // How near a note's start, or a phrase bar's end in the rail, the pointer hits it, in pixels.
         private const double HitPixels = 7;
 
+        // How far the pointer can move between a right button's press and release, in pixels, and still be a click.
+        private const double ClickSlop = 4;
+
         // A short sustain's dashed outline's dashes, and the gaps between them, in pixels.
         private const double ShortTailDash = 2;
 
@@ -151,6 +154,16 @@ namespace ChartBuilder.Controls.Editing
         private bool _isFrameRequested;
         private bool _isRedrawPosted;
         private bool _isPressed;
+
+        // The button whose press started the gesture going on, where it was pressed, and whether it has been dragged since:
+        // a right click that isn't dragged opens the note menu.
+        private MouseButton _pressButton;
+        private Point _pressedAt;
+        private bool _pressDragged;
+
+        // The modifier keys held as the pointer last moved or a key last went down or up: with Ctrl, the place
+        // tool's ghost is an open note, or a kick.
+        private KeyModifiers _keys;
 
         // The proposed beat being dragged by its handle, if one is.
         private int? _proposalDrag;
@@ -768,12 +781,36 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
+        /// <summary>
+        /// A press starts a gesture of the button pressed: the left button's of the current tool, the middle button's
+        /// erasing whatever the tool, and the right button's lengthening or shortening the selected notes, or opening the
+        /// note menu when it isn't dragged. Another button pressed while one's gesture goes on is ignored.
+        /// </summary>
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
             base.OnPointerPressed(e);
             var current = e.GetCurrentPoint(this);
-            if (!current.Properties.IsLeftButtonPressed || Session is not { } session)
+            if (Session is not { } session)
                 return;
+            if (_isPressed || _proposalDrag is not null)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            var button = current.Properties.PointerUpdateKind switch
+            {
+                PointerUpdateKind.LeftButtonPressed => MouseButton.Left,
+                PointerUpdateKind.MiddleButtonPressed => MouseButton.Middle,
+                PointerUpdateKind.RightButtonPressed => MouseButton.Right,
+                _ => MouseButton.None,
+            };
+            if (button == MouseButton.None)
+                return;
+            _pressButton = button;
+            _pressedAt = current.Position;
+            _pressDragged = false;
+            ShowTip(null);
 
             if (_lane is { Vocal: not null })
             {
@@ -788,7 +825,7 @@ namespace ChartBuilder.Controls.Editing
             e.Pointer.Capture(this);
 
             // A proposed beat's handle, while a proposed tempo map is reviewed, comes before the tools.
-            if (ProposalHandleAt(current.Position) is { } beat)
+            if (button == MouseButton.Left && ProposalHandleAt(current.Position) is { } beat)
             {
                 _proposalDrag = beat;
                 e.Handled = true;
@@ -799,11 +836,17 @@ namespace ChartBuilder.Controls.Editing
             _lastPoint = point;
 
             // A box is drawn from a press in the lanes that's on no note, with the select tool.
-            _boxFrom = session.Tool == EditorTool.Select && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
+            _boxFrom = button == MouseButton.Left && session.Tool == EditorTool.Select && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
                 ? current.Position
                 : null;
             _boxTo = current.Position;
-            session.Tools.Press(point, ModifiersOf(e.KeyModifiers));
+            var modifiers = ModifiersOf(e.KeyModifiers);
+            if (button == MouseButton.Middle)
+                session.Tools.PressErase(point);
+            else if (button == MouseButton.Right)
+                session.Tools.PressContext(point, modifiers);
+            else
+                session.Tools.Press(point, modifiers);
             e.Handled = true;
             _overlay.Redraw();
         }
@@ -813,10 +856,17 @@ namespace ChartBuilder.Controls.Editing
             base.OnPointerMoved(e);
             var position = e.GetPosition(this);
             _hover = position;
+            _keys = e.KeyModifiers;
             if (_proposalDrag is { } beat)
             {
                 DragProposedBeat(beat, position);
                 return;
+            }
+
+            if (_isPressed)
+            {
+                var moved = position - _pressedAt;
+                _pressDragged |= (moved.X * moved.X) + (moved.Y * moved.Y) > ClickSlop * ClickSlop;
             }
 
             if (_isPressed && Session is { } session && _lane is { Vocal: not null })
@@ -825,14 +875,14 @@ namespace ChartBuilder.Controls.Editing
                 {
                     _lastVocalPoint = vocalPoint;
                     _boxTo = position;
-                    session.Tools.Drag(vocalPoint);
+                    session.Tools.Drag(vocalPoint, ModifiersOf(e.KeyModifiers));
                 }
             }
             else if (_isPressed && Session is { } highway && PointAt(position) is { } point)
             {
                 _lastPoint = point;
                 _boxTo = position;
-                highway.Tools.Drag(point);
+                highway.Tools.Drag(point, ModifiersOf(e.KeyModifiers));
             }
             else if (!_isPressed)
             {
@@ -855,16 +905,38 @@ namespace ChartBuilder.Controls.Editing
                 return;
             }
 
-            if (!_isPressed)
+            if (!_isPressed || e.InitialPressMouseButton != _pressButton)
                 return;
             _isPressed = false;
             _boxFrom = null;
             e.Pointer.Capture(null);
-            if (Session is { } session && _lane is { Vocal: not null })
+            if (Session is not { } session)
+                return;
+            if (_pressButton == MouseButton.Right && !_pressDragged)
+            {
+                // A right click: the note it was on is selected, and the menu acts on the selection.
+                session.Tools.Cancel();
+                ShowNoteMenu();
+            }
+            else if (_lane is { Vocal: not null })
+            {
                 session.Tools.Release(VocalPointAt(e.GetPosition(this), clamp: true) ?? _lastVocalPoint);
-            else if (Session is { } highway)
-                highway.Tools.Release(PointAt(e.GetPosition(this)) ?? _lastPoint);
+            }
+            else
+            {
+                session.Tools.Release(PointAt(e.GetPosition(this)) ?? _lastPoint);
+            }
+
+            e.Handled = true;
             _overlay.Redraw();
+        }
+
+        /// <summary>Opens the note menu at the pointer, for the selected notes, after a right click; nothing with none.</summary>
+        private void ShowNoteMenu()
+        {
+            if (_lane?.BuildNoteMenu() is not { Count: > 0 } items || !this.TryFindResource("LaneMenu", out var found) || found is not LaneMenuConverter menu)
+                return;
+            new MenuFlyout { ItemsSource = menu.MenuItems(items) }.ShowAt(this, showAtPointer: true);
         }
 
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
@@ -886,6 +958,7 @@ namespace ChartBuilder.Controls.Editing
         {
             base.OnPointerExited(e);
             _hover = null;
+            ShowTip(null);
             _overlay.Redraw();
         }
 
@@ -922,6 +995,7 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
+            TakeKeys(e.KeyModifiers);
             if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
                 return;
             e.Handled = EditorKeys.Handle(e.PhysicalKey, e.KeyModifiers, editor, lane, this);
@@ -930,9 +1004,30 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnKeyUp(KeyEventArgs e)
         {
             base.OnKeyUp(e);
+            TakeKeys(e.KeyModifiers);
             if (e.Handled || _editor is not { } editor || _lane is not { } lane || Session is not { })
                 return;
             e.Handled = EditorKeys.HandleUp(e.PhysicalKey, editor, lane);
+        }
+
+        /// <summary>
+        /// Takes in the modifier keys held after one goes down or up: a drag goes on with them, as Ctrl makes the right
+        /// button's sustains or runs end together and Shift makes it lay runs, and the place tool's ghost moves to the open lane with Ctrl.
+        /// </summary>
+        private void TakeKeys(KeyModifiers keys)
+        {
+            if (keys == _keys)
+                return;
+            _keys = keys;
+            if (_isPressed && Session is { } session)
+            {
+                if (_lane is { Vocal: not null })
+                    session.Tools.Drag(_lastVocalPoint, ModifiersOf(keys));
+                else
+                    session.Tools.Drag(_lastPoint, ModifiersOf(keys));
+            }
+
+            _overlay.Redraw();
         }
 
         /// <summary>Moves focus to the lane's other canvas, once it's shown in place of this one.</summary>
@@ -991,27 +1086,48 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Shows a resize arrow over a phrase or disco flip bar's end in the rail, and a hand over its body, or over a
-        /// proposed fill's ghost, which is clicked to keep or drop it.
+        /// proposed fill's ghost, which is clicked to keep or drop it; and over a bar, a tip saying what it is.
         /// </summary>
         private void ShowRailCursor(Point position)
         {
             StandardCursorType? wanted = null;
+            string? tip = null;
             if (PointAt(position) is { Rail: not null } point && Session is { } session)
             {
+                PhraseGrip? grip = null;
                 if (session.Fills.HitTest(point) is not null)
                 {
                     wanted = StandardCursorType.Hand;
                 }
-                else if (session.Chart.PartOf(point.Track.Instrument) is { } part
-                    && (PhraseRail.HitTest(part, point)?.Grip ?? PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point)?.Grip) is { } grip)
+                else if (session.Chart.PartOf(point.Track.Instrument) is { } part && PhraseRail.HitTest(part, point) is { } phrase)
                 {
-                    wanted = grip == PhraseGrip.Body ? StandardCursorType.Hand
+                    (grip, tip) = (phrase.Grip, ChartEditorViewModel.PhraseKindName(phrase.Phrase.Kind));
+                }
+                else if (PhraseRail.HitTestDiscoFlip(point.Track.Difficulty, session.DiscoFlipRangesOf(point.Track), point) is { } flip)
+                {
+                    (grip, tip) = (flip.Grip, ChartEditorViewModel.PhraseKindName(RailKind.DiscoFlip));
+                }
+
+                if (grip is { } grabbed)
+                {
+                    wanted = grabbed == PhraseGrip.Body ? StandardCursorType.Hand
                         : View == LaneView.Highway ? StandardCursorType.SizeNorthSouth
                         : StandardCursorType.SizeWestEast;
                 }
             }
 
             SetCursor(wanted);
+            ShowTip(tip);
+        }
+
+        /// <summary>Shows <paramref name="tip"/> by the pointer, as what's under it says what it is, or none for null.</summary>
+        private void ShowTip(string? tip)
+        {
+            if (Equals(ToolTip.GetTip(this), tip))
+                return;
+            ToolTip.SetTip(this, tip);
+            if (tip is null)
+                ToolTip.SetIsOpen(this, false);
         }
 
         /// <summary>Shows <paramref name="wanted"/> as the pointer's cursor, or the usual one for null.</summary>
@@ -1785,31 +1901,49 @@ namespace ChartBuilder.Controls.Editing
             double size = GemSize(projection);
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
 
-            // Tails at the back, then the bars across, then the gems; within each, the latest first.
-            for (int i = notes.Length - 1; i >= 0; i--)
+            // Tails at the back, an open note's across the lanes behind the frets', then the bars across, then the gems;
+            // within each, the latest first. A kick has no sustain.
+            foreach (bool wide in (ReadOnlySpan<bool>)[true, false])
             {
-                var note = notes[i];
-                if (note.Length <= EditableNote.PlainLength || (slots.Across == note.Lane))
-                    continue;
-                int lane = session.ShownLane(key, note);
-                var shown = Shown(game, note, drums, lane);
-                int column = slots.IndexOf(lane);
-                if (column < 0)
-                    continue;
-                double start = projection.AlongOf(session.AudioAt(note.Tick));
-                double end = projection.AlongOf(session.AudioAt(note.Tick + note.Length));
-                double width = Math.Max(3, projection.LaneSize * 0.2);
-                double center = projection.AcrossOf(column);
-                var tail = Box(start, end, center - (width / 2), center + (width / 2));
-                var color = HighwayPalette.NoteColor(kind, laneCount, shown);
-                if (!isGhost && shown.Length == 0)
+                for (int i = notes.Length - 1; i >= 0; i--)
                 {
-                    // Shorter than the sustain cutoff: the games read a plain note, so the tail is only dashed (C5 item 3).
-                    DashedOutline.DrawRectangle(context, ShortTailPen(color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
-                }
-                else
-                {
-                    _gems.DrawTail(context, kind, shown, color, tail, outlined: false);
+                    var note = notes[i];
+                    bool across = slots.Across == note.Lane;
+                    if (note.Length <= EditableNote.PlainLength || across != wide || (across && drums))
+                        continue;
+                    int lane = session.ShownLane(key, note);
+                    var shown = Shown(game, note, drums, lane);
+                    int column = slots.IndexOf(lane);
+                    if (column < 0 && !across)
+                        continue;
+                    double start = projection.AlongOf(session.AudioAt(note.Tick));
+                    double end = projection.AlongOf(session.AudioAt(note.Tick + note.Length));
+                    Rect tail;
+                    if (across)
+                    {
+                        tail = Box(start, end, across1 + 4, across2 - 4);
+                    }
+                    else
+                    {
+                        double width = Math.Max(3, projection.LaneSize * 0.2);
+                        double center = projection.AcrossOf(column);
+                        tail = Box(start, end, center - (width / 2), center + (width / 2));
+                    }
+
+                    var color = HighwayPalette.NoteColor(kind, laneCount, shown);
+                    if (!isGhost && shown.Length == 0)
+                    {
+                        // Shorter than the sustain cutoff: the games read a plain note, so the tail is only dashed (C5 item 3).
+                        DashedOutline.DrawRectangle(context, ShortTailPen(color), tail.Deflate(0.5), 0, ShortTailDash, ShortTailDash);
+                    }
+                    else if (across)
+                    {
+                        _gems.DrawWideTail(context, color, tail, outlined: false);
+                    }
+                    else
+                    {
+                        _gems.DrawTail(context, kind, shown, color, tail, outlined: false);
+                    }
                 }
             }
 
@@ -1890,15 +2024,22 @@ namespace ChartBuilder.Controls.Editing
             text.Draw(context, at);
         }
 
-        /// <summary>The note the place tool would put down where the pointer is, as it would be drawn.</summary>
+        /// <summary>
+        /// The note the place tool would put down where the pointer is, as it would be drawn: with Ctrl held, an
+        /// open note, or a kick.
+        /// </summary>
         private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
-            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || PointAt(hover) is not { } point || point.Lane is not { } lane)
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || PointAt(hover) is not { Rail: null } point)
+                return;
+            bool apart = (_keys & KeyModifiers.Control) != 0;
+            if ((apart ? EditorTools.ApartLane(slots) : point.Lane) is not { } lane)
                 return;
             long tick = session.Snap.Nearest(point.Tick, session.TempoMap);
             int column = slots.IndexOf(lane);
             int stored = session.StoredLane(key, tick, lane);
-            if (column < 0 || track.TryGetNote(tick, stored, false, out _))
+            bool across = slots.Across == lane;
+            if ((column < 0 && !across) || track.TryGetNote(tick, stored, false, out _))
                 return;
             double along = projection.AlongOf(session.AudioAt(tick));
 
@@ -1913,7 +2054,21 @@ namespace ChartBuilder.Controls.Editing
                     && !DrumCymbals.IsTom(session.Chart.PartOf(key.Instrument)!, lane, tick);
             var placed = new ChartNote(tick, 0, drums ? lane - 1 : lane, cymbal ? NoteFlags.Cymbal : NoteFlags.None);
             var color = HighwayPalette.NoteColor(track.Kind, laneCount, placed);
-            var rect = GemRect(projection, column, along, GemSize(projection));
+            double size = GemSize(projection);
+
+            // An open note or kick is a bar: across the highway, or in a timeline's last row.
+            if (across || (column == slots.Slots.Count - 1 && slots.Across is null && lane == EditorTools.ApartLane(slots)))
+            {
+                double thickness = Math.Max(4, size * 0.45);
+                var bar = across
+                    ? Box(along - (thickness / 2), along + (thickness / 2), projection.LaneFrom + 4, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count) - 4)
+                    : GemRect(projection, column, along, size);
+                using (context.PushOpacity(0.45))
+                    _gems.DrawBar(context, placed, color, bar, outlined: true);
+                return;
+            }
+
+            var rect = GemRect(projection, column, along, size);
 
             // A GHL black fret on a white one makes a barre, drawn over the white's top half.
             if (slots.IsShared(lane) && slots.PartnerOf(lane) is { } white && track.TryGetNote(tick, white, false, out _))

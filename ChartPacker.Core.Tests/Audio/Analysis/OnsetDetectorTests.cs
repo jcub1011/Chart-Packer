@@ -112,8 +112,8 @@ public sealed class OnsetDetectorTests
 
         foreach (var band in whole.Bands)
         {
-            CollectionAssert.AreEqual(whole.Envelope(band).Values.ToArray(), chunked.Envelope(band).Values.ToArray(), $"{band}'s flux.");
-            CollectionAssert.AreEqual(whole.Times(band, 1), chunked.Times(band, 1), $"{band}'s onsets.");
+            Assert.AreSequenceEqual(whole.Envelope(band).Values.ToArray(), chunked.Envelope(band).Values.ToArray(), $"{band}'s flux.");
+            Assert.AreSequenceEqual(whole.Times(band, 1), chunked.Times(band, 1), $"{band}'s onsets.");
         }
     }
 

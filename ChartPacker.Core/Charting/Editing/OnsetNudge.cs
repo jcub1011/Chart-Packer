@@ -75,8 +75,7 @@ public static class OnsetNudge
             {
                 var chord = notes.Where(n => n.Tick == tick).ToList();
                 var landed = chord.Select(n => n with { Tick = to }).ToList();
-                bool lands = landed.Any(n => track.Notes.IndexOfPlace(n) is int at && at >= 0 && !moving.Contains(track.Notes[at]))
-                    || EditorTools.PlacementRefusal(track, landed, moving) is not null;
+                bool lands = landed.Any(n => track.Notes.IndexOfPlace(n) is int at && at >= 0 && !moving.Contains(track.Notes[at]));
                 if (lands)
                 {
                     targets.Remove(tick);

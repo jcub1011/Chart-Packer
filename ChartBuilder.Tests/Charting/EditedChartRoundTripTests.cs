@@ -50,12 +50,12 @@ public sealed class EditedChartRoundTripTests
         var saved = result.Saved.PartOf(Drums)!;
         for (int i = 0; i < drums.Tracks.Count; i++)
         {
-            Assert.AreSequenceEqual(drums.Tracks[i].Notes.ToList(), saved.Tracks[i].Notes.ToList());
-            Assert.AreSequenceEqual(drums.Tracks[i].Mixes.ToList(), saved.Tracks[i].Mixes.ToList());
+            Assert.AreSequenceEqual(drums.Tracks[i].Notes.ToList(), [.. saved.Tracks[i].Notes]);
+            Assert.AreSequenceEqual(drums.Tracks[i].Mixes.ToList(), [.. saved.Tracks[i].Mixes]);
         }
 
-        Assert.AreSequenceEqual(drums.Phrases.ToList(), saved.Phrases.ToList());
-        Assert.AreSequenceEqual(drums.TomMarkers.ToList(), saved.TomMarkers.ToList());
+        Assert.AreSequenceEqual(drums.Phrases.ToList(), [.. saved.Phrases]);
+        Assert.AreSequenceEqual(drums.TomMarkers.ToList(), [.. saved.TomMarkers]);
         var game = MidiChartReader.Read(result.Bytes, after).Tracks[new ChartTrackKey(Drums, Expert)].Notes;
         ChartNote At(long tick, int lane) => game.Single(n => n.Tick == tick && n.Lane == lane);
         foreach (var (tick, lane) in (ReadOnlySpan<(long, int)>)[(960, 1), (1920, 2), (2880, 3)])
@@ -88,8 +88,8 @@ public sealed class EditedChartRoundTripTests
         Assert.IsTrue(result.IsValid, DescribeModel(result.ModelDifferences));
         var track = chart.PartOf(ChartInstrument.GhlGuitar)![Expert];
         var saved = result.Saved.PartOf(ChartInstrument.GhlGuitar)![Expert];
-        Assert.AreSequenceEqual(track.Notes.ToList(), saved.Notes.ToList());
-        Assert.AreSequenceEqual(track.FlaggedChords.ToList(), saved.FlaggedChords.ToList());
+        Assert.AreSequenceEqual(track.Notes.ToList(), [.. saved.Notes]);
+        Assert.AreSequenceEqual(track.FlaggedChords.ToList(), [.. saved.FlaggedChords]);
     }
 
     [TestMethod]

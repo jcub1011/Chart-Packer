@@ -124,7 +124,7 @@ public sealed class ReducerTests
         var hard = Reducer.Reduce(chart, Guitar, Expert, Hard, Rules(Hard)).Flags;
         var medium = Reducer.Reduce(chart, Guitar, Expert, Medium, Rules(Medium)).Flags;
 
-        Assert.AreEqual(3, hard.Count);
+        Assert.HasCount(3, hard);
         Assert.AreSequenceEqual([new FlaggedChord(960, ChordFlags.ForceStrum)], medium.ToList());
     }
 
@@ -193,8 +193,8 @@ public sealed class ReducerTests
 
         var result = Reducer.Reduce(chart, Expert, Hard, DrumReductionRules.Default(Hard), DrumsVariant.Pro);
 
-        Assert.IsFalse(result.Notes.Any(n => n.DoubleKick));
-        Assert.AreSequenceEqual(chart.PartOf(Drums)![Expert].Mixes.ToList(), result.Mixes.ToList());
+        Assert.DoesNotContain(n => n.DoubleKick, result.Notes);
+        Assert.AreSequenceEqual(chart.PartOf(Drums)![Expert].Mixes.ToList(), [.. result.Mixes]);
         Assert.AreEqual(1, result.Removed);
     }
 

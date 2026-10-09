@@ -89,8 +89,8 @@ public sealed partial class EditorTools
         {
             moves.Add(() =>
             {
-                var (command, moved) = MoveOf(key, notes, tickDelta, 0);
-                return MoveRefusal(key, notes, moved) is { } why ? (null, why) : (command, null);
+                var (command, _) = MoveOf(key, notes, tickDelta, 0);
+                return (command, null);
             });
         }
 
