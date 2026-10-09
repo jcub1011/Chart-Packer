@@ -572,12 +572,10 @@ namespace ChartBuilder.Controls.Editing
             {
                 if (!cached)
                     layer.CacheMode = null;
-                else if (layer.CacheMode is null)
-                {
+                else                     
                     // Not snapped to the screen's pixels: snapped, a slow lane's picture stands still for frames, then
                     // jumps a pixel; drawn smoothed between them, it moves as smoothly as the song.
-                    layer.CacheMode = new BitmapCache { SnapsToDevicePixels = false };
-                }
+                    layer.CacheMode ??= new BitmapCache { SnapsToDevicePixels = false };
             }
         }
 
