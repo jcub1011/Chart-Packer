@@ -34,8 +34,13 @@ public sealed class StemPlayer : IDisposable
     // Stretched, each grain's frames are mapped in this many pieces, so the map follows the grains' fade closely.
     private const int PiecesPerGrain = 8;
 
-    // How far SmoothPosition may drift from Position before it's put straight back on it.
+    // How far SmoothPosition may drift from what the device has taken before it's put straight back on it.
     private const int SmoothSnapMilliseconds = 50;
+
+    // How long SmoothPosition takes to make up how far it is from what the device has taken, and the most faster or
+    // slower than the device it runs meanwhile.
+    private const double SmoothSlewSeconds = 0.2;
+    private const double SmoothMaxTrim = 0.1;
 
     private readonly StemMixer _mixer;
     private readonly IAudioOutput _output;
@@ -79,8 +84,10 @@ public sealed class StemPlayer : IDisposable
     private int _mixedVolumes;
     private long _volumesRemixedAt;
 
-    // Which frame of the mix each frame written stands for. Under _lock, with _writtenFrames.
+    // Which frame of the mix each frame written stands for: the grains played, and, for SmoothPosition, where the speed
+    // says the mix has got to, which runs on evenly where the grains don't. Under _lock, with _writtenFrames.
     private readonly PositionMap _map = new();
+    private readonly PositionMap _nominal = new();
 
     // What was written lately, by output frame, for TryReadHeard. Written and read under _lock, with _writtenFrames.
     private readonly OutputTap _tap = new();
@@ -96,13 +103,14 @@ public sealed class StemPlayer : IDisposable
     private readonly List<Piece> _pieces = [];
     private readonly float[] _soundMix;
 
-    // SmoothPosition's clock, and where it was last put: _smoothFrame of the mix at _smoothAt, when Position was
-    // _smoothHeard. Under _lock.
+    // SmoothPosition's clock, and where it was last put: _smoothOutput frames of the output played at _smoothAt, when the
+    // device had taken _smoothSeen, running _smoothTrim times as fast as the device from there. Under _lock.
     private readonly TimeProvider _clock;
     private bool _smoothValid;
-    private double _smoothFrame;
+    private double _smoothOutput;
     private long _smoothAt;
-    private long _smoothHeard;
+    private long _smoothSeen;
+    private double _smoothTrim = 1;
 
     /// <param name="mixer">What to play.</param>
     /// <param name="output">Where to play it, at <paramref name="mixer"/>'s rate. The player owns it.</param>
@@ -198,11 +206,12 @@ public sealed class StemPlayer : IDisposable
     }
 
     /// <summary>
-    /// <see cref="Position"/> moving smoothly: it only moves when the device takes more of the queue, every few
-    /// milliseconds, so this carries it on between, at the speed, by a monotonic clock. When <see cref="Position"/>
-    /// moves, this takes up half of how far apart they are, or all of it past 50 ms; it's put back on it by a seek, a
-    /// change of speed, playing and pausing. While paused it's <see cref="Position"/>. What's drawn against the audio
-    /// follows this (charter-spec §4.4.1).
+    /// <see cref="Position"/> moving smoothly, for what's drawn against the audio (charter-spec §4.4.1). What the device
+    /// has played only moves when it takes more of the queue, every few milliseconds, so this carries it on between by a
+    /// monotonic clock, at the device's own rate; and stretched, the grains played step back and forth around where the
+    /// speed says the mix has got to, so this is where the speed says. When the device takes more, this runs up to 10%
+    /// faster or slower until it has made up how far apart they are, never stepping back; past 50 ms, or after a seek, a
+    /// change of speed, playing or pausing, it's put straight back on it. While paused it's <see cref="Position"/>.
     /// </summary>
     public TimeSpan SmoothPosition
     {
@@ -216,34 +225,45 @@ public sealed class StemPlayer : IDisposable
                     return FramesToTime(target);
                 }
 
-                long heard = HeardSourceFrame();
                 if (!_playing)
                 {
                     _smoothValid = false;
-                    return FramesToTime(heard);
+                    return FramesToTime(HeardSourceFrame());
                 }
 
+                long played = Math.Max(0, _writtenFrames - _output.QueuedFrames);
                 long now = _clock.GetTimestamp();
                 if (!_smoothValid)
                 {
                     _smoothValid = true;
-                    _smoothFrame = _smoothHeard = heard;
+                    _smoothOutput = _smoothSeen = played;
                     _smoothAt = now;
-                    return FramesToTime(heard);
+                    _smoothTrim = 1;
+                    return FramesToTime(_nominal.SourceAt(played));
                 }
 
-                double framesPerTick = _mixer.OutputRate * (double)_speed / _clock.TimestampFrequency;
-                double smooth = _smoothFrame + ((now - _smoothAt) * framesPerTick);
-                if (heard != _smoothHeard)
+                // The device plays what's written at its own speed: 1 while the mix is stretched.
+                double framesPerSecond = _mixer.OutputRate * (double)_output.Speed;
+                double smooth = _smoothOutput + ((now - _smoothAt) * framesPerSecond * _smoothTrim / _clock.TimestampFrequency);
+                if (played != _smoothSeen)
                 {
-                    double error = heard - smooth;
-                    smooth = Math.Abs(error) > _mixer.OutputRate * SmoothSnapMilliseconds / 1000.0 ? heard : smooth + (error / 2);
-                    _smoothFrame = smooth;
+                    double error = played - smooth;
+                    if (Math.Abs(error) > framesPerSecond * SmoothSnapMilliseconds / 1000)
+                    {
+                        smooth = played;
+                        _smoothTrim = 1;
+                    }
+                    else
+                    {
+                        _smoothTrim = 1 + Math.Clamp(error / (framesPerSecond * SmoothSlewSeconds), -SmoothMaxTrim, SmoothMaxTrim);
+                    }
+
+                    _smoothOutput = smooth;
                     _smoothAt = now;
-                    _smoothHeard = heard;
+                    _smoothSeen = played;
                 }
 
-                return FramesToTime(smooth);
+                return FramesToTime(_nominal.SourceAt(smooth));
             }
         }
     }
@@ -582,6 +602,7 @@ public sealed class StemPlayer : IDisposable
                         _stretching = _pitchCorrection && _speed != 1;
                         _output.Speed = _stretching ? 1 : _speed;
                         _map.Reset(_writtenFrames, _mixer.PositionFrames);
+                        _nominal.Reset(_writtenFrames, _mixer.PositionFrames);
                         _tap.Clear();
                         _retune = false;
                         if (_pendingSeek == seek)
@@ -664,7 +685,10 @@ public sealed class StemPlayer : IDisposable
                             AddSounds(written);
                         _output.Write(written);
                         foreach (var piece in _pieces)
+                        {
                             _map.Add(_writtenFrames + piece.Offset, piece.Frames, piece.From, piece.To);
+                            _nominal.Add(_writtenFrames + piece.Offset, piece.Frames, piece.NominalFrom, piece.NominalTo);
+                        }
                         _writtenFrames += frames;
                     }
                 }
@@ -724,7 +748,7 @@ public sealed class StemPlayer : IDisposable
         double from = _mixer.PositionFrames;
         int frames = _mixer.Mix(chunk);
         if (frames > 0)
-            _pieces.Add(new Piece(0, frames, from, _mixer.PositionFrames));
+            _pieces.Add(new Piece(0, frames, from, _mixer.PositionFrames, from, _mixer.PositionFrames));
         return frames;
     }
 
@@ -741,12 +765,12 @@ public sealed class StemPlayer : IDisposable
         {
             int left = _stretcher.FramesToNextGrain;
             int count = Math.Min(frames - done, left > 0 ? Math.Min(left, most) : most);
-            double from = _stretcher.PlayedPosition;
+            double from = _stretcher.PlayedPosition, nominalFrom = _stretcher.SourcePosition;
             int read = _stretcher.Read(chunk.Slice(done * 2, count * 2));
             if (read == 0)
                 break;
 
-            _pieces.Add(new Piece(done, read, from, _stretcher.PlayedPosition));
+            _pieces.Add(new Piece(done, read, from, _stretcher.PlayedPosition, nominalFrom, _stretcher.SourcePosition));
             done += read;
         }
 
@@ -889,8 +913,12 @@ public sealed class StemPlayer : IDisposable
         Played,
     }
 
-    /// <summary><paramref name="Frames"/> frames from <paramref name="Offset"/> into a chunk, playing the mix evenly from <paramref name="From"/> to <paramref name="To"/>.</summary>
-    private readonly record struct Piece(int Offset, int Frames, double From, double To);
+    /// <summary>
+    /// <paramref name="Frames"/> frames from <paramref name="Offset"/> into a chunk, playing the mix evenly from
+    /// <paramref name="From"/> to <paramref name="To"/>, while the speed says it goes from <paramref name="NominalFrom"/> to
+    /// <paramref name="NominalTo"/>.
+    /// </summary>
+    private readonly record struct Piece(int Offset, int Frames, double From, double To, double NominalFrom, double NominalTo);
 
     /// <summary>
     /// A sound playing: from frame <paramref name="Start"/> of the next chunk on, it's read from <paramref name="At"/>

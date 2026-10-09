@@ -31,6 +31,17 @@ public sealed class PositionMapTests
     }
 
     [TestMethod]
+    public void BetweenFramesItStandsForBetweenTheirs()
+    {
+        var map = new PositionMap();
+        map.Reset(0, 1000);
+        map.Add(0, 100, 1000, 1025);
+
+        Assert.AreEqual(1012.625, map.SourceAt(50.5), 1e-9);
+        Assert.AreEqual(1025, map.SourceAt(100.5), 1e-9, "Past what's been written, where it ends.");
+    }
+
+    [TestMethod]
     public void TheOldestIsForgottenOnceItIsFull()
     {
         var map = new PositionMap();

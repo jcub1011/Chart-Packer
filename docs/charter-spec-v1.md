@@ -277,9 +277,9 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
 - **The true source position.** While stretching, `TimeStretcher.SourcePosition` is the nominal
   position, and the grain actually played can be up to ±12 ms away. The stretcher reports the
   source position of the grain it actually plays, and `PositionMap` records that.
-- **A smooth clock.** `Position` only moves when SDL takes a buffer. Drawing uses
-  `SmoothPosition`, which interpolates between those updates with a monotonic clock, scaled by the
-  speed, and is pulled back onto `Position` when they differ.
+- **A smooth clock.** `Position` only moves when SDL takes a buffer, and while stretching it follows
+  the grains, back and forth. Drawing uses `SmoothPosition`, which interpolates between those
+  updates with a monotonic clock and follows the speed's nominal position rather than the grains.
 
 *Settled in CM2:*
 
@@ -293,9 +293,13 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
   played first reach it. A new schedule is handed over whole, never edited, and a seek drops the
   sounds playing. Played as mixed at another speed, sounds are read at that speed, so the device's
   resampling leaves them at their own pitch.
-- **`SmoothPosition`** runs on a `TimeProvider` (the system's monotonic clock), takes up half of how
-  far it is from `Position` each time that moves, and all of it past 50 ms or after a seek, a change
-  of speed, playing or pausing.
+- **`SmoothPosition`** runs on a `TimeProvider` (the system's monotonic clock), in output frames,
+  which the device plays at its own steady rate. Each time SDL takes more, it runs up to 10% faster or
+  slower until it has made up how far it is from what has been taken (over about 200 ms), so it
+  never steps back. It is put straight onto what has been taken past 50 ms, or after a seek, a change
+  of speed, playing or pausing. It maps output frames to the mix by a second `PositionMap` of the
+  stretcher's nominal `SourcePosition`, which moves evenly at the speed. `Position` and the sounds laid
+  over the mix stay on the grains played.
 - **Regions.** Play selection and the loop are a region that `StemPlayer` plays. A loop carries on
   from the region's start without dropping the queue. Played as mixed, it turns on the region's end
   frame; stretched, within a chunk (20 ms) of it. A seek drops a region played once, but not a loop.

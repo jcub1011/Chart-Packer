@@ -6,7 +6,9 @@ namespace ChartPacker.Audio.Playback;
 /// </summary>
 /// <remarks>
 /// <para>Stretched, the frames played follow the grains, so a segment is a few milliseconds of output and the mix can
-/// even step back a little from one to the next (<see cref="Dsp.TimeStretcher.PlayedPosition"/>).</para>
+/// even step back a little from one to the next (<see cref="Dsp.TimeStretcher.PlayedPosition"/>). Fed where the speed
+/// says the mix has got to instead (<see cref="Dsp.TimeStretcher.SourcePosition"/>), a segment runs on for as long as the
+/// speed does.</para>
 /// <para>Keeps the latest <see cref="Capacity"/> segments, far more than an output queues. Not thread-safe.</para>
 /// </remarks>
 internal sealed class PositionMap
@@ -66,10 +68,10 @@ internal sealed class PositionMap
     }
 
     /// <summary>
-    /// The frame of the mix <paramref name="outputFrame"/> stands for: before what's kept, where that starts; past what's
-    /// been written, where it ends.
+    /// The frame of the mix <paramref name="outputFrame"/> stands for, which may be between frames: before what's kept,
+    /// where that starts; past what's been written, where it ends.
     /// </summary>
-    public double SourceAt(long outputFrame)
+    public double SourceAt(double outputFrame)
     {
         if (_count == 0)
             return 0;
@@ -82,7 +84,7 @@ internal sealed class PositionMap
             if (segment.Frames == 0)
                 return segment.Source;
 
-            long into = Math.Min(outputFrame - segment.Output, segment.Frames);
+            double into = Math.Min(outputFrame - segment.Output, segment.Frames);
             return segment.Source + ((segment.SourceEnd - segment.Source) * into / segment.Frames);
         }
 

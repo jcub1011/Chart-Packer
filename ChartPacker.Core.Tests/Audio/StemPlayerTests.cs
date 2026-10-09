@@ -773,31 +773,73 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
-    public void TheSmoothPositionFollowsAPositionThatRunsSlowerThanTheClock()
+    public void TheSmoothPositionMovesEvenlyThoughTheDeviceTakesUnevenly()
     {
         var clock = new ManualClock();
         using var output = new FakeOutput();
         using var player = SilentPlayer(output, seconds: 10, clock);
         player.Play();
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
-        _ = player.SmoothPosition;
 
-        // The device takes 10 ms every 12 ms. Each taking pulls the smooth position halfway back to it, so it runs no
-        // more than 4 ms ahead, and steps back no more than 2 ms at a time.
-        double last = 0;
-        for (int step = 1; step <= 100; step++)
+        // The device takes 10 ms at a time, 10 ms apart on average but up to 4 ms early or late, and the screen reads at
+        // 60 Hz, between them at any point.
+        var random = new Random(7);
+        var frames = Watch(player, output, clock, n => (n + 1) * 10 + (random.NextDouble() * 8) - 4, Rate / 100, QueueTarget, 3000);
+
+        AssertMovesEvenly(frames, speed: 1, near: 10);
+    }
+
+    [TestMethod]
+    public void TheSmoothPositionFollowsADeviceThatRunsSlowerThanTheClock()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The device's clock runs 0.5% slower than the system's: the smooth position runs that much slower too.
+        var frames = Watch(player, output, clock, n => (n + 1) * 10.05, Rate / 100, QueueTarget, 3000);
+
+        AssertMovesEvenly(frames, speed: 1, near: 10);
+    }
+
+    [TestMethod]
+    public void AStalledDevicePutsTheSmoothPositionStraightBackOnIt()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The device takes nothing for 100 ms from 500 ms: the smooth position runs on meanwhile, then, 50 ms past it,
+        // lands on it.
+        var frames = Watch(player, output, clock, n => n < 50 ? (n + 1) * 10 : (n + 11) * 10, Rate / 100, QueueTarget, 1000);
+
+        var after = frames.First(f => f.At > 610);
+        Assert.AreEqual(after.Position, after.Smooth, 1e-3);
+    }
+
+    [TestMethod]
+    public void StretchedTheSmoothPositionMovesEvenlyAtTheSpeed()
+    {
+        // At a quarter speed the grains played step back and forth around where the speed says, up to 12 ms either way
+        // on noise; what's drawn has to move on evenly at a quarter speed regardless.
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        var source = new FakeSource(Rate, 2, 10L * Rate, (n, channel) => ((uint)(n * 2654435761L) ^ (uint)(channel * 40503)) / (float)uint.MaxValue - 0.5f);
+        using var player = new StemPlayer(new StemMixer([KeyValuePair.Create("song", (IPcmSource)source)]), output, clock)
         {
-            clock.Advance(TimeSpan.FromMilliseconds(12));
-            output.Drain(Rate / 100);
-            WaitUntil(() => output.QueuedFrames >= QueueTarget);
+            PitchCorrection = true,
+            Speed = 0.25f,
+        };
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
 
-            double smooth = player.SmoothPosition.TotalMilliseconds;
-            double position = player.Position.TotalMilliseconds;
-            Assert.IsLessThanOrEqualTo(4.0 + 1e-3, smooth - position, $"Step {step}: {smooth} ms against {position} ms.");
-            Assert.IsGreaterThanOrEqualTo(-1e-3, smooth - position, $"Step {step}: {smooth} ms against {position} ms.");
-            Assert.IsGreaterThanOrEqualTo(last - 2.0 - 1e-3, smooth, $"Step {step} stepped back from {last} ms to {smooth} ms.");
-            last = smooth;
-        }
+        var frames = Watch(player, output, clock, n => (n + 1) * 10, Rate / 100, QueueTarget, 3000);
+
+        AssertMovesEvenly(frames, speed: 0.25, near: Stretched * 1000 + 3);
     }
 
     [TestMethod]
@@ -828,6 +870,66 @@ public sealed class StemPlayerTests
         long frames = (long)(seconds * Rate);
         var source = new FakeSource(Rate, 2, frames, (n, _) => (float)n / (Rate * 10));
         return new StemPlayer(new StemMixer([KeyValuePair.Create("song", (IPcmSource)source)]), output);
+    }
+
+    /// <summary>What the screen read of the player in a frame, in milliseconds: when, and where the player was.</summary>
+    private sealed record Frame(double At, double Smooth, double Position);
+
+    /// <summary>
+    /// Plays for <paramref name="milliseconds"/> of <paramref name="clock"/> from now: the device takes
+    /// <paramref name="take"/> frames at each of <paramref name="takingAt"/>'s times, the player filling the queue back
+    /// to <paramref name="target"/> after each, and the screen reads the player at 60 Hz between.
+    /// </summary>
+    private static List<Frame> Watch(StemPlayer player, FakeOutput output, ManualClock clock, Func<int, double> takingAt, int take, int target, double milliseconds)
+    {
+        // In microseconds, so the clock doesn't drift from rounding.
+        const double FrameMicroseconds = 1_000_000 / 60.0;
+        var frames = new List<Frame>();
+        long now = 0, end = (long)(milliseconds * 1000);
+        int taking = 0, frame = 1;
+        long nextTaking = (long)(takingAt(0) * 1000);
+        while (now < end)
+        {
+            long nextFrame = (long)(frame * FrameMicroseconds);
+            long next = Math.Min(nextFrame, nextTaking);
+            clock.Advance(TimeSpan.FromTicks((next - now) * 10));
+            now = next;
+            if (next == nextTaking)
+            {
+                output.Drain(take);
+                WaitUntil(() => output.QueuedFrames >= target);
+                nextTaking = (long)(takingAt(++taking) * 1000);
+            }
+            else
+            {
+                frames.Add(new Frame(now / 1000.0, player.SmoothPosition.TotalMilliseconds, player.Position.TotalMilliseconds));
+                frame++;
+            }
+        }
+
+        return frames;
+    }
+
+    /// <summary>
+    /// Asserts each frame moved on by within 15% of the time between them times <paramref name="speed"/>, so never back;
+    /// and from half a second in, was within <paramref name="near"/> ms of <see cref="StemPlayer.Position"/>.
+    /// </summary>
+    private static void AssertMovesEvenly(List<Frame> frames, double speed, double near)
+    {
+        for (int i = 1; i < frames.Count; i++)
+        {
+            var (last, frame) = (frames[i - 1], frames[i]);
+            double expected = (frame.At - last.At) * speed;
+            double moved = frame.Smooth - last.Smooth;
+            Assert.IsTrue(
+                moved >= expected * 0.85 && moved <= expected * 1.15,
+                $"At {frame.At:F1} ms it moved {moved:F3} ms, against {expected:F3} ms.");
+            if (frame.At >= 500)
+            {
+                Assert.IsLessThanOrEqualTo(
+                    near, Math.Abs(frame.Smooth - frame.Position), $"At {frame.At:F1} ms it was at {frame.Smooth:F3} ms, against {frame.Position:F3} ms.");
+            }
+        }
     }
 
     /// <summary>A player of one silent stem <paramref name="seconds"/> long.</summary>
