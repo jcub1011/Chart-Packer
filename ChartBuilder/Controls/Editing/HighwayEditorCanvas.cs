@@ -37,19 +37,19 @@ namespace ChartBuilder.Controls.Editing
         }
 
         protected override Rect LabelsArea(Size size, LaneProjection projection) =>
-            new(projection.LaneFrom - OnsetStripSize - RailWidth, 0, RailWidth, size.Height);
+            new(projection.LaneFrom - OnsetStripSize - RailWidth, projection.TimeFrom, RailWidth, projection.TimeLength);
 
         protected override Rect BehindArea(Size size, LaneProjection projection) =>
-            new(projection.LaneFrom + 4, 0, Math.Max(0, LanesWidth(projection) - 8), size.Height);
+            new(projection.LaneFrom + 4, projection.TimeFrom, Math.Max(0, LanesWidth(projection) - 8), projection.TimeLength);
 
         // Highways have no strip: the column beside them is their full-strength backdrop.
         protected override Rect StripArea(Size size, LaneProjection projection) => default;
 
         protected override Rect BesideArea(Size size, LaneProjection projection, int phraseRows) =>
-            new(PhraseRailFrom(projection, phraseRows) + PhraseRailSize(phraseRows) + 2, 0, Math.Max(0, Extras.BesideSize - 4), size.Height);
+            new(PhraseRailFrom(projection, phraseRows) + PhraseRailSize(phraseRows) + 2, projection.TimeFrom, Math.Max(0, Extras.BesideSize - 4), projection.TimeLength);
 
         protected override Rect OnsetArea(Size size, LaneProjection projection) =>
-            new(projection.LaneFrom - OnsetStripSize, 0, OnsetStripSize, size.Height);
+            new(projection.LaneFrom - OnsetStripSize, projection.TimeFrom, OnsetStripSize, projection.TimeLength);
 
         // Right of the forcing marks.
         protected override double PhraseRailFrom(LaneProjection projection, int phraseRows) =>

@@ -121,6 +121,24 @@ public sealed record LaneProjection(LaneView View, double TimeFrom, double TimeL
         return new LaneProjection(view, timeFrom, timeLength, laneFrom, laneSize, slots, start, end - start);
     }
 
+    /// <summary>
+    /// This projection reaching <paramref name="secondsBefore"/> further back than its start and <paramref name="secondsAfter"/>
+    /// beyond its end, past the screen's edges, with every second still drawn where it is now: a page of the lane, drawn
+    /// once and moved along as the song plays (<see cref="LanePage"/>).
+    /// </summary>
+    public LaneProjection Widened(double secondsBefore, double secondsAfter)
+    {
+        // The time axis runs from the end on a highway, whose start is at the bottom, and from the start on a timeline.
+        double pixels = PixelsPerSecond;
+        return this with
+        {
+            TimeFrom = TimeFrom - (pixels * (View == LaneView.Highway ? secondsAfter : secondsBefore)),
+            TimeLength = TimeLength + (pixels * (secondsBefore + secondsAfter)),
+            Start = Start - secondsBefore,
+            SecondsOnScreen = SecondsOnScreen + secondsBefore + secondsAfter,
+        };
+    }
+
     /// <summary>Where the strike line is drawn along the time axis, in pixels.</summary>
     public double StrikeAlong => AlongOf(Start + (SecondsOnScreen * EditorViewport.StrikeFraction));
 

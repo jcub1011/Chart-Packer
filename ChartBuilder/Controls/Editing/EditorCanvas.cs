@@ -9,6 +9,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using Avalonia.Media.TextFormatting;
+using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ChartBuilder.Resources;
@@ -34,8 +35,11 @@ namespace ChartBuilder.Controls.Editing
     /// <para>The strike line stays put, a quarter of the way from the strike end, on the cursor: scrolling moves the
     /// song past it a grid step a notch, and so moves the cursor through the song, as does playing. How far the lane shows beyond it is the
     /// lane's look-ahead, which Ctrl+wheel changes.</para>
-    /// <para>Only what's on screen is drawn: the notes between the ticks at the view's ends, found by binary search (§11).
-    /// While the song plays, each frame moves the cursor with it, which redraws the lane.</para>
+    /// <para>Only what's near the screen is drawn: the notes between the ticks at a page's ends, found by binary search
+    /// (§11). The canvas is drawn in layers (<see cref="Layer"/>). What moves with the song, the notes and the beats, audio,
+    /// labels and phrase rail under them, is drawn as a page reaching past the screen's edges (<see cref="LanePage"/>), and
+    /// as the cursor moves, as it does every frame the song plays, the page is only moved, until the view nears its end.
+    /// The strike line's glow, and what follows the pointer, are drawn again as they change.</para>
     /// </remarks>
     public abstract class EditorCanvas : Control
     {
@@ -181,11 +185,64 @@ namespace ChartBuilder.Controls.Editing
         // draw them.
         private readonly List<Phrase> _phrasesShown = [];
 
+        // How far a page reaches past the screen, in screens: a little back, and most of it the way the view is moving.
+        private const double PageBehind = 0.25;
+        private const double PageAhead = 0.75;
+
+        // How near a page's end the screen may come, in pixels, before it's drawn again around the screen: room for what's
+        // drawn around a moment rather than at it, a gem or a measure's number, whose moment may be past the page's end.
+        private const double PageMargin = 32;
+
+        // How far beyond the page what's drawn on it may reach, in pixels: a long phrase's or sustain's box is cut there,
+        // so the page's picture is the page's size, whatever's on it.
+        private const double PagePad = 32;
+
+        // The longest a page's picture may be along the time axis, in the screen's pixels, which some graphics cards
+        // can't make pictures much bigger than; and the least a page must reach past the screen to be worth keeping.
+        // A lane too long for both is drawn again every frame, as a whole, without pictures.
+        private const double MaxPagePixels = 8192;
+        private const double MinPageReach = 64;
+
+        // Whether the layers that move with the song are drawn from pictures of themselves, kept while they're only moved:
+        // far less to draw each frame, for a picture's worth of memory each. False to compare, or should the pictures look
+        // worse than the drawing.
+        private const bool CacheLayers = true;
+
+        // How long a page with pictures still to come waits before it's drawn again with them.
+        private static readonly TimeSpan RedrawDelay = TimeSpan.FromMilliseconds(50);
+
+        // The canvas's layers, bottom to top; the page the song and the notes are drawn as; whether the lane is short
+        // enough to have pages; which way the view last moved; and how far along the time axis a box may reach, while a
+        // page is drawn.
+        private readonly Layer _song;
+        private readonly Layer _strike;
+        private readonly Layer _notes;
+        private readonly Layer _overlay;
+        private readonly Layer[] _layers;
+        private LanePage? _page;
+        private bool _isPaged;
+        private bool _isBackwards;
+        private double? _lastStart;
+        private Size _arranged;
+        private (double From, double To) _alongLimit = (double.NegativeInfinity, double.PositiveInfinity);
+        private TopLevel? _topLevel;
+        private DispatcherTimer? _redrawTimer;
+
         static EditorCanvas()
         {
             FocusableProperty.OverrideDefaultValue<EditorCanvas>(true);
             ClipToBoundsProperty.OverrideDefaultValue<EditorCanvas>(true);
-            AffectsRender<EditorCanvas>(AccentBrushProperty, LabelBrushProperty);
+        }
+
+        protected EditorCanvas()
+        {
+            _song = new Layer(this, LayerKind.Song);
+            _strike = new Layer(this, LayerKind.Strike);
+            _notes = new Layer(this, LayerKind.Notes);
+            _overlay = new Layer(this, LayerKind.Overlay);
+            _layers = [_song, _strike, _notes, _overlay];
+            foreach (var layer in _layers)
+                VisualChildren.Add(layer);
         }
 
         /// <summary>The cursor, the selection and the place tool's ghost.</summary>
@@ -212,6 +269,9 @@ namespace ChartBuilder.Controls.Editing
         /// seconds beyond the strike line, with room kept for a phrase rail of <paramref name="phraseRows"/> rows.
         /// </summary>
         protected abstract LaneProjection Project(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead, int phraseRows);
+
+        // The areas below run the length of the projection's time axis, rather than the canvas's, so a page's areas run the
+        // length of the page.
 
         /// <summary>Where the margin is that measure numbers, tempo markers and section names are drawn in: the left rail of a highway, the ruler along a timeline's top.</summary>
         protected abstract Rect LabelsArea(Size size, LaneProjection projection);
@@ -260,10 +320,13 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>The rectangle between two points along the time axis and two across the lanes.</summary>
         protected Rect Box(double along1, double along2, double across1, double across2)
         {
-            var a = At(Math.Min(along1, along2), Math.Min(across1, across2));
-            var b = At(Math.Max(along1, along2), Math.Max(across1, across2));
+            var a = At(Limited(Math.Min(along1, along2)), Math.Min(across1, across2));
+            var b = At(Limited(Math.Max(along1, along2)), Math.Max(across1, across2));
             return new Rect(a, b);
         }
+
+        /// <summary><paramref name="along"/>, cut to the page being drawn, so nothing drawn on it reaches far past it.</summary>
+        private double Limited(double along) => Math.Clamp(along, _alongLimit.From, _alongLimit.To);
 
         /// <summary>How far along the time axis <paramref name="point"/> is.</summary>
         private double AlongOf(Point point) => View == LaneView.Highway ? point.Y : point.X;
@@ -292,50 +355,124 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
-            if (change.Property == IsVisibleProperty && IsVisible)
-                RequestFrame();
+            if (change.Property == IsVisibleProperty)
+            {
+                // Hidden, a lane isn't kept up with the cursor, and lets go of its pictures.
+                UpdatePaging();
+                if (IsVisible)
+                {
+                    InvalidateLayers();
+                    RequestFrame();
+                }
+            }
+            else if (change.Property == AccentBrushProperty || change.Property == LabelBrushProperty)
+            {
+                InvalidateLayers();
+            }
         }
 
-        public override void Render(DrawingContext context)
+        protected override Size ArrangeOverride(Size finalSize)
         {
-            var bounds = new Rect(Bounds.Size);
-            context.FillRectangle(RailBrush, bounds);
-            if (Session is not { } session || _lane?.Track is not { } key || session.TrackOf(key) is not { } track)
+            foreach (var layer in _layers)
+                layer.Arrange(new Rect(finalSize));
+            if (finalSize != _arranged)
+            {
+                _arranged = finalSize;
+                UpdatePaging();
+                InvalidateLayers();
+            }
+
+            return finalSize;
+        }
+
+        // The canvas itself is only the background, which takes the pointer: its layers draw the rest.
+        public override void Render(DrawingContext context) => context.FillRectangle(RailBrush, new Rect(Bounds.Size));
+
+        /// <summary>Draws <paramref name="layer"/>: a page of what moves with the song, or what stays put on the screen.</summary>
+        private void RenderLayer(DrawingContext context, Layer layer)
+        {
+            layer.Page = null;
+            if (Session is not { } session || _lane is not { Track: { } key } lane || session.TrackOf(key) is not { } track)
                 return;
 
+            var size = Bounds.Size;
             var slots = session.SlotsOf(key.Instrument, View);
             var part = session.Chart.PartOf(key.Instrument)!;
             var rows = PhraseRail.RowsOf(part.Kind);
-            Extras = ExtrasOf(bounds.Size, key);
-            var projection = Project(bounds.Size, slots, session.Viewport, _lane.LookAhead, rows.Count);
-            var lanes = Box(projection.TimeFrom, projection.TimeFrom + projection.TimeLength, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count));
-            var map = session.TempoMap;
-            double fromTick = Math.Max(0, session.TickAt(projection.Start));
-            double toTick = Math.Max(0, session.TickAt(projection.End));
+            Extras = ExtrasOf(size, key);
+            var screen = Project(size, slots, session.Viewport, lane.LookAhead, rows.Count);
+            switch (layer.Kind)
+            {
+                case LayerKind.Strike:
+                    RenderStrike(context, session, key, track, slots, screen);
+                    return;
+                case LayerKind.Overlay:
+                    RenderOverlay(context, session, key, track, slots, screen);
+                    return;
+            }
 
-            context.FillRectangle(LanesBrush, lanes);
+            var page = PageFor(screen);
+            layer.Show(page, screen);
+            var projection = page.Page;
+            _alongLimit = (projection.TimeFrom - PagePad, projection.TimeFrom + projection.TimeLength + PagePad);
+            try
+            {
+                if (layer.Kind == LayerKind.Song)
+                    RenderSong(context, session, key, part, rows, slots, projection, size);
+                else
+                    RenderNotes(context, session, lane, key, track, part, slots, projection);
+            }
+            finally
+            {
+                _alongLimit = (double.NegativeInfinity, double.PositiveInfinity);
+            }
+        }
+
+        /// <summary>
+        /// The song under the notes, across a page: the lanes, the audio, the beats and their numbers, the tempo markers, the
+        /// sections and the phrase rail.
+        /// </summary>
+        private void RenderSong(DrawingContext context, EditorSession session, ChartTrackKey key, EditablePart part, IReadOnlyList<RailKind> rows, LaneSlots slots, LaneProjection projection, Size size)
+        {
+            var (fromTick, toTick) = TicksOf(session, projection);
+            FillPage(context, projection);
+            context.FillRectangle(LanesBrush, LanesOf(projection, slots));
             DrawLaneDividers(context, projection, slots);
-            DrawBackdrop(context, bounds.Size, projection, rows.Count);
+            DrawBackdrop(context, size, projection, rows.Count);
             FindPhrasesShown(part, fromTick, toTick);
             DrawPhraseTints(context, session, projection);
             DrawFillBands(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
-            DrawBeats(context, session, map, projection, fromTick, toTick, bounds.Size);
-            DrawOnsets(context, bounds.Size, projection, key);
-            DrawTempoMarkers(context, session, projection, fromTick, toTick, bounds.Size);
-            DrawTempoProposal(context, session, projection, bounds.Size);
-            DrawSections(context, session, projection, fromTick, toTick, bounds.Size);
-            DrawStrikeBand(context, session, projection);
+            DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
+            DrawOnsets(context, size, projection, key);
+            DrawTempoMarkers(context, session, projection, fromTick, toTick, size);
+            DrawTempoProposal(context, session, projection, size);
+            DrawSections(context, session, projection, fromTick, toTick, size);
+
+            // The phrase rail is beside the lanes, clear of the strike line's band, which is drawn over this.
             DrawPhraseRail(context, session, part, rows, projection);
             DrawDiscoFlips(context, session, key, rows, projection, fromTick, toTick);
             DrawFillGhosts(context, session, key, rows, projection, fromTick, toTick);
+        }
 
-            using (context.PushClip(lanes))
+        /// <summary>The strike line's band, and while the song plays, the columns it's playing through, lit.</summary>
+        private void RenderStrike(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
+        {
+            DrawStrikeBand(context, session, screen);
+            if (_editor?.Playback.IsPlaying != true)
+                return;
+            using (context.PushClip(LanesOf(screen, slots)))
+                DrawGlow(context, session, key, track, screen, slots);
+        }
+
+        /// <summary>The notes across a page, within the lanes: the ghost difficulty's, a draft over the notes it would replace, and the solos' counts.</summary>
+        private void RenderNotes(DrawingContext context, EditorSession session, EditorLaneViewModel lane, ChartTrackKey key, EditableTrack track, EditablePart part, LaneSlots slots, LaneProjection projection)
+        {
+            var (fromTick, toTick) = TicksOf(session, projection);
+            FillPage(context, projection);
+            using (context.PushClip(LanesOf(projection, slots)))
             {
-                if (_editor?.Playback.IsPlaying == true)
-                    DrawGlow(context, session, key, track, projection, slots);
-
-                if (_lane.Ghost is { } ghost)
+                if (lane.Ghost is { } ghost)
                 {
                     var ghostKey = new ChartTrackKey(key.Instrument, ghost);
                     using (context.PushOpacity(0.28))
@@ -355,11 +492,19 @@ namespace ChartBuilder.Controls.Editing
                     DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, longest, isGhost: false);
                 }
 
+                FindPhrasesShown(part, fromTick, toTick);
                 DrawSoloCounts(context, session, track, projection, fromTick, toTick);
-                DrawHover(context, session, key, track, projection, slots);
             }
+        }
 
-            DrawCursor(context, session, projection, lanes);
+        /// <summary>What follows the pointer and the focus: the place tool's ghost, the cursor, a box being drawn, and the focus's edge.</summary>
+        private void RenderOverlay(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
+        {
+            var lanes = LanesOf(screen, slots);
+            using (context.PushClip(lanes))
+                DrawHover(context, session, key, track, screen, slots);
+
+            DrawCursor(context, session, screen, lanes);
             if (_boxFrom is { } from)
             {
                 var box = new Rect(from, _boxTo).Normalize();
@@ -367,7 +512,211 @@ namespace ChartBuilder.Controls.Editing
             }
 
             if (IsFocused)
-                context.DrawRectangle(null, AccentPens().Focus, bounds.Deflate(0.5));
+                context.DrawRectangle(null, AccentPens().Focus, new Rect(Bounds.Size).Deflate(0.5));
+        }
+
+        /// <summary>
+        /// Nothing, across all of a page and a little beyond, so the page's picture is the same size whatever's on it, and
+        /// isn't made again each time the page is.
+        /// </summary>
+        private void FillPage(DrawingContext context, LaneProjection projection)
+        {
+            double across = View == LaneView.Highway ? Bounds.Width : Bounds.Height;
+            context.FillRectangle(Brushes.Transparent, Box(projection.TimeFrom - PagePad, projection.TimeFrom + projection.TimeLength + PagePad, 0, across));
+        }
+
+        /// <summary>The columns or rows of <paramref name="slots"/>, along all of <paramref name="projection"/>'s time axis.</summary>
+        private Rect LanesOf(LaneProjection projection, LaneSlots slots) =>
+            Box(projection.TimeFrom, projection.TimeFrom + projection.TimeLength, projection.LaneFrom, projection.LaneFrom + (projection.LaneSize * slots.Slots.Count));
+
+        /// <summary>The ticks at <paramref name="projection"/>'s ends, from 0.</summary>
+        private static (double From, double To) TicksOf(EditorSession session, LaneProjection projection) =>
+            (Math.Max(0, session.TickAt(projection.Start)), Math.Max(0, session.TickAt(projection.End)));
+
+        /// <summary>
+        /// The page the song and the notes are drawn as, for the lane <paramref name="screen"/> shows: the one they share, or,
+        /// when it doesn't serve, a new one around the screen. The viewport's changes make new pages ahead of the drawing;
+        /// one made here, as a lane drawn first or laid out again, has the other layer drawn on it too, once this frame is
+        /// out, rather than now, while the frame's layers are being drawn.
+        /// </summary>
+        private LanePage PageFor(LaneProjection screen)
+        {
+            if (_page is { } page && page.Fits(screen))
+                return page;
+
+            _page = LanePage.Of(screen, _isBackwards ? PageAhead : PageBehind, _isBackwards ? PageBehind : PageAhead, MaxPageLength());
+            Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var layer in (ReadOnlySpan<Layer>)[_song, _notes])
+                {
+                    if (layer.Page is { } drawn && !ReferenceEquals(drawn, _page))
+                        layer.Redraw();
+                }
+            });
+            return _page;
+        }
+
+        /// <summary>The longest a page may be along the time axis, in the canvas's own pixels.</summary>
+        private double MaxPageLength() => MaxPagePixels / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+
+        /// <summary>
+        /// Whether the lane is short enough along the time axis to have pages that reach usefully past the screen, and whether
+        /// its pages are kept as pictures: only while it's shown, so a hidden view doesn't hold on to its pictures.
+        /// </summary>
+        private void UpdatePaging()
+        {
+            double length = View == LaneView.Highway ? _arranged.Height : _arranged.Width;
+            _isPaged = length > 0 && MaxPageLength() - length >= MinPageReach;
+            bool cached = CacheLayers && _isPaged && IsVisible;
+            foreach (var layer in (ReadOnlySpan<Layer>)[_song, _notes])
+            {
+                if (!cached)
+                    layer.CacheMode = null;
+                else if (layer.CacheMode is null)
+                {
+                    // Not snapped to the screen's pixels: snapped, a slow lane's picture stands still for frames, then
+                    // jumps a pixel; drawn smoothed between them, it moves as smoothly as the song.
+                    layer.CacheMode = new BitmapCache { SnapsToDevicePixels = false };
+                }
+            }
+        }
+
+        /// <summary>Has every layer drawn again, on a new page: after anything but the cursor's moving changes what's drawn.</summary>
+        private void InvalidateLayers()
+        {
+            _page = null;
+            foreach (var layer in _layers)
+                layer.Redraw();
+        }
+
+        /// <summary>Whether the place tool's ghost is shown under the pointer, which snaps to the song as it moves under it.</summary>
+        private bool IsHoverShown => _hover is not null && !_isPressed && Session?.Tool == EditorTool.Place;
+
+        /// <summary>
+        /// Follows the cursor: the song and the notes are moved, as far as their page reaches, and drawn again around the
+        /// screen past it, rather than the whole lane drawn again every frame the song plays. The glow is drawn again while
+        /// the song plays, and the place tool's ghost, which snaps to the song under a still pointer.
+        /// </summary>
+        private void OnViewportChanged(object? sender, EventArgs e)
+        {
+            if (!IsVisible)
+                return;
+            if (CurrentProjection() is not { } screen)
+            {
+                InvalidateLayers();
+                return;
+            }
+
+            if (_lastStart is { } last && screen.Start != last)
+                _isBackwards = screen.Start < last;
+            _lastStart = screen.Start;
+
+            if (_isPaged && _page is { } page && page.Fits(screen, PageMargin))
+            {
+                _song.Follow(page, screen);
+                _notes.Follow(page, screen);
+            }
+            else
+            {
+                _page = null;
+                _song.Redraw();
+                _notes.Redraw();
+            }
+
+            if (_editor?.Playback.IsPlaying == true)
+                _strike.Redraw();
+            if (IsHoverShown)
+                _overlay.Redraw();
+        }
+
+        /// <summary>Which of the canvas's layers, bottom to top.</summary>
+        private enum LayerKind
+        {
+            /// <summary>The song under the notes, on a page.</summary>
+            Song,
+
+            /// <summary>The strike line's band and the glow, which stay put on the screen.</summary>
+            Strike,
+
+            /// <summary>The notes, on a page.</summary>
+            Notes,
+
+            /// <summary>The place tool's ghost, the cursor, a box being drawn and the focus's edge.</summary>
+            Overlay,
+        }
+
+        /// <summary>
+        /// One of the canvas's layers, which the canvas draws. One that moves with the song is drawn on a page, then only
+        /// moved, by its composition visual's translation: moving it by a render transform would have it drawn again.
+        /// Kept as a picture of itself too, it's no more than that picture to draw each frame.
+        /// </summary>
+        private sealed class Layer : Control
+        {
+            private readonly Painter _painter;
+
+            public Layer(EditorCanvas owner, LayerKind kind)
+            {
+                Kind = kind;
+                IsHitTestVisible = false;
+                _painter = new Painter(owner, this);
+                VisualChildren.Add(_painter);
+            }
+
+            public LayerKind Kind { get; }
+
+            /// <summary>The page this was last drawn on; none for a layer that stays put, or that had nothing to draw.</summary>
+            public LanePage? Page { get; set; }
+
+            protected override Size ArrangeOverride(Size finalSize)
+            {
+                _painter.Arrange(new Rect(finalSize));
+                return finalSize;
+            }
+
+            /// <summary>Has this drawn again.</summary>
+            public void Redraw() => _painter.InvalidateVisual();
+
+            /// <summary>Drawn on <paramref name="page"/>, moved to show what <paramref name="screen"/> shows.</summary>
+            public void Show(LanePage page, LaneProjection screen)
+            {
+                Page = page;
+                MoveTo(page.ShiftOf(screen), screen.View);
+            }
+
+            /// <summary>Moves this to show what <paramref name="screen"/> shows, or has it drawn again when it isn't on <paramref name="page"/>.</summary>
+            public void Follow(LanePage page, LaneProjection screen)
+            {
+                if (!ReferenceEquals(Page, page) || !MoveTo(page.ShiftOf(screen), screen.View))
+                    Redraw();
+            }
+
+            private bool MoveTo(double shift, LaneView view)
+            {
+                if (ElementComposition.GetElementVisual(this) is not { } visual)
+                    return false;
+                visual.Translation = view == LaneView.Highway ? new Vector3D(0, shift, 0) : new Vector3D(shift, 0, 0);
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// What a layer draws, drawn by a visual of its own inside the layer. A layer kept as a picture has its picture drawn
+        /// again only when what's inside it changes, not when its own drawing does, so a layer that drew its page itself
+        /// would go on showing its first page however many it was drawn on since.
+        /// </summary>
+        private sealed class Painter : Control
+        {
+            private readonly EditorCanvas _owner;
+            private readonly Layer _layer;
+
+            public Painter(EditorCanvas owner, Layer layer)
+            {
+                _owner = owner;
+                _layer = layer;
+                IsHitTestVisible = false;
+            }
+
+            public override void Render(DrawingContext context) => _owner.RenderLayer(context, _layer);
         }
 
         protected override void OnGotFocus(FocusChangedEventArgs e)
@@ -375,13 +724,13 @@ namespace ChartBuilder.Controls.Editing
             base.OnGotFocus(e);
             if (Session is { } session && _lane?.Track is { } key)
                 session.Focused = key;
-            InvalidateVisual();
+            _overlay.Redraw();
         }
 
         protected override void OnLostFocus(FocusChangedEventArgs e)
         {
             base.OnLostFocus(e);
-            InvalidateVisual();
+            _overlay.Redraw();
         }
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -412,7 +761,7 @@ namespace ChartBuilder.Controls.Editing
             _boxTo = current.Position;
             session.Tools.Press(point, ModifiersOf(e.KeyModifiers));
             e.Handled = true;
-            InvalidateVisual();
+            _overlay.Redraw();
         }
 
         protected override void OnPointerMoved(PointerEventArgs e)
@@ -437,7 +786,7 @@ namespace ChartBuilder.Controls.Editing
                 ShowRailCursor(position);
             }
 
-            InvalidateVisual();
+            _overlay.Redraw();
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -457,7 +806,7 @@ namespace ChartBuilder.Controls.Editing
             e.Pointer.Capture(null);
             if (Session is { } session)
                 session.Tools.Release(PointAt(e.GetPosition(this)) ?? _lastPoint);
-            InvalidateVisual();
+            _overlay.Redraw();
         }
 
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
@@ -469,14 +818,14 @@ namespace ChartBuilder.Controls.Editing
             _isPressed = false;
             _boxFrom = null;
             Session?.Tools.Release(_lastPoint);
-            InvalidateVisual();
+            _overlay.Redraw();
         }
 
         protected override void OnPointerExited(PointerEventArgs e)
         {
             base.OnPointerExited(e);
             _hover = null;
-            InvalidateVisual();
+            _overlay.Redraw();
         }
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -643,13 +992,17 @@ namespace ChartBuilder.Controls.Editing
                 editor.Session.ChartChanged += OnChartChanged;
                 editor.Session.StateChanged += OnRedraw;
                 editor.Session.Selection.Changed += OnRedraw;
-                editor.Session.Viewport.Changed += OnRedraw;
+                editor.Session.Viewport.Changed += OnViewportChanged;
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
-                editor.Audio.Changed += OnRedraw;
+                editor.Audio.Changed += OnAudioChanged;
                 editor.AudioAssist.PropertyChanged += OnAudioAssistChanged;
             }
 
-            InvalidateVisual();
+            _topLevel = TopLevel.GetTopLevel(this);
+            if (_topLevel is { } top)
+                top.ScalingChanged += OnScalingChanged;
+
+            InvalidateLayers();
             RequestFrame();
         }
 
@@ -662,11 +1015,17 @@ namespace ChartBuilder.Controls.Editing
                 editor.Session.ChartChanged -= OnChartChanged;
                 editor.Session.StateChanged -= OnRedraw;
                 editor.Session.Selection.Changed -= OnRedraw;
-                editor.Session.Viewport.Changed -= OnRedraw;
+                editor.Session.Viewport.Changed -= OnViewportChanged;
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;
-                editor.Audio.Changed -= OnRedraw;
+                editor.Audio.Changed -= OnAudioChanged;
                 editor.AudioAssist.PropertyChanged -= OnAudioAssistChanged;
             }
+
+            if (_topLevel is { } top)
+                top.ScalingChanged -= OnScalingChanged;
+            _topLevel = null;
+            _redrawTimer?.Stop();
+            _isRedrawPosted = false;
 
             _lane = null;
             _editor = null;
@@ -678,23 +1037,33 @@ namespace ChartBuilder.Controls.Editing
                 session.Focused = key;
             _longest = null;
             _ghostLongest = null;
-            InvalidateVisual();
+            InvalidateLayers();
         }
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
             _longest = null;
             _ghostLongest = null;
-            InvalidateVisual();
+            InvalidateLayers();
         }
 
-        private void OnRedraw(object? sender, EventArgs e) => InvalidateVisual();
+        private void OnRedraw(object? sender, EventArgs e) => InvalidateLayers();
 
-        // Find first downbeat's guess is drawn over the lanes.
+        // More of the lane's audio read or analysed: only the song's page has it.
+        private void OnAudioChanged(object? sender, EventArgs e) => _song.Redraw();
+
+        // The pictures of the lane's audio are made at the screen's pixels.
+        private void OnScalingChanged(object? sender, EventArgs e)
+        {
+            UpdatePaging();
+            InvalidateLayers();
+        }
+
+        // Find first downbeat's guess is drawn over the lanes, on the song's page.
         private void OnAudioAssistChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(AudioAssistViewModel.Downbeat))
-                InvalidateVisual();
+                _song.Redraw();
         }
 
         private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
@@ -703,13 +1072,13 @@ namespace ChartBuilder.Controls.Editing
             {
                 case nameof(PlaybackViewModel.IsPlaying):
                     // Paused, the strike line's glow goes out.
-                    InvalidateVisual();
+                    _strike.Redraw();
                     RequestFrame();
                     break;
                 case nameof(PlaybackViewModel.Waveform):
                 case nameof(PlaybackViewModel.Loop):
                 case nameof(PlaybackViewModel.IsLooping):
-                    InvalidateVisual();
+                    _song.Redraw();
                     break;
             }
         }
@@ -731,7 +1100,7 @@ namespace ChartBuilder.Controls.Editing
             if (_editor is not { } editor)
                 return;
 
-            // The view moves with the cursor, which redraws it.
+            // The view moves with the cursor, which moves the lane's pages (OnViewportChanged).
             editor.FollowPlayback(time);
             RequestFrame();
         }
@@ -985,17 +1354,27 @@ namespace ChartBuilder.Controls.Editing
         // The sensitivity a proposed beat snaps to the mix's onsets at: the editor's default.
         private const double OnsetSensitivity = 0.5;
 
-        /// <summary>Draws the lane again once this frame is out, to carry on with pictures there was no time for.</summary>
+        /// <summary>
+        /// Draws the song's page again shortly, to carry on with pictures of the audio there was no time for, or not yet
+        /// worked out: not every frame, as the page and its picture are drawn whole each time.
+        /// </summary>
         private void PostRedraw()
         {
             if (_isRedrawPosted)
                 return;
             _isRedrawPosted = true;
-            Dispatcher.UIThread.Post(() =>
+            if (_redrawTimer is null)
             {
-                _isRedrawPosted = false;
-                InvalidateVisual();
-            }, DispatcherPriority.Background);
+                _redrawTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = RedrawDelay };
+                _redrawTimer.Tick += (_, _) =>
+                {
+                    _redrawTimer.Stop();
+                    _isRedrawPosted = false;
+                    _song.Redraw();
+                };
+            }
+
+            _redrawTimer.Start();
         }
 
         /// <summary>The selected span, and the loop region.</summary>
@@ -1113,7 +1492,7 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>A faint band across the lanes, behind the notes, over each of Generate fills' proposals on a drums lane.</summary>
-        private static void DrawFillBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
+        private void DrawFillBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection, double fromTick, double toTick)
         {
             var fills = session.Fills;
             if (!fills.IsActive || key.Instrument != FillProposals.Part)
@@ -1162,15 +1541,13 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The box a phrase spans along the time axis, between two points across it: at least two pixels long, so one with no length shows.</summary>
-        private static Rect BoxOf(LaneProjection projection, EditorSession session, Phrase phrase, double across1, double across2)
+        private Rect BoxOf(LaneProjection projection, EditorSession session, Phrase phrase, double across1, double across2)
         {
             double start = projection.AlongOf(session.AudioAt(phrase.Tick));
             double end = projection.AlongOf(session.AudioAt(phrase.Tick + phrase.Length));
             if (Math.Abs(end - start) < 2)
                 end = start + (projection.View == LaneView.Highway ? -2 : 2);
-            var a = projection.View == LaneView.Highway ? new Point(across1, Math.Min(start, end)) : new Point(Math.Min(start, end), across1);
-            var b = projection.View == LaneView.Highway ? new Point(across2, Math.Max(start, end)) : new Point(Math.Max(start, end), across2);
-            return new Rect(a, b);
+            return Box(start, end, across1, across2);
         }
 
         private static int IndexOf(IReadOnlyList<RailKind> rows, RailKind kind)

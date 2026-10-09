@@ -29,17 +29,17 @@ namespace ChartBuilder.Controls.Editing
             return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), top, height / slots.Slots.Count, slots, viewport, lookAhead);
         }
 
-        protected override Rect LabelsArea(Size size, LaneProjection projection) => new(0, 0, size.Width, RulerHeight);
+        protected override Rect LabelsArea(Size size, LaneProjection projection) => new(projection.TimeFrom, 0, projection.TimeLength, RulerHeight);
 
         protected override Rect BehindArea(Size size, LaneProjection projection) =>
-            new(0, projection.LaneFrom, size.Width, projection.LaneSize * projection.Slots.Slots.Count);
+            new(projection.TimeFrom, projection.LaneFrom, projection.TimeLength, projection.LaneSize * projection.Slots.Slots.Count);
 
-        protected override Rect StripArea(Size size, LaneProjection projection) => new(0, RulerHeight, size.Width, StripHeight(size));
+        protected override Rect StripArea(Size size, LaneProjection projection) => new(projection.TimeFrom, RulerHeight, projection.TimeLength, StripHeight(size));
 
         protected override Rect BesideArea(Size size, LaneProjection projection, int phraseRows) => StripArea(size, projection);
 
         protected override Rect OnsetArea(Size size, LaneProjection projection) =>
-            new(0, projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count) + 2, size.Width, OnsetStripSize);
+            new(projection.TimeFrom, projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count) + 2, projection.TimeLength, OnsetStripSize);
 
         // Above the forcing marks.
         protected override double PhraseRailFrom(LaneProjection projection, int phraseRows) => projection.LaneFrom - MarkHeight - PhraseRailSize(phraseRows);
