@@ -4,6 +4,7 @@
              xmlns:res="using:ChartBuilder.Resources"
              xmlns:ui="using:ChartPacker.UI.Controls"
              xmlns:uiviews="using:ChartPacker.UI.Views"
+             xmlns:sres="using:ChartPacker.Resources"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="700"
@@ -148,11 +149,18 @@
             <TextBlock Classes="muted note" Text="{x:Static res:Strings.InspectorNoOtherFiles}" IsVisible="{Binding HasNoOtherFiles}" />
             <TextBlock Classes="muted note" Margin="0,6,0,0" Text="{x:Static res:Strings.InspectorFilesReadOnlyNote}" />
 
+            <!-- The findings counted, not listed (GitHub issue #53): View issues lists them in a window of their own. -->
             <TextBlock Classes="section" Text="{x:Static res:Strings.InspectorFindingsHeading}" />
-            <TextBlock Classes="muted note" Margin="0,0,0,4" Text="{Binding Findings.Summary}" />
-            <ItemsControl ItemsSource="{Binding Findings.Items}"
-                          ItemTemplate="{StaticResource FindingItemTemplate}"
-                          IsVisible="{Binding Findings.HasFindings}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,4">
+                <TextBlock Grid.Column="0" Classes="note" VerticalAlignment="Center" Text="{Binding Findings.Issues.Headline}" />
+                <Button Grid.Column="1"
+                        Classes="labelled"
+                        FontSize="12"
+                        VerticalAlignment="Center"
+                        Content="{x:Static sres:SharedStrings.ChartIssuesViewButton}"
+                        Command="{Binding ViewIssuesCommand}"
+                        ToolTip.Tip="{x:Static sres:SharedStrings.ChartIssuesViewToolTip}" />
+            </Grid>
 
             <TextBlock Classes="section" Text="{Binding MetadataEditor.MetadataHeader}" />
             <uiviews:MetadataEditorView DataContext="{Binding MetadataEditor}" />

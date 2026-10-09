@@ -25,6 +25,10 @@ namespace ChartBuilder.ViewModels
         // Until the lane is made, so the default it starts on isn't kept as its own look-ahead.
         private bool _isMade;
 
+        // What the header's letters and menus were made from last, so an edit that changes none of it doesn't make them
+        // again: the track, the ghost, the part, and which of its difficulties have notes.
+        private (ChartTrackKey? Track, ChartDifficulty? Ghost, EditablePart? Part, int WithNotes)? _difficultiesOf;
+
         internal EditorLaneViewModel(LaneDockViewModel dock, DockLane lane)
         {
             _dock = dock;
@@ -175,6 +179,22 @@ namespace ChartBuilder.ViewModels
         /// <summary>Takes in which difficulties have notes, after an edit.</summary>
         internal void RefreshDifficulties()
         {
+            var part = Track is { } shown ? Editor?.Session.Chart.PartOf(shown.Instrument) : null;
+            int withNotes = 0;
+            if (part is not null)
+            {
+                foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+                {
+                    if (part[difficulty].Notes.Count > 0)
+                        withNotes |= 1 << (int)difficulty;
+                }
+            }
+
+            var of = (Track, Ghost, part, withNotes);
+            if (_difficultiesOf == of)
+                return;
+            _difficultiesOf = of;
+
             OnPropertyChanged(nameof(HasCanvas));
             OnPropertyChanged(nameof(HasPlaceholder));
             OnPropertyChanged(nameof(ShowsHighway));
@@ -188,7 +208,6 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            var part = Editor?.Session.Chart.PartOf(track.Instrument);
             Difficulties = [.. Enum.GetValues<ChartDifficulty>().Select(d => new DifficultyLetter(
                 d,
                 ChartLabels.DifficultyName(d),

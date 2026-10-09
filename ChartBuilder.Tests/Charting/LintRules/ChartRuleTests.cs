@@ -51,7 +51,7 @@ public sealed class ChartRuleTests
         [ChrRules.Chr061, 1],
         [ChrRules.Chr062, 1],
         [ChrRules.Chr063, 4],
-        [ChrRules.Chr080, 3],
+        [ChrRules.Chr080, 1],
         [ChrRules.Chr081, 1],
         [ChrRules.Chr082, 1],
         [ChrRules.Chr083, 1],
@@ -74,6 +74,19 @@ public sealed class ChartRuleTests
     public void ACleanChartWithDrumsTriggersNoRule()
     {
         var findings = new ChartLinter().LintAll(Clean([], drums: true).Input).Findings;
+
+        Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+    }
+
+    [TestMethod]
+    public void APartChartedOnOnlySomeDifficultiesIsFine()
+    {
+        // GitHub issue #53: a difficulty left empty isn't an issue; only a part with no notes at all is (CHR080).
+        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2")]);
+        new AddPart(ChartInstrument.Bass).Apply(chart);
+        new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0)]).Apply(chart);
+
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).Findings;
 
         Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
     }
@@ -224,7 +237,6 @@ public sealed class ChartRuleTests
         var (chart, input) = ruleId switch
         {
             ChrRules.Chr003 => Clean([KeyValuePair.Create("song_length", "5000")], TimeSpan.FromSeconds(5)),
-            ChrRules.Chr080 => Clean([KeyValuePair.Create("diff_bass", "2")]),
             ChrRules.Chr083 => Clean([KeyValuePair.Create("diff_guitar", "-1")]),
             ChrRules.Chr084 => Clean([KeyValuePair.Create("song_length", "58000")]),
             ChrRules.Chr040 or ChrRules.Chr041 or ChrRules.Chr042 or ChrRules.Chr043 or ChrRules.Chr044 or ChrRules.Chr045 or ChrRules.Chr046 or ChrRules.Chr048
@@ -312,7 +324,6 @@ public sealed class ChartRuleTests
                 break;
             case ChrRules.Chr080:
                 new AddPart(ChartInstrument.Bass).Apply(chart);
-                new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0)]).Apply(chart);
                 break;
             case ChrRules.Chr081:
                 new AddNotes(Guitar, ChartDifficulty.Easy, [.. Enumerable.Range(0, Notes * 2).Select(i => new EditableNote(((long)i * Beat / 2) + (Beat / 4), 1, 1))]).Apply(chart);

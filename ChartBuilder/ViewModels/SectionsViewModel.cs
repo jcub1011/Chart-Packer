@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using Avalonia.Collections;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting;
@@ -141,6 +141,18 @@ namespace ChartBuilder.ViewModels
         private static string TickOf(EventRow row) => row.Event.Tick.ToString(CultureInfo.CurrentCulture);
     }
 
+    /// <summary>The heading over the focused part's own text events in the Sections tab's list, e.g. "Text events on Drums".</summary>
+    public sealed class PartEventsHeading : ObservableObject
+    {
+        private string _text = "";
+
+        public string Text
+        {
+            get => _text;
+            internal set => SetProperty(ref _text, value);
+        }
+    }
+
     /// <summary>
     /// The Sections tab (charter-spec C8 items 3, 5 and 6): every text event of <c>EVENTS</c> in time order, sections,
     /// song events and free text alike, then the focused part's own text events, each with its time and its measure and
@@ -148,13 +160,18 @@ namespace ChartBuilder.ViewModels
     /// and <b>Insert event</b> add them at the cursor, on the grid.
     /// </summary>
     /// <remarks>
-    /// The rows follow the chart (an edit, an undo or redo, or a drag's preview), the song's delay and the focus. They're
+    /// <para>The rows follow the chart (an edit, an undo or redo, or a drag's preview), the song's delay and the focus. They're
     /// worked out once the changes of a moment are in, and a row whose event is still there is kept, with whatever's typed
-    /// in its fields.
+    /// in its fields.</para>
+    /// <para>They're listed in one list, <see cref="Rows"/>, the part's heading among them, which a virtualizing list shows,
+    /// so a chart with thousands of text events only makes the rows on screen; it's changed only where the rows have.</para>
     /// </remarks>
     public sealed partial class SectionsViewModel : ViewModelBase, IDisposable
     {
         private readonly ChartEditorViewModel _editor;
+        private readonly PartEventsHeading _partHeading = new();
+        private List<EventItem> _events = [];
+        private List<EventItem> _partEvents = [];
         private ChartInstrument? _part;
         private ChartInstrument? _focused;
         private bool _scheduled;
@@ -185,11 +202,11 @@ namespace ChartBuilder.ViewModels
             Refresh();
         }
 
-        /// <summary>EVENTS' text events, in time order.</summary>
-        public ObservableCollection<EventItem> Events { get; } = [];
-
-        /// <summary>The focused part's own text events, in time order.</summary>
-        public ObservableCollection<EventItem> PartEvents { get; } = [];
+        /// <summary>
+        /// The list's rows: EVENTS' text events, in time order, then, when the focused part has text events of its own, the
+        /// <see cref="PartEventsHeading"/> and those, in time order.
+        /// </summary>
+        public AvaloniaList<object> Rows { get; } = [];
 
         [ObservableProperty]
         public partial bool HasEvents { get; private set; }
@@ -347,59 +364,66 @@ namespace ChartBuilder.ViewModels
                 PartHeading = part is { } instrument
                     ? string.Format(CultureInfo.CurrentCulture, Strings.SectionsPartHeadingFormat, ChartLabels.InstrumentName(instrument))
                     : "";
+                _partHeading.Text = PartHeading;
                 InsertEventMenu = EventMenuOf(part);
             }
 
-            Sync(Events, EventRows.Of(chart, null), map);
-            Sync(PartEvents, part is null ? [] : EventRows.Of(chart, part), map);
-            HasEvents = Events.Count > 0;
-            HasPartEvents = PartEvents.Count > 0;
+            _events = Sync(_events, EventRows.Of(chart, null), map);
+            _partEvents = Sync(_partEvents, part is null ? [] : EventRows.Of(chart, part), map);
+            HasEvents = _events.Count > 0;
+            HasPartEvents = _partEvents.Count > 0;
+
+            var rows = new List<object>(_events.Count + 1 + _partEvents.Count);
+            rows.AddRange(_events);
+            if (HasPartEvents)
+            {
+                rows.Add(_partHeading);
+                rows.AddRange(_partEvents);
+            }
+
+            ListRows.Replace(Rows, rows);
 
             if (_editNext is { } wanted)
             {
                 _editNext = null;
-                var item = Events.Concat(PartEvents).FirstOrDefault(i => i.Row.Part == wanted.Part && i.Row.Event == wanted.Event);
+                var item = _events.Concat(_partEvents).FirstOrDefault(i => i.Row.Part == wanted.Part && i.Row.Event == wanted.Event);
                 if (item is not null)
                     EditRequested?.Invoke(this, item);
             }
         }
 
         /// <summary>
-        /// Makes <paramref name="items"/> the rows of <paramref name="rows"/>, keeping each row whose event is still there,
-        /// and changing the list as little as it can, so the rows kept keep their fields and what's typed in them.
+        /// The rows of <paramref name="rows"/>, keeping each of <paramref name="items"/> whose event is still there, so the
+        /// rows kept keep their fields and what's typed in them.
         /// </summary>
-        private void Sync(ObservableCollection<EventItem> items, IReadOnlyList<EventRow> rows, TempoMap map)
+        private List<EventItem> Sync(List<EventItem> items, IReadOnlyList<EventRow> rows, TempoMap map)
         {
-            var unused = items.ToList();
+            // The rows there are, by their event; two of the same event at one tick are both kept.
+            var unused = new Dictionary<(ChartInstrument? Part, TextEvent Event), Stack<EventItem>>(items.Count);
+            for (int i = items.Count - 1; i >= 0; i--)
+            {
+                var key = (items[i].Row.Part, items[i].Row.Event);
+                if (!unused.TryGetValue(key, out var same))
+                    unused[key] = same = new Stack<EventItem>(1);
+                same.Push(items[i]);
+            }
+
             var next = new List<EventItem>(rows.Count);
             foreach (var row in rows)
             {
                 string where = WhereOf(row.Event.Tick, map);
-                int found = unused.FindIndex(i => i.Row.Part == row.Part && i.Row.Event == row.Event);
-                if (found < 0)
+                if (unused.TryGetValue((row.Part, row.Event), out var same) && same.TryPop(out var item))
+                {
+                    item.Update(row, where);
+                    next.Add(item);
+                }
+                else
                 {
                     next.Add(new EventItem(this, row, where));
-                    continue;
                 }
-
-                var item = unused[found];
-                unused.RemoveAt(found);
-                item.Update(row, where);
-                next.Add(item);
             }
 
-            foreach (var gone in unused)
-                items.Remove(gone);
-            for (int i = 0; i < next.Count; i++)
-            {
-                if (i < items.Count && ReferenceEquals(items[i], next[i]))
-                    continue;
-                int at = items.IndexOf(next[i]);
-                if (at >= 0)
-                    items.Move(at, i);
-                else
-                    items.Insert(i, next[i]);
-            }
+            return next;
         }
 
         /// <summary>Where <paramref name="tick"/> is: its time in the song, and its measure and beat.</summary>

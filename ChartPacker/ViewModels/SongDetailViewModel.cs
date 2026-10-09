@@ -99,6 +99,7 @@ namespace ChartPacker.ViewModels
         private readonly DraftSaver _saver;
         private CancellationTokenSource? _loadCts;
         private CancellationTokenSource? _chartLintCts;
+        private readonly IChartIssuesWindowService? _chartIssuesWindow;
 
         // This panel is telling the draft store about its own change, which it needn't hear back.
         private bool _notifyingDrafts;
@@ -179,9 +180,11 @@ namespace ChartPacker.ViewModels
             SongFileGate? songFiles = null,
             IConfirmationService? confirmation = null,
             DraftSaver? saver = null,
-            Func<string, bool>? isOpenInChartBuilder = null)
+            Func<string, bool>? isOpenInChartBuilder = null,
+            IChartIssuesWindowService? chartIssuesWindow = null)
         {
             _isOpenInChartBuilder = isOpenInChartBuilder;
+            _chartIssuesWindow = chartIssuesWindow;
             _drafts = drafts;
             _downloads = downloads;
             _reveal = reveal;
@@ -258,6 +261,19 @@ namespace ChartPacker.ViewModels
         public AvaloniaList<RemovedTrackRow> RemovedTracks { get; } = [];
 
         public AvaloniaList<FindingRow> Findings { get; } = [];
+
+        /// <summary>
+        /// The one song's chart findings (charter-spec C16 item 5), counted here in a line (GitHub issue #53); View issues
+        /// lists them in a window of their own, by part and difficulty.
+        /// </summary>
+        public ChartIssuesViewModel ChartIssues { get; } = new();
+
+        /// <summary>Whether the song's chart has been linted, so its findings are counted.</summary>
+        [ObservableProperty]
+        public partial bool HasChartIssues { get; private set; }
+
+        /// <summary>Whether View issues can open its window here.</summary>
+        public bool CanViewChartIssues => _chartIssuesWindow is not null;
 
         /// <summary>How many keys, shown as rows or not, fail validation as drafted.</summary>
         public int FailingFieldCount => MetadataEditor.FailingFieldCount;
@@ -611,6 +627,8 @@ namespace ChartPacker.ViewModels
             Charts.Clear();
             RemovedTracks.Clear();
             Findings.Clear();
+            ChartIssues.Clear();
+            HasChartIssues = false;
             OnPropertyChanged(nameof(FailingFieldCount));
             OnPropertyChanged(nameof(HasValidationIssues));
             Title = entries.Count switch
@@ -1710,8 +1728,8 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Lints the song's chart with its <c>song.ini</c> as drafted (charter-spec C16 item 5), off the UI thread, and lists
-        /// what it finds after the song's own findings. A newer load or lint takes its place.
+        /// Lints the song's chart with its <c>song.ini</c> as drafted (charter-spec C16 item 5), off the UI thread, and counts
+        /// what it finds, for View issues to list. A newer load or lint takes its place.
         /// </summary>
         private async Task LoadChartFindingsAsync(EditableSong song)
         {
@@ -1722,21 +1740,16 @@ namespace ChartPacker.ViewModels
             {
                 var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
                 var entry = song.Entry;
-                var report = await Task.Run(() => SongChartLint.LintAsync(entry, pairs, null, LibraryChartLint.Cache, cts.Token), cts.Token);
+                var (report, chartName) = await Task.Run(
+                    async () => (await SongChartLint.LintAsync(entry, pairs, null, LibraryChartLint.Cache, cts.Token), ChartNameOf(entry, cts.Token)),
+                    cts.Token);
                 if (_chartLintCts != cts || _songs.Count != 1 || !ReferenceEquals(_songs[0], song))
                     return;
 
-                for (int i = Findings.Count - 1; i >= 0; i--)
-                {
-                    if (ChrRules.IsChartRule(Findings[i].RuleId))
-                        Findings.RemoveAt(i);
-                }
-
-                Findings.AddRange(report.Findings.Select(f => new FindingRow(
-                    f.Finding.RuleId,
-                    LibraryChartLint.Where(f) is { } where ? string.Format(CultureInfo.CurrentCulture, Strings.ChartFindingWhereFormat, f.Finding.Message, where) : f.Finding.Message,
-                    f.Finding.Severity == Severity.Error)));
-                OnPropertyChanged(nameof(HasFindings));
+                ChartIssues.FileName = chartName ?? "";
+                ChartIssues.Title = string.Format(CultureInfo.CurrentCulture, SharedStrings.ChartIssuesWindowTitleFormat, Title);
+                ChartIssues.Show(report.Findings, static f => f.Finding, static f => new FindingItem(f.Finding, _ => LibraryChartLint.Where(f)));
+                HasChartIssues = report.Status == SongChartLintStatus.Linted;
             }
             catch (OperationCanceledException)
             {
@@ -1747,6 +1760,23 @@ namespace ChartPacker.ViewModels
                     _chartLintCts = null;
             }
         }
+
+        /// <summary>The chart file the song's chart is read from, as linting picks it, e.g. notes.mid; null when it can't be listed.</summary>
+        private static string? ChartNameOf(SongEntry entry, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return ChartReader.Pick(SongFile.ListTopLevel(entry, cancellationToken).Select(static f => f.Name));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Lists the song's chart findings, by part and difficulty, in a window of their own.</summary>
+        [RelayCommand]
+        private void ViewChartIssues() => _chartIssuesWindow?.Show(ChartIssues);
 
         /// <summary>
         /// Merges the songs' metadata and drafts into the metadata's rows and icons, which are updated in place so that a

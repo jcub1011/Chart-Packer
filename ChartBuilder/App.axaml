@@ -9,7 +9,6 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://ChartPacker.UI/Styles/Icons.axaml" />
                 <ResourceInclude Source="avares://ChartBuilder/Controls/EditorSidePanel.axaml" />
-                <ResourceInclude Source="avares://ChartBuilder/Views/FindingTemplates.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
@@ -17,6 +16,6 @@
     <!-- The palette, colours and common styles are shared with Chart Packer. -->
     <Application.Styles>
         <StyleInclude Source="avares://ChartPacker.UI/Styles/AppTheme.axaml" />
-        <StyleInclude Source="avares://ChartBuilder/Styles/Severity.axaml" />
+        <StyleInclude Source="avares://ChartPacker.UI/Styles/Severity.axaml" />
     </Application.Styles>
 </Application>

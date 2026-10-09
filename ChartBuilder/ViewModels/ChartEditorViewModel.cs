@@ -61,6 +61,9 @@ namespace ChartBuilder.ViewModels
         private bool _syncing;
         private IReadOnlyList<PhraseKindChoice>? _phraseChoices;
 
+        // The frame the playhead was last followed in.
+        private TimeSpan? _followed;
+
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
         /// <param name="audio">The song's audio as the lanes draw and analyse it.</param>
         /// <param name="dialogs">Shows the authoring tools' dialogs; null where there are none to show.</param>
@@ -294,8 +297,13 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>Follows the playhead, once a frame while it plays: the cursor moves with it, and the view with the cursor.</summary>
-        public void FollowPlayback()
+        /// <param name="frame">The frame's time, as the screen gives it. Every lane asks each frame; the first to ask moves
+        /// the cursor for all of them, which redraws them all, so the rest don't move it again.</param>
+        public void FollowPlayback(TimeSpan frame)
         {
+            if (_followed == frame)
+                return;
+            _followed = frame;
             if (Playback.IsPlaying)
                 Session.Viewport.Follow(Playback.Clock().TotalSeconds);
         }

@@ -42,8 +42,10 @@ namespace ChartBuilder.ViewModels
         private readonly Dictionary<SongTrack, int> _versions = [];
         private readonly HashSet<SongTrack> _readingChannels = [];
 
-        // On the UI thread: the mixes made, by source and whether by channel, and those being made.
+        // On the UI thread: the mixes made, by source and whether by channel, and those being made; and a single stem's
+        // waveforms, kept so each frame draws the same ones, whose pictures the painter keeps.
         private readonly Dictionary<(string Key, bool Stereo), Mixed> _mixes = [];
+        private readonly Dictionary<(SongTrack Track, bool Stereo), (int Version, object Made)> _singles = [];
         private bool _changePending;
         private bool _disposed;
 
@@ -73,7 +75,7 @@ namespace ChartBuilder.ViewModels
             if (peaks.Count == 0)
                 return null;
             if (peaks.Count == 1 && !source.IsMix)
-                return WaveformPeaks.Of(peaks[0].Peaks);
+                return (Waveform)SingleOf(peaks[0], stereo: false);
             return (Waveform?)MixOf(source, peaks, stereo: false)?.Mono;
         }
 
@@ -84,13 +86,13 @@ namespace ChartBuilder.ViewModels
         public (Waveform Left, Waveform Right)? Stereo(AudioSource source)
         {
             ArgumentNullException.ThrowIfNull(source);
-            var peaks = PeaksOf(source.Tracks, channels: true);
-            if (peaks.Count < source.Tracks.Count(t => HasPeaks(t)))
+            var peaks = PeaksOf(source.Tracks, channels: true, out int had);
+            if (peaks.Count < had)
                 return null;
             if (peaks.Count == 0)
                 return null;
             if (peaks.Count == 1 && !source.IsMix)
-                return (WaveformPeaks.Of(peaks[0].Peaks.Left), WaveformPeaks.Of(peaks[0].Peaks.Right));
+                return ((Waveform, Waveform))SingleOf(peaks[0], stereo: true);
             return MixOf(source, peaks, stereo: true)?.Channels;
         }
 
@@ -100,32 +102,47 @@ namespace ChartBuilder.ViewModels
             _cancel.Cancel();
             _changed.Stop();
             _mixes.Clear();
+            _singles.Clear();
         }
 
-        private bool HasPeaks(SongTrack track)
+        /// <summary>A single stem's waveform, or its left and right, made again only when its peaks have changed.</summary>
+        private object SingleOf((SongTrack Track, StemPeaks Peaks, int Version) peaks, bool stereo)
         {
-            lock (_lock)
-                return _peaks.ContainsKey(track);
+            var key = (peaks.Track, stereo);
+            if (_singles.TryGetValue(key, out var single) && single.Version == peaks.Version)
+                return single.Made;
+
+            object made = stereo
+                ? (WaveformPeaks.Of(peaks.Peaks.Left), WaveformPeaks.Of(peaks.Peaks.Right))
+                : WaveformPeaks.Of(peaks.Peaks);
+            _singles[key] = (peaks.Version, made);
+            return made;
         }
 
         /// <summary>
         /// The peaks there are of <paramref name="tracks"/>, with their versions; by channel, only those read so, and the
         /// others' channels are read.
         /// </summary>
-        private List<(SongTrack Track, StemPeaks Peaks, int Version)> PeaksOf(IReadOnlyList<SongTrack> tracks, bool channels)
+        private List<(SongTrack Track, StemPeaks Peaks, int Version)> PeaksOf(IReadOnlyList<SongTrack> tracks, bool channels) =>
+            PeaksOf(tracks, channels, out _);
+
+        /// <param name="had">How many of <paramref name="tracks"/> have any peaks read, by channel or not.</param>
+        private List<(SongTrack Track, StemPeaks Peaks, int Version)> PeaksOf(IReadOnlyList<SongTrack> tracks, bool channels, out int had)
         {
-            var found = new List<(SongTrack, StemPeaks, int)>();
-            var missing = new List<SongTrack>();
+            var found = new List<(SongTrack, StemPeaks, int)>(tracks.Count);
+            List<SongTrack>? missing = null;
+            had = 0;
             lock (_lock)
             {
                 foreach (var track in tracks)
                 {
                     if (!_peaks.TryGetValue(track, out var peaks))
                         continue;
+                    had++;
                     if (channels && !peaks.HasChannels)
                     {
                         if (_readingChannels.Add(track))
-                            missing.Add(track);
+                            (missing ??= []).Add(track);
                         continue;
                     }
 
@@ -133,7 +150,7 @@ namespace ChartBuilder.ViewModels
                 }
             }
 
-            if (missing.Count > 0)
+            if (missing is not null)
                 Read(missing, channels: true);
             return found;
         }
@@ -142,11 +159,11 @@ namespace ChartBuilder.ViewModels
         private Mixed? MixOf(AudioSource source, List<(SongTrack Track, StemPeaks Peaks, int Version)> peaks, bool stereo)
         {
             var key = (source.Key, stereo);
-            string versions = string.Join(",", peaks.Select(p => p.Version));
             _mixes.TryGetValue(key, out var mixed);
-            if (mixed?.Versions == versions || mixed?.Making == versions)
-                return mixed?.Made is null ? null : mixed;
+            if (mixed is not null && (Same(mixed.Versions, peaks) || Same(mixed.Making, peaks)))
+                return mixed.Made is null ? null : mixed;
 
+            int[] versions = [.. peaks.Select(p => p.Version)];
             mixed ??= new Mixed();
             mixed.Making = versions;
             _mixes[key] = mixed;
@@ -166,6 +183,19 @@ namespace ChartBuilder.ViewModels
                 });
             }, token);
             return mixed.Made is null ? null : mixed;
+
+            static bool Same(int[]? versions, List<(SongTrack Track, StemPeaks Peaks, int Version)> peaks)
+            {
+                if (versions is null || versions.Length != peaks.Count)
+                    return false;
+                for (int i = 0; i < versions.Length; i++)
+                {
+                    if (versions[i] != peaks[i].Version)
+                        return false;
+                }
+
+                return true;
+            }
         }
 
         /// <summary>Reads <paramref name="tracks"/>' peaks in the background, from the cache where it has them.</summary>
@@ -268,9 +298,9 @@ namespace ChartBuilder.ViewModels
         {
             public object? Made { get; set; }
 
-            public string? Versions { get; set; }
+            public int[]? Versions { get; set; }
 
-            public string? Making { get; set; }
+            public int[]? Making { get; set; }
 
             public Waveform? Mono => Made as Waveform;
 

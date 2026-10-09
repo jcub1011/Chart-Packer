@@ -18,7 +18,7 @@
 
         <!-- A row: a bar on its left in the accent for a section and manila for a song event; the name or text, or a song
              event's label; where it is; and its tick. -->
-        <DataTemplate x:Key="EventRowTemplate" x:DataType="vm:EventItem">
+        <DataTemplate x:Key="EventRowTemplate" DataType="vm:EventItem">
             <Border Classes="event-row" Classes.section="{Binding IsSection}" Classes.song="{Binding IsSongEvent}">
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
                     <TextBox Grid.Row="0" Grid.Column="0"
@@ -144,21 +144,35 @@
                    TextWrapping="Wrap"
                    Text="{x:Static res:Strings.SectionsKeysHint}" />
 
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="8,0,8,8" Spacing="4">
-                <TextBlock Classes="caption" Margin="4,2,0,0" Text="{x:Static res:Strings.SectionsEventsHeading}" IsVisible="{Binding HasEvents}" />
-                <TextBlock Classes="muted"
-                           FontSize="12"
-                           Margin="4"
-                           TextWrapping="Wrap"
-                           Text="{x:Static res:Strings.SectionsNone}"
-                           IsVisible="{Binding !HasEvents}" />
-                <ItemsControl ItemsSource="{Binding Events}" ItemTemplate="{StaticResource EventRowTemplate}" />
+        <TextBlock DockPanel.Dock="Top"
+                   Classes="caption"
+                   Margin="12,2,12,4"
+                   Text="{x:Static res:Strings.SectionsEventsHeading}"
+                   IsVisible="{Binding HasEvents}" />
+        <TextBlock DockPanel.Dock="Top"
+                   Classes="muted"
+                   FontSize="12"
+                   Margin="12,4,12,8"
+                   TextWrapping="Wrap"
+                   Text="{x:Static res:Strings.SectionsNone}"
+                   IsVisible="{Binding !HasEvents}" />
 
-                <!-- The focused part's own text events, when it has any (C8 item 6). -->
-                <TextBlock Classes="caption" Margin="4,10,0,0" Text="{Binding PartHeading}" IsVisible="{Binding HasPartEvents}" />
-                <ItemsControl ItemsSource="{Binding PartEvents}" ItemTemplate="{StaticResource EventRowTemplate}" IsVisible="{Binding HasPartEvents}" />
-            </StackPanel>
+        <!-- EVENTS' rows, then the focused part's own text events under their heading, when it has any (C8 item 6): one
+             virtualizing list, so only the rows on screen are made. Not a ListBox, whose keys would take the fields' arrows. -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="EventList" Margin="8,0,8,8" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.DataTemplates>
+                    <DataTemplate DataType="vm:PartEventsHeading">
+                        <TextBlock Classes="caption" Margin="4,10,0,4" Text="{Binding Text}" />
+                    </DataTemplate>
+                    <StaticResource ResourceKey="EventRowTemplate" />
+                </ItemsControl.DataTemplates>
+            </ItemsControl>
         </ScrollViewer>
     </DockPanel>
 </UserControl>

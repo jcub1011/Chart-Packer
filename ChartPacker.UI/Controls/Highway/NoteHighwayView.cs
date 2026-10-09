@@ -706,10 +706,10 @@ namespace ChartPacker.UI.Controls.Highway
                 _hits = new double[lane.LaneCount];
             var hits = _hits;
             Array.Clear(hits, 0, lane.LaneCount);
-            for (int i = LowerBound(lane.Starts, now - Math.Max(StrikeGlow.Seconds, lane.MaxLength)); i < lane.Starts.Length && lane.Starts[i] <= now; i++)
+            for (int i = LowerBound(lane.Starts, now - (lane.MaxLength + StrikeGlow.Lingers)); i < lane.Starts.Length && lane.Starts[i] <= now; i++)
             {
                 var note = lane.Notes[i];
-                double glow = StrikeGlow.Brightness(now - lane.Starts[i], lane.Ends[i] > now && lane.Ends[i] > lane.Starts[i]);
+                double glow = StrikeGlow.Brightness(now - lane.Starts[i], Math.Max(0, lane.Ends[i] - lane.Starts[i]));
                 if (glow <= 0)
                     continue;
 
@@ -744,9 +744,13 @@ namespace ChartPacker.UI.Controls.Highway
                 double radius = GemPainter.CornerOf(rect);
                 double hit = hits[column];
 
-                // Hollow until struck, then filled in the lane's colour.
-                var fill = hit > 0 ? StrikeGlow.TargetFill(color, hit) : HighwayPalette.WithAlpha(HighwayPalette.Darken(color, 0.72), 0xC8);
-                context.DrawRectangle(Brush(fill), Pen(hit > 0 ? StrikeGlow.TargetEdge(color) : color, 2), rect.Deflate(1), radius, radius);
+                // Dark until struck, then filled in the lane's colour, which fades back to dark.
+                context.DrawRectangle(Brush(HighwayPalette.WithAlpha(HighwayPalette.Darken(color, 0.72), 0xC8)), Pen(color, 2), rect.Deflate(1), radius, radius);
+                if (hit > 0)
+                {
+                    using (context.PushOpacity(hit))
+                        context.DrawRectangle(Brush(StrikeGlow.TargetFill(color)), Pen(StrikeGlow.TargetEdge(color), 2), rect.Deflate(1), radius, radius);
+                }
             }
         }
 

@@ -34,6 +34,9 @@ namespace ChartPacker.UI.Controls
         /// <summary>A dimmed row's colour is taken from this far up the levels, as a fraction.</summary>
         private const double Dimmed = 0.3;
 
+        // How far under a power of two the columns to a pixel may be and still be taken as it.
+        private const double LevelSlack = 1e-6;
+
         private static readonly long RefreshInterval = Stopwatch.Frequency / 10;
         private static readonly RenderOptions Smooth = new() { BitmapInterpolationMode = BitmapInterpolationMode.MediumQuality };
         private static readonly Dictionary<TileKey, Tile> Tiles = [];
@@ -66,8 +69,9 @@ namespace ChartPacker.UI.Controls
             if (spectrogram.IsReleased || perColumn == 0 || !double.IsFinite(perColumn) || bounds.Width <= 0 || bounds.Height <= 0)
                 return true;
 
-            // A power of two of columns to a picture's pixel, as many as fit in a screen pixel.
-            int level = Math.Clamp((int)Math.Ceiling(Math.Log2(Math.Max(1, pixel / Math.Abs(perColumn)))), 0, MaxLevel);
+            // A power of two of columns to a picture's pixel, as many as fit in a screen pixel; a hair under a power of two
+            // is taken as it, so the level doesn't flip between frames as the lane moves.
+            int level = Math.Clamp((int)Math.Ceiling(Math.Log2(Math.Max(1, pixel / Math.Abs(perColumn))) - LevelSlack), 0, MaxLevel);
             int span = TileColumns << level;
             int first = Math.Max(0, spectrogram.ColumnAt(Math.Min(from, to)) - 1);
             int last = Math.Min(spectrogram.ColumnCount - 1, spectrogram.ColumnAt(Math.Max(from, to)) + 1);
@@ -82,26 +86,54 @@ namespace ChartPacker.UI.Controls
                 for (int index = first / span; index <= last / span; index++)
                 {
                     var key = new TileKey(spectrogram, level, index, levels.Item1, levels.Item2, band);
-                    if (TileOf(key, out bool current) is not { } bitmap)
+                    if (TileOf(key, out bool current) is { } bitmap)
                     {
-                        complete = false;
+                        complete &= current;
+                        DrawTile(bitmap, level, index);
                         continue;
                     }
 
-                    complete &= current;
+                    // Not drawn yet: a neighbouring level's pictures of the same columns stand in, rather than a gap.
+                    complete = false;
+                    long start = (long)index * span;
+                    foreach (int other in (ReadOnlySpan<int>)[level + 1, level - 1])
+                    {
+                        if (other < 0 || other > MaxLevel)
+                            continue;
+                        int otherSpan = TileColumns << other;
+                        bool any = false;
+                        for (long at = start / otherSpan; at * otherSpan < start + span; at++)
+                        {
+                            if (!Tiles.TryGetValue(key with { Level = other, Index = (int)at }, out var stand))
+                                continue;
+                            double near = origin + (perColumn * (start - 0.5)), far = origin + (perColumn * (start + span - 0.5));
+                            var clip = isVertical
+                                ? new Rect(bounds.X, Math.Min(near, far), bounds.Width, Math.Abs(far - near))
+                                : new Rect(Math.Min(near, far), bounds.Y, Math.Abs(far - near), bounds.Height);
+                            using (context.PushClip(clip))
+                                DrawTile(stand.Bitmap, other, (int)at);
+                            any = true;
+                        }
 
-                    // A picture's pixel x is columns start + x·2^level, centred half a column earlier.
-                    double along = origin + (perColumn * ((index * (double)span) - 0.5));
-                    double step = perColumn * (1 << level);
-                    var matrix = isVertical
-                        ? new Matrix(0, step, -bounds.Width / Rows, 0, bounds.Right, along)
-                        : new Matrix(step, 0, 0, bounds.Height / Rows, along, bounds.Top);
-                    using (context.PushTransform(matrix))
-                        context.DrawImage(bitmap, new Rect(0, 0, TileColumns, Rows), new Rect(0, 0, TileColumns, Rows));
+                        if (any)
+                            break;
+                    }
                 }
             }
 
             return complete;
+
+            void DrawTile(WriteableBitmap bitmap, int tileLevel, int tileIndex)
+            {
+                // A picture's pixel x is columns start + x·2^level, centred half a column earlier.
+                double along = origin + (perColumn * ((tileIndex * (double)(TileColumns << tileLevel)) - 0.5));
+                double step = perColumn * (1 << tileLevel);
+                var matrix = isVertical
+                    ? new Matrix(0, step, -bounds.Width / Rows, 0, bounds.Right, along)
+                    : new Matrix(step, 0, 0, bounds.Height / Rows, along, bounds.Top);
+                using (context.PushTransform(matrix))
+                    context.DrawImage(bitmap, new Rect(0, 0, TileColumns, Rows), new Rect(0, 0, TileColumns, Rows));
+            }
         }
 
         /// <summary>

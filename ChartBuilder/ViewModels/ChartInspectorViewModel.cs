@@ -58,6 +58,7 @@ namespace ChartBuilder.ViewModels
         private readonly EditorSong _song;
         private readonly ChartUndoStack _undo;
         private readonly IImagePickerService _imagePicker;
+        private readonly IChartIssuesWindowService _chartIssues;
         private readonly DispatcherTimer _delayTimer;
         private readonly DispatcherTimer _partsTimer;
         private readonly CancellationTokenSource _closing = new();
@@ -76,11 +77,12 @@ namespace ChartBuilder.ViewModels
         private CancellationTokenSource? _filesCts;
         private CancellationTokenSource? _partsCts;
 
-        public ChartInspectorViewModel(EditorSong song, ChartUndoStack undo, FindingsViewModel findings, IImagePickerService imagePicker)
+        public ChartInspectorViewModel(EditorSong song, ChartUndoStack undo, FindingsViewModel findings, IImagePickerService imagePicker, IChartIssuesWindowService chartIssues)
         {
             _song = song;
             _undo = undo;
             _imagePicker = imagePicker;
+            _chartIssues = chartIssues;
             Findings = findings;
             MetadataEditor = new MetadataEditorViewModel(this);
             _delayTimer = new DispatcherTimer(DelayTypingPause, DispatcherPriority.Background, (_, _) => ApplyDelay());
@@ -97,7 +99,10 @@ namespace ChartBuilder.ViewModels
         /// <summary>The metadata: the difficulties as icons, and a row per other <c>song.ini</c> key.</summary>
         public MetadataEditorViewModel MetadataEditor { get; }
 
-        /// <summary>The chart's findings, as the Findings tab lists them.</summary>
+        /// <summary>
+        /// The chart's findings, which the Inspector only counts (GitHub issue #53): View issues lists them in a window of
+        /// their own, as the Findings tab does.
+        /// </summary>
         public FindingsViewModel Findings { get; }
 
         /// <summary>"Artist – Name" as the next save leaves them, or the song's file or folder name.</summary>
@@ -331,6 +336,10 @@ namespace ChartBuilder.ViewModels
 
         private void OnSongChanged(object? sender, EventArgs e) => QueueRefresh();
 
+        /// <summary>Lists the chart's findings, grouped by part and difficulty, in a window of their own.</summary>
+        [RelayCommand]
+        private void ViewIssues() => _chartIssues.Show(Findings.Issues);
+
         // A part added or removed changes the ratings the song calls for, and the instruments' icons.
         private void OnChartChanged(object? sender, ChartCommandEventArgs e)
         {
@@ -361,6 +370,7 @@ namespace ChartBuilder.ViewModels
             var pairs = _song.EffectivePairs();
             _items = [new MetadataItem(_song.Pairs, DraftOf(_song.PendingChanges()), DuplicateKeysOf(_song.Pairs))];
             Title = _song.Title ?? Strings.EditorUntitledChart;
+            Findings.Issues.Title = string.Format(CultureInfo.CurrentCulture, SharedStrings.ChartIssuesWindowTitleFormat, Title);
             Charter = SongHeadline.CharterMarkup(pairs);
             Subtitle = _song.Entry?.FullPath ?? Strings.InspectorNewChartPath;
             MetadataEditor.Refresh();

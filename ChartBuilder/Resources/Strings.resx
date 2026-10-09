@@ -1498,26 +1498,6 @@ Saving also makes these changes to song.ini:
     <value>Findings</value>
     <comment>The right panel's tab listing the chart's lint findings.</comment>
   </data>
-  <data name="FindingsSummaryFormat" xml:space="preserve">
-    <value>{0} errors · {1} warnings · {2} info</value>
-    <comment>The findings panel's summary: how many of each severity.</comment>
-  </data>
-  <data name="FindingsNone" xml:space="preserve">
-    <value>No findings: nothing the rules check for.</value>
-  </data>
-  <data name="FindingGoToButton" xml:space="preserve">
-    <value>→</value>
-    <comment>A finding row's button that goes to where it is.</comment>
-  </data>
-  <data name="FindingGoToToolTip" xml:space="preserve">
-    <value>Go to it in the chart</value>
-  </data>
-  <data name="FindingFixButton" xml:space="preserve">
-    <value>Fix</value>
-  </data>
-  <data name="FindingFixToolTip" xml:space="preserve">
-    <value>Apply the quick fix, as one step to undo</value>
-  </data>
   <data name="FindingNoFixStatus" xml:space="preserve">
     <value>That finding has no single right fix here.</value>
   </data>

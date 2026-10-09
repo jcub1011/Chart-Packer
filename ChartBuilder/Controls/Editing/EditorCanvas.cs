@@ -153,6 +153,13 @@ namespace ChartBuilder.Controls.Editing
 
         // The longest note of the track drawn, so the notes held into view from before it are found; worked out again after an edit.
         private (ChartTrackKey Track, long Length)? _longest;
+        private (ChartTrackKey Track, long Length)? _ghostLongest;
+
+        // What's drawn every frame that would otherwise be made every frame: the pens in the accent, as of which accent,
+        // a short sustain's dashed outline by colour, and the chords whose forcing marks are drawn.
+        private (IBrush Accent, IPen Selected, IPen Cursor, IPen Focus)? _accentPens;
+        private readonly Dictionary<Color, IPen> _dashedPens = [];
+        private readonly HashSet<long> _flagged = [];
 
         // The ticks of the measures' first beats, for numbering them; kept for the tempo map they're for.
         private TempoMap? _measuresOf;
@@ -323,20 +330,22 @@ namespace ChartBuilder.Controls.Editing
 
                 if (_lane.Ghost is { } ghost)
                 {
+                    var ghostKey = new ChartTrackKey(key.Instrument, ghost);
                     using (context.PushOpacity(0.28))
-                        DrawNotes(context, session, new ChartTrackKey(key.Instrument, ghost), part[ghost], projection, slots, fromTick, toTick, isGhost: true);
+                        DrawNotes(context, session, ghostKey, part[ghost], projection, slots, fromTick, toTick, LongestOf(ref _ghostLongest, ghostKey, part[ghost]), isGhost: true);
                 }
 
                 // A draft not yet added (Reduce, record mode) over the notes it would replace, which fade behind it.
+                long longest = LongestOf(ref _longest, key, track);
                 if (session.GhostTrack(key) is { } draft)
                 {
                     using (context.PushOpacity(0.3))
-                        DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, isGhost: false);
-                    DrawNotes(context, session, key, draft, projection, slots, fromTick, toTick, isGhost: true);
+                        DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, longest, isGhost: false);
+                    DrawNotes(context, session, key, draft, projection, slots, fromTick, toTick, LongestIn(draft), isGhost: true);
                 }
                 else
                 {
-                    DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, isGhost: false);
+                    DrawNotes(context, session, key, track, projection, slots, fromTick, toTick, longest, isGhost: false);
                 }
 
                 DrawSoloCounts(context, session, track, projection, fromTick, toTick);
@@ -351,7 +360,7 @@ namespace ChartBuilder.Controls.Editing
             }
 
             if (IsFocused)
-                context.DrawRectangle(null, new ImmutablePen(((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF, 1), bounds.Deflate(0.5));
+                context.DrawRectangle(null, AccentPens().Focus, bounds.Deflate(0.5));
         }
 
         protected override void OnGotFocus(FocusChangedEventArgs e)
@@ -661,12 +670,14 @@ namespace ChartBuilder.Controls.Editing
             if (e.PropertyName == nameof(EditorLaneViewModel.Track) && IsFocused && Session is { } session && _lane?.Track is { } key)
                 session.Focused = key;
             _longest = null;
+            _ghostLongest = null;
             InvalidateVisual();
         }
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
             _longest = null;
+            _ghostLongest = null;
             InvalidateVisual();
         }
 
@@ -714,7 +725,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
 
             // The view moves with the cursor, which redraws it.
-            editor.FollowPlayback();
+            editor.FollowPlayback(time);
             RequestFrame();
         }
 
@@ -1307,16 +1318,15 @@ namespace ChartBuilder.Controls.Editing
             }
         }
 
-        private void DrawNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, bool isGhost)
+        /// <param name="longest">The longest note's length in <paramref name="track"/>, so a sustain begun before the view is drawn.</param>
+        private void DrawNotes(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots, double fromTick, double toTick, long longest, bool isGhost)
         {
             var kind = track.Kind;
             bool drums = kind == ChartInstrumentKind.Drums;
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
             var game = isGhost ? null : session.GameTrack(key).Notes;
-            long longest = isGhost ? track.Notes.Select(static n => n.Length).DefaultIfEmpty().Max() : LongestOf(key, track);
             var notes = track.Notes.Between((long)Math.Max(0, Math.Floor(fromTick) - longest), (long)Math.Ceiling(toTick) + 1);
-            var accent = AccentBrush ?? DefaultAccentBrush;
-            var selectedPen = new ImmutablePen((accent as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF, 2);
+            var selectedPen = AccentPens().Selected;
             double size = GemSize(projection);
             double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * slots.Slots.Count);
 
@@ -1340,7 +1350,7 @@ namespace ChartBuilder.Controls.Editing
                 if (!isGhost && shown.Length == 0)
                 {
                     // Shorter than the sustain cutoff: the games read a plain note, so the tail is only dashed (C5 item 3).
-                    context.DrawRectangle(null, new ImmutablePen(HighwayPalette.WithAlpha(color, 0xC0).ToUInt32(), 1, new ImmutableDashStyle([2, 2], 0)), tail.Deflate(0.5));
+                    context.DrawRectangle(null, DashedPen(color), tail.Deflate(0.5));
                 }
                 else
                 {
@@ -1348,7 +1358,8 @@ namespace ChartBuilder.Controls.Editing
                 }
             }
 
-            var flagged = new HashSet<long>();
+            var flagged = _flagged;
+            flagged.Clear();
             foreach (bool bars in (ReadOnlySpan<bool>)[true, false])
             {
                 for (int i = notes.Length - 1; i >= 0; i--)
@@ -1469,7 +1480,7 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// The columns the song is playing through, lit as the inspector's highway lights them: a beam rising from the
-        /// strike line and the column's target filled in, as each note reaches it, fading, and held while it's sustained.
+        /// strike line and the column's target filled in, as each note reaches it, fading, and slowly over a sustain.
         /// </summary>
         private void DrawGlow(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
@@ -1495,13 +1506,15 @@ namespace ChartBuilder.Controls.Editing
                 using (context.PushOpacity(hit * StrikeGlow.BeamOpacity))
                     context.FillRectangle(StrikeGlow.Beam(color, View == LaneView.Highway), Box(strike, strike + reach, edge, edge + projection.LaneSize));
 
+                // The target, as opaque as the column is lit.
                 var rect = GemRect(projection, column, strike, size);
                 double radius = GemPainter.CornerOf(rect);
-                context.DrawRectangle(_gems.Brush(StrikeGlow.TargetFill(color, hit)), _gems.Pen(StrikeGlow.TargetEdge(color), 2), rect.Deflate(1), radius, radius);
+                using (context.PushOpacity(hit))
+                    context.DrawRectangle(_gems.Brush(StrikeGlow.TargetFill(color)), _gems.Pen(StrikeGlow.TargetEdge(color), 2), rect.Deflate(1), radius, radius);
             }
         }
 
-        /// <summary>How brightly each column is lit at <paramref name="now"/>, from 0 to 1: just struck, or held.</summary>
+        /// <summary>How brightly each column is lit at <paramref name="now"/>, from 0 to 1: just struck, or sustained.</summary>
         private double[] HitsAt(EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, double now)
         {
             int count = slots.Slots.Count;
@@ -1512,18 +1525,18 @@ namespace ChartBuilder.Controls.Editing
 
             bool drums = track.Kind == ChartInstrumentKind.Drums;
             var game = session.GameTrack(key).Notes;
-            double from = Math.Max(0, session.TickAt(now - StrikeGlow.Seconds));
-            var notes = track.Notes.Between((long)Math.Max(0, Math.Floor(from) - LongestOf(key, track)), (long)Math.Ceiling(Math.Max(0, session.TickAt(now))) + 1);
+            double from = Math.Max(0, session.TickAt(now - StrikeGlow.Lingers));
+            var notes = track.Notes.Between((long)Math.Max(0, Math.Floor(from) - LongestOf(ref _longest, key, track)), (long)Math.Ceiling(Math.Max(0, session.TickAt(now))) + 1);
             foreach (var note in notes)
             {
                 double start = session.AudioAt(note.Tick);
                 if (start > now)
                     continue;
 
-                // Held while the games read it as a sustain and its tail hasn't passed.
+                // Fading over its tail while the games read it as a sustain.
                 int lane = session.ShownLane(key, note);
                 var shown = Shown(game, note, drums, lane);
-                double glow = StrikeGlow.Brightness(now - start, shown.Length > 0 && session.AudioAt(note.Tick + shown.Length) > now);
+                double glow = StrikeGlow.Brightness(now - start, shown.Length > 0 ? session.AudioAt(note.Tick + shown.Length) - start : 0);
                 if (glow <= 0)
                     continue;
 
@@ -1546,7 +1559,7 @@ namespace ChartBuilder.Controls.Editing
         private void DrawCursor(DrawingContext context, EditorSession session, LaneProjection projection, Rect lanes)
         {
             double along = projection.AlongOf(session.Viewport.Cursor);
-            var pen = new ImmutablePen(((AccentBrush ?? DefaultAccentBrush) as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF, 1.5);
+            var pen = AccentPens().Cursor;
             var labels = LabelsArea(Bounds.Size, projection);
             context.DrawLine(pen, At(along, View == LaneView.Highway ? labels.Left : labels.Top), At(along, View == LaneView.Highway ? lanes.Right : lanes.Bottom));
         }
@@ -1602,15 +1615,42 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>The longest note of <paramref name="track"/>, worked out once after each edit.</summary>
-        private long LongestOf(ChartTrackKey key, EditableTrack track)
+        /// <summary>The longest note's length in <paramref name="track"/>, kept in <paramref name="known"/> until the chart changes.</summary>
+        private static long LongestOf(ref (ChartTrackKey Track, long Length)? known, ChartTrackKey key, EditableTrack track)
         {
-            if (_longest is { } known && known.Track == key)
-                return known.Length;
+            if (known is { } kept && kept.Track == key)
+                return kept.Length;
+            long longest = LongestIn(track);
+            known = (key, longest);
+            return longest;
+        }
+
+        private static long LongestIn(EditableTrack track)
+        {
             long longest = 0;
             foreach (var note in track.Notes)
                 longest = Math.Max(longest, note.Length);
-            _longest = (key, longest);
             return longest;
+        }
+
+        /// <summary>The selection's, the cursor's and the focus's pens, in the accent, made again only when it changes.</summary>
+        private (IBrush Accent, IPen Selected, IPen Cursor, IPen Focus) AccentPens()
+        {
+            var accent = AccentBrush ?? DefaultAccentBrush;
+            if (_accentPens is { } pens && ReferenceEquals(pens.Accent, accent))
+                return pens;
+            uint color = (accent as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF7CB4FF;
+            (IBrush, IPen, IPen, IPen) made = (accent, new ImmutablePen(color, 2), new ImmutablePen(color, 1.5), new ImmutablePen(color, 1));
+            _accentPens = made;
+            return made;
+        }
+
+        /// <summary>A short sustain's dashed outline in <paramref name="color"/>, made once.</summary>
+        private IPen DashedPen(Color color)
+        {
+            if (!_dashedPens.TryGetValue(color, out var pen))
+                _dashedPens[color] = pen = new ImmutablePen(HighwayPalette.WithAlpha(color, 0xC0).ToUInt32(), 1, new ImmutableDashStyle([2, 2], 0));
+            return pen;
         }
 
         /// <summary>The ticks of the measures' first beats up to <paramref name="last"/>, for numbering them.</summary>

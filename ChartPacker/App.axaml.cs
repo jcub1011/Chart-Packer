@@ -69,7 +69,8 @@ namespace ChartPacker
                     Path.Combine(UserConfigPaths.ConfigFolder, "dedup-log.jsonl"),
                     isOpenInChartBuilder);
                 var detail = new SongDetailViewModel(
-                    drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, isOpenInChartBuilder: isOpenInChartBuilder);
+                    drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, isOpenInChartBuilder: isOpenInChartBuilder,
+                    chartIssuesWindow: new AvaloniaChartIssuesWindowService(() => window));
                 var validatorWindow = new AvaloniaValidatorWindowService(
                     () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, isOpenInChartBuilder, latency);
                 var chartBuilder = new ChartBuilderLauncher();

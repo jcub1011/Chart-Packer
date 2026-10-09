@@ -4,6 +4,7 @@
         xmlns:views="using:ChartBuilder.Views"
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:ctl="using:ChartPacker.UI.Controls"
+        xmlns:uiviews="using:ChartPacker.UI.Views"
         xmlns:bctl="using:ChartBuilder.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -37,11 +38,6 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="16" />
             <Setter Property="Spacing" Value="4" />
-        </Style>
-        <!-- A finding's row, with a bar on its left coloured by how serious it is (Styles/Severity.axaml). -->
-        <Style Selector="Border.finding">
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
         <!-- The message bar: flat, one line, and clickable anywhere to open Messages, like Chart Packer's job summary
              line. -->
@@ -525,38 +521,38 @@
                                    Classes="muted"
                                    FontSize="12"
                                    Margin="12,8,12,4"
-                                   Text="{Binding Findings.Summary}" />
-                        <Panel>
-                            <TextBlock Classes="muted centered"
-                                       FontSize="12"
-                                       Margin="12"
-                                       TextWrapping="Wrap"
-                                       Text="{x:Static res:Strings.FindingsNone}"
-                                       IsVisible="{Binding !Findings.HasFindings}" />
-                            <ScrollViewer IsVisible="{Binding Findings.HasFindings}">
-                                <ItemsControl Margin="8,0,8,8" ItemsSource="{Binding Findings.Items}" ItemTemplate="{StaticResource FindingItemTemplate}" />
-                            </ScrollViewer>
-                        </Panel>
+                                   Text="{Binding Findings.Issues.Summary}" />
+                        <uiviews:ChartIssuesView DataContext="{Binding Findings.Issues}" />
                     </DockPanel>
                 </TabItem>
                 <TabItem Header="{x:Static res:Strings.PendingChangesTab}">
-                    <ScrollViewer>
-                        <StackPanel Margin="12,8" Spacing="6">
-                            <TextBlock Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
-                            <TextBlock Classes="muted"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Text="{x:Static res:Strings.PendingChangesNone}"
-                                       IsVisible="{Binding !HasPendingChanges}" />
-                            <ItemsControl ItemsSource="{Binding PendingChanges}" IsVisible="{Binding HasPendingChanges}">
+                    <!-- The list virtualizes, in its own scroller, with the heading above it and the hint below. -->
+                    <DockPanel Margin="12,8">
+                        <TextBlock DockPanel.Dock="Top" Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
+                        <TextBlock DockPanel.Dock="Top"
+                                   Classes="muted"
+                                   FontSize="12"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="{x:Static res:Strings.PendingChangesNone}"
+                                   IsVisible="{Binding !HasPendingChanges}" />
+                        <TextBlock DockPanel.Dock="Bottom"
+                                   Classes="muted"
+                                   FontSize="12"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="{x:Static res:Strings.PendingChangesHint}"
+                                   IsVisible="{Binding HasPendingChanges}" />
+                        <ScrollViewer Margin="0,6,0,0" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasPendingChanges}">
+                            <ItemsControl ItemsSource="{Binding PendingChanges}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <StackPanel Spacing="2" />
+                                        <VirtualizingStackPanel />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:PendingChangeItem">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" ToolTip.Tip="{Binding Reason}">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,2" ToolTip.Tip="{Binding Reason}">
                                             <SelectableTextBlock Grid.Column="0"
                                                                  FontSize="12"
                                                                  VerticalAlignment="Center"
@@ -581,13 +577,8 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock Classes="muted"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Text="{x:Static res:Strings.PendingChangesHint}"
-                                       IsVisible="{Binding HasPendingChanges}" />
-                        </StackPanel>
-                    </ScrollViewer>
+                        </ScrollViewer>
+                    </DockPanel>
                 </TabItem>
                 <!-- The highway preview (charter-spec C18), docked; it also opens in a window of its own. -->
                 <TabItem Header="{x:Static res:Strings.PreviewTab}">

@@ -91,6 +91,7 @@ namespace ChartBuilder.Services
             new AvaloniaConfirmationService(() => editor),
             new AvaloniaFolderPickerService(() => editor),
             new AvaloniaImagePickerService(() => editor),
+            new AvaloniaChartIssuesWindowService(() => editor),
             new AvaloniaFirstSaveDialogService(() => editor),
             new AvaloniaMessagesDialogService(() => editor),
             openOutput,

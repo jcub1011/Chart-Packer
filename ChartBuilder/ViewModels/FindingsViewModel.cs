@@ -9,11 +9,11 @@ using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Lint;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Validation;
 using ChartPacker.Core.Validation.QuickFixes;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Serilog;
 
 namespace ChartBuilder.ViewModels
@@ -21,43 +21,24 @@ namespace ChartBuilder.ViewModels
     /// <summary>A mark on the bottom timeline for a finding: where it is in audio time, and how serious.</summary>
     public readonly record struct FindingMark(double Seconds, Severity Severity);
 
-    /// <summary>A row of the findings panel: a lint finding, where it is, and how to go there or fix it.</summary>
-    public sealed class FindingItem(Finding finding, string where, bool canFix, Action<Finding> goTo, Action<Finding> fix)
-    {
-        public Finding Finding => finding;
-
-        public string RuleId => finding.RuleId;
-
-        public string Message => finding.Message;
-
-        /// <summary>Where it is: the part and difficulty, and the measure and beat.</summary>
-        public string Where => where;
-
-        public bool IsError => finding.Severity == Severity.Error;
-
-        public bool IsWarning => finding.Severity == Severity.Warning;
-
-        public bool IsInfo => finding.Severity == Severity.Info;
-
-        /// <summary>Whether it has a quick fix to offer: a chart command, or a pending change to restore.</summary>
-        public bool CanFix => canFix;
-
-        public IRelayCommand GoToCommand { get; } = new RelayCommand(() => goTo(finding));
-
-        public IRelayCommand FixCommand { get; } = new RelayCommand(() => fix(finding));
-    }
-
     /// <summary>
     /// The findings panel (charter-spec C3 item 5, C16): the chart linted as it's edited, off the UI thread on a snapshot,
     /// each finding linked to its place in the chart, with its quick fix where it has one. The bottom timeline marks them.
     /// </summary>
     /// <remarks>
-    /// Edits are linted a moment after they stop, so typing isn't held up, and never in the middle of a drag, whose
-    /// preview isn't on the undo stack. Only what each edit touched is checked again (<see cref="ChartLintScheduler"/>).
+    /// <para>Edits are linted a moment after they stop, so typing isn't held up, and never in the middle of a drag, whose
+    /// preview isn't on the undo stack. Only what each edit touched is checked again (<see cref="ChartLintScheduler"/>).</para>
+    /// <para>The findings are listed by <see cref="Issues"/>, which keeps the rows of those still found, so a run of lint
+    /// only makes rows for what changed, and the lists showing them only make the rows on screen.</para>
     /// </remarks>
     public sealed partial class FindingsViewModel : ViewModelBase, IDisposable
     {
         private static readonly TimeSpan Delay = TimeSpan.FromMilliseconds(150);
+
+        // The rules whose findings have a quick fix: CHR084's restores song_length's correction; CHR083's uses the
+        // suggested rating (charter-spec C18 item 3).
+        private static readonly HashSet<string> Fixable =
+            QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Append(ChrRules.Chr084).Append(ChrRules.Chr083).ToHashSet(StringComparer.Ordinal);
 
         private readonly EditorSong _song;
         private readonly ChartUndoStack _undo;
@@ -66,6 +47,7 @@ namespace ChartBuilder.ViewModels
         private readonly DispatcherTimer _timer;
         private readonly List<TaskCompletionSource> _settling = [];
         private ChartTrackKey? _focused;
+        private TempoMap? _shownMap;
         private bool _disposed;
 
         public FindingsViewModel(EditorSong song, ChartUndoStack undo, ChartEditorViewModel editor)
@@ -73,6 +55,7 @@ namespace ChartBuilder.ViewModels
             _song = song;
             _undo = undo;
             _editor = editor;
+            Issues.FileName = ChartFiles.MidiName;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = Delay };
             _timer.Tick += (_, _) => _ = RunAsync();
             _undo.Changed += OnChartChanged;
@@ -84,25 +67,17 @@ namespace ChartBuilder.ViewModels
 
         private static ILogger Logger => Log.ForContext<FindingsViewModel>();
 
-        /// <summary>The findings, in order: song-wide first, then by part, difficulty and tick.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasFindings), nameof(ErrorCount), nameof(WarningCount), nameof(InfoCount), nameof(Summary))]
-        public partial IReadOnlyList<FindingItem> Items { get; private set; } = [];
+        /// <summary>
+        /// The findings, grouped as the Findings tab and the chart issues window list them; in order within each group:
+        /// by part, difficulty and tick.
+        /// </summary>
+        public ChartIssuesViewModel Issues { get; } = new();
 
         /// <summary>The marks for the bottom timeline: the lane in focus's findings, and the song-wide ones.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<FindingMark> Marks { get; private set; } = [];
 
-        public bool HasFindings => Items.Count > 0;
-
-        public int ErrorCount => Items.Count(i => i.IsError);
-
-        public int WarningCount => Items.Count(i => i.IsWarning);
-
-        public int InfoCount => Items.Count(i => i.IsInfo);
-
-        /// <summary>The counts by severity, as the panel's summary.</summary>
-        public string Summary => string.Format(CultureInfo.CurrentCulture, Strings.FindingsSummaryFormat, ErrorCount, WarningCount, InfoCount);
+        public int ErrorCount => Issues.ErrorCount;
 
         /// <summary>Raised when the findings change.</summary>
         public event EventHandler? Changed;
@@ -127,7 +102,7 @@ namespace ChartBuilder.ViewModels
         {
             var focused = _editor.Session.Focused;
             var marks = new List<FindingMark>();
-            foreach (var item in Items)
+            foreach (var item in Issues.Items)
             {
                 var finding = item.Finding;
                 if (finding.Location is { } location)
@@ -141,7 +116,9 @@ namespace ChartBuilder.ViewModels
                 }
             }
 
-            Marks = marks;
+            // Only when they've changed, as the timeline is drawn again for new marks.
+            if (!marks.SequenceEqual(Marks))
+                Marks = marks;
         }
 
         public void Dispose()
@@ -247,13 +224,15 @@ namespace ChartBuilder.ViewModels
 
         private void Show(ChartLintResult result)
         {
-            var map = _song.Chart.TempoMap.ToTempoMap();
-            // CHR084's fix restores song_length's correction; CHR083's uses the suggested rating (charter-spec C18 item 3).
-            var fixable = QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Append(ChrRules.Chr084).Append(ChrRules.Chr083).ToHashSet(StringComparer.Ordinal);
+            // Where a finding is follows the tempo map, so after it changes no row is kept.
+            var map = _editor.Session.TempoMap;
+            bool reuse = ReferenceEquals(map, _shownMap);
+            _shownMap = map;
 
             // What the load left out of the chart file is listed too, until a save writes the file without it.
             var findings = ChartLoadFindings.Merge(result.Findings, ChartLoadFindings.Of(_song.Opened?.Load.Issues ?? []));
-            Items = [.. findings.Select(f => new FindingItem(f, WhereOf(f, map), fixable.Contains(f.RuleId), GoTo, Fix))];
+            Issues.Show(findings, static f => f, f => new FindingItem(f, finding => WhereOf(finding, map), Fixable.Contains(f.RuleId), GoTo, Fix), reuse);
+            OnPropertyChanged(nameof(ErrorCount));
             RefreshMarks();
             Changed?.Invoke(this, EventArgs.Empty);
         }

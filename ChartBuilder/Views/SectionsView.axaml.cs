@@ -55,16 +55,23 @@ namespace ChartBuilder.Views
             }
         }
 
-        // A row inserted to be renamed: once it's laid out, its name is selected to type over.
+        // A row inserted to be renamed: brought into view, as the list only makes the rows on screen, and once it's laid out,
+        // its name is selected to type over.
         private void OnEditRequested(object? sender, EventItem item) => Dispatcher.UIThread.Post(
             () =>
             {
-                var box = this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(b => b.Name == "NameBox" && ReferenceEquals(b.DataContext, item));
-                if (box is null)
-                    return;
-                box.BringIntoView();
-                box.Focus();
-                box.SelectAll();
+                EventList.ScrollIntoView(item);
+                Dispatcher.UIThread.Post(
+                    () =>
+                    {
+                        var box = EventList.ContainerFromItem(item)?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(b => b.Name == "NameBox");
+                        if (box is null)
+                            return;
+                        box.BringIntoView();
+                        box.Focus();
+                        box.SelectAll();
+                    },
+                    DispatcherPriority.Loaded);
             },
             DispatcherPriority.Loaded);
     }

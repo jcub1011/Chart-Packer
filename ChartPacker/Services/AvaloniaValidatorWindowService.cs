@@ -71,7 +71,8 @@ namespace ChartPacker.Services
                 songFiles,
                 confirmation,
                 saver,
-                isOpenInChartBuilder);
+                isOpenInChartBuilder,
+                new AvaloniaChartIssuesWindowService(() => dialog));
 
             // Songs are read as many at once as a library scan reads.
             int parallelism = Math.Max(settings.Settings.ScanParallelism, AppSettings.MinScanParallelism);

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting.Layout;
+using ChartPacker.Core.Charts;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
 
@@ -22,6 +23,9 @@ namespace ChartBuilder.ViewModels
     {
         private readonly EditorLaneViewModel _lane;
         private readonly Action<LaneAudioOptions> _keep;
+
+        // The source last resolved, and what from, as it's asked for every frame the lane is drawn.
+        private (EditorAudio Audio, LaneAudioOptions Options, ChartInstrument Instrument, AudioSource? Source)? _source;
 
         internal LaneAudioViewModel(EditorLaneViewModel lane, LaneAudioOptions options, Action<LaneAudioOptions> keep)
         {
@@ -43,7 +47,19 @@ namespace ChartBuilder.ViewModels
         public bool HasAudio => Audio?.HasAudio == true;
 
         /// <summary>The audio the lane is drawn over and its onsets come from, as picked; null without audio or a part.</summary>
-        public AudioSource? Source => Audio is { } audio && _lane.Track is { } track ? audio.SourceFor(Options, track.Instrument) : null;
+        public AudioSource? Source
+        {
+            get
+            {
+                if (Audio is not { } audio || _lane.Track is not { } track)
+                    return null;
+                if (_source is { } known && ReferenceEquals(known.Audio, audio) && ReferenceEquals(known.Options, Options) && known.Instrument == track.Instrument)
+                    return known.Source;
+                var source = audio.SourceFor(Options, track.Instrument);
+                _source = (audio, Options, track.Instrument, source);
+                return source;
+            }
+        }
 
         /// <summary>The audio picker's choices: the part's own stems, the mix, and each stem.</summary>
         public IReadOnlyList<AudioSourceChoice> SourceChoices =>

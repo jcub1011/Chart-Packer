@@ -415,4 +415,88 @@
   <data name="ValueForbidden" xml:space="preserve">
     <value>Values can't contain ; or line breaks.</value>
   </data>
+  <data name="ChartIssuesWindowTitle" xml:space="preserve">
+    <value>Chart issues</value>
+    <comment>The chart issues window's title before a song is named.</comment>
+  </data>
+  <data name="ChartIssuesWindowTitleFormat" xml:space="preserve">
+    <value>Chart issues · {0}</value>
+    <comment>{0} is the song.</comment>
+  </data>
+  <data name="ChartIssuesSummaryFormat" xml:space="preserve">
+    <value>{0} errors · {1} warnings · {2} info</value>
+  </data>
+  <data name="ChartIssuesErrorsFormat" xml:space="preserve">
+    <value>{0} errors</value>
+    <comment>A group's count of errors.</comment>
+  </data>
+  <data name="ChartIssuesWarningsFormat" xml:space="preserve">
+    <value>{0} warnings</value>
+    <comment>A group's count of warnings.</comment>
+  </data>
+  <data name="ChartIssuesInfosFormat" xml:space="preserve">
+    <value>{0} info</value>
+    <comment>A group's count of info findings.</comment>
+  </data>
+  <data name="ChartIssuesCountsSeparator" xml:space="preserve">
+    <value> · </value>
+    <comment>Between a group's counts.</comment>
+  </data>
+  <data name="ChartIssuesTheChart" xml:space="preserve">
+    <value>the chart</value>
+    <comment>Stands in for the chart file's name when it isn't known.</comment>
+  </data>
+  <data name="ChartIssuesNoneInFormat" xml:space="preserve">
+    <value>No warnings or errors in {0}</value>
+    <comment>{0} is the chart file, e.g. notes.mid.</comment>
+  </data>
+  <data name="ChartIssuesHeadlineFormat" xml:space="preserve">
+    <value>{0} warnings and {1} errors in {2}</value>
+    <comment>{2} is the chart file, e.g. notes.mid.</comment>
+  </data>
+  <data name="ChartIssuesHeadlineInfoFormat" xml:space="preserve">
+    <value>{0} · {1} info</value>
+    <comment>{0} is the headline; {1} the count of info findings.</comment>
+  </data>
+  <data name="ChartIssuesParsingGroup" xml:space="preserve">
+    <value>Reading the chart file</value>
+    <comment>The group of what reading the chart file left out.</comment>
+  </data>
+  <data name="ChartIssuesGeneralGroup" xml:space="preserve">
+    <value>Whole chart</value>
+    <comment>The group of findings about the chart as a whole, not one part.</comment>
+  </data>
+  <data name="ChartIssuesTrackGroupFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment>A part and difficulty's group: {0} the part, {1} the difficulty.</comment>
+  </data>
+  <data name="ChartIssuesViewButton" xml:space="preserve">
+    <value>View issues…</value>
+  </data>
+  <data name="ChartIssuesViewToolTip" xml:space="preserve">
+    <value>List every finding, by part and difficulty, in a window of its own</value>
+  </data>
+  <data name="ChartIssuesNone" xml:space="preserve">
+    <value>No findings: nothing the rules check for.</value>
+  </data>
+  <data name="ChartIssuesListName" xml:space="preserve">
+    <value>Chart issues</value>
+    <comment>The issues list's name, for screen readers.</comment>
+  </data>
+  <data name="ChartIssuesCloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="FindingGoToButton" xml:space="preserve">
+    <value>→</value>
+    <comment>A finding row's button that goes to where it is.</comment>
+  </data>
+  <data name="FindingGoToToolTip" xml:space="preserve">
+    <value>Go to it in the chart</value>
+  </data>
+  <data name="FindingFixButton" xml:space="preserve">
+    <value>Fix</value>
+  </data>
+  <data name="FindingFixToolTip" xml:space="preserve">
+    <value>Apply the quick fix, as one step to undo</value>
+  </data>
 </root>

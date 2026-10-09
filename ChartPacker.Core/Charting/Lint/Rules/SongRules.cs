@@ -7,10 +7,10 @@ using ChartPacker.Core.Validation;
 namespace ChartPacker.Core.Charting.Lint.Rules;
 
 /// <summary>
-/// CHR080: a part has notes on some difficulties and none on others. One finding for each empty difficulty, at its
-/// start.
+/// CHR080: a part is in the chart but has no notes on any difficulty. One finding for each empty part, at its start. A
+/// part charted on some difficulties and not others is fine: the games offer only those it has.
 /// </summary>
-public sealed class MissingDifficultyRule : IChartLintRule
+public sealed class EmptyPartRule : IChartLintRule
 {
     public string RuleId => ChrRules.Chr080;
 
@@ -26,15 +26,7 @@ public sealed class MissingDifficultyRule : IChartLintRule
         foreach (var part in context.Parts)
         {
             if (!part.HasNotes)
-                continue;
-            foreach (var track in part.Tracks)
-            {
-                if (track.Notes.Count == 0)
-                {
-                    string message = string.Format(CultureInfo.CurrentCulture, FindingMessages.ChrMissingDifficultyFormat, track.Difficulty);
-                    findings.Add(new Finding(RuleId, Severity, message, Location: new ChartLocation(part.Instrument, track.Difficulty, 0, 0)));
-                }
-            }
+                findings.Add(new Finding(RuleId, Severity, FindingMessages.ChrEmptyPart, Location: new ChartLocation(part.Instrument, null, 0, 0)));
         }
 
         return findings;

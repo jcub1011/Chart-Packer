@@ -381,9 +381,8 @@
   <data name="ChrNotesInBigRockEnding" xml:space="preserve">
     <value>Notes are inside a big rock ending, which the games skip.</value>
   </data>
-  <data name="ChrMissingDifficultyFormat" xml:space="preserve">
-    <value>The part has notes on some difficulties but none on {0}.</value>
-    <comment>{0} is the difficulty, e.g. Easy.</comment>
+  <data name="ChrEmptyPart" xml:space="preserve">
+    <value>The part is in the chart but has no notes on any difficulty.</value>
   </data>
   <data name="ChrLowerDifficultyDenserFormat" xml:space="preserve">
     <value>{0} has more notes per second ({1:0.0}) than {2} ({3:0.0}).</value>

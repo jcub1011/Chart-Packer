@@ -32,6 +32,9 @@ namespace ChartPacker.UI.Controls
         // How many pixels a picture may have across the lane, or along it.
         private const int MaxTilePixels = 4096;
 
+        // The decimal places the lane's scale is rounded to, which a frame's movement can't change.
+        private const int ScaleDigits = 6;
+
         // Pictures drawn pixel for pixel, not smoothed.
         private static readonly RenderOptions Sharp = new() { BitmapInterpolationMode = BitmapInterpolationMode.None, EdgeMode = EdgeMode.Aliased };
 
@@ -73,8 +76,10 @@ namespace ChartPacker.UI.Controls
                 return true;
 
             // Whole buckets to a bar, a power of two of them, on a grid from the song's start, so the bars keep their
-            // places as the lane moves and the same pictures do for any speed near this one.
-            int bucketsPerBar = (int)Math.Min(1 << 20, System.Numerics.BitOperations.RoundUpToPowerOf2((uint)Math.Max(1, Math.Ceiling(pixel / Math.Abs(perBucket)))));
+            // places as the lane moves and the same pictures do for any speed near this one. The lane's scale is rounded
+            // first: it's worked out from where it is, which changes every frame it moves, and the noise in that mustn't
+            // flip the bars or the pictures' size between frames.
+            int bucketsPerBar = (int)Math.Min(1 << 20, System.Numerics.BitOperations.RoundUpToPowerOf2((uint)Math.Max(1, Math.Ceiling(Math.Round(pixel / Math.Abs(perBucket), ScaleDigits)))));
             int bucketsPerTile = bucketsPerBar * BarsPerTile;
             int first = Math.Max(0, (int)Math.Floor(Math.Min(from, to) * perSecond));
             int end = Math.Min(waveform.ReadCount, (int)Math.Ceiling(Math.Max(from, to) * perSecond));
@@ -85,7 +90,7 @@ namespace ChartPacker.UI.Controls
             double half = (isVertical ? bounds.Width : bounds.Height) / 2;
 
             // The screen's pixels a picture covers: along the lane, for its bars, and across it.
-            int length = Math.Clamp((int)Math.Round(Math.Abs(perBucket) * bucketsPerTile / pixel), 1, MaxTilePixels);
+            int length = Math.Clamp((int)Math.Round(Math.Round(Math.Abs(perBucket) * bucketsPerTile / pixel, ScaleDigits)), 1, MaxTilePixels);
             int across = Math.Clamp((int)Math.Round(2 * half / pixel), 1, MaxTilePixels);
 
             // A picture spans its buckets along the lane, from its start, and levels from -1 to 1 across it: to the

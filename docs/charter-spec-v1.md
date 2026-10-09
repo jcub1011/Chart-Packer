@@ -1957,7 +1957,7 @@ merges the group into its first phrase.
 
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
-| CHR080 | Warning | A part has notes on some difficulties and none on others | Reduce ([C9](#c9-difficulty-authoring)) |
+| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is fine. | — |
 | CHR081 | Info | A lower difficulty has more chords per second than the one above it | — |
 | CHR082 | Info | The chart has no sections | — |
 | CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating |

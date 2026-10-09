@@ -76,7 +76,7 @@ namespace ChartBuilder.ViewModels
             Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);
             Sections = new SectionsViewModel(Editor);
-            Inspector = new ChartInspectorViewModel(song, _undo, Findings, services.ImagePicker);
+            Inspector = new ChartInspectorViewModel(song, _undo, Findings, services.ImagePicker, services.ChartIssues);
             Findings.Changed += (_, _) => RefreshSaveState();
             Editor.AudioAssist.ShowMessagesRequested += (_, _) => _ = ShowMessagesAsync();
             Song.Changed += OnSongChanged;
@@ -282,7 +282,7 @@ namespace ChartBuilder.ViewModels
         {
             if (e.Affected.TempoMapChanged)
                 Playback.RefreshTempoMap();
-            PendingChanges = PendingChangesOf();
+            RefreshPendingChanges();
             ChartSettings.Reload();
             UndoCommand.NotifyCanExecuteChanged();
             RedoCommand.NotifyCanExecuteChanged();
@@ -297,11 +297,31 @@ namespace ChartBuilder.ViewModels
         /// </summary>
         private void OnSongChanged(object? sender, EventArgs e)
         {
-            PendingChanges = PendingChangesOf();
+            RefreshPendingChanges();
             Editor.Session.SetSongSettings(Song.EffectivePairs(), Song.Delay);
             Playback.RefreshTempoMap();
             CountChange();
             RefreshSaveState();
+        }
+
+        /// <summary>Lists what's pending again, only when it's changed, so an edit that changes none of it doesn't remake the list.</summary>
+        private void RefreshPendingChanges()
+        {
+            var changes = Song.AllPendingChanges();
+            if (changes.Count == PendingChanges.Count)
+            {
+                bool same = true;
+                for (int i = 0; i < changes.Count && same; i++)
+                {
+                    var shown = PendingChanges[i];
+                    same = shown.Change == changes[i] && shown.IsReverted == (changes[i].CanRevert && Song.Reverted.Contains(changes[i].Key));
+                }
+
+                if (same)
+                    return;
+            }
+
+            PendingChanges = PendingChangesOf();
         }
 
         private IReadOnlyList<PendingChangeItem> PendingChangesOf() =>
