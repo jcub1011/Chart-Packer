@@ -102,6 +102,15 @@ namespace ChartBuilder.Services
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
 
+        /// <summary>Whether the editor was maximized when it last closed, so the next one opens maximized.</summary>
+        public bool EditorMaximized { get; set; }
+
+        /// <summary>
+        /// Where the middle of the launcher was, in screen pixels, when Chart Builder last closed (or of the editor, when
+        /// it closed with the app). The launcher opens there if that point is still on a screen. Null for where the OS puts it.
+        /// </summary>
+        public ScreenPoint? LauncherCenter { get; set; }
+
         /// <summary>The songs opened lately, the latest first, as the home screen lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
         public List<RecentSong> RecentSongs { get; set; } = [];
 
@@ -134,5 +143,13 @@ namespace ChartBuilder.Services
 
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = 1.4;
+    }
+
+    /// <summary>A point on the screens, in screen pixels.</summary>
+    public sealed class ScreenPoint
+    {
+        public int X { get; set; }
+
+        public int Y { get; set; }
     }
 }

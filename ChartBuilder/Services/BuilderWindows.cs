@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -48,6 +49,10 @@ namespace ChartBuilder.Services
         public void StartWith(BuilderArgs args)
         {
             var (launcher, viewModel) = CreateLauncher();
+
+            // Back where Chart Builder closed, if that's still on a screen.
+            if (settings.Settings.LauncherCenter is { } closedAt)
+                WindowPlacement.CenterOn(launcher, new PixelPoint(closedAt.X, closedAt.Y));
 
             // What the command line asks for (charter-spec §4.8) opens over the window once it's showing.
             launcher.Opened += OnOpened;
@@ -190,6 +195,14 @@ namespace ChartBuilder.Services
         {
             editor.DataContext = viewModel;
 
+            // The editor opens on the launcher's screen: centered over it, or maximized there if it last was.
+            var launcher = desktop.MainWindow;
+            var launcherCenter = launcher is null ? null : WindowPlacement.CenterOf(launcher);
+            if (launcherCenter is { } center)
+                WindowPlacement.CenterOn(editor, center);
+            if (settings.Settings.EditorMaximized)
+                editor.WindowState = WindowState.Maximized;
+
             // The song's audio and lock go with the window.
             editor.Closed += (_, _) => viewModel.Dispose();
 
@@ -224,12 +237,31 @@ namespace ChartBuilder.Services
             // opens while the editor is still closing, so the app, which exits when its last window closes, stays up.
             editor.Closing += (_, e) =>
             {
-                if (!e.Cancel && e.CloseReason is not (WindowCloseReason.ApplicationShutdown or WindowCloseReason.OSShutdown))
-                    Show(CreateLauncher().Window);
+                if (e.Cancel)
+                    return;
+
+                // A minimized editor doesn't say how it was shown.
+                if (editor.WindowState != WindowState.Minimized)
+                    settings.Settings.EditorMaximized = editor.WindowState is WindowState.Maximized or WindowState.FullScreen;
+
+                var returnTo = LauncherCenterAfter(editor, launcherCenter);
+                if (e.CloseReason is WindowCloseReason.ApplicationShutdown or WindowCloseReason.OSShutdown)
+                {
+                    // There's no launcher to bring back, so the next start opens where it would have been.
+                    RememberLauncherCenter(returnTo);
+                }
+                else
+                {
+                    var next = CreateLauncher().Window;
+                    if (returnTo is { } point)
+                        WindowPlacement.CenterOn(next, point);
+                    Show(next);
+                }
+
+                settings.Save();
             };
 
             // The launcher closes once the editor is showing, for the same reason.
-            var launcher = desktop.MainWindow;
             Show(editor);
             launcher?.Close();
         }
@@ -246,7 +278,40 @@ namespace ChartBuilder.Services
                 lockFolder,
                 recovery);
             launcher.DataContext = viewModel;
+
+            // Where it is as Chart Builder closes is where it opens next time. Not when the editor takes its place,
+            // which is the main window by then.
+            launcher.Closing += (_, e) =>
+            {
+                if (e.Cancel || desktop.MainWindow != launcher)
+                    return;
+                RememberLauncherCenter(WindowPlacement.CenterOf(launcher));
+                settings.Save();
+            };
             return (launcher, viewModel);
+        }
+
+        /// <summary>
+        /// Where the launcher comes back once <paramref name="editor"/> closes: where it was before (<paramref name="home"/>),
+        /// unless the editor was moved to another screen, when it's centered over the editor there.
+        /// </summary>
+        private static PixelPoint? LauncherCenterAfter(Window editor, PixelPoint? home)
+        {
+            var center = WindowPlacement.CenterOf(editor);
+            if (home is not { } was)
+                return center;
+            if (center is not { } now)
+                return was;
+
+            var screen = WindowPlacement.ScreenOf(editor, now);
+            return screen is not null && WindowPlacement.ScreenOf(editor, was) is { } before && before.Bounds == screen.Bounds ? was : now;
+        }
+
+        /// <summary>Keeps <paramref name="center"/> for the launcher to open at next time, if there is one. Saved by the caller.</summary>
+        private void RememberLauncherCenter(PixelPoint? center)
+        {
+            if (center is { } point)
+                settings.Settings.LauncherCenter = new ScreenPoint { X = point.X, Y = point.Y };
         }
 
         private void Show(Window window)
