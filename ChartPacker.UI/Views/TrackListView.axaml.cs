@@ -3,6 +3,9 @@ using System.Linq;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using ChartPacker.UI.ViewModels;
 
 namespace ChartPacker.UI.Views
@@ -60,6 +63,7 @@ namespace ChartPacker.UI.Views
         public TrackListView()
         {
             InitializeComponent();
+            AddHandler(ContextRequestedEvent, OnRowContextRequested, RoutingStrategies.Tunnel);
         }
 
         /// <summary>The tracks, a row each.</summary>
@@ -171,20 +175,27 @@ namespace ChartPacker.UI.Views
                 Classes.Set("compact", false);
         }
 
-        // The menu is a popup of its own, out of reach of bindings to this control, so its actions are set as it opens.
-        private void OnTrackMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+        // The menu is a popup of its own, out of reach of bindings to this control, so its actions are set as a row asks for
+        // it, on the way down, before the menu opens. Not as it opens: the first time it opens it isn't yet in the row's
+        // tree, so it hasn't the row as its DataContext, and its actions would do nothing.
+        private void OnRowContextRequested(object? sender, ContextRequestedEventArgs e)
         {
-            if (sender is ContextMenu { DataContext: TrackRowViewModel row } menu)
-                SetUpMenu(menu, row, e, ("replace", ReplaceTrackCommand), ("remove", RemoveTrackCommand));
+            if ((e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<Border>().FirstOrDefault(b => b.ContextMenu is not null) is not { ContextMenu: { } menu } border)
+                return;
+            if (border.DataContext is TrackRowViewModel row)
+                SetUpMenu(menu, row, ("replace", ReplaceTrackCommand), ("remove", RemoveTrackCommand));
+            else if (border.DataContext is RemovedTrackRow removed)
+                SetUpMenu(menu, removed, ("restore", RestoreTrackCommand));
         }
 
-        private void OnRemovedTrackMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+        // A menu with nothing on it isn't shown at all.
+        private void OnRowMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (sender is ContextMenu { DataContext: RemovedTrackRow row } menu)
-                SetUpMenu(menu, row, e, ("restore", RestoreTrackCommand));
+            if (sender is ContextMenu menu && !menu.Items.OfType<MenuItem>().Any(i => i.IsVisible))
+                e.Cancel = true;
         }
 
-        private void SetUpMenu(ContextMenu menu, object row, System.ComponentModel.CancelEventArgs e, params (string Tag, ICommand? Command)[] actions)
+        private void SetUpMenu(ContextMenu menu, object row, params (string Tag, ICommand? Command)[] actions)
         {
             bool shown = CanEdit && ActionsInContextMenu;
             foreach (var item in menu.Items.OfType<MenuItem>())
@@ -195,10 +206,6 @@ namespace ChartPacker.UI.Views
                 item.CommandParameter = row;
                 item.IsVisible = shown && action.Command is not null;
             }
-
-            // A menu with nothing on it isn't shown at all.
-            if (!menu.Items.OfType<MenuItem>().Any(i => i.IsVisible))
-                e.Cancel = true;
         }
     }
 }

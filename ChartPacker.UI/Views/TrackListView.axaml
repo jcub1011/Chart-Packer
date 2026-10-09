@@ -93,7 +93,7 @@
                     <!-- Transparent so the whole row, gaps and waveform included, takes a right-click. -->
                     <Border Classes="trackRow kept">
                         <Border.ContextMenu>
-                            <ContextMenu Opening="OnTrackMenuOpening">
+                            <ContextMenu Opening="OnRowMenuOpening">
                                 <MenuItem Tag="replace" Header="{x:Static res:SharedStrings.ReplaceTrackToolTip}" />
                                 <MenuItem Tag="remove" Header="{x:Static res:SharedStrings.RemoveTrackToolTip}" />
                                 <MenuItem Header="{Binding DownloadHeader}"
@@ -202,7 +202,7 @@
                     <!-- As tall as a track row, which its switches and slider set, so the list keeps its rhythm. -->
                     <Border Classes="trackRow removedTrack">
                         <Border.ContextMenu>
-                            <ContextMenu Opening="OnRemovedTrackMenuOpening">
+                            <ContextMenu Opening="OnRowMenuOpening">
                                 <MenuItem Tag="restore" Header="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}" />
                             </ContextMenu>
                         </Border.ContextMenu>

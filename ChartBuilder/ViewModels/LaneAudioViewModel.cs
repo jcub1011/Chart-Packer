@@ -5,6 +5,7 @@ using System.Linq;
 using ChartBuilder.Resources;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Scanning;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
 
@@ -24,8 +25,12 @@ namespace ChartBuilder.ViewModels
         private readonly EditorLaneViewModel _lane;
         private readonly Action<LaneAudioOptions> _keep;
 
-        // The source last resolved, and what from, as it's asked for every frame the lane is drawn.
-        private (EditorAudio Audio, LaneAudioOptions Options, ChartInstrument Instrument, AudioSource? Source)? _source;
+        // The source last resolved, and what from, as it's asked for every frame the lane is drawn. The tracks are part of
+        // it, as the audio takes new ones in place when a track is added or removed.
+        private (EditorAudio Audio, IReadOnlyList<SongTrack> Tracks, LaneAudioOptions Options, ChartInstrument Instrument, AudioSource? Source)? _source;
+
+        // The picker's choices, made again only when they change: a new list clears the picker's selection first.
+        private IReadOnlyList<AudioSourceChoice> _choices = [];
 
         internal LaneAudioViewModel(EditorLaneViewModel lane, LaneAudioOptions options, Action<LaneAudioOptions> keep)
         {
@@ -53,17 +58,17 @@ namespace ChartBuilder.ViewModels
             {
                 if (Audio is not { } audio || _lane.Track is not { } track)
                     return null;
-                if (_source is { } known && ReferenceEquals(known.Audio, audio) && ReferenceEquals(known.Options, Options) && known.Instrument == track.Instrument)
+                if (_source is { } known && ReferenceEquals(known.Audio, audio) && ReferenceEquals(known.Tracks, audio.Tracks)
+                    && ReferenceEquals(known.Options, Options) && known.Instrument == track.Instrument)
                     return known.Source;
                 var source = audio.SourceFor(Options, track.Instrument);
-                _source = (audio, Options, track.Instrument, source);
+                _source = (audio, audio.Tracks, Options, track.Instrument, source);
                 return source;
             }
         }
 
         /// <summary>The audio picker's choices: the part's own stems, the mix, and each stem.</summary>
-        public IReadOnlyList<AudioSourceChoice> SourceChoices =>
-            Audio is { } audio && _lane.Track is { } track ? AudioSource.ChoicesFor(track.Instrument, audio.Tracks) : [];
+        public IReadOnlyList<AudioSourceChoice> SourceChoices => _choices;
 
         public AudioSourceChoice? SelectedSource
         {
@@ -199,7 +204,17 @@ namespace ChartBuilder.ViewModels
         public void ToggleBackdrop() => Set(Options with { Backdrop = IsWaveform ? LaneBackdrop.Spectrogram : LaneBackdrop.Waveform });
 
         /// <summary>Takes in the lane's part, the song's audio or the setting, which change the choices and what's shown.</summary>
-        internal void Refresh() => RaiseAll();
+        internal void Refresh()
+        {
+            var choices = Audio is { } audio && _lane.Track is { } track ? AudioSource.ChoicesFor(track.Instrument, audio.Tracks) : [];
+            if (!choices.SequenceEqual(_choices))
+            {
+                _choices = choices;
+                OnPropertyChanged(nameof(SourceChoices));
+            }
+
+            RaiseAll();
+        }
 
         private void Set(LaneAudioOptions options)
         {
@@ -217,7 +232,6 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(Options));
             OnPropertyChanged(nameof(HasAudio));
             OnPropertyChanged(nameof(Source));
-            OnPropertyChanged(nameof(SourceChoices));
             OnPropertyChanged(nameof(SelectedSource));
             OnPropertyChanged(nameof(Backdrop));
             OnPropertyChanged(nameof(IsWaveform));

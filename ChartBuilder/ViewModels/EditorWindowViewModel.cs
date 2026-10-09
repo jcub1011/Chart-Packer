@@ -48,7 +48,8 @@ namespace ChartBuilder.ViewModels
         // The copies of the files saves replace or remove, kept for undo; made by the first save that needs one.
         private MediaStash? _stash;
 
-        // How long the tracks must be still before the audio is opened again, so a burst of undos opens it once.
+        // How long the tracks must be still before the audio is opened again, so a burst of undos opens it once. Its timer
+        // isn't at background priority, which the lanes' redraws as their audio is read could hold off for seconds.
         private static readonly TimeSpan TracksDelay = TimeSpan.FromMilliseconds(250);
 
         private EditorWindowViewModel(EditorServices services, EditorSong song, SongLock? songLock, bool startsSaved = true)
@@ -69,7 +70,7 @@ namespace ChartBuilder.ViewModels
             Metadata = new ChartMetadataViewModel(song, ApplyChartSettings);
             Tracks = new EditorTracksViewModel(song, Playback, services.FilePicker, ApplyChartSettings);
             Art = new ArtViewModel(song, services.ImagePicker, services.FilePicker, ApplyChartSettings, Playback.Clock);
-            _tracksTimer = new DispatcherTimer(TracksDelay, DispatcherPriority.Background, (_, _) => _ = ReloadAudioAsync());
+            _tracksTimer = new DispatcherTimer(TracksDelay, DispatcherPriority.Normal, (_, _) => _ = ReloadAudioAsync());
             _tracksTimer.Stop();
             PendingChanges = PendingChangesOf();
             Title = TitleOf();

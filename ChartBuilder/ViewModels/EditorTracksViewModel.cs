@@ -30,6 +30,7 @@ namespace ChartBuilder.ViewModels
         private readonly CancellationTokenSource _closing = new();
         private readonly Dictionary<string, RelayCommand> _addCommands = [];
         private CancellationTokenSource? _sizesCts;
+        private IReadOnlyList<TrackRowViewModel> _rows = [];
 
         /// <param name="song">The song open.</param>
         /// <param name="playback">Plays the tracks, and holds their rows and switches.</param>
@@ -49,11 +50,16 @@ namespace ChartBuilder.ViewModels
                 _addCommands[stem] = new RelayCommand(() => _ = SetTrackAsync(stem), () => CanEdit);
             _playback.PropertyChanged += OnPlaybackChanged;
             _song.Changed += OnSongChanged;
+            _song.TracksChanged += OnSongTracksChanged;
+            _rows = RowsNow();
             Refresh();
         }
 
-        /// <summary>The tracks, as they're played: a row each.</summary>
-        public IReadOnlyList<TrackRowViewModel> Tracks => _playback.Tracks;
+        /// <summary>
+        /// The tracks, as they're played: a row each. A track removed goes at once, rather than once the audio is opened
+        /// again without it, so its row isn't there to be removed again.
+        /// </summary>
+        public IReadOnlyList<TrackRowViewModel> Tracks => _rows;
 
         /// <summary>The song's tracks a pending change removes, and nothing replaces.</summary>
         [ObservableProperty]
@@ -83,6 +89,7 @@ namespace ChartBuilder.ViewModels
             _sizesCts?.Cancel();
             _playback.PropertyChanged -= OnPlaybackChanged;
             _song.Changed -= OnSongChanged;
+            _song.TracksChanged -= OnSongTracksChanged;
         }
 
         /// <summary>Asks for a file to put in place of <paramref name="row"/>'s track, as Add track does for its stem.</summary>
@@ -147,13 +154,30 @@ namespace ChartBuilder.ViewModels
         private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(PlaybackViewModel.Tracks))
-            {
-                OnPropertyChanged(nameof(Tracks));
-                _ = ShowSizesAsync();
-            }
+                RefreshRows();
         }
 
         private void OnSongChanged(object? sender, EventArgs e) => Refresh();
+
+        private void OnSongTracksChanged(object? sender, EventArgs e) => RefreshRows();
+
+        /// <summary>Shows the rows of the tracks played that the song still has, when they've changed.</summary>
+        private void RefreshRows()
+        {
+            var rows = RowsNow();
+            if (rows.SequenceEqual(_rows))
+                return;
+            _rows = rows;
+            OnPropertyChanged(nameof(Tracks));
+            _ = ShowSizesAsync();
+        }
+
+        // By stem, so a track replaced or saved keeps its row until the audio is opened again with the one in its place.
+        private List<TrackRowViewModel> RowsNow()
+        {
+            var stems = _song.Tracks.Select(t => t.Stem).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return [.. _playback.Tracks.Where(r => stems.Contains(r.Track.Stem))];
+        }
 
         /// <summary>Lists the tracks removed and labels Add track, as the song's tracks are now.</summary>
         private void Refresh()
