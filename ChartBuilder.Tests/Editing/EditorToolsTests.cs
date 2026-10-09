@@ -18,31 +18,119 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void PlacePutsANoteOnTheGridAsOneStep(LaneView view)
+    public void PlacePutsANoteOnTheGridAsOneStepAndSelectsNothing(LaneView view)
     {
         var session = Of(Guitar());
+        Expert(session).Notes.Add(new EditableNote(960, 1, 0));
+        session.Selection.Select(GuitarExpert, Expert(session).Notes);
         session.Tool = EditorTool.Place;
 
         Click(session, At(session, 130, 2, view));
 
-        Assert.AreSequenceEqual([new EditableNote(120, EditableNote.PlainLength, 2)], Expert(session).Notes.ToList());
+        Assert.AreSequenceEqual([new EditableNote(120, EditableNote.PlainLength, 2), new EditableNote(960, 1, 0)], Expert(session).Notes.ToList());
         Assert.AreEqual(1, session.UndoStack.UndoCount);
-        Assert.AreSequenceEqual([new NotePlace(120, 2)], session.Selection.Places.ToList());
+        Assert.IsTrue(session.Selection.IsEmpty);
     }
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void DraggingWhilePlacingDrawsOutTheSustain(LaneView view)
+    public void DraggingWhilePlacingLaysARunOnTheGridAsOneStep(LaneView view)
     {
         var session = Of(Guitar());
         session.Tool = EditorTool.Place;
 
         DragFromTo(session, At(session, 120, 1, view), At(session, 500, 1, view));
 
-        Assert.AreSequenceEqual([new EditableNote(120, 360, 1)], Expert(session).Notes.ToList());
+        Assert.AreSequenceEqual([.. new long[] { 120, 240, 360, 480 }.Select(t => new EditableNote(t, 1, 1))], Expert(session).Notes.ToList());
         Assert.AreEqual(1, session.UndoStack.UndoCount);
+        Assert.IsTrue(session.Selection.IsEmpty);
         session.Undo();
         Assert.IsEmpty(Expert(session).Notes);
+    }
+
+    [TestMethod]
+    public void ARunPlacedGoesBackDraggedBackAndLeavesOutNotesAlreadyThere()
+    {
+        var session = Of(Guitar());
+        EditableNote there = new(240, 480, 1);
+        Expert(session).Notes.Add(there);
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 480, 1), At(session, 120, 1));
+
+        Assert.AreSequenceEqual([new EditableNote(120, 1, 1), there, new EditableNote(360, 1, 1), new EditableNote(480, 1, 1)], Expert(session).Notes.ToList());
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void CtrlDraggingWhilePlacingDrawsOutTheSustain(LaneView view)
+    {
+        var session = Of(Guitar());
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 120, 1, view), At(session, 500, 1, view), EditorModifiers.Control);
+
+        Assert.AreSequenceEqual([new EditableNote(120, 360, 1)], Expert(session).Notes.ToList());
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+        Assert.IsTrue(session.Selection.IsEmpty);
+    }
+
+    [TestMethod]
+    public void CtrlPressedOrLetGoWhilePlacingSwitchesBetweenTheSustainAndTheRun()
+    {
+        var session = Of(Guitar());
+        session.Tool = EditorTool.Place;
+
+        session.Tools.Press(At(session, 0, 1));
+        session.Tools.Drag(At(session, 240, 1));
+        Assert.HasCount(3, Expert(session).Notes);
+        session.Tools.Drag(At(session, 240, 1), EditorModifiers.Control);
+        Assert.AreSequenceEqual([new EditableNote(0, 240, 1)], Expert(session).Notes.ToList());
+        session.Tools.Drag(At(session, 360, 1));
+        session.Tools.Release(At(session, 360, 1));
+
+        Assert.AreSequenceEqual([.. new long[] { 0, 120, 240, 360 }.Select(t => new EditableNote(t, 1, 1))], Expert(session).Notes.ToList());
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void AltCtrlDraggingWhilePlacingDrawsOutAnOpenSustain(LaneView view)
+    {
+        var session = Of(Guitar());
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 0, 3, view), At(session, 480, 3, view), EditorModifiers.Alt | EditorModifiers.Control);
+
+        Assert.AreSequenceEqual([new EditableNote(0, 480, Open)], Expert(session).Notes.ToList());
+    }
+
+    [TestMethod]
+    public void AltDraggingWhilePlacingOnDrumsLaysARunOfKicks()
+    {
+        var session = Of(Drums(), focused: DrumsExpert);
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 0, 2, key: DrumsExpert), At(session, 240, 2, key: DrumsExpert), EditorModifiers.Alt);
+
+        var track = session.Chart.PartOf(ChartInstrument.Drums)![ChartDifficulty.Expert];
+        Assert.AreSequenceEqual([.. new long[] { 0, 120, 240 }.Select(t => new EditableNote(t, 1, 0))], track.Notes.ToList());
+    }
+
+    [TestMethod]
+    public void CtrlDraggingWhilePlacingOnDrumsPlacesThePadAloneAndSaysWhy()
+    {
+        var session = Of(Drums(), focused: DrumsExpert);
+        session.Tool = EditorTool.Place;
+
+        session.Tools.Press(At(session, 0, 2, key: DrumsExpert), EditorModifiers.Control);
+        session.Tools.Drag(At(session, 480, 2, key: DrumsExpert), EditorModifiers.Control);
+        Assert.IsNotNull(session.Status);
+        session.Tools.Release(At(session, 480, 2, key: DrumsExpert));
+
+        var track = session.Chart.PartOf(ChartInstrument.Drums)![ChartDifficulty.Expert];
+        Assert.AreSequenceEqual([new EditableNote(0, 1, 2)], track.Notes.ToList());
     }
 
     [TestMethod]
@@ -53,9 +141,9 @@ public sealed class EditorToolsTests
         var session = Of(Guitar());
         session.Tool = EditorTool.Place;
         Click(session, At(session, 0, 1, view));
-        Click(session, At(session, 480, 1, view), EditorModifiers.Control);
+        Click(session, At(session, 480, 1, view), EditorModifiers.Alt);
 
-        Click(session, At(session, 0, 0, view), EditorModifiers.Control);
+        Click(session, At(session, 0, 0, view), EditorModifiers.Alt);
         Click(session, At(session, 480, 3, view));
 
         Assert.AreSequenceEqual(
@@ -66,14 +154,61 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void ShiftWithThePlaceToolPlacesInTheColumnClicked(LaneView view)
+    public void ShiftWithThePlaceToolSelectsAfreshAndPlacesNothing(LaneView view)
     {
         var session = Of(Guitar());
+        EditableNote first = new(0, 1, 2), second = new(480, 1, 3), third = new(960, 1, 1);
+        Expert(session).Notes.Add(first);
+        Expert(session).Notes.Add(second);
+        Expert(session).Notes.Add(third);
+        session.Selection.Select(GuitarExpert, [third]);
         session.Tool = EditorTool.Place;
 
         Click(session, At(session, 0, 2, view), EditorModifiers.Shift);
+        Assert.AreSequenceEqual([first], session.Selection.Notes.ToList(), "The first press with Shift held selects afresh.");
+        Click(session, At(session, 480, 3, view), EditorModifiers.Shift);
+        Assert.AreSequenceEqual([first, second], session.Selection.Notes.ToList(), "Those after it, with Shift still held, add.");
+        Click(session, At(session, 700, 2, view), EditorModifiers.Shift);
+        Assert.HasCount(2, session.Selection.Notes, "A click in an empty place, with Shift held, keeps what's selected.");
 
-        Assert.AreSequenceEqual([new EditableNote(0, 1, 2)], Expert(session).Notes.ToList());
+        session.Tools.HoldKeys(EditorModifiers.None);
+        Click(session, At(session, 960, 1, view), EditorModifiers.Shift);
+        Assert.AreSequenceEqual([third], session.Selection.Notes.ToList(), "Shift let go and held again selects afresh.");
+
+        Assert.HasCount(3, Expert(session).Notes);
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void AShiftBoxWithThePlaceToolSelectsAfresh(LaneView view)
+    {
+        var session = Of(Guitar());
+        EditableNote inside = new(480, 1, 1), outside = new(1920, 1, 1);
+        Expert(session).Notes.Add(inside);
+        Expert(session).Notes.Add(outside);
+        session.Selection.Select(GuitarExpert, [outside]);
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 400, 0, view), At(session, 800, 2, view), EditorModifiers.Shift);
+
+        Assert.AreSequenceEqual([inside], session.Selection.Notes.ToList());
+        Assert.HasCount(2, Expert(session).Notes);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void ShiftWithTheSelectToolStillAddsToTheSelection(LaneView view)
+    {
+        var session = Of(Guitar());
+        EditableNote first = new(0, 1, 2), second = new(480, 1, 3);
+        Expert(session).Notes.Add(first);
+        Expert(session).Notes.Add(second);
+        session.Selection.Select(GuitarExpert, [first]);
+
+        Click(session, At(session, 480, 3, view), EditorModifiers.Shift);
+
+        Assert.AreSequenceEqual([first, second], session.Selection.Notes.ToList());
     }
 
     [TestMethod]
@@ -169,9 +304,9 @@ public sealed class EditorToolsTests
         track.Notes.Add(new EditableNote(0, 1, 0));
         track.Notes.Add(new EditableNote(240, 1, 1));
 
-        // Selected with the tool picked, as Ctrl+A selects: leaving the select tool selects nothing.
-        session.Tool = EditorTool.Sustain;
+        // Selected before the tool is picked: changing tools keeps the selection.
         session.Selection.Select(GuitarExpert, track.Notes);
+        session.Tool = EditorTool.Sustain;
 
         DragFromTo(session, At(session, 0, 0, view), At(session, 950, 0, view));
 
@@ -232,6 +367,7 @@ public sealed class EditorToolsTests
 
         session.Tools.ToggleNoteAtCursor(2);
         Assert.AreSequenceEqual([new EditableNote(960, 1, 2)], Expert(session).Notes.ToList());
+        Assert.IsTrue(session.Selection.IsEmpty, "A note placed leaves nothing selected.");
         session.Tools.ToggleNoteAtCursor(Open);
         Assert.AreSequenceEqual([new EditableNote(960, 1, Open), new EditableNote(960, 1, 2)], Expert(session).Notes.ToList(), "An open joins the chord.");
         session.Tools.ToggleNoteAtCursor(2);

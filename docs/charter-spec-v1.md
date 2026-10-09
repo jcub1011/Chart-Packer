@@ -952,7 +952,7 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **Lanes:** green, red, yellow, blue and orange, plus **open**, which is drawn across the whole
-   highway. *Settled in CM2:* on a highway, the Place tool puts an open note with Ctrl-click or
+   highway. *Settled in CM2:* on a highway, the Place tool puts an open note with Alt-click or
    `0`. A timeline gives open notes a row of their own.
 2. **Chords:** several frets on one tick. An open note can be placed in a chord with frets, and a
    fret on an open: YARG plays them, and charts in the wild have them. Such a chord is still flagged
@@ -960,7 +960,9 @@ Acceptance criteria:
    read it, so the read-back check still passes and the chart can be saved
    ([§4.3](#43-writing-midichartwriter)).
 3. **Sustains:**
-   - A sustain is drawn by dragging the note's tail, or set with the sustain tool.
+   - A sustain is drawn by dragging the note's tail, by placing a note with a Ctrl-drag, or set
+     with the sustain tool; the selected notes' sustains change by a Ctrl-drag on one of them or a
+     right-drag ([§9](#9-keyboard-shortcuts)).
    - Sustains snap to the grid.
    - A sustain shorter than the song's sustain cutoff (`sustain_cutoff_threshold`, otherwise a
      third of a beat in MIDI) is drawn as a plain note with a dashed tail, because that's how the
@@ -1695,7 +1697,8 @@ Acceptance criteria:
 
 1. **Undo and redo** (Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z) for every change, tempo map included.
 2. **Selection**:
-   - click, Shift+click, and box select;
+   - click, Shift+click, and box select; holding Shift gives any tool the select tool's press on
+     a highway, the first press while it's held selecting afresh;
    - select a time range across lanes;
    - select a whole lane;
    - select everything in a section.
@@ -2404,7 +2407,7 @@ These are the defaults. Rebinding is future work.
 | `Alt`+`Shift`+arrows across | Shift the selected notes a lane, each stopping at the edge |
 | `Alt`+`→` / `←`, `Alt`+`↑` / `↓` (vocal lane) | Move the selected vocal notes one grid step, or one semitone |
 | `Alt`+`Shift`+`↑` / `↓` (vocal lane) | Move the selected vocal notes an octave |
-| `Alt`+drag | Select a time range across the lanes shown |
+| `Alt`+drag (Select tool, not on a selected note) | Select a time range across the lanes shown |
 | `PgUp` / `PgDn` | Move the cursor one measure |
 | `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
 | `[` / `]` | Coarser or finer snap |
@@ -2430,6 +2433,24 @@ These are the defaults. Rebinding is future work.
 | `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills, adding nothing; else clear the selection |
 | `F11` | In the preview's window, full screen on or off; Esc leaves it |
 | `Ctrl`+`S` | Save |
+
+Mouse gestures on a highway's lane (a vocal lane keeps its own, [C3](#c3-editor-layout) item 7).
+Switching tools keeps the selection; placing notes, by mouse or key, leaves nothing selected.
+
+| Gesture | Action |
+| ------- | ------ |
+| Place: click | Place a note |
+| Place: drag | Place a run of notes, one on every grid step to the pointer, leaving out places taken |
+| Place: `Ctrl`+drag | Place a note with a sustain to the pointer (not on drums) |
+| Place: `Alt` with any of these | An open note, or the kick, instead |
+| `Shift`+click or drag, any tool | Select, as the Select tool does; the first press while Shift is held selects afresh |
+| `Ctrl`+drag on a selected note | Lengthen or shorten each selected sustain by the same grid steps |
+| `Alt`+drag on a selected note | Lay a run of each selected note, as many grid steps as dragged |
+| Right-drag | Lengthen or shorten each selected sustain by the same grid steps |
+| `Ctrl`+right-drag | End every selected sustain at the pointer |
+| `Alt`+right-drag | Lay a run of each selected note up to the pointer |
+| Right-click | The note menu |
+| Middle-drag | Erase, whatever the tool |
 
 ## 10. Settings
 

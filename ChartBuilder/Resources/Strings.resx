@@ -1099,11 +1099,11 @@ Open it anyway?</value>
     <comment>A six-fret note's lane, with its column.</comment>
   </data>
   <data name="ToolSelectToolTip" xml:space="preserve">
-    <value>Select notes and drag them in time or across lanes; drag a tail to set a sustain; drag in an empty place to select a span. Click an empty place to clear the selection.</value>
+    <value>Select notes and drag them in time or across lanes; drag a tail to set a sustain; drag in an empty place to select a span. Click an empty place to clear the selection. On a selected note, Ctrl-drag lengthens or shortens each sustain and Alt-drag lays a run of each note. Right-drag sets the selected sustains (Ctrl: to end at the pointer; Alt: runs up to the pointer). Hold Shift with any tool to select.</value>
     <comment>The Select tool's tooltip.</comment>
   </data>
   <data name="ToolPlaceToolTip" xml:space="preserve">
-    <value>Click to place a note on the grid, and drag to draw out its sustain. Shift-click places an open note (the kick on drums).</value>
+    <value>Click to place a note on the grid, and drag to lay a run of notes; Ctrl-drag draws out a sustain instead. Hold Alt to place an open note (the kick on drums). Hold Shift to select instead.</value>
     <comment>The Place tool's tooltip.</comment>
   </data>
   <data name="ToolEraseToolTip" xml:space="preserve">
@@ -1111,7 +1111,7 @@ Open it anyway?</value>
     <comment>The Erase tool's tooltip.</comment>
   </data>
   <data name="ToolSustainToolTip" xml:space="preserve">
-    <value>Drag from a note to set how long it's held; with notes selected, sets them all.</value>
+    <value>Drag from a note to set how long it's held; with notes selected, sets them all to end at the pointer. Ctrl-drag a selected note to lengthen or shorten each sustain by the same amount.</value>
     <comment>The Sustain tool's tooltip.</comment>
   </data>
   <data name="ToolTempoToolTip" xml:space="preserve">

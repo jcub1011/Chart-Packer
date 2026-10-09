@@ -52,12 +52,21 @@ internal static class EditorSessions
         session.Tools.Release(point);
     }
 
-    /// <summary>Drags from one point to another through a point between them.</summary>
+    /// <summary>Drags from one point to another through a point between them, with <paramref name="modifiers"/> held throughout.</summary>
     public static void DragFromTo(EditorSession session, ChartPoint start, ChartPoint end, EditorModifiers modifiers = EditorModifiers.None)
     {
         session.Tools.Press(start, modifiers);
-        session.Tools.Drag(start with { Tick = (start.Tick + end.Tick) / 2 });
-        session.Tools.Drag(end);
+        session.Tools.Drag(start with { Tick = (start.Tick + end.Tick) / 2 }, modifiers);
+        session.Tools.Drag(end, modifiers);
+        session.Tools.Release(end);
+    }
+
+    /// <summary>Drags with the right button from one point to another through a point between them, with <paramref name="modifiers"/> held throughout.</summary>
+    public static void RightDragFromTo(EditorSession session, ChartPoint start, ChartPoint end, EditorModifiers modifiers = EditorModifiers.None)
+    {
+        session.Tools.PressContext(start, modifiers);
+        session.Tools.Drag(start with { Tick = (start.Tick + end.Tick) / 2 }, modifiers);
+        session.Tools.Drag(end, modifiers);
         session.Tools.Release(end);
     }
 
@@ -94,12 +103,12 @@ internal static class EditorSessions
         session.Tools.Release(point);
     }
 
-    /// <summary>Drags from one point in a vocal part's lane to another through a point between them.</summary>
+    /// <summary>Drags from one point in a vocal part's lane to another through a point between them, with <paramref name="modifiers"/> held throughout.</summary>
     public static void DragFromTo(EditorSession session, VocalPoint start, VocalPoint end, EditorModifiers modifiers = EditorModifiers.None)
     {
         session.Tools.Press(start, modifiers);
-        session.Tools.Drag(start with { Tick = (start.Tick + end.Tick) / 2 });
-        session.Tools.Drag(end);
+        session.Tools.Drag(start with { Tick = (start.Tick + end.Tick) / 2 }, modifiers);
+        session.Tools.Drag(end, modifiers);
         session.Tools.Release(end);
     }
 

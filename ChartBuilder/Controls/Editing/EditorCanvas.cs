@@ -782,9 +782,10 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// A press starts a gesture of the button pressed: the left button's of the current tool, the middle button's
-        /// erasing whatever the tool, and the right button's lengthening or shortening the selected notes, or opening the
-        /// note menu when it isn't dragged. Another button pressed while one's gesture goes on is ignored.
+        /// A press starts a gesture of the button pressed: the left button's of the current tool (with Shift, the select
+        /// tool's; with Ctrl or Alt on a selected note, its sustains or runs), the middle button's erasing whatever the
+        /// tool, and the right button's lengthening or shortening the selected notes, or laying runs of them with Alt, or
+        /// opening the note menu when it isn't dragged. Another button pressed while one's gesture goes on is ignored.
         /// </summary>
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
@@ -835,8 +836,10 @@ namespace ChartBuilder.Controls.Editing
             _isPressed = true;
             _lastPoint = point;
 
-            // A box is drawn from a press in the lanes that's on no note, with the select tool.
-            _boxFrom = button == MouseButton.Left && session.Tool == EditorTool.Select && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
+            // A box is drawn from a press in the lanes that's on no note, with the select tool or Shift, which lends any tool
+            // the select tool's press.
+            bool selecting = session.Tool == EditorTool.Select || (e.KeyModifiers & KeyModifiers.Shift) != 0;
+            _boxFrom = button == MouseButton.Left && selecting && point.Rail is null && session.TrackOf(point.Track) is not null && session.Tools.HitTest(point) is null
                 ? current.Position
                 : null;
             _boxTo = current.Position;
@@ -857,6 +860,8 @@ namespace ChartBuilder.Controls.Editing
             var position = e.GetPosition(this);
             _hover = position;
             _keys = e.KeyModifiers;
+            if (!_isPressed)
+                Session?.Tools.HoldKeys(ModifiersOf(e.KeyModifiers));
             if (_proposalDrag is { } beat)
             {
                 DragProposedBeat(beat, position);
@@ -1012,10 +1017,12 @@ namespace ChartBuilder.Controls.Editing
 
         /// <summary>
         /// Takes in the modifier keys held after one goes down or up: a drag goes on with them, as Ctrl makes the right
-        /// button's sustains or runs end together and Shift makes it lay runs, and the place tool's ghost moves to the open lane with Ctrl.
+        /// button's sustains end together and Alt makes it lay runs, and the place tool's drag a sustain with Ctrl; the
+        /// place tool's ghost moves to the open lane with Alt, and goes with Shift, which lends it the select tool's press.
         /// </summary>
         private void TakeKeys(KeyModifiers keys)
         {
+            Session?.Tools.HoldKeys(ModifiersOf(keys));
             if (keys == _keys)
                 return;
             _keys = keys;
@@ -2025,14 +2032,14 @@ namespace ChartBuilder.Controls.Editing
         }
 
         /// <summary>
-        /// The note the place tool would put down where the pointer is, as it would be drawn: with Ctrl held, an
-        /// open note, or a kick.
+        /// The note the place tool would put down where the pointer is, as it would be drawn: with Alt held, an open
+        /// note, or a kick. None with Shift held, which lends the place tool the select tool's press.
         /// </summary>
         private void DrawHover(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneProjection projection, LaneSlots slots)
         {
-            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || PointAt(hover) is not { Rail: null } point)
+            if (_hover is not { } hover || _isPressed || session.Tool != EditorTool.Place || (_keys & KeyModifiers.Shift) != 0 || PointAt(hover) is not { Rail: null } point)
                 return;
-            bool apart = (_keys & KeyModifiers.Control) != 0;
+            bool apart = (_keys & KeyModifiers.Alt) != 0;
             if ((apart ? EditorTools.ApartLane(slots) : point.Lane) is not { } lane)
                 return;
             long tick = session.Snap.Nearest(point.Tick, session.TempoMap);

@@ -29,6 +29,9 @@ public sealed partial class EditorTools
     // The modifier keys held as the gesture last moved, which some gestures read as they go.
     private EditorModifiers _modifiers;
 
+    // Whether a press with Shift held has started the selection afresh, so those after it, while Shift stays down, add to it.
+    private bool _shiftSelecting;
+
     internal EditorTools(EditorSession session) => _session = session;
 
     /// <summary>Whether a gesture is going on.</summary>
@@ -67,19 +70,40 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Starts a gesture at <paramref name="point"/> with the current tool; in the phrase rail, with any tool, a gesture on
-    /// the phrase there (charter-spec C8). The place tool puts an open note, or a kick, down with Ctrl.
+    /// the phrase there (charter-spec C8). Pressed on a selected note with Ctrl, a drag lengthens or shortens each selected
+    /// note's sustain by the same grid steps; with Alt, it lays a run of each, as many steps as dragged. With Shift, any
+    /// tool selects as the select tool does, the first press while Shift is held selecting afresh. The place tool puts an
+    /// open note, or a kick, down with Alt.
     /// </summary>
     public void Press(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
         Cancel();
         _modifiers = modifiers;
         _session.Focused = point.Track;
+        bool shift = modifiers.HasFlag(EditorModifiers.Shift);
+        if (!shift)
+            _shiftSelecting = false;
         if (_session.TrackOf(point.Track) is null)
             return;
-        bool shift = modifiers.HasFlag(EditorModifiers.Shift);
         if (point.Rail is not null)
         {
             _gesture = PressRail(point, shift);
+            return;
+        }
+
+        if (PressSelected(point, modifiers) is { } edit)
+        {
+            _gesture = edit;
+            return;
+        }
+
+        // Shift lends the other tools the select tool's press: a selection started afresh, added to while Shift stays down.
+        if (shift && _session.Tool != EditorTool.Select)
+        {
+            if (!_shiftSelecting)
+                _session.Selection.Clear();
+            _shiftSelecting = true;
+            _gesture = PressSelect(point, shift: true);
             return;
         }
 
@@ -93,7 +117,7 @@ public sealed partial class EditorTools
         _gesture = _session.Tool switch
         {
             EditorTool.Select => PressSelect(point, shift),
-            EditorTool.Place => PressPlace(point, apart: modifiers.HasFlag(EditorModifiers.Control)),
+            EditorTool.Place => PressPlace(point, apart: modifiers.HasFlag(EditorModifiers.Alt)),
             EditorTool.Erase => new EraseGesture(this, point),
             EditorTool.Sustain => PressSustain(point),
             EditorTool.Phrase => point.Lane is null ? null : PressDraw(point),
@@ -118,9 +142,9 @@ public sealed partial class EditorTools
     /// <summary>
     /// Starts the right button's gesture at <paramref name="point"/>, whatever the tool. A note there that isn't selected
     /// is selected alone; then a drag lengthens or shortens the selected notes' sustains, each by the same grid steps so
-    /// they keep their own lengths, or with Ctrl ends them all where the pointer is, as one step. With Shift, the drag lays
-    /// a run of each note on the grid instead, as far as the pointer has moved, or with Ctrl too, up to the pointer. A click
-    /// with no drag, cancelled rather than released, leaves the selection for the note menu.
+    /// they keep their own lengths, or with Ctrl ends them all where the pointer is, as one step. With Alt, the drag lays
+    /// a run of each note on the grid instead, up to the pointer, so the runs end together. A click with no drag,
+    /// cancelled rather than released, leaves the selection for the note menu.
     /// </summary>
     public void PressContext(ChartPoint point, EditorModifiers modifiers = EditorModifiers.None)
     {
@@ -134,7 +158,33 @@ public sealed partial class EditorTools
         if (HitTest(point) is { } hit && !selection.Contains(point.Track, hit.Note))
             selection.Select(point.Track, [hit.Note]);
         if (selection.Track == point.Track && selection.Notes is { Count: > 0 } notes)
-            _gesture = new NoteLengthGesture(this, point.Track, notes, point.Tick);
+            _gesture = new NoteLengthGesture(this, point.Track, notes, point.Tick, laysRun: null);
+    }
+
+    /// <summary>
+    /// Takes note of the modifier keys held while no button is down: once Shift is let go, the next press with Shift
+    /// selects afresh.
+    /// </summary>
+    public void HoldKeys(EditorModifiers modifiers)
+    {
+        if (!modifiers.HasFlag(EditorModifiers.Shift))
+            _shiftSelecting = false;
+    }
+
+    /// <summary>
+    /// The left button's gesture on a selected note with Ctrl or Alt held, with the select, place or sustain tool: with
+    /// Ctrl, each selected note's sustain lengthened or shortened by the same grid steps; with Alt, a run of each, as many
+    /// steps as dragged. Null anywhere else, or with neither held.
+    /// </summary>
+    private NoteLengthGesture? PressSelected(ChartPoint point, EditorModifiers modifiers)
+    {
+        bool ctrl = modifiers.HasFlag(EditorModifiers.Control);
+        if ((!ctrl && !modifiers.HasFlag(EditorModifiers.Alt)) || _session.Tool is not (EditorTool.Select or EditorTool.Place or EditorTool.Sustain))
+            return null;
+        var selection = _session.Selection;
+        if (HitTest(point) is not { } hit || !selection.Contains(point.Track, hit.Note))
+            return null;
+        return new NoteLengthGesture(this, point.Track, selection.Notes, point.Tick, laysRun: !ctrl);
     }
 
     /// <summary>Moves the gesture on to <paramref name="point"/>, with <paramref name="modifiers"/> held.</summary>
@@ -164,7 +214,7 @@ public sealed partial class EditorTools
     /// <summary>
     /// Places a note in <paramref name="shown"/>'s column at the cursor of the focused lane, or removes the one there
     /// (charter-spec §9: 1–5, and 0 for an open note or the kick). Inside a disco flip section, it's the pad drawn in that
-    /// column (C6 item 7), so 2 places red.
+    /// column (C6 item 7), so 2 places red. A note placed leaves nothing selected.
     /// </summary>
     public void ToggleNoteAtCursor(int shown)
     {
@@ -180,7 +230,7 @@ public sealed partial class EditorTools
 
         var placed = new EditableNote(tick, EditableNote.PlainLength, lane);
         if (_session.Execute(new AddNotes(key.Instrument, key.Difficulty, [placed])))
-            _session.Selection.Select(key, [placed]);
+            _session.Selection.Clear();
     }
 
     /// <summary>Moves the cursor <paramref name="steps"/> grid steps later, or earlier when negative (charter-spec §9).</summary>
@@ -646,7 +696,7 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Places a 2× kick at the cursor of the focused Expert drums lane, or removes the one there (charter-spec §9:
-    /// Shift+0).
+    /// Shift+0). A kick placed leaves nothing selected.
     /// </summary>
     public void ToggleDoubleKickAtCursor()
     {
@@ -667,7 +717,7 @@ public sealed partial class EditorTools
 
         var placed = new EditableNote(tick, EditableNote.PlainLength, 0, DoubleKick: true);
         if (_session.Execute(new AddNotes(key.Instrument, key.Difficulty, [placed])))
-            _session.Selection.Select(key, [placed]);
+            _session.Selection.Clear();
     }
 
     /// <summary>The selected notes, when they're drum notes: their track, the drums part and the notes.</summary>
@@ -824,7 +874,7 @@ public sealed partial class EditorTools
         }
 
         var note = new EditableNote(tick, EditableNote.PlainLength, placed);
-        var gesture = new PlaceGesture(this, point.Track, note);
+        var gesture = new PlaceGesture(this, point.Track, note, point.Tick);
         return gesture.Start() ? gesture : null;
     }
 
@@ -1141,15 +1191,17 @@ public sealed partial class EditorTools
     }
 
     /// <summary>
-    /// Lengthens or shortens the sustains of notes as the right button drags (<see cref="PressContext"/>): each by the
-    /// ticks the pointer has moved on the grid, so they keep their own lengths; with Ctrl, each to end where the pointer
-    /// is, as <see cref="SustainGesture"/> does.
+    /// Lengthens or shortens the sustains of notes as a button drags: each by the ticks the pointer has moved on the grid,
+    /// so they keep their own lengths, or each to end where the pointer is, as <see cref="SustainGesture"/> does.
     /// </summary>
     /// <remarks>
-    /// With Shift, it lays a run of each note instead, a copy on every grid step: as many steps on (or back) from each note
-    /// as the pointer has moved, or with Ctrl too, up to where the pointer is, so the runs end together.
+    /// Or it lays a run of each note instead, a copy on every grid step: as many steps on (or back) from each note as the
+    /// pointer has moved, or up to where the pointer is, so the runs end together. With <paramref name="laysRun"/> given, the
+    /// left button's gesture (<see cref="PressSelected"/>), it keeps to that, by the steps moved. Without, the right
+    /// button's (<see cref="PressContext"/>), the keys held decide as it goes: none for the sustains by the steps moved,
+    /// Ctrl for them ending at the pointer, Alt for runs up to it.
     /// </remarks>
-    private sealed class NoteLengthGesture(EditorTools tools, ChartTrackKey track, IReadOnlyList<EditableNote> notes, double pressed) : Gesture(tools)
+    private sealed class NoteLengthGesture(EditorTools tools, ChartTrackKey track, IReadOnlyList<EditableNote> notes, double pressed, bool? laysRun) : Gesture(tools)
     {
         private (long At, bool Match, bool Run)? _last;
         private AddNotes? _run;
@@ -1157,8 +1209,9 @@ public sealed partial class EditorTools
         public override void Drag(ChartPoint point)
         {
             long at = Tools.Snap.Nearest(point.Tick, Tools.Map);
-            bool match = Tools._modifiers.HasFlag(EditorModifiers.Control);
-            bool run = Tools._modifiers.HasFlag(EditorModifiers.Shift);
+            bool alt = Tools._modifiers.HasFlag(EditorModifiers.Alt);
+            bool match = laysRun is null && (alt || Tools._modifiers.HasFlag(EditorModifiers.Control));
+            bool run = laysRun ?? alt;
             if (_last == (at, match, run))
                 return;
             _last = (at, match, run);
@@ -1264,32 +1317,64 @@ public sealed partial class EditorTools
     /// <summary>Where <paramref name="note"/>'s sustain ends: its own tick when it has none.</summary>
     private static long SustainEnd(EditableNote note) => note.Length <= EditableNote.PlainLength ? note.Tick : note.Tick + note.Length;
 
-    /// <summary>Places a note, and drags out its sustain.</summary>
-    private sealed class PlaceGesture(EditorTools tools, ChartTrackKey track, EditableNote note) : Gesture(tools)
+    /// <summary>
+    /// Places a note, and as the pointer drags, a run of it on every grid step up to the pointer, on or back, leaving out
+    /// the places with a note already; with Ctrl, its sustain instead, which drums don't have. It leaves nothing selected.
+    /// </summary>
+    private sealed class PlaceGesture(EditorTools tools, ChartTrackKey track, EditableNote note, double pressed) : Gesture(tools)
     {
-        private long _length = -1;
+        private (long End, bool Sustain)? _last;
+        private AddNotes? _placed;
 
-        public bool Start() => Preview(EditableNote.PlainLength);
+        public bool Start() => Preview([note]);
 
         public override void Drag(ChartPoint point)
         {
+            // Back on the grid step pressed, the note alone: the note itself may have gone to an onset off the grid.
             long end = Tools.Snap.Nearest(point.Tick, Tools.Map);
-            Preview(end > note.Tick ? end - note.Tick : EditableNote.PlainLength);
+            bool sustain = Tools._modifiers.HasFlag(EditorModifiers.Control);
+            if (_last == (end, sustain))
+                return;
+            _last = (end, sustain);
+            if (end == Tools.Snap.Nearest(pressed, Tools.Map))
+            {
+                Preview([note]);
+                return;
+            }
+
+            if (sustain)
+            {
+                if (Session.TrackOf(track) is { Kind: ChartInstrumentKind.Drums })
+                {
+                    Preview([note]);
+                    Session.Status = NoDrumSustain;
+                    return;
+                }
+
+                Preview([note with { Length = LengthTo(note, end) }]);
+                return;
+            }
+
+            // The run previewed last is in the chart until this one replaces it, so its notes don't count as there.
+            var previewed = _placed?.Notes.ToHashSet() ?? [];
+            var run = Tools.RunOf(track, [note], steps: null, end, previewed);
+            Preview([note, .. run?.Notes ?? []]);
         }
 
         public override void Release(ChartPoint point)
         {
             Drag(point);
-            if (Session.CommitPreview() is AddNotes added)
-                Session.Selection.Select(track, added.Notes);
+            if (Session.CommitPreview() is not null)
+                Session.Selection.Clear();
         }
 
-        private bool Preview(long length)
+        private bool Preview(IReadOnlyList<EditableNote> notes)
         {
-            if (length == _length)
-                return true;
-            _length = length;
-            return Session.Preview(new AddNotes(track.Instrument, track.Difficulty, [note with { Length = length }]));
+            var placed = new AddNotes(track.Instrument, track.Difficulty, notes);
+            if (!Session.Preview(placed))
+                return false;
+            _placed = placed;
+            return true;
         }
     }
 

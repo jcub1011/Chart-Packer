@@ -9,8 +9,9 @@ namespace ChartBuilder.Tests.Editing;
 
 /// <summary>
 /// The middle and right buttons, whatever the tool, and what goes with them: the middle button erases notes and phrases;
-/// the right button lengthens or shortens the selected notes and opens the note menu, whose types are set here; leaving
-/// the select tool selects nothing; and Ctrl with the place tool puts an open note down.
+/// the right button lengthens or shortens the selected notes, or lays runs of them, and opens the note menu, whose types
+/// are set here; Ctrl and Alt with the left button on a selected note do the same; changing tools keeps the selection;
+/// and Alt with the place tool puts an open note down.
 /// </summary>
 [TestClass]
 public sealed class MouseGestureTests
@@ -290,11 +291,47 @@ public sealed class MouseGestureTests
         Assert.AreSequenceEqual([.. chord, single], track.Notes.ToList());
     }
 
-    // The right button's drag with Shift: runs of notes.
+    // The left button's drag with Ctrl or Alt on a selected note.
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void AShiftRightDragLaysARunOfEachSelectedNoteAsManyStepsAsDraggedAsOneStep(LaneView view)
+    public void ACtrlDragOnASelectedNoteLengthensEachSelectedNoteByTheStepsDragged(LaneView view)
+    {
+        // With the place tool too: on a selected note, it places nothing.
+        var session = Of(Guitar());
+        var track = Expert(session);
+        EditableNote plain = new(0, EditableNote.PlainLength, 1), held = new(480, 240, 2);
+        track.Notes.Add(plain);
+        track.Notes.Add(held);
+        session.Selection.Select(GuitarExpert, [plain, held]);
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 480, 2, view), At(session, 480 + Step, 2, view), EditorModifiers.Control);
+
+        Assert.AreSequenceEqual([new EditableNote(0, Step, 1), new EditableNote(480, 240 + Step, 2)], track.Notes.ToList());
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+        Assert.HasCount(2, session.Selection.Notes);
+    }
+
+    [TestMethod]
+    public void ACtrlDragWithThePlaceToolOffTheSelectedNotesPlacesASustain()
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        EditableNote selected = new(0, EditableNote.PlainLength, 1);
+        track.Notes.Add(selected);
+        session.Selection.Select(GuitarExpert, [selected]);
+        session.Tool = EditorTool.Place;
+
+        DragFromTo(session, At(session, 960, 2), At(session, 1440, 2), EditorModifiers.Control);
+
+        Assert.AreSequenceEqual([selected, new EditableNote(960, 480, 2)], track.Notes.ToList());
+        Assert.IsTrue(session.Selection.IsEmpty);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void AnAltDragOnASelectedNoteLaysARunOfEachAsManyStepsAsDraggedAsOneStep(LaneView view)
     {
         var session = Of(Guitar());
         var track = Expert(session);
@@ -303,8 +340,8 @@ public sealed class MouseGestureTests
         track.Notes.Add(held);
         session.Selection.Select(GuitarExpert, [first, held]);
 
-        session.Tools.PressContext(At(session, 240, 2, view));
-        session.Tools.Drag(At(session, 480, 2, view), EditorModifiers.Shift);
+        session.Tools.Press(At(session, 240, 2, view), EditorModifiers.Alt);
+        session.Tools.Drag(At(session, 480, 2, view), EditorModifiers.Alt);
         session.Tools.Release(At(session, 480, 2, view));
 
         // Each note's run is two steps long, from the note; the copies have no sustain.
@@ -325,17 +362,19 @@ public sealed class MouseGestureTests
         track.Notes.Add(note);
         session.Selection.Select(GuitarExpert, [note]);
 
-        session.Tools.PressContext(At(session, 0, 1));
+        session.Tools.Press(At(session, 0, 1), EditorModifiers.Alt);
         for (int step = 1; step <= 4; step++)
-            session.Tools.Drag(At(session, step * Step, 1), EditorModifiers.Shift);
+            session.Tools.Drag(At(session, step * Step, 1), EditorModifiers.Alt);
         session.Tools.Release(At(session, 4 * Step, 1));
 
         Assert.AreSequenceEqual([.. Enumerable.Range(0, 5).Select(i => new EditableNote(i * Step, 1, 1))], track.Notes.ToList());
         Assert.AreEqual(1, session.UndoStack.UndoCount);
     }
 
+    // The right button's drag with Alt: runs of notes up to the pointer.
+
     [TestMethod]
-    public void CtrlShiftRightDragEndsEveryRunWhereThePointerIs()
+    public void AnAltRightDragEndsEveryRunWhereThePointerIs()
     {
         var session = Of(Guitar());
         var track = Expert(session);
@@ -345,7 +384,7 @@ public sealed class MouseGestureTests
         session.Selection.Select(GuitarExpert, [first, second]);
 
         session.Tools.PressContext(At(session, 240, 2));
-        session.Tools.Drag(At(session, 480, 2), EditorModifiers.Shift | EditorModifiers.Control);
+        session.Tools.Drag(At(session, 480, 2), EditorModifiers.Alt);
         session.Tools.Release(At(session, 480, 2));
 
         // The first note's run reaches further, to end with the second's.
@@ -367,9 +406,7 @@ public sealed class MouseGestureTests
         track.Notes.Add(there);
         session.Selection.Select(GuitarExpert, [note]);
 
-        session.Tools.PressContext(At(session, 480, 1));
-        session.Tools.Drag(At(session, 240, 1), EditorModifiers.Shift);
-        session.Tools.Release(At(session, 240, 1));
+        DragFromTo(session, At(session, 480, 1), At(session, 240, 1), EditorModifiers.Alt);
 
         Assert.AreSequenceEqual([new EditableNote(240, 1, 1), there, note], track.Notes.ToList());
     }
@@ -383,9 +420,7 @@ public sealed class MouseGestureTests
         track.Notes.Add(pad);
         session.Selection.Select(DrumsExpert, [pad]);
 
-        session.Tools.PressContext(At(session, 0, 1, key: DrumsExpert));
-        session.Tools.Drag(At(session, Step, 1, key: DrumsExpert), EditorModifiers.Shift);
-        session.Tools.Release(At(session, Step, 1, key: DrumsExpert));
+        RightDragFromTo(session, At(session, 0, 1, key: DrumsExpert), At(session, Step, 1, key: DrumsExpert), EditorModifiers.Alt);
 
         Assert.AreSequenceEqual([pad, pad with { Tick = Step }], track.Notes.ToList());
         Assert.IsNull(session.Status);
@@ -394,7 +429,7 @@ public sealed class MouseGestureTests
     // The tools.
 
     [TestMethod]
-    public void LeavingTheSelectToolSelectsNothing()
+    public void ChangingToolsKeepsTheSelection()
     {
         var session = Of(Guitar());
         EditableNote note = new(0, 1, 1);
@@ -402,42 +437,33 @@ public sealed class MouseGestureTests
         session.Selection.Select(GuitarExpert, [note]);
 
         session.Tool = EditorTool.Place;
-
-        Assert.IsTrue(session.Selection.IsEmpty);
-    }
-
-    [TestMethod]
-    public void ChangingBetweenOtherToolsKeepsTheSelection()
-    {
-        var session = Of(Guitar());
-        session.Tool = EditorTool.Place;
-        Click(session, At(session, 0, 1));
-        Assert.IsFalse(session.Selection.IsEmpty);
-
+        Assert.AreSequenceEqual([note], session.Selection.Notes.ToList());
         session.Tool = EditorTool.Sustain;
+        Assert.AreSequenceEqual([note], session.Selection.Notes.ToList());
+        session.Tool = EditorTool.Select;
 
-        Assert.IsFalse(session.Selection.IsEmpty);
+        Assert.AreSequenceEqual([note], session.Selection.Notes.ToList());
     }
 
     [TestMethod]
     [DynamicData(nameof(Views))]
-    public void CtrlWithThePlaceToolPutsDownAnOpenNote(LaneView view)
+    public void AltWithThePlaceToolPutsDownAnOpenNote(LaneView view)
     {
         var session = Of(Guitar());
         session.Tool = EditorTool.Place;
 
-        Click(session, At(session, 130, 2, view), EditorModifiers.Control);
+        Click(session, At(session, 130, 2, view), EditorModifiers.Alt);
 
         Assert.AreSequenceEqual([new EditableNote(120, EditableNote.PlainLength, Open)], Expert(session).Notes.ToList());
     }
 
     [TestMethod]
-    public void CtrlWithThePlaceToolPutsDownAKickOnDrums()
+    public void AltWithThePlaceToolPutsDownAKickOnDrums()
     {
         var session = Of(Drums(), focused: DrumsExpert);
         session.Tool = EditorTool.Place;
 
-        Click(session, At(session, 130, 2, key: DrumsExpert), EditorModifiers.Control);
+        Click(session, At(session, 130, 2, key: DrumsExpert), EditorModifiers.Alt);
 
         var track = session.Chart.PartOf(ChartInstrument.Drums)![ChartDifficulty.Expert];
         Assert.AreSequenceEqual([new EditableNote(120, EditableNote.PlainLength, 0)], track.Notes.ToList());

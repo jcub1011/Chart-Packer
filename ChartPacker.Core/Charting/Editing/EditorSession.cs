@@ -202,7 +202,7 @@ public sealed class EditorSession
         }
     } = SnapGrid.Default;
 
-    /// <summary>The tool a press in the lanes uses. Leaving the select tool selects nothing.</summary>
+    /// <summary>The tool a press in the lanes uses. Changing it keeps the selection.</summary>
     public EditorTool Tool
     {
         get;
@@ -211,8 +211,6 @@ public sealed class EditorSession
             if (field == value)
                 return;
             Tools.Cancel();
-            if (field == EditorTool.Select)
-                Selection.Clear();
             field = value;
             RaiseState();
         }
