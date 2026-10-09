@@ -41,7 +41,7 @@ namespace ChartBuilder.Controls.Editing
     /// as the cursor moves, as it does every frame the song plays, the page is only moved, until the view nears its end.
     /// The strike line's glow, and what follows the pointer, are drawn again as they change.</para>
     /// </remarks>
-    public abstract class EditorCanvas : Control
+    public abstract partial class EditorCanvas : Control
     {
         public static readonly StyledProperty<IBrush?> AccentBrushProperty =
             AvaloniaProperty.Register<EditorCanvas, IBrush?>(nameof(AccentBrush));
@@ -310,6 +310,15 @@ namespace ChartBuilder.Controls.Editing
         /// </summary>
         protected abstract double PhraseRailFrom(LaneProjection projection, int phraseRows);
 
+        /// <summary>
+        /// Where the time axis and a vocal part's pitch rows are, for a canvas of <paramref name="size"/>; null for a view
+        /// that doesn't draw vocals, which only the timeline does.
+        /// </summary>
+        protected virtual LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead) => null;
+
+        /// <summary>Where a vocal part's lyrics are drawn, under its pitch rows.</summary>
+        protected virtual Rect LyricsArea(Size size, LaneProjection projection) => default;
+
         /// <summary>How thick the phrase rail of <paramref name="phraseRows"/> rows is across the view, in pixels.</summary>
         protected static double PhraseRailSize(int phraseRows) =>
             phraseRows == 0 ? 0 : (phraseRows * PhraseRowSize) + ((phraseRows - 1) * PhraseRowGap) + (2 * PhraseRailMargin);
@@ -392,7 +401,16 @@ namespace ChartBuilder.Controls.Editing
         private void RenderLayer(DrawingContext context, Layer layer)
         {
             layer.Page = null;
-            if (Session is not { } session || _lane is not { Track: { } key } lane || session.TrackOf(key) is not { } track)
+            if (Session is not { } session || _lane is not { } lane)
+                return;
+            if (lane.Vocal is { } vocal)
+            {
+                if (session.VocalsOf(vocal) is { } vocals)
+                    RenderVocalLayer(context, layer, session, lane, vocal, vocals);
+                return;
+            }
+
+            if (lane.Track is not { } key || session.TrackOf(key) is not { } track)
                 return;
 
             var size = Bounds.Size;
@@ -411,10 +429,7 @@ namespace ChartBuilder.Controls.Editing
                     return;
             }
 
-            var page = PageFor(screen);
-            layer.Show(page, screen);
-            var projection = page.Page;
-            _alongLimit = (projection.TimeFrom - PagePad, projection.TimeFrom + projection.TimeLength + PagePad);
+            var projection = ShowPage(layer, screen);
             try
             {
                 if (layer.Kind == LayerKind.Song)
@@ -426,6 +441,19 @@ namespace ChartBuilder.Controls.Editing
             {
                 _alongLimit = (double.NegativeInfinity, double.PositiveInfinity);
             }
+        }
+
+        /// <summary>
+        /// Shows <paramref name="layer"/> on the page for what <paramref name="screen"/> shows, and limits what's drawn to the
+        /// page, until the caller puts <see cref="_alongLimit"/> back: the projection to draw the page with.
+        /// </summary>
+        private LaneProjection ShowPage(Layer layer, LaneProjection screen)
+        {
+            var page = PageFor(screen);
+            layer.Show(page, screen);
+            var projection = page.Page;
+            _alongLimit = (projection.TimeFrom - PagePad, projection.TimeFrom + projection.TimeLength + PagePad);
+            return projection;
         }
 
         /// <summary>
@@ -621,9 +649,11 @@ namespace ChartBuilder.Controls.Editing
                 _notes.Redraw();
             }
 
-            if (_editor?.Playback.IsPlaying == true)
+            // A vocal part lights the note and the phrase on the strike line wherever the cursor stops, not only as it plays.
+            bool vocal = _lane is { Vocal: not null };
+            if (_editor?.Playback.IsPlaying == true || vocal)
                 _strike.Redraw();
-            if (IsHoverShown)
+            if (IsHoverShown || vocal)
                 _overlay.Redraw();
         }
 
@@ -735,7 +765,24 @@ namespace ChartBuilder.Controls.Editing
         {
             base.OnPointerPressed(e);
             var current = e.GetCurrentPoint(this);
-            if (!current.Properties.IsLeftButtonPressed || Session is not { } session || PointAt(current.Position) is not { } point)
+            if (!current.Properties.IsLeftButtonPressed || Session is not { } session)
+                return;
+
+            // A vocal part isn't edited yet: a press takes the keys, or drags a proposed beat's handle.
+            if (_lane is { Vocal: not null })
+            {
+                Focus();
+                if (ProposalHandleAt(current.Position) is { } handle)
+                {
+                    e.Pointer.Capture(this);
+                    _proposalDrag = handle;
+                }
+
+                e.Handled = true;
+                return;
+            }
+
+            if (PointAt(current.Position) is not { } point)
                 return;
 
             Focus();
@@ -829,7 +876,7 @@ namespace ChartBuilder.Controls.Editing
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
-            if (Session is not { } session || _lane is not { Track: not null } lane)
+            if (Session is not { } session || _lane is not { HasCanvas: true } lane)
                 return;
 
             double delta = e.Delta.Y;
@@ -1341,7 +1388,11 @@ namespace ChartBuilder.Controls.Editing
         /// <summary>The lane's layout as the canvas has it now, for the pointer; null without a part to show.</summary>
         private LaneProjection? CurrentProjection()
         {
-            if (Session is not { } session || _lane?.Track is not { } key || session.TrackOf(key) is null)
+            if (Session is not { } session || _lane is null)
+                return null;
+            if (_lane.Vocal is { } vocal)
+                return session.VocalsOf(vocal) is { } vocals ? ProjectVocals(Bounds.Size, VocalSlotsOf(vocals), session.Viewport, _lane.LookAhead) : null;
+            if (_lane.Track is not { } key || session.TrackOf(key) is null)
                 return null;
             var slots = session.SlotsOf(key.Instrument, View);
             var rows = PhraseRail.RowsOf(ChartInstruments.KindOf(key.Instrument));

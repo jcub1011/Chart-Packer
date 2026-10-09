@@ -248,7 +248,6 @@
                     </Button>
                     <!-- The lane's look-ahead: how far beyond the strike line it shows. -->
                     <Button Classes="lane-part"
-                            IsVisible="{Binding !IsVocal}"
                             ToolTip.Tip="{x:Static res:Strings.LaneLookAheadToolTip}"
                             AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}">
                         <TextBlock FontSize="12" VerticalAlignment="Center" Text="{Binding LookAheadText}" />
@@ -270,7 +269,7 @@
                         </Button.Flyout>
                     </Button>
                     <Button Classes="tool"
-                            IsVisible="{Binding HasCanvas}"
+                            IsVisible="{Binding ShowsEditMenu}"
                             ToolTip.Tip="{x:Static res:Strings.LaneEditToolTip}"
                             AutomationProperties.Name="{x:Static res:Strings.LaneEditToolTip}">
                         <ctl:LineIcon Data="{StaticResource EditChartStroke}" />

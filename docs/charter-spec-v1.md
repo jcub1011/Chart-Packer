@@ -51,8 +51,9 @@ This spec **supersedes** the "editing charts" non-goal in
 ## 2. Non-goals for v1
 
 - **Vocals and harmonies editing.** `PART VOCALS` and `HARM1`–`HARM3` are kept byte for byte on
-  save ([§4.2](#lossless-passthrough)). The existing vocals tools (`VocalsEditor`, lyrics lane)
-  are unchanged.
+  save ([§4.2](#lossless-passthrough)). The editor's vocal lanes show them, read-only
+  ([C3](#c3-editor-layout) item 7). The existing vocals tools (`VocalsEditor`, lyrics lane) are
+  unchanged.
 - **Pro keys, keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are.
 - **Venue, lighting, camera and crowd events.** Kept as they are.
 - **Writing `.chart`.** `.chart` is imported only ([C2](#c2-open-and-import)).
@@ -812,6 +813,24 @@ Acceptance criteria:
    collapsed panel's strip reads the titles only once. The counts are at the top of the panel.
 6. **Transport bar**: play and pause, position, speed, pitch correction, loop, metronome, hit
    sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)).
+7. **Vocal lanes.** A lane showing `PART VOCALS` or `HARM1`–`HARM3` is always drawn along a
+   timeline, as a piano roll, read-only:
+   - one row per semitone, from a little above the part's highest sung note to a little below its
+     lowest, at least an octave, with black keys' rows darker and each C named at the left edge;
+   - each sung note a bar on its pitch's row; a slide (`+`) a line from the note before; a spoken
+     note (`#`, `^`) an outline along the middle row;
+   - the phrases shaded behind the rows, and the lyrics in a band under them, each syllable at its
+     tick, with a hyphen where it joins the next. A syllable that would run into the one before is
+     left out, as the lane is zoomed out;
+   - the beats, sections, tempo markers, loop and selection as a highway's lane has them;
+   - what's on the strike line lit, as Chart Packer's lyrics lane lights it, wherever the cursor is,
+     playing or not: the note being sung near white with a glow where it crosses the line, its
+     syllable in the same tint, and its phrase shaded a little more than the others.
+
+   Scrolling, zoom (look-ahead) and the keys that move the cursor or play work as in any lane. A
+   lane whose track the chart hasn't says so. The part is read from its passthrough track
+   ([§4.2](#lossless-passthrough)) by `EditorSession.VocalsOf` into a `VocalLane`, in ticks, and
+   read again when the track is re-ticked or put back by an undo.
 
 Acceptance criteria:
 
@@ -2179,8 +2198,8 @@ Editor straight away, with no dialog before it.
 │ [album art]         │              ┃             ┃               │ Tick  78,960       │
 │ Tracks              │              ┃             ┃               │ …                  │
 │ Chart files         ├━━━━━━━━━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━┤                    │
-│ Other files         │ Vocals ▾                              + ✕  │                    │
-│ Findings            │   vocals                                   │                    │
+│ Other files         │ Vocals ▾                        2.0 s + ✕  │                    │
+│ Findings            │   piano roll, lyrics under it              │                    │
 │ Metadata            │                                            │                    │
 ╞═════════════════════╧════════════════════════════════════════════╧════════════════════╡
 │ Timeline                                                              1:38.4 / 4:12.0 │
@@ -2193,7 +2212,8 @@ Editor straight away, with no dialog before it.
   **Sections** ([C8](#c8-phrases-and-events) item 3). The ◉ (View) menu will choose which lanes are shown; it is a placeholder so
   far. The toolbar's groups wrap onto more rows as the
   window narrows.
-- The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part. They are
+- The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part, drawn as a
+  piano roll ([C3](#c3-editor-layout) item 7). They are
   docked like Visual Studio's tool windows: dragging a lane's header shows guides on the lane under
   the pointer and on the edges of the whole area, and dropping on one docks the lane against that
   edge. A lane's highway is always vertical; only the room it takes is tall or wide. ━ splitters
@@ -2454,8 +2474,9 @@ fails the run if anything there changes anyway.
 
 ## 14. Future (after v1)
 
-- Vocals and harmonies editing (lyrics, pitches, phrases), building on `VocalChart` and
-  `VocalsEditor`.
+- Vocals and harmonies editing (lyrics, pitches, phrases), building on `VocalLane`, the vocal
+  lanes' piano roll ([C3](#c3-editor-layout) item 7), `VocalChart` and `VocalsEditor`. It needs a
+  command that replaces a passthrough track and a vocal track writer.
 - Keys, pro keys, pro guitar/bass and Elite drums.
 - Venue, lighting and camera events.
 - `.chart` export.

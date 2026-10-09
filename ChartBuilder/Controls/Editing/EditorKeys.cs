@@ -51,7 +51,8 @@ namespace ChartBuilder.Controls.Editing
                     editor.FinishRecording();
             }
 
-            if (plain && key == PhysicalKey.R)
+            // A vocal part isn't recorded into, and is only ever drawn along a timeline.
+            if (plain && key == PhysicalKey.R && !lane.IsVocal)
             {
                 editor.ToggleRecord();
                 return true;
@@ -162,7 +163,7 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.O when shift && !ctrl && !alt:
                     editor.AudioAssist.Nudge();
                     return true;
-                case PhysicalKey.V when plain:
+                case PhysicalKey.V when plain && !lane.IsVocal:
                     lane.ToggleView();
                     canvas.FocusSibling();
                     return true;

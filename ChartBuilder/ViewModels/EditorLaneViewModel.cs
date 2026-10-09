@@ -16,7 +16,7 @@ namespace ChartBuilder.ViewModels
     /// <summary>
     /// One of the Editor's lanes: a part's highway at one difficulty, or a vocal part. Its header picks the part, the
     /// difficulty and a ghost difficulty, and closes the lane; its body is the part's editor canvas, as a highway or a
-    /// timeline (charter-spec C3). Vocal parts are a placeholder so far.
+    /// timeline (charter-spec C3). A vocal part is always drawn along a timeline, and isn't edited yet.
     /// </summary>
     public sealed partial class EditorLaneViewModel : ViewModelBase
     {
@@ -26,8 +26,8 @@ namespace ChartBuilder.ViewModels
         private bool _isMade;
 
         // What the header's letters and menus were made from last, so an edit that changes none of it doesn't make them
-        // again: the track, the ghost, the part, and which of its difficulties have notes.
-        private (ChartTrackKey? Track, ChartDifficulty? Ghost, EditablePart? Part, int WithNotes)? _difficultiesOf;
+        // again: the track, the ghost, the part, which of its difficulties have notes, and a vocal part as read.
+        private (ChartTrackKey? Track, ChartDifficulty? Ghost, EditablePart? Part, int WithNotes, VocalLane? Vocals)? _difficultiesOf;
 
         internal EditorLaneViewModel(LaneDockViewModel dock, DockLane lane)
         {
@@ -60,6 +60,11 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline))]
         public partial bool IsVocal { get; private set; }
+
+        /// <summary>The vocal part the lane shows; null for a highway.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline), nameof(ShowsEditMenu))]
+        public partial VocalTrack? Vocal { get; private set; }
 
         /// <summary>The part and difficulty the lane shows; null for a vocal part.</summary>
         [ObservableProperty]
@@ -107,19 +112,24 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial ChartDifficulty? Ghost { get; private set; }
 
-        /// <summary>Whether the lane has a canvas: a part the chart has.</summary>
-        public bool HasCanvas => Editor is not null && Track is { } track && Editor.Session.Chart.PartOf(track.Instrument) is not null;
+        /// <summary>Whether the lane has a canvas: a part, or a vocal track, the chart has.</summary>
+        public bool HasCanvas => Editor is { } editor
+            && (Track is { } track ? editor.Session.Chart.PartOf(track.Instrument) is not null
+                : Vocal is { } vocal && editor.Session.VocalsOf(vocal) is not null);
 
         public bool HasPlaceholder => !HasCanvas;
 
-        /// <summary>Whether the highway canvas is shown.</summary>
-        public bool ShowsHighway => HasCanvas && !IsTimeline;
+        /// <summary>Whether the highway canvas is shown: never for a vocal part, which is drawn along a timeline.</summary>
+        public bool ShowsHighway => HasCanvas && !IsTimeline && !IsVocal;
 
         /// <summary>Whether the timeline canvas is shown.</summary>
-        public bool ShowsTimeline => HasCanvas && IsTimeline;
+        public bool ShowsTimeline => HasCanvas && (IsTimeline || IsVocal);
 
-        /// <summary>Stands in for the lane's editor: the vocals, or a part the chart hasn't.</summary>
-        public string Placeholder => IsVocal ? Strings.LaneVocalsPlaceholder
+        /// <summary>Whether the header offers the authoring tools, which edit a part's notes.</summary>
+        public bool ShowsEditMenu => HasCanvas && !IsVocal;
+
+        /// <summary>Stands in for the lane's editor: a part or a vocal track the chart hasn't.</summary>
+        public string Placeholder => IsVocal ? string.Format(CultureInfo.CurrentCulture, Strings.LaneNoVocalsFormat, Title)
             : Track is { } track ? string.Format(CultureInfo.CurrentCulture, Strings.LaneNoPartFormat, ChartLabels.InstrumentName(track.Instrument))
             : Strings.LaneHighwayPlaceholder;
 
@@ -164,6 +174,7 @@ namespace ChartBuilder.ViewModels
             var layout = _dock.Layout;
             Title = LaneMenuItem.TitleOf(Lane.Part);
             IsVocal = Lane.Part.IsVocal;
+            Vocal = Lane.Part.Vocal;
             Track = Lane.Part.Track;
             if (Ghost is { } ghost && Track is { } track && ghost == track.Difficulty)
                 Ghost = null;
@@ -190,7 +201,9 @@ namespace ChartBuilder.ViewModels
                 }
             }
 
-            var of = (Track, Ghost, part, withNotes);
+            // A vocal track re-ticked or put back by an undo is read again, so it's another part as read.
+            var vocals = Vocal is { } vocal ? Editor?.Session.VocalsOf(vocal) : null;
+            var of = (Track, Ghost, part, withNotes, vocals);
             if (_difficultiesOf == of)
                 return;
             _difficultiesOf = of;
@@ -199,6 +212,7 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(HasPlaceholder));
             OnPropertyChanged(nameof(ShowsHighway));
             OnPropertyChanged(nameof(ShowsTimeline));
+            OnPropertyChanged(nameof(ShowsEditMenu));
             OnPropertyChanged(nameof(Placeholder));
             if (Track is not { } track)
             {

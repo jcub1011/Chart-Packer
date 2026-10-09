@@ -8,7 +8,8 @@ namespace ChartBuilder.Controls.Editing
     /// The timeline view of a lane (charter-spec C3 item 1), in the style of a DAW: time runs left to right and each note
     /// lane is a row, under a ruler of measure numbers, tempo markers and section names, a strip of the waveform or
     /// spectrogram (C12, C13) and the phrase rail (C8), with the onsets in a strip under the rows (C14). It suits
-    /// long-range editing and lining notes up with the audio.
+    /// long-range editing and lining notes up with the audio. It's the view a vocal part is drawn in, as a piano roll with
+    /// its lyrics under it.
     /// </summary>
     public sealed class TimelineEditorCanvas : EditorCanvas
     {
@@ -16,6 +17,9 @@ namespace ChartBuilder.Controls.Editing
         private const double RulerHeight = 18;
         private const double MaxStripHeight = 48;
         private const double MarkHeight = 14;
+
+        // A vocal part's band of lyrics, under its rows.
+        private const double LyricsHeight = 18;
 
         protected override LaneView View => LaneView.Timeline;
 
@@ -43,6 +47,16 @@ namespace ChartBuilder.Controls.Editing
 
         // Above the forcing marks.
         protected override double PhraseRailFrom(LaneProjection projection, int phraseRows) => projection.LaneFrom - MarkHeight - PhraseRailSize(phraseRows);
+
+        // A vocal part's rows are under the ruler, and its lyrics under them.
+        protected override LaneProjection? ProjectVocals(Size size, LaneSlots slots, EditorViewport viewport, double lookAhead)
+        {
+            double height = Math.Max(1, size.Height - RulerHeight - LyricsHeight);
+            return LaneProjection.Of(LaneView.Timeline, 0, Math.Max(1, size.Width), RulerHeight, height / slots.Slots.Count, slots, viewport, lookAhead);
+        }
+
+        protected override Rect LyricsArea(Size size, LaneProjection projection) =>
+            new(projection.TimeFrom, projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count), projection.TimeLength, LyricsHeight);
 
         // A fifth of the lane's height, so the rows keep most of it.
         private static double StripHeight(Size size) => Math.Clamp((size.Height - RulerHeight) * 0.2, 0, MaxStripHeight);

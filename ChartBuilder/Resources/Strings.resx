@@ -262,9 +262,9 @@
     <value>The highway goes here.</value>
     <comment>Stands in for a highway lane's editor.</comment>
   </data>
-  <data name="LaneVocalsPlaceholder" xml:space="preserve">
-    <value>The vocals lane goes here.</value>
-    <comment>Stands in for a vocals lane's editor.</comment>
+  <data name="LaneNoVocalsFormat" xml:space="preserve">
+    <value>The chart has no {0} part.</value>
+    <comment>A vocals lane's placeholder when the chart hasn't the vocal track it shows, with the lane's title, e.g. "Harmony 2".</comment>
   </data>
   <data name="NoLanesOpen" xml:space="preserve">
     <value>No lanes open</value>

@@ -120,6 +120,21 @@ public static class VocalReader
     }
 
     /// <summary>
+    /// Reads one vocal track the editor keeps as it was loaded (charter-spec §4.2), as <see cref="Read"/> reads it from
+    /// the whole file. Its ticks are the chart's; the editor's tempo map places them.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="track"/> isn't a track.</exception>
+    /// <exception cref="ChartFormatException">The track is malformed.</exception>
+    public static VocalPart ReadPart(Charting.PassthroughTrack track)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+        if (!track.IsTrack)
+            throw new ArgumentException("Only a track has vocals.", nameof(track));
+        string name = (track.Name ?? string.Empty).Trim().ToUpperInvariant();
+        return ReadTrack(track.Array, name, MidiFile.ReadEvents(track.Array, track.ChunkOf()));
+    }
+
+    /// <summary>
     /// The lyrics and phrases of a <c>.chart</c>'s <c>[Events]</c> <paramref name="lines"/>; <see langword="null"/>
     /// when there's no lyric. A <c>phrase_start</c> ends any phrase still open, and a phrase left open
     /// ends a beat after the last vocal event. Every phrase lasts at least a tick.

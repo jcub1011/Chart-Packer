@@ -153,7 +153,7 @@ namespace ChartBuilder.ViewModels
         public void RefreshVisibleSpan()
         {
             // A loop, not a query: this runs every frame while the song plays.
-            EditorLaneViewModel? focused = null, first = null;
+            EditorLaneViewModel? focused = null, first = null, firstVocal = null;
             var key = Session.Focused;
             foreach (var each in Lanes.All)
             {
@@ -163,11 +163,14 @@ namespace ChartBuilder.ViewModels
                     break;
                 }
 
-                if (first is null && each.HasCanvas)
+                // A highway's span before a vocal lane's, which is only the one when there's no highway.
+                if (each.IsVocal)
+                    firstVocal ??= each.HasCanvas ? each : null;
+                else if (first is null && each.HasCanvas)
                     first = each;
             }
 
-            var lane = focused ?? first;
+            var lane = focused ?? first ?? firstVocal;
             var (start, end) = Session.Viewport.SpanOf(lane?.LookAhead ?? DefaultLookAhead);
             VisibleStart = start;
             VisibleEnd = end;

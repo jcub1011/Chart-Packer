@@ -18,6 +18,13 @@ public enum VocalTrack
     Harmony3,
 }
 
+/// <summary>The MIDI tracks <see cref="VocalTrack"/>'s parts are.</summary>
+public static class VocalTracks
+{
+    /// <summary>The name of <paramref name="track"/>'s MIDI track: <c>PART VOCALS</c>, or <c>HARM1</c> to <c>HARM3</c>.</summary>
+    public static string NameOf(VocalTrack track) => VocalReader.TrackNames[(int)track];
+}
+
 /// <summary>What an editor lane shows: one instrument's highway at one difficulty, or one vocal part.</summary>
 public sealed record LanePart
 {

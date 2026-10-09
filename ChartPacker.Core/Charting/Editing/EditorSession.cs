@@ -1,4 +1,5 @@
 using ChartPacker.Core.Charting.Commands;
+using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
 
 namespace ChartPacker.Core.Charting.Editing;
@@ -70,6 +71,10 @@ public sealed class EditorSession
     private ChartReadOptions? _readOptions;
     private GameDiscoFlips? _discoFlips;
     private readonly Dictionary<ChartDifficulty, IReadOnlyList<DiscoFlipRange>> _discoFlipRanges = [];
+
+    // Each vocal part as last read, with the track it was read from: a track is never changed, only replaced (re-ticked,
+    // or put back by an undo), so a part is read again only when its track isn't the one it was read from.
+    private readonly Dictionary<VocalTrack, (PassthroughTrack Track, VocalLane Lane)> _vocals = [];
 
     /// <param name="undo">The chart's undo stack.</param>
     /// <param name="delay">The song's delay: how much later than its ticks say the chart plays against the audio.</param>
@@ -396,6 +401,47 @@ public sealed class EditorSession
 
     /// <summary>The track's notes as the editor has them, or null when the chart hasn't the part.</summary>
     public EditableTrack? TrackOf(ChartTrackKey key) => Chart.PartOf(key.Instrument)?[key.Difficulty];
+
+    /// <summary>
+    /// The vocal part <paramref name="track"/> as its lane draws it, read from the chart's first track of that name, which
+    /// the editor keeps as it was loaded (charter-spec §4.2); null when the chart hasn't the track. A track that can't be
+    /// read is an empty part. Read again only after its track is replaced.
+    /// </summary>
+    public VocalLane? VocalsOf(VocalTrack track)
+    {
+        string name = VocalTracks.NameOf(track);
+        PassthroughTrack? found = null;
+        foreach (var each in Chart.Passthrough)
+        {
+            if (each.IsTrack && each.Name is { } eachName && eachName.Trim().Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                found = each;
+                break;
+            }
+        }
+
+        if (found is null)
+        {
+            _vocals.Remove(track);
+            return null;
+        }
+
+        if (_vocals.TryGetValue(track, out var known) && ReferenceEquals(known.Track, found))
+            return known.Lane;
+
+        VocalLane lane;
+        try
+        {
+            lane = new VocalLane(VocalReader.ReadPart(found));
+        }
+        catch (ChartFormatException)
+        {
+            lane = new VocalLane(new VocalPart(name, [], [], []));
+        }
+
+        _vocals[track] = (found, lane);
+        return lane;
+    }
 
     /// <summary>Does <paramref name="command"/> as one undoable step. A refusal is said in <see cref="Status"/>.</summary>
     /// <returns>Whether it was done.</returns>
