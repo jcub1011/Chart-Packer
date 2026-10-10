@@ -107,7 +107,20 @@ namespace ChartBuilder.ViewModels
             }
 
             var settings = ChartPackerSettingsFile.PackSettings(_services.ChartPackerSettingsFile);
-            var (scanRoot, destination, layout) = settings.PackOf(entry);
+            var (scanRoot, _, layout) = settings.PackOf(entry);
+
+            // The pack folder is Chart Builder's own default: when set, packing goes there without asking,
+            // otherwise it asks, starting at the song's parent folder.
+            string? destination = _settings.Settings.DefaultPackFolder;
+            if (string.IsNullOrWhiteSpace(destination))
+            {
+                string songPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(entry.FullPath));
+                string projectFolder = Path.GetDirectoryName(songPath) ?? songPath;
+                destination = await _services.FolderPicker.PickFolderAsync(Strings.SaveAndPackPickerTitle, projectFolder);
+                if (destination is null)
+                    return;
+            }
+
             IsSaving = true;
             try
             {

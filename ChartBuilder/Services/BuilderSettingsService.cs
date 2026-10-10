@@ -42,6 +42,10 @@ namespace ChartBuilder.Services
         private static void Sanitize(BuilderSettings settings)
         {
             settings.DefaultCharterName ??= "";
+            if (string.IsNullOrWhiteSpace(settings.LastNewChartFolder))
+                settings.LastNewChartFolder = null;
+            if (string.IsNullOrWhiteSpace(settings.DefaultPackFolder))
+                settings.DefaultPackFolder = null;
             settings.CalibrationPrompted = [.. (settings.CalibrationPrompted ?? []).Where(d => !string.IsNullOrEmpty(d)).Distinct()];
             settings.RecentSongs = [.. (settings.RecentSongs ?? []).Where(s => s is not null && !string.IsNullOrWhiteSpace(s.Path)).Take(RecentSongs.Max)];
             foreach (var song in settings.RecentSongs)

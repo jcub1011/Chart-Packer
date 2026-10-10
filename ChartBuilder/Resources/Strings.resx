@@ -1257,7 +1257,7 @@ Open it anyway?</value>
     <value>Save and pack</value>
   </data>
   <data name="SaveAndPackToolTip" xml:space="preserve">
-    <value>Save, then pack the song to a .sng with Chart Packer's output folder and overwrite settings</value>
+    <value>Save, then pack the song to a .sng in the pack folder, with Chart Packer's overwrite settings</value>
   </data>
   <data name="SaveAndPackSngToolTip" xml:space="preserve">
     <value>The song is already a .sng; Save writes to it</value>
@@ -1446,6 +1446,22 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="AutosaveMinutesKeywords" xml:space="preserve">
     <value>autosave recovery crash backup minutes interval</value>
+  </data>
+  <data name="PackFolderLabel" xml:space="preserve">
+    <value>Pack folder</value>
+  </data>
+  <data name="PackFolderDescription" xml:space="preserve">
+    <value>Where Save and pack writes the .sng. When set, packing goes there without asking. When empty, it asks every time, starting at the song's parent folder.</value>
+  </data>
+  <data name="PackFolderKeywords" xml:space="preserve">
+    <value>pack export output sng folder destination save</value>
+  </data>
+  <data name="PackFolderEmpty" xml:space="preserve">
+    <value>Ask every time</value>
+  </data>
+  <data name="SaveAndPackPickerTitle" xml:space="preserve">
+    <value>Pack the .sng into</value>
+    <comment>The folder picker's title for Save and pack; the .sng is written inside the one picked.</comment>
   </data>
   <data name="RecoveredNotice" xml:space="preserve">
     <value>Recovered from an autosave. It isn't saved yet: save it to keep it.</value>

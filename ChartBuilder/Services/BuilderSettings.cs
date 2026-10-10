@@ -126,6 +126,9 @@ namespace ChartBuilder.Services
         /// <summary>The parent folder a new chart's first save last made its song folder in (charter-spec C1, §10). Null for none yet.</summary>
         public string? LastNewChartFolder { get; set; }
 
+        /// <summary>Where Save and pack writes the .sng. Null for asking every time, starting at the song's parent folder.</summary>
+        public string? DefaultPackFolder { get; set; }
+
         /// <summary>Whether the first song played on an output device that has no calibrated latency offers the calibration tool (charter-spec C11).</summary>
         public bool PromptForCalibration { get; set; } = true;
 

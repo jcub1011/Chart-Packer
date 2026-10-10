@@ -9,7 +9,7 @@ namespace ChartBuilder.Services
     /// <param name="Settings">Chart Builder's settings, and where the layout and the recent songs are saved.</param>
     /// <param name="SettingsWindow">Opens Program settings.</param>
     /// <param name="Confirmations">Asks before a change that loses something, and Save, Discard or Cancel on closing.</param>
-    /// <param name="FolderPicker">Picks the folder Export copy writes to, and a new chart's parent folder.</param>
+    /// <param name="FolderPicker">Picks the folder Save and pack writes to, the folder Export copy writes to, and a new chart's parent folder.</param>
     /// <param name="ImagePicker">Picks the album art the Art tab puts in place of the song's.</param>
     /// <param name="FilePicker">Picks the tracks and backgrounds Chart settings and the Art tab add.</param>
     /// <param name="FirstSave">Asks where a new chart's first save makes its folder.</param>

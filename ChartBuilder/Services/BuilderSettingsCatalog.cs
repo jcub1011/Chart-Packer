@@ -154,6 +154,19 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.AutosaveMinutes,
                         Set = minutes => settings.Settings.AutosaveMinutes = minutes,
                     },
+                    new FolderSetting
+                    {
+                        Id = "charter.packFolder",
+                        Category = editing,
+                        Label = Strings.PackFolderLabel,
+                        Description = Strings.PackFolderDescription,
+                        Keywords = SettingKeywords.Split(Strings.PackFolderKeywords),
+                        DefaultValue = null,
+                        EmptyLabel = Strings.PackFolderEmpty,
+                        PickerTitle = Strings.SaveAndPackPickerTitle,
+                        Get = () => settings.Settings.DefaultPackFolder,
+                        Set = folder => settings.Settings.DefaultPackFolder = folder,
+                    },
                     new RangeSetting
                     {
                         Id = "charter.highwaySpeed",
