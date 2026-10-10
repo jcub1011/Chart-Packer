@@ -59,6 +59,7 @@ public static class FfmpegLibrary
         {
             Native.AvUtil => Native.AvUtilMajor,
             Native.SwScale => Native.SwScaleMajor,
+            Native.SwResample => Native.SwResampleMajor,
             Native.AvCodec => Native.AvCodecMajor,
             Native.AvFormat => Native.AvFormatMajor,
             _ => -1,

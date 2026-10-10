@@ -5,12 +5,14 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
+using ChartPacker.Audio.Encoding;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Metadata;
+using ChartPacker.Core.Packing;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
 using ChartPacker.Core.Validation;
@@ -117,6 +119,7 @@ namespace ChartBuilder.ViewModels
             remembered.LastExportFolder = dialog.ExportFolder;
             remembered.LastExportPolicy = dialog.Policy;
             remembered.LastTranscodeToOpus = dialog.TranscodeToOpus;
+            remembered.LastTranscodeBitrateKbps = dialog.TranscodeBitrateKbps;
             _settings.Save();
 
             if ((HasUnsavedChanges || Song.PendingChanges().Count > 0 || Song.Media.Count > 0) && !await SaveCoreAsync())
@@ -210,17 +213,46 @@ namespace ChartBuilder.ViewModels
                 _settings.Settings.LastTranscodeToOpus,
                 targetFor,
                 _services.FolderPicker,
-                Strings.SaveAndPackPickerTitle);
+                Strings.SaveAndPackPickerTitle,
+                transcodeAvailable: OpusTranscoder.IsAvailable,
+                initialBitrateKbps: _settings.Settings.LastTranscodeBitrateKbps);
         }
 
-        /// <summary>Packs a song folder to the dialog's location with its if-exists choice.</summary>
+        /// <summary>Packs a song folder to the dialog's location with its if-exists choice, transcoding first when asked, behind a progress dialog.</summary>
         private async Task PackToSngAsync(SongEntry entry, ExportSngViewModel dialog)
         {
             var settings = ChartPackerSettingsFile.PackSettings(_services.ChartPackerSettingsFile);
             var (scanRoot, _, layout) = settings.PackOf(entry);
+            var options = new PackOptions(
+                TranscodeToOpus: dialog.TranscodeToOpus,
+                OpusBitrateKbps: dialog.TranscodeBitrateKbps);
+            IPackTranscoder? transcoder = dialog.TranscodeToOpus ? new OpusPackTranscoder() : null;
 
             JobItemResult? result = null;
-            await Task.Run(() => SongJob.RunAsync(JobKind.Pack, [entry], scanRoot, dialog.ExportFolder, dialog.Policy, new Reporter(r => result = r), layout));
+            bool finished;
+            if (_services.ExportProgress is { } progressService)
+            {
+                var progress = new ExportProgressViewModel();
+                finished = await progressService.RunAsync(
+                    progress,
+                    (exportProgress, ct) => SongJob.RunAsync(
+                        JobKind.Pack, [entry], scanRoot, dialog.ExportFolder, dialog.Policy,
+                        new Reporter(r => result = r), layout, options, transcoder, exportProgress, ct));
+            }
+            else
+            {
+                await SongJob.RunAsync(
+                    JobKind.Pack, [entry], scanRoot, dialog.ExportFolder, dialog.Policy,
+                    new Reporter(r => result = r), layout, options, transcoder, exportProgress: null);
+                finished = true;
+            }
+
+            if (!finished)
+            {
+                Messages.Post(Severity.Warning, Strings.ExportProgressCancelled);
+                return;
+            }
+
             var (severity, message) = PackNotice(result);
             Messages.Post(severity, message);
         }

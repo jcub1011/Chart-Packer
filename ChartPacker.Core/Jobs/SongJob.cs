@@ -1,7 +1,7 @@
 using ChartPacker.Core.Packing;
 using ChartPacker.Core.Scanning;
+using ChartPacker.Core.Sng;
 using ChartPacker.Core.Validation;
-
 namespace ChartPacker.Core.Jobs;
 
 /// <summary>Packs or unpacks a list of library entries, one at a time.</summary>
@@ -29,6 +29,8 @@ public static class SongJob
     /// <param name="progress">Receives each item's result.</param>
     /// <param name="layout">Whether outputs mirror each entry's place under <paramref name="scanRoot"/> or all go directly in <paramref name="destinationRoot"/>.</param>
     /// <param name="options">Pack options; the defaults when <see langword="null"/>.</param>
+    /// <param name="transcoder">Transcodes non-Opus stems when <see cref="PackOptions.TranscodeToOpus"/>; no transcoding when <see langword="null"/>.</param>
+    /// <param name="exportProgress">Receives transcode and pack progress for the item in flight; may be <see langword="null"/>.</param>
     /// <param name="cancellationToken">Stops the job.</param>
     /// <exception cref="OperationCanceledException">The job was cancelled.</exception>
     public static async Task RunAsync(
@@ -40,6 +42,8 @@ public static class SongJob
         IProgress<JobItemResult> progress,
         OutputLayout layout = OutputLayout.Mirror,
         PackOptions? options = null,
+        IPackTranscoder? transcoder = null,
+        IProgress<ExportProgress>? exportProgress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -47,7 +51,7 @@ public static class SongJob
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationRoot);
         ArgumentNullException.ThrowIfNull(progress);
 
-        var job = new Job(kind, scanRoot, destinationRoot, policy, layout, options);
+        var job = new Job(kind, scanRoot, destinationRoot, policy, layout, options, transcoder, exportProgress);
         foreach (SongEntry entry in entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -62,7 +66,9 @@ public static class SongJob
         string destinationRoot,
         OverwritePolicy policy,
         OutputLayout layout,
-        PackOptions? options)
+        PackOptions? options,
+        IPackTranscoder? transcoder,
+        IProgress<ExportProgress>? exportProgress)
     {
         // Outputs this job has written, preferred and actual paths both, and the item that wrote each.
         private readonly Dictionary<string, SongEntry> _claimed = new(OutputPaths.PathComparer);
@@ -96,14 +102,48 @@ public static class SongJob
             if (CheckTarget(entry, preferred, isDirectory: false, out string? target) is { } skipped)
                 return skipped;
 
-            var verify = await Packer.PackAsync(plan, target!, policy == OverwritePolicy.Overwrite, null, cancellationToken).ConfigureAwait(false);
-            Finding[] findings = [.. plan.Findings, .. verify];
+            PackOptions effective = options ?? PackOptions.Default;
+            string? transcodeFolder = null;
+            try
+            {
+                if (effective.TranscodeToOpus && transcoder is not null && transcoder.IsAvailable)
+                {
+                    transcodeFolder = StagingPath.For(target!);
+                    Directory.CreateDirectory(transcodeFolder);
+                    IReadOnlyList<SngSourceFile> included = await transcoder.TranscodeAsync(
+                        plan, transcodeFolder, effective.OpusBitrateKbps, exportProgress, cancellationToken).ConfigureAwait(false);
+                    plan = plan with { Included = included };
+                }
 
-            if (verify.Any(f => f.Severity == Severity.Error))
-                return new JobItemResult(entry, JobItemStatus.Failed, SkipReason.None, null, findings);
+                long totalBytes = plan.Included.Sum(f => f.Length);
+                string packName = Path.GetFileName(target!);
+                var verify = await Packer.PackAsync(
+                    plan,
+                    target!,
+                    policy == OverwritePolicy.Overwrite,
+                    exportProgress is null ? null : new Progress<long>(written => exportProgress.Report(
+                        new ExportProgress(
+                            ExportPhase.Packing,
+                            0, 1, packName,
+                            totalBytes <= 0 ? 1 : Math.Clamp((double)written / totalBytes, 0, 1)))),
+                    cancellationToken).ConfigureAwait(false);
+                Finding[] findings = [.. plan.Findings, .. verify];
 
-            Claim(entry, preferred, target!);
-            return new JobItemResult(entry, StatusFor(findings), SkipReason.None, target, findings);
+                if (verify.Any(f => f.Severity == Severity.Error))
+                    return new JobItemResult(entry, JobItemStatus.Failed, SkipReason.None, null, findings);
+
+                Claim(entry, preferred, target!);
+                return new JobItemResult(entry, StatusFor(findings), SkipReason.None, target, findings);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                return new JobItemResult(entry, JobItemStatus.Failed, SkipReason.None, null, [], ex.Message);
+            }
+            finally
+            {
+                if (transcodeFolder is not null)
+                    StagingPath.TryDeleteDirectory(transcodeFolder);
+            }
         }
 
         private async Task<JobItemResult> UnpackAsync(SongEntry entry, CancellationToken cancellationToken)

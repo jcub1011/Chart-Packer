@@ -139,6 +139,9 @@ namespace ChartBuilder.Services
         /// <summary>Whether the export dialog's auto-transcode to Opus was on the last time it was confirmed. Off by default.</summary>
         public bool LastTranscodeToOpus { get; set; }
 
+        /// <summary>The export dialog's Opus quality the last time it was confirmed, in kbps per stereo stem.</summary>
+        public int LastTranscodeBitrateKbps { get; set; } = 128;
+
         /// <summary>Whether the first song played on an output device that has no calibrated latency offers the calibration tool (charter-spec C11).</summary>
         public bool PromptForCalibration { get; set; } = true;
 

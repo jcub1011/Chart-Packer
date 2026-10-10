@@ -1535,10 +1535,49 @@ Saving also makes these changes to song.ini:
     <value>Off by default. Applies to song folders only.</value>
   </data>
   <data name="ExportSngTranscodeUnavailable" xml:space="preserve">
-    <value>Transcoding to Opus isn't bundled in this build yet, so Export stays disabled while this is checked with non-Opus stems. Convert the stems to .opus first, or uncheck it to pack as-is.</value>
+    <value>Transcoding to Opus isn't available in this build, so Export stays disabled while this is checked with non-Opus stems. Convert the stems to .opus first, or uncheck it to pack as-is.</value>
   </data>
   <data name="ExportSngTranscodeSngNote" xml:space="preserve">
     <value>Transcoding isn't available for songs opened from a .sng; the .sng is copied as-is.</value>
+  </data>
+  <data name="ExportSngQualityLabel" xml:space="preserve">
+    <value>Opus quality</value>
+  </data>
+  <data name="ExportSngQualityVoiceName" xml:space="preserve">
+    <value>Voice</value>
+  </data>
+  <data name="ExportSngQualityBalancedName" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="ExportSngQualityMusicName" xml:space="preserve">
+    <value>Music</value>
+  </data>
+  <data name="ExportSngQualityHighName" xml:space="preserve">
+    <value>High</value>
+  </data>
+  <data name="ExportSngQualityChoiceFormat" xml:space="preserve">
+    <value>{0} — {1} kbps per stem</value>
+    <comment>{0} is the quality name; {1} is the stereo bitrate in kbps.</comment>
+  </data>
+  <data name="ExportSngQualityNote" xml:space="preserve">
+    <value>Mono stems use half the rate.</value>
+  </data>
+  <data name="ExportProgressTitle" xml:space="preserve">
+    <value>Exporting .sng</value>
+  </data>
+  <data name="ExportProgressStarting" xml:space="preserve">
+    <value>Starting…</value>
+  </data>
+  <data name="ExportProgressTranscodingFormat" xml:space="preserve">
+    <value>Transcoding {0} ({1} of {2})… {3}%</value>
+    <comment>{0} is the stem; {1} and {2} are how many stems are done and how many there are; {3} is the percent.</comment>
+  </data>
+  <data name="ExportProgressPackingFormat" xml:space="preserve">
+    <value>Packing {0}… {1}%</value>
+    <comment>{0} is the .sng file name; {1} is the percent.</comment>
+  </data>
+  <data name="ExportProgressCancelled" xml:space="preserve">
+    <value>Export cancelled; nothing was written.</value>
   </data>
   <data name="ExportSngErrorsFormat" xml:space="preserve">
     <value>Resolve the {0} chart error(s) in Findings before exporting.</value>

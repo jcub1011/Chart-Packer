@@ -147,6 +147,20 @@
                           IsChecked="{Binding TranscodeToOpus}"
                           IsEnabled="{Binding CanTranscode}" />
                 <TextBlock Classes="muted note" Text="{Binding TranscodeNote}" />
+                <ComboBox HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding QualityChoices}"
+                          SelectedItem="{Binding SelectedQuality}"
+                          IsVisible="{Binding TranscodeToOpus}"
+                          AutomationProperties.Name="{x:Static res:Strings.ExportSngQualityLabel}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ExportQualityChoice">
+                            <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Classes="muted note"
+                           Text="{x:Static res:Strings.ExportSngQualityNote}"
+                           IsVisible="{Binding TranscodeToOpus}" />
                 <TextBlock Classes="note"
                            Foreground="{DynamicResource WarningTextBrush}"
                            Text="{x:Static res:Strings.ExportSngTranscodeUnavailable}"

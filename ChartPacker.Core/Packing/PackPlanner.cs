@@ -10,7 +10,9 @@ namespace ChartPacker.Core.Packing;
 
 /// <summary>Choices that change what goes into a <c>.sng</c>.</summary>
 /// <param name="IncludeSubfolders">Whether files in subfolders are packed (A13: off by default).</param>
-public sealed record PackOptions(bool IncludeSubfolders = false)
+/// <param name="TranscodeToOpus">Whether non-Opus audio stems are transcoded to Opus before packing. Needs an <see cref="IPackTranscoder"/> where it's used.</param>
+/// <param name="OpusBitrateKbps">The transcoded Opus bitrate in kbps per stereo stem (mono stems use half), when <paramref name="TranscodeToOpus"/>.</param>
+public sealed record PackOptions(bool IncludeSubfolders = false, bool TranscodeToOpus = false, int OpusBitrateKbps = 128)
 {
     /// <summary>The defaults from project spec §8.</summary>
     public static PackOptions Default { get; } = new();

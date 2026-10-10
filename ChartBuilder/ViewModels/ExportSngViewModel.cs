@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using ChartBuilder.Resources;
+using ChartPacker.Audio.Encoding;
 using ChartPacker.Core.Jobs;
 using ChartPacker.UI.Services;
 using ChartPacker.UI.ViewModels;
@@ -31,6 +32,9 @@ namespace ChartBuilder.ViewModels
 
     /// <summary>An if-exists choice in the export dialog's policy dropdown.</summary>
     public sealed record ExportPolicyChoice(OverwritePolicy Value, string Label);
+
+    /// <summary>An Opus quality in the export dialog's quality dropdown.</summary>
+    public sealed record ExportQualityChoice(OpusQuality Quality, string Label);
 
     /// <summary>
     /// Export to <c>.sng</c> (chart editor): a read-only preview of the song's metadata, art and stems,
@@ -60,6 +64,8 @@ namespace ChartBuilder.ViewModels
         /// <param name="pendingCount">The unsaved changes Export saves first.</param>
         /// <param name="initialPolicy">The if-exists choice pre-filled: the last one, or Chart Packer's policy.</param>
         /// <param name="initialTranscode">Whether auto-transcode starts on. Off by default.</param>
+        /// <param name="transcodeAvailable">Whether this build can transcode to Opus.</param>
+        /// <param name="initialBitrateKbps">The Opus bitrate auto-transcode starts on, in kbps per stereo stem.</param>
         /// <param name="targetFor">The preferred <c>.sng</c> path for a destination folder.</param>
         /// <param name="folders">Picks the export location.</param>
         /// <param name="browseTitle">The folder picker's title.</param>
@@ -79,7 +85,9 @@ namespace ChartBuilder.ViewModels
             Func<string, string> targetFor,
             IFolderPickerService folders,
             string browseTitle,
-            Func<string, bool>? exists = null)
+            Func<string, bool>? exists = null,
+            bool transcodeAvailable = true,
+            int initialBitrateKbps = 128)
         {
             ArgumentNullException.ThrowIfNull(songTitle);
             ArgumentNullException.ThrowIfNull(metadata);
@@ -102,6 +110,7 @@ namespace ChartBuilder.ViewModels
             IsSngSource = isSngSource;
             ErrorCount = errorCount;
             PendingCount = pendingCount;
+            IsTranscodeAvailable = transcodeAvailable;
 
             PolicyChoices =
             [
@@ -110,10 +119,27 @@ namespace ChartBuilder.ViewModels
                 new ExportPolicyChoice(OverwritePolicy.Skip, Strings.ExportSngPolicySkip),
             ];
             SelectedPolicy = PolicyChoices.First(c => c.Value == initialPolicy);
+            QualityChoices =
+            [
+                QualityChoice(OpusQuality.Voice, Strings.ExportSngQualityVoiceName),
+                QualityChoice(OpusQuality.Balanced, Strings.ExportSngQualityBalancedName),
+                QualityChoice(OpusQuality.Music, Strings.ExportSngQualityMusicName),
+                QualityChoice(OpusQuality.High, Strings.ExportSngQualityHighName),
+            ];
+            SelectedQuality = QualityChoices
+                .OrderBy(c => Math.Abs(OpusBitrates.StereoBps(c.Quality) / 1000 - initialBitrateKbps))
+                .First();
             ExportFolder = initialFolder;
             TranscodeToOpus = !isSngSource && initialTranscode;
             RefreshDerived();
         }
+
+        private static ExportQualityChoice QualityChoice(OpusQuality quality, string name) =>
+            new(quality, string.Format(
+                CultureInfo.CurrentCulture,
+                Strings.ExportSngQualityChoiceFormat,
+                name,
+                OpusBitrates.StereoBps(quality) / 1000));
 
         /// <summary>The song's title, as the dialog shows it.</summary>
         public string SongTitle { get; }
@@ -213,6 +239,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether auto-transcode can be turned on: song folders only.</summary>
         public bool CanTranscode => !IsSngSource;
 
+        /// <summary>Whether this build can transcode to Opus at all.</summary>
+        public bool IsTranscodeAvailable { get; }
+
         public string TranscodeNote => IsSngSource ? Strings.ExportSngTranscodeSngNote : Strings.ExportSngTranscodeNote;
 
         /// <summary>Whether auto-transcode is on. Off by default; unavailable for <c>.sng</c> sources.</summary>
@@ -221,8 +250,18 @@ namespace ChartBuilder.ViewModels
         [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
         public partial bool TranscodeToOpus { get; set; }
 
-        /// <summary>Auto-transcode is checked but can't run yet: no Opus encoder is bundled.</summary>
-        public bool TranscodeBlocked => TranscodeToOpus && !IsSngSource && NonOpusCount > 0;
+        /// <summary>Auto-transcode is checked but can't run: this build has no Opus encoder.</summary>
+        public bool TranscodeBlocked => TranscodeToOpus && !IsSngSource && NonOpusCount > 0 && !IsTranscodeAvailable;
+
+        public IReadOnlyList<ExportQualityChoice> QualityChoices { get; }
+
+        /// <summary>The Opus quality auto-transcode encodes with.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(TranscodeBitrateKbps))]
+        public partial ExportQualityChoice SelectedQuality { get; set; }
+
+        /// <summary>The Opus bitrate in kbps per stereo stem (mono stems use half).</summary>
+        public int TranscodeBitrateKbps => OpusBitrates.StereoBps(SelectedQuality.Quality) / 1000;
 
         /// <summary>The export location.</summary>
         [ObservableProperty]

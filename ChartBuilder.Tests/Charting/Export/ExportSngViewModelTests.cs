@@ -1,5 +1,6 @@
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
+using ChartPacker.Audio.Encoding;
 using ChartPacker.Core.Jobs;
 using ChartPacker.UI.Services;
 
@@ -23,7 +24,9 @@ public sealed class ExportSngViewModelTests
         int pending = 0,
         Func<string, string>? targetFor = null,
         Func<string, bool>? exists = null,
-        IReadOnlyList<ExportStemRow>? stems = null) => new(
+        IReadOnlyList<ExportStemRow>? stems = null,
+        bool transcodeAvailable = true,
+        int bitrateKbps = 128) => new(
         "Artist – Name",
         [new ExportMetadataRow("name", "Name")],
         "album.png",
@@ -38,7 +41,9 @@ public sealed class ExportSngViewModelTests
         targetFor ?? (dest => dest + "/Band.sng"),
         new StubFolders(null),
         "Browse",
-        exists ?? (_ => false));
+        exists ?? (_ => false),
+        transcodeAvailable,
+        bitrateKbps);
 
     [TestMethod]
     public void ShowsResolvedTargetAndAllowsExport()
@@ -112,9 +117,25 @@ public sealed class ExportSngViewModelTests
     }
 
     [TestMethod]
-    public void TranscodeWithNonOpusBlocksExportUntilUnchecked()
+    public void TranscodeWithNonOpusAllowsExportWhenAvailable()
     {
         var vm = Dialog();
+
+        vm.TranscodeToOpus = true;
+
+        Assert.IsFalse(vm.TranscodeBlocked);
+        Assert.IsTrue(vm.ExportCommand.CanExecute(null));
+
+        vm.TranscodeToOpus = false;
+
+        Assert.IsFalse(vm.TranscodeBlocked);
+        Assert.IsTrue(vm.ExportCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void TranscodeUnavailableBlocksExportUntilUnchecked()
+    {
+        var vm = Dialog(transcodeAvailable: false);
 
         vm.TranscodeToOpus = true;
 
@@ -125,6 +146,23 @@ public sealed class ExportSngViewModelTests
 
         Assert.IsFalse(vm.TranscodeBlocked);
         Assert.IsTrue(vm.ExportCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void QualityDefaultsToMusic128k()
+    {
+        var vm = Dialog();
+
+        Assert.AreEqual(OpusQuality.Music, vm.SelectedQuality.Quality);
+        Assert.AreEqual(128, vm.TranscodeBitrateKbps);
+    }
+
+    [TestMethod]
+    public void QualityStartsNearestTheLastBitrate()
+    {
+        Assert.AreEqual(OpusQuality.High, Dialog(bitrateKbps: 192).SelectedQuality.Quality);
+        Assert.AreEqual(OpusQuality.Voice, Dialog(bitrateKbps: 64).SelectedQuality.Quality);
+        Assert.AreEqual(96, Dialog(bitrateKbps: 96).TranscodeBitrateKbps);
     }
 
     [TestMethod]
