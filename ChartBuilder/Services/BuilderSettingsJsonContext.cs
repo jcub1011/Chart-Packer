@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Layout;
+using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Launching;
 
 namespace ChartBuilder.Services
@@ -11,6 +12,7 @@ namespace ChartBuilder.Services
     [JsonSerializable(typeof(LaneDockState))]
     [JsonSerializable(typeof(List<RecentSong>))]
     [JsonSerializable(typeof(ReductionDefaults))]
+    [JsonSerializable(typeof(OverwritePolicy))]
     internal sealed partial class BuilderSettingsJsonContext : JsonSerializerContext
     {
     }

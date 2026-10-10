@@ -3,6 +3,7 @@ using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
+using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Launching;
 
 namespace ChartBuilder.Services
@@ -128,6 +129,15 @@ namespace ChartBuilder.Services
 
         /// <summary>Where Save and pack writes the .sng. Null for asking every time, starting at the song's parent folder.</summary>
         public string? DefaultPackFolder { get; set; }
+
+        /// <summary>The export dialog's location the last time it was confirmed. Null for none yet.</summary>
+        public string? LastExportFolder { get; set; }
+
+        /// <summary>The export dialog's if-exists choice the last time it was confirmed. Null for Chart Packer's policy.</summary>
+        public OverwritePolicy? LastExportPolicy { get; set; }
+
+        /// <summary>Whether the export dialog's auto-transcode to Opus was on the last time it was confirmed. Off by default.</summary>
+        public bool LastTranscodeToOpus { get; set; }
 
         /// <summary>Whether the first song played on an output device that has no calibrated latency offers the calibration tool (charter-spec C11).</summary>
         public bool PromptForCalibration { get; set; } = true;

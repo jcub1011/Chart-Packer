@@ -92,13 +92,14 @@ namespace ChartBuilder.ViewModels
         [RelayCommand(CanExecute = nameof(CanSaveAndPack))]
         private async Task SaveAndPackAsync()
         {
-            if ((HasUnsavedChanges || Song.IsNew || Song.PendingChanges().Count > 0 || Song.Media.Count > 0) && !await SaveCoreAsync())
+            // A new chart has no folder to name the .sng from until it's first saved.
+            if (Song.IsNew && !await SaveCoreAsync())
                 return;
-            if (Song.Entry is not { Kind: SongEntryKind.SongFolder } entry)
+            if (Song.Entry is not { } entry)
                 return;
 
             // An Error is something the games read differently from what's written, so it stops packing (charter-spec C16
-            // item 4); the findings are brought up to date with the save first.
+            // item 4); the findings are brought up to date before the export dialog opens.
             await Findings.SettleAsync();
             if (Findings.ErrorCount > 0)
             {
@@ -106,28 +107,37 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            var settings = ChartPackerSettingsFile.PackSettings(_services.ChartPackerSettingsFile);
-            var (scanRoot, _, layout) = settings.PackOf(entry);
+            // The export dialog previews what will be packed and asks where it goes: nothing is
+            // written until Export is chosen there. The pack folder is only its default location.
+            var dialog = BuildExportDialog(entry);
+            if (!await _services.ExportSng.AskAsync(dialog))
+                return;
 
-            // The pack folder is Chart Builder's own default: when set, packing goes there without asking,
-            // otherwise it asks, starting at the song's parent folder.
-            string? destination = _settings.Settings.DefaultPackFolder;
-            if (string.IsNullOrWhiteSpace(destination))
+            var remembered = _settings.Settings;
+            remembered.LastExportFolder = dialog.ExportFolder;
+            remembered.LastExportPolicy = dialog.Policy;
+            remembered.LastTranscodeToOpus = dialog.TranscodeToOpus;
+            _settings.Save();
+
+            if ((HasUnsavedChanges || Song.PendingChanges().Count > 0 || Song.Media.Count > 0) && !await SaveCoreAsync())
+                return;
+            if (Song.Entry is not { } savedEntry)
+                return;
+
+            await Findings.SettleAsync();
+            if (Findings.ErrorCount > 0)
             {
-                string songPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(entry.FullPath));
-                string projectFolder = Path.GetDirectoryName(songPath) ?? songPath;
-                destination = await _services.FolderPicker.PickFolderAsync(Strings.SaveAndPackPickerTitle, projectFolder);
-                if (destination is null)
-                    return;
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveAndPackErrorsFormat, Findings.ErrorCount));
+                return;
             }
 
             IsSaving = true;
             try
             {
-                JobItemResult? result = null;
-                await Task.Run(() => SongJob.RunAsync(JobKind.Pack, [entry], scanRoot, destination, settings.Policy, new Reporter(r => result = r), layout));
-                var (severity, message) = PackNotice(result);
-                Messages.Post(severity, message);
+                if (savedEntry.Kind == SongEntryKind.SongFolder)
+                    await PackToSngAsync(savedEntry, dialog);
+                else
+                    await CopySngAsync(savedEntry, dialog);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -139,7 +149,107 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        private bool CanSaveAndPack() => !IsSaving && Song.Entry is not { Kind: SongEntryKind.SngFile } && Findings.ErrorCount == 0;
+        private bool CanSaveAndPack() => !IsSaving && Findings.ErrorCount == 0;
+
+        /// <summary>The export dialog for <paramref name="entry"/>, pre-filled with the last choices and the song as Export leaves it.</summary>
+        private ExportSngViewModel BuildExportDialog(SongEntry entry)
+        {
+            bool isSng = entry.Kind == SongEntryKind.SngFile;
+            var packSettings = ChartPackerSettingsFile.PackSettings(_services.ChartPackerSettingsFile);
+            string songPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(entry.FullPath));
+            string songParent = Path.GetDirectoryName(songPath) ?? songPath;
+
+            string initialFolder = _settings.Settings.LastExportFolder
+                ?? _settings.Settings.DefaultPackFolder
+                ?? packSettings.OutputFolder
+                ?? songParent;
+            if (string.IsNullOrWhiteSpace(initialFolder))
+                initialFolder = songParent;
+
+            Func<string, string> targetFor;
+            if (isSng)
+            {
+                string fileName = Path.GetFileName(entry.FullPath);
+                targetFor = dest => Path.Combine(dest, fileName);
+            }
+            else
+            {
+                var (scanRoot, _, layout) = packSettings.PackOf(entry);
+                targetFor = dest => OutputPaths.PackTarget(entry, scanRoot, dest, layout);
+            }
+
+            var metadata = Song.EffectivePairs()
+                .Select(p => new ExportMetadataRow(p.Key, p.Value))
+                .ToList();
+            string artStatus = Song.EffectiveMedia(MediaSlot.AlbumArt) switch
+            {
+                MediaRef.SourceRef source => Path.GetFileName(source.Path),
+                MediaRef.StoredRef => Song.StoredFilesOf(MediaSlot.AlbumArt).FirstOrDefault() ?? Strings.ExportSngArtNone,
+                _ => Strings.ExportSngArtNone,
+            };
+            var stems = Song.Tracks
+                .Select(t =>
+                {
+                    string fileName = t.IsStaged && t.StagedSourcePath is { } staged ? Path.GetFileName(staged) : t.StoredName;
+                    return new ExportStemRow(t.Stem, fileName, Path.GetExtension(fileName).Equals(".opus", StringComparison.OrdinalIgnoreCase));
+                })
+                .OrderBy(t => AudioStems.OrderOf(t.Stem))
+                .ToList();
+
+            return new ExportSngViewModel(
+                Song.Title ?? entry.DisplayName,
+                metadata,
+                artStatus,
+                Art.AlbumArt.Image,
+                stems,
+                initialFolder,
+                isSng,
+                Findings.ErrorCount,
+                Song.PendingChanges().Count + Song.Media.Count + (_undo.IsDirty ? 1 : 0),
+                _settings.Settings.LastExportPolicy ?? packSettings.Policy,
+                _settings.Settings.LastTranscodeToOpus,
+                targetFor,
+                _services.FolderPicker,
+                Strings.SaveAndPackPickerTitle);
+        }
+
+        /// <summary>Packs a song folder to the dialog's location with its if-exists choice.</summary>
+        private async Task PackToSngAsync(SongEntry entry, ExportSngViewModel dialog)
+        {
+            var settings = ChartPackerSettingsFile.PackSettings(_services.ChartPackerSettingsFile);
+            var (scanRoot, _, layout) = settings.PackOf(entry);
+
+            JobItemResult? result = null;
+            await Task.Run(() => SongJob.RunAsync(JobKind.Pack, [entry], scanRoot, dialog.ExportFolder, dialog.Policy, new Reporter(r => result = r), layout));
+            var (severity, message) = PackNotice(result);
+            Messages.Post(severity, message);
+        }
+
+        /// <summary>Saves a copy of a <c>.sng</c>-opened song elsewhere (Save as <c>.sng</c>), with the dialog's if-exists choice.</summary>
+        private async Task CopySngAsync(SongEntry entry, ExportSngViewModel dialog)
+        {
+            string target = Path.Combine(dialog.ExportFolder, Path.GetFileName(entry.FullPath));
+            string? resolved = OutputPaths.Resolve(target, dialog.Policy, isDirectory: false);
+            if (resolved is null)
+            {
+                Messages.Post(Severity.Warning, string.Format(CultureInfo.CurrentCulture, Strings.ExportSngSkippedExistsFormat, target));
+                return;
+            }
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    Directory.CreateDirectory(dialog.ExportFolder);
+                    File.Copy(entry.FullPath, resolved, overwrite: true);
+                });
+                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.ExportSngCopiedFormat, resolved));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, ex.Message));
+            }
+        }
 
         [RelayCommand(CanExecute = nameof(CanExportCopy))]
         private async Task ExportCopyAsync()

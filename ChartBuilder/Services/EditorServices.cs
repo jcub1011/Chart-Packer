@@ -13,6 +13,7 @@ namespace ChartBuilder.Services
     /// <param name="ImagePicker">Picks the album art the Art tab puts in place of the song's.</param>
     /// <param name="FilePicker">Picks the tracks and backgrounds Chart settings and the Art tab add.</param>
     /// <param name="FirstSave">Asks where a new chart's first save makes its folder.</param>
+    /// <param name="ExportSng">Shows the Export to <c>.sng</c> dialog: preview, location and if-exists choice.</param>
     /// <param name="MessagesDialog">Shows what the Editor has said this session, from its message bar.</param>
     /// <param name="OpenOutput">Opens the audio output, for playback.</param>
     /// <param name="Latency">The audio/visual latency, which what's drawn against the audio allows for.</param>
@@ -29,6 +30,7 @@ namespace ChartBuilder.Services
         IImagePickerService ImagePicker,
         IFilePickerService FilePicker,
         IFirstSaveDialogService FirstSave,
+        IExportSngDialogService ExportSng,
         IMessagesDialogService MessagesDialog,
         Func<int, IAudioOutput> OpenOutput,
         AudioLatencyService Latency,

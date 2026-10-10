@@ -1257,11 +1257,11 @@ Open it anyway?</value>
     <value>Save and pack</value>
   </data>
   <data name="SaveAndPackToolTip" xml:space="preserve">
-    <value>Save, then pack the song to a .sng in the pack folder, with Chart Packer's overwrite settings</value>
+    <value>Save, then review and export the song to a .sng</value>
   </data>
   <data name="SaveAndPackSngToolTip" xml:space="preserve">
-    <value>The song is already a .sng; Save writes to it</value>
-    <comment>Save and pack's tooltip, disabled, when the song open is a .sng.</comment>
+    <value>Save, then review and save a copy of the .sng elsewhere</value>
+    <comment>Save and pack's tooltip when the song open is a .sng.</comment>
   </data>
   <data name="ExportCopyButton" xml:space="preserve">
     <value>Export copy</value>
@@ -1451,7 +1451,7 @@ Saving also makes these changes to song.ini:
     <value>Pack folder</value>
   </data>
   <data name="PackFolderDescription" xml:space="preserve">
-    <value>Where Save and pack writes the .sng. When set, packing goes there without asking. When empty, it asks every time, starting at the song's parent folder.</value>
+    <value>The export dialog's default location for the .sng. When empty, it starts at the song's parent folder. The dialog always asks before writing anything.</value>
   </data>
   <data name="PackFolderKeywords" xml:space="preserve">
     <value>pack export output sng folder destination save</value>
@@ -1462,6 +1462,138 @@ Saving also makes these changes to song.ini:
   <data name="SaveAndPackPickerTitle" xml:space="preserve">
     <value>Pack the .sng into</value>
     <comment>The folder picker's title for Save and pack; the .sng is written inside the one picked.</comment>
+  </data>
+  <data name="ExportSngTitle" xml:space="preserve">
+    <value>Export to .sng</value>
+  </data>
+  <data name="ExportSngIntro" xml:space="preserve">
+    <value>Review what will be packed, choose where the .sng goes, then Export. Nothing is written until then.</value>
+  </data>
+  <data name="ExportSngSongLabel" xml:space="preserve">
+    <value>Song</value>
+  </data>
+  <data name="ExportSngMetadataLabel" xml:space="preserve">
+    <value>Song metadata (as exported)</value>
+  </data>
+  <data name="ExportSngArtLabel" xml:space="preserve">
+    <value>Album art</value>
+  </data>
+  <data name="ExportSngArtNone" xml:space="preserve">
+    <value>No album art</value>
+  </data>
+  <data name="ExportSngStemsLabel" xml:space="preserve">
+    <value>Audio stems</value>
+  </data>
+  <data name="ExportSngStemPassthrough" xml:space="preserve">
+    <value>already Opus</value>
+    <comment>A stem's note in the export dialog when its file is already Opus.</comment>
+  </data>
+  <data name="ExportSngStemWillTranscode" xml:space="preserve">
+    <value>will transcode to Opus</value>
+    <comment>A stem's note in the export dialog when auto-transcode will convert its file.</comment>
+  </data>
+  <data name="ExportSngStemAsIs" xml:space="preserve">
+    <value>packed as-is</value>
+    <comment>A stem's note in the export dialog when its file is packed unchanged.</comment>
+  </data>
+  <data name="ExportSngNoStems" xml:space="preserve">
+    <value>No audio stems.</value>
+  </data>
+  <data name="ExportSngLocationLabel" xml:space="preserve">
+    <value>Export location</value>
+  </data>
+  <data name="ExportSngBrowseButton" xml:space="preserve">
+    <value>Browse…</value>
+  </data>
+  <data name="ExportSngTargetLabel" xml:space="preserve">
+    <value>Will write</value>
+  </data>
+  <data name="ExportSngExistsFormat" xml:space="preserve">
+    <value>{0} already exists.</value>
+    <comment>{0} is the .sng that exists.</comment>
+  </data>
+  <data name="ExportSngPolicyLabel" xml:space="preserve">
+    <value>If the .sng already exists</value>
+  </data>
+  <data name="ExportSngPolicyOverwrite" xml:space="preserve">
+    <value>Overwrite it</value>
+  </data>
+  <data name="ExportSngPolicyRename" xml:space="preserve">
+    <value>Rename (write Name (2).sng)</value>
+  </data>
+  <data name="ExportSngPolicySkip" xml:space="preserve">
+    <value>Skip (write nothing)</value>
+  </data>
+  <data name="ExportSngRenamePreviewFormat" xml:space="preserve">
+    <value>Will write {0} instead.</value>
+    <comment>{0} is the renamed .sng.</comment>
+  </data>
+  <data name="ExportSngTranscodeLabel" xml:space="preserve">
+    <value>Auto-transcode non-Opus audio to Opus</value>
+  </data>
+  <data name="ExportSngTranscodeNote" xml:space="preserve">
+    <value>Off by default. Applies to song folders only.</value>
+  </data>
+  <data name="ExportSngTranscodeUnavailable" xml:space="preserve">
+    <value>Transcoding to Opus isn't bundled in this build yet, so Export stays disabled while this is checked with non-Opus stems. Convert the stems to .opus first, or uncheck it to pack as-is.</value>
+  </data>
+  <data name="ExportSngTranscodeSngNote" xml:space="preserve">
+    <value>Transcoding isn't available for songs opened from a .sng; the .sng is copied as-is.</value>
+  </data>
+  <data name="ExportSngErrorsFormat" xml:space="preserve">
+    <value>Resolve the {0} chart error(s) in Findings before exporting.</value>
+    <comment>{0} is the error count.</comment>
+  </data>
+  <data name="ExportSngPendingFormat" xml:space="preserve">
+    <value>{0} unsaved change(s) will be saved on Export.</value>
+    <comment>{0} is the pending change count.</comment>
+  </data>
+  <data name="ExportSngExportButton" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="ExportSngNoFolder" xml:space="preserve">
+    <value>Choose where the .sng goes.</value>
+  </data>
+  <data name="ExportSngCopiedFormat" xml:space="preserve">
+    <value>Saved and copied the .sng to {0}.</value>
+    <comment>{0} is the .sng written.</comment>
+  </data>
+  <data name="ExportSngSkippedExistsFormat" xml:space="preserve">
+    <value>Saved, but nothing was written: {0} is already there, and the choice is to skip it.</value>
+    <comment>{0} is the .sng that exists.</comment>
+  </data>
+  <data name="ExportSngSongHeading" xml:space="preserve">
+    <value>Song</value>
+  </data>
+  <data name="ExportSngAudioHeading" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="ExportSngLocationHeading" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="ExportSngOtherHeading" xml:space="preserve">
+    <value>Other metadata</value>
+  </data>
+  <data name="ExportSngNameLabel" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="ExportSngArtistLabel" xml:space="preserve">
+    <value>Artist</value>
+  </data>
+  <data name="ExportSngAlbumLabel" xml:space="preserve">
+    <value>Album</value>
+  </data>
+  <data name="ExportSngGenreLabel" xml:space="preserve">
+    <value>Genre</value>
+  </data>
+  <data name="ExportSngYearLabel" xml:space="preserve">
+    <value>Year</value>
+  </data>
+  <data name="ExportSngCharterLabel" xml:space="preserve">
+    <value>Charter</value>
+  </data>
+  <data name="ExportSngLengthLabel" xml:space="preserve">
+    <value>Length</value>
   </data>
   <data name="RecoveredNotice" xml:space="preserve">
     <value>Recovered from an autosave. It isn't saved yet: save it to keep it.</value>

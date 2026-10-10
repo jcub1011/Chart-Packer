@@ -46,6 +46,10 @@ namespace ChartBuilder.Services
                 settings.LastNewChartFolder = null;
             if (string.IsNullOrWhiteSpace(settings.DefaultPackFolder))
                 settings.DefaultPackFolder = null;
+            if (string.IsNullOrWhiteSpace(settings.LastExportFolder))
+                settings.LastExportFolder = null;
+            if (settings.LastExportPolicy is not null && !Enum.IsDefined(settings.LastExportPolicy.Value))
+                settings.LastExportPolicy = null;
             settings.CalibrationPrompted = [.. (settings.CalibrationPrompted ?? []).Where(d => !string.IsNullOrEmpty(d)).Distinct()];
             settings.RecentSongs = [.. (settings.RecentSongs ?? []).Where(s => s is not null && !string.IsNullOrWhiteSpace(s.Path)).Take(RecentSongs.Max)];
             foreach (var song in settings.RecentSongs)

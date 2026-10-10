@@ -98,6 +98,7 @@ namespace ChartBuilder.Services
             new AvaloniaImagePickerService(() => editor),
             new AvaloniaFilePickerService(() => editor),
             new AvaloniaFirstSaveDialogService(() => editor),
+            new AvaloniaExportSngDialogService(() => editor),
             new AvaloniaMessagesDialogService(() => editor),
             openOutput,
             latency,
