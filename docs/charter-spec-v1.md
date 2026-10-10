@@ -1360,9 +1360,10 @@ Acceptance criteria:
    from the strike end. Scrolling pauses following until playback is restarted. *Restated in
    CM2:*
    - The cursor is always at that place: it's the lane's strike line.
-   - Scrolling moves the song past it a grid step a notch, through the tempo map, so the strike
-     line stays on the grid across tempo and time-signature changes. The cursor moves with it,
-     and the audio seeks there, playing or paused. A touchpad's part-notches add up to grid steps.
+    - Scrolling moves the song past it a grid step a notch, through the tempo map, so the strike
+      line stays on the grid across tempo and time-signature changes. The cursor moves with it,
+      and the audio seeks there, playing or paused. A touchpad's part-notches add up to grid steps.
+      With `Shift` held, a notch moves four grid steps instead.
    - Pausing leaves the cursor where playback stopped, and Space plays from there.
    - Each lane's look-ahead, the seconds it shows beyond the strike line, is its own. It's set
      from the lane's header, or with Ctrl+wheel, `+` and `−`, and saved with the lane layout. A
@@ -2431,6 +2432,7 @@ These are the defaults. Rebinding is future work.
 | `Shift`+`O` | Nudge the selected notes to their onsets |
 | `B` | Tap tempo |
 | `Ctrl`+wheel, `+` / `−` | Zoom |
+| `Shift`+wheel | Move the cursor four grid steps later or earlier |
 | `Ctrl`+`1`–`4` | Easy to Expert |
 | `V` | Switch between Highway and Timeline |
 | `H` / `G` / `T` | Toggle force HOPO, force strum, tap on the selected chords |
