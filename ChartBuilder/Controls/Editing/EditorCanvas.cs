@@ -171,6 +171,9 @@ namespace ChartBuilder.Controls.Editing
 
         // The wheel's turn not yet taken as a step, as a touchpad turns it a fraction of a notch at a time.
         private double _wheel;
+
+        // The Ctrl+wheel turn not yet taken as a look-ahead step, as a touchpad turns it a fraction of a notch at a time.
+        private double _zoomWheel;
         private Point? _boxFrom;
         private Point _boxTo;
         private ChartPoint _lastPoint;
@@ -967,6 +970,17 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
+        /// <summary>Takes at most one notch out of the wheel turn carried in <paramref name="carry"/>, adding <paramref name="delta"/> first, so a mouse reporting several units per physical notch still moves a single step. A turn the other way starts over, and fractions add up across events, as with cursor scrolling.</summary>
+        internal static int TakeZoomStep(ref double carry, double delta)
+        {
+            if (Math.Sign(delta) != Math.Sign(carry))
+                carry = 0;
+            carry += delta;
+            int notches = (int)Math.Truncate(carry);
+            carry -= notches;
+            return Math.Clamp(notches, -1, 1);
+        }
+
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
@@ -976,8 +990,10 @@ namespace ChartBuilder.Controls.Editing
             double delta = e.Delta.Y;
             if ((e.KeyModifiers & KeyModifiers.Control) != 0)
             {
-                // Turned up, the lane looks less far ahead, so the notes are further apart.
-                lane.ZoomBy(Math.Pow(0.85, delta));
+                // Turned up, the lane looks less far ahead, so the notes are further apart: half a second a notch, at most one notch per wheel event.
+                int zoomStep = TakeZoomStep(ref _zoomWheel, delta);
+                if (zoomStep != 0)
+                    lane.StepLookAhead(-zoomStep);
             }
             else
             {

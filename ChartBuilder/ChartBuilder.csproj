@@ -49,4 +49,8 @@
   <ItemGroup Condition="'$(DesignTimeBuild)' == 'true'">
     <Compile Include="$(IntermediateOutputPath)Strings.Designer.cs" Condition="Exists('$(IntermediateOutputPath)Strings.Designer.cs')" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChartBuilder.Tests" />
+  </ItemGroup>
+
 </Project>

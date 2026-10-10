@@ -179,12 +179,12 @@ namespace ChartBuilder.Controls.Editing
                 case PhysicalKey.BracketRight when plain:
                     session.Snap = session.Snap.Finer();
                     return true;
-                // The lane's look-ahead: + looks less far, so the notes spread out; − looks further.
+                // The lane's look-ahead: + looks less far, so the notes spread out; − looks further. Half a second a press.
                 case PhysicalKey.Equal or PhysicalKey.NumPadAdd when plain || shift:
-                    lane.ZoomBy(0.8);
+                    lane.StepLookAhead(-1);
                     return true;
                 case PhysicalKey.Minus or PhysicalKey.NumPadSubtract when plain:
-                    lane.ZoomBy(1.25);
+                    lane.StepLookAhead(1);
                     return true;
                 // The lane's audio as a waveform or a spectrogram (charter-spec C13 item 5).
                 case PhysicalKey.W when plain:

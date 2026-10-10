@@ -91,6 +91,18 @@ public sealed class EditorViewportTests
     }
 
     [TestMethod]
+    public void ALanesLookAheadMovesInHalfSecondSteps()
+    {
+        Assert.AreEqual(0.5, EditorViewport.ClampLookAhead(0), 1e-9, "Never below half a second.");
+        Assert.AreEqual(60, EditorViewport.ClampLookAhead(100), 1e-9, "Never above 60 seconds.");
+        Assert.AreEqual(1.5, EditorViewport.ClampLookAhead(1.26), 1e-9, "Rounds to the nearest half second.");
+        Assert.AreEqual(1.0, EditorViewport.ClampLookAhead(1.24), 1e-9);
+        Assert.AreEqual(2.0, EditorViewport.ClampLookAhead(2), 1e-9, "A value already on a step stays.");
+        Assert.AreEqual(2.5, EditorViewport.QuantizeLookAhead(2.5), 1e-9);
+        Assert.AreEqual(0.5, EditorViewport.ClampLookAhead(double.NaN), 1e-9, "Not a number is the shortest look-ahead.");
+    }
+
+    [TestMethod]
     public void ALanesLookAheadIsHowFarItShowsBeyondTheStrikeLine()
     {
         var viewport = new EditorViewport();

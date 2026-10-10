@@ -91,8 +91,8 @@ namespace ChartBuilder.ViewModels
         public partial double LookAhead { get; set; }
 
         /// <summary>
-        /// The look-ahead for the header's slider: its base-2 logarithm, so a short one is set as finely as a long one,
-        /// from <see cref="MinLookAheadScale"/> to <see cref="MaxLookAheadScale"/>.
+        /// The look-ahead on a base-2 logarithmic scale, from <see cref="MinLookAheadScale"/> to
+        /// <see cref="MaxLookAheadScale"/>. The header's slider binds <see cref="LookAhead"/> linearly instead.
         /// </summary>
         public double LookAheadScale
         {
@@ -104,11 +104,20 @@ namespace ChartBuilder.ViewModels
 
         public static double MaxLookAheadScale => Math.Log2(EditorViewport.MaxLookAhead);
 
+        /// <summary>The shortest look-ahead the header's slider offers, in seconds.</summary>
+        public static double MinLookAhead => EditorViewport.MinLookAhead;
+
+        /// <summary>The longest look-ahead the header's slider offers, in seconds.</summary>
+        public static double MaxLookAhead => EditorViewport.MaxLookAhead;
+
         /// <summary>The look-ahead as the header shows it, e.g. "2.0 s".</summary>
         public string LookAheadText => string.Format(CultureInfo.CurrentCulture, Strings.LaneLookAheadFormat, LookAhead);
 
         /// <summary>Looks further ahead by <paramref name="factor"/>, or nearer when it's less than 1.</summary>
-        public void ZoomBy(double factor) => LookAhead *= factor;
+        public void ZoomBy(double factor) => LookAhead = EditorViewport.ClampLookAhead(LookAhead * factor);
+
+        /// <summary>Looks further ahead by half a second per <paramref name="steps"/>, or nearer when negative.</summary>
+        public void StepLookAhead(double steps) => LookAhead = EditorViewport.ClampLookAhead(LookAhead + steps * EditorViewport.LookAheadStep);
 
         /// <summary>Another difficulty of the part, drawn faintly behind the lane's own; null for none.</summary>
         [ObservableProperty]

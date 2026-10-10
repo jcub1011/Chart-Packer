@@ -316,11 +316,13 @@
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneLookAheadLabel}" />
                                         <TextBlock Grid.Column="1" Classes="muted" Text="{Binding LookAheadText}" />
                                     </Grid>
-                                    <Slider Minimum="{x:Static vm:EditorLaneViewModel.MinLookAheadScale}"
-                                            Maximum="{x:Static vm:EditorLaneViewModel.MaxLookAheadScale}"
-                                            SmallChange="0.1"
-                                            LargeChange="0.5"
-                                            Value="{Binding LookAheadScale}"
+                                    <Slider Minimum="{x:Static vm:EditorLaneViewModel.MinLookAhead}"
+                                            Maximum="{x:Static vm:EditorLaneViewModel.MaxLookAhead}"
+                                            SmallChange="0.5"
+                                            LargeChange="5"
+                                            TickFrequency="0.5"
+                                            IsSnapToTickEnabled="True"
+                                            Value="{Binding LookAhead}"
                                             AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}" />
                                 </StackPanel>
                             </Flyout>
