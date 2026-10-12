@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using ChartBuilder.ViewModels;
 using ChartPacker.Core.Charting.Layout;
 
@@ -305,8 +307,18 @@ namespace ChartBuilder.Controls
 
         private void OnHeaderPressed(EditorLane view, PointerPressedEventArgs e)
         {
-            // The header's buttons take their own presses, so only the header itself starts a drag.
+            // The header's buttons take their own presses, so only the header itself starts a drag. Buttons mark
+            // their presses handled before they bubble here, but a ComboBox's closed box doesn't, so presses from
+            // anywhere inside an interactive header control are ignored explicitly (else the lane would capture the
+            // pointer and the difficulty drop-down would never open).
             if (!e.GetCurrentPoint(view.DragHandle).Properties.IsLeftButtonPressed)
+                return;
+            if (e.Source is Visual source
+                && (source.FindAncestorOfType<Button>(includeSelf: true) is not null
+                    || source.FindAncestorOfType<ToggleButton>(includeSelf: true) is not null
+                    || source.FindAncestorOfType<ComboBox>(includeSelf: true) is not null
+                    || source.FindAncestorOfType<ComboBoxItem>(includeSelf: true) is not null
+                    || source.FindAncestorOfType<Slider>(includeSelf: true) is not null))
                 return;
 
             CancelDrag();

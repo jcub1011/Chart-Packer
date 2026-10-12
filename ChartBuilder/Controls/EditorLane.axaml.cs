@@ -9,8 +9,9 @@ namespace ChartBuilder.Controls
         // drop-down, so a width on the edge doesn't flip between them.
         private const double LettersHysteresis = 8;
 
-        // How wide the difficulty letters are, as last measured while they were shown.
-        private double _lettersWidth;
+        // How wide the difficulty letters are, as last measured while they were shown. Starts at roughly four
+        // buttons, so a narrow lane starts on the drop-down instead of flashing the letters first.
+        private double _lettersWidth = 90;
 
         public EditorLane()
         {

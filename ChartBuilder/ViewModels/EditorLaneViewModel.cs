@@ -70,7 +70,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The part and difficulty the lane shows; null for a vocal part.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline))]
+        [NotifyPropertyChangedFor(nameof(Placeholder), nameof(HasCanvas), nameof(HasPlaceholder), nameof(ShowsHighway), nameof(ShowsTimeline), nameof(SelectedDifficultyIndex))]
         public partial ChartTrackKey? Track { get; private set; }
 
         /// <summary>How the lane draws the song: a vertical highway or a horizontal timeline. <c>V</c> switches it.</summary>
@@ -152,17 +152,21 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The part's four difficulties, as the header's letters (charter-spec C3 item 3).</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(CurrentDifficulty))]
+        [NotifyPropertyChangedFor(nameof(SelectedDifficultyIndex))]
         public partial IReadOnlyList<DifficultyLetter> Difficulties { get; private set; } = [];
 
-        /// <summary>The difficulty shown, of <see cref="Difficulties"/>, as the header's drop-down picks it when the lane is too narrow for the letters.</summary>
-        public DifficultyLetter? CurrentDifficulty
+        /// <summary>Index into <see cref="Difficulties"/> of the difficulty shown, as the header's drop-down picks it
+        /// when the lane is too narrow for the letters.</summary>
+        /// <remarks>Bound by index, rather than by item or value: the letters are remade after every edit, with new
+        /// commands, so neither item equality nor a value re-match survives the list being replaced.</remarks>
+        public int SelectedDifficultyIndex
         {
-            get => Difficulties.FirstOrDefault(static d => d.IsCurrent);
+            get => Track is { } track ? (int)track.Difficulty : -1;
             set
             {
-                if (value is not null)
-                    ShowDifficulty(value.Difficulty);
+                if (value >= 0 && value < Difficulties.Count)
+                    ShowDifficulty(Difficulties[value].Difficulty);
+                OnPropertyChanged();
             }
         }
 
@@ -260,12 +264,28 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            Difficulties = [.. Enum.GetValues<ChartDifficulty>().Select(d => new DifficultyLetter(
-                d,
-                ChartLabels.DifficultyName(d),
-                part is not null && part[d].Notes.Count > 0,
-                d == track.Difficulty,
-                new RelayCommand(() => ShowDifficulty(d))))];
+            var values = Enum.GetValues<ChartDifficulty>();
+            if (Difficulties.Count != values.Length)
+            {
+                Difficulties = [.. values.Select(d => new DifficultyLetter(
+                    d,
+                    ChartLabels.DifficultyName(d),
+                    part is not null && part[d].Notes.Count > 0,
+                    d == track.Difficulty,
+                    new RelayCommand(() => ShowDifficulty(d))))];
+            }
+            else
+            {
+                // In place, keeping the same objects: replacing the list would clear the header drop-down's
+                // selection, leaving its box blank until the difficulty is picked again. Made in the same order,
+                // so each letter is its difficulty's.
+                for (int i = 0; i < values.Length; i++)
+                {
+                    var letter = Difficulties[i];
+                    letter.HasNotes = part is not null && part[values[i]].Notes.Count > 0;
+                    letter.IsCurrent = values[i] == track.Difficulty;
+                }
+            }
             GhostMenu =
             [
                 LaneMenuItem.Choice(Strings.LaneGhostNone, Ghost is null, () => Ghost = null),
@@ -333,8 +353,31 @@ namespace ChartBuilder.ViewModels
     }
 
     /// <summary>One of a lane's difficulty letters: E, M, H or X, coloured when it has notes (charter-spec C3 item 3).</summary>
-    public sealed record DifficultyLetter(ChartDifficulty Difficulty, string Name, bool HasNotes, bool IsCurrent, IRelayCommand Show)
+    /// <remarks>One stable instance per difficulty, updated in place: the header's drop-down keeps its selection
+    /// across refreshes only while its items stay the same objects.</remarks>
+    public sealed partial class DifficultyLetter : ObservableObject
     {
+        public DifficultyLetter(ChartDifficulty difficulty, string name, bool hasNotes, bool isCurrent, IRelayCommand show)
+        {
+            Difficulty = difficulty;
+            Name = name;
+            HasNotes = hasNotes;
+            IsCurrent = isCurrent;
+            Show = show;
+        }
+
+        public ChartDifficulty Difficulty { get; }
+
+        public string Name { get; }
+
+        [ObservableProperty]
+        public partial bool HasNotes { get; set; }
+
+        [ObservableProperty]
+        public partial bool IsCurrent { get; set; }
+
+        public IRelayCommand Show { get; }
+
         /// <summary>The letter: E, M, H or X.</summary>
         public string Letter => Difficulty switch
         {

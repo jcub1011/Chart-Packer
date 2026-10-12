@@ -70,11 +70,15 @@
             <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
         </Style>
 
-        <!-- The drop-down in their place in a narrow lane: the lane's letter, and the difficulties' names, coloured alike. -->
+        <!-- The drop-down in their place in a narrow lane: the lane's letter, and the difficulties' names, coloured alike.
+             Fixed to one letter plus the chevron: sizing to the full names would push the lane's tools aside. -->
         <Style Selector="ComboBox.difficulty">
+            <Setter Property="Width" Value="60" />
+            <Setter Property="MinWidth" Value="0" />
             <Setter Property="Height" Value="24" />
             <Setter Property="MinHeight" Value="24" />
             <Setter Property="Padding" Value="8,0,0,0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style Selector="TextBlock.difficulty">
@@ -138,7 +142,7 @@
                               Classes="difficulty"
                               IsVisible="False"
                               ItemsSource="{Binding Difficulties}"
-                              SelectedItem="{Binding CurrentDifficulty}"
+                              SelectedIndex="{Binding SelectedDifficultyIndex, Mode=TwoWay}"
                               ToolTip.Tip="{x:Static res:Strings.LaneDifficultyPickerToolTip}"
                               AutomationProperties.Name="{x:Static res:Strings.LaneDifficultyPickerToolTip}">
                         <ComboBox.SelectionBoxItemTemplate>
