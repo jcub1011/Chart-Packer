@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -42,13 +43,15 @@ namespace ChartPacker.ViewModels
                 if (e.PropertyName == nameof(LibraryViewModel.SelectedEntries))
                     _ = Detail.ShowAsync(Library.SelectedEntries);
             };
+            Library.EditedSongsChanged += (_, changed) => _ = RefreshDetailForChangedAsync(changed);
             Library.PrepareEditChart = PrepareEditChartAsync;
         }
 
         /// <summary>
         /// Called as the window is activated, as when the user comes back from Chart Builder: re-reads the songs opened
         /// in it that have changed, and the inspector's, if it's showing one of them, and the audio latency its
-        /// calibration tool measures (charter-spec §4.8). Never throws.
+        /// calibration tool measures (charter-spec §4.8). Never throws. Songs Chart Builder saves while both windows
+        /// show are also picked up by the library's background poller.
         /// </summary>
         public async Task OnActivatedAsync()
         {
@@ -58,6 +61,23 @@ namespace ChartPacker.ViewModels
             try
             {
                 var changed = await Library.RefreshEditedSongsAsync();
+                await RefreshDetailForChangedAsync(changed);
+            }
+            catch (Exception ex)
+            {
+                // Nothing awaits this, so anything not caught here would be lost.
+                Trace.TraceError($"Re-reading the songs Chart Builder changed failed: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// Re-shows the inspector when it displays one of the <paramref name="changed"/> songs Chart Builder saved.
+        /// Unsaved changes in the inspector are kept as they are rather than shown over. Never throws.
+        /// </summary>
+        private async Task RefreshDetailForChangedAsync(IReadOnlyList<SongEntry> changed)
+        {
+            try
+            {
                 var shown = Library.SelectedEntries;
                 bool showsChanged = changed.Any(c => shown.Any(s => s.FullPath == c.FullPath));
 
