@@ -79,6 +79,10 @@ namespace ChartBuilder.Services
             settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);
             settings.EditorTimelineHeight = Size(settings.EditorTimelineHeight, BuilderSettings.MinEditorTimelineHeight, BuilderSettings.DefaultEditorTimelineHeight);
+
+            if (settings.EditorFullscreen)
+                settings.EditorMaximized = true;
+            SanitizeEditorBounds(settings);
         }
 
         /// <summary>
@@ -87,5 +91,30 @@ namespace ChartBuilder.Services
         /// </summary>
         private static double Size(double value, double min, double fallback) =>
             double.IsFinite(value) ? Math.Clamp(value, min, BuilderSettings.MaxEditorPanelSize) : fallback;
+
+        /// <summary>
+        /// A saved editor normal size, clamped to the window's minimum and maximum; null when it isn't a
+        /// number. A bound missing any part restores none of it, so a half-saved bound is dropped whole.
+        /// </summary>
+        private static void SanitizeEditorBounds(BuilderSettings settings)
+        {
+            double? width = settings.EditorWidth is { } w && double.IsFinite(w)
+                ? Math.Clamp(w, BuilderSettings.MinEditorWidth, BuilderSettings.MaxEditorWidth)
+                : null;
+            double? height = settings.EditorHeight is { } h && double.IsFinite(h)
+                ? Math.Clamp(h, BuilderSettings.MinEditorHeight, BuilderSettings.MaxEditorHeight)
+                : null;
+            if (width is null || height is null || settings.EditorX is null || settings.EditorY is null)
+            {
+                settings.EditorX = null;
+                settings.EditorY = null;
+                settings.EditorWidth = null;
+                settings.EditorHeight = null;
+                return;
+            }
+
+            settings.EditorWidth = width;
+            settings.EditorHeight = height;
+        }
     }
 }

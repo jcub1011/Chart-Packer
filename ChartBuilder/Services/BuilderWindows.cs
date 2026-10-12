@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
@@ -233,9 +235,12 @@ namespace ChartBuilder.Services
         {
             editor.DataContext = viewModel;
 
-            // The next Editor opens maximized when the last one closed maximized.
-            if (settings.Settings.EditorMaximized)
-                editor.WindowState = WindowState.Maximized;
+            // The window this one replaces, if any: a new project keeps its screen, position, size and state.
+            var previous = desktop.MainWindow as EditorWindow;
+            if (previous is not null && !ReferenceEquals(previous, editor) && previous.WindowState != WindowState.Minimized)
+                HandOff(previous, editor);
+            else
+                RestorePlacement(editor);
 
             // The song's audio and lock go with the window.
             editor.Closed += (_, _) => viewModel.Dispose();
@@ -266,23 +271,112 @@ namespace ChartBuilder.Services
                 });
             };
 
-            // A minimized editor doesn't say how it was shown.
+            // A minimized editor doesn't say how it was shown or where it was.
             editor.Closing += (_, e) =>
             {
                 if (e.Cancel)
                     return;
 
-                if (editor.WindowState != WindowState.Minimized)
-                    settings.Settings.EditorMaximized = editor.WindowState is WindowState.Maximized or WindowState.FullScreen;
+                if (editor.WindowState == WindowState.Minimized)
+                {
+                    settings.Save();
+                    return;
+                }
+
+                if (editor.WindowState == WindowState.Normal)
+                {
+                    settings.Settings.EditorX = editor.Position.X;
+                    settings.Settings.EditorY = editor.Position.Y;
+                    settings.Settings.EditorWidth = editor.Width;
+                    settings.Settings.EditorHeight = editor.Height;
+                    settings.Settings.EditorMaximized = false;
+                    settings.Settings.EditorFullscreen = false;
+                }
+                else if (editor.WindowState == WindowState.FullScreen)
+                {
+                    settings.Settings.EditorMaximized = true;
+                    settings.Settings.EditorFullscreen = true;
+                }
+                else
+                {
+                    settings.Settings.EditorMaximized = true;
+                    settings.Settings.EditorFullscreen = false;
+                }
+
                 settings.Save();
             };
 
             // The window this one replaces closes once it's showing, so the app, which exits when its last window
             // closes, stays up.
-            var previous = desktop.MainWindow;
+            var replaced = desktop.MainWindow;
             Show(editor);
-            if (previous is not null && !ReferenceEquals(previous, editor))
-                previous.Close();
+            if (replaced is not null && !ReferenceEquals(replaced, editor))
+                replaced.Close();
+        }
+
+        /// <summary>
+        /// Puts <paramref name="editor"/> where <paramref name="previous"/> is: the same screen, position and size,
+        /// and the same state, fullscreen included. Opening a song or a new chart swaps windows in place.
+        /// </summary>
+        private static void HandOff(EditorWindow previous, EditorWindow editor)
+        {
+            editor.Width = previous.Width;
+            editor.Height = previous.Height;
+            editor.WindowStartupLocation = WindowStartupLocation.Manual;
+            editor.Position = previous.Position;
+            if (previous.WindowState != WindowState.Normal)
+                editor.WindowState = previous.WindowState;
+        }
+
+        /// <summary>
+        /// Puts <paramref name="editor"/> where it was when it last closed, or leaves it centered when that's
+        /// unknown or no longer on a screen.
+        /// </summary>
+        private void RestorePlacement(EditorWindow editor)
+        {
+            if (settings.Settings.EditorX is not { } x
+                || settings.Settings.EditorY is not { } y
+                || settings.Settings.EditorWidth is not { } width
+                || settings.Settings.EditorHeight is not { } height)
+            {
+                ApplySavedState(editor);
+                return;
+            }
+
+            width = Math.Clamp(width, BuilderSettings.MinEditorWidth, BuilderSettings.MaxEditorWidth);
+            height = Math.Clamp(height, BuilderSettings.MinEditorHeight, BuilderSettings.MaxEditorHeight);
+            var desired = new PixelPoint(x, y);
+
+            var screens = editor.Screens.All;
+            if (screens.Count == 0)
+            {
+                ApplySavedState(editor);
+                return;
+            }
+
+            Screen? target = editor.Screens.ScreenFromPoint(desired);
+            target ??= editor.Screens.ScreenFromPoint(new PixelPoint(desired.X + (int)(width / 2), desired.Y + (int)(height / 2)));
+            target ??= screens[0];
+            var area = target.WorkingArea;
+
+            var pixelSize = PixelSize.FromSize(new Size(width, height), target.Scaling);
+            var minPixels = PixelSize.FromSize(new Size(BuilderSettings.MinEditorWidth, BuilderSettings.MinEditorHeight), target.Scaling);
+            pixelSize = WindowPlacement.FitSize(pixelSize, minPixels, area);
+
+            editor.Width = pixelSize.Width / target.Scaling;
+            editor.Height = pixelSize.Height / target.Scaling;
+            editor.WindowStartupLocation = WindowStartupLocation.Manual;
+            editor.Position = WindowPlacement.PlaceAt(desired, pixelSize, area);
+            ApplySavedState(editor);
+        }
+
+        /// <summary>Shows <paramref name="editor"/> maximized or fullscreen when it last closed that way.</summary>
+        private void ApplySavedState(EditorWindow editor)
+        {
+            if (settings.Settings.EditorFullscreen)
+                editor.WindowState = WindowState.FullScreen;
+            else if (settings.Settings.EditorMaximized)
+                editor.WindowState = WindowState.Maximized;
         }
 
         private void Show(Window window)

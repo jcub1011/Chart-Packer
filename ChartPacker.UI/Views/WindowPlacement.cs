@@ -33,6 +33,22 @@ namespace ChartPacker.UI.Views
             Fit(center.Y - (size.Height / 2), size.Height, workingArea.Y, workingArea.Bottom));
 
         /// <summary>
+        /// Where a window of <paramref name="size"/> goes to be at <paramref name="position"/>, moved as little as
+        /// keeps it inside <paramref name="workingArea"/>. One too big for the area is put at its top left.
+        /// </summary>
+        public static PixelPoint PlaceAt(PixelPoint position, PixelSize size, PixelRect workingArea) => new(
+            Fit(position.X, size.Width, workingArea.X, workingArea.Right),
+            Fit(position.Y, size.Height, workingArea.Y, workingArea.Bottom));
+
+        /// <summary>
+        /// <paramref name="size"/> made to fit in <paramref name="workingArea"/>: at most the area, at
+        /// least <paramref name="min"/> where the area allows it.
+        /// </summary>
+        public static PixelSize FitSize(PixelSize size, PixelSize min, PixelRect workingArea) => new(
+            Math.Max(Math.Min(size.Width, workingArea.Width), Math.Min(min.Width, workingArea.Width)),
+            Math.Max(Math.Min(size.Height, workingArea.Height), Math.Min(min.Height, workingArea.Height)));
+
+        /// <summary>
         /// Centers <paramref name="window"/>, not yet shown, on <paramref name="center"/>, within the working area of the
         /// screen that point is on.
         /// </summary>

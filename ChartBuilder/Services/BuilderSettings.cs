@@ -113,8 +113,31 @@ namespace ChartBuilder.Services
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }
 
-        /// <summary>Whether the editor was maximized when it last closed, so the next one opens maximized.</summary>
+        /// <summary>Whether the editor was maximized or fullscreen when it last closed, so the next one opens that way.</summary>
+        /// <remarks>Kept for files saved before fullscreen was told apart from maximized; use with <see cref="EditorFullscreen"/>.</remarks>
         public bool EditorMaximized { get; set; }
+
+        /// <summary>Whether the editor was fullscreen when it last closed, so the next one opens fullscreen.</summary>
+        public bool EditorFullscreen { get; set; }
+
+        /// <summary>The editor's normal bounds when it last closed, in screen pixels (position) and device-independent pixels (size). Null for none yet.</summary>
+        public int? EditorX { get; set; }
+
+        public int? EditorY { get; set; }
+
+        public double? EditorWidth { get; set; }
+
+        public double? EditorHeight { get; set; }
+
+        /// <summary>The narrowest and shortest the editor's normal size is restored as.</summary>
+        public const double MinEditorWidth = 720;
+
+        public const double MinEditorHeight = 480;
+
+        /// <summary>The widest and tallest the editor's normal size is restored as: bigger than an 8K screen.</summary>
+        public const double MaxEditorWidth = 7680;
+
+        public const double MaxEditorHeight = 4320;
 
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;
