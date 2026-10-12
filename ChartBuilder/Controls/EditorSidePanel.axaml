@@ -24,14 +24,29 @@
                                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                                 BorderThickness="0,0,0,1">
                             <Grid ColumnDefinitions="*,Auto">
-                                <!-- EditorSidePanel.cs scrolls it sideways with the mouse wheel. Its scroll bar is
-                                     shown whole whenever the tabs don't fit, rather than growing under the pointer, and
-                                     EditorSidePanel.cs makes room for it below them. -->
+                                <!-- EditorSidePanel.cs scrolls it sideways with the mouse wheel. Its scroll bar stays in
+                                     the collapsed state, floating over the band's foot with no extra padding. -->
                                 <ScrollViewer Name="PART_TabScroller"
                                               Grid.Column="0"
-                                              AllowAutoHide="False"
+                                              AllowAutoHide="True"
                                               HorizontalScrollBarVisibility="Auto"
                                               VerticalScrollBarVisibility="Disabled">
+                                    <ScrollViewer.Styles>
+                                        <!-- Keep the horizontal bar collapsed even while the pointer is over it. -->
+                                        <Style Selector="ScrollBar:horizontal[IsExpanded=true] /template/ Grid#Root">
+                                            <Setter Property="Background" Value="Transparent" />
+                                        </Style>
+                                        <Style Selector="ScrollBar:horizontal[IsExpanded=true] /template/ Rectangle#TrackRect">
+                                            <Setter Property="Opacity" Value="0" />
+                                        </Style>
+                                        <Style Selector="ScrollBar:horizontal[IsExpanded=true] /template/ Thumb">
+                                            <Setter Property="Background" Value="{DynamicResource ScrollBarPanningThumbBackground}" />
+                                            <Setter Property="RenderTransform" Value="{DynamicResource HorizontalSmallScrollThumbScaleTransform}" />
+                                        </Style>
+                                        <Style Selector="ScrollBar:horizontal[IsExpanded=true] /template/ RepeatButton">
+                                            <Setter Property="Opacity" Value="0" />
+                                        </Style>
+                                    </ScrollViewer.Styles>
                                     <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
                                 </ScrollViewer>
                                 <Button Grid.Column="1"
