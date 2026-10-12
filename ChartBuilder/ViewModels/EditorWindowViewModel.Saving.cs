@@ -386,10 +386,12 @@ namespace ChartBuilder.ViewModels
                 await WriteRecoveryForSaveAsync(written.Bytes, version);
 
                 // The files the save replaces or removes are kept first, so undo can still bring them back, and the editor
-                // lets go of the ones it has open, which couldn't be replaced while it held them.
+                // lets go of the ones it has open, which couldn't be replaced while it held them. A .sng save rewrites
+                // the .sng itself, so every handle to it is let go of: playback and editor audio hold it open with
+                // FileShare.Read, which would otherwise block the replace, and their stored offsets would be stale after.
                 var stash = _stash ??= MediaStash.Create();
                 var kept = await Task.Run(() => stash.KeepAsync(Song, slots));
-                released = ReleaseFilesFor(slots);
+                released = ReleaseFilesFor(entry, slots);
                 var findings = await Task.Run(() => ChartSaver.SaveAsync(entry, request, written));
                 if (FirstError(findings) is { } error)
                 {
@@ -418,14 +420,17 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
-        /// Lets go of the song's files the save of <paramref name="slots"/> replaces or removes, which are held open while
+        /// Lets go of the song's files the save replaces or removes, which are held open while
         /// they're played and drawn: the audio, when a track changes, and the background video, when it does.
+        /// A <c>.sng</c> save rewrites the <c>.sng</c> itself, so it always lets go of the audio and the video,
+        /// which hold the <c>.sng</c> open and couldn't be replaced while they held it.
         /// </summary>
         /// <returns>Whether anything was let go of, to be opened again once the save is done.</returns>
-        private bool ReleaseFilesFor(IReadOnlyCollection<MediaSlot> slots)
+        private bool ReleaseFilesFor(SongEntry entry, IReadOnlyCollection<MediaSlot> slots)
         {
-            bool tracks = slots.Any(s => s.Kind == MediaKind.Track);
-            bool video = slots.Contains(MediaSlot.BackgroundVideo);
+            bool isSng = entry.Kind == SongEntryKind.SngFile;
+            bool tracks = isSng || slots.Any(s => s.Kind == MediaKind.Track);
+            bool video = isSng || slots.Contains(MediaSlot.BackgroundVideo);
             if (tracks)
             {
                 _tracksTimer.Stop();
