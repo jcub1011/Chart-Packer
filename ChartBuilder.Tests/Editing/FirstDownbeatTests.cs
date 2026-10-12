@@ -62,7 +62,7 @@ public sealed class FirstDownbeatTests
         var edit = TempoMapEdits.LeadIn(Guitar(), 0.2, TimeSpan.Zero, keepTimes: false);
 
         Assert.IsTrue(edit.IsRefused);
-        Assert.Contains("Delay", edit.Refusal);
+        Assert.Contains("Delay", edit.Refusal ?? string.Empty);
     }
 
     [TestMethod]

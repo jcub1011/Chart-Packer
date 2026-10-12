@@ -101,7 +101,7 @@ public sealed class ChartIssuesTests
         Assert.AreSequenceEqual((object[])[a, e, d], rows.ToList());
         Assert.HasCount(2, changes);
         Assert.AreEqual(1, changes[0].OldStartingIndex);
-        Assert.HasCount(2, changes[0].OldItems);
+        Assert.HasCount(2, changes[0].OldItems ?? Array.Empty<object>());
         Assert.AreEqual(1, changes[1].NewStartingIndex);
     }
 

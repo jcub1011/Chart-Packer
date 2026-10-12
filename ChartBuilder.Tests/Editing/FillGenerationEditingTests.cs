@@ -154,7 +154,7 @@ public sealed class FillGenerationEditingTests
         session.SetSongSettings([], TimeSpan.FromSeconds(1));
 
         Assert.IsFalse(session.Fills.IsActive);
-        Assert.Contains("dropped", session.Status);
+        Assert.Contains("dropped", session.Status ?? string.Empty);
     }
 
     [TestMethod]
@@ -218,7 +218,7 @@ public sealed class FillGenerationEditingTests
         Assert.IsFalse(session.Fills.Start(FillOptions.Default, null));
 
         Assert.IsFalse(session.Fills.IsActive);
-        Assert.Contains("second star power phrase", session.Status);
+        Assert.Contains("second star power phrase", session.Status ?? string.Empty);
     }
 
     [TestMethod]
