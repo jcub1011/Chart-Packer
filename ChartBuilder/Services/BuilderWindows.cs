@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -24,14 +23,14 @@ using ChartPacker.ViewModels.Settings;
 namespace ChartBuilder.Services
 {
     /// <summary>
-    /// Chart Builder's top-level windows: the launcher (home screen) and the Editor. Only one is open at a time,
-    /// and closing the Editor brings the launcher back.
+    /// Chart Builder's top-level window: the Editor. Opening a song or a new chart swaps it for a new Editor window,
+    /// closing this one; closing the last Editor exits the app.
     /// </summary>
     /// <param name="openOutput">Opens the audio output at a rate, for the Editor's playback and the calibration tool.</param>
     /// <param name="latency">The audio/visual latency, which the calibration tool measures.</param>
     /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
     /// <param name="chartPackerSettingsFile">Chart Packer's settings, which a save reads for the library and packing, never writes.</param>
-    /// <param name="recovery">Where the Editor autosaves the chart open, and the launcher finds what's left to recover.</param>
+    /// <param name="recovery">Where the Editor autosaves the chart open, and where what's left to recover is found on startup.</param>
     public sealed class BuilderWindows(
         IClassicDesktopStyleApplicationLifetime desktop,
         BuilderSettingsService settings,
@@ -44,37 +43,73 @@ namespace ChartBuilder.Services
         // The calibration tool, while it's open.
         private CalibrationWindow? _calibration;
 
-        /// <summary>Makes the launcher the app's main window, opening <paramref name="args"/> over it once it's showing.</summary>
+        /// <summary>Makes a new Editor the app's main window, opening <paramref name="args"/> in it once it's showing.</summary>
         /// <remarks>Called before the app has started, so the lifetime shows it.</remarks>
         public void StartWith(BuilderArgs args)
         {
-            var (launcher, viewModel) = CreateLauncher();
+            var (editor, viewModel) = CreateNewChart([]);
 
-            // Back where Chart Builder closed, if that's still on a screen.
-            if (settings.Settings.LauncherCenter is { } closedAt)
-                WindowPlacement.CenterOn(launcher, new PixelPoint(closedAt.X, closedAt.Y));
-
-            // What the command line asks for (charter-spec §4.8) opens over the window once it's showing.
-            launcher.Opened += OnOpened;
-            desktop.MainWindow = launcher;
+            editor.Opened += OnOpened;
+            OpenEditor(editor, viewModel);
 
             void OnOpened(object? sender, EventArgs e)
             {
-                launcher.Opened -= OnOpened;
-                // Posted, since it can close the launcher (New chart opens the editor) and Opened is still running.
-                Dispatcher.UIThread.Post(() => viewModel.Start(args));
+                editor.Opened -= OnOpened;
+                // Posted, since it can swap the window (a song to open replaces the blank chart) and Opened is still running.
+                Dispatcher.UIThread.Post(() => _ = StartAsync(viewModel, args));
             }
+        }
+
+        /// <summary>
+        /// Opens what the command line asks for, or what the startup setting says, in the first Editor window, then
+        /// offers the new charts a crash left autosaved but never saved.
+        /// </summary>
+        private async Task StartAsync(EditorWindowViewModel viewModel, BuilderArgs args)
+        {
+            switch (args)
+            {
+                case { Problem: { } problem }:
+                    viewModel.Messages.Error(string.Format(CultureInfo.CurrentCulture, EditorWindowViewModel.ProblemFormat(problem.Kind), problem.Argument));
+                    break;
+                case { Start: BuilderStart.NewChart }:
+                    await viewModel.StartNewChartAsync(args.AudioFiles);
+                    break;
+                case { Start: BuilderStart.OpenSong, SongPath: { } path }:
+                    await viewModel.OpenSongAsync(path);
+                    break;
+                case { Start: BuilderStart.Calibrate }:
+                    await ShowCalibrationAsync();
+                    break;
+                default:
+                    if (settings.Settings.StartupAction == StartupAction.ReopenRecent
+                        && settings.Settings.RecentSongs.FirstOrDefault() is { Path: string recent }
+                        && !string.IsNullOrWhiteSpace(recent))
+                        await viewModel.OpenSongAsync(recent);
+                    break;
+            }
+
+            if (desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel current })
+                await current.OfferUnsavedChartsAsync();
         }
 
         public void OpenNewChart(IReadOnlyList<string> audioFiles)
         {
-            // The chart starts on the default resolution, 120 BPM and 4/4 with a Lead part, all of which the Chart
-            // settings tab changes (charter-spec C1).
+            var (editor, viewModel) = CreateNewChart(audioFiles);
+            OpenEditor(editor, viewModel);
+        }
+
+        /// <summary>
+        /// A new chart (charter-spec C1), with <paramref name="audioFiles"/>' tracks as its stems. It has no folder,
+        /// and so no lock, until it's first saved. The chart starts on the default resolution, 120 BPM and 4/4 with a
+        /// Lead part, all of which the Chart settings tab changes.
+        /// </summary>
+        private (EditorWindow Window, EditorWindowViewModel ViewModel) CreateNewChart(IReadOnlyList<string> audioFiles)
+        {
             var chart = EditableChart.CreateNew(new NewChartSettings(
                 "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
             var audio = NewChartStems.TracksOf(audioFiles);
             var editor = new EditorWindow();
-            OpenEditor(editor, EditorWindowViewModel.ForNewChart(ServicesFor(editor), chart, audio));
+            return (editor, EditorWindowViewModel.ForNewChart(ServicesFor(editor), chart, audio));
         }
 
         public void OpenSong(OpenedSong song, SongLock songLock)
@@ -107,9 +142,10 @@ namespace ChartBuilder.Services
             lockFolder,
             chartPackerSettingsFile,
             recovery,
-            new AvaloniaAuthoringDialogService(() => editor));
+            new AvaloniaAuthoringDialogService(() => editor),
+            this);
 
-        /// <summary>Shows the Editor in place of the launcher, and starts its audio.</summary>
+        /// <summary>Shows the Editor, replacing the window open, and starts its audio.</summary>
         private void OpenEditor(EditorWindow editor, EditorWindowViewModel viewModel)
         {
             Open(editor, viewModel);
@@ -197,11 +233,7 @@ namespace ChartBuilder.Services
         {
             editor.DataContext = viewModel;
 
-            // The editor opens on the launcher's screen: centered over it, or maximized there if it last was.
-            var launcher = desktop.MainWindow;
-            var launcherCenter = launcher is null ? null : WindowPlacement.CenterOf(launcher);
-            if (launcherCenter is { } center)
-                WindowPlacement.CenterOn(editor, center);
+            // The next Editor opens maximized when the last one closed maximized.
             if (settings.Settings.EditorMaximized)
                 editor.WindowState = WindowState.Maximized;
 
@@ -209,8 +241,7 @@ namespace ChartBuilder.Services
             editor.Closed += (_, _) => viewModel.Dispose();
 
             // Unsaved edits are asked about first: Save, Discard or Cancel (charter-spec C15 item 7). The close is held
-            // while the user answers, and made again once they've chosen to go ahead. Registered before the handler
-            // that brings the launcher back, so that one sees the close cancelled.
+            // while the user answers, and made again once they've chosen to go ahead.
             bool closeAllowed = false;
             editor.Closing += (_, e) =>
             {
@@ -235,85 +266,23 @@ namespace ChartBuilder.Services
                 });
             };
 
-            // Back to the launcher when the user closes the editor, but not when the app or OS is shutting down. It
-            // opens while the editor is still closing, so the app, which exits when its last window closes, stays up.
+            // A minimized editor doesn't say how it was shown.
             editor.Closing += (_, e) =>
             {
                 if (e.Cancel)
                     return;
 
-                // A minimized editor doesn't say how it was shown.
                 if (editor.WindowState != WindowState.Minimized)
                     settings.Settings.EditorMaximized = editor.WindowState is WindowState.Maximized or WindowState.FullScreen;
-
-                var returnTo = LauncherCenterAfter(editor, launcherCenter);
-                if (e.CloseReason is WindowCloseReason.ApplicationShutdown or WindowCloseReason.OSShutdown)
-                {
-                    // There's no launcher to bring back, so the next start opens where it would have been.
-                    RememberLauncherCenter(returnTo);
-                }
-                else
-                {
-                    var next = CreateLauncher().Window;
-                    if (returnTo is { } point)
-                        WindowPlacement.CenterOn(next, point);
-                    Show(next);
-                }
-
                 settings.Save();
             };
 
-            // The launcher closes once the editor is showing, for the same reason.
+            // The window this one replaces closes once it's showing, so the app, which exits when its last window
+            // closes, stays up.
+            var previous = desktop.MainWindow;
             Show(editor);
-            launcher?.Close();
-        }
-
-        private (MainWindow Window, MainWindowViewModel ViewModel) CreateLauncher()
-        {
-            var launcher = new MainWindow();
-            var viewModel = new MainWindowViewModel(
-                this,
-                    SettingsWindowFor(launcher),
-                new AvaloniaFilePickerService(() => launcher),
-                new AvaloniaConfirmationService(() => launcher),
-                settings,
-                lockFolder,
-                recovery);
-            launcher.DataContext = viewModel;
-
-            // Where it is as Chart Builder closes is where it opens next time. Not when the editor takes its place,
-            // which is the main window by then.
-            launcher.Closing += (_, e) =>
-            {
-                if (e.Cancel || desktop.MainWindow != launcher)
-                    return;
-                RememberLauncherCenter(WindowPlacement.CenterOf(launcher));
-                settings.Save();
-            };
-            return (launcher, viewModel);
-        }
-
-        /// <summary>
-        /// Where the launcher comes back once <paramref name="editor"/> closes: where it was before (<paramref name="home"/>),
-        /// unless the editor was moved to another screen, when it's centered over the editor there.
-        /// </summary>
-        private static PixelPoint? LauncherCenterAfter(Window editor, PixelPoint? home)
-        {
-            var center = WindowPlacement.CenterOf(editor);
-            if (home is not { } was)
-                return center;
-            if (center is not { } now)
-                return was;
-
-            var screen = WindowPlacement.ScreenOf(editor, now);
-            return screen is not null && WindowPlacement.ScreenOf(editor, was) is { } before && before.Bounds == screen.Bounds ? was : now;
-        }
-
-        /// <summary>Keeps <paramref name="center"/> for the launcher to open at next time, if there is one. Saved by the caller.</summary>
-        private void RememberLauncherCenter(PixelPoint? center)
-        {
-            if (center is { } point)
-                settings.Settings.LauncherCenter = new ScreenPoint { X = point.X, Y = point.Y };
+            if (previous is not null && !ReferenceEquals(previous, editor))
+                previous.Close();
         }
 
         private void Show(Window window)

@@ -216,6 +216,22 @@ namespace ChartBuilder.Services
                     Volume("audio.hitSoundVolume", audio, Strings.HitSoundVolumeLabel, Strings.HitSoundVolumeDescription, Strings.HitSoundVolumeKeywords,
                         () => settings.Settings.HitSoundVolume, volume => settings.Settings.HitSoundVolume = volume),
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
+                    new ChoiceSetting<StartupAction>
+                    {
+                        Id = "general.startupAction",
+                        Category = general,
+                        Label = Strings.StartupActionLabel,
+                        Description = Strings.StartupActionDescription,
+                        Keywords = SettingKeywords.Split(Strings.StartupActionKeywords),
+                        DefaultValue = StartupAction.BlankChart,
+                        Choices =
+                        [
+                            new SettingChoice<StartupAction>(StartupAction.BlankChart, Strings.StartupBlankChart),
+                            new SettingChoice<StartupAction>(StartupAction.ReopenRecent, Strings.StartupReopenRecent),
+                        ],
+                        Get = () => settings.Settings.StartupAction,
+                        Set = action => settings.Settings.StartupAction = action,
+                    },
                 ]);
         }
 

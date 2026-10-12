@@ -18,6 +18,16 @@ namespace ChartBuilder.Services
         KeepTimes,
     }
 
+    /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
+    public enum StartupAction
+    {
+        /// <summary>A blank new chart.</summary>
+        BlankChart,
+
+        /// <summary>The song opened most recently.</summary>
+        ReopenRecent,
+    }
+
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
     /// <remarks>Chart Packer's are in its own file, so neither app overwrites the other's.</remarks>
     public sealed class BuilderSettings
@@ -106,13 +116,10 @@ namespace ChartBuilder.Services
         /// <summary>Whether the editor was maximized when it last closed, so the next one opens maximized.</summary>
         public bool EditorMaximized { get; set; }
 
-        /// <summary>
-        /// Where the middle of the launcher was, in screen pixels, when Chart Builder last closed (or of the editor, when
-        /// it closed with the app). The launcher opens there if that point is still on a screen. Null for where the OS puts it.
-        /// </summary>
-        public ScreenPoint? LauncherCenter { get; set; }
+        /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
+        public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;
 
-        /// <summary>The songs opened lately, the latest first, as the home screen lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
+        /// <summary>The songs opened lately, the latest first, as the Open menu lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
         public List<RecentSong> RecentSongs { get; set; } = [];
 
         /// <summary>The fewest minutes between autosaves.</summary>
@@ -159,13 +166,5 @@ namespace ChartBuilder.Services
 
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = 1.4;
-    }
-
-    /// <summary>A point on the screens, in screen pixels.</summary>
-    public sealed class ScreenPoint
-    {
-        public int X { get; set; }
-
-        public int Y { get; set; }
     }
 }

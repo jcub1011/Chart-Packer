@@ -1,6 +1,6 @@
 namespace ChartPacker.Core.Launching;
 
-/// <summary>A song opened in Chart Builder lately, as the home screen lists it (charter-spec §4.5).</summary>
+/// <summary>A song opened in Chart Builder lately, as the Open menu lists it.</summary>
 public sealed class RecentSong
 {
     /// <summary>The song folder or <c>.sng</c>, in full.</summary>

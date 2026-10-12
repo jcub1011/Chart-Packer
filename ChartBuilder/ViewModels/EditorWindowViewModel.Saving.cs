@@ -34,7 +34,7 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether a save, a pack or an export is running.</summary>
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(SaveAndPackCommand), nameof(ExportCopyCommand))]
+        [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(SaveAndPackCommand), nameof(ExportCopyCommand), nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand))]
         public partial bool IsSaving { get; private set; }
 
         /// <summary>
@@ -521,6 +521,7 @@ namespace ChartBuilder.ViewModels
                 settings.LastNewChartFolder = target.ParentFolder;
                 settings.RecentSongs = RecentSongs.Add(settings.RecentSongs, new RecentSong { Path = entry.FullPath, Title = Song.Title ?? "", OpenedAt = DateTimeOffset.Now });
                 _settings.Save();
+                RefreshRecent();
                 Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.FirstSavedStatusFormat, folder));
                 return true;
             }

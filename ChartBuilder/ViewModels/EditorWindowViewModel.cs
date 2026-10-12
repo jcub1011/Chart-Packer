@@ -73,6 +73,7 @@ namespace ChartBuilder.ViewModels
             _tracksTimer = new DispatcherTimer(TracksDelay, DispatcherPriority.Normal, (_, _) => _ = ReloadAudioAsync());
             _tracksTimer.Stop();
             PendingChanges = PendingChangesOf();
+            RefreshRecent();
             Title = TitleOf();
             Playback.PropertyChanged += (_, e) =>
             {

@@ -51,6 +51,8 @@ namespace ChartBuilder.Services
             if (settings.LastExportPolicy is not null && !Enum.IsDefined(settings.LastExportPolicy.Value))
                 settings.LastExportPolicy = null;
             settings.CalibrationPrompted = [.. (settings.CalibrationPrompted ?? []).Where(d => !string.IsNullOrEmpty(d)).Distinct()];
+            if (!Enum.IsDefined(settings.StartupAction))
+                settings.StartupAction = StartupAction.BlankChart;
             settings.RecentSongs = [.. (settings.RecentSongs ?? []).Where(s => s is not null && !string.IsNullOrWhiteSpace(s.Path)).Take(RecentSongs.Max)];
             foreach (var song in settings.RecentSongs)
                 song.Title ??= "";

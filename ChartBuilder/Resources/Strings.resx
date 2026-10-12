@@ -74,7 +74,7 @@
   </data>
   <data name="AppName" xml:space="preserve">
     <value>Chart Builder</value>
-    <comment>The app's name, shown as the launcher's title and on its home screen.</comment>
+    <comment>The app's name, shown in the editor's toolbar.</comment>
   </data>
   <data name="HomeTagline" xml:space="preserve">
     <value>Make charts for Clone Hero, YARG and the other games that read notes.mid.</value>
@@ -107,7 +107,7 @@
   </data>
   <data name="UnexpectedErrorFormat" xml:space="preserve">
     <value>Something went wrong: {0}</value>
-    <comment>Shown on the home screen when New chart fails unexpectedly. {0} is the error message.</comment>
+    <comment>Shown on the message bar when New chart fails unexpectedly. {0} is the error message.</comment>
   </data>
   <data name="MessageBarToolTip" xml:space="preserve">
     <value>Show this message and the earlier ones</value>
@@ -396,6 +396,48 @@
   <data name="RecentOpenToolTipFormat" xml:space="preserve">
     <value>Open {0}</value>
     <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="OpenButton" xml:space="preserve">
+    <value>Open</value>
+    <comment>The toolbar's Open button, left of Save, with the recent projects and the picker.</comment>
+  </data>
+  <data name="OpenToolTip" xml:space="preserve">
+    <value>Open a song folder or .sng in the editor (Ctrl+O).</value>
+  </data>
+  <data name="OpenSelectButton" xml:space="preserve">
+    <value>Select…</value>
+    <comment>The Open menu's first entry, which opens the file/folder picker.</comment>
+  </data>
+  <data name="OpenNewChartButton" xml:space="preserve">
+    <value>New chart</value>
+    <comment>The Open menu's entry that starts a new chart in the editor (Ctrl+N).</comment>
+  </data>
+  <data name="OpenMenuRecentEmpty" xml:space="preserve">
+    <value>No recent projects</value>
+    <comment>The Open menu when no song has been opened yet.</comment>
+  </data>
+  <data name="StartupActionLabel" xml:space="preserve">
+    <value>What opens on startup</value>
+  </data>
+  <data name="StartupActionDescription" xml:space="preserve">
+    <value>What Chart Builder opens with when it starts with nothing on its command line.</value>
+  </data>
+  <data name="StartupActionKeywords" xml:space="preserve">
+    <value>startup open blank new chart recent start launch</value>
+  </data>
+  <data name="StartupBlankChart" xml:space="preserve">
+    <value>A blank new chart</value>
+  </data>
+  <data name="StartupReopenRecent" xml:space="preserve">
+    <value>The most recently opened song</value>
+  </data>
+  <data name="UnsavedRecoverTitle" xml:space="preserve">
+    <value>Recover unsaved chart</value>
+    <comment>Offered on startup for a new chart that was autosaved but never saved.</comment>
+  </data>
+  <data name="UnsavedRecoverMessageFormat" xml:space="preserve">
+    <value>"{0}", autosaved at {1}, was never saved. Recover it, or delete its autosave?</value>
+    <comment>{0} is the chart's name; {1} is when it was autosaved.</comment>
   </data>
   <data name="OpeningSongFormat" xml:space="preserve">
     <value>Opening {0}…</value>
@@ -1659,7 +1701,7 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="UnsavedChartsHeading" xml:space="preserve">
     <value>Unsaved new charts</value>
-    <comment>The home screen's list of new charts that were autosaved but never saved.</comment>
+    <comment>Offered on startup: new charts that were autosaved but never saved.</comment>
   </data>
   <data name="UnsavedChartSavedFormat" xml:space="preserve">
     <value>Autosaved {0}</value>

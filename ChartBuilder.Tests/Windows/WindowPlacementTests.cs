@@ -3,7 +3,7 @@ using ChartPacker.UI.Views;
 
 namespace ChartBuilder.Tests.Windows;
 
-/// <summary>Where the launcher and editor go when one is placed over where the other was.</summary>
+/// <summary>Where an editor goes when it's placed over where the window open was.</summary>
 [TestClass]
 public sealed class WindowPlacementTests
 {

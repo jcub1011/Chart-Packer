@@ -19,6 +19,8 @@
         WindowStartupLocation="CenterScreen">
 
     <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+N" Command="{Binding NewChartCommand}" />
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenChartCommand}" />
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenProgramSettingsCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
         <KeyBinding Gesture="Space" Command="{Binding Playback.PlayPauseCommand}" />
@@ -96,9 +98,75 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Saving (charter-spec C17): Save, Save and pack to a .sng, and a copy written elsewhere. -->
+                    <!-- Opening (charter-spec C2): the picker, a new chart, and the recent projects. -->
                     <Border Classes="toolbar-group">
                         <StackPanel Orientation="Horizontal" Spacing="2">
+                            <Button x:Name="OpenMenuButton"
+                                    Classes="tool"
+                                    ToolTip.Tip="{x:Static res:Strings.OpenToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.OpenButton}">
+                                <ctl:LineIcon Data="{StaticResource InputFolderStroke}" />
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedLeft">
+                                        <StackPanel x:Name="OpenMenuPanel" Spacing="2" MinWidth="300">
+                                            <StackPanel.Styles>
+                                                <Style Selector="Button.open-menu">
+                                                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                    <Setter Property="Padding" Value="10,6" />
+                                                    <Setter Property="CornerRadius" Value="4" />
+                                                </Style>
+                                            </StackPanel.Styles>
+                                            <Button Classes="open-menu"
+                                                    Command="{Binding OpenChartCommand}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.OpenSelectButton}">
+                                                <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.OpenSelectButton}" />
+                                            </Button>
+                                            <Button Classes="open-menu"
+                                                    Command="{Binding NewChartCommand}"
+                                                    ToolTip.Tip="{x:Static res:Strings.HomeNewChartToolTip}"
+                                                    AutomationProperties.Name="{x:Static res:Strings.OpenNewChartButton}">
+                                                <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.OpenNewChartButton}" />
+                                            </Button>
+                                            <Separator Margin="0,4" />
+                                            <TextBlock Classes="caption"
+                                                       Margin="10,4,10,2"
+                                                       Text="{x:Static res:Strings.RecentHeading}"
+                                                       IsVisible="{Binding HasRecent}" />
+                                            <TextBlock Classes="muted"
+                                                       Margin="10,4"
+                                                       FontSize="12"
+                                                       Text="{x:Static res:Strings.OpenMenuRecentEmpty}"
+                                                       IsVisible="{Binding !HasRecent}" />
+                                            <ScrollViewer MaxHeight="320">
+                                                <ItemsControl ItemsSource="{Binding Recent}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:RecentSongItem">
+                                                            <Button Classes="open-menu"
+                                                                    Command="{Binding $parent[ItemsControl].((vm:EditorWindowViewModel)DataContext).OpenRecentCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    ToolTip.Tip="{Binding ToolTip}"
+                                                                    AutomationProperties.Name="{Binding Title}">
+                                                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                                                                    <TextBlock Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                                                    <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="{Binding OpenedText}" />
+                                                                    <TextBlock Grid.Row="1"
+                                                                               Grid.ColumnSpan="2"
+                                                                               Classes="muted"
+                                                                               FontSize="11"
+                                                                               TextTrimming="PrefixCharacterEllipsis"
+                                                                               Text="{Binding Path}" />
+                                                                </Grid>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
                             <Button Classes="tool"
                                     Command="{Binding SaveCommand}"
                                     ToolTip.Tip="{x:Static res:Strings.SaveToolTip}"

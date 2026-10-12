@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using ChartBuilder.Controls;
 using ChartBuilder.Services;
 using ChartBuilder.ViewModels;
@@ -53,6 +54,15 @@ namespace ChartBuilder.Views
             Deactivated += (_, _) => _viewModel?.Editor.RecordReleaseAll();
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             Closing += (_, _) => CaptureLayout();
+
+            // The Open menu closes once something in it is picked.
+            OpenMenuPanel.AddHandler(Button.ClickEvent, (_, _) => (OpenMenuButton.Flyout as Flyout)?.Hide(), RoutingStrategies.Bubble);
+
+            // Audio files dropped anywhere on the window start a new chart with them as its stems (charter-spec C1). A
+            // song folder or .sng opens it (C2).
+            DragDrop.SetAllowDrop(this, true);
+            AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            AddHandler(DragDrop.DropEvent, OnDrop);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -82,6 +92,26 @@ namespace ChartBuilder.Views
 
         /// <summary>Generate fills' options close once the fills are proposed, so the ghosts can be seen.</summary>
         private void OnGenerateFillsClick(object? sender, RoutedEventArgs e) => GenerateFillsButton.Flyout?.Hide();
+
+        private void OnDragOver(object? sender, DragEventArgs e) =>
+            e.DragEffects = DroppedFiles.SongOf(e) is not null || DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
+
+        private void OnDrop(object? sender, DragEventArgs e)
+        {
+            if (_viewModel is not { } vm)
+                return;
+
+            // Posted, since it swaps the window and the drop is still being handled.
+            if (DroppedFiles.SongOf(e) is { } song)
+            {
+                Dispatcher.UIThread.Post(() => _ = vm.OpenSongAsync(song));
+                return;
+            }
+
+            var files = DroppedFiles.AudioOf(e);
+            if (files.Count > 0)
+                Dispatcher.UIThread.Post(() => _ = vm.StartNewChartAsync(files));
+        }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {

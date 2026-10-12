@@ -23,8 +23,8 @@ namespace ChartBuilder
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // Composition root: services are wired by hand, as in Chart Packer. BuilderWindows wires each window
-                // as it opens: the launcher first, then the Editor in its place.
+                // Composition root: services are wired by hand, as in Chart Packer. BuilderWindows opens the
+                // first Editor, then swaps it for a new one for each song or chart opened.
                 var settings = BuilderSettingsService.Load(UserConfigPaths.BuilderSettingsFile);
 
                 // An Editor that didn't close cleanly leaves the copies it kept for undo; a day on, no session needs them.

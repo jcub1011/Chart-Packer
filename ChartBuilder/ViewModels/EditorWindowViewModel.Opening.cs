@@ -21,7 +21,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
 {
-    /// <summary>A song on the home screen's Recent list.</summary>
+    /// <summary>A song on the Open menu's Recent list.</summary>
     public sealed class RecentSongItem(RecentSong song)
     {
         public string Title => song.Title;
@@ -46,163 +46,74 @@ namespace ChartBuilder.ViewModels
         public string ToolTip => string.Format(CultureInfo.CurrentCulture, Strings.RecentOpenToolTipFormat, song.Path);
     }
 
-    /// <summary>
-    /// A new chart that was autosaved but never saved, on the home screen until it's recovered or discarded (charter-spec
-    /// C15 item 6).
-    /// </summary>
-    public sealed class UnsavedChartItem(RecoveryFile file)
-    {
-        public RecoveryFile File => file;
-
-        public string Title => file.Manifest.Title;
-
-        /// <summary>When it was autosaved.</summary>
-        public string SavedText => string.Format(
-            CultureInfo.CurrentCulture, Strings.UnsavedChartSavedFormat, file.Manifest.SavedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture));
-    }
-
-    /// <summary>Chart Builder's launcher: the home screen, which hands over to the Editor window (charter-spec §4.5).</summary>
-    /// <param name="picker">Picks a song to open.</param>
-    /// <param name="confirmations">Asks before a <c>.chart</c> whose conversion changes it is opened.</param>
-    /// <param name="settings">Where the recent songs are kept.</param>
-    /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
-    /// <param name="recovery">Where the Editor's autosaves are, offered when their song opens.</param>
-    public sealed partial class MainWindowViewModel(
-        IEditorWindowService editors,
-        ISettingsWindowService settingsWindow,
-        IFilePickerService picker,
-        IConfirmationService confirmations,
-        BuilderSettingsService settings,
-        string lockFolder,
-        RecoveryStore recovery) : ViewModelBase
+    /// <summary>The Editor window's Open menu: the picker, a new chart, and the recent projects.</summary>
+    public sealed partial class EditorWindowViewModel
     {
         // How many of a conversion warning's places it lists before saying how many more there are.
         private const int WarningTimesShown = 5;
 
-        /// <summary>What happened last, e.g. why the command line couldn't be used.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasMessage))]
-        public partial string? Message { get; set; }
-
-        /// <summary>Whether <see cref="Message"/> is a problem.</summary>
-        [ObservableProperty]
-        public partial bool IsError { get; set; }
-
         /// <summary>Whether a song is being opened, so nothing else can be started meanwhile.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsIdle))]
-        [NotifyCanExecuteChangedFor(nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand), nameof(RecoverUnsavedCommand), nameof(DiscardUnsavedCommand))]
+        [NotifyCanExecuteChangedFor(nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand))]
         public partial bool IsOpening { get; private set; }
 
-        public bool IsIdle => !IsOpening;
-
-        public bool HasMessage => Message is not null;
-
         /// <summary>The songs opened lately, the latest first.</summary>
-        public ObservableCollection<RecentSongItem> Recent { get; } = [.. settings.Settings.RecentSongs.Select(s => new RecentSongItem(s))];
+        public ObservableCollection<RecentSongItem> Recent { get; } = [];
 
         public bool HasRecent => Recent.Count > 0;
 
-        /// <summary>New charts that were autosaved but never saved, as a crash left them, the latest first.</summary>
-        public ObservableCollection<UnsavedChartItem> UnsavedCharts { get; } = [.. recovery.NewCharts().Select(f => new UnsavedChartItem(f))];
+        private bool CanOpen() => !IsOpening && !IsSaving;
 
-        public bool HasUnsavedCharts => UnsavedCharts.Count > 0;
-
-        /// <summary>Opens an unsaved new chart from its autosave, unsaved until it's saved.</summary>
-        [RelayCommand(CanExecute = nameof(IsIdle))]
-        private void RecoverUnsaved(UnsavedChartItem? item)
-        {
-            if (item is null)
-                return;
-            try
-            {
-                editors.OpenRecovered(Autosave.RecoverNew(item.File), null, item.File.Key);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                ShowError(string.Format(CultureInfo.CurrentCulture, Strings.RecoverFailedFormat, ex.Message));
-            }
-        }
-
-        /// <summary>Deletes an unsaved new chart's autosave, after asking.</summary>
-        [RelayCommand(CanExecute = nameof(IsIdle))]
-        private async Task DiscardUnsavedAsync(UnsavedChartItem? item)
-        {
-            if (item is null || !await confirmations.ConfirmAsync(
-                    Strings.DiscardUnsavedTitle,
-                    string.Format(CultureInfo.CurrentCulture, Strings.DiscardUnsavedMessageFormat, item.Title),
-                    Strings.DiscardUnsavedButton))
-                return;
-            recovery.Delete(item.File.Key);
-            UnsavedCharts.Remove(item);
-            OnPropertyChanged(nameof(HasUnsavedCharts));
-        }
-
-        /// <summary>Opens what the command line asks for. Called once, when the window is first shown.</summary>
-        public void Start(BuilderArgs args)
-        {
-            switch (args)
-            {
-                case { Problem: { } problem }:
-                    ShowError(string.Format(CultureInfo.CurrentCulture, ProblemFormat(problem.Kind), problem.Argument));
-                    break;
-                case { Start: BuilderStart.NewChart }:
-                    StartNewChart(args.AudioFiles);
-                    break;
-                case { Start: BuilderStart.OpenSong, SongPath: { } path }:
-                    _ = OpenSongAsync(path);
-                    break;
-                case { Start: BuilderStart.Calibrate }:
-                    _ = editors.ShowCalibrationAsync();
-                    break;
-            }
-        }
-
-        /// <summary>Closes the launcher and opens a new chart in the Editor, with no audio.</summary>
-        [RelayCommand(CanExecute = nameof(IsIdle))]
-        private void NewChart() => StartNewChart([]);
+        /// <summary>Closes what's open, once it's saved or discarded, and opens a new chart, with no audio.</summary>
+        [RelayCommand(CanExecute = nameof(CanOpen))]
+        private Task NewChartAsync() => StartNewChartAsync([]);
 
         /// <summary>
-        /// Closes the launcher and opens a new chart in the Editor (charter-spec C1), with <paramref name="audioFiles"/>,
-        /// e.g. ones dropped on the window, as its stems. It has no folder until it's first saved. Never throws: it's
-        /// started from the command line, a drop or a command, so a failure is shown on the home screen instead.
+        /// Closes what's open, once it's saved or discarded, and opens a new chart (charter-spec C1), with
+        /// <paramref name="audioFiles"/>, e.g. ones dropped on the window, as its stems. It has no folder until it's
+        /// first saved. Never throws: it's started from a drop or a command, so a failure is said on the message bar.
         /// </summary>
-        public void StartNewChart(IReadOnlyList<string> audioFiles)
+        public async Task StartNewChartAsync(IReadOnlyList<string> audioFiles)
         {
-            if (IsOpening)
+            if (!CanOpen())
+                return;
+            if (!await ConfirmCloseAsync())
                 return;
 
             try
             {
-                editors.OpenNewChart(audioFiles);
+                _services.Editors.OpenNewChart(audioFiles);
             }
             catch (Exception ex)
             {
                 // Nothing above this catches it, so anything not caught here would take the app down.
                 Trace.TraceError($"Opening a new chart failed: {ex}");
-                ShowError(string.Format(CultureInfo.CurrentCulture, Strings.UnexpectedErrorFormat, ex.Message));
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.UnexpectedErrorFormat, ex.Message));
             }
         }
 
         /// <summary>Picks a song folder or <c>.sng</c>, and opens it.</summary>
-        [RelayCommand(CanExecute = nameof(IsIdle))]
+        [RelayCommand(CanExecute = nameof(CanOpen))]
         private async Task OpenChartAsync()
         {
-            if (await picker.PickSongAsync(Strings.OpenSongPickerTitle) is { } path)
+            if (await _services.FilePicker.PickSongAsync(Strings.OpenSongPickerTitle) is { } path)
                 await OpenSongAsync(path);
         }
 
-        [RelayCommand(CanExecute = nameof(IsIdle))]
+        [RelayCommand(CanExecute = nameof(CanOpen))]
         private Task OpenRecentAsync(RecentSongItem? song) => song is null ? Task.CompletedTask : OpenSongAsync(song.Path);
 
         /// <summary>
-        /// Opens the song at <paramref name="path"/> in the editor (charter-spec C2): a folder, a <c>.sng</c>, or a file in
-        /// a song folder. Never throws: it's started from the command line, a drop, the picker or the Recent list, so
-        /// whatever stops it is shown on the home screen instead.
+        /// Opens the song at <paramref name="path"/> in a new Editor window, closing this one once its chart is saved
+        /// or discarded (charter-spec C2): a folder, a <c>.sng</c>, or a file in a song folder. Never throws: it's
+        /// started from the command line, a drop, the picker or the Recent list, so whatever stops it is said on the
+        /// message bar instead.
         /// </summary>
         public async Task OpenSongAsync(string path)
         {
-            if (IsOpening)
+            if (!CanOpen())
+                return;
+            if (!await ConfirmCloseAsync())
                 return;
 
             SongLock? songLock = null;
@@ -212,19 +123,19 @@ namespace ChartBuilder.ViewModels
                 if (SongOpener.EntryOf(path) is not { } entry)
                 {
                     ForgetRecent(path);
-                    ShowError(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongMissingFormat, path));
+                    Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongMissingFormat, path));
                     return;
                 }
 
                 // Held from before the song is read, so another Chart Builder can't open it meanwhile.
-                songLock = SongLock.TryAcquire(entry.FullPath, lockFolder);
+                songLock = SongLock.TryAcquire(entry.FullPath, _services.LockFolder);
                 if (songLock is null)
                 {
-                    ShowError(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongLockedFormat, entry.FullPath));
+                    Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongLockedFormat, entry.FullPath));
                     return;
                 }
 
-                ShowInfo(string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, entry.DisplayName));
+                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, entry.DisplayName));
                 var result = await SongOpener.OpenAsync(entry);
 
                 // An autosave of edits a crash or a shutdown left unsaved is offered first (charter-spec C2 item 7).
@@ -233,10 +144,7 @@ namespace ChartBuilder.ViewModels
                 {
                     var (goOn, file) = await OfferRecoveryAsync(entry);
                     if (!goOn)
-                    {
-                        Message = null;
                         return;
-                    }
 
                     recovered = file;
                 }
@@ -244,12 +152,11 @@ namespace ChartBuilder.ViewModels
                 if (result.Empty is { } empty)
                 {
                     // A song with neither chart file can be given one (charter-spec C1, New chart in this song).
-                    if (recovered is null && !await confirmations.ConfirmAsync(
+                    if (recovered is null && !await _confirmations.ConfirmAsync(
                             Strings.NewChartInSongTitle,
                             string.Format(CultureInfo.CurrentCulture, Strings.NewChartInSongMessageFormat, entry.DisplayName),
                             Strings.NewChartInSongButton))
                     {
-                        Message = null;
                         return;
                     }
 
@@ -260,38 +167,76 @@ namespace ChartBuilder.ViewModels
                 {
                     if (result.Problem is { Kind: SongOpenProblemKind.Missing })
                         ForgetRecent(path);
-                    ShowError(ProblemText(result.Problem!, entry.FullPath));
+                    Messages.Error(ProblemText(result.Problem!, entry.FullPath));
                     return;
                 }
 
                 // A .chart's conversion is shown before the editor opens, so the user can go back (charter-spec C2 item 3).
-                if (song.ImportWarnings.Count > 0 && !await confirmations.ConfirmAsync(
+                if (song.ImportWarnings.Count > 0 && !await _confirmations.ConfirmAsync(
                         Strings.ImportTitle,
                         string.Format(CultureInfo.CurrentCulture, Strings.ImportMessageFormat, song.Title, string.Join(Environment.NewLine, song.ImportWarnings.Select(Describe))),
                         Strings.ImportConfirmButton))
                 {
-                    Message = null;
                     return;
                 }
 
                 RememberRecent(song);
                 if (recovered is not null)
-                    editors.OpenRecovered(Autosave.Recover(song, recovered), songLock, recovered.Key);
+                    _services.Editors.OpenRecovered(Autosave.Recover(song, recovered), songLock, recovered.Key);
                 else
-                    editors.OpenSong(song, songLock);
+                    _services.Editors.OpenSong(song, songLock);
                 songLock = null;
             }
             catch (Exception ex)
             {
                 // Nothing above this catches it, so anything not caught here would take the app down.
                 Trace.TraceError($"Opening {path} failed: {ex}");
-                ShowError(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongUnreadableFormat, path, ex.Message));
+                Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongUnreadableFormat, path, ex.Message));
             }
             finally
             {
                 // Still held only if the editor didn't take it.
                 songLock?.Dispose();
                 IsOpening = false;
+            }
+        }
+
+        /// <summary>
+        /// Offers the new charts a crash left autosaved but never saved, the latest first: Recover, Delete, or Cancel
+        /// to leave the rest alone. Called once, on the first Editor window. Stops after a recovery, as the recovered
+        /// chart opens in a new window in this one's place.
+        /// </summary>
+        public async Task OfferUnsavedChartsAsync()
+        {
+            while (_services.Recovery.NewCharts() is [var file, ..])
+            {
+                string when = file.Manifest.SavedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+                var choice = await _confirmations.ChooseAsync(
+                    Strings.UnsavedRecoverTitle,
+                    string.Format(CultureInfo.CurrentCulture, Strings.UnsavedRecoverMessageFormat, file.Manifest.Title, when),
+                    Strings.RecoverButton,
+                    Strings.DiscardUnsavedButton);
+                if (choice == ConfirmChoice.First)
+                {
+                    try
+                    {
+                        _services.Editors.OpenRecovered(Autosave.RecoverNew(file), null, file.Key);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.RecoverFailedFormat, ex.Message));
+                    }
+
+                    return;
+                }
+
+                if (choice == ConfirmChoice.Second)
+                {
+                    _services.Recovery.Delete(file.Key);
+                    continue;
+                }
+
+                return;
             }
         }
 
@@ -305,13 +250,13 @@ namespace ChartBuilder.ViewModels
         /// </returns>
         private async Task<(bool GoOn, RecoveryFile? File)> OfferRecoveryAsync(SongEntry entry)
         {
-            if (recovery.Find(entry.FullPath) is not { } file)
+            if (_services.Recovery.Find(entry.FullPath) is not { } file)
                 return (true, null);
 
             var offer = await RecoveryStore.AssessAsync(file, entry);
             if (offer == RecoveryOffer.Stale)
             {
-                recovery.Delete(file.Key);
+                _services.Recovery.Delete(file.Key);
                 return (true, null);
             }
 
@@ -319,57 +264,50 @@ namespace ChartBuilder.ViewModels
             string message = string.Format(CultureInfo.CurrentCulture, Strings.RecoverMessageFormat, entry.DisplayName, when);
             if (offer == RecoveryOffer.OfferChanged)
                 message += Environment.NewLine + Environment.NewLine + Strings.RecoverChangedWarning;
-            switch (await confirmations.ChooseAsync(Strings.RecoverTitle, message, Strings.RecoverButton, Strings.RecoverDiscardButton))
+            switch (await _confirmations.ChooseAsync(Strings.RecoverTitle, message, Strings.RecoverButton, Strings.RecoverDiscardButton))
             {
                 case ConfirmChoice.First:
                     return (true, file);
                 case ConfirmChoice.Second:
-                    recovery.Delete(file.Key);
+                    _services.Recovery.Delete(file.Key);
                     return (true, null);
                 default:
                     return (false, null);
             }
         }
 
-        [RelayCommand]
-        private Task OpenSettingsAsync() => settingsWindow.ShowAsync();
-
         private void RememberRecent(OpenedSong song)
         {
-            settings.Settings.RecentSongs = RecentSongs.Add(
-                settings.Settings.RecentSongs,
+            _settings.Settings.RecentSongs = RecentSongs.Add(
+                _settings.Settings.RecentSongs,
                 new RecentSong { Path = song.Entry.FullPath, Title = song.Title, OpenedAt = DateTimeOffset.Now });
-            settings.Save();
+            _settings.Save();
+            RefreshRecent();
         }
 
         /// <summary>Takes a song that's no longer there off the Recent list.</summary>
         private void ForgetRecent(string path)
         {
-            if (!settings.Settings.RecentSongs.Any(s => RecentSongs.SamePath(s.Path, path)))
+            if (!_settings.Settings.RecentSongs.Any(s => RecentSongs.SamePath(s.Path, path)))
                 return;
 
-            settings.Settings.RecentSongs = RecentSongs.Remove(settings.Settings.RecentSongs, path);
-            settings.Save();
-            foreach (var item in Recent.Where(s => RecentSongs.SamePath(s.Path, path)).ToList())
-                Recent.Remove(item);
+            _settings.Settings.RecentSongs = RecentSongs.Remove(_settings.Settings.RecentSongs, path);
+            _settings.Save();
+            RefreshRecent();
+        }
+
+        /// <summary>Lists the Recent songs again, as saved.</summary>
+        private void RefreshRecent()
+        {
+            Recent.Clear();
+            foreach (var song in _settings.Settings.RecentSongs)
+                Recent.Add(new RecentSongItem(song));
             OnPropertyChanged(nameof(HasRecent));
-        }
-
-        private void ShowError(string message)
-        {
-            IsError = true;
-            Message = message;
-        }
-
-        private void ShowInfo(string message)
-        {
-            IsError = false;
-            Message = message;
         }
 
         /// <summary>A new chart as New chart starts one: the default resolution, 120 BPM and 4/4, with a Lead part.</summary>
         private EditableChart EmptyChart() => EditableChart.CreateNew(new NewChartSettings(
-            "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+            "", _settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
 
         private static string ProblemText(SongOpenProblem problem, string path) => problem.Kind switch
         {
@@ -400,7 +338,7 @@ namespace ChartBuilder.ViewModels
             return string.Format(CultureInfo.CurrentCulture, Strings.ImportIssueTimesFormat, text, times);
         }
 
-        private static string ProblemFormat(BuilderArgsProblemKind kind) => kind switch
+        internal static string ProblemFormat(BuilderArgsProblemKind kind) => kind switch
         {
             BuilderArgsProblemKind.UnknownOption => Strings.ArgsUnknownOptionFormat,
             _ => Strings.ArgsUnexpectedArgumentFormat,

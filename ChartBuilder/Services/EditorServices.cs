@@ -23,6 +23,7 @@ namespace ChartBuilder.Services
     /// <param name="ChartPackerSettingsFile">Chart Packer's settings, read for its library and packing settings, never written.</param>
     /// <param name="Recovery">Where the chart is autosaved, for recovery after a crash.</param>
     /// <param name="Authoring">Shows the authoring tools' dialogs: Reduce and the rest.</param>
+    /// <param name="Editors">Opens songs and new charts in new Editor windows, closing this one.</param>
     public sealed record EditorServices(
         BuilderSettingsService Settings,
         ISettingsWindowService SettingsWindow,
@@ -40,5 +41,6 @@ namespace ChartBuilder.Services
         string LockFolder,
         string ChartPackerSettingsFile,
         RecoveryStore Recovery,
-        IAuthoringDialogService Authoring);
+        IAuthoringDialogService Authoring,
+        IEditorWindowService Editors);
 }
