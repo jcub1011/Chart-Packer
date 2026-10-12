@@ -12,7 +12,9 @@
              x:Class="ChartPacker.UI.Views.MetadataEditorView"
              x:DataType="vm:MetadataEditorViewModel">
     <!-- A song inspector's metadata, Chart Packer's and Chart Builder's: the difficulties as icons, then a row per other
-         key, edited in place, and a row to add a key. The inspector around it shows the section's heading. -->
+         key, edited in place, and a row to add a key. The inspector around it shows the section's heading.
+         Too narrow for a key and value side by side (the compact class, set as the control is
+         sized), each row's value goes on a second line under its key. -->
 
     <UserControl.Resources>
         <conv:DifficultyGlyphConverter x:Key="DifficultyGlyph"
@@ -58,6 +60,81 @@
 
     <UserControl.Styles>
         <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <!-- Where a row's key and value go: side by side, or, compact, the value under the key,
+             which takes the row's room. Set here rather than on the elements, as the compact styles move them. -->
+        <Style Selector="TextBlock.metadataKey">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="1" />
+        </Style>
+        <Style Selector="Button.metadataValue">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="2" />
+        </Style>
+        <Style Selector="StackPanel.metadataEdit">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="2" />
+        </Style>
+        <Style Selector="StackPanel.metadataActions">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="3" />
+        </Style>
+        <Style Selector="StackPanel.metadataMessage">
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.ColumnSpan" Value="3" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact TextBlock.metadataKey">
+            <Setter Property="Grid.ColumnSpan" Value="2" />
+            <Setter Property="MaxWidth" Value="Infinity" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact Button.metadataValue">
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.ColumnSpan" Value="3" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact StackPanel.metadataEdit">
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.ColumnSpan" Value="3" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact StackPanel.metadataMessage">
+            <Setter Property="Grid.Row" Value="2" />
+        </Style>
+        <!-- Where the new row's key, value and buttons go: on one line, or, compact, the key on its own
+             line, the value under it, and Add/Cancel right-aligned below that. -->
+        <Style Selector="AutoCompleteBox.newKey">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="0" />
+            <Setter Property="Width" Value="220" />
+        </Style>
+        <Style Selector="TextBox.newValue">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="1" />
+        </Style>
+        <Style Selector="Button.newAdd">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="2" />
+        </Style>
+        <Style Selector="Button.newCancel">
+            <Setter Property="Grid.Row" Value="0" />
+            <Setter Property="Grid.Column" Value="3" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact AutoCompleteBox.newKey">
+            <Setter Property="Grid.ColumnSpan" Value="4" />
+            <Setter Property="Width" Value="NaN" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact TextBox.newValue">
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Grid.Column" Value="0" />
+            <Setter Property="Grid.ColumnSpan" Value="4" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact Button.newAdd">
+            <Setter Property="Grid.Row" Value="2" />
+        </Style>
+        <Style Selector="views|MetadataEditorView.compact Button.newCancel">
+            <Setter Property="Grid.Row" Value="2" />
+        </Style>
     </UserControl.Styles>
 
     <StackPanel>
@@ -190,7 +267,7 @@
                                 <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
                             </ContextMenu>
                         </Border.ContextMenu>
-                        <Grid RowDefinitions="Auto,Auto">
+                        <Grid RowDefinitions="Auto,Auto,Auto">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="14" />
                                 <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
@@ -201,8 +278,7 @@
                                        Classes="marker"
                                        Margin="0,2,0,0"
                                        Text="{Binding Marker}" />
-                            <TextBlock Grid.Column="1"
-                                       Classes="muted"
+                            <TextBlock Classes="muted metadataKey"
                                        Classes.removed="{Binding IsRemoved}"
                                        MaxWidth="220"
                                        Margin="0,2,16,0"
@@ -218,8 +294,7 @@
                             </TextBlock>
 
                             <!-- Tags like <color=#FDFD96FF> are rendered and times are formatted; the tooltip shows the value as stored. -->
-                            <Button Grid.Column="2"
-                                    Classes="value"
+                            <Button Classes="value metadataValue"
                                     Command="{Binding BeginEditCommand}"
                                     IsVisible="{Binding !IsEditing}"
                                     ToolTip.Tip="{Binding ToolTip}"
@@ -236,7 +311,7 @@
                                                IsVisible="{Binding ShowDistinct}" />
                                 </Panel>
                             </Button>
-                            <StackPanel Grid.Column="2" IsVisible="{Binding IsEditing}">
+                            <StackPanel Classes="metadataEdit" IsVisible="{Binding IsEditing}">
                                 <!-- Enter or leaving the box keeps the text; Escape drops it. -->
                                 <TextBox Classes="inline"
                                          Text="{Binding EditText}"
@@ -253,7 +328,7 @@
                                 <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
                             </StackPanel>
 
-                            <StackPanel Grid.Column="3"
+                            <StackPanel Classes="metadataActions"
                                         Orientation="Horizontal"
                                         Margin="4,0,0,0"
                                         IsVisible="{Binding ShowActions}">
@@ -280,7 +355,7 @@
                                 </Button>
                             </StackPanel>
 
-                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" IsVisible="{Binding !IsEditing}">
+                            <StackPanel Classes="metadataMessage" IsVisible="{Binding !IsEditing}">
                                 <TextBlock Classes="issue" Text="{Binding Issue}" IsVisible="{Binding HasIssue}" />
                                 <TextBlock Classes="hint" Text="{Binding Hint}" IsVisible="{Binding HasHint}" />
                             </StackPanel>
@@ -293,10 +368,9 @@
         <!-- New row: key and value, both checked before anything goes into the drafts.
              The key box suggests the known keys not already in use, and takes any other key typed. -->
         <StackPanel Margin="14,6,0,0" Spacing="4" IsVisible="{Binding IsAdding}">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="4">
                 <AutoCompleteBox x:Name="NewKeyBox"
-                                 Grid.Column="0"
-                                 Width="220"
+                                 Classes="newKey"
                                  Text="{Binding NewKey}"
                                  ItemsSource="{Binding AvailableKeys}"
                                  ValueMemberBinding="{Binding Key, DataType=meta:KnownKey}"
@@ -320,7 +394,7 @@
                     </AutoCompleteBox.ItemTemplate>
                 </AutoCompleteBox>
                 <TextBox x:Name="NewValueBox"
-                         Grid.Column="1"
+                         Classes="newValue"
                          Text="{Binding NewValue}"
                          PlaceholderText="{x:Static res:SharedStrings.NewValueWatermark}"
                          AutomationProperties.Name="{x:Static res:SharedStrings.NewValueWatermark}">
@@ -329,11 +403,11 @@
                         <KeyBinding Gesture="Escape" Command="{Binding CancelAddCommand}" />
                     </TextBox.KeyBindings>
                 </TextBox>
-                <Button Grid.Column="2"
+                <Button Classes="newAdd"
                         Content="{x:Static res:SharedStrings.AddButton}"
                         Command="{Binding CommitAddCommand}"
                         AutomationProperties.Name="{x:Static res:SharedStrings.AddButton}" />
-                <Button Grid.Column="3"
+                <Button Classes="newCancel"
                         Content="{x:Static res:SharedStrings.CancelButton}"
                         Command="{Binding CancelAddCommand}"
                         AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />

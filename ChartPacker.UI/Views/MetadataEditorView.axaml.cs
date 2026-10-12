@@ -14,6 +14,13 @@ namespace ChartPacker.UI.Views
     /// </summary>
     public partial class MetadataEditorView : UserControl
     {
+        // Narrower than this, a row's value goes on a second line under its key; wider than the other,
+        // back beside it. The gap keeps a width near the edge, as a scroll bar coming and going moves it,
+        // from switching back and forth. A row is the marker (14) plus the key (up to 220, shared) plus the
+        // value, so side by side needs roughly this: a typical key leaves the value room, a longest key trims.
+        private const double CompactBelow = 380;
+        private const double WideFrom = 400;
+
         public MetadataEditorView()
         {
             InitializeComponent();
@@ -27,6 +34,17 @@ namespace ChartPacker.UI.Views
             };
             NewKeyBox.AddHandler(PointerReleasedEvent, OnKeyBoxPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
             NewKeyBox.AddHandler(KeyDownEvent, OnKeyBoxKeyDown, RoutingStrategies.Tunnel);
+        }
+
+        /// <summary>Puts each row's value on a second line under its key while the panel is too narrow for one.</summary>
+        protected override void OnSizeChanged(SizeChangedEventArgs e)
+        {
+            base.OnSizeChanged(e);
+            double width = e.NewSize.Width;
+            if (width < CompactBelow)
+                Classes.Set("compact", true);
+            else if (width >= WideFrom)
+                Classes.Set("compact", false);
         }
 
         /// <summary>Clicking away from a value's edit box keeps what was typed, like pressing Enter.</summary>
