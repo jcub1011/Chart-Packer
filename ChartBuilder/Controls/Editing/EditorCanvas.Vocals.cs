@@ -109,6 +109,9 @@ namespace ChartBuilder.Controls.Editing
             _lastVocalPoint = point;
             _boxFrom = _pressButton == MouseButton.Left && session.Tool == EditorTool.Select && !point.InPhrases && session.Tools.HitTest(point) is null ? position : null;
             _boxTo = position;
+            _boxFromSeconds = _boxFrom is not null && CurrentProjection() is { } anchorScreen
+                ? anchorScreen.SecondsAt(AlongOf(position))
+                : null;
             var modifiers = ModifiersOf(e.KeyModifiers);
             if (_pressButton == MouseButton.Middle)
                 session.Tools.PressErase(point);
@@ -417,7 +420,7 @@ namespace ChartBuilder.Controls.Editing
             var lyrics = LyricsArea(size, screen);
             var reach = new Rect(RowsOf(screen).TopLeft, new Point(screen.TimeFrom + screen.TimeLength, Math.Max(RowsOf(screen).Bottom, lyrics.Bottom)));
             DrawCursor(context, session, screen, reach);
-            DrawBox(context);
+            DrawBox(context, screen);
             if (IsFocused)
                 context.DrawRectangle(null, AccentPens().Focus, new Rect(Bounds.Size).Deflate(0.5));
         }

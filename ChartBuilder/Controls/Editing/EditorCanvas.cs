@@ -176,6 +176,8 @@ namespace ChartBuilder.Controls.Editing
         private double _zoomWheel;
         private Point? _boxFrom;
         private Point _boxTo;
+        // The box's press anchor in audio seconds, so the box tracks the song when the view scrolls or zooms mid-drag.
+        private double? _boxFromSeconds;
         private ChartPoint _lastPoint;
         private VocalPoint _lastVocalPoint;
 
@@ -553,17 +555,20 @@ namespace ChartBuilder.Controls.Editing
                 DrawHover(context, session, key, track, screen, slots);
 
             DrawCursor(context, session, screen, lanes);
-            DrawBox(context);
+            DrawBox(context, screen);
 
             if (IsFocused)
                 context.DrawRectangle(null, AccentPens().Focus, new Rect(Bounds.Size).Deflate(0.5));
         }
 
-        /// <summary>The box being drawn out to select notes, if one is.</summary>
-        private void DrawBox(DrawingContext context)
+        /// <summary>The box being drawn out to select notes, if one is: its press anchor sticks to the song, so scrolling or zooming mid-drag moves the box with the content the selection covers.</summary>
+        private void DrawBox(DrawingContext context, LaneProjection screen)
         {
-            if (_boxFrom is { } from)
-                context.DrawRectangle(BoxBrush, BoxPen, new Rect(from, _boxTo).Normalize());
+            if (_boxFrom is not { } from)
+                return;
+            if (_boxFromSeconds is { } seconds)
+                from = At(screen.AlongOf(seconds), AcrossOf(from));
+            context.DrawRectangle(BoxBrush, BoxPen, new Rect(from, _boxTo).Normalize());
         }
 
         /// <summary>
@@ -677,7 +682,29 @@ namespace ChartBuilder.Controls.Editing
             if (_editor?.Playback.IsPlaying == true || vocal)
                 _strike.Redraw();
             if (IsHoverShown || vocal)
+            {
                 _overlay.Redraw();
+            }
+            else if (_isPressed && _boxFrom is not null && Session is { } moving)
+            {
+                // Scrolling mid-drag moves the song under a still pointer: keep the selection live at the pointer and
+                // redraw the box, whose press anchor is re-projected when drawn.
+                if (_lane is { Vocal: not null })
+                {
+                    if (VocalPointAt(_boxTo, clamp: true) is { } vocalPoint)
+                    {
+                        _lastVocalPoint = vocalPoint;
+                        moving.Tools.Drag(vocalPoint, ModifiersOf(_keys));
+                    }
+                }
+                else if (PointAt(_boxTo) is { } scrolled)
+                {
+                    _lastPoint = scrolled;
+                    moving.Tools.Drag(scrolled, ModifiersOf(_keys));
+                }
+
+                _overlay.Redraw();
+            }
         }
 
         /// <summary>Which of the canvas's layers, bottom to top.</summary>
@@ -846,6 +873,9 @@ namespace ChartBuilder.Controls.Editing
                 ? current.Position
                 : null;
             _boxTo = current.Position;
+            _boxFromSeconds = _boxFrom is not null && CurrentProjection() is { } anchorScreen
+                ? anchorScreen.SecondsAt(AlongOf(current.Position))
+                : null;
             var modifiers = ModifiersOf(e.KeyModifiers);
             if (button == MouseButton.Middle)
                 session.Tools.PressErase(point);
@@ -917,6 +947,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
             _isPressed = false;
             _boxFrom = null;
+            _boxFromSeconds = null;
             e.Pointer.Capture(null);
             if (Session is not { } session)
                 return;
@@ -955,6 +986,7 @@ namespace ChartBuilder.Controls.Editing
                 return;
             _isPressed = false;
             _boxFrom = null;
+            _boxFromSeconds = null;
             if (_lane is { Vocal: not null })
                 Session?.Tools.Release(_lastVocalPoint);
             else

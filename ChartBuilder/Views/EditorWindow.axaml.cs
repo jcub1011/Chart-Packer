@@ -55,8 +55,10 @@ namespace ChartBuilder.Views
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             Closing += (_, _) => CaptureLayout();
 
-            // The Open menu closes once something in it is picked.
-            OpenMenuPanel.AddHandler(Button.ClickEvent, (_, _) => (OpenMenuButton.Flyout as Flyout)?.Hide(), RoutingStrategies.Bubble);
+            // The Open menu closes once something in it is picked. Posted, as closing the flyout
+            // takes its buttons out of the tree and clears their bound commands before they run
+            // (see DifficultyPicker.OnChosen): the click's command runs first.
+            OpenMenuPanel.AddHandler(Button.ClickEvent, (_, _) => Dispatcher.UIThread.Post(() => (OpenMenuButton.Flyout as Flyout)?.Hide()), RoutingStrategies.Bubble);
 
             // Audio files dropped anywhere on the window start a new chart with them as its stems (charter-spec C1). A
             // song folder or .sng opens it (C2).
@@ -90,8 +92,8 @@ namespace ChartBuilder.Views
             e.Handled = true;
         }
 
-        /// <summary>Generate fills' options close once the fills are proposed, so the ghosts can be seen.</summary>
-        private void OnGenerateFillsClick(object? sender, RoutedEventArgs e) => GenerateFillsButton.Flyout?.Hide();
+        /// <summary>Generate fills' options close once the fills are proposed, so the ghosts can be seen. Posted, as closing the flyout clears the button's bound command before it runs.</summary>
+        private void OnGenerateFillsClick(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() => GenerateFillsButton.Flyout?.Hide());
 
         private void OnDragOver(object? sender, DragEventArgs e) =>
             e.DragEffects = DroppedFiles.SongOf(e) is not null || DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
