@@ -2675,7 +2675,7 @@ Saving also makes these changes to song.ini:
     <comment>Above the Parts rows' rating boxes.</comment>
   </data>
   <data name="ChartSettingsPartToolTip" xml:space="preserve">
-    <value>Whether the chart has this part. Unticking a part with notes asks first.</value>
+    <value>Whether the chart has this part. Turning off a part with notes asks first.</value>
   </data>
   <data name="ChartSettingsDifficultyToolTip" xml:space="preserve">
     <value>The part's difficulty rating, 0 to 6 as the games show it; ? while it's unrated. Click to change it</value>
@@ -2683,6 +2683,10 @@ Saving also makes these changes to song.ini:
   <data name="ChartSettingsProDrumsDifficultyLabel" xml:space="preserve">
     <value>Pro drums</value>
     <comment>Beside Pro drums' own rating, diff_drums_real.</comment>
+  </data>
+  <data name="ChartSettingsFiveLaneDrumsLabel" xml:space="preserve">
+    <value>5-lane Drums</value>
+    <comment>A drums chip in Chart settings' Parts: drums charted with five pads.</comment>
   </data>
   <data name="ChartSettingsSectionMetadata" xml:space="preserve">
     <value>Metadata</value>

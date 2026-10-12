@@ -28,51 +28,40 @@ namespace ChartBuilder.ViewModels
         public override string ToString() => Label;
     }
 
-    /// <summary>A drum variant Chart settings offers.</summary>
-    public sealed record DrumsVariantChoice(DrumsVariant Value, string Label)
-    {
-        public override string ToString() => Label;
-    }
-
-    /// <summary>
-    /// A part in Chart settings' Parts: ticked when the chart has it, with its difficulty rating, and for Pro drums their
-    /// own rating too, each picked from a flyout as Chart Packer's inspector picks one.
+    /// <summary>A part chip in Chart settings' Parts: selected when the chart has it, with its difficulty rating picked from a
+    /// flyout as Chart Packer's inspector picks one. Drums are three chips sharing one part: 4-lane, Pro and 5-lane.
     /// </summary>
-    public sealed partial class ChartPartRowViewModel : ObservableObject
+    public sealed partial class ChartPartChipViewModel : ObservableObject
     {
-        internal ChartPartRowViewModel(ChartSettingsViewModel owner, ChartInstrument instrument, string label, bool isChecked)
+        internal ChartPartChipViewModel(ChartSettingsViewModel owner, ChartInstrument instrument, DrumsVariant? variant, string label, string difficultyKey, bool isChecked)
         {
             Instrument = instrument;
+            Variant = variant;
             Label = label;
-            DifficultyKey = SongIniPartKeys.DifficultyKeysOf(instrument, null)[0];
-            Rating = new ChartRatingViewModel(owner, DifficultyKey, label);
-            ProRating = new ChartRatingViewModel(owner, SongIniPartKeys.ProDrumsDifficulty, Strings.ChartSettingsProDrumsDifficultyLabel);
+            DifficultyKey = difficultyKey;
+            Rating = new ChartRatingViewModel(owner, difficultyKey, label);
             IsChecked = isChecked;
         }
 
         public ChartInstrument Instrument { get; }
 
+        /// <summary>Which drums layout the chip stands for; null for a normal part.</summary>
+        public DrumsVariant? Variant { get; }
+
+        public bool IsDrumsChip => Variant is not null;
+
         public string Label { get; }
 
-        public bool IsDrums => Instrument == ChartInstrument.Drums;
-
-        /// <summary>The <c>song.ini</c> key of the part's rating, e.g. <c>diff_guitar</c>.</summary>
+        /// <summary>The <c>song.ini</c> key of the rating the chip shows, e.g. <c>diff_guitar</c>.</summary>
         public string DifficultyKey { get; }
 
         [ObservableProperty]
         public partial bool IsChecked { get; set; }
 
-        /// <summary>The part's rating.</summary>
+        /// <summary>The rating the chip shows.</summary>
         public ChartRatingViewModel Rating { get; }
 
-        /// <summary>Pro drums' own rating (<c>diff_drums_real</c>), for drums charted as Pro.</summary>
-        public ChartRatingViewModel ProRating { get; }
-
-        /// <summary>Whether the part has Pro drums' rating as well: drums, charted as Pro.</summary>
-        [ObservableProperty]
-        public partial bool HasProDifficulty { get; internal set; }
-
-        /// <summary><c>*</c> while a rating has a pending change, as an edited metadata row has.</summary>
+        /// <summary><c>*</c> while the rating has a pending change, as an edited metadata row has.</summary>
         [ObservableProperty]
         public partial string? Marker { get; internal set; }
     }
@@ -205,9 +194,9 @@ namespace ChartBuilder.ViewModels
             var values = ChartSettingsValues.Of(_chart);
             Resolutions = [.. NewChartSettings.Resolutions.Append(values.Resolution).Distinct().Order().Select(r => new ResolutionChoice(r, BuilderSettingsCatalog.ResolutionLabel(r)))];
             Denominators = [.. NewChartSettings.Denominators.Append(values.Denominator).Distinct().Order()];
-            Parts = [.. NewChartSettings.Instruments.Select(i => new ChartPartRowViewModel(this, i, PartName(i), values.Parts.Contains(i)))];
-            foreach (var part in Parts)
-                part.PropertyChanged += OnPartChanged;
+            PartChips = BuildChips(values);
+            foreach (var chip in PartChips)
+                chip.PropertyChanged += OnChipChanged;
             _song.Changed += OnSongChanged;
             Load();
         }
@@ -257,20 +246,10 @@ namespace ChartBuilder.ViewModels
 
         // Parts.
 
-        public IReadOnlyList<ChartPartRowViewModel> Parts { get; }
+        public IReadOnlyList<ChartPartChipViewModel> PartChips { get; }
 
-        public IReadOnlyList<DrumsVariantChoice> DrumsVariants { get; } =
-        [
-            new(DrumsVariant.FourLane, Strings.DrumsFourLane),
-            new(DrumsVariant.Pro, Strings.DrumsPro),
-            new(DrumsVariant.FiveLane, Strings.DrumsFiveLane),
-        ];
-
-        [ObservableProperty]
-        public partial DrumsVariantChoice SelectedDrums { get; set; }
-
-        /// <summary>Whether drums are ticked, so their variant is offered.</summary>
-        public bool HasDrums => Parts.Any(p => p.IsDrums && p.IsChecked);
+        /// <summary>Whether any drums chip is on, so the drums hint is offered.</summary>
+        public bool HasDrums => PartChips.Any(p => p.IsDrumsChip && p.IsChecked);
 
         /// <summary>What stops a change being applied, or why the last one wasn't; null when nothing does.</summary>
         [ObservableProperty]
@@ -339,8 +318,6 @@ namespace ChartBuilder.ViewModels
 
         partial void OnDenominatorChanged(int value) => ApplyNow();
 
-        partial void OnSelectedDrumsChanged(DrumsVariantChoice value) => ApplyNow();
-
         partial void OnDelayMsChanged(decimal? value)
         {
             if (_loading)
@@ -357,12 +334,37 @@ namespace ChartBuilder.ViewModels
             _song.Changed -= OnSongChanged;
         }
 
-        /// <summary>Sets the rating <paramref name="key"/> to <paramref name="tier"/>, or unrated for null, at once, as one undo step.</summary>
+        /// <summary>
+        /// Sets the rating <paramref name="key"/> to <paramref name="tier"/>, or unrated for null, at once, as one undo step.
+        /// While Pro drums are on, <c>diff_drums</c> and <c>diff_drums_real</c> are kept together, as the Pro chip only
+        /// shows <c>diff_drums_real</c>.
+        /// </summary>
         internal void SetDifficulty(string key, int? tier)
         {
             if (IsSaving)
                 return;
-            if (SongCommands.SetDifficulty(_song, key, tier) is { } command)
+            string drumsKey = SongIniPartKeys.DifficultyKeysOf(ChartInstrument.Drums, null)[0];
+            string proKey = SongIniPartKeys.ProDrumsDifficulty;
+            bool proOn = PartChips.Any(c => c.Variant == DrumsVariant.Pro && c.IsChecked);
+            if (key.Equals(drumsKey, StringComparison.OrdinalIgnoreCase) && proOn)
+            {
+                if (SongCommands.SetValues(_song, new Dictionary<string, string?>
+                    {
+                        [drumsKey] = tier?.ToString(CultureInfo.InvariantCulture) ?? MetadataDifficulty.UnsetValue,
+                        [proKey] = tier?.ToString(CultureInfo.InvariantCulture) ?? MetadataDifficulty.UnsetValue,
+                    }) is { } both)
+                    _apply(both);
+            }
+            else if (key.Equals(proKey, StringComparison.OrdinalIgnoreCase) && proOn)
+            {
+                if (SongCommands.SetValues(_song, new Dictionary<string, string?>
+                    {
+                        [proKey] = tier?.ToString(CultureInfo.InvariantCulture) ?? MetadataDifficulty.UnsetValue,
+                        [drumsKey] = tier?.ToString(CultureInfo.InvariantCulture) ?? MetadataDifficulty.UnsetValue,
+                    }) is { } both)
+                    _apply(both);
+            }
+            else if (SongCommands.SetDifficulty(_song, key, tier) is { } command)
                 _apply(command);
         }
 
@@ -388,25 +390,50 @@ namespace ChartBuilder.ViewModels
         // The ratings and the delay follow the song: an edit's undo, a save, or another tab's edit.
         private void OnSongChanged(object? sender, EventArgs e) => LoadSong();
 
-        private async void OnPartChanged(object? sender, PropertyChangedEventArgs e)
+        private async void OnChipChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(ChartPartRowViewModel.IsChecked) || sender is not ChartPartRowViewModel part)
+            if (e.PropertyName != nameof(ChartPartChipViewModel.IsChecked) || sender is not ChartPartChipViewModel chip)
                 return;
 
-            if (part.IsDrums)
+            if (chip.IsDrumsChip)
                 OnPropertyChanged(nameof(HasDrums));
             if (_loading)
                 return;
 
+            // The drums chips share one part, so only one can be on.
+            bool syncPro = false;
+            if (chip.IsDrumsChip && chip.IsChecked)
+            {
+                _loading = true;
+                try
+                {
+                    foreach (var other in PartChips)
+                    {
+                        if (other != chip && other.IsDrumsChip && other.IsChecked)
+                            other.IsChecked = false;
+                    }
+                }
+                finally
+                {
+                    _loading = false;
+                }
+
+                OnPropertyChanged(nameof(HasDrums));
+                syncPro = chip.Variant == DrumsVariant.Pro;
+            }
+
             try
             {
-                // Unticking a part that has notes asks first, as Remove part does (charter-spec C1, Parts).
-                if (!part.IsChecked && _chart.PartOf(part.Instrument) is { HasNotes: true } && !await _confirmations.ConfirmAsync(
+                // Turning off a part that has notes asks first, as Remove part does (charter-spec C1, Parts).
+                // Switching drums variants keeps or converts the notes, so only removing drums asks.
+                bool removing = !chip.IsChecked && (!chip.IsDrumsChip || !PartChips.Any(c => c.IsDrumsChip && c.IsChecked));
+                ChartInstrument removed = chip.Instrument;
+                if (removing && _chart.PartOf(removed) is { HasNotes: true } && !await _confirmations.ConfirmAsync(
                         Strings.RemovePartTitle,
-                        string.Format(CultureInfo.CurrentCulture, Strings.RemovePartMessageFormat, part.Label),
+                        string.Format(CultureInfo.CurrentCulture, Strings.RemovePartMessageFormat, chip.Label),
                         Strings.RemovePartConfirm))
                 {
-                    Restore(() => part.IsChecked = true);
+                    Restore(() => chip.IsChecked = true);
                     return;
                 }
             }
@@ -414,11 +441,26 @@ namespace ChartBuilder.ViewModels
             {
                 // Nothing awaits this, so anything not caught here would take the app down.
                 Trace.TraceError($"Asking to remove a part failed: {ex}");
-                Restore(() => part.IsChecked = true);
+                Restore(() => chip.IsChecked = true);
                 return;
             }
 
             ApplyNow();
+
+            // Turning Pro on takes the standard drums rating with it, as that's the only rating the Pro chip shows.
+            if (syncPro)
+                SyncProRatingFromDrums();
+        }
+
+        /// <summary>Copies the standard drums rating to Pro drums' own rating, when they differ.</summary>
+        private void SyncProRatingFromDrums()
+        {
+            string drumsKey = SongIniPartKeys.DifficultyKeysOf(ChartInstrument.Drums, null)[0];
+            int? tier = MetadataDifficulty.TierOf(_song.EffectiveValue(drumsKey));
+            string? current = _song.EffectiveValue(SongIniPartKeys.ProDrumsDifficulty);
+            string wanted = tier?.ToString(CultureInfo.InvariantCulture) ?? MetadataDifficulty.UnsetValue;
+            if (!string.Equals(current, wanted, StringComparison.Ordinal))
+                SetDifficulty(SongIniPartKeys.ProDrumsDifficulty, tier);
         }
 
         /// <summary>Shows the problem with what's being typed at once, and applies it once the typing pauses.</summary>
@@ -511,18 +553,13 @@ namespace ChartBuilder.ViewModels
         private void LoadSong()
         {
             var pending = _song.PendingChanges().Select(c => c.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            bool pro = _chart.DrumsVariant == DrumsVariant.Pro;
             _loading = true;
             try
             {
-                foreach (var part in Parts)
+                foreach (var chip in PartChips)
                 {
-                    part.Rating.Update(MetadataDifficulty.TierOf(_song.EffectiveValue(part.DifficultyKey)));
-                    part.HasProDifficulty = part.IsDrums && pro;
-                    if (part.HasProDifficulty)
-                        part.ProRating.Update(MetadataDifficulty.TierOf(_song.EffectiveValue(SongIniPartKeys.ProDrumsDifficulty)));
-                    bool changed = pending.Contains(part.DifficultyKey) || (part.HasProDifficulty && pending.Contains(SongIniPartKeys.ProDrumsDifficulty));
-                    part.Marker = changed ? "*" : null;
+                    chip.Rating.Update(MetadataDifficulty.TierOf(_song.EffectiveValue(chip.DifficultyKey)));
+                    chip.Marker = pending.Contains(chip.DifficultyKey) ? "*" : null;
                 }
 
                 if (!_delayTyped)
@@ -535,7 +572,7 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>Sets the fields from the chart and the song.</summary>
-        [MemberNotNull(nameof(SelectedResolution), nameof(SelectedDrums))]
+        [MemberNotNull(nameof(SelectedResolution))]
         private void Load()
         {
             _typingTimer.Stop();
@@ -550,9 +587,15 @@ namespace ChartBuilder.ViewModels
                 _chartNumerator = values.Numerator;
                 Numerator = values.Numerator;
                 Denominator = values.Denominator;
-                foreach (var part in Parts)
-                    part.IsChecked = values.Parts.Contains(part.Instrument);
-                SelectedDrums = DrumsVariants.First(d => d.Value == values.Drums);
+                bool hasDrums = values.Parts.Contains(ChartInstrument.Drums);
+                foreach (var chip in PartChips)
+                {
+                    chip.IsChecked = chip.IsDrumsChip
+                        ? hasDrums && values.Drums == chip.Variant
+                        : values.Parts.Contains(chip.Instrument);
+                }
+
+                OnPropertyChanged(nameof(HasDrums));
             }
             finally
             {
@@ -581,6 +624,10 @@ namespace ChartBuilder.ViewModels
         {
             // The BPM shown is rounded, so one left as it was keeps the tempo the chart has.
             long microseconds = Bpm == _chartBpm ? _chartMicroseconds : EditableTempoMap.MicrosecondsPerQuarterOf((double)Bpm!.Value);
+            var parts = PartChips.Where(p => p.IsChecked).Select(p => p.Instrument).ToHashSet();
+            DrumsVariant drums = PartChips.FirstOrDefault(p => p.IsDrumsChip && p.IsChecked)?.Variant
+                ?? _chart.DrumsVariant
+                ?? DrumsVariant.Pro;
             return ChartSettingsValues.Of(_chart) with
             {
                 Resolution = SelectedResolution.Value,
@@ -588,8 +635,8 @@ namespace ChartBuilder.ViewModels
                 Numerator = (int)Numerator!.Value,
                 Denominator = Denominator,
                 // Parts Chart Builder doesn't edit aren't offered, so they're kept as they are.
-                Parts = Parts.Where(p => p.IsChecked).Select(p => p.Instrument).ToHashSet(),
-                Drums = SelectedDrums.Value,
+                Parts = parts,
+                Drums = drums,
             };
         }
 
@@ -656,5 +703,33 @@ namespace ChartBuilder.ViewModels
             ChartInstrument.Drums => Strings.PartDrums,
             _ => ChartLabels.InstrumentName(instrument),
         };
+
+        private List<ChartPartChipViewModel> BuildChips(ChartSettingsValues values)
+        {
+            var chips = new List<ChartPartChipViewModel>();
+            bool hasDrums = values.Parts.Contains(ChartInstrument.Drums);
+            foreach (var instrument in NewChartSettings.Instruments)
+            {
+                if (instrument == ChartInstrument.Drums)
+                    continue;
+                chips.Add(new ChartPartChipViewModel(
+                    this, instrument, null, PartName(instrument),
+                    SongIniPartKeys.DifficultyKeysOf(instrument, null)[0],
+                    values.Parts.Contains(instrument)));
+            }
+
+            string drumsKey = SongIniPartKeys.DifficultyKeysOf(ChartInstrument.Drums, null)[0];
+            chips.Add(new ChartPartChipViewModel(
+                this, ChartInstrument.Drums, DrumsVariant.FourLane, Strings.PartDrums, drumsKey,
+                hasDrums && values.Drums == DrumsVariant.FourLane));
+            chips.Add(new ChartPartChipViewModel(
+                this, ChartInstrument.Drums, DrumsVariant.Pro, Strings.ChartSettingsProDrumsDifficultyLabel,
+                SongIniPartKeys.ProDrumsDifficulty,
+                hasDrums && values.Drums == DrumsVariant.Pro));
+            chips.Add(new ChartPartChipViewModel(
+                this, ChartInstrument.Drums, DrumsVariant.FiveLane, Strings.ChartSettingsFiveLaneDrumsLabel, drumsKey,
+                hasDrums && values.Drums == DrumsVariant.FiveLane));
+            return chips;
+        }
     }
 }
