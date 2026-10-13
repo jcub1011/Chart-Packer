@@ -20,19 +20,6 @@
          empty space can take focus from an edit box, which commits it. -->
     <UserControl.Styles>
         <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
-        <Style Selector="TextBlock.section-heading">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-            <Setter Property="Margin" Value="0,4,0,0" />
-        </Style>
-        <Style Selector="Border.section">
-            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12" />
-        </Style>
         <Style Selector="StackPanel.field">
             <Setter Property="Spacing" Value="4" />
         </Style>
@@ -123,73 +110,67 @@
     </UserControl.Resources>
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="16,14" Spacing="10">
+        <StackPanel Margin="12,10" Spacing="0">
             <!-- A chip per part: on when the chart has it, with its rating inside it, which opens the inspector's
                  difficulty flyout. Drums are three chips sharing one part: 4-lane, Pro and 5-lane. -->
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />
-            <Border Classes="section">
-                <StackPanel Spacing="8">
-                    <ItemsControl ItemsSource="{Binding ChartSettings.PartChips}"
-                                  AutomationProperties.Name="{x:Static res:Strings.ChartSettingsSectionParts}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel ItemSpacing="6" LineSpacing="6" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ChartPartChipViewModel">
-                                <Border Classes="partChip" Classes.checked="{Binding IsChecked}">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <TextBlock Classes="marker"
-                                                   VerticalAlignment="Center"
-                                                   Text="{Binding Marker}"
-                                                   IsVisible="{Binding Marker, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                                        <ToggleButton Classes="partChipLabel"
-                                                      VerticalAlignment="Center"
-                                                      Content="{Binding Label}"
-                                                      IsChecked="{Binding IsChecked}"
-                                                      ToolTip.Tip="{x:Static res:Strings.ChartSettingsPartToolTip}"
-                                                      AutomationProperties.Name="{Binding Label}" />
-                                        <ContentControl Content="{Binding Rating}"
-                                                        ContentTemplate="{StaticResource RatingTemplate}"
-                                                        IsEnabled="{Binding IsChecked}" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Classes="muted"
-                               TextWrapping="Wrap"
-                               FontSize="12"
-                               Text="{x:Static res:Strings.ChartSettingsDrumsToolTip}"
-                               IsVisible="{Binding ChartSettings.HasDrums}" />
-                </StackPanel>
-            </Border>
+            <TextBlock Classes="caption" Margin="0,2,0,4" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />
+            <StackPanel Spacing="8">
+                <ItemsControl ItemsSource="{Binding ChartSettings.PartChips}"
+                              AutomationProperties.Name="{x:Static res:Strings.ChartSettingsSectionParts}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ChartPartChipViewModel">
+                            <Border Classes="partChip" Classes.checked="{Binding IsChecked}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="marker"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding Marker}"
+                                               IsVisible="{Binding Marker, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    <ToggleButton Classes="partChipLabel"
+                                                  VerticalAlignment="Center"
+                                                  Content="{Binding Label}"
+                                                  IsChecked="{Binding IsChecked}"
+                                                  ToolTip.Tip="{x:Static res:Strings.ChartSettingsPartToolTip}"
+                                                  AutomationProperties.Name="{Binding Label}" />
+                                    <ContentControl Content="{Binding Rating}"
+                                                    ContentTemplate="{StaticResource RatingTemplate}"
+                                                    IsEnabled="{Binding IsChecked}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="muted"
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Text="{x:Static res:Strings.ChartSettingsDrumsToolTip}"
+                           IsVisible="{Binding ChartSettings.HasDrums}" />
+            </StackPanel>
 
             <!-- The song's metadata, as Chart Packer's inspector edits it; Revert and Remove are on a row's right-click menu. -->
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionMetadata}" />
-            <Border Classes="section">
-                <uiviews:MetadataEditorView DataContext="{Binding Metadata.MetadataEditor}" />
-            </Border>
+            <TextBlock Classes="caption" Margin="0,10,0,4" Text="{x:Static res:Strings.ChartSettingsSectionMetadata}" />
+            <uiviews:MetadataEditorView DataContext="{Binding Metadata.MetadataEditor}" />
 
             <!-- The song's tracks, with their mix; Replace and Remove are on a row's right-click menu. -->
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ChartSettingsSectionTracks}" />
-            <Border Classes="section">
-                <StackPanel Spacing="4">
-                    <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12" Text="{x:Static res:Strings.ChartSettingsTracksNote}" />
-                    <uiviews:TrackListView Tracks="{Binding Tracks.Tracks}"
-                                           RemovedTracks="{Binding Tracks.RemovedTracks}"
-                                           AddTrackOptions="{Binding Tracks.AddTrackOptions}"
-                                           CanEdit="{Binding Tracks.CanEdit}"
-                                           ActionsInContextMenu="True"
-                                           PositionSeconds="{Binding Playback.PositionSeconds}"
-                                           LengthSeconds="{Binding Playback.LengthSeconds}"
-                                           ReplaceTrackCommand="{Binding Tracks.ReplaceTrackCommand}"
-                                           RemoveTrackCommand="{Binding Tracks.RemoveTrackCommand}"
-                                           RestoreTrackCommand="{Binding Tracks.RestoreTrackCommand}" />
-                    <TextBlock Classes="error" Text="{Binding Tracks.Error}" IsVisible="{Binding Tracks.HasError}" />
-                </StackPanel>
-            </Border>
+            <TextBlock Classes="caption" Margin="0,10,0,4" Text="{x:Static res:Strings.ChartSettingsSectionTracks}" />
+            <StackPanel Spacing="4">
+                <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12" Text="{x:Static res:Strings.ChartSettingsTracksNote}" />
+                <uiviews:TrackListView Tracks="{Binding Tracks.Tracks}"
+                                       RemovedTracks="{Binding Tracks.RemovedTracks}"
+                                       AddTrackOptions="{Binding Tracks.AddTrackOptions}"
+                                       CanEdit="{Binding Tracks.CanEdit}"
+                                       ActionsInContextMenu="True"
+                                       PositionSeconds="{Binding Playback.PositionSeconds}"
+                                       LengthSeconds="{Binding Playback.LengthSeconds}"
+                                       ReplaceTrackCommand="{Binding Tracks.ReplaceTrackCommand}"
+                                       RemoveTrackCommand="{Binding Tracks.RemoveTrackCommand}"
+                                       RestoreTrackCommand="{Binding Tracks.RestoreTrackCommand}" />
+                <TextBlock Classes="error" Text="{Binding Tracks.Error}" IsVisible="{Binding Tracks.HasError}" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

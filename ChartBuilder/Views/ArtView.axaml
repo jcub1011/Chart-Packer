@@ -14,12 +14,6 @@
          to saved. Each change is an undo step, saved with the song. -->
     <UserControl.Styles>
         <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
-        <Style Selector="TextBlock.section-heading">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-            <Setter Property="Margin" Value="0,4,0,0" />
-        </Style>
         <Style Selector="TextBlock.note">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -27,7 +21,7 @@
     </UserControl.Styles>
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <ItemsControl Margin="16,14" ItemsSource="{Binding Slots}">
+        <ItemsControl Margin="12,10" ItemsSource="{Binding Slots}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <StackPanel Spacing="10" />
@@ -35,8 +29,8 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ArtSlotViewModel">
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="section-heading" Text="{Binding Title}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="caption" Text="{Binding Title}" />
                         <Border Classes="artTile" AutomationProperties.Name="{Binding Title}">
                             <Border.ContextMenu>
                                 <ContextMenu>
