@@ -23,7 +23,6 @@
         <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenChartCommand}" />
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenProgramSettingsCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
-        <KeyBinding Gesture="Space" Command="{Binding Playback.PlayPauseCommand}" />
         <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />

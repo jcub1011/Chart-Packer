@@ -29,6 +29,9 @@ namespace ChartBuilder.Views
 
         private bool _isOpen;
 
+        // Space played or paused and hasn't been let go yet, so its auto-repeat doesn't toggle again.
+        private bool _isSpaceHeld;
+
         // The sizes last given to the side columns and the timeline row: NaN for a collapsed side, and before the
         // window opens. A definition that no longer matches was moved by its splitter, i.e. by the user.
         private double _leftApplied = double.NaN;
@@ -51,7 +54,11 @@ namespace ChartBuilder.Views
             SizeChanged += (_, _) => ApplyLayout();
 
             // Keys held in record mode are let go when the window loses focus, as their key-ups won't come here.
-            Deactivated += (_, _) => _viewModel?.Editor.RecordReleaseAll();
+            Deactivated += (_, _) =>
+            {
+                _isSpaceHeld = false;
+                _viewModel?.Editor.RecordReleaseAll();
+            };
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             Closing += (_, _) => CaptureLayout();
 
@@ -65,6 +72,10 @@ namespace ChartBuilder.Views
             DragDrop.SetAllowDrop(this, true);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DropEvent, OnDrop);
+
+            // Space plays or pauses, tunnelled so a focused button takes it as playback rather than as a click.
+            AddHandler(KeyDownEvent, OnSpaceKeyDown, RoutingStrategies.Tunnel);
+            AddHandler(KeyUpEvent, OnSpaceKeyUp, RoutingStrategies.Tunnel);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -89,6 +100,47 @@ namespace ChartBuilder.Views
             if (e.Handled || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None || _viewModel?.Editor.Session.Fills is not { IsActive: true } fills)
                 return;
             fills.Cancel();
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Space anywhere in the window plays or pauses, and Shift+Space plays the selection, once a press however long
+        /// it's held. Tunnelled, so a focused button or list plays rather than taking it. Not while a text box has focus:
+        /// it types a space there. Not a key binding, which would run alongside the focused control's own Space.
+        /// </summary>
+        private void OnSpaceKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Space)
+                return;
+
+            bool playSelection = e.KeyModifiers == KeyModifiers.Shift;
+            if (!playSelection && e.KeyModifiers != KeyModifiers.None)
+                return;
+
+            if (e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox)
+                return;
+
+            e.Handled = true;
+            if (_isSpaceHeld)
+                return;
+
+            _isSpaceHeld = true;
+            if (_viewModel is not { } vm)
+                return;
+
+            if (playSelection)
+                vm.Editor.PlaySelection();
+            else
+                vm.Editor.PlayPause();
+        }
+
+        /// <summary>Letting go of a Space that played or paused, so the focused control doesn't see half a press.</summary>
+        private void OnSpaceKeyUp(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Space || !_isSpaceHeld)
+                return;
+
+            _isSpaceHeld = false;
             e.Handled = true;
         }
 
