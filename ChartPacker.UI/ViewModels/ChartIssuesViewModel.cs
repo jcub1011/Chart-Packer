@@ -11,31 +11,41 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartPacker.UI.ViewModels
 {
     /// <summary>
-    /// A chart finding, as the issues list shows it: its message, rule and place, with Go to and Fix where whoever lists
-    /// it can take you there or fix it.
+    /// One way to fix a finding, as its right-click menu offers it: on this finding, on every finding of its rule in its
+    /// part, or on every finding of its rule.
+    /// </summary>
+    /// <param name="Label">What it does; null for a rule's only way, so the menu offers Fix, Fix All For and Fix All without a list.</param>
+    /// <param name="Fix">Fixes the finding this way.</param>
+    /// <param name="FixAllInPart">Fixes every finding of its rule in its part this way, as one step; null when there's no such fix.</param>
+    /// <param name="FixAll">Fixes every finding of its rule this way, as one step; null when there's no such fix.</param>
+    public sealed record FindingFix(string? Label, Action Fix, Action? FixAllInPart, Action? FixAll);
+
+    /// <summary>
+    /// A chart finding, as the issues list shows it: its message, rule and place, with Go to where whoever lists it can
+    /// take you there, and a right-click menu of its fixes where they can fix it.
     /// </summary>
     public sealed class FindingItem
     {
         private readonly Func<Finding, string?> _whereOf;
         private readonly Action<Finding>? _goTo;
-        private readonly Action<Finding>? _fix;
-        private readonly bool _canFix;
+        private readonly Func<Finding, IReadOnlyList<FindingFix>>? _fixesOf;
         private string? _where;
         private bool _hasWhere;
         private IRelayCommand? _goToCommand;
-        private IRelayCommand? _fixCommand;
 
         /// <param name="whereOf">Where the finding is, in words; worked out only once the row is shown.</param>
-        /// <param name="canFix">Whether it has a quick fix to offer, which <paramref name="fix"/> applies.</param>
-        public FindingItem(Finding finding, Func<Finding, string?> whereOf, bool canFix = false, Action<Finding>? goTo = null, Action<Finding>? fix = null)
+        /// <param name="fixesOf">
+        /// The ways to fix a finding, worked out each time its menu opens, so they're of the chart as it is then; none when
+        /// it has none. Null where the list can't fix anything, so its rows have no menu.
+        /// </param>
+        public FindingItem(Finding finding, Func<Finding, string?> whereOf, Action<Finding>? goTo = null, Func<Finding, IReadOnlyList<FindingFix>>? fixesOf = null)
         {
             ArgumentNullException.ThrowIfNull(finding);
             ArgumentNullException.ThrowIfNull(whereOf);
             Finding = finding;
             _whereOf = whereOf;
-            _canFix = canFix;
             _goTo = goTo;
-            _fix = fix;
+            _fixesOf = fixesOf;
         }
 
         public Finding Finding { get; }
@@ -65,15 +75,21 @@ namespace ChartPacker.UI.ViewModels
 
         public bool IsInfo => Finding.Severity == Severity.Info;
 
-        /// <summary>Whether it has a quick fix to offer: a chart command, or a pending change to restore.</summary>
-        public bool CanFix => _canFix && _fix is not null;
-
         /// <summary>Whether it can be gone to in the chart.</summary>
         public bool CanGoTo => _goTo is not null;
 
         public IRelayCommand GoToCommand => _goToCommand ??= new RelayCommand(() => _goTo?.Invoke(Finding));
 
-        public IRelayCommand FixCommand => _fixCommand ??= new RelayCommand(() => _fix?.Invoke(Finding));
+        /// <summary>Whether its row has a menu of fixes: where the list can fix findings, whether or not this one has a fix.</summary>
+        public bool OffersFixes => _fixesOf is not null;
+
+        /// <summary>The ways to fix it now, in the order to offer them; none when it has none.</summary>
+        public IReadOnlyList<FindingFix> Fixes() => _fixesOf?.Invoke(Finding) ?? [];
+
+        /// <summary>The menu item that fixes every finding of its rule in its part: "Fix All For Guitar"; empty for one in no part.</summary>
+        public string FixAllInPartText => Finding.Location is { } location
+            ? string.Format(CultureInfo.CurrentCulture, SharedStrings.FindingFixAllForFormat, ChartLabels.InstrumentName(location.Part))
+            : "";
     }
 
     /// <summary>What a group of the issues list is of: reading the chart file, the chart as a whole, or one part's track.</summary>

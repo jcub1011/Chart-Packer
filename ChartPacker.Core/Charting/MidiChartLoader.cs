@@ -211,7 +211,7 @@ public static class MidiChartLoader
     }
 
     /// <summary>The audio time an anchor event gives, written exactly as the writer writes one, so it's written back the same.</summary>
-    private static long? AnchorOf(string text)
+    internal static long? AnchorOf(string text)
     {
         if (!text.StartsWith(AnchorStart, StringComparison.Ordinal) || !text.EndsWith(AnchorEnd, StringComparison.Ordinal) || text.Length <= AnchorStart.Length + AnchorEnd.Length)
             return null;

@@ -1,6 +1,7 @@
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Lint.Rules;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Resources;
 using ChartPacker.Core.Validation;
 using ChartPacker.Core.Validation.QuickFixes;
 
@@ -8,27 +9,41 @@ namespace ChartPacker.Core.Charting.Lint;
 
 /// <summary>
 /// The quick fixes of the chart lint rules (charter-spec §6, C16 item 3), each one undoable command worked out from
-/// the chart as it is when it's asked for. A fix that has no single right answer, such as a note snapped onto another,
-/// proposes nothing.
+/// the chart as it is when it's asked for. Where there's more than one right answer, such as which of two notes too close
+/// together to delete, each is offered, labelled, for the author to pick; one that would do something wrong, such as
+/// snapping a note onto another, isn't offered.
 /// </summary>
 public static class ChartFixes
 {
+    // The ways to fix the rules with more than one (ChartFixOption.Id).
+    private const string SnapNearest = "nearest";
+    private const string SnapFarther = "farther";
+    private const string DeleteChord = "delete";
+    private const string MakePlain = "plain";
+    private const string LengthenToCutoff = "cutoff";
+    private const string RemoveOpen = "remove-open";
+    private const string KeepOpen = "keep-open";
+    private const string DeleteLater = "delete-later";
+    private const string DeleteEarlier = "delete-earlier";
+    private const string SwitchToPro = "pro";
+    private const string NoTomMarkers = "remove-tom-markers";
+
     /// <summary>Every chart fix, at most one per rule, for <see cref="QuickFixRegistry.ChartStrategies"/>.</summary>
     public static IReadOnlyList<IChartQuickFixStrategy> All { get; } =
     [
         new Fix(ChrRules.Chr001, AddFourFourAtStart),
-        new Fix(ChrRules.Chr004, SnapToGrid),
+        new Fixes(ChrRules.Chr004, SnapToGrid),
         new Fix(ChrRules.Chr005, KeepTheLaterMarker),
         new Fix(ChrRules.Chr020, TrimSustain),
-        new Fix(ChrRules.Chr021, RemoveSustain),
-        new Fix(ChrRules.Chr022, RemoveOpen),
+        new Fixes(ChrRules.Chr021, PlainOrCutoff),
+        new Fixes(ChrRules.Chr022, OpenOrFrets),
         new Fix(ChrRules.Chr023, RemoveRedundantForce),
         new Fix(ChrRules.Chr024, RemoveForceHopo),
         new Fix(ChrRules.Chr025, RemoveFirstForce),
-        new Fix(ChrRules.Chr026, DeleteTheLaterNote),
+        new Fixes(ChrRules.Chr026, DeleteEitherNote),
         new Fix(ChrRules.Chr040, RemoveTomMarker),
         new Fix(ChrRules.Chr043, EndFillOnSharedNote),
-        new Fix(ChrRules.Chr045, SwitchToPro),
+        new Fixes(ChrRules.Chr045, ProOrNoTomMarkers),
         new Fix(ChrRules.Chr060, DeleteEmptyStarPower),
         new Fix(ChrRules.Chr061, DeleteEmptySolo),
         new Fix(ChrRules.Chr062, MergePhrases),
@@ -38,18 +53,29 @@ public static class ChartFixes
     private static IChartCommand? AddFourFourAtStart(Finding finding, EditableChart chart, ChartReadOptions options) =>
         chart.TempoMap.TimeSignatures.At(0).IsEmpty ? new AddTimeSignature(new TimeSignatureMarker(0, 4, 4)) : null;
 
-    // CHR004: the chord moved to the nearest tick on a common grid, unless a note is already there on one of its lanes.
-    private static IChartCommand? SnapToGrid(Finding finding, EditableChart chart, ChartReadOptions options)
+    // CHR004: the chord moved to the nearest tick on a common grid, or to the grid line on its other side, unless a note is
+    // already there on one of its lanes; or deleted.
+    private static IEnumerable<ChartFixOption> SnapToGrid(Finding finding, EditableChart chart, ChartReadOptions options)
     {
         if (TrackAt(finding, chart) is not var (part, track, location))
-            return null;
+            yield break;
         var chord = track.Notes.At(location.Tick).ToArray();
         if (chord.Length == 0)
-            return null;
-        long target = OffGridRule.NearestOnGrid(location.Tick, chart.TempoMap.ToTempoMap());
-        if (target == location.Tick || chord.Any(n => track.TryGetNote(target, n.Lane, n.DoubleKick, out _)))
-            return null;
-        return new MoveNotes(part.Instrument, track.Difficulty, chord, target - location.Tick, 0);
+            yield break;
+        var map = chart.TempoMap.ToTempoMap();
+        long tick = location.Tick;
+        long nearest = OffGridRule.NearestOnGrid(tick, map);
+        var (before, after) = OffGridRule.GridLinesAround(tick, map);
+        long farther = nearest <= tick ? after : before;
+
+        bool Free(long target) => target != tick && !chord.Any(n => track.TryGetNote(target, n.Lane, n.DoubleKick, out _));
+        IChartCommand MoveTo(long target) => new MoveNotes(part.Instrument, track.Difficulty, chord, target - tick, 0);
+
+        if (Free(nearest))
+            yield return new ChartFixOption(SnapNearest, FindingMessages.FixSnapNearest, MoveTo(nearest));
+        if (farther != nearest && Free(farther))
+            yield return new ChartFixOption(SnapFarther, farther < tick ? FindingMessages.FixSnapBefore : FindingMessages.FixSnapAfter, MoveTo(farther));
+        yield return new ChartFixOption(DeleteChord, FindingMessages.FixDeleteChord, new RemoveNotes(part.Instrument, track.Difficulty, chord));
     }
 
     // CHR005: the markers before the last on the tick removed, as the games read only the last.
@@ -87,24 +113,31 @@ public static class ChartFixes
         return lengths.Count > 0 ? new SetSustain(part.Instrument, track.Difficulty, lengths) : null;
     }
 
-    // CHR021: the chord's sustains that the games read as plain notes made plain notes.
-    private static IChartCommand? RemoveSustain(Finding finding, EditableChart chart, ChartReadOptions options)
+    // CHR021: the chord's sustains that the games read as plain notes made plain notes, or held to the cutoff, so they're
+    // read as sustains.
+    private static IEnumerable<ChartFixOption> PlainOrCutoff(Finding finding, EditableChart chart, ChartReadOptions options)
     {
         if (TrackAt(finding, chart) is not var (part, track, location))
-            return null;
+            yield break;
         long cutoff = SustainCutoff.Of(chart.Resolution, options.SustainCutoff);
         var notes = track.Notes.At(location.Tick).ToArray().Where(n => SustainUnderCutoffRule.IsUnderCutoff(n, chart.Resolution, cutoff)).ToList();
-        return notes.Count > 0 ? new SetSustain(part.Instrument, track.Difficulty, notes, EditableNote.PlainLength) : null;
+        if (notes.Count == 0)
+            yield break;
+        yield return new ChartFixOption(MakePlain, FindingMessages.FixMakePlain, new SetSustain(part.Instrument, track.Difficulty, notes, EditableNote.PlainLength));
+        yield return new ChartFixOption(LengthenToCutoff, FindingMessages.FixLengthenToCutoff, new SetSustain(part.Instrument, track.Difficulty, notes, cutoff));
     }
 
-    // CHR022: the open note taken out of the chord, leaving its frets.
-    private static IChartCommand? RemoveOpen(Finding finding, EditableChart chart, ChartReadOptions options)
+    // CHR022: the open note taken out of the chord, leaving its frets; or the frets, leaving the open note.
+    private static IEnumerable<ChartFixOption> OpenOrFrets(Finding finding, EditableChart chart, ChartReadOptions options)
     {
         if (TrackAt(finding, chart) is not var (part, track, location))
-            return null;
+            yield break;
         var chord = track.Notes.At(location.Tick).ToArray();
         var opens = chord.Where(n => n.Lane == ChartNote.OpenLane).ToList();
-        return opens.Count > 0 && opens.Count < chord.Length ? new RemoveNotes(part.Instrument, track.Difficulty, opens) : null;
+        if (opens.Count == 0 || opens.Count == chord.Length)
+            yield break;
+        yield return new ChartFixOption(RemoveOpen, FindingMessages.FixRemoveOpen, new RemoveNotes(part.Instrument, track.Difficulty, opens));
+        yield return new ChartFixOption(KeepOpen, FindingMessages.FixKeepOpen, new RemoveNotes(part.Instrument, track.Difficulty, chord.Where(n => n.Lane != ChartNote.OpenLane)));
     }
 
     // CHR023: the force that changes nothing turned off.
@@ -134,20 +167,22 @@ public static class ChartFixes
         return flags == ChordFlags.None ? null : new SetChordFlags(part.Instrument, track.Difficulty, [location.Tick], flags, on: false);
     }
 
-    // CHR026: the later of the two notes deleted.
-    private static IChartCommand? DeleteTheLaterNote(Finding finding, EditableChart chart, ChartReadOptions options)
+    // CHR026: the later of the two notes deleted, or the earlier.
+    private static IEnumerable<ChartFixOption> DeleteEitherNote(Finding finding, EditableChart chart, ChartReadOptions options)
     {
         if (TrackAt(finding, chart) is not var (part, track, location))
-            return null;
+            yield break;
         long tooClose = CloseNotesRule.TooCloseTicks(chart.Resolution);
         var notes = track.Notes;
         for (int i = notes.FirstAtOrAfter(location.Tick); i < notes.Count && notes[i].Tick == location.Tick; i++)
         {
             if (CloseNotesRule.TooCloseAfter(track, i, tooClose) is { } later && later.Tick == location.EndTick)
-                return new RemoveNotes(part.Instrument, track.Difficulty, [later]);
+            {
+                yield return new ChartFixOption(DeleteLater, FindingMessages.FixDeleteLater, new RemoveNotes(part.Instrument, track.Difficulty, [later]));
+                yield return new ChartFixOption(DeleteEarlier, FindingMessages.FixDeleteEarlier, new RemoveNotes(part.Instrument, track.Difficulty, [notes[i]]));
+                yield break;
+            }
         }
-
-        return null;
     }
 
     // CHR040: the marker that covers nothing removed.
@@ -175,9 +210,15 @@ public static class ChartFixes
         return null;
     }
 
-    // CHR045: the drums made Pro, whose tom markers are saved.
-    private static IChartCommand? SwitchToPro(Finding finding, EditableChart chart, ChartReadOptions options) =>
-        chart.DrumsVariant == DrumsVariant.FourLane ? new SetDrumsVariant(DrumsVariant.Pro) : null;
+    // CHR045: the drums made Pro, whose tom markers are saved; or the tom markers removed, as saving would leave them out.
+    private static IEnumerable<ChartFixOption> ProOrNoTomMarkers(Finding finding, EditableChart chart, ChartReadOptions options)
+    {
+        if (chart.DrumsVariant != DrumsVariant.FourLane)
+            yield break;
+        yield return new ChartFixOption(SwitchToPro, FindingMessages.FixSwitchToPro, new SetDrumsVariant(DrumsVariant.Pro));
+        if (finding.Location is { } location && chart.PartOf(location.Part) is { Kind: ChartInstrumentKind.Drums, TomMarkers.Count: > 0 } drums)
+            yield return new ChartFixOption(NoTomMarkers, FindingMessages.FixRemoveTomMarkers, new RemoveTomMarkers(drums.TomMarkers.ToList()));
+    }
 
     // CHR060: the star power phrase with no notes deleted.
     private static IChartCommand? DeleteEmptyStarPower(Finding finding, EditableChart chart, ChartReadOptions options) =>
@@ -229,17 +270,31 @@ public static class ChartFixes
             ? (part, part[difficulty], location)
             : null;
 
-    /// <summary>A chart fix for one rule, from a function.</summary>
+    /// <summary>A chart fix for one rule with one way to fix it, from a function.</summary>
     private sealed class Fix(string ruleId, Func<Finding, EditableChart, ChartReadOptions, IChartCommand?> propose) : IChartQuickFixStrategy
     {
         public string RuleId => ruleId;
 
-        public IChartCommand? Propose(Finding finding, EditableChart chart, ChartReadOptions options)
+        public IReadOnlyList<ChartFixOption> Propose(Finding finding, EditableChart chart, ChartReadOptions options)
         {
             ArgumentNullException.ThrowIfNull(finding);
             ArgumentNullException.ThrowIfNull(chart);
             ArgumentNullException.ThrowIfNull(options);
-            return propose(finding, chart, options);
+            return propose(finding, chart, options) is { } command ? [new ChartFixOption(ChartFixOption.Only, null, command)] : [];
+        }
+    }
+
+    /// <summary>A chart fix for one rule with more than one way to fix it, each labelled, from a function.</summary>
+    private sealed class Fixes(string ruleId, Func<Finding, EditableChart, ChartReadOptions, IEnumerable<ChartFixOption>> propose) : IChartQuickFixStrategy
+    {
+        public string RuleId => ruleId;
+
+        public IReadOnlyList<ChartFixOption> Propose(Finding finding, EditableChart chart, ChartReadOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(finding);
+            ArgumentNullException.ThrowIfNull(chart);
+            ArgumentNullException.ThrowIfNull(options);
+            return [.. propose(finding, chart, options)];
         }
     }
 }

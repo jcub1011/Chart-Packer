@@ -109,11 +109,11 @@ public sealed class MouseGestureTests
         session.Selection.Select(GuitarExpert, [plain, held]);
 
         session.Tools.PressContext(At(session, 480, 2, view));
-        session.Tools.Drag(At(session, 480 + Step, 2, view));
-        session.Tools.Release(At(session, 480 + Step, 2, view));
+        session.Tools.Drag(At(session, 480 + (2 * Step), 2, view));
+        session.Tools.Release(At(session, 480 + (2 * Step), 2, view));
 
-        // A note without a sustain grows one from its tick.
-        Assert.AreSequenceEqual([new EditableNote(0, Step, 1), new EditableNote(480, 240 + Step, 2)], track.Notes.ToList());
+        // A note without a sustain grows one from its tick, once it's as long as the sustain cutoff.
+        Assert.AreSequenceEqual([new EditableNote(0, 2 * Step, 1), new EditableNote(480, 240 + (2 * Step), 2)], track.Notes.ToList());
         Assert.AreEqual(1, session.UndoStack.UndoCount);
         session.Undo();
         Assert.AreSequenceEqual([plain, held], track.Notes.ToList());
@@ -306,9 +306,9 @@ public sealed class MouseGestureTests
         session.Selection.Select(GuitarExpert, [plain, held]);
         session.Tool = EditorTool.Place;
 
-        DragFromTo(session, At(session, 480, 2, view), At(session, 480 + Step, 2, view), EditorModifiers.Control);
+        DragFromTo(session, At(session, 480, 2, view), At(session, 480 + (2 * Step), 2, view), EditorModifiers.Control);
 
-        Assert.AreSequenceEqual([new EditableNote(0, Step, 1), new EditableNote(480, 240 + Step, 2)], track.Notes.ToList());
+        Assert.AreSequenceEqual([new EditableNote(0, 2 * Step, 1), new EditableNote(480, 240 + (2 * Step), 2)], track.Notes.ToList());
         Assert.AreEqual(1, session.UndoStack.UndoCount);
         Assert.HasCount(2, session.Selection.Notes);
     }

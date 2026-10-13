@@ -1722,6 +1722,14 @@ Saving also makes these changes to song.ini:
   <data name="FindingNoFixStatus" xml:space="preserve">
     <value>That finding has no single right fix here.</value>
   </data>
+  <data name="FindingsFixedAllFormat" xml:space="preserve">
+    <value>Fixed {0} {1} findings in {2}.</value>
+    <comment>After Fix All For a part. {0} is how many were fixed, {1} the rule ID (CHR023), {2} the part (Guitar).</comment>
+  </data>
+  <data name="FindingsFixedEverywhereFormat" xml:space="preserve">
+    <value>Fixed {0} {1} findings.</value>
+    <comment>After Fix All. {0} is how many were fixed, {1} the rule ID (CHR023).</comment>
+  </data>
   <data name="FindingPartDifficultyFormat" xml:space="preserve">
     <value>{0} {1}</value>
     <comment>A finding's part and difficulty, e.g. "Lead Guitar Expert". {0} is the part; {1} the difficulty.</comment>

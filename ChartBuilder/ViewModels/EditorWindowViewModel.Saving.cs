@@ -257,7 +257,10 @@ namespace ChartBuilder.ViewModels
             Messages.Post(severity, message);
         }
 
-        /// <summary>Saves a copy of a <c>.sng</c>-opened song elsewhere (Save as <c>.sng</c>), with the dialog's if-exists choice.</summary>
+        /// <summary>
+        /// Saves a copy of a <c>.sng</c>-opened song elsewhere (Save as <c>.sng</c>), with the dialog's if-exists choice,
+        /// without what a packed <c>.sng</c> leaves out (<see cref="ExportCleanup"/>).
+        /// </summary>
         private async Task CopySngAsync(SongEntry entry, ExportSngViewModel dialog)
         {
             string target = Path.Combine(dialog.ExportFolder, Path.GetFileName(entry.FullPath));
@@ -270,10 +273,10 @@ namespace ChartBuilder.ViewModels
 
             try
             {
-                await Task.Run(() =>
+                await Task.Run(async () =>
                 {
                     Directory.CreateDirectory(dialog.ExportFolder);
-                    File.Copy(entry.FullPath, resolved, overwrite: true);
+                    await ExportCleanup.CopySngAsync(entry.FullPath, resolved);
                 });
                 Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.ExportSngCopiedFormat, resolved));
             }

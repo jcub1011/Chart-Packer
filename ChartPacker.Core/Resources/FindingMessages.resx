@@ -196,6 +196,58 @@
     <value>"{0}" has an empty value and was left out.</value>
     <comment>{0} is the key.</comment>
   </data>
+  <data name="FixSnapNearest" xml:space="preserve">
+    <value>Snap to the nearest grid line</value>
+    <comment>A way to fix an off-grid note (CHR004), as its menu lists it.</comment>
+  </data>
+  <data name="FixSnapBefore" xml:space="preserve">
+    <value>Snap to the grid line before</value>
+    <comment>A way to fix an off-grid note (CHR004) when the nearest grid line is after it.</comment>
+  </data>
+  <data name="FixSnapAfter" xml:space="preserve">
+    <value>Snap to the grid line after</value>
+    <comment>A way to fix an off-grid note (CHR004) when the nearest grid line is before it.</comment>
+  </data>
+  <data name="FixDeleteChord" xml:space="preserve">
+    <value>Delete the note</value>
+    <comment>A way to fix an off-grid note or chord (CHR004).</comment>
+  </data>
+  <data name="FixMakePlain" xml:space="preserve">
+    <value>Make it a plain note</value>
+    <comment>A way to fix a sustain shorter than the cutoff (CHR021).</comment>
+  </data>
+  <data name="FixLengthenToCutoff" xml:space="preserve">
+    <value>Lengthen it to the sustain cutoff</value>
+    <comment>A way to fix a sustain shorter than the cutoff (CHR021).</comment>
+  </data>
+  <data name="FixRemoveOpen" xml:space="preserve">
+    <value>Remove the open note</value>
+    <comment>A way to fix an open note in a chord (CHR022).</comment>
+  </data>
+  <data name="FixKeepOpen" xml:space="preserve">
+    <value>Keep only the open note</value>
+    <comment>A way to fix an open note in a chord (CHR022): the frets are removed.</comment>
+  </data>
+  <data name="FixDeleteLater" xml:space="preserve">
+    <value>Delete the later note</value>
+    <comment>A way to fix two notes too close together (CHR026).</comment>
+  </data>
+  <data name="FixDeleteEarlier" xml:space="preserve">
+    <value>Delete the earlier note</value>
+    <comment>A way to fix two notes too close together (CHR026).</comment>
+  </data>
+  <data name="FixSwitchToPro" xml:space="preserve">
+    <value>Switch to Pro drums</value>
+    <comment>A way to fix tom markers on 4-lane drums (CHR045).</comment>
+  </data>
+  <data name="FixRemoveTomMarkers" xml:space="preserve">
+    <value>Remove the tom markers</value>
+    <comment>A way to fix tom markers on 4-lane drums (CHR045).</comment>
+  </data>
+  <data name="PartKeyDroppedFormat" xml:space="preserve">
+    <value>"{0}" is for a part the chart has no notes for, and was left out.</value>
+    <comment>{0} is the key.</comment>
+  </data>
   <data name="MetadataNotWrittenFormat" xml:space="preserve">
     <value>"{0}" was left out of song.ini because its key or value contains a character song.ini can't hold.</value>
     <comment>{0} is the key.</comment>

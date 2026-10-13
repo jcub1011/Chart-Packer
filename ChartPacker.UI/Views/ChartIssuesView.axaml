@@ -66,7 +66,12 @@
                     </Border>
                 </DataTemplate>
                 <DataTemplate DataType="vm:FindingItem">
+                    <!-- Its fixes are on its right-click menu, filled as the row asks for it (ChartIssuesView.axaml.cs), so
+                         they're of the chart as it is then. It isn't shown where the list can't fix anything. -->
                     <Border Classes="finding severity" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+                        <Border.ContextMenu>
+                            <ContextMenu Opening="OnFindingMenuOpening" />
+                        </Border.ContextMenu>
                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
                             <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12" TextWrapping="Wrap" Text="{Binding Message}" />
                             <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
@@ -74,12 +79,6 @@
                                 <TextBlock Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Text="{Binding Where}" />
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                                <Button Classes="labelled"
-                                        FontSize="12"
-                                        Content="{x:Static res:SharedStrings.FindingFixButton}"
-                                        Command="{Binding FixCommand}"
-                                        IsVisible="{Binding CanFix}"
-                                        ToolTip.Tip="{x:Static res:SharedStrings.FindingFixToolTip}" />
                                 <Button Classes="labelled"
                                         FontSize="12"
                                         Content="{x:Static res:SharedStrings.FindingGoToButton}"

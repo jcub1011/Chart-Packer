@@ -352,6 +352,34 @@ public sealed class EditorToolsTests
     }
 
     [TestMethod]
+    [DynamicData(nameof(Views))]
+    public void ATailDraggedShorterThanTheSustainCutoffMakesAPlainNote(LaneView view)
+    {
+        // At 480 ticks a beat the cutoff is a third of a beat, 160 ticks: 120 is under it, 240 isn't.
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 480, 0));
+        track.Notes.Add(new EditableNote(0, 480, 1));
+
+        DragFromTo(session, At(session, 300, 0, view), At(session, 240, 0, view));
+        DragFromTo(session, At(session, 300, 1, view), At(session, 120, 1, view));
+
+        Assert.AreSequenceEqual([new EditableNote(0, 240, 0), new EditableNote(0, EditableNote.PlainLength, 1)], track.Notes.ToList());
+    }
+
+    [TestMethod]
+    public void AShortSustainFollowsTheSongsCutoff()
+    {
+        var session = Of(Guitar(), songIni: [KeyValuePair.Create("sustain_cutoff_threshold", "60")]);
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(0, 480, 1));
+
+        DragFromTo(session, At(session, 300, 1), At(session, 120, 1));
+
+        Assert.AreSequenceEqual([new EditableNote(0, 120, 1)], track.Notes.ToList());
+    }
+
+    [TestMethod]
     public void CancellingAGestureLeavesTheChartAsItWas()
     {
         var session = Of(Guitar());

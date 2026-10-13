@@ -36,11 +36,6 @@ namespace ChartBuilder.ViewModels
     {
         private static readonly TimeSpan Delay = TimeSpan.FromMilliseconds(150);
 
-        // The rules whose findings have a quick fix: CHR084's restores song_length's correction; CHR083's uses the
-        // suggested rating (charter-spec C18 item 3).
-        private static readonly HashSet<string> Fixable =
-            QuickFixRegistry.ChartStrategies.Select(s => s.RuleId).Append(ChrRules.Chr084).Append(ChrRules.Chr083).ToHashSet(StringComparer.Ordinal);
-
         private readonly EditorSong _song;
         private readonly ChartUndoStack _undo;
         private readonly ChartEditorViewModel _editor;
@@ -232,7 +227,7 @@ namespace ChartBuilder.ViewModels
 
             // What the load left out of the chart file is listed too, until a save writes the file without it.
             var findings = ChartLoadFindings.Merge(result.Findings, ChartLoadFindings.Of(_song.Opened?.Load.Issues ?? []));
-            Issues.Show(findings, static f => f, f => new FindingItem(f, finding => WhereOf(finding, map), Fixable.Contains(f.RuleId), GoTo, Fix), reuse);
+            Issues.Show(findings, static f => f, f => new FindingItem(f, finding => WhereOf(finding, map), GoTo, FixesOf), reuse);
             OnPropertyChanged(nameof(ErrorCount));
             RefreshMarks();
             Changed?.Invoke(this, EventArgs.Empty);
@@ -301,35 +296,75 @@ namespace ChartBuilder.ViewModels
             RefreshMarks();
         }
 
-        /// <summary>Applies <paramref name="finding"/>'s fix: a chart command as one undo step, or a reverted change restored.</summary>
-        private void Fix(Finding finding)
+        /// <summary>
+        /// The ways to fix <paramref name="finding"/> now, for its menu: CHR084's reverted change restored, CHR083's suggested
+        /// rating used (charter-spec C18 item 3), or the chart's fixes, each of which Fix All can apply to every finding of
+        /// its rule, in its part or everywhere.
+        /// </summary>
+        private IReadOnlyList<FindingFix> FixesOf(Finding finding)
         {
             if (PendingSongIniFixes.KeyToRestore(finding, _song) is { } key)
-            {
-                _song.Restore(key);
-                return;
-            }
+                return [new FindingFix(null, () => _song.Restore(key), null, null)];
 
             var session = _editor.Session;
             if (finding.RuleId == ChrRules.Chr083)
             {
-                if (PendingSongIniFixes.SuggestedRating(finding, _song.Chart, session.ReadOptions) is { } rating)
-                {
-                    _song.SetRating(rating.Key, rating.Tier);
-                    _editor.Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUsedFormat, rating.Tier, rating.Key));
-                }
-                else
-                {
-                    session.Status = Strings.FindingNoFixStatus;
-                }
-
-                return;
+                return PendingSongIniFixes.SuggestedRating(finding, _song.Chart, session.ReadOptions) is { } rating
+                    ? [new FindingFix(null, () => UseRating(rating.Key, rating.Tier), null, null)]
+                    : [];
             }
 
-            if (QuickFixRegistry.ProposeChartFix(finding, session.Chart, session.ReadOptions) is { } command)
+            return [.. QuickFixRegistry.ProposeChartFixes(finding, session.Chart, session.ReadOptions).Select(option => new FindingFix(
+                option.Label,
+                () => Fix(finding, option.Id),
+                finding.Location is { } location ? () => FixAll(finding, option.Id, location.Part) : null,
+                () => FixAll(finding, option.Id, null)))];
+        }
+
+        private void UseRating(string key, int tier)
+        {
+            _song.SetRating(key, tier);
+            _editor.Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUsedFormat, tier, key));
+        }
+
+        /// <summary>Applies <paramref name="finding"/>'s fix <paramref name="optionId"/> as one undo step, worked out again from the chart as it is.</summary>
+        private void Fix(Finding finding, string optionId)
+        {
+            var session = _editor.Session;
+            if (QuickFixRegistry.ProposeChartFix(finding, session.Chart, session.ReadOptions, optionId) is { } command)
                 session.Execute(command);
             else
                 session.Status = Strings.FindingNoFixStatus;
+        }
+
+        /// <summary>
+        /// Applies the fix <paramref name="optionId"/> of every finding of <paramref name="finding"/>'s rule as one undo step:
+        /// in <paramref name="part"/>, every difficulty, or with none given, everywhere.
+        /// </summary>
+        private async void FixAll(Finding finding, string optionId, ChartInstrument? part)
+        {
+            // Brought up to date first, so the fixes are of the findings of the chart as it is.
+            await SettleAsync();
+            var findings = Issues.Items
+                .Select(i => i.Finding)
+                .Where(f => f.RuleId == finding.RuleId && (part is null || f.Location?.Part == part))
+                .ToList();
+            var session = _editor.Session;
+            switch (session.FixAll(findings, optionId))
+            {
+                case null:
+                    // Refused: the session's status says why.
+                    break;
+                case 0:
+                    session.Status = Strings.FindingNoFixStatus;
+                    break;
+                case int fixes when part is { } instrument:
+                    _editor.Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.FindingsFixedAllFormat, fixes, finding.RuleId, ChartLabels.InstrumentName(instrument)));
+                    break;
+                case int fixes:
+                    _editor.Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.FindingsFixedEverywhereFormat, fixes, finding.RuleId));
+                    break;
+            }
         }
     }
 }

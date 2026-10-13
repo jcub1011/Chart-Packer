@@ -1,6 +1,8 @@
 using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Validation;
+using ChartPacker.Core.Validation.QuickFixes;
 
 namespace ChartPacker.Core.Charting.Editing;
 
@@ -518,6 +520,27 @@ public sealed class EditorSession
         }
 
         return applied.Count == 0 || Execute(applied.Count == 1 ? applied[0] : new CompositeCommand(applied));
+    }
+
+    /// <summary>
+    /// Applies the quick fix <paramref name="optionId"/> (<see cref="ChartFixOption.Id"/>) of each of
+    /// <paramref name="findings"/> as one undoable step, each worked out against the chart the fixes before it leave, so
+    /// one an earlier fix has already seen to proposes nothing and is passed over.
+    /// </summary>
+    /// <returns>How many fixes were applied, none when no finding has one left; null when one was refused, which <see cref="Status"/> says.</returns>
+    public int? FixAll(IEnumerable<Finding> findings, string optionId)
+    {
+        ArgumentNullException.ThrowIfNull(findings);
+        ArgumentNullException.ThrowIfNull(optionId);
+        int fixes = 0;
+        bool done = ExecuteAsOne(findings.Select(finding => (Func<(IChartCommand?, string?)>)(() =>
+        {
+            var command = QuickFixRegistry.ProposeChartFix(finding, Chart, ReadOptions, optionId);
+            if (command is not null)
+                fixes++;
+            return (command, null);
+        })));
+        return done ? fixes : null;
     }
 
     /// <summary>

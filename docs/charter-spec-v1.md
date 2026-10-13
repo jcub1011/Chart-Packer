@@ -972,9 +972,10 @@ Acceptance criteria:
   event's time, and every passthrough event's time within half a tick of where it was.
 - **AC C4.3** Tick ↔ seconds round trips agree with the existing `TempoMap` to within half a tick
   for every tempo map in the test fixtures.
-- **AC C4.4** Anchors survive a save, a pack to `.sng` and a reopen. Loading and saving a chart
-  without edits gives the same tempo values (microseconds per quarter note), time signatures and
-  anchors.
+- **AC C4.4** Anchors survive a save and a reopen. Loading and saving a chart without edits gives
+  the same tempo values (microseconds per quarter note), time signatures and anchors. A pack to
+  `.sng` keeps the tempos and time signatures but leaves the anchors out
+  ([§7.3](#73-text-events)).
 
 ### C5. 5-fret notes
 
@@ -996,6 +997,9 @@ Acceptance criteria:
    - A sustain shorter than the song's sustain cutoff (`sustain_cutoff_threshold`, otherwise a
      third of a beat in MIDI) is drawn as a plain note with a dashed tail, because that's how the
      games will read it.
+   - A sustain dragged shorter than the cutoff (by its tail, a Ctrl-drag or a right-drag) becomes a
+     plain note as it's dragged, since the games would read it as one anyway. A loaded chart's short
+     sustains are kept as they are, and CHR021 offers to make them plain.
    - **Extended sustains** (one note held while others are played) and **disjoint chords**
      (notes of one chord with different lengths) are allowed.
 4. **Forcing:**
@@ -1871,6 +1875,20 @@ Acceptance criteria:
    used, for fixes that depend on them, such as CHR021's sustain cutoff. A fix that changes
    `song.ini` instead (CHR084's) restores the pending change the user reverted; it isn't an undo
    step, as reverting isn't.
+   - **More than one right answer.** Where a finding can be fixed more than one right way, such as
+     which of two notes too close together to delete (CHR026), each way is offered, labelled, for the
+     author to pick. A way that would do something wrong, such as snapping a note onto another, isn't
+     offered. Each way has an ID that's the same for every finding of its rule, so Fix All applies
+     the same way to each.
+   - **The finding's menu.** A finding's fixes are on its right-click menu, worked out as it opens
+     from the chart as it is then. For a rule with one way to fix it: **Fix**, **Fix All For
+     <part>** (every finding of its rule in its part, every difficulty) and **Fix All** (every
+     finding of its rule in the chart). For one with more: a list of the ways, each with those three
+     under it. Each Fix All is one undo step, its fixes worked out against the chart the fixes before
+     them leave, so one an earlier fix has already seen to is passed over. Fix All is only offered
+     for chart fixes, not CHR083's or CHR084's, and Fix All For only for a finding in a part. A
+     finding without a fix shows a greyed-out **No Fixes Available**. The library's list, which
+     fixes nothing, has no menu.
 4. **Severity.**
    - Lint **never blocks saving**. A chart in progress must always be saveable.
    - **Errors** are things the author wrote that the games read differently, such as an open note
@@ -1971,6 +1989,9 @@ Acceptance criteria:
    ([project-spec F1](project-spec-v1.md#f1-pack-song-folder--sng)) with Core's packing
    (`PackPlanner`, `SongJob`). It uses Chart Packer's output folder and overwrite settings, which
    Chart Builder reads from Chart Packer's settings file and never writes.
+   - The `.sng` leaves out what only Chart Builder reads: the tempo anchors ([§7.3](#73-text-events))
+     and the `song.ini` keys of parts the chart has no notes in (SNG062). A song opened from a
+     `.sng` is copied the same way.
 4. **Export copy** writes the song with its draft applied to another folder, using the existing
    `SongExport`.
 
@@ -2164,7 +2185,7 @@ never reused.
 | CHR001 | Warning | No time signature at tick 0; the games assume 4/4 | Add 4/4 at 0 |
 | CHR002 | Warning | A tempo below 20 or above 400 BPM (probably a typo or a half/double-time mistake) | — |
 | CHR003 | Warning | A note, phrase or event other than `[end]` after the end of the audio (in audio time, [§4.4.1](#441-playback-changes)) | — |
-| CHR004 | Info | A note isn't on any common grid: a whole-note division from 1/1 to 1/192, or a triplet one | Snap to grid |
+| CHR004 | Info | A note isn't on any common grid: a whole-note division from 1/1 to 1/192, or a triplet one | Snap to the nearest grid line, or the one on its other side, where no note is already; or delete |
 | CHR005 | Warning | Two tempo markers or two time signatures on the same tick | Keep the later one |
 
 ### 5-fret and GHL
@@ -2172,12 +2193,12 @@ never reused.
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
 | CHR020 | Warning | A sustain runs into the next note on its lane, so the games will cut it short | Trim sustain |
-| CHR021 | Info | A sustain is shorter than the sustain cutoff, so the games read it as a plain note. Only lengths of at least a sixteenth note count, as many charts hold every plain note a sixteenth. | Remove sustain |
-| CHR022 | Error | An open note in a chord with frets | Remove open |
+| CHR021 | Info | A sustain is shorter than the sustain cutoff, so the games read it as a plain note. Only lengths of at least a sixteenth note count, as many charts hold every plain note a sixteenth. | Make it a plain note, or lengthen it to the cutoff |
+| CHR022 | Error | An open note in a chord with frets | Remove the open note, or keep only it |
 | CHR023 | Info | A force HOPO or force strum that doesn't change the chord at any HOPO threshold a MIDI chart can be read with | Remove force |
 | CHR024 | Warning | A forced HOPO on a chord that repeats the previous note or chord exactly. The games play it as a HOPO, but the same frets can't be hammered on again. | Remove force |
 | CHR025 | Warning | The first note of a part is a HOPO (forced or tap) | Remove force |
-| CHR026 | Warning | Two notes on the same lane closer than 1/64 of a whole note in ticks (likely a stray duplicate) | Delete the later one |
+| CHR026 | Warning | Two notes on the same lane closer than 1/64 of a whole note in ticks (likely a stray duplicate) | Delete the later one, or the earlier |
 
 ### Drums
 
@@ -2188,7 +2209,7 @@ never reused.
 | CHR042 | Warning | A drum fill overlaps a star power phrase (not counting a big rock ending) | — |
 | CHR043 | Warning | A drum fill whose last tick has no note on some difficulty, so there is nothing to activate on there (not counting a big rock ending) | Move end to last note |
 | CHR044 | Warning | A roll or trill phrase with fewer than two notes, or a trill covering only one pad | — |
-| CHR045 | Warning | Tom markers on 4-lane drums. The games would read them as Pro, so saving leaves them out ([C6](#c6-drums-4-lane-pro-and-5-lane) item 9). | Switch to Pro |
+| CHR045 | Warning | Tom markers on 4-lane drums. The games would read them as Pro, so saving leaves them out ([C6](#c6-drums-4-lane-pro-and-5-lane) item 9). | Switch to Pro, or remove the markers |
 | CHR046 | Warning | A fifth-pad note (5-lane green) on a 4-lane or Pro song | — |
 | CHR047 | — | *Retired in CM3.* An accent or ghost on a kick. The games never read one, so the loader doesn't keep one, and the editor can't place one. | — |
 | CHR048 | Warning | The chart has a `PART DRUMS_2X` track. It is kept as it is and doesn't follow edits to `PART DRUMS`. | — |
@@ -2313,7 +2334,7 @@ down to Easy, 31–40 down to Medium, 41–50 down to Hard. The writer uses 25, 
 | `[mix <d> drums<n>]`, `[mix <d> drums<n>d]` | drums track | Drum mix per difficulty; the `d` suffix is disco flip (parsed by `ChartTextEvents.TryParseMix`) |
 | `[section <name>]` / `[prc_<name>]` | `EVENTS` | Practice sections |
 | `[music_start]`, `[music_end]`, `[coda]`, `[end]` | `EVENTS` | Song events |
-| `[chartpacker_anchor <µs>]` | tempo track, at the anchored marker's tick | A tempo anchor ([C4](#c4-tempo-map-and-grid)). The number is the anchor's audio time in whole microseconds. The games ignore it. |
+| `[chartpacker_anchor <µs>]` | tempo track, at the anchored marker's tick | A tempo anchor ([C4](#c4-tempo-map-and-grid)). The number is the anchor's audio time in whole microseconds. The games ignore it, so a packed or exported `.sng` leaves it out (`ExportCleanup`). A save keeps it, including a save into a `.sng` the song was opened from. |
 
 ### 7.4 Tracks the writer creates
 

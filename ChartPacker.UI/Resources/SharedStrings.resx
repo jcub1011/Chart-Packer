@@ -505,11 +505,21 @@
   <data name="FindingGoToToolTip" xml:space="preserve">
     <value>Go to it in the chart</value>
   </data>
-  <data name="FindingFixButton" xml:space="preserve">
+  <data name="FindingFixMenuItem" xml:space="preserve">
     <value>Fix</value>
+    <comment>A finding's right-click menu item that applies its quick fix.</comment>
   </data>
-  <data name="FindingFixToolTip" xml:space="preserve">
-    <value>Apply the quick fix, as one step to undo</value>
+  <data name="FindingFixAllForFormat" xml:space="preserve">
+    <value>Fix All For {0}</value>
+    <comment>A finding's right-click menu item that fixes every finding of its rule in its part, as one step. {0} is the part (Guitar).</comment>
+  </data>
+  <data name="FindingFixAllMenuItem" xml:space="preserve">
+    <value>Fix All</value>
+    <comment>A finding's right-click menu item that fixes every finding of its rule in the chart, as one step.</comment>
+  </data>
+  <data name="FindingNoFixesMenuItem" xml:space="preserve">
+    <value>No Fixes Available</value>
+    <comment>The greyed-out right-click menu item of a finding without a quick fix.</comment>
   </data>
   <data name="MuteButton" xml:space="preserve">
     <value>M</value>

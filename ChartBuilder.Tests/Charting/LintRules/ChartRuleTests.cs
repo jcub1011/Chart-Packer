@@ -1,6 +1,7 @@
 using System.Globalization;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
+using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charting.Lint;
 using ChartPacker.Core.Charting.Saving;
@@ -142,32 +143,90 @@ public sealed class ChartRuleTests
     [DynamicData(nameof(Fixable))]
     public void EachFixClearsItsFindingAsOneStepAndUndoingItBringsItBack(string ruleId)
     {
+        // Every way to fix it, each from the chart as triggered.
         var (chart, input) = Triggered(ruleId);
         var linter = new ChartLinter();
         var before = linter.LintAll(input);
-        var stack = new ChartUndoStack(chart);
+        var finding = before.FindingsOf(ruleId)[0];
+        var options = QuickFixRegistry.ProposeChartFixes(finding, chart, input.Options);
+        Assert.IsNotEmpty(options);
+        Assert.IsTrue(options.Count == 1 || options.All(o => o.Label is not null), "A rule with more than one way to fix it labels each.");
+        Assert.HasCount(options.Count, options.Select(o => o.Id).Distinct(), "Each way has its own ID.");
 
-        var fix = QuickFixRegistry.ProposeChartFix(before.FindingsOf(ruleId)[0], chart, input.Options);
-        Assert.IsNotNull(fix);
-        stack.Execute(fix);
-        var fixedFindings = linter.LintAll(Snapshot(chart, input)).Findings;
-        stack.Undo();
-        var undone = linter.LintAll(Snapshot(chart, input));
+        foreach (var option in options)
+        {
+            var stack = new ChartUndoStack(chart);
+            stack.Execute(QuickFixRegistry.ProposeChartFix(finding, chart, input.Options, option.Id)!);
+            var fixedFindings = linter.LintAll(Snapshot(chart, input)).FindingsOf(ruleId);
+            stack.Undo();
+            var undone = linter.LintAll(Snapshot(chart, input));
 
-        Assert.IsEmpty(fixedFindings, string.Join("; ", fixedFindings.Select(Describe)));
-        Assert.AreEqual(1, stack.RedoCount, "One step.");
-        Assert.AreSequenceEqual(before.Findings.Select(Describe).ToList(), [.. undone.Findings.Select(Describe)]);
+            Assert.IsEmpty(fixedFindings, $"{option.Id}: " + string.Join("; ", fixedFindings.Select(Describe)));
+            Assert.AreEqual(1, stack.RedoCount, $"{option.Id}: one step.");
+            Assert.AreSequenceEqual(before.Findings.Select(Describe).ToList(), [.. undone.Findings.Select(Describe)]);
+        }
     }
 
     [TestMethod]
-    public void AFixWithNoSingleRightAnswerProposesNothing()
+    public void FixAllFixesEveryFindingOfARuleInAPartAsOneStep()
     {
-        // A note snapped onto a note already on the grid.
+        // Strums forced where they're strums anyway, in two difficulties.
+        var (chart, input) = Clean();
+        new SetChordFlags(Guitar, Expert, [Beat, 3 * Beat], ChordFlags.ForceStrum, on: true).Apply(chart);
+        new SetChordFlags(Guitar, ChartDifficulty.Hard, [2 * Beat], ChordFlags.ForceStrum, on: true).Apply(chart);
+        var linter = new ChartLinter();
+        var before = linter.LintAll(Snapshot(chart, input));
+        var session = new EditorSession(new ChartUndoStack(chart), default, input.SongIni);
+
+        int? fixes = session.FixAll(before.FindingsOf(ChrRules.Chr023), ChartFixOption.Only);
+        var fixedFindings = linter.LintAll(Snapshot(chart, input)).Findings;
+        session.Undo();
+
+        Assert.AreEqual(3, fixes);
+        Assert.IsEmpty(fixedFindings, string.Join("; ", fixedFindings.Select(Describe)));
+        Assert.AreEqual(1, session.UndoStack.RedoCount, "One step.");
+        Assert.AreSequenceEqual(before.Findings.Select(Describe).ToList(), [.. linter.LintAll(Snapshot(chart, input)).Findings.Select(Describe)]);
+    }
+
+    [TestMethod]
+    public void FixAllPassesOverAFindingAnEarlierFixSawTo()
+    {
+        // 0 → 10 → 20: deleting 10 leaves the second finding's earlier note gone, so it has nothing left to fix.
+        var (chart, input) = Clean();
+        new AddNotes(Guitar, Expert, [new EditableNote(10, 1, 0), new EditableNote(20, 1, 0)]).Apply(chart);
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr026);
+        Assert.HasCount(2, findings);
+        var session = new EditorSession(new ChartUndoStack(chart), default, input.SongIni);
+
+        Assert.AreEqual(1, session.FixAll(findings, "delete-later"));
+        Assert.AreEqual(1, session.UndoStack.UndoCount);
+        Assert.DoesNotContain(new EditableNote(10, 1, 0), chart.PartOf(Guitar)![Expert].Notes.ToList());
+    }
+
+    [TestMethod]
+    public void AFixThatWouldDoSomethingWrongIsntOffered()
+    {
+        // A note that the nearest grid line would snap onto a note already there: it can go to the line before, or go.
         var (chart, input) = Clean();
         new AddNotes(Guitar, Expert, [new EditableNote(477, 1, 1)]).Apply(chart);
         var finding = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr004).Single();
 
-        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding, chart, input.Options));
+        var options = QuickFixRegistry.ProposeChartFixes(finding, chart, input.Options);
+
+        Assert.AreSequenceEqual(["farther", "delete"], [.. options.Select(o => o.Id)]);
+        Assert.IsNull(QuickFixRegistry.ProposeChartFix(finding, chart, input.Options, "nearest"));
+    }
+
+    [TestMethod]
+    public void TwoNotesTooCloseTogetherCanLoseEither()
+    {
+        var (chart, input) = Triggered(ChrRules.Chr026);
+        var finding = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr026).Single();
+        var expert = chart.PartOf(Guitar)![Expert];
+
+        new ChartUndoStack(chart).Execute(QuickFixRegistry.ProposeChartFix(finding, chart, input.Options, "delete-earlier")!);
+
+        Assert.AreEqual(10, expert.Notes[0].Tick, "The note at 0 went; the one 10 ticks on stayed.");
     }
 
     [TestMethod]

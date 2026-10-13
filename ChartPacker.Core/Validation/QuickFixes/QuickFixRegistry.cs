@@ -78,18 +78,18 @@ public static class QuickFixRegistry
     /// <param name="chart">The chart it was found in, as it is now.</param>
     /// <param name="options">The settings the chart is read with, as lint read it.</param>
     /// <returns>
-    /// One undoable command to run through the chart's undo stack, or <see langword="null"/> when the rule has no fix or
-    /// this finding has no single right one.
+    /// Each way to fix it, an undoable command to run through the chart's undo stack; none when the rule has no fix or
+    /// nothing here can fix this finding.
     /// </returns>
-    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart, ChartReadOptions options) => ProposeChartFix(finding, chart, options, ChartStrategies);
+    public static IReadOnlyList<ChartFixOption> ProposeChartFixes(Finding finding, EditableChart chart, ChartReadOptions options) => ProposeChartFixes(finding, chart, options, ChartStrategies);
 
-    /// <summary>The fix for the chart lint finding <paramref name="finding"/>, from the first of <paramref name="strategies"/> for its rule.</summary>
+    /// <summary>The ways to fix the chart lint finding <paramref name="finding"/>, from the first of <paramref name="strategies"/> for its rule.</summary>
     /// <param name="finding">A chart lint finding.</param>
     /// <param name="chart">The chart it was found in, as it is now.</param>
     /// <param name="options">The settings the chart is read with, as lint read it.</param>
     /// <param name="strategies">The strategies to look in, such as <see cref="ChartStrategies"/>.</param>
-    /// <returns>One undoable command, or <see langword="null"/> when none is for the rule, or its strategy has no single right fix.</returns>
-    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart, ChartReadOptions options, IEnumerable<IChartQuickFixStrategy> strategies)
+    /// <returns>Each way to fix it; none when no strategy is for the rule, or nothing here can fix this finding.</returns>
+    public static IReadOnlyList<ChartFixOption> ProposeChartFixes(Finding finding, EditableChart chart, ChartReadOptions options, IEnumerable<IChartQuickFixStrategy> strategies)
     {
         ArgumentNullException.ThrowIfNull(finding);
         ArgumentNullException.ThrowIfNull(chart);
@@ -101,7 +101,14 @@ public static class QuickFixRegistry
                 return strategy.Propose(finding, chart, options);
         }
 
-        return null;
+        return [];
+    }
+
+    /// <summary>The way to fix <paramref name="finding"/> that's <paramref name="optionId"/>, as <see cref="ProposeChartFixes(Finding, EditableChart, ChartReadOptions)"/> works them out; null when that way has nothing to do here.</summary>
+    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart, ChartReadOptions options, string optionId)
+    {
+        ArgumentNullException.ThrowIfNull(optionId);
+        return ProposeChartFixes(finding, chart, options).FirstOrDefault(o => o.Id == optionId)?.Command;
     }
 
     /// <summary>

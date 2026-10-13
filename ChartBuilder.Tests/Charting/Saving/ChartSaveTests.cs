@@ -399,9 +399,9 @@ public sealed class ChartSaveTests
     }
 
     [TestMethod]
-    public async Task AnchorsSurviveASaveAPackAndAReopen()
+    public async Task AnchorsSurviveASaveAndAReopenButNotAPack()
     {
-        // AC C4.4.
+        // AC C4.4: the games don't read anchors, so a packed .sng leaves them out (charter-spec §7.3).
         string folder = _folders.Song("Song", ("notes.mid", MidiFixtures.TempoMap()), ("song.ini", Ini("name = Song")));
         var song = EditorSong.Of(await OpenAsync(folder, Token));
         var map = song.Chart.TempoMap;
@@ -414,11 +414,15 @@ public sealed class ChartSaveTests
         var plan = await PackPlanner.PlanAsync(folder, cancellationToken: Token);
         string sng = Path.Combine(_folders.Root, "Packed.sng");
         await Packer.PackAsync(plan, sng, overwrite: false, cancellationToken: Token);
-        var reopened = (await OpenAsync(sng, Token)).Chart.TempoMap;
+        var reopened = (await OpenAsync(folder, Token)).Chart.TempoMap;
+        var packed = (await OpenAsync(sng, Token)).Chart.TempoMap;
 
         Assert.AreSequenceEqual(tempos, [.. reopened.Tempos]);
         Assert.AreSequenceEqual(signatures, [.. reopened.TimeSignatures]);
         Assert.AreSequenceEqual(anchors, [.. reopened.Anchors]);
+        Assert.AreSequenceEqual(tempos, [.. packed.Tempos]);
+        Assert.AreSequenceEqual(signatures, [.. packed.TimeSignatures]);
+        Assert.IsEmpty(packed.Anchors);
     }
 
     [TestMethod]

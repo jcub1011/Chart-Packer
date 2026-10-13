@@ -1203,7 +1203,7 @@ public sealed partial class EditorTools
             if (end == _end)
                 return;
             _end = end;
-            Session.Preview(SustainsOf(track, notes, n => LengthTo(n, end)));
+            Session.Preview(SustainsOf(track, notes, n => Tools.LengthTo(n, end)));
         }
     }
 
@@ -1259,7 +1259,7 @@ public sealed partial class EditorTools
             }
 
             long delta = at - from;
-            Session.Preview(SustainsOf(track, notes, n => match ? LengthTo(n, at) : LengthTo(n, SustainEnd(n) + delta)));
+            Session.Preview(SustainsOf(track, notes, n => match ? Tools.LengthTo(n, at) : Tools.LengthTo(n, SustainEnd(n) + delta)));
         }
 
         public override void Release(ChartPoint point)
@@ -1328,8 +1328,15 @@ public sealed partial class EditorTools
         return lengths.Count == 0 ? null : new SetSustain(track.Instrument, track.Difficulty, lengths);
     }
 
-    /// <summary>The length that ends <paramref name="note"/> at <paramref name="end"/>: none, at or before its tick.</summary>
-    private static long LengthTo(EditableNote note, long end) => Math.Max(EditableNote.PlainLength, end - note.Tick);
+    /// <summary>
+    /// The length that ends <paramref name="note"/> at <paramref name="end"/>: none, at or before its tick, or when it would
+    /// be shorter than the sustain cutoff, as the games would read it as a plain note anyway.
+    /// </summary>
+    private long LengthTo(EditableNote note, long end)
+    {
+        long length = end - note.Tick;
+        return length < SustainCutoff.Of(_session.Chart.Resolution, _session.ReadOptions.SustainCutoff) ? EditableNote.PlainLength : length;
+    }
 
     /// <summary>Where <paramref name="note"/>'s sustain ends: its own tick when it has none.</summary>
     private static long SustainEnd(EditableNote note) => note.Length <= EditableNote.PlainLength ? note.Tick : note.Tick + note.Length;
@@ -1368,7 +1375,7 @@ public sealed partial class EditorTools
                     return;
                 }
 
-                Preview([note with { Length = LengthTo(note, end) }]);
+                Preview([note with { Length = Tools.LengthTo(note, end) }]);
                 return;
             }
 

@@ -199,10 +199,16 @@ Behaviour:
      key mapping as the reference tool (SNG070).
    - The user can edit the result in the metadata editor (F5) before packing.
    - Empty values are dropped (SNG061).
+   - The keys of parts the chart has no notes in are dropped (SNG062), such as `diff_drums` and
+     `pro_drums` in a chart without drums. Which part owns a key comes from `MidiPartCatalog`. A
+     `.chart` only drops the keys of parts its reader reads, so its vocals' keys are kept. With no
+     chart, or one that can't be read, every key is kept.
 5. **Pre-flight validation.** The full rule catalogue runs against the plan. **Errors block
    packing.** Warnings are shown, and the user can go ahead anyway.
 6. **Write.**
    - A fresh random 16-byte mask is generated.
+   - A `notes.mid` is stored without Chart Builder's tempo anchors
+     ([charter-spec §7.3](charter-spec-v1.md#73-text-events)). The folder's file is left alone.
    - The file is streamed to `<name>.sng.tmp` and atomically renamed over the target.
    - If the target already exists, the overwrite policy applies (Ask, Overwrite, Skip or
      Rename).
@@ -615,6 +621,7 @@ folder or Pack Plan.
 | SNG025 | Info | S F | A legacy key (`frets`, `track`, `star_power_note`, `pro_drum`). The replacement key is suggested. | [§9.4](sng-spec.md#reference-behaviour) |
 | SNG060 | Warning | S F | A known boolean key isn't exactly `True`/`False` (e.g. `true`, `1`) | [A8](sng-spec.md#a8) |
 | SNG061 | Warning (S) / Info (F) | S F | An empty value. It is dropped when packing. | [A9](sng-spec.md#a9) |
+| SNG062 | Info | F | A key of a part the chart has no notes in. It is dropped when packing. | — |
 
 ### Filenames
 

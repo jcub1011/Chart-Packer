@@ -135,6 +135,10 @@ public sealed class OffGridRule : IChartLintRule
     /// <summary>Whether <paramref name="tick"/> is on a common grid of <paramref name="map"/>.</summary>
     public static bool IsOnGrid(long tick, TempoMap map) => FinestGrids.Any(g => g.Nearest(tick, map) == tick);
 
+    /// <summary>The ticks on a common grid either side of <paramref name="tick"/>, nearest it: the one before and the one after.</summary>
+    public static (long Before, long After) GridLinesAround(long tick, TempoMap map) =>
+        (FinestGrids.Max(g => g.Step(tick, -1, map)), FinestGrids.Min(g => g.Step(tick, 1, map)));
+
     /// <summary>The nearest tick to <paramref name="tick"/> on a common grid, the coarser grid's when two are as near.</summary>
     public static long NearestOnGrid(long tick, TempoMap map)
     {
