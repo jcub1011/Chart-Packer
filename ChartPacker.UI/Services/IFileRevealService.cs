@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     /// <summary>Shows files and folders in the system's file manager.</summary>
     public interface IFileRevealService
@@ -10,5 +10,8 @@ namespace ChartPacker.Services
         /// manager can select it. Paths in the same folder share one window.
         /// </summary>
         void Reveal(IReadOnlyList<string> paths);
+
+        /// <summary>Opens <paramref name="folder"/> itself in the file manager, showing what's in it. Nothing when it isn't there.</summary>
+        void OpenFolder(string folder);
     }
 }

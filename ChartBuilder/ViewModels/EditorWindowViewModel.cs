@@ -131,6 +131,14 @@ namespace ChartBuilder.ViewModels
         public EditorSong Song { get; }
 
         /// <summary>
+        /// The title's tooltip: that clicking it shows the song in the file manager, and where it is. None for a new chart,
+        /// which has no folder until it's first saved.
+        /// </summary>
+        public string? ShowSongToolTip => Song.Entry is { } entry
+            ? string.Format(CultureInfo.CurrentCulture, Strings.ShowSongToolTipFormat, FileRevealService.RevealLabel, entry.FullPath)
+            : null;
+
+        /// <summary>
         /// The <c>song.ini</c> changes the chart and the song call for, shown from as soon as they're called for until
         /// they're saved, the reverted ones among them (charter-spec C17 item 2).
         /// </summary>
@@ -219,6 +227,21 @@ namespace ChartBuilder.ViewModels
         /// <summary>Shows every message said this session, from the message bar.</summary>
         [RelayCommand]
         private Task ShowMessagesAsync() => _services.MessagesDialog.ShowAsync(new MessagesDialogViewModel(Messages));
+
+        private bool CanShowSong() => Song.Entry is not null;
+
+        /// <summary>Opens the song's folder in the file manager, or for a <c>.sng</c>, the folder it's in with it selected.</summary>
+        [RelayCommand(CanExecute = nameof(CanShowSong))]
+        private void ShowSong()
+        {
+            if (Song.Entry is not { } entry)
+                return;
+
+            if (entry.Kind == SongEntryKind.SngFile)
+                _services.Reveal.Reveal([entry.FullPath]);
+            else
+                _services.Reveal.OpenFolder(entry.FullPath);
+        }
 
         [RelayCommand]
         private async Task OpenProgramSettingsAsync()

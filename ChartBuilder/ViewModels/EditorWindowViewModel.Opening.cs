@@ -21,7 +21,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
 {
-    /// <summary>A song on the Open menu's Recent list.</summary>
+    /// <summary>A song on the File menu's Open recent list.</summary>
     public sealed class RecentSongItem(RecentSong song)
     {
         public string Title => song.Title;
@@ -46,7 +46,7 @@ namespace ChartBuilder.ViewModels
         public string ToolTip => string.Format(CultureInfo.CurrentCulture, Strings.RecentOpenToolTipFormat, song.Path);
     }
 
-    /// <summary>The Editor window's Open menu: the picker, a new chart, and the recent projects.</summary>
+    /// <summary>The Editor window's File menu's opening: the picker, a new chart, and the recent projects.</summary>
     public sealed partial class EditorWindowViewModel
     {
         // How many of a conversion warning's places it lists before saying how many more there are.

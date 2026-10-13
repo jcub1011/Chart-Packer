@@ -9,7 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using ChartPacker.Resources;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     /// <summary>
     /// Shows files in Explorer with them selected, one window per folder; in Finder on macOS; and
@@ -19,9 +19,9 @@ namespace ChartPacker.Services
     {
         /// <summary>The name of the menu item that reveals a file, after the platform's file manager.</summary>
         public static string RevealLabel =>
-            OperatingSystem.IsWindows() ? Strings.RevealInExplorer
-            : OperatingSystem.IsMacOS() ? Strings.RevealInFinder
-            : Strings.RevealInFolder;
+            OperatingSystem.IsWindows() ? SharedStrings.RevealInExplorer
+            : OperatingSystem.IsMacOS() ? SharedStrings.RevealInFinder
+            : SharedStrings.RevealInFolder;
 
         public void Reveal(IReadOnlyList<string> paths)
         {
@@ -57,6 +57,22 @@ namespace ChartPacker.Services
             catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException)
             {
                 Trace.TraceWarning($"Couldn't show '{existing[0]}': {ex.Message}");
+            }
+        }
+
+        public void OpenFolder(string folder)
+        {
+            if (!Directory.Exists(folder))
+                return;
+
+            try
+            {
+                if (topLevel()?.Launcher is { } launcher)
+                    _ = launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(folder));
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            {
+                Trace.TraceWarning($"Couldn't open '{folder}': {ex.Message}");
             }
         }
 

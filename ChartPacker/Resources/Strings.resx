@@ -1794,18 +1794,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>{0:N0} moved to the {1}, {2:N0} deleted permanently, {3:N0} skipped or failed</value>
     <comment>{0}, {2} and {3} are counts, {1} is "Recycle Bin" or "Trash".</comment>
   </data>
-  <data name="RevealInExplorer" xml:space="preserve">
-    <value>Show in Explorer</value>
-    <comment>Right-click menu item on Windows.</comment>
-  </data>
-  <data name="RevealInFinder" xml:space="preserve">
-    <value>Show in Finder</value>
-    <comment>Right-click menu item on macOS.</comment>
-  </data>
-  <data name="RevealInFolder" xml:space="preserve">
-    <value>Show in folder</value>
-    <comment>Right-click menu item on Linux, and the download notice's button.</comment>
-  </data>
   <data name="MenuDownloadAllFiles" xml:space="preserve">
     <value>Download all files</value>
     <comment>Library right-click menu: saves each selected song as a song folder.</comment>

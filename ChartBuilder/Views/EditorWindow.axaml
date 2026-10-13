@@ -6,6 +6,7 @@
         xmlns:ctl="using:ChartPacker.UI.Controls"
         xmlns:uiviews="using:ChartPacker.UI.Views"
         xmlns:bctl="using:ChartBuilder.Controls"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
@@ -16,6 +17,8 @@
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1280" Height="800"
         MinWidth="720" MinHeight="480"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
         WindowStartupLocation="CenterScreen">
 
     <Window.KeyBindings>
@@ -28,11 +31,62 @@
         <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
     </Window.KeyBindings>
 
+    <!-- With the client area extended, Avalonia draws the caption buttons itself (Fluent's WindowDrawnDecorations), not
+         Windows. Its own title text is hidden, as the title bar below shows the title, and its full screen button, as full
+         screen hides the caption buttons, leaving no way to restore, resize or close the window. -->
+    <Window.WindowDecorationsTheme>
+        <ControlTheme TargetType="WindowDrawnDecorations" BasedOn="{StaticResource {x:Type WindowDrawnDecorations}}">
+            <!-- The text, not its panel: the panel's IsVisible is template-bound, which a style can't override. -->
+            <Style Selector="^ /template/ Panel#PART_TitleTextPanel > TextBlock">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="^ /template/ Button#PART_FullScreenButton">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+        </ControlTheme>
+    </Window.WindowDecorationsTheme>
+
     <Window.Resources>
         <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
     </Window.Resources>
 
     <Window.Styles>
+        <!-- The title bar the window draws for itself: its menus flat on the frame's colour, like the caption buttons. -->
+        <!-- 30 high, as Fluent's caption buttons are. -->
+        <Style Selector="Border.title-bar">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+        </Style>
+        <Style Selector="Border.title-bar Menu">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- The song's title: flat, lit on hover like the menus, and plain text while disabled (a new chart). -->
+        <Style Selector="Button.title-link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.title-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Button.title-link:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+        <Style Selector="Button.title-link:disabled">
+            <Setter Property="Cursor" Value="Arrow" />
+        </Style>
+        <Style Selector="Button.title-link:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="Border.title-bar Menu > MenuItem">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
         <!-- Centred messages standing in for content that isn't built yet. -->
         <Style Selector="StackPanel.placeholder">
             <Setter Property="HorizontalAlignment" Value="Center" />
@@ -79,139 +133,89 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- The toolbar. The code-behind refits the panels as it changes height, wrapping as the window narrows. -->
+        <!-- The title bar and the toolbar. The code-behind refits the panels as they change height, the toolbar wrapping as
+             the window narrows. -->
         <StackPanel x:Name="TopBand" Grid.Row="0">
+            <!-- The window draws its own title bar (ExtendClientAreaToDecorationsHint): the icon, the File and Edit menus,
+                 and the window's title and the program version. The caption buttons are drawn over its right end, which the
+                 last column keeps clear: minimize, maximize and close, 45 wide with 2 between, inside the 1px frame.
+                 Dragging anywhere but the menus moves the window. -->
+            <Border Classes="title-bar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+                <Grid ColumnDefinitions="Auto,Auto,*,140">
+                    <Image Grid.Column="0"
+                           Width="16"
+                           Height="16"
+                           Margin="12,0,6,0"
+                           VerticalAlignment="Center"
+                           Source="/Assets/avalonia-logo.ico"
+                           AutomationProperties.Name="{x:Static res:Strings.AppName}" />
+                    <Menu Grid.Column="1" chrome:WindowDecorationProperties.ElementRole="User">
+                        <MenuItem Header="{x:Static res:Strings.MenuFile}">
+                            <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N" />
+                            <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O" />
+                            <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
+                                 the logical tree ($parent), as the submenu's popup isn't under the menu in the visual tree. -->
+                            <MenuItem Header="{x:Static res:Strings.MenuOpenRecent}" ItemsSource="{Binding Recent}" IsEnabled="{Binding HasRecent}">
+                                <MenuItem.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:RecentSongItem">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" MinWidth="240">
+                                            <TextBlock Grid.Column="0" MaxWidth="360" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding OpenedText}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </MenuItem.ItemTemplate>
+                                <MenuItem.ItemContainerTheme>
+                                    <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:RecentSongItem">
+                                        <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
+                                        <Setter Property="Command" Value="{Binding $parent[Menu].((vm:EditorWindowViewModel)DataContext).OpenRecentCommand}" />
+                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                    </ControlTheme>
+                                </MenuItem.ItemContainerTheme>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
+                            <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
+                                      Command="{Binding SaveAndPackCommand}"
+                                      ToolTip.Tip="{Binding SaveAndPackToolTip}"
+                                      ToolTip.ShowOnDisabled="True" />
+                            <MenuItem Header="{x:Static res:Strings.MenuExportCopy}"
+                                      Command="{Binding ExportCopyCommand}"
+                                      ToolTip.Tip="{Binding ExportCopyToolTip}"
+                                      ToolTip.ShowOnDisabled="True" />
+                        </MenuItem>
+                        <!-- Settings is the program's; the chart's are a tab in the left panel. Its Ctrl+, isn't shown, as
+                             Avalonia would print it as Ctrl+OemComma. -->
+                        <MenuItem Header="{x:Static res:Strings.MenuEdit}">
+                            <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
+                            <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
+                            <Separator />
+                            <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
+                        </MenuItem>
+                    </Menu>
+                    <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
+                         is a button that shows the song in the file manager; a new chart's, with nowhere to show, is plain text. -->
+                    <Grid Grid.Column="2"
+                          ColumnDefinitions="*,Auto"
+                          ColumnSpacing="8"
+                          Margin="6,0,0,0"
+                          HorizontalAlignment="Left"
+                          VerticalAlignment="Center">
+                        <Button Grid.Column="0"
+                                Classes="title-link"
+                                chrome:WindowDecorationProperties.ElementRole="User"
+                                Command="{Binding ShowSongCommand}"
+                                ToolTip.Tip="{Binding ShowSongToolTip}"
+                                AutomationProperties.Name="{Binding ShowSongToolTip}">
+                            <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                        </Button>
+                        <TextBlock Grid.Column="1" Classes="muted" FontSize="12" VerticalAlignment="Center" Text="{Binding VersionText}" />
+                    </Grid>
+                </Grid>
+            </Border>
+
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
                 <WrapPanel ItemSpacing="8" LineSpacing="6">
-                    <!-- Which program this is, and its version. -->
-                    <Border Classes="toolbar-group" Padding="8,3">
-                        <StackPanel Orientation="Horizontal" Spacing="8" Height="28">
-                            <Image Width="20"
-                                   Height="20"
-                                   VerticalAlignment="Center"
-                                   Source="/Assets/avalonia-logo.ico"
-                                   AutomationProperties.Name="{x:Static res:Strings.AppName}" />
-                            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{x:Static res:Strings.AppName}" />
-                            <TextBlock Classes="muted" VerticalAlignment="Center" FontSize="12" Text="{Binding VersionText}" />
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Opening (charter-spec C2): the picker, a new chart, and the recent projects. -->
-                    <Border Classes="toolbar-group">
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <Button x:Name="OpenMenuButton"
-                                    Classes="tool"
-                                    ToolTip.Tip="{x:Static res:Strings.OpenToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.OpenButton}">
-                                <ctl:LineIcon Data="{StaticResource InputFolderStroke}" />
-                                <Button.Flyout>
-                                    <Flyout Placement="BottomEdgeAlignedLeft">
-                                        <StackPanel x:Name="OpenMenuPanel" Spacing="2" MinWidth="300">
-                                            <StackPanel.Styles>
-                                                <Style Selector="Button.open-menu">
-                                                    <Setter Property="HorizontalAlignment" Value="Stretch" />
-                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                                    <Setter Property="Background" Value="Transparent" />
-                                                    <Setter Property="Padding" Value="10,6" />
-                                                    <Setter Property="CornerRadius" Value="4" />
-                                                </Style>
-                                            </StackPanel.Styles>
-                                            <Button Classes="open-menu"
-                                                    Command="{Binding OpenChartCommand}"
-                                                    AutomationProperties.Name="{x:Static res:Strings.OpenSelectButton}">
-                                                <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.OpenSelectButton}" />
-                                            </Button>
-                                            <Button Classes="open-menu"
-                                                    Command="{Binding NewChartCommand}"
-                                                    ToolTip.Tip="{x:Static res:Strings.HomeNewChartToolTip}"
-                                                    AutomationProperties.Name="{x:Static res:Strings.OpenNewChartButton}">
-                                                <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.OpenNewChartButton}" />
-                                            </Button>
-                                            <Separator Margin="0,4" />
-                                            <TextBlock Classes="caption"
-                                                       Margin="10,4,10,2"
-                                                       Text="{x:Static res:Strings.RecentHeading}"
-                                                       IsVisible="{Binding HasRecent}" />
-                                            <TextBlock Classes="muted"
-                                                       Margin="10,4"
-                                                       FontSize="12"
-                                                       Text="{x:Static res:Strings.OpenMenuRecentEmpty}"
-                                                       IsVisible="{Binding !HasRecent}" />
-                                            <ScrollViewer MaxHeight="320">
-                                                <ItemsControl ItemsSource="{Binding Recent}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="vm:RecentSongItem">
-                                                            <Button Classes="open-menu"
-                                                                    Command="{Binding $parent[ItemsControl].((vm:EditorWindowViewModel)DataContext).OpenRecentCommand}"
-                                                                    CommandParameter="{Binding}"
-                                                                    ToolTip.Tip="{Binding ToolTip}"
-                                                                    AutomationProperties.Name="{Binding Title}">
-                                                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
-                                                                    <TextBlock Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
-                                                                    <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="{Binding OpenedText}" />
-                                                                    <TextBlock Grid.Row="1"
-                                                                               Grid.ColumnSpan="2"
-                                                                               Classes="muted"
-                                                                               FontSize="11"
-                                                                               TextTrimming="PrefixCharacterEllipsis"
-                                                                               Text="{Binding Path}" />
-                                                                </Grid>
-                                                            </Button>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </ScrollViewer>
-                                        </StackPanel>
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                            <Button Classes="tool"
-                                    Command="{Binding SaveCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.SaveToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.SaveButton}">
-                                <ctl:LineIcon Data="{StaticResource SaveStroke}" />
-                            </Button>
-                            <Button Classes="tool"
-                                    Command="{Binding SaveAndPackCommand}"
-                                    ToolTip.Tip="{Binding SaveAndPackToolTip}"
-                                    ToolTip.ShowOnDisabled="True"
-                                    AutomationProperties.Name="{x:Static res:Strings.SaveAndPackButton}">
-                                <ctl:LineIcon Data="{StaticResource PackStroke}" />
-                            </Button>
-                            <Button Classes="tool"
-                                    Command="{Binding ExportCopyCommand}"
-                                    ToolTip.Tip="{Binding ExportCopyToolTip}"
-                                    ToolTip.ShowOnDisabled="True"
-                                    AutomationProperties.Name="{x:Static res:Strings.ExportCopyButton}">
-                                <ctl:LineIcon Data="{StaticResource OutputFolderStroke}" />
-                            </Button>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Classes="toolbar-group">
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <!-- Program settings. Chart settings is a tab in the left panel. -->
-                            <Button Classes="tool"
-                                    Command="{Binding OpenProgramSettingsCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.ProgramSettingsToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.ProgramSettingsButton}">
-                                <ctl:LineIcon Data="{StaticResource SettingsStroke}" />
-                            </Button>
-                            <!-- Which lanes are shown. A placeholder until its controls are built. -->
-                            <Button Classes="tool"
-                                    ToolTip.Tip="{x:Static res:Strings.ViewMenuToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.ViewMenuButton}">
-                                <ctl:LineIcon Data="{StaticResource ViewStroke}" />
-                                <Button.Flyout>
-                                    <Flyout Placement="BottomEdgeAlignedLeft">
-                                        <TextBlock Classes="muted" Text="{x:Static res:Strings.ViewMenuPlaceholder}" />
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                        </StackPanel>
-                    </Border>
-
                     <!-- The editing tools (charter-spec §4.5: EditorTools), one picked at a time. Beside the Phrase tool is
                          the kind of phrase it adds, of those the part in focus can have (C8), and Generate fills (C6
                          item 5), whose options are in its flyout. -->

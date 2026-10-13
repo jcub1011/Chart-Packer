@@ -86,6 +86,18 @@
     <value>Videos ({0})</value>
     <comment>A file-picker filter. {0} is the extensions.</comment>
   </data>
+  <data name="RevealInExplorer" xml:space="preserve">
+    <value>Show in Explorer</value>
+    <comment>Right-click menu item on Windows.</comment>
+  </data>
+  <data name="RevealInFinder" xml:space="preserve">
+    <value>Show in Finder</value>
+    <comment>Right-click menu item on macOS.</comment>
+  </data>
+  <data name="RevealInFolder" xml:space="preserve">
+    <value>Show in folder</value>
+    <comment>Right-click menu item on Linux, and the download notice's button.</comment>
+  </data>
   <data name="AudioFileTypeName" xml:space="preserve">
     <value>Audio (ogg, opus, mp3, wav)</value>
   </data>

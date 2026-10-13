@@ -63,11 +63,6 @@ namespace ChartBuilder.Views
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             Closing += (_, _) => CaptureLayout();
 
-            // The Open menu closes once something in it is picked. Posted, as closing the flyout
-            // takes its buttons out of the tree and clears their bound commands before they run
-            // (see DifficultyPicker.OnChosen): the click's command runs first.
-            OpenMenuPanel.AddHandler(Button.ClickEvent, (_, _) => Dispatcher.UIThread.Post(() => (OpenMenuButton.Flyout as Flyout)?.Hide()), RoutingStrategies.Bubble);
-
             // Audio files dropped anywhere on the window start a new chart with them as its stems (charter-spec C1). A
             // song folder or .sng opens it (C2).
             DragDrop.SetAllowDrop(this, true);

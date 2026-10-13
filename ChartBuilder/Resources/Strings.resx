@@ -74,16 +74,13 @@
   </data>
   <data name="AppName" xml:space="preserve">
     <value>Chart Builder</value>
-    <comment>The app's name, shown in the editor's toolbar.</comment>
+    <comment>The app's name, for its icon in the editor's title bar.</comment>
   </data>
   <data name="HomeTagline" xml:space="preserve">
     <value>Make charts for Clone Hero, YARG and the other games that read notes.mid.</value>
   </data>
   <data name="HomeNewChartButton" xml:space="preserve">
     <value>New chart</value>
-  </data>
-  <data name="HomeNewChartToolTip" xml:space="preserve">
-    <value>Start a new chart in the editor (Ctrl+N).</value>
   </data>
   <data name="HomeOpenChartButton" xml:space="preserve">
     <value>Open chart</value>
@@ -155,22 +152,7 @@
   </data>
   <data name="VersionFormat" xml:space="preserve">
     <value>v{0}</value>
-    <comment>The program version in the editor's toolbar, e.g. "v0.3.0".</comment>
-  </data>
-  <data name="ProgramSettingsButton" xml:space="preserve">
-    <value>Program settings</value>
-  </data>
-  <data name="ProgramSettingsToolTip" xml:space="preserve">
-    <value>Program settings (Ctrl+,)</value>
-  </data>
-  <data name="ViewMenuButton" xml:space="preserve">
-    <value>View</value>
-  </data>
-  <data name="ViewMenuToolTip" xml:space="preserve">
-    <value>Choose which lanes are shown</value>
-  </data>
-  <data name="ViewMenuPlaceholder" xml:space="preserve">
-    <value>Lane controls are coming soon.</value>
+    <comment>The program version in the editor's title bar, e.g. "v0.3.0".</comment>
   </data>
   <data name="ComingSoonToolTip" xml:space="preserve">
     <value>Coming soon.</value>
@@ -199,6 +181,50 @@
   <data name="ToolTempo" xml:space="preserve">
     <value>Tempo</value>
     <comment>An editing tool: tempo markers and time signatures.</comment>
+  </data>
+  <data name="MenuFile" xml:space="preserve">
+    <value>_File</value>
+    <comment>The editor title bar's File menu. The underscore marks its access key (Alt+F).</comment>
+  </data>
+  <data name="MenuNewChart" xml:space="preserve">
+    <value>_New chart</value>
+    <comment>File menu: starts a new chart in the editor (Ctrl+N).</comment>
+  </data>
+  <data name="MenuOpen" xml:space="preserve">
+    <value>_Open…</value>
+    <comment>File menu: picks a song folder or .sng to open (Ctrl+O).</comment>
+  </data>
+  <data name="MenuOpenRecent" xml:space="preserve">
+    <value>Open _recent</value>
+    <comment>File menu: the songs opened lately, in a submenu.</comment>
+  </data>
+  <data name="MenuSave" xml:space="preserve">
+    <value>_Save</value>
+    <comment>File menu: saves the chart and its song.ini changes (Ctrl+S).</comment>
+  </data>
+  <data name="MenuSaveAndPack" xml:space="preserve">
+    <value>Save and _pack…</value>
+    <comment>File menu: saves, then reviews and exports the song to a .sng.</comment>
+  </data>
+  <data name="MenuExportCopy" xml:space="preserve">
+    <value>_Export copy…</value>
+    <comment>File menu: writes a copy of the song to another folder.</comment>
+  </data>
+  <data name="MenuEdit" xml:space="preserve">
+    <value>_Edit</value>
+    <comment>The editor title bar's Edit menu. The underscore marks its access key (Alt+E).</comment>
+  </data>
+  <data name="MenuUndo" xml:space="preserve">
+    <value>_Undo</value>
+    <comment>Edit menu (Ctrl+Z).</comment>
+  </data>
+  <data name="MenuRedo" xml:space="preserve">
+    <value>_Redo</value>
+    <comment>Edit menu (Ctrl+Y).</comment>
+  </data>
+  <data name="MenuSettings" xml:space="preserve">
+    <value>_Settings…</value>
+    <comment>Edit menu: the program settings (Ctrl+,). The chart's settings are a tab in the left panel.</comment>
   </data>
   <data name="UndoButton" xml:space="preserve">
     <value>Undo</value>
@@ -382,9 +408,6 @@
   <data name="OpenSongPickerTitle" xml:space="preserve">
     <value>Open a song: its .sng, or the song.ini or chart in its folder</value>
   </data>
-  <data name="RecentHeading" xml:space="preserve">
-    <value>Recent</value>
-  </data>
   <data name="RecentToday" xml:space="preserve">
     <value>today</value>
     <comment>When a recent song was last opened.</comment>
@@ -396,25 +419,6 @@
   <data name="RecentOpenToolTipFormat" xml:space="preserve">
     <value>Open {0}</value>
     <comment>{0} is the song's path.</comment>
-  </data>
-  <data name="OpenButton" xml:space="preserve">
-    <value>Open</value>
-    <comment>The toolbar's Open button, left of Save, with the recent projects and the picker.</comment>
-  </data>
-  <data name="OpenToolTip" xml:space="preserve">
-    <value>Open a song folder or .sng in the editor (Ctrl+O).</value>
-  </data>
-  <data name="OpenSelectButton" xml:space="preserve">
-    <value>Select…</value>
-    <comment>The Open menu's first entry, which opens the file/folder picker.</comment>
-  </data>
-  <data name="OpenNewChartButton" xml:space="preserve">
-    <value>New chart</value>
-    <comment>The Open menu's entry that starts a new chart in the editor (Ctrl+N).</comment>
-  </data>
-  <data name="OpenMenuRecentEmpty" xml:space="preserve">
-    <value>No recent projects</value>
-    <comment>The Open menu when no song has been opened yet.</comment>
   </data>
   <data name="StartupActionLabel" xml:space="preserve">
     <value>What opens on startup</value>
@@ -819,6 +823,10 @@ Open it anyway?</value>
   </data>
   <data name="PendingChangeFormat" xml:space="preserve">
     <value>{0} = {1}</value>
+  </data>
+  <data name="ShowSongToolTipFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>The title bar's song title's tooltip. {0} is "Show in Explorer" or the platform's like, {1} the song's folder or .sng.</comment>
   </data>
   <data name="EditorUntitledChart" xml:space="preserve">
     <value>Untitled chart</value>
@@ -1292,21 +1300,12 @@ Open it anyway?</value>
     <value>Discard</value>
     <comment>Closes without saving, in the prompt when the Editor closes with unsaved edits.</comment>
   </data>
-  <data name="SaveToolTip" xml:space="preserve">
-    <value>Save the chart and its song.ini changes (Ctrl+S)</value>
-  </data>
-  <data name="SaveAndPackButton" xml:space="preserve">
-    <value>Save and pack</value>
-  </data>
   <data name="SaveAndPackToolTip" xml:space="preserve">
     <value>Save, then review and export the song to a .sng</value>
   </data>
   <data name="SaveAndPackSngToolTip" xml:space="preserve">
     <value>Save, then review and save a copy of the .sng elsewhere</value>
     <comment>Save and pack's tooltip when the song open is a .sng.</comment>
-  </data>
-  <data name="ExportCopyButton" xml:space="preserve">
-    <value>Export copy</value>
   </data>
   <data name="ExportCopyToolTip" xml:space="preserve">
     <value>Write a copy of the song, with the chart and its song.ini changes, to another folder</value>

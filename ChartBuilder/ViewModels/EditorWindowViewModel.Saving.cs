@@ -575,8 +575,10 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(HasUnsavedChanges));
             OnPropertyChanged(nameof(SaveAndPackToolTip));
             OnPropertyChanged(nameof(ExportCopyToolTip));
+            OnPropertyChanged(nameof(ShowSongToolTip));
             SaveAndPackCommand.NotifyCanExecuteChanged();
             ExportCopyCommand.NotifyCanExecuteChanged();
+            ShowSongCommand.NotifyCanExecuteChanged();
         }
 
         // The save's song.ini changes, then its changes to the art, backgrounds and tracks, a line each.

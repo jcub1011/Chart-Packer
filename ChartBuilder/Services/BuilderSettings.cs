@@ -143,7 +143,7 @@ namespace ChartBuilder.Services
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;
 
-        /// <summary>The songs opened lately, the latest first, as the Open menu lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
+        /// <summary>The songs opened lately, the latest first, as the File menu's Open recent lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
         public List<RecentSong> RecentSongs { get; set; } = [];
 
         /// <summary>The fewest minutes between autosaves.</summary>

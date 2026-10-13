@@ -153,7 +153,8 @@ namespace ChartBuilder.Services
             new AvaloniaAuthoringDialogService(() => editor),
             this,
             input,
-            ShowInputDevices);
+            ShowInputDevices,
+            new FileRevealService(() => editor));
 
         /// <summary>Shows the Editor, replacing the window open, and starts its audio.</summary>
         private void OpenEditor(EditorWindow editor, EditorWindowViewModel viewModel)
