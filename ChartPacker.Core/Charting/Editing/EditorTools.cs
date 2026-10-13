@@ -66,6 +66,22 @@ public sealed partial class EditorTools
         return plan;
     }
 
+    /// <summary>
+    /// Puts the selected notes on <paramref name="grid"/>, chord by chord, as one step (<see cref="NoteQuantize"/>), and keeps
+    /// them selected where they land. Null when nothing is selected.
+    /// </summary>
+    public QuantizePlan? QuantizeSelection(SnapGrid grid)
+    {
+        if (_session.Selection.Track is not { } key || _session.Selection.Notes is not { Count: > 0 } notes)
+            return null;
+
+        Cancel();
+        var plan = NoteQuantize.Plan(_session, key, notes, grid);
+        if (plan.Command is { } command && _session.Execute(command))
+            _session.Selection.Select(key, plan.Notes);
+        return plan;
+    }
+
     private TempoMap Map => _session.TempoMap;
 
     /// <summary>

@@ -169,11 +169,12 @@ public sealed class EditorSession
     /// <paramref name="startSeconds"/> of audio, as the editor draws the song.
     /// </summary>
     /// <param name="punch">The range to record into when overwriting; null for the stretch the pass plays over.</param>
-    public RecordPass StartRecording(ChartTrackKey track, RecordMode mode, double startSeconds, (long From, long To)? punch = null)
+    /// <param name="quantize">The grid presses go to (<see cref="RecordPass.Quantize"/>); null to keep the time they're played at.</param>
+    public RecordPass StartRecording(ChartTrackKey track, RecordMode mode, double startSeconds, (long From, long To)? punch = null, SnapGrid? quantize = null)
     {
         Tools.Cancel();
         Recording?.Cancel();
-        Recording = new RecordPass(this, track, mode, startSeconds, mode == RecordMode.Overwrite ? punch : null);
+        Recording = new RecordPass(this, track, mode, startSeconds, mode == RecordMode.Overwrite ? punch : null) { Quantize = quantize };
         RaiseState();
         return Recording;
     }
@@ -370,13 +371,19 @@ public sealed class EditorSession
     /// the nearest onset within half a grid step with snap to onset on, otherwise the grid (charter-spec C14 item 2, C15
     /// item 5).
     /// </summary>
-    public long Quantize(double tick, ChartTrackKey key)
+    public long Quantize(double tick, ChartTrackKey key) => Quantize(tick, key, Snap);
+
+    /// <summary>
+    /// Where a note at <paramref name="tick"/> of <paramref name="key"/>'s track goes on <paramref name="grid"/>: the nearest
+    /// onset within half a step of it with snap to onset on, otherwise the grid's nearest step.
+    /// </summary>
+    public long Quantize(double tick, ChartTrackKey key, SnapGrid grid)
     {
         var map = TempoMap;
         if (SnapToOnset && Onsets?.OnsetsFor(key) is { Count: > 0 } onsets
-            && OnsetSnap.Nearest(tick, onsets, map, Delay.TotalSeconds, Snap) is { } onset)
+            && OnsetSnap.Nearest(tick, onsets, map, Delay.TotalSeconds, grid) is { } onset)
             return onset;
-        return Snap.Nearest(tick, map);
+        return grid.Nearest(tick, map);
     }
 
     /// <summary>Moves the cursor to <paramref name="tick"/>.</summary>

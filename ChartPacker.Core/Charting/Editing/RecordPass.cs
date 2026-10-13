@@ -20,18 +20,27 @@ public enum RecordMode
 /// </summary>
 /// <remarks>
 /// <para>A press's time is in audio seconds as the editor draws the song: <c>SmoothPosition − latency × speed</c> when it
-/// was pressed (§4.4.1), which the caller reads from the playback clock. It's quantised to the grid, or to an onset with
-/// snap to onset on (<see cref="EditorSession.Quantize"/>). So a pass works at any speed: a fast passage can be recorded at
-/// 50%.</para>
+/// was pressed (§4.4.1), which the caller reads from the playback clock. So a pass works at any speed: a fast passage can
+/// be recorded at 50%.</para>
+/// <para>A press keeps the tick it was played at, unless the pass quantises (<see cref="Quantize"/>): to the grid, or to an
+/// onset with snap to onset on (<see cref="EditorSession.Quantize(double, ChartTrackKey, SnapGrid)"/>). Kept as played,
+/// keys pressed within <see cref="ChordWindowSeconds"/> of a chord's first press are one chord, as they're meant to be.</para>
 /// <para>The chart isn't changed while the pass goes on: its notes are drawn as a ghost over the lane
 /// (<see cref="EditorSession.GhostTrack"/>), and the pass is added as one undoable step when it ends.</para>
 /// </remarks>
 public sealed class RecordPass
 {
+    /// <summary>How long after a chord's first press, in seconds of the song, a press kept as played joins it.</summary>
+    public const double ChordWindowSeconds = 0.025;
+
     private readonly EditorSession _session;
     private readonly Dictionary<NotePlace, EditableNote> _notes = [];
     private readonly Dictionary<int, NotePlace> _held = [];
     private EditableTrack? _ghost;
+
+    // The first press of the chord a press kept as played may join: its time and tick.
+    private double _chordSeconds = double.NaN;
+    private long _chordTick;
 
     internal RecordPass(EditorSession session, ChartTrackKey track, RecordMode mode, double startSeconds, (long From, long To)? punch)
     {
@@ -49,6 +58,12 @@ public sealed class RecordPass
 
     /// <summary>The range the pass records into when overwriting: presses outside it are left out. Null for none.</summary>
     public (long From, long To)? Punch { get; }
+
+    /// <summary>
+    /// The grid presses and lets-go go to from now on, or to an onset with snap to onset on; null keeps the tick each was
+    /// played at.
+    /// </summary>
+    public SnapGrid? Quantize { get; set; }
 
     /// <summary>The tick the pass started at.</summary>
     public long StartTick { get; }
@@ -75,7 +90,7 @@ public sealed class RecordPass
         int key = doubleKick ? int.MinValue : shownLane;
         if (_held.ContainsKey(key))
             return false;
-        long tick = Math.Max(0, _session.Quantize(Math.Max(0, _session.TickAt(audioSeconds)), Track));
+        long tick = PressTick(audioSeconds);
         if (Punch is { } punch && (tick < punch.From || tick > punch.To))
             return false;
         if (doubleKick && (!IsDrums || Track.Difficulty != ChartDifficulty.Expert))
@@ -116,8 +131,10 @@ public sealed class RecordPass
         int key = doubleKick ? int.MinValue : shownLane;
         if (!_held.Remove(key, out var place) || IsDrums || !_notes.TryGetValue(place, out var note))
             return;
-        long end = _session.Quantize(Math.Max(0, _session.TickAt(audioSeconds)), Track);
-        double step = _session.Snap.IsOn ? _session.Snap.StepTicks(_session.Chart.Resolution) : 1;
+        long end = TickOf(audioSeconds);
+        double step = Quantize is { } grid
+            ? grid.IsOn ? grid.StepTicks(_session.Chart.Resolution) : 1
+            : _session.Snap.StepTicks(_session.Chart.Resolution);
         long length = end - note.Tick;
         if (length < step)
             return;
@@ -160,6 +177,27 @@ public sealed class RecordPass
 
     /// <summary>Ends the pass, adding nothing.</summary>
     public void Cancel() => _session.EndRecording(this);
+
+    // A press's tick: quantised, or as played, joining the chord pressed just before it.
+    private long PressTick(double audioSeconds)
+    {
+        if (Quantize is not null)
+            return TickOf(audioSeconds);
+        if (audioSeconds >= _chordSeconds && audioSeconds - _chordSeconds <= ChordWindowSeconds)
+            return _chordTick;
+        _chordSeconds = audioSeconds;
+        _chordTick = TickOf(audioSeconds);
+        return _chordTick;
+    }
+
+    // The tick at a moment of the song: quantised, or the nearest tick.
+    private long TickOf(double audioSeconds)
+    {
+        double tick = Math.Max(0, _session.TickAt(audioSeconds));
+        return Quantize is { } grid
+            ? Math.Max(0, _session.Quantize(tick, Track, grid))
+            : (long)Math.Round(tick, MidpointRounding.AwayFromZero);
+    }
 
     private EditableTrack GhostOf()
     {

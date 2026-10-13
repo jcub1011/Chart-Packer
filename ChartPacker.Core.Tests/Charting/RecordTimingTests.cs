@@ -24,9 +24,8 @@ public sealed class RecordTimingTests
     {
         // AC C15.3: with a latency of 40 ms, a key pressed when SmoothPosition is 40 ms past a beat is on the beat as it's
         // shown and heard; at 50%, the same holds 20 ms of song time past it. At 120 BPM and 480 ticks a beat, tick 960
-        // is 1 s. Snap is off, so the tick is the clock's to the tick, not the grid's.
+        // is 1 s. The pass doesn't quantise, so the tick is the clock's to the tick, not the grid's.
         var session = Session();
-        session.Snap = session.Snap with { IsOn = false };
         var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
 
         var drawn = LatencyCompensation.Drawn(TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(pastMs), 40, speed);
@@ -41,8 +40,7 @@ public sealed class RecordTimingTests
     {
         // The handling of a key event comes a little after the press; quantising to the grid takes it up.
         var session = Session();
-        session.Snap = SnapGrid.Of(16);
-        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
+        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0, quantize: SnapGrid.Of(16));
         var random = new Random(4);
         for (int beat = 1; beat <= 16; beat++)
         {

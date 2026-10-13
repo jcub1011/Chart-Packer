@@ -8,18 +8,18 @@ using static ChartBuilder.Tests.Editing.EditorSessions;
 namespace ChartBuilder.Tests.Editing;
 
 /// <summary>
-/// Record mode (charter-spec C15 item 5): presses at audio times, quantised, held for sustains, added as one step. At 120
-/// BPM and 480 ticks a beat, a beat is half a second.
+/// Record mode (charter-spec C15 item 5): presses at audio times, kept as played or quantised, held for sustains, added as
+/// one step. At 120 BPM and 480 ticks a beat, a beat is half a second, and a millisecond is 0.96 ticks.
 /// </summary>
 [TestClass]
 public sealed class RecordPassTests
 {
     [TestMethod]
-    public void APressGoesOnTheNearestGridStepAndThePassIsOneStep()
+    public void QuantizedAPressGoesOnTheNearestGridStepAndThePassIsOneStep()
     {
         var session = Of(Guitar());
         var start = session.Chart.Clone();
-        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
+        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0, quantize: SnapGrid.Default);
 
         pass.Press(0, 0.51);
         pass.Release(0, 0.53);
@@ -36,10 +36,10 @@ public sealed class RecordPassTests
     }
 
     [TestMethod]
-    public void HoldingAKeyHoldsASustainToTheGrid()
+    public void QuantizedHoldingAKeyHoldsASustainToTheGrid()
     {
         var session = Of(Guitar());
-        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
+        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0, quantize: SnapGrid.Default);
 
         pass.Press(1, 0.5);
         pass.Release(1, 1.49);
@@ -116,7 +116,7 @@ public sealed class RecordPassTests
         var session = Of(Guitar());
         session.Onsets = new FixedOnsets([0.53]);
         session.SnapToOnset = true;
-        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
+        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0, quantize: SnapGrid.Default);
 
         pass.Press(0, 0.51);
         pass.Finish(1);
@@ -182,6 +182,55 @@ public sealed class RecordPassTests
         b.Finish(1);
 
         Assert.AreEqual(Expert(full).Notes.Single(), Expert(half).Notes.Single());
+    }
+
+    [TestMethod]
+    public void UnquantizedAPressKeepsTheTickItWasPlayedAt()
+    {
+        var session = Of(Guitar());
+        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
+
+        pass.Press(0, 0.51);
+        pass.Release(0, 0.53);
+        pass.Press(2, 1.24);
+        pass.Release(2, 1.6);
+
+        pass.Finish(2);
+        Assert.AreSequenceEqual([(490L, 0, 1L), (1190L, 2, 346L)], Expert(session).Notes.Select(n => (n.Tick, n.Lane, n.Length)).ToList());
+    }
+
+    [TestMethod]
+    public void UnquantizedPressesWithinTheChordWindowOfTheFirstAreOneChord()
+    {
+        var session = Of(Guitar());
+        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
+
+        // 0.51 and 0.52 join the chord 0.5 began; 0.53 is past its window, though only 10 ms after 0.52, so a roll
+        // doesn't run on as one chord.
+        pass.Press(0, 0.5);
+        pass.Press(1, 0.51);
+        pass.Press(2, 0.52);
+        pass.Press(3, 0.53);
+        pass.ReleaseAll(0.54);
+
+        pass.Finish(1);
+        Assert.AreSequenceEqual([(480L, 0), (480L, 1), (480L, 2), (509L, 3)], Expert(session).Notes.Select(n => (n.Tick, n.Lane)).ToList());
+    }
+
+    [TestMethod]
+    public void QuantizeSetDuringAPassAppliesFromTheNextPress()
+    {
+        var session = Of(Guitar());
+        var pass = session.StartRecording(GuitarExpert, RecordMode.Merge, 0);
+
+        pass.Press(0, 0.51);
+        pass.Release(0, 0.52);
+        pass.Quantize = SnapGrid.Of(8);
+        pass.Press(1, 0.76);
+        pass.Release(1, 0.77);
+
+        pass.Finish(1);
+        Assert.AreSequenceEqual([490L, 720L], Expert(session).Notes.Select(n => n.Tick).ToList());
     }
 
     private sealed class FixedOnsets(IReadOnlyList<double> seconds) : IOnsetSource

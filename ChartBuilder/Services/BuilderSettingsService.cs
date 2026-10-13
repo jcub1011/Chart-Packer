@@ -66,6 +66,8 @@ namespace ChartBuilder.Services
 
             if (!SnapGrid.CommonDivisions.Contains(settings.DefaultSnapDivision))
                 settings.DefaultSnapDivision = SnapGrid.Default.Division;
+            if (!SnapGrid.CommonDivisions.Contains(settings.QuantizeDivision))
+                settings.QuantizeDivision = SnapGrid.Default.Division;
             if (!Enum.IsDefined(settings.DefaultEditorView))
                 settings.DefaultEditorView = LaneView.Highway;
             settings.EditorHighwaySpeed = double.IsFinite(settings.EditorHighwaySpeed)

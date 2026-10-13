@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
+using ChartBuilder.Services;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
@@ -11,9 +13,9 @@ namespace ChartBuilder.ViewModels
     public sealed partial class EditorLaneViewModel
     {
         /// <summary>
-        /// The menu a right click in the lane opens, for the selected notes: a chord's type and open note on a fret part;
-        /// cymbal or tom, the dynamics and 2× kick on drums; sung or spoken and slide on a vocal part. Each item ticks what
-        /// every selected note is, as Properties does. Empty when none of the lane's notes is selected.
+        /// The menu a right click in the lane opens, for the selected notes: Quantize, then a chord's type and open note on a
+        /// fret part; cymbal or tom, the dynamics and 2× kick on drums; sung or spoken and slide on a vocal part. Each item
+        /// ticks what every selected note is, as Properties does. Empty when none of the lane's notes is selected.
         /// </summary>
         public IReadOnlyList<LaneMenuItem> BuildNoteMenu()
         {
@@ -25,7 +27,12 @@ namespace ChartBuilder.ViewModels
                 return selection.Vocal == vocal && selection.HasVocalNotes ? VocalNoteMenu(session, vocal) : [];
             if (Track is not { } track || selection.Track != track || selection.Notes.Count == 0 || session.TrackOf(track) is not { } edited)
                 return [];
-            return edited.Kind == ChartInstrumentKind.Drums ? DrumNoteMenu(session, track) : FretNoteMenu(session.Tools);
+            var items = edited.Kind == ChartInstrumentKind.Drums ? DrumNoteMenu(session, track) : FretNoteMenu(session.Tools);
+            var quantize = LaneMenuItem.Action(
+                string.Format(CultureInfo.CurrentCulture, Strings.NoteMenuQuantizeFormat, BuilderSettingsCatalog.SnapLabel(editor.QuantizeGrid.Division)),
+                isEnabled: true,
+                editor.QuantizeSelection);
+            return items.Count == 0 ? [quantize] : [quantize, LaneMenuItem.Separator, .. items];
         }
 
         private static List<LaneMenuItem> FretNoteMenu(EditorTools tools)

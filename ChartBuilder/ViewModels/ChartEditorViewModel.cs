@@ -89,6 +89,8 @@ namespace ChartBuilder.ViewModels
             FillEndChoices = [new FillEndChoice(FillEnd.Crash, Strings.GenerateFillsEndCrash), new FillEndChoice(FillEnd.AnyNote, Strings.GenerateFillsEndAnyNote)];
             SelectedFillEnd = FillEndChoices[0];
             SelectedRecordMode = RecordModeChoices[0];
+            SelectedQuantize = SnapChoices.FirstOrDefault(c => c.Division == saved.QuantizeDivision) ?? SnapChoices.First(c => c.Division == SnapGrid.Default.Division);
+            IsRecordQuantized = saved.RecordQuantize;
             Lanes = new LaneDockViewModel(layout, this);
             Properties = new PropertiesViewModel(this);
             Session.Onsets = new LaneOnsetSource(this);

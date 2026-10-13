@@ -214,5 +214,14 @@ namespace ChartBuilder.Services
 
         /// <summary>Whether a MIDI kit's hard hits record as accents and its soft ones as ghosts.</summary>
         public bool RecordDynamicsFromVelocity { get; set; }
+
+        /// <summary>Whether record mode puts what's played on the quantize grid as it's recorded. Off: it's kept as played.</summary>
+        public bool RecordQuantize { get; set; }
+
+        /// <summary>
+        /// The grid Quantize puts notes on, and record mode with it on, as steps in a whole note: one of
+        /// <see cref="SnapGrid.CommonDivisions"/>, the last one picked.
+        /// </summary>
+        public int QuantizeDivision { get; set; } = SnapGrid.Default.Division;
     }
 }

@@ -41,6 +41,63 @@ namespace ChartBuilder.ViewModels
         public partial RecordModeChoice? SelectedRecordMode { get; set; }
 
         /// <summary>
+        /// Whether record mode puts what's played on the quantize grid (<see cref="SelectedQuantize"/>) as it's recorded,
+        /// from the next press on; off, it's kept as played. Remembered from the last time it was set.
+        /// </summary>
+        [ObservableProperty]
+        public partial bool IsRecordQuantized { get; set; }
+
+        /// <summary>
+        /// The quantize grid: what record mode quantizes to, and what Quantize in the note menu puts notes on. Remembered from
+        /// the last one picked.
+        /// </summary>
+        [ObservableProperty]
+        public partial SnapChoice? SelectedQuantize { get; set; }
+
+        /// <summary>The quantize grid, as <see cref="SelectedQuantize"/> picks it.</summary>
+        public SnapGrid QuantizeGrid => SnapGrid.Of(SelectedQuantize?.Division ?? SnapGrid.Default.Division);
+
+        partial void OnIsRecordQuantizedChanged(bool value)
+        {
+            if (Session.Recording is { } pass)
+                pass.Quantize = value ? QuantizeGrid : null;
+            if (_settings.Settings.RecordQuantize == value)
+                return;
+            _settings.Settings.RecordQuantize = value;
+            _settings.Save();
+        }
+
+        partial void OnSelectedQuantizeChanged(SnapChoice? value)
+        {
+            if (value is null)
+                return;
+            if (Session.Recording is { Quantize: not null } pass)
+                pass.Quantize = QuantizeGrid;
+            if (_settings.Settings.QuantizeDivision == value.Division)
+                return;
+            _settings.Settings.QuantizeDivision = value.Division;
+            _settings.Save();
+        }
+
+        /// <summary>
+        /// Puts the selected notes, and their sustains' ends, on the quantize grid, chord by chord, as one step (the note
+        /// menu's Quantize); chords that would land on notes that aren't selected stay.
+        /// </summary>
+        public void QuantizeSelection()
+        {
+            var grid = QuantizeGrid;
+            if (Session.Tools.QuantizeSelection(grid) is not { } plan)
+                return;
+            string label = BuilderSettingsCatalog.SnapLabel(grid.Division);
+            if (plan.Blocked.Count > 0)
+                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.QuantizedBlockedFormat, plan.Moved, label, plan.Blocked.Count));
+            else if (plan.Command is null)
+                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.QuantizeNothingFormat, label));
+            else
+                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.QuantizedFormat, plan.Moved, label));
+        }
+
+        /// <summary>
         /// Whether record mode is on (charter-spec C15 item 5): playing the song records a pass into the focused lane. It and
         /// playtest (C19 item 4) are never on together; with both off, playing just plays.
         /// </summary>
@@ -150,7 +207,7 @@ namespace ChartBuilder.ViewModels
 
             var mode = SelectedRecordMode?.Mode ?? RecordMode.Merge;
             var range = Session.Selection.Range is { } r && r.To > r.From ? r : ((long, long)?)null;
-            var pass = Session.StartRecording(key, mode, Playback.Clock().TotalSeconds, range);
+            var pass = Session.StartRecording(key, mode, Playback.Clock().TotalSeconds, range, IsRecordQuantized ? QuantizeGrid : null);
             if (InstrumentActions.ProfileOf(ChartInstruments.KindOf(key.Instrument)) is { } profile && Devices() is { } devices)
             {
                 var settings = _settings.Settings;

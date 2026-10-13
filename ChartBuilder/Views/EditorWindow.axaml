@@ -650,6 +650,18 @@
                                   MinWidth="100"
                                   ToolTip.Tip="{x:Static res:Strings.RecordModeToolTip}"
                                   AutomationProperties.Name="{x:Static res:Strings.RecordModeToolTip}" />
+                        <!-- Quantize: on, record mode puts what's played on the grid beside it; off, it's kept as played. The
+                             grid is also what Quantize in the note menu uses. -->
+                        <CheckBox VerticalAlignment="Center"
+                                  Content="{x:Static res:Strings.QuantizeLabel}"
+                                  IsChecked="{Binding Editor.IsRecordQuantized}"
+                                  ToolTip.Tip="{x:Static res:Strings.QuantizeToolTip}" />
+                        <ComboBox ItemsSource="{Binding Editor.SnapChoices}"
+                                  SelectedItem="{Binding Editor.SelectedQuantize}"
+                                  DisplayMemberBinding="{Binding Label, x:DataType=vm:SnapChoice}"
+                                  MinWidth="80"
+                                  ToolTip.Tip="{x:Static res:Strings.QuantizeResolutionToolTip}"
+                                  AutomationProperties.Name="{x:Static res:Strings.QuantizeResolutionToolTip}" />
                         <!-- What the playtest found (charter-spec C19 item 4): the pass's stats, the problems, to go to, and Clear,
                              which forgets them. -->
                         <TextBlock Classes="muted"

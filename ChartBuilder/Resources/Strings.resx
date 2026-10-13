@@ -2507,6 +2507,28 @@ Saving also makes these changes to song.ini:
   <data name="RecordModeToolTip" xml:space="preserve">
     <value>How a recorded pass goes in: merged with what's there, or over the selected range or the stretch played</value>
   </data>
+  <data name="QuantizeLabel" xml:space="preserve">
+    <value>Quantize</value>
+  </data>
+  <data name="QuantizeToolTip" xml:space="preserve">
+    <value>Quantize while recording: on, what's played goes on the quantize grid; off, it's kept as played</value>
+  </data>
+  <data name="QuantizeResolutionToolTip" xml:space="preserve">
+    <value>The quantize grid: what record mode quantizes to, and what Quantize in the note menu puts the selected notes on</value>
+  </data>
+  <data name="NoteMenuQuantizeFormat" xml:space="preserve">
+    <value>Quantize to {0}</value>
+    <comment>The note menu: puts the selected notes, and their sustains' ends, on the quantize grid. {0} is the grid, e.g. 1/16.</comment>
+  </data>
+  <data name="QuantizedFormat" xml:space="preserve">
+    <value>Quantized {0} chords to {1}.</value>
+  </data>
+  <data name="QuantizedBlockedFormat" xml:space="preserve">
+    <value>Quantized {0} chords to {1}. {2} stayed where they were: they'd land on notes that aren't selected.</value>
+  </data>
+  <data name="QuantizeNothingFormat" xml:space="preserve">
+    <value>The selected notes are on the {0} grid already.</value>
+  </data>
   <data name="RecordModeMerge" xml:space="preserve">
     <value>Merge</value>
   </data>
