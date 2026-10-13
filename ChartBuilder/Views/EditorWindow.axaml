@@ -629,11 +629,20 @@
                             </Panel>
                         </Button>
                         <ToggleButton Classes="tool"
-                                      IsChecked="{Binding Editor.IsRecording, Mode=OneWay}"
+                                      IsChecked="{Binding Editor.IsRecordArmed, Mode=OneWay}"
                                       Command="{Binding Editor.ToggleRecordCommand}"
                                       ToolTip.Tip="{Binding Editor.RecordToolTip}"
                                       AutomationProperties.Name="{x:Static res:Strings.RecordButton}">
                             <Ellipse Width="10" Height="10" Fill="{DynamicResource DifficultyHardBrush}" />
+                        </ToggleButton>
+                        <!-- Playtest (charter-spec C19 item 4): on, playing judges the focused lane as played. Never on with Record;
+                             both can be off. -->
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Editor.Playtest.IsArmed, Mode=OneWay}"
+                                      Command="{Binding Editor.TogglePlaytestCommand}"
+                                      ToolTip.Tip="{Binding Editor.Playtest.ToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.PlaytestButton}">
+                            <PathIcon Width="16" Height="16" Data="{StaticResource PlaytestIconGeometry}" />
                         </ToggleButton>
                         <ComboBox ItemsSource="{Binding Editor.RecordModeChoices}"
                                   SelectedItem="{Binding Editor.SelectedRecordMode}"
@@ -641,6 +650,49 @@
                                   MinWidth="100"
                                   ToolTip.Tip="{x:Static res:Strings.RecordModeToolTip}"
                                   AutomationProperties.Name="{x:Static res:Strings.RecordModeToolTip}" />
+                        <!-- What the playtest found (charter-spec C19 item 4): the pass's stats, the problems, to go to, and Clear,
+                             which forgets them. -->
+                        <TextBlock Classes="muted"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding Editor.Playtest.StatsText}"
+                                   IsVisible="{Binding Editor.Playtest.HasFeedback}" />
+                        <Button Classes="labelled"
+                                Content="{x:Static res:Strings.PlaytestProblemsButton}"
+                                IsVisible="{Binding Editor.Playtest.HasProblems}"
+                                ToolTip.Tip="{x:Static res:Strings.PlaytestProblemsToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.PlaytestProblemsButton}">
+                            <Button.Flyout>
+                                <Flyout Placement="TopEdgeAlignedLeft">
+                                    <ScrollViewer MaxHeight="360" MinWidth="260">
+                                        <ItemsControl ItemsSource="{Binding Editor.Playtest.Problems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:PlaytestProblemRow">
+                                                    <Button HorizontalAlignment="Stretch"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Background="Transparent"
+                                                            Padding="10,4"
+                                                            CornerRadius="4"
+                                                            Command="{Binding $parent[ItemsControl].((vm:EditorWindowViewModel)DataContext).Editor.Playtest.GoToProblemCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            AutomationProperties.Name="{Binding What}">
+                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                                            <TextBlock Grid.Column="0" Text="{Binding What}" />
+                                                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Where}" />
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button Classes="labelled"
+                                Content="{x:Static res:Strings.PlaytestClearButton}"
+                                Command="{Binding Editor.Playtest.ClearCommand}"
+                                IsVisible="{Binding Editor.Playtest.HasFeedback}"
+                                ToolTip.Tip="{x:Static res:Strings.PlaytestClearToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.PlaytestClearToolTip}" />
                         <ComboBox ItemsSource="{Binding Playback.SpeedPercents}"
                                   SelectedItem="{Binding Playback.SpeedPercent}"
                                   IsEnabled="{Binding Playback.IsReady}"

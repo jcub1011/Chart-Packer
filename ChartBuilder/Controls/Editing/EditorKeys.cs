@@ -25,8 +25,22 @@ namespace ChartBuilder.Controls.Editing
             bool plain = (modifiers & (KeyModifiers.Control | KeyModifiers.Shift | KeyModifiers.Alt | KeyModifiers.Meta)) == 0;
             bool highway = canvas.CanvasView == LaneView.Highway;
 
-            // Record mode (charter-spec C15 item 5): number keys play notes, R or Space ends the pass, Esc cancels it, and a
-            // difficulty key ends it before switching.
+            // Playtest (charter-spec C19 item 4): P turns it on or off, and N and Shift+N go to the problems it found. While the
+            // song plays, the window takes the keys bound before they get here (EditorWindow).
+            if (plain && key == PhysicalKey.P)
+            {
+                editor.TogglePlaytest();
+                return true;
+            }
+
+            if ((plain || (shift && !ctrl && !alt)) && key == PhysicalKey.N && editor.Playtest.HasFeedback)
+            {
+                editor.Playtest.StepProblem(shift ? -1 : 1);
+                return true;
+            }
+
+            // Record mode (charter-spec C15 item 5): number keys play notes, Space ends the pass and R turns record mode off,
+            // Esc cancels the pass, and a difficulty key ends it before switching.
             if (session.Recording is not null)
             {
                 if (plain && ShownLaneOf(key, lane, session) is { } shown)
@@ -142,7 +156,11 @@ namespace ChartBuilder.Controls.Editing
             }
 
             // 1 to 5 are the lanes in a highway's order (GHL's 1 to 6 white 1–3, then black 1–3), and 0 the open note or the
-            // kick; Shift+0 is the 2× kick (§9).
+            // kick; Shift+0 is the 2× kick (§9). Only while the song is paused: while it plays, only record mode writes notes
+            // (charter-spec C15 item 5), so a key that placed one would read as recording with it off. The key does nothing.
+            if ((plain || shift) && !ctrl && !alt && LaneKey(key) is not null && editor.Playback.IsPlaying)
+                return true;
+
             if (shift && !ctrl && !alt && LaneKey(key) == 0 && lane.Track is { Instrument: var instrument } && ChartInstruments.KindOf(instrument) == ChartInstrumentKind.Drums)
             {
                 tools.ToggleDoubleKickAtCursor();

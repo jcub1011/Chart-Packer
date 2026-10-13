@@ -34,6 +34,12 @@ public static class UserConfigPaths
     /// </summary>
     public static string AudioLatencyFile => Path.Combine(ConfigFolder, "audio-latency.json");
 
+    /// <summary>
+    /// Chart Builder's instrument bindings: each profile's, and each device's offset and MIDI settings (charter-spec C19,
+    /// §10).
+    /// </summary>
+    public static string InputBindingsFile => Path.Combine(ConfigFolder, "input-bindings.json");
+
     /// <summary>Where Chart Builder holds a lock file for each song it has open (charter-spec §4.8, <c>SongLock</c>).</summary>
     public static string LockFolder => Path.Combine(ConfigFolder, "locks");
 

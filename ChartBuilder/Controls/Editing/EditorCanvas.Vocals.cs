@@ -167,6 +167,10 @@ namespace ChartBuilder.Controls.Editing
                 case LayerKind.Overlay:
                     RenderVocalOverlay(context, session, vocal, vocals, screen, size);
                     return;
+
+                // A vocal part isn't playtested (charter-spec C19 item 4).
+                case LayerKind.Playtest:
+                    return;
             }
 
             var projection = ShowPage(layer, screen);

@@ -54,6 +54,7 @@ namespace ChartBuilder.ViewModels
         private readonly BuilderSettingsService _settings;
         private readonly IConfirmationService _confirmations;
         private readonly IAuthoringDialogService? _dialogs;
+        private readonly InputService? _input;
         private readonly DispatcherTimer _refresh;
         private readonly DispatcherTimer _tapEnd;
         private readonly TapTempo _taps = new();
@@ -67,11 +68,13 @@ namespace ChartBuilder.ViewModels
         /// <param name="messages">Where what the editor has to say goes, for the window's message bar.</param>
         /// <param name="audio">The song's audio as the lanes draw and analyse it.</param>
         /// <param name="dialogs">Shows the authoring tools' dialogs; null where there are none to show.</param>
-        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, EditorAudio audio, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout, IAuthoringDialogService? dialogs = null)
+        /// <param name="input">The instrument devices and their bindings, for playtest and record mode; null where there are none.</param>
+        public ChartEditorViewModel(EditorSong song, ChartUndoStack undo, PlaybackViewModel playback, EditorAudio audio, BuilderSettingsService settings, IConfirmationService confirmations, EditorMessages messages, LaneDockLayout layout, IAuthoringDialogService? dialogs = null, InputService? input = null)
         {
             _settings = settings;
             _confirmations = confirmations;
             _dialogs = dialogs;
+            _input = input;
             Song = song;
             Playback = playback;
             Audio = audio;
@@ -92,6 +95,7 @@ namespace ChartBuilder.ViewModels
             Session.VisibleTracks = () => [.. Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>()];
             AudioAssist = new AudioAssistViewModel(this);
             Preview = new PreviewViewModel(this, settings);
+            Playtest = new PlaytestViewModel(this, settings, input?.Settings.Settings, Devices);
 
             _refresh = new DispatcherTimer(DispatcherPriority.Background) { Interval = RefreshDelay };
             _refresh.Tick += (_, _) => RefreshDerived();
@@ -127,6 +131,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The highway preview, docked in the side panel or in a window of its own (charter-spec C18).</summary>
         public PreviewViewModel Preview { get; }
+
+        /// <summary>Playtest: the focused lane played with the keyboard and the instrument devices (charter-spec C19).</summary>
+        public PlaytestViewModel Playtest { get; }
 
         /// <summary>What a lane draws its audio as until it's switched: the setting's.</summary>
         public LaneBackdrop DefaultBackdrop => _settings.Settings.DefaultLaneBackdrop;
@@ -311,6 +318,7 @@ namespace ChartBuilder.ViewModels
             Audio.ReloadSettings(_settings.Settings);
             foreach (var lane in Lanes.All)
                 lane.Audio.Refresh();
+            Playtest.ReloadSettings();
         }
 
         /// <summary>Follows the playhead, once a frame while it plays: the cursor moves with it, and the view with the cursor.</summary>
@@ -323,6 +331,8 @@ namespace ChartBuilder.ViewModels
             _followed = frame;
             if (Playback.IsPlaying)
                 Session.Viewport.Follow(Playback.Clock().TotalSeconds);
+            _devices?.Sample();
+            Playtest.Frame();
         }
 
         /// <summary>Plays or pauses from the cursor (Space).</summary>
@@ -468,6 +478,9 @@ namespace ChartBuilder.ViewModels
             Playback.Scrubbed -= OnScrubbed;
             Lanes.LayoutChanged -= OnLayoutChanged;
             Preview.Dispose();
+            Playtest.Dispose();
+            _devices?.Dispose();
+            _devices = null;
             Session.Detach();
         }
 
@@ -610,9 +623,14 @@ namespace ChartBuilder.ViewModels
                     ScheduleRefresh();
                     break;
 
-                // A pass of record mode ends when the song stops (charter-spec C15 item 5).
-                case nameof(PlaybackViewModel.IsPlaying) when !Playback.IsPlaying && IsRecording:
-                    FinishRecording();
+                // Playing records a pass with record mode on, and playtests the focused lane with it off; stopping ends
+                // either (charter-spec C15 item 5, C19 item 4).
+                case nameof(PlaybackViewModel.IsPlaying):
+                    _devices?.Sample();
+                    if (Playback.IsPlaying)
+                        StartPlaying();
+                    else
+                        StopPlaying();
                     break;
             }
         }

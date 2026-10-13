@@ -66,8 +66,11 @@ public sealed class RecordPass
     /// draws the song. A key held down and repeating is pressed once.
     /// </summary>
     /// <param name="doubleKick">Whether it's the 2× kick (Expert drums).</param>
+    /// <param name="dynamics">
+    /// An accent or ghost, from a MIDI kit's velocity (charter-spec C19 item 7): on a drum pad only, never the kick or a fret.
+    /// </param>
     /// <returns>Whether a note was recorded.</returns>
-    public bool Press(int shownLane, double audioSeconds, bool doubleKick = false)
+    public bool Press(int shownLane, double audioSeconds, bool doubleKick = false, NoteDynamics dynamics = NoteDynamics.None)
     {
         int key = doubleKick ? int.MinValue : shownLane;
         if (_held.ContainsKey(key))
@@ -93,7 +96,9 @@ public sealed class RecordPass
             }
         }
 
-        var placed = new EditableNote(tick, EditableNote.PlainLength, lane, DoubleKick: doubleKick);
+        if (!IsDrums || lane < 1)
+            dynamics = NoteDynamics.None;
+        var placed = new EditableNote(tick, EditableNote.PlainLength, lane, dynamics, doubleKick);
         var place = NotePlace.Of(placed);
         _notes[place] = placed;
         _held[key] = place;

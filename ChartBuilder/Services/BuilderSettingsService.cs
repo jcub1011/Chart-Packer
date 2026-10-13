@@ -3,6 +3,7 @@ using System.Linq;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Editing;
+using ChartPacker.Core.Charting.Playtest;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Settings;
 
@@ -75,6 +76,10 @@ namespace ChartBuilder.Services
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
             settings.ReductionRules = (settings.ReductionRules ?? ReductionDefaults.Shipped).Normalized();
             settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
+            settings.PlaytestEarlyMs = Math.Clamp(settings.PlaytestEarlyMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
+            settings.PlaytestLateMs = Math.Clamp(settings.PlaytestLateMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
+            if (!Enum.IsDefined(settings.GuitarRecordStyle))
+                settings.GuitarRecordStyle = GuitarRecordStyle.Strum;
 
             settings.EditorLeftPanelWidth = Size(settings.EditorLeftPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorLeftPanelWidth);
             settings.EditorRightPanelWidth = Size(settings.EditorRightPanelWidth, BuilderSettings.MinEditorPanelWidth, BuilderSettings.DefaultEditorRightPanelWidth);

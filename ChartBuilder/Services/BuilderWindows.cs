@@ -15,6 +15,7 @@ using ChartPacker.Audio.Playback;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Recovery;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Input;
 using ChartPacker.Core.Launching;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Settings;
@@ -33,6 +34,7 @@ namespace ChartBuilder.Services
     /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
     /// <param name="chartPackerSettingsFile">Chart Packer's settings, which a save reads for the library and packing, never writes.</param>
     /// <param name="recovery">Where the Editor autosaves the chart open, and where what's left to recover is found on startup.</param>
+    /// <param name="input">The instrument devices and their bindings (charter-spec C19).</param>
     public sealed class BuilderWindows(
         IClassicDesktopStyleApplicationLifetime desktop,
         BuilderSettingsService settings,
@@ -40,10 +42,14 @@ namespace ChartBuilder.Services
         AudioLatencyService latency,
         string lockFolder,
         string chartPackerSettingsFile,
-        RecoveryStore recovery) : IEditorWindowService
+        RecoveryStore recovery,
+        InputService input) : IEditorWindowService
     {
         // The calibration tool, while it's open.
         private CalibrationWindow? _calibration;
+
+        // The Input devices window, while it's open.
+        private InputDevicesWindow? _inputDevices;
 
         /// <summary>Makes a new Editor the app's main window, opening <paramref name="args"/> in it once it's showing.</summary>
         /// <remarks>Called before the app has started, so the lifetime shows it.</remarks>
@@ -145,7 +151,9 @@ namespace ChartBuilder.Services
             chartPackerSettingsFile,
             recovery,
             new AvaloniaAuthoringDialogService(() => editor),
-            this);
+            this,
+            input,
+            ShowInputDevices);
 
         /// <summary>Shows the Editor, replacing the window open, and starts its audio.</summary>
         private void OpenEditor(EditorWindow editor, EditorWindowViewModel viewModel)
@@ -196,6 +204,28 @@ namespace ChartBuilder.Services
             {
                 _calibration = null;
             }
+        }
+
+        /// <summary>
+        /// Opens the Input devices window (charter-spec C19 item 2), where devices are bound to the instruments. Only one is
+        /// open at a time; opening it again brings that one to the front. It doesn't hold up the Editor, so a binding can
+        /// be tried in a playtest while it's open.
+        /// </summary>
+        public void ShowInputDevices()
+        {
+            if (_inputDevices is { } open)
+            {
+                open.Activate();
+                return;
+            }
+
+            var window = new InputDevicesWindow { DataContext = new InputDevicesViewModel(input) };
+            var owner = desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow;
+            _inputDevices = window;
+            window.Closed += (_, _) => _inputDevices = null;
+            if (owner is not null)
+                WindowChrome.UseOwnerIcon(window, owner);
+            window.Show();
         }
 
         /// <summary>
@@ -388,7 +418,16 @@ namespace ChartBuilder.Services
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,
             settingsPicker => new SettingsWindowViewModel(
-                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync()), settingsPicker, settings.Save));
+                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings), settingsPicker, settings.Save));
+
+        /// <summary>Puts every profile's bindings back to the keyboard's defaults, keeping each device's settings.</summary>
+        private void ResetBindings()
+        {
+            var bindings = input.Settings.Settings;
+            bindings.FiveFret = InputPresets.KeyboardFiveFret();
+            bindings.Drums = InputPresets.KeyboardDrums();
+            input.SaveBindings();
+        }
 
         /// <summary>Opens the Reduce dialog's Settings mode over the window in front, which edits the default rules (charter-spec §10).</summary>
         private async Task ShowReductionDefaultsAsync()

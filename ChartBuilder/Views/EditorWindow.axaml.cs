@@ -53,11 +53,12 @@ namespace ChartBuilder.Views
             };
             SizeChanged += (_, _) => ApplyLayout();
 
-            // Keys held in record mode are let go when the window loses focus, as their key-ups won't come here.
+            // Keys held in record mode or playtest are let go when the window loses focus, as their key-ups won't come here.
             Deactivated += (_, _) =>
             {
                 _isSpaceHeld = false;
                 _viewModel?.Editor.RecordReleaseAll();
+                _viewModel?.Editor.Playtest.ReleaseKeys();
             };
             TopBand.SizeChanged += (_, _) => ApplyLayout();
             Closing += (_, _) => CaptureLayout();
@@ -76,6 +77,10 @@ namespace ChartBuilder.Views
             // Space plays or pauses, tunnelled so a focused button takes it as playback rather than as a click.
             AddHandler(KeyDownEvent, OnSpaceKeyDown, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, OnSpaceKeyUp, RoutingStrategies.Tunnel);
+
+            // Playtest's keys, tunnelled, so they play wherever focus is: on the play button just clicked, say.
+            AddHandler(KeyDownEvent, OnPlaytestKeyDown, RoutingStrategies.Tunnel);
+            AddHandler(KeyUpEvent, OnPlaytestKeyUp, RoutingStrategies.Tunnel);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -133,6 +138,26 @@ namespace ChartBuilder.Views
             else
                 vm.Editor.PlayPause();
         }
+
+        /// <summary>
+        /// While the song plays a playtest, a key bound to the lane's instrument plays rather than editing, wherever focus is
+        /// (charter-spec C19 item 4). Not while a text box has focus, which types it.
+        /// </summary>
+        private void OnPlaytestKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Handled || _viewModel?.Editor.Playtest is not { IsActive: true } playtest || IsTyping(e))
+                return;
+            e.Handled = playtest.HandleKey(e.PhysicalKey, e.KeyModifiers, down: true);
+        }
+
+        private void OnPlaytestKeyUp(object? sender, KeyEventArgs e)
+        {
+            if (e.Handled || _viewModel?.Editor.Playtest is not { IsActive: true } playtest)
+                return;
+            e.Handled = playtest.HandleKey(e.PhysicalKey, e.KeyModifiers, down: false);
+        }
+
+        private bool IsTyping(KeyEventArgs e) => e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox;
 
         /// <summary>Letting go of a Space that played or paused, so the focused control doesn't see half a press.</summary>
         private void OnSpaceKeyUp(object? sender, KeyEventArgs e)

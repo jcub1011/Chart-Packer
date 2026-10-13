@@ -8,6 +8,7 @@ using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
+using ChartPacker.Core.Input;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -23,6 +24,11 @@ namespace ChartBuilder.ViewModels
         // Record mode's message, which each pass updates.
         private const string RecordMessageKey = "record";
 
+        // The instrument devices, started the first time the song plays, and where what they play goes in a pass of record
+        // mode.
+        private InputPlayer? _devices;
+        private RecordInput? _recordSink;
+
         /// <summary>The ways record mode can put a pass in: merged with what's there, or over it.</summary>
         public IReadOnlyList<RecordModeChoice> RecordModeChoices { get; } =
         [
@@ -34,21 +40,31 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial RecordModeChoice? SelectedRecordMode { get; set; }
 
-        /// <summary>Whether a pass of record mode is going on (charter-spec C15 item 5).</summary>
+        /// <summary>
+        /// Whether record mode is on (charter-spec C15 item 5): playing the song records a pass into the focused lane. It and
+        /// playtest (C19 item 4) are never on together; with both off, playing just plays.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(RecordToolTip))]
+        public partial bool IsRecordArmed { get; private set; }
+
+        /// <summary>Whether a pass of record mode is going on.</summary>
         public bool IsRecording => Session.Recording is not null;
 
-        public string RecordToolTip => IsRecording ? Strings.RecordStopToolTip : Strings.RecordStartToolTip;
+        public string RecordToolTip => IsRecordArmed ? Strings.RecordStopToolTip : Strings.RecordStartToolTip;
 
         /// <summary>
-        /// Starts a pass of record mode into the focused lane, playing from the cursor if the song isn't playing, or ends the
-        /// one going on, adding it as one step (R).
+        /// Turns record mode on or off (R), and playtest off. Turned on while the song plays, a pass starts there and then;
+        /// turned off, the pass going on ends, added as one step.
         /// </summary>
         [RelayCommand]
         public void ToggleRecord()
         {
-            if (Session.Recording is not null)
+            if (IsRecordArmed)
             {
+                IsRecordArmed = false;
                 FinishRecording();
+                Messages.Info(Strings.RecordOff, RecordMessageKey);
                 return;
             }
 
@@ -58,17 +74,91 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            if (!Playback.IsReady)
+            Playtest.Disarm();
+            IsRecordArmed = true;
+            if (Playback.IsPlaying)
             {
-                Session.Status = Strings.RecordNoAudio;
+                StartRecordingPass();
+                return;
+            }
+
+            Messages.Info(string.Format(
+                CultureInfo.CurrentCulture, Strings.RecordArmedFormat, ChartLabels.InstrumentName(key.Instrument), ChartLabels.DifficultyName(key.Difficulty)),
+                RecordMessageKey);
+        }
+
+        /// <summary>
+        /// Turns playtest on or off (P), and record mode off (charter-spec C19 item 4). Turned on while the song plays, the
+        /// focused lane is playtested from there; turned off, it's not, and what it found stays until it's cleared.
+        /// </summary>
+        [RelayCommand]
+        public void TogglePlaytest()
+        {
+            if (Playtest.IsArmed)
+            {
+                Playtest.Disarm();
+                Messages.Info(Strings.PlaytestOff, RecordMessageKey);
+                return;
+            }
+
+            if (IsRecordArmed)
+            {
+                IsRecordArmed = false;
+                FinishRecording();
+            }
+
+            Playtest.IsArmed = true;
+            if (Playback.IsPlaying)
+                Playtest.Begin();
+            Messages.Info(Session.Focused is { } key
+                ? string.Format(CultureInfo.CurrentCulture, Strings.PlaytestOnFormat, ChartLabels.InstrumentName(key.Instrument), ChartLabels.DifficultyName(key.Difficulty))
+                : Strings.PlaytestOnNoLane, RecordMessageKey);
+        }
+
+        /// <summary>The song started playing: a pass of record mode, or a playtest of the focused lane, if either is on.</summary>
+        private void StartPlaying()
+        {
+            if (IsRecordArmed)
+                StartRecordingPass();
+            else if (Playtest.IsArmed && !Playtest.Begin())
+                Session.Status = Strings.PlaytestNotPlayable;
+        }
+
+        /// <summary>The song stopped: the pass going on ends, added as one step, and so does the playtest.</summary>
+        private void StopPlaying()
+        {
+            if (IsRecording)
+                FinishRecording();
+            Playtest.End();
+        }
+
+        /// <summary>
+        /// Starts a pass of record mode into the focused lane from where the song is, over the selection's range when there's
+        /// one. The instrument devices record into it too (charter-spec C19 item 7), each press timed by its own event; the
+        /// keyboard records by the number keys, as it always has.
+        /// </summary>
+        private void StartRecordingPass()
+        {
+            if (Session.Recording is not null)
+                return;
+            Playtest.End();
+            if (Session.Focused is not { } key || Session.TrackOf(key) is null)
+            {
+                Session.Status = Strings.RecordNoLane;
                 return;
             }
 
             var mode = SelectedRecordMode?.Mode ?? RecordMode.Merge;
             var range = Session.Selection.Range is { } r && r.To > r.From ? r : ((long, long)?)null;
-            if (!Playback.IsPlaying)
-                PlayPause();
-            Session.StartRecording(key, mode, Playback.Clock().TotalSeconds, range);
+            var pass = Session.StartRecording(key, mode, Playback.Clock().TotalSeconds, range);
+            if (InstrumentActions.ProfileOf(ChartInstruments.KindOf(key.Instrument)) is { } profile && Devices() is { } devices)
+            {
+                var settings = _settings.Settings;
+                _recordSink = new RecordInput(Session, pass, settings.GuitarRecordStyle, settings.RecordDynamicsFromVelocity);
+                devices.Profile = profile;
+                devices.PlaysKeys = false;
+            }
+
             Messages.Info(string.Format(
                 CultureInfo.CurrentCulture,
                 mode == RecordMode.Overwrite ? Strings.RecordingOverwriteFormat : Strings.RecordingMergeFormat,
@@ -88,11 +178,39 @@ namespace ChartBuilder.ViewModels
         /// <summary>Lets go of every key held in record mode, as when the window loses focus.</summary>
         public void RecordReleaseAll() => Session.Recording?.ReleaseAll(Playback.Clock().TotalSeconds);
 
+        /// <summary>The instrument devices, started the first time they're asked for; null where there are none.</summary>
+        private InputPlayer? Devices() => _devices ??= _input is null ? null : new InputPlayer(_input, Playback, new DeviceSink(this));
+
+        /// <summary>Stops the devices recording, letting go of what they held first, so a held fret ends its sustain.</summary>
+        private void StopRecordInput()
+        {
+            if (_recordSink is { } sink)
+            {
+                _devices?.ReleaseKeys();
+                sink.ReleaseAll(Playback.Clock().TotalSeconds);
+            }
+
+            _recordSink = null;
+        }
+
+        /// <summary>Where what the devices play goes: the pass of record mode going on, else the playtest.</summary>
+        private sealed class DeviceSink(ChartEditorViewModel editor) : IActionSink
+        {
+            public void Handle(in TimedAction action)
+            {
+                if (editor._recordSink is { } record)
+                    record.Handle(action);
+                else
+                    editor.Playtest.Handle(action);
+            }
+        }
+
         /// <summary>Ends the pass of record mode going on, adding what it recorded as one step.</summary>
         public void FinishRecording()
         {
             if (Session.Recording is not { } pass)
                 return;
+            StopRecordInput();
             int count = pass.Count;
             bool added = pass.Finish(Playback.Clock().TotalSeconds);
             Messages.Info(added
@@ -105,7 +223,11 @@ namespace ChartBuilder.ViewModels
         {
             if (Session.Recording is not { } pass)
                 return;
+            StopRecordInput();
             pass.Cancel();
+
+            // Record mode goes off, so the rest of the song just plays rather than recording nothing.
+            IsRecordArmed = false;
             Messages.Info(Strings.RecordCancelled, RecordMessageKey);
         }
 

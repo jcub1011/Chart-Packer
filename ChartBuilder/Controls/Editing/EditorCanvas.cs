@@ -236,6 +236,7 @@ namespace ChartBuilder.Controls.Editing
         private readonly Layer _song;
         private readonly Layer _strike;
         private readonly Layer _notes;
+        private readonly Layer _playtest;
         private readonly Layer _overlay;
         private readonly Layer[] _layers;
         private LanePage? _page;
@@ -258,8 +259,9 @@ namespace ChartBuilder.Controls.Editing
             _song = new Layer(this, LayerKind.Song);
             _strike = new Layer(this, LayerKind.Strike);
             _notes = new Layer(this, LayerKind.Notes);
+            _playtest = new Layer(this, LayerKind.Playtest);
             _overlay = new Layer(this, LayerKind.Overlay);
-            _layers = [_song, _strike, _notes, _overlay];
+            _layers = [_song, _strike, _notes, _playtest, _overlay];
             foreach (var layer in _layers)
                 VisualChildren.Add(layer);
         }
@@ -449,6 +451,9 @@ namespace ChartBuilder.Controls.Editing
                 case LayerKind.Overlay:
                     RenderOverlay(context, session, key, track, slots, screen);
                     return;
+                case LayerKind.Playtest:
+                    RenderPlaytest(context, session, key, slots, screen);
+                    return;
             }
 
             var projection = ShowPage(layer, screen);
@@ -505,14 +510,24 @@ namespace ChartBuilder.Controls.Editing
             DrawFillGhosts(context, session, key, rows, projection, fromTick, toTick);
         }
 
-        /// <summary>The strike line's band, and while the song plays, the columns it's playing through, lit.</summary>
+        /// <summary>
+        /// The strike line's band, and while the song plays, the columns it's playing through, lit. While the lane is
+        /// playtested, the frets and pads pressed are shown on it, as the games show theirs, and each hit bursts from it.
+        /// </summary>
         private void RenderStrike(DrawingContext context, EditorSession session, ChartTrackKey key, EditableTrack track, LaneSlots slots, LaneProjection screen)
         {
             DrawStrikeBand(context, session, screen);
             if (_editor?.Playback.IsPlaying != true)
                 return;
             using (context.PushClip(LanesOf(screen, slots)))
+            {
+                var playing = PlayingOf(key);
+                if (playing is not null)
+                    DrawPresses(context, session, key, screen, slots);
                 DrawGlow(context, session, key, track, screen, slots);
+                if (playing is not null)
+                    DrawHitBursts(context, session, key, playing, screen, slots);
+            }
         }
 
         /// <summary>The notes across a page, within the lanes: the ghost difficulty's, a draft over the notes it would replace, and the solos' counts.</summary>
@@ -681,6 +696,8 @@ namespace ChartBuilder.Controls.Editing
             bool vocal = _lane is { Vocal: not null };
             if (_editor?.Playback.IsPlaying == true || vocal)
                 _strike.Redraw();
+            if (_editor?.Playtest.HasFeedback == true)
+                _playtest.Redraw();
             if (IsHoverShown || vocal)
             {
                 _overlay.Redraw();
@@ -718,6 +735,9 @@ namespace ChartBuilder.Controls.Editing
 
             /// <summary>The notes, on a page.</summary>
             Notes,
+
+            /// <summary>What a playtest found, which stays put on the screen, over the notes (charter-spec C19 item 4).</summary>
+            Playtest,
 
             /// <summary>The place tool's ghost, the cursor, a box being drawn and the focus's edge.</summary>
             Overlay,
@@ -1244,6 +1264,7 @@ namespace ChartBuilder.Controls.Editing
                 editor.Playback.PropertyChanged += OnPlaybackChanged;
                 editor.Audio.Changed += OnAudioChanged;
                 editor.AudioAssist.PropertyChanged += OnAudioAssistChanged;
+                editor.Playtest.Changed += OnPlaytestChanged;
             }
 
             _topLevel = TopLevel.GetTopLevel(this);
@@ -1267,6 +1288,7 @@ namespace ChartBuilder.Controls.Editing
                 editor.Playback.PropertyChanged -= OnPlaybackChanged;
                 editor.Audio.Changed -= OnAudioChanged;
                 editor.AudioAssist.PropertyChanged -= OnAudioAssistChanged;
+                editor.Playtest.Changed -= OnPlaytestChanged;
             }
 
             if (_topLevel is { } top)
@@ -2163,7 +2185,7 @@ namespace ChartBuilder.Controls.Editing
             bool drums = kind == ChartInstrumentKind.Drums;
             int laneCount = drums ? slots.Slots.Count - (slots.Across is null ? 1 : 0) : 5;
             double now = session.Viewport.Cursor;
-            var hits = HitsAt(session, key, track, slots, now);
+            var hits = PlayingOf(key) is { } run ? PlaytestHitsAt(run, key, slots, now) : HitsAt(session, key, track, slots, now);
             double strike = projection.AlongOf(now);
             double reach = StrikeGlow.BeamReach * (projection.AlongOf(projection.End) - strike);
             double size = GemSize(projection);

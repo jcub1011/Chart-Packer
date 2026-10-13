@@ -2499,10 +2499,10 @@ Saving also makes these changes to song.ini:
     <value>Record</value>
   </data>
   <data name="RecordStartToolTip" xml:space="preserve">
-    <value>Record (R): play notes with the number keys while the song plays; hold a key for a sustain</value>
+    <value>Record mode (R): playing the song records the keys and devices you play into the focused lane, and pausing adds the pass as one step</value>
   </data>
   <data name="RecordStopToolTip" xml:space="preserve">
-    <value>Stop recording (R), adding the pass as one step</value>
+    <value>Record mode is on (R): playing the song records into the focused lane. Click to turn it off.</value>
   </data>
   <data name="RecordModeToolTip" xml:space="preserve">
     <value>How a recorded pass goes in: merged with what's there, or over the selected range or the stretch played</value>
@@ -2516,14 +2516,11 @@ Saving also makes these changes to song.ini:
   <data name="RecordNoLane" xml:space="preserve">
     <value>Click a lane to record into first.</value>
   </data>
-  <data name="RecordNoAudio" xml:space="preserve">
-    <value>Record mode plays the song, and it has no audio yet.</value>
-  </data>
   <data name="RecordingMergeFormat" xml:space="preserve">
-    <value>Recording into {0} · {1}, merging. Press R or Space to stop, Esc to cancel.</value>
+    <value>Recording into {0} · {1}, merging. Space stops and adds the pass, Esc cancels it, R turns record mode off.</value>
   </data>
   <data name="RecordingOverwriteFormat" xml:space="preserve">
-    <value>Recording into {0} · {1}, overwriting. Press R or Space to stop, Esc to cancel.</value>
+    <value>Recording into {0} · {1}, overwriting. Space stops and adds the pass, Esc cancels it, R turns record mode off.</value>
   </data>
   <data name="RecordedFormat" xml:space="preserve">
     <value>Recorded {0} notes, as one step.</value>
@@ -2532,7 +2529,7 @@ Saving also makes these changes to song.ini:
     <value>Nothing was recorded.</value>
   </data>
   <data name="RecordCancelled" xml:space="preserve">
-    <value>Recording cancelled; nothing was added.</value>
+    <value>Recording cancelled; nothing was added. Record mode is off.</value>
   </data>
   <data name="PreviewTab" xml:space="preserve">
     <value>Preview</value>
@@ -2753,5 +2750,513 @@ Saving also makes these changes to song.ini:
   <data name="LaneDifficultyPickerToolTip" xml:space="preserve">
     <value>Difficulty shown (Ctrl+1–4)</value>
     <comment>The drop-down that stands in for the difficulty letters in a lane's header when the lane is too narrow for them.</comment>
+  </data>
+  <data name="SettingsCategoryInput" xml:space="preserve">
+    <value>Input</value>
+    <comment>Settings: the category of the instrument devices, their bindings and playtest.</comment>
+  </data>
+  <data name="InputDevicesLabel" xml:space="preserve">
+    <value>Instrument devices</value>
+    <comment>Settings: the row that opens the Input devices window.</comment>
+  </data>
+  <data name="InputDevicesDescription" xml:space="preserve">
+    <value>Play the keyboard, game controllers (guitars, drums, gamepads) and MIDI devices (drum kits, on Windows) as instruments, to playtest a chart and to record into it. Their controls are bound to each instrument's frets, strum and pads in the Input devices window.</value>
+    <comment>Settings: what the Instrument devices row does.</comment>
+  </data>
+  <data name="InputDevicesKeywords" xml:space="preserve">
+    <value>controller;guitar;drums;kit;midi;gamepad;joystick;keyboard;bindings;keybinds;map;input</value>
+    <comment>Settings: search words for the Instrument devices row, separated by semicolons.</comment>
+  </data>
+  <data name="InputDevicesButton" xml:space="preserve">
+    <value>Input devices…</value>
+    <comment>Settings: the button that opens the Input devices window.</comment>
+  </data>
+  <data name="InputResetBindingsButton" xml:space="preserve">
+    <value>Reset bindings</value>
+    <comment>Settings: the button that puts every instrument's bindings back to the keyboard's defaults.</comment>
+  </data>
+  <data name="PlaytestEarlyLabel" xml:space="preserve">
+    <value>Playtest hit window, early (ms)</value>
+    <comment>Settings: how long before a note a playtest takes a hit for it.</comment>
+  </data>
+  <data name="PlaytestEarlyDescription" xml:space="preserve">
+    <value>How long before a note a hit still counts, in real time. At a slower speed the notes come slower, and the window stays as long.</value>
+    <comment>Settings: what the early hit window does.</comment>
+  </data>
+  <data name="PlaytestEarlyKeywords" xml:space="preserve">
+    <value>playtest;hit window;timing;early;judge</value>
+    <comment>Settings: search words for the early hit window, separated by semicolons.</comment>
+  </data>
+  <data name="PlaytestLateLabel" xml:space="preserve">
+    <value>Playtest hit window, late (ms)</value>
+    <comment>Settings: how long after a note a playtest takes a hit for it.</comment>
+  </data>
+  <data name="PlaytestLateDescription" xml:space="preserve">
+    <value>How long after a note a hit still counts, in real time.</value>
+    <comment>Settings: what the late hit window does.</comment>
+  </data>
+  <data name="PlaytestLateKeywords" xml:space="preserve">
+    <value>playtest;hit window;timing;late;judge</value>
+    <comment>Settings: search words for the late hit window, separated by semicolons.</comment>
+  </data>
+  <data name="PlaytestCymbalsLabel" xml:space="preserve">
+    <value>Cymbals must match</value>
+    <comment>Settings: whether Pro drums cymbal notes need a cymbal hit.</comment>
+  </data>
+  <data name="PlaytestCymbalsDescription" xml:space="preserve">
+    <value>On Pro drums, a cymbal note needs a cymbal and a tom note a tom, for each colour whose cymbal and tom are bound to different controls. A colour with one control hits either.</value>
+    <comment>Settings: what Cymbals must match does.</comment>
+  </data>
+  <data name="PlaytestCymbalsKeywords" xml:space="preserve">
+    <value>playtest;pro drums;cymbal;tom</value>
+    <comment>Settings: search words for Cymbals must match, separated by semicolons.</comment>
+  </data>
+  <data name="PlaytestDoubleKickLabel" xml:space="preserve">
+    <value>Judge the 2× kick</value>
+    <comment>Settings: whether a playtest judges Expert+ double kick notes.</comment>
+  </data>
+  <data name="PlaytestDoubleKickDescription" xml:space="preserve">
+    <value>Whether Expert's 2× kick notes are played in a playtest, or left out as the games leave them out without Expert+.</value>
+    <comment>Settings: what Judge the 2× kick does.</comment>
+  </data>
+  <data name="PlaytestDoubleKickKeywords" xml:space="preserve">
+    <value>playtest;double kick;2x;expert+;pedal</value>
+    <comment>Settings: search words for Judge the 2× kick, separated by semicolons.</comment>
+  </data>
+  <data name="PlaytestOverhitsLabel" xml:space="preserve">
+    <value>Overhits break the combo</value>
+    <comment>Settings: whether a drum hit with no note to hit breaks the playtest combo.</comment>
+  </data>
+  <data name="PlaytestOverhitsDescription" xml:space="preserve">
+    <value>Whether a pad hit with no note to hit breaks the combo, as a strum with nothing to hit does on guitar.</value>
+    <comment>Settings: what Overhits break the combo does.</comment>
+  </data>
+  <data name="PlaytestOverhitsKeywords" xml:space="preserve">
+    <value>playtest;overhit;combo;drums</value>
+    <comment>Settings: search words for Overhits break the combo, separated by semicolons.</comment>
+  </data>
+  <data name="PlaytestDynamicsLabel" xml:space="preserve">
+    <value>Judge accents and ghosts</value>
+    <comment>Settings: whether a playtest checks how hard drum accents and ghosts are hit.</comment>
+  </data>
+  <data name="PlaytestDynamicsDescription" xml:space="preserve">
+    <value>With a MIDI kit, counts an accent hit softly or a ghost hit hard as a problem. The note is still hit.</value>
+    <comment>Settings: what Judge accents and ghosts does.</comment>
+  </data>
+  <data name="PlaytestDynamicsKeywords" xml:space="preserve">
+    <value>playtest;accent;ghost;velocity;dynamics;midi</value>
+    <comment>Settings: search words for Judge accents and ghosts, separated by semicolons.</comment>
+  </data>
+  <data name="GuitarRecordStyleLabel" xml:space="preserve">
+    <value>Guitar records by</value>
+    <comment>Settings: how a guitar controller records notes in record mode.</comment>
+  </data>
+  <data name="GuitarRecordStyleDescription" xml:space="preserve">
+    <value>How a guitar controller records: a strum places the frets held, as the games play; or each fret places a note as it's pressed, as the number keys do.</value>
+    <comment>Settings: what Guitar records by does.</comment>
+  </data>
+  <data name="GuitarRecordStyleKeywords" xml:space="preserve">
+    <value>record;guitar;strum;frets;controller</value>
+    <comment>Settings: search words for Guitar records by, separated by semicolons.</comment>
+  </data>
+  <data name="GuitarRecordStyleStrum" xml:space="preserve">
+    <value>Strumming</value>
+    <comment>Settings: a guitar controller records a note on each strum.</comment>
+  </data>
+  <data name="GuitarRecordStyleFrets" xml:space="preserve">
+    <value>Pressing frets</value>
+    <comment>Settings: a guitar controller records a note on each fret pressed.</comment>
+  </data>
+  <data name="RecordDynamicsLabel" xml:space="preserve">
+    <value>Dynamics from velocity</value>
+    <comment>Settings: whether a MIDI kit records accents and ghosts by how hard it is hit.</comment>
+  </data>
+  <data name="RecordDynamicsDescription" xml:space="preserve">
+    <value>When recording drums from a MIDI kit, a hard hit is an accent and a soft one a ghost, by the velocities set for the kit in the Input devices window.</value>
+    <comment>Settings: what Dynamics from velocity does.</comment>
+  </data>
+  <data name="RecordDynamicsKeywords" xml:space="preserve">
+    <value>record;accent;ghost;velocity;dynamics;midi;kit</value>
+    <comment>Settings: search words for Dynamics from velocity, separated by semicolons.</comment>
+  </data>
+  <data name="PlaytestStatsEmpty" xml:space="preserve">
+    <value>Nothing played yet</value>
+    <comment>The transport bar's playtest stats before anything is judged.</comment>
+  </data>
+  <data name="PlaytestStatsFormat" xml:space="preserve">
+    <value>{0:P1} · {1} combo · {2:+0;−0;0} ms</value>
+    <comment>The transport bar's playtest stats: {0} the accuracy, {1} the combo, {2} the mean offset in milliseconds, late positive.</comment>
+  </data>
+  <data name="PlaytestProblemsButton" xml:space="preserve">
+    <value>Problems</value>
+    <comment>The transport bar: the button that lists what the playtest found.</comment>
+  </data>
+  <data name="PlaytestProblemsToolTip" xml:space="preserve">
+    <value>Notes missed, overstrums, overhits and dropped sustains, over every pass (N, Shift+N)</value>
+    <comment>The Problems button's tooltip.</comment>
+  </data>
+  <data name="PlaytestProblemMiss" xml:space="preserve">
+    <value>Missed</value>
+    <comment>A playtest problem: a note not hit.</comment>
+  </data>
+  <data name="PlaytestProblemOverstrum" xml:space="preserve">
+    <value>Overstrum</value>
+    <comment>A playtest problem: a strum with nothing to hit, or the wrong frets.</comment>
+  </data>
+  <data name="PlaytestProblemOverhit" xml:space="preserve">
+    <value>Overhit</value>
+    <comment>A playtest problem: a pad hit with no note to hit.</comment>
+  </data>
+  <data name="PlaytestProblemSustainDrop" xml:space="preserve">
+    <value>Sustain dropped</value>
+    <comment>A playtest problem: a sustain let go too early.</comment>
+  </data>
+  <data name="PlaytestProblemTimesFormat" xml:space="preserve">
+    <value>{0} ×{1}</value>
+    <comment>A playtest problem that happened more than once: {0} the problem, {1} how many times.</comment>
+  </data>
+  <data name="PlaytestNoProblems" xml:space="preserve">
+    <value>The playtest hasn't found any problems.</value>
+    <comment>The status when N is pressed with no problems.</comment>
+  </data>
+  <data name="PlaytestNoMoreProblems" xml:space="preserve">
+    <value>No more problems that way.</value>
+    <comment>The status when N or Shift+N finds no problem past the cursor.</comment>
+  </data>
+  <data name="InputDevicesWindowTitle" xml:space="preserve">
+    <value>Input devices</value>
+    <comment>The Input devices window's title.</comment>
+  </data>
+  <data name="InputDevicesHeading" xml:space="preserve">
+    <value>Devices</value>
+    <comment>The Input devices window: the heading over the devices connected.</comment>
+  </data>
+  <data name="InputDevicesHint" xml:space="preserve">
+    <value>A device's meter lights when it does anything. Devices are read only while this window is open, or while playtesting or recording.</value>
+    <comment>The Input devices window: the note under the devices.</comment>
+  </data>
+  <data name="InputRescanButton" xml:space="preserve">
+    <value>Rescan</value>
+    <comment>The Input devices window: the button that looks for MIDI devices plugged in since.</comment>
+  </data>
+  <data name="InputRescanToolTip" xml:space="preserve">
+    <value>Look for MIDI devices plugged in since the window opened</value>
+    <comment>The Rescan button's tooltip.</comment>
+  </data>
+  <data name="InputKeyboardName" xml:space="preserve">
+    <value>Keyboard</value>
+    <comment>The keyboard, as a device in the Input devices window.</comment>
+  </data>
+  <data name="InputDeviceKindKeyboard" xml:space="preserve">
+    <value>Keyboard</value>
+    <comment>The Input devices window: what kind of device the keyboard is.</comment>
+  </data>
+  <data name="InputDeviceKindController" xml:space="preserve">
+    <value>Game controller</value>
+    <comment>The Input devices window: a game controller SDL doesn't say more about.</comment>
+  </data>
+  <data name="InputDeviceKindGuitar" xml:space="preserve">
+    <value>Guitar controller</value>
+    <comment>The Input devices window: a controller SDL says is a guitar.</comment>
+  </data>
+  <data name="InputDeviceKindDrums" xml:space="preserve">
+    <value>Drum controller</value>
+    <comment>The Input devices window: a controller SDL says is a drum kit.</comment>
+  </data>
+  <data name="InputDeviceKindMidi" xml:space="preserve">
+    <value>MIDI device</value>
+    <comment>The Input devices window: a MIDI input port.</comment>
+  </data>
+  <data name="InputDeviceInUse" xml:space="preserve">
+    <value>In use by another app</value>
+    <comment>The Input devices window: a MIDI port another app holds.</comment>
+  </data>
+  <data name="InputDeviceCantOpen" xml:space="preserve">
+    <value>Couldn't be opened</value>
+    <comment>The Input devices window: a device that couldn't be opened.</comment>
+  </data>
+  <data name="InputActivityLabel" xml:space="preserve">
+    <value>Activity</value>
+    <comment>The Input devices window: a device's activity meter, for screen readers.</comment>
+  </data>
+  <data name="InputOffsetLabel" xml:space="preserve">
+    <value>Input offset (ms)</value>
+    <comment>The Input devices window: a device's input latency.</comment>
+  </data>
+  <data name="InputOffsetToolTip" xml:space="preserve">
+    <value>How much later than you play it the device reports it, as a wireless guitar or a drum module can: taken off each input's time</value>
+    <comment>The input offset's tooltip.</comment>
+  </data>
+  <data name="InputMidiSettings" xml:space="preserve">
+    <value>MIDI settings</value>
+    <comment>The Input devices window: the expander with a MIDI device's velocities.</comment>
+  </data>
+  <data name="InputMinVelocityLabel" xml:space="preserve">
+    <value>Softest hit</value>
+    <comment>The Input devices window: the lowest MIDI velocity taken.</comment>
+  </data>
+  <data name="InputMinVelocityToolTip" xml:space="preserve">
+    <value>Hits softer than this are ignored, as crosstalk from another pad</value>
+    <comment>The softest hit's tooltip.</comment>
+  </data>
+  <data name="InputRetriggerLabel" xml:space="preserve">
+    <value>Retrigger (ms)</value>
+    <comment>The Input devices window: the MIDI double-trigger time.</comment>
+  </data>
+  <data name="InputRetriggerToolTip" xml:space="preserve">
+    <value>A pad struck again within this long is ignored, as a double trigger</value>
+    <comment>The retrigger time's tooltip.</comment>
+  </data>
+  <data name="InputAccentLabel" xml:space="preserve">
+    <value>Accent at velocity</value>
+    <comment>The Input devices window: the MIDI velocity from which a hit is an accent.</comment>
+  </data>
+  <data name="InputGhostLabel" xml:space="preserve">
+    <value>Ghost at velocity</value>
+    <comment>The Input devices window: the MIDI velocity up to which a hit is a ghost.</comment>
+  </data>
+  <data name="InputPresetGeneralMidiButton" xml:space="preserve">
+    <value>Use General MIDI drum map</value>
+    <comment>The Input devices window: binds a MIDI device's notes to the drums by the General MIDI drum map.</comment>
+  </data>
+  <data name="InputPresetGeneralMidiToolTip" xml:space="preserve">
+    <value>Bind this device's notes to the drums as most kits send them, in place of its drums bindings</value>
+    <comment>The General MIDI drum map button's tooltip.</comment>
+  </data>
+  <data name="InputPresetGuitarButton" xml:space="preserve">
+    <value>Use Xbox guitar layout</value>
+    <comment>The Input devices window: binds a controller as an Xbox 360 guitar.</comment>
+  </data>
+  <data name="InputPresetGuitarToolTip" xml:space="preserve">
+    <value>Bind this controller as an Xbox 360 guitar is laid out, in place of its 5-fret bindings</value>
+    <comment>The Xbox guitar layout button's tooltip.</comment>
+  </data>
+  <data name="InputPresetGeneralMidi" xml:space="preserve">
+    <value>The General MIDI drum map</value>
+    <comment>The Input devices window: the GM preset, named in a status.</comment>
+  </data>
+  <data name="InputPresetGuitar" xml:space="preserve">
+    <value>The Xbox guitar layout</value>
+    <comment>The Input devices window: the guitar preset, named in a status.</comment>
+  </data>
+  <data name="InputPresetAppliedFormat" xml:space="preserve">
+    <value>{0} is bound on {1}.</value>
+    <comment>The Input devices window: a preset applied. {0} the preset, {1} the device.</comment>
+  </data>
+  <data name="InputPresetGuitarUnknown" xml:space="preserve">
+    <value>SDL doesn't know this controller's layout. Bind its controls one by one.</value>
+    <comment>The Input devices window: the guitar preset can't be applied.</comment>
+  </data>
+  <data name="InputProfileFiveFret" xml:space="preserve">
+    <value>5-fret</value>
+    <comment>The Input devices window: the 5-fret guitar and bass tab.</comment>
+  </data>
+  <data name="InputProfileDrums" xml:space="preserve">
+    <value>Drums</value>
+    <comment>The Input devices window: the drums tab.</comment>
+  </data>
+  <data name="InputResetProfileButton" xml:space="preserve">
+    <value>Reset to keyboard defaults</value>
+    <comment>The Input devices window: puts the tab's bindings back to the keyboard's.</comment>
+  </data>
+  <data name="InputProfileResetFormat" xml:space="preserve">
+    <value>{0} is back to the keyboard's defaults.</value>
+    <comment>The Input devices window: a profile reset. {0} the profile.</comment>
+  </data>
+  <data name="InputBindButton" xml:space="preserve">
+    <value>+ Bind</value>
+    <comment>The Input devices window: the button that waits for a control to bind to the action.</comment>
+  </data>
+  <data name="InputBindListening" xml:space="preserve">
+    <value>Press a control…</value>
+    <comment>The Input devices window: Bind waiting for a control.</comment>
+  </data>
+  <data name="InputBindPromptFormat" xml:space="preserve">
+    <value>Press the key, button, pad or note for {0}, or move an axis. Esc stops.</value>
+    <comment>The Input devices window: what Bind is waiting for. {0} the action.</comment>
+  </data>
+  <data name="InputBoundFormat" xml:space="preserve">
+    <value>{0} plays {1}.</value>
+    <comment>The Input devices window: a control bound. {0} the control, {1} the action.</comment>
+  </data>
+  <data name="InputAlreadyBoundFormat" xml:space="preserve">
+    <value>{0} already plays {1}.</value>
+    <comment>The Input devices window: the control pressed is already bound to the action.</comment>
+  </data>
+  <data name="InputMoveFormat" xml:space="preserve">
+    <value>{0} plays {1}. Move it to {2}?</value>
+    <comment>The Input devices window: the control pressed is bound to another action. {0} the control, {1} what it plays now, {2} the action it was pressed for.</comment>
+  </data>
+  <data name="InputMoveConfirm" xml:space="preserve">
+    <value>Move</value>
+    <comment>The Input devices window: moves the control to the new action.</comment>
+  </data>
+  <data name="InputMoveCancel" xml:space="preserve">
+    <value>Keep</value>
+    <comment>The Input devices window: keeps the control where it is.</comment>
+  </data>
+  <data name="InputKeyReserved" xml:space="preserve">
+    <value>Space, Esc, P and N are the editor's, and can't be bound.</value>
+    <comment>The Input devices window: a reserved key was pressed while binding.</comment>
+  </data>
+  <data name="InputRemoveBindingToolTip" xml:space="preserve">
+    <value>Remove this binding</value>
+    <comment>The Input devices window: the ✕ on a binding's chip.</comment>
+  </data>
+  <data name="InputChipFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>A binding on a device other than the keyboard: {0} the device, {1} the control.</comment>
+  </data>
+  <data name="InputControlButtonFormat" xml:space="preserve">
+    <value>Button {0}</value>
+    <comment>A controller's button, numbered from 1.</comment>
+  </data>
+  <data name="InputControlAxisFormat" xml:space="preserve">
+    <value>Axis {0}{1}</value>
+    <comment>A controller's axis, numbered from 1, and its half: + or −.</comment>
+  </data>
+  <data name="InputControlHatFormat" xml:space="preserve">
+    <value>D-pad {0} {1}</value>
+    <comment>A controller's hat, numbered from 1, and its direction.</comment>
+  </data>
+  <data name="InputControlNoteFormat" xml:space="preserve">
+    <value>Note {0}</value>
+    <comment>A MIDI note, by its number.</comment>
+  </data>
+  <data name="InputControlCcFormat" xml:space="preserve">
+    <value>CC {0}</value>
+    <comment>A MIDI control change, by its number.</comment>
+  </data>
+  <data name="InputHatUp" xml:space="preserve">
+    <value>up</value>
+    <comment>A hat's direction.</comment>
+  </data>
+  <data name="InputHatRight" xml:space="preserve">
+    <value>right</value>
+    <comment>A hat's direction.</comment>
+  </data>
+  <data name="InputHatDown" xml:space="preserve">
+    <value>down</value>
+    <comment>A hat's direction.</comment>
+  </data>
+  <data name="InputHatLeft" xml:space="preserve">
+    <value>left</value>
+    <comment>A hat's direction.</comment>
+  </data>
+  <data name="InputActionGreen" xml:space="preserve">
+    <value>Green</value>
+    <comment>A 5-fret action: the green fret.</comment>
+  </data>
+  <data name="InputActionRed" xml:space="preserve">
+    <value>Red</value>
+    <comment>A 5-fret action: the red fret.</comment>
+  </data>
+  <data name="InputActionYellow" xml:space="preserve">
+    <value>Yellow</value>
+    <comment>A 5-fret action: the yellow fret.</comment>
+  </data>
+  <data name="InputActionBlue" xml:space="preserve">
+    <value>Blue</value>
+    <comment>A 5-fret action: the blue fret.</comment>
+  </data>
+  <data name="InputActionOrange" xml:space="preserve">
+    <value>Orange</value>
+    <comment>A 5-fret action: the orange fret.</comment>
+  </data>
+  <data name="InputActionStrumUp" xml:space="preserve">
+    <value>Strum up</value>
+    <comment>A 5-fret action.</comment>
+  </data>
+  <data name="InputActionStrumDown" xml:space="preserve">
+    <value>Strum down</value>
+    <comment>A 5-fret action.</comment>
+  </data>
+  <data name="InputActionWhammy" xml:space="preserve">
+    <value>Whammy</value>
+    <comment>A 5-fret action: the whammy bar.</comment>
+  </data>
+  <data name="InputActionStarPower" xml:space="preserve">
+    <value>Star power</value>
+    <comment>A 5-fret action: the star power button or tilt.</comment>
+  </data>
+  <data name="InputActionKick" xml:space="preserve">
+    <value>Kick</value>
+    <comment>A drums action: the kick pedal.</comment>
+  </data>
+  <data name="InputActionRedPad" xml:space="preserve">
+    <value>Red (snare)</value>
+    <comment>A drums action: the red pad.</comment>
+  </data>
+  <data name="InputActionYellowTom" xml:space="preserve">
+    <value>Yellow tom</value>
+    <comment>A drums action.</comment>
+  </data>
+  <data name="InputActionYellowCymbal" xml:space="preserve">
+    <value>Yellow cymbal (hi-hat)</value>
+    <comment>A drums action.</comment>
+  </data>
+  <data name="InputActionBlueTom" xml:space="preserve">
+    <value>Blue tom</value>
+    <comment>A drums action.</comment>
+  </data>
+  <data name="InputActionBlueCymbal" xml:space="preserve">
+    <value>Blue cymbal (ride)</value>
+    <comment>A drums action.</comment>
+  </data>
+  <data name="InputActionGreenTom" xml:space="preserve">
+    <value>Green tom</value>
+    <comment>A drums action.</comment>
+  </data>
+  <data name="InputActionGreenCymbal" xml:space="preserve">
+    <value>Green cymbal (crash)</value>
+    <comment>A drums action.</comment>
+  </data>
+  <data name="InputActionOrangePad" xml:space="preserve">
+    <value>Orange (5-lane)</value>
+    <comment>A drums action: a 5-lane kit's fifth pad, a cymbal between blue and green.</comment>
+  </data>
+  <data name="RecordArmedFormat" xml:space="preserve">
+    <value>Record mode is on: play the song to record into {0} · {1}.</value>
+    <comment>The message bar when record mode is turned on while the song is paused. {0} the part, {1} the difficulty.</comment>
+  </data>
+  <data name="RecordOff" xml:space="preserve">
+    <value>Record mode is off.</value>
+    <comment>The message bar when record mode is turned off.</comment>
+  </data>
+  <data name="PlaytestClearButton" xml:space="preserve">
+    <value>Clear</value>
+    <comment>The transport bar: forgets everything the playtest found.</comment>
+  </data>
+  <data name="PlaytestClearToolTip" xml:space="preserve">
+    <value>Clear the playtest: its marks on every lane, its problems and its stats</value>
+    <comment>The Clear button's tooltip.</comment>
+  </data>
+  <data name="PlaytestButton" xml:space="preserve">
+    <value>Playtest</value>
+    <comment>The transport bar: the button that turns playtest on and off, for screen readers.</comment>
+  </data>
+  <data name="PlaytestStartToolTip" xml:space="preserve">
+    <value>Playtest (P): playing the song plays the focused lane with your keyboard and controllers, judged as the games judge it</value>
+    <comment>The Playtest button's tooltip while playtest is off.</comment>
+  </data>
+  <data name="PlaytestStopToolTip" xml:space="preserve">
+    <value>Playtest is on (P): playing the song playtests the focused lane. Click to turn it off.</value>
+    <comment>The Playtest button's tooltip while playtest is on.</comment>
+  </data>
+  <data name="PlaytestOnFormat" xml:space="preserve">
+    <value>Playtest is on: play the song to play {0} · {1}; pause to fix what you missed.</value>
+    <comment>The message bar when playtest is turned on. {0} the part, {1} the difficulty.</comment>
+  </data>
+  <data name="PlaytestOnNoLane" xml:space="preserve">
+    <value>Playtest is on: click a lane, then play the song to play it.</value>
+    <comment>The message bar when playtest is turned on with no lane focused.</comment>
+  </data>
+  <data name="PlaytestOff" xml:space="preserve">
+    <value>Playtest is off.</value>
+    <comment>The message bar when playtest is turned off.</comment>
+  </data>
+  <data name="PlaytestNotPlayable" xml:space="preserve">
+    <value>Click a 5-fret or drums lane to playtest it: vocals and 6-fret can't be playtested yet.</value>
+    <comment>Why playing the song with playtest on doesn't playtest the focused lane.</comment>
   </data>
 </root>

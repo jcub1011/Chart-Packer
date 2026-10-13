@@ -6,6 +6,7 @@ using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
+using ChartPacker.Core.Charting.Playtest;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using ChartPacker.UI;
@@ -20,19 +21,111 @@ namespace ChartBuilder.Services
     {
         /// <param name="calibrate">Opens the calibration tool, which edits the audio latency (charter-spec C11).</param>
         /// <param name="editReductionRules">Opens the Reduce dialog's Settings mode, which edits the default rules (charter-spec C9).</param>
-        public static SettingsCatalog Create(BuilderSettingsService settings, Action calibrate, Action editReductionRules)
+        /// <param name="openInputDevices">Opens the Input devices window, which edits the instrument bindings (charter-spec C19).</param>
+        /// <param name="resetBindings">Puts every instrument profile's bindings back to the keyboard's defaults.</param>
+        public static SettingsCatalog Create(BuilderSettingsService settings, Action calibrate, Action editReductionRules, Action openInputDevices, Action resetBindings)
         {
             var charter = new SettingCategory("charter", Strings.SettingsCategoryCharter);
             var newCharts = new SettingCategory("charter.newCharts", Strings.SettingsCategoryNewCharts, charter);
             var editing = new SettingCategory("charter.editing", Strings.SettingsCategoryEditing, charter);
             var audioAssist = new SettingCategory("charter.audioAssist", Strings.SettingsCategoryAudioAssist, charter);
             var audio = new SettingCategory("audio", Strings.SettingsCategoryAudio);
+            var input = new SettingCategory("input", Strings.SettingsCategoryInput);
             var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [charter, newCharts, editing, audioAssist, audio, general, logging],
+                [charter, newCharts, editing, audioAssist, audio, input, general, logging],
                 [
+                    // The bindings are per device and control, so they're set in the Input devices window (charter-spec C19 item 2).
+                    new ActionSetting
+                    {
+                        Id = "input.devices",
+                        Category = input,
+                        Label = Strings.InputDevicesLabel,
+                        Description = Strings.InputDevicesDescription,
+                        Keywords = SettingKeywords.Split(Strings.InputDevicesKeywords),
+                        Actions =
+                        [
+                            new SettingAction(Strings.InputDevicesButton, openInputDevices),
+                            new SettingAction(Strings.InputResetBindingsButton, resetBindings),
+                        ],
+                    },
+                    HitWindowSetting("input.playtestEarlyMs", input, Strings.PlaytestEarlyLabel, Strings.PlaytestEarlyDescription, Strings.PlaytestEarlyKeywords,
+                        () => settings.Settings.PlaytestEarlyMs, ms => settings.Settings.PlaytestEarlyMs = ms),
+                    HitWindowSetting("input.playtestLateMs", input, Strings.PlaytestLateLabel, Strings.PlaytestLateDescription, Strings.PlaytestLateKeywords,
+                        () => settings.Settings.PlaytestLateMs, ms => settings.Settings.PlaytestLateMs = ms),
+                    new ToggleSetting
+                    {
+                        Id = "input.cymbalsMustMatch",
+                        Category = input,
+                        Label = Strings.PlaytestCymbalsLabel,
+                        Description = Strings.PlaytestCymbalsDescription,
+                        Keywords = SettingKeywords.Split(Strings.PlaytestCymbalsKeywords),
+                        DefaultValue = true,
+                        Get = () => settings.Settings.PlaytestCymbalsMustMatch,
+                        Set = on => settings.Settings.PlaytestCymbalsMustMatch = on,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "input.doubleKick",
+                        Category = input,
+                        Label = Strings.PlaytestDoubleKickLabel,
+                        Description = Strings.PlaytestDoubleKickDescription,
+                        Keywords = SettingKeywords.Split(Strings.PlaytestDoubleKickKeywords),
+                        DefaultValue = true,
+                        Get = () => settings.Settings.PlaytestDoubleKick,
+                        Set = on => settings.Settings.PlaytestDoubleKick = on,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "input.overhitsBreakCombo",
+                        Category = input,
+                        Label = Strings.PlaytestOverhitsLabel,
+                        Description = Strings.PlaytestOverhitsDescription,
+                        Keywords = SettingKeywords.Split(Strings.PlaytestOverhitsKeywords),
+                        DefaultValue = true,
+                        Get = () => settings.Settings.PlaytestOverhitsBreakCombo,
+                        Set = on => settings.Settings.PlaytestOverhitsBreakCombo = on,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "input.judgeDynamics",
+                        Category = input,
+                        Label = Strings.PlaytestDynamicsLabel,
+                        Description = Strings.PlaytestDynamicsDescription,
+                        Keywords = SettingKeywords.Split(Strings.PlaytestDynamicsKeywords),
+                        DefaultValue = false,
+                        Get = () => settings.Settings.PlaytestJudgeDynamics,
+                        Set = on => settings.Settings.PlaytestJudgeDynamics = on,
+                    },
+                    new ChoiceSetting<GuitarRecordStyle>
+                    {
+                        Id = "input.guitarRecordStyle",
+                        Category = input,
+                        Label = Strings.GuitarRecordStyleLabel,
+                        Description = Strings.GuitarRecordStyleDescription,
+                        Keywords = SettingKeywords.Split(Strings.GuitarRecordStyleKeywords),
+                        DefaultValue = GuitarRecordStyle.Strum,
+                        Choices =
+                        [
+                            new SettingChoice<GuitarRecordStyle>(GuitarRecordStyle.Strum, Strings.GuitarRecordStyleStrum),
+                            new SettingChoice<GuitarRecordStyle>(GuitarRecordStyle.Frets, Strings.GuitarRecordStyleFrets),
+                        ],
+                        Get = () => settings.Settings.GuitarRecordStyle,
+                        Set = style => settings.Settings.GuitarRecordStyle = style,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "input.recordDynamics",
+                        Category = input,
+                        Label = Strings.RecordDynamicsLabel,
+                        Description = Strings.RecordDynamicsDescription,
+                        Keywords = SettingKeywords.Split(Strings.RecordDynamicsKeywords),
+                        DefaultValue = false,
+                        Get = () => settings.Settings.RecordDynamicsFromVelocity,
+                        Set = on => settings.Settings.RecordDynamicsFromVelocity = on,
+                    },
                     // The latency is per device, so it's edited in the calibration tool rather than here (charter-spec §10).
                     new ActionSetting
                     {
@@ -238,6 +331,21 @@ namespace ChartBuilder.Services
         /// <summary>A snap as it's shown, e.g. "1/16".</summary>
         public static string SnapLabel(int division) =>
             string.Format(CultureInfo.CurrentCulture, Strings.SnapFormat, division);
+
+        /// <summary>One side of the playtest's hit window, in milliseconds (charter-spec C19).</summary>
+        private static IntegerSetting HitWindowSetting(string id, SettingCategory category, string label, string description, string keywords, Func<int> get, Action<int> set) => new()
+        {
+            Id = id,
+            Category = category,
+            Label = label,
+            Description = description,
+            Keywords = SettingKeywords.Split(keywords),
+            DefaultValue = (int)HitWindow.DefaultMs,
+            Minimum = (int)HitWindow.MinMs,
+            Maximum = (int)HitWindow.MaxMs,
+            Get = get,
+            Set = set,
+        };
 
         /// <summary>A volume from 0 to 100%, edited with a slider.</summary>
         private static RangeSetting Volume(string id, SettingCategory category, string label, string description, string keywords, Func<int> get, Action<int> set) => new()

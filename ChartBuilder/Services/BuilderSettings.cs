@@ -3,6 +3,7 @@ using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Authoring;
 using ChartPacker.Core.Charting.Editing;
 using ChartPacker.Core.Charting.Layout;
+using ChartPacker.Core.Charting.Playtest;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Launching;
 
@@ -189,5 +190,29 @@ namespace ChartBuilder.Services
 
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = 1.4;
+
+        /// <summary>How long before a note a playtest takes a hit for it, in real milliseconds (charter-spec C19).</summary>
+        public int PlaytestEarlyMs { get; set; } = (int)HitWindow.DefaultMs;
+
+        /// <summary>How long after a note a playtest takes a hit for it, in real milliseconds (charter-spec C19).</summary>
+        public int PlaytestLateMs { get; set; } = (int)HitWindow.DefaultMs;
+
+        /// <summary>Whether a Pro drums cymbal note needs a cymbal, and a tom note a tom, for the colours the kit splits.</summary>
+        public bool PlaytestCymbalsMustMatch { get; set; } = true;
+
+        /// <summary>Whether a playtest judges Expert's 2× kick notes.</summary>
+        public bool PlaytestDoubleKick { get; set; } = true;
+
+        /// <summary>Whether a drum hit with no note to hit breaks the combo.</summary>
+        public bool PlaytestOverhitsBreakCombo { get; set; } = true;
+
+        /// <summary>Whether a playtest counts accents hit softly and ghosts hit hard.</summary>
+        public bool PlaytestJudgeDynamics { get; set; }
+
+        /// <summary>How a guitar controller records (charter-spec C19 item 7).</summary>
+        public GuitarRecordStyle GuitarRecordStyle { get; set; } = GuitarRecordStyle.Strum;
+
+        /// <summary>Whether a MIDI kit's hard hits record as accents and its soft ones as ghosts.</summary>
+        public bool RecordDynamicsFromVelocity { get; set; }
     }
 }

@@ -63,15 +63,16 @@ This spec **supersedes** the "editing charts" non-goal in
 - **Audio editing or encoding.** Stems are added, replaced and removed as files, as in
   [project-spec F7](project-spec-v1.md#f7-audio-playback), but never cut, mixed down or
   re-encoded.
-- **Playing the chart with a controller** (scoring, hit windows). Previewing uses autoplay
-  ([C18](#c18-preview)).
+- **A game mode** (score, star power, failing, multiplayer). Previewing uses autoplay
+  ([C18](#c18-preview)). Playtesting in the editor judges hits against hit windows to check a chart
+  plays right, and stops there ([C19](#c19-playtest-and-instrument-input)).
 
 ## 3. Users and scope
 
 | | |
 | --- | --- |
 | **Users** | Chart authors, from first-time charters to people moving from Moonscraper or Editor on Fire |
-| **Platforms** | As the app: Windows, macOS and Linux, Native AOT ([project-spec §3](project-spec-v1.md#3-target-users-and-platforms)) |
+| **Platforms** | As the app: Windows, macOS and Linux, Native AOT ([project-spec §3](project-spec-v1.md#3-target-users-and-platforms)). MIDI devices as instruments are Windows only for now ([C19](#c19-playtest-and-instrument-input)). |
 
 Instruments and variants in v1:
 
@@ -96,7 +97,9 @@ Chart-Packer.slnx
 ├── ChartPacker.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
 │                                 settings window, shared controls, and the drawing of notes and waveforms
 ├── ChartPacker.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synthesis/ (`Synth`: click, beep, hit sounds)
-├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions), + SongLock
+├── ChartPacker.Input/            Instrument devices (new, C19): SDL3 game controllers, and MIDI input on Windows (winmm)
+├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions, playtest), + SongLock,
+│                                 + Input/ (bindings, routing and timing of instrument input, C19)
 └── ChartPacker.Core.Tests/       + Charting/, Audio/Analysis/ tests
 ```
 
@@ -422,6 +425,9 @@ metadata editor. Chart Packer's unsaved drafts for a song are never written by C
 writing, and the settings are all in-house or already budgeted
 ([project-spec §4.3](project-spec-v1.md#43-native-aot-constraints-required)). The AOT constraints
 apply unchanged: compiled bindings, source-generated MVVM and JSON, and no reflection.
+Instrument input ([C19](#c19-playtest-and-instrument-input)) adds none either: game controllers
+are read through SDL3's joystick subsystem, from the SDL3 package already used for audio, and MIDI
+devices through Windows's own winmm, called with `LibraryImport`.
 
 The one addition is **Serilog** (`Serilog` and `Serilog.Sinks.File`, Apache 2.0). Both apps log
 through it to daily files in the per-user log folder (`UserConfigPaths.LogFolder`), which is kept
@@ -828,7 +834,9 @@ Acceptance criteria:
    where it happens. *Settled in CM2:* the Findings tab's title doesn't show the counts, as a
    collapsed panel's strip reads the titles only once. The counts are at the top of the panel.
 6. **Transport bar**: play and pause, position, speed, pitch correction, loop, metronome, hit
-   sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)).
+   sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)). Beside
+   Record, the Playtest button (never on with Record; both can be off), the playtest's stats, the
+   Problems list and Clear ([C19](#c19-playtest-and-instrument-input)).
 7. **Vocal lanes.** A lane showing `PART VOCALS` or `HARM1`–`HARM3` is always drawn along a
    timeline, as a piano roll:
    - one row per semitone, every pitch a part sings (36 to 84) whatever its notes, so any pitch can
@@ -1750,6 +1758,8 @@ Acceptance criteria:
    - Each pass is one undoable command. Recording can overwrite the selected range or merge with
      what's there.
    - This works at any speed, so a fast passage can be recorded at 50%.
+   - Game controllers and MIDI devices record too, through their bindings, each press timed by its
+     own event ([C19](#c19-playtest-and-instrument-input) item 7).
 6. **Autosave and recovery.**
    - Every 2 minutes (configurable, 1 to 60), and when playback stops, the model is written to a recovery
      file in the per-user config folder (`Recovery/`), never into the song. Nothing is written
@@ -1808,13 +1818,20 @@ Acceptance criteria:
   (§4.2), and anchors keep their times.
 - **Record mode.** R starts a pass into the focused lane, playing from the cursor if the song isn't
   playing; R, Space or the song stopping ends it, as one step, and Esc cancels it. The transport
-  bar has the Record button and Merge or Overwrite. Overwrite clears the range selected, or the
+  bar has the Record button and Merge or Overwrite. (*Revised in CM6:* R and the Record button turn
+  record mode on and off, and playing the song with it on starts a pass from where the song is; the
+  song stopping ends it, as one step, and the next play starts another. Turned on while the song
+  plays, a pass starts there; turned off, the pass ends. Esc cancels the pass and turns record mode
+  off. Record mode and playtest ([C19](#c19-playtest-and-instrument-input) item 4) are never on
+  together, and with both off, playing just plays.) Overwrite clears the range selected, or the
   stretch played, and leaves out presses outside a range selected. Presses on one tick make a
   chord, and a fret takes an open note's place. A key let go less than a grid step after it was
   pressed leaves a plain note; drums ignore holds. The pass is drawn as a ghost until it ends.
 - **Press times** are read from the playback clock when the key event is handled, on every OS, as
   key events carry no timestamp. The wait before an event is handled isn't corrected; at 50% speed
-  it's halved in song time. Keys held when the window loses focus are let go then.
+  it's halved in song time. Keys held when the window loses focus are let go then. (*Revised in
+  CM6:* controllers and MIDI devices carry timestamps, and are corrected
+  ([C19](#c19-playtest-and-instrument-input) item 3).)
 
 Acceptance criteria:
 
@@ -2006,6 +2023,121 @@ Acceptance criteria:
 
 - **AC C18.1** Preview follows the latency calibration and stays within one frame of the editor
   view while both are shown.
+
+### C19. Playtest and instrument input
+
+The keyboard, game controllers and MIDI devices can be played as instruments: to playtest a chart in
+the editor, judged as the games judge it, and to record into it ([C15](#c15-editing-ergonomics)
+item 5).
+
+**Behaviour:**
+
+1. **Devices.**
+   - **Game controllers** (gamepads, guitar and drum controllers) are read through SDL3's joystick
+     subsystem as raw buttons, axes and hats, so a guitar SDL doesn't know as a gamepad still works.
+     They're read while the window is in the background too.
+   - **MIDI devices** (drum kits, pad controllers, keyboards) are read through winmm, on Windows
+     only for now. Other OSes list none. Each backend is an `IInputSource`, so another can be added
+     without changing anything else.
+   - Devices are opened the first time the Editor's song plays, or the Input devices window opens,
+     and kept open until the Editor and the window close, so a MIDI port is free for other apps
+     until then. A port another app holds is shown as in use.
+2. **Bindings.** Each instrument family has a profile that binds controls to its actions.
+   - 5-fret: Green, Red, Yellow, Blue, Orange, Strum up, Strum down, Whammy and Star power.
+   - Drums: Kick, Red, Yellow tom, Yellow cymbal, Blue tom, Blue cymbal, Green tom, Green cymbal and
+     Orange (a 5-lane kit's fifth pad).
+   - An action can have several controls (two kick pedals, or a keyboard and a guitar). A control
+     has one action in each profile.
+   - The **Input devices** window lists the devices, each with a meter showing its activity, and the
+     profiles. **Bind** takes the next control pressed: a key, a button, a hat direction, a MIDI note,
+     or an axis moved past half way from where it rested. Controls already held are ignored, so a
+     resting pedal or a stuck axis isn't taken. Binding a control another action has asks to move it.
+   - Presets: the keyboard defaults (the number keys, as record mode's, with Enter and the arrow keys
+     to strum), a General MIDI drum map, and the usual layout of Xbox 360 guitars.
+   - Each device has an input offset in milliseconds, for wireless controllers and drum modules that
+     add their own delay. A MIDI device also has a velocity floor (against crosstalk), a retrigger
+     time (against double triggers), and the velocities taken as an accent and as a ghost.
+   - Space, Esc, P and N are the editor's while playtesting, and can't be bound.
+3. **Timing.** Every input is timed by its own event's timestamp, on one monotonic clock, and turned
+   into song time through the playback clock as it was at that moment:
+   **`SmoothPosition` − latency × speed**, as everything drawn is ([C10](#c10-playback) item 5), less
+   the device's offset. When the event is handled doesn't change it, so controllers and MIDI devices,
+   read on threads of their own, are judged as exactly as they're timed. Keys carry no timestamp
+   ([C15](#c15-editing-ergonomics)), and are timed when they're handled.
+4. **Playtest.** P and the Playtest button turn playtest on and off. With it on, playing the song
+   playtests the focused lane's part and difficulty: inputs are judged against its game view
+   ([§4.3](#43-writing-midichartwriter)) by the rules in items 5 and 6. While it's paused, the editor
+   works as it always does, so a missed note can be fixed straight away and the passage played
+   again. Playtest and record mode ([C15](#c15-editing-ergonomics) item 5) are never on together:
+   turning one on turns the other off. Both can be off, and then playing just plays.
+   - While playing, a key bound to the lane's instrument plays, and doesn't edit, wherever focus is
+     (but a text box). Other keys work as they always do; Space, Esc, P and N are never bound.
+   - The strike line shows what's pressed, as the games show their frets and pads: a fret's target
+     while it's held, a pad's or the kick's as it's hit, and a strum across the lanes, each in its
+     colour. Only notes hit light their columns, as autoplay's do in the preview, with a burst out of
+     the target. A missed note is marked where it is, and stays marked until it's played again. A
+     meter at the strike line shows how early or late the last hits were.
+   - The transport bar shows the accuracy, the combo and the mean offset. N and Shift+N move the
+     cursor to the next and previous problem: a miss, an overstrum, an overhit or a dropped sustain.
+     The Problems list shows every one, with how many passes it happened on.
+   - Each lane played keeps what was found in it, marked over its notes, until **Clear** forgets
+     every lane's marks, problems and stats. The stats and problems shown are the lane played last.
+   - Each pass over the loop region, and each play, starts its stats afresh; problems add up over
+     the passes.
+   - Seeking, and the loop's jump back, judge nothing they skip.
+   - The hit window is in real time, so at 50% speed it's half as long in song time, as the notes
+     come half as fast.
+   - Vocals and 6-fret aren't playtested in v1.
+5. **5-fret rules.** As the games play, close enough to check a chart; each number is a setting.
+   - The hit window is 70 ms either side of the note.
+   - A single note is played with its fret held and none above it; frets below may be held
+     (anchoring). A chord needs exactly its frets. An open note needs none.
+   - A strum note is hit by a strum in the window, with its frets held. A strum up to 50 ms before
+     the frets are right still counts once they are.
+   - A HOPO is hit by pressing or lifting to its frets, while the combo is going; a tap, at any time.
+     A strum up to 80 ms after such a hit is part of it. Pressing a fret that's wrong for the next
+     HOPO or tap in the window (ghosting) means that one must be strummed.
+   - A strum with nothing to hit, or the wrong frets, is an **overstrum**, and breaks the combo.
+     Hitting a later note in the window misses the ones before it.
+   - A sustain is held to its end with its frets held. Letting go more than 50 ms early is a
+     dropped sustain, which counts as a problem but doesn't break the combo.
+   - Whammy and star power are read but not judged.
+6. **Drums rules.**
+   - The hit window is 70 ms either side. Each note is hit by its own pad; a pad hit with no note to
+     hit is an **overhit**, which breaks the combo (a setting).
+   - Pro drums: a cymbal note needs a cymbal and a tom note a tom, for each colour whose cymbal and
+     tom are bound to different controls; with one control for a colour, either counts. Notes in a
+     disco flip are played as the game view has them.
+   - 5-lane drums: a 5-lane kit's pads play their own lanes. A 4-lane kit's play them as
+     [§7.6](#76-drum-layout-conversion) turns Pro into 5-lane.
+   - The kick, and on Expert the 2× kick, which can be left out of the judging (a setting).
+   - Accents and ghosts can be judged by velocity (a setting, off by default).
+7. **Recording from devices** ([C15](#c15-editing-ergonomics) item 5).
+   - Guitar: a strum places the frets held, or an open note, and letting go of a fret ends its
+     sustain. As a setting, each fret can place a note as it's pressed instead, as the number keys
+     do.
+   - Drums: each hit places a note on its pad's lane. With **Dynamics from velocity** on, a hard hit
+     is an accent and a soft one a ghost. A cymbal or a tom isn't recorded in v1, only the pad's
+     colour.
+8. **Recording a performance (later).** Every input becomes one stream of timed actions, which the
+   judge and record mode each take. The judge gives the same result from the same actions, so a
+   performance kept as its actions could be judged again after the chart changes.
+
+*Settings* ([§10](#10-settings)): the early and late hit windows, cymbals must match, judge the 2×
+kick, overhits break the combo, judge accents and ghosts, the guitar's record style and dynamics
+from velocity. The bindings and each device's offset and MIDI settings are in the Input devices
+window, kept in `input-bindings.json`.
+
+Acceptance criteria:
+
+- **AC C19.1** An input whose timestamp is exactly on a note is judged 0 ms off however long after
+  it is handled, up to 100 ms, at 100% and at 50% speed, with a latency of 40 ms.
+- **AC C19.2** Every rule in items 5 and 6 has a test of synthetic inputs that hits, misses,
+  overstrums or overhits as described.
+- **AC C19.3** Bindings are kept in `input-bindings.json` and found again for a controller
+  reconnected or plugged into another port.
+- **AC C19.4** Seeking while playtesting, or the loop jumping back, marks no note it skipped as
+  missed.
 
 ---
 
@@ -2413,9 +2545,9 @@ These are the defaults. Rebinding is future work.
 
 | Keys | Action |
 | ---- | ------ |
-| `1`–`5` (`1`–`6` GHL) | Place or remove a note on that lane at the cursor; in record mode, play a note |
-| `0` | Open note, or drum kick |
-| `Shift`+`0` | 2× kick (Expert drums) |
+| `1`–`5` (`1`–`6` GHL) | Place or remove a note on that lane at the cursor; in record mode, play a note. While the song plays with record mode off, nothing |
+| `0` | Open note, or drum kick (as `1`–`5`, while the song plays) |
+| `Shift`+`0` | 2× kick (Expert drums; as `1`–`5`, while the song plays) |
 | `Space` | Play or pause from the cursor |
 | `Shift`+`Space` | Play the selection |
 | `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
@@ -2440,7 +2572,9 @@ These are the defaults. Rebinding is future work.
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
 | `L` | Set the loop region to the selection |
-| `R` | Start or stop record mode; while it records, Space ends the pass too, and Esc cancels it |
+| `R` | Record mode on or off, and playtest off: on, playing the song records a pass. Space ends a pass, and Esc cancels it |
+| `P` | Playtest on or off, and record mode off: on, playing the song playtests the lane ([C19](#c19-playtest-and-instrument-input)) |
+| `N` / `Shift`+`N` | Move the cursor to the playtest's next or previous problem |
 | `W` | Switch the lane between waveform and spectrogram |
 | `Ctrl`+`A` | Select all in the current difficulty, or a vocal lane's part |
 | `Ctrl`+`Shift`+`A` | Select the section the cursor is in, across the lanes shown |
@@ -2484,6 +2618,7 @@ save writes its own temp file and renames it into place.
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
 | `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
 | `audio-latency.json` | Chart Builder's calibration tool | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when its window is activated ([§4.8](#48-launching-and-coordination)). |
+| `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
 and the Core `SettingDefinition` catalog that Chart Packer's uses. The catalog can express Toggle,
@@ -2507,6 +2642,11 @@ opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
 | Autosave interval | 2 minutes (1 to 60) |
 | Default charter name | Empty. Prefills `charter` for a new chart, and fills an empty `charter` on save |
 | Default difficulty reduction rules | As in [C9](#c9-difficulty-authoring). The Reduce dialog starts from them, and its changes apply to one run only. |
+| Playtest hit window, early / late (under Input) | 70 ms / 70 ms (20 to 200) |
+| Cymbals must match, judge the 2× kick, overhits break the combo (under Input) | On, on, on |
+| Judge accents and ghosts (under Input) | Off |
+| Guitar record style (under Input) | Strum: a strum places the frets held |
+| Dynamics from velocity, when recording drums (under Input) | Off |
 
 There is no existing playback-offset setting in `AppSettings` to extend. The latency is new. It is
 stored in `audio-latency.json` as two maps, from device ID and from device name to whole
@@ -2551,6 +2691,7 @@ layout. It isn't a row in Settings.
 | Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the beep's position in the mixed output for a given latency (AC C11.1) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
+| Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |
 | Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two `FileStream`s in one test process standing in for two processes, and released when the holder is disposed (AC C2.5); `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
 
 **Test isolation** is as in [project-spec §10](project-spec-v1.md#10-testing-strategy). Tests use
@@ -2568,6 +2709,7 @@ fails the run if anything there changes anyway.
 | **CM3: Drums and GHL** | C6 all three drum variants and conversion, C7 GHL, C8 phrases and events, and the drums and phrase lint rules | AC C6, C7 and C8 pass |
 | **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and new chart's **Detect from audio** | AC C12, C13 and C14 pass |
 | **CM5: Authoring tools** | C9 reduction, C15 record mode, clipboard and transforms, C16 lint in the library, C18 preview and suggested difficulty | AC C9, C15, C16 and C18 pass |
+| **CM6: Playtest and instrument input** | C19: the input model and judge, keyboard playtest in the editor, game controllers and the Input devices window, recording from devices, then MIDI devices on Windows | AC C19 pass; zero AOT warnings |
 
 ## 14. Future (after v1)
 
@@ -2578,9 +2720,12 @@ fails the run if anything there changes anyway.
 - `.chart` export.
 - Auto-charting drafts from audio. This would build on C14, and the result would always be
   labelled as a draft.
-- Playtesting with a guitar or drum controller, with hit windows and scoring.
-- A MIDI drum kit or controller as the input for record mode.
-- Rebindable shortcuts.
+- Playtesting 6-fret, extended sustains, and recording cymbals and toms from a kit
+  ([C19](#c19-playtest-and-instrument-input)).
+- MIDI devices on macOS and Linux.
+- Keeping and replaying a playtest performance, judged again against the chart as it changes.
+- Measuring a device's input offset by tapping along, as the tap test does.
+- Rebindable editor shortcuts (instrument bindings are in C19).
 - Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
   library and inspector as well as Chart Builder.
 
