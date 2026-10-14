@@ -79,6 +79,11 @@ namespace ChartBuilder.Controls.Editing
         private static readonly IBrush LoopBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x18, 0x3C, 0xD2, 0x78));
         private static readonly IBrush BoxBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0x6E, 0x9C, 0xFF));
         private static readonly IPen BoxPen = new ImmutablePen(Color.FromArgb(0xC0, 0x6E, 0x9C, 0xFF).ToUInt32(), 1);
+
+        // The synchronized region, outlined, and the passages synced with it, in an orange apart from the tempo markers'.
+        private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x38, 0xFF, 0x7A, 0x1A));
+        private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x20, 0xFF, 0x7A, 0x1A));
+        private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xD0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1.5);
         private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x48, 0xC8, 0xD2, 0xFF));
         private static readonly IBrush FullWaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x70, 0xC8, 0xD2, 0xFF));
@@ -498,6 +503,7 @@ namespace ChartBuilder.Controls.Editing
             DrawPhraseTints(context, session, projection);
             DrawFillBands(context, session, key, projection, fromTick, toTick);
             DrawSpans(context, session, projection);
+            DrawSyncBands(context, session, key, projection);
             DrawBeats(context, session, session.TempoMap, projection, fromTick, toTick, size);
             DrawOnsets(context, size, projection, key);
             DrawTempoMarkers(context, session, projection, fromTick, toTick, size);
@@ -1659,6 +1665,27 @@ namespace ChartBuilder.Controls.Editing
                 context.FillRectangle(LoopBrush, Box(projection.AlongOf(loop.Start), projection.AlongOf(loop.End), across1, across2));
             if (session.Selection.Range is { } range && range.To > range.From)
                 context.FillRectangle(SpanBrush, Box(projection.AlongOf(session.AudioAt(range.From)), projection.AlongOf(session.AudioAt(range.To)), across1, across2));
+        }
+
+        /// <summary>
+        /// On the synchronized region's lane, the region outlined and each passage synced with it as an orange band, behind
+        /// the notes; and the region being dragged out with the Sync tool.
+        /// </summary>
+        private void DrawSyncBands(DrawingContext context, EditorSession session, ChartTrackKey key, LaneProjection projection)
+        {
+            var sync = session.Sync;
+            double across1 = projection.LaneFrom, across2 = projection.LaneFrom + (projection.LaneSize * projection.Slots.Slots.Count);
+            Rect BandOf(long from, long to) => Box(projection.AlongOf(session.AudioAt(from)), projection.AlongOf(session.AudioAt(to)), across1, across2);
+
+            if (sync.Track == key && sync.Span is var (regionFrom, regionTo))
+            {
+                foreach (long start in sync.Matches)
+                    context.FillRectangle(SyncedBrush, BandOf(start, start + regionTo - regionFrom));
+                context.DrawRectangle(SyncRegionBrush, SyncRegionPen, BandOf(regionFrom, regionTo));
+            }
+
+            if (sync.Draft is var (track, draftFrom, draftTo) && track == key)
+                context.DrawRectangle(SyncRegionBrush, SyncRegionPen, BandOf(draftFrom, draftTo));
         }
 
         /// <summary>A faint tint across the lanes, behind the notes, over each star power phrase and solo (charter-spec C8).</summary>

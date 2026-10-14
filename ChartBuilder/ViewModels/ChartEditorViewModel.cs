@@ -242,6 +242,29 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>
+        /// Whether the Sync tool's button is down: the tool is picked, or a synchronized region is drawn. Pressed while a
+        /// region is drawn, it takes the region away rather than picking the tool.
+        /// </summary>
+        public bool IsSyncTool
+        {
+            get => Session.Tool == EditorTool.Sync || Session.Sync.IsActive;
+            set
+            {
+                if (Session.Sync.IsActive)
+                {
+                    Session.Sync.Clear();
+                    if (Session.Tool == EditorTool.Sync)
+                        Session.Tool = EditorTool.Select;
+                    OnSessionState(this, EventArgs.Empty);
+                }
+                else
+                {
+                    SetTool(EditorTool.Sync, value);
+                }
+            }
+        }
+
+        /// <summary>
         /// The kinds of phrase the Phrase tool offers for the part in focus (charter-spec C8): star power, solos and big
         /// rock endings on 5-fret and GHL; star power, solos, fills, rolls and trills on drums, whose big rock ending is a
         /// fill after <c>[coda]</c>; and on Pro drums, disco flip too (C6 item 7), the only drums the games flip.
@@ -508,6 +531,7 @@ namespace ChartBuilder.ViewModels
             OnPropertyChanged(nameof(IsSustainTool));
             OnPropertyChanged(nameof(IsPhraseTool));
             OnPropertyChanged(nameof(IsTempoTool));
+            OnPropertyChanged(nameof(IsSyncTool));
             OnPropertyChanged(nameof(IsRecording));
             OnPropertyChanged(nameof(RecordToolTip));
             RefreshFills();
@@ -728,7 +752,15 @@ namespace ChartBuilder.ViewModels
                     solos.Add((Session.AudioAt(phrase.Tick), Session.AudioAt(phrase.Tick + phrase.Length)));
             }
 
-            return new OverviewData(sections, density, starPower, solos);
+            var synced = new List<(double, double, bool)>();
+            if (Session.Sync is { Span: var (from, to) } sync)
+            {
+                synced.Add((Session.AudioAt(from), Session.AudioAt(to), true));
+                foreach (long start in sync.Matches)
+                    synced.Add((Session.AudioAt(start), Session.AudioAt(start + to - from), false));
+            }
+
+            return new OverviewData(sections, density, starPower, solos, synced);
         }
     }
 
@@ -737,11 +769,13 @@ namespace ChartBuilder.ViewModels
 
     /// <summary>
     /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the note density of the lane in
-    /// focus, from 0 to 1 in columns across the song, and its star power and solos, each as audio seconds.
+    /// focus, from 0 to 1 in columns across the song, its star power and solos, and the synchronized region and the
+    /// passages synced with it, each as audio seconds.
     /// </summary>
     public sealed record OverviewData(
         IReadOnlyList<OverviewSection> Sections,
         IReadOnlyList<float> Density,
         IReadOnlyList<(double Start, double End)> StarPower,
-        IReadOnlyList<(double Start, double End)> Solos);
+        IReadOnlyList<(double Start, double End)> Solos,
+        IReadOnlyList<(double Start, double End, bool IsRegion)> Synced);
 }

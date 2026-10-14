@@ -138,6 +138,7 @@ public sealed partial class EditorTools
             EditorTool.Sustain => PressSustain(point),
             EditorTool.Phrase => point.Lane is null ? null : PressDraw(point),
             EditorTool.Tempo => PressTempo(point),
+            EditorTool.Sync => point.Lane is null ? null : new SyncGesture(this, point),
             _ => null,
         };
     }

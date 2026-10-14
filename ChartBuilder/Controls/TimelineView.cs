@@ -48,6 +48,11 @@ namespace ChartBuilder.Controls
         private static readonly IBrush DensityBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xB0, 0x40));
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
+        // The synchronized region, outlined, and the passages synced with it, filled, behind the other marks.
+        private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0xFF, 0x7A, 0x1A));
+        private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0xFF, 0x7A, 0x1A));
+        private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xE0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1);
+
         // The lint marks: a short tick up from the ruler's foot, coloured by severity, errors drawn last so they show.
         private const double MarkHeight = 6;
         private static readonly IBrush ErrorMarkBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xF8, 0x71, 0x71));
@@ -356,7 +361,10 @@ namespace ChartBuilder.Controls
             }
         }
 
-        /// <summary>The lane in focus over the whole song: its note density, star power and solos, and the song's sections.</summary>
+        /// <summary>
+        /// The lane in focus over the whole song: its note density, star power and solos, and the song's sections; and the
+        /// synchronized region and the passages synced with it.
+        /// </summary>
         private void DrawOverview(DrawingContext context, Rect bounds)
         {
             if (Overview is not { } overview)
@@ -365,6 +373,15 @@ namespace ChartBuilder.Controls
             double width = bounds.Width;
             double top = RulerHeight;
             double densityHeight = (bounds.Height - top) * DensityFraction;
+            foreach (var (start, end, isRegion) in overview.Synced)
+            {
+                var band = new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), bounds.Bottom - top);
+                if (isRegion)
+                    context.DrawRectangle(SyncRegionBrush, SyncRegionPen, band.Deflate(0.5));
+                else
+                    context.FillRectangle(SyncedBrush, band);
+            }
+
             int columns = overview.Density.Count;
             for (int i = 0; i < columns; i++)
             {

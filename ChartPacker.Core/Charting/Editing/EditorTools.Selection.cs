@@ -159,4 +159,35 @@ public sealed partial class EditorTools
                 Session.Selection.Clear();
         }
     }
+
+    /// <summary>
+    /// Drags out a synchronized region on the pressed lane's track, both ends on the grid (the Sync tool). Once it's drawn,
+    /// the tool picked before Sync comes back; when it's refused, Sync stays, to draw another. A click draws nothing.
+    /// </summary>
+    private sealed class SyncGesture(EditorTools tools, ChartPoint pressed) : Gesture(tools)
+    {
+        private bool _moved;
+
+        public override void Drag(ChartPoint point)
+        {
+            _moved |= Math.Abs(point.Tick - pressed.Tick) > pressed.Tolerance;
+            if (!_moved)
+                return;
+            var snap = Tools.Snap;
+            long a = snap.Nearest(Math.Max(0, pressed.Tick), Tools.Map);
+            long b = snap.Nearest(Math.Max(0, point.Tick), Tools.Map);
+            Session.Sync.Draft = a == b ? null : (pressed.Track, Math.Min(a, b), Math.Max(a, b));
+        }
+
+        public override void Release(ChartPoint point)
+        {
+            Drag(point);
+            var draft = Session.Sync.Draft;
+            Session.Sync.Draft = null;
+            if (draft is var (track, from, to) && Session.Sync.Define(track, from, to))
+                Session.Tool = Session.ToolBeforeSync;
+        }
+
+        public override void Cancel() => Session.Sync.Draft = null;
+    }
 }

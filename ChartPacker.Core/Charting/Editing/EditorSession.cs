@@ -15,6 +15,9 @@ public enum EditorTool
     Sustain,
     Phrase,
     Tempo,
+
+    /// <summary>Drags out a synchronized region (<see cref="SyncRegion"/>).</summary>
+    Sync,
 }
 
 /// <summary>The modifier keys held with a click or a key.</summary>
@@ -97,6 +100,7 @@ public sealed class EditorSession
         Fills = new FillProposals(this);
         TempoProposal = new TempoProposals(this);
         Reduce = new ReduceProposals(this);
+        Sync = new SyncRegion(this);
         SongEventMarks = SongEventsWith(null);
         undo.Changed += OnUndoChanged;
     }
@@ -219,6 +223,9 @@ public sealed class EditorSession
     /// <summary>The run of Reduce going on, if there's one (charter-spec C9 item 2).</summary>
     public ReduceProposals Reduce { get; }
 
+    /// <summary>The synchronized region, if one is drawn: edits in it are made again in the passages that matched it.</summary>
+    public SyncRegion Sync { get; }
+
     /// <summary>
     /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a Reduce run's, or null for
     /// none.
@@ -277,10 +284,15 @@ public sealed class EditorSession
             if (field == value)
                 return;
             Tools.Cancel();
+            if (value == EditorTool.Sync)
+                ToolBeforeSync = field;
             field = value;
             RaiseState();
         }
     }
+
+    /// <summary>The tool picked before the Sync tool, which a region drawn goes back to.</summary>
+    internal EditorTool ToolBeforeSync { get; private set; }
 
     /// <summary>
     /// The kind of phrase the Phrase tool draws, of those offered for the focused part (<see cref="ToolKindsOf"/>), or disco
@@ -525,7 +537,7 @@ public sealed class EditorSession
         ArgumentNullException.ThrowIfNull(command);
         try
         {
-            UndoStack.Execute(command);
+            UndoStack.Execute(Sync.IsActive ? Sync.WithCopies(command) : command);
             Status = null;
             return true;
         }
@@ -695,6 +707,7 @@ public sealed class EditorSession
             KeepPhraseKindOffered();
             Fills.OnChanged();
             Reduce.OnChanged();
+            Sync.OnChanged();
             PlaceSongEvents();
         }
 

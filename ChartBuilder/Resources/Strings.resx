@@ -182,6 +182,10 @@
     <value>Tempo</value>
     <comment>An editing tool: tempo markers and time signatures.</comment>
   </data>
+  <data name="ToolSync" xml:space="preserve">
+    <value>Sync</value>
+    <comment>An editing tool: a synchronized region, whose edits are copied to the passages matching it.</comment>
+  </data>
   <data name="MenuFile" xml:space="preserve">
     <value>_File</value>
     <comment>The editor title bar's File menu. The underscore marks its access key (Alt+F).</comment>
@@ -1167,6 +1171,10 @@ Open it anyway?</value>
   <data name="ToolTempoToolTip" xml:space="preserve">
     <value>Click to add a tempo marker; drag one to move it, or, when it's anchored, to fit the tempo to the audio. Edit its tempo in Properties.</value>
     <comment>The Tempo tool's tooltip.</comment>
+  </data>
+  <data name="ToolSyncToolTip" xml:space="preserve">
+    <value>Drag over two or more chords of a lane to synchronize them: every passage of the lane matching them exactly is highlighted, and edits in the region are made in each of them too. Click again to clear the region.</value>
+    <comment>The Sync tool's tooltip.</comment>
   </data>
   <data name="ToolPhraseToolTip" xml:space="preserve">
     <value>Drag along the lanes to add a phrase of the kind picked beside this. With any tool, click a phrase in the rail beside the lanes to select it, drag it to move it, or drag either end to resize it. S puts star power over the selection.</value>

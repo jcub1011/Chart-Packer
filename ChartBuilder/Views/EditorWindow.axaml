@@ -305,6 +305,7 @@
                                 </Button.Flyout>
                             </Button>
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolTempo}" IsChecked="{Binding Editor.IsTempoTool}" ToolTip.Tip="{x:Static res:Strings.ToolTempoToolTip}" />
+                            <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSync}" IsChecked="{Binding Editor.IsSyncTool}" ToolTip.Tip="{x:Static res:Strings.ToolSyncToolTip}" />
                         </StackPanel>
                     </Border>
 
