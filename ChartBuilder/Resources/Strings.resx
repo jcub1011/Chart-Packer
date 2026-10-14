@@ -2309,6 +2309,22 @@ Saving also makes these changes to song.ini:
   <data name="LaneEditToolTip" xml:space="preserve">
     <value>Edit: copy, reduce and transform this lane</value>
   </data>
+  <data name="LaneMoreToolTip" xml:space="preserve">
+    <value>More lane tools: audio, view, ghost difficulty and edit</value>
+    <comment>The tooltip of a narrow lane's "more" button, which holds the tools its header has no room for.</comment>
+  </data>
+  <data name="LaneMoreAudio" xml:space="preserve">
+    <value>Audio…</value>
+    <comment>A narrow lane's "more" menu item: opens the lane's audio settings.</comment>
+  </data>
+  <data name="LaneMoreGhost" xml:space="preserve">
+    <value>Ghost difficulty</value>
+    <comment>A narrow lane's "more" menu submenu: the difficulty drawn faintly behind the lane's own.</comment>
+  </data>
+  <data name="LaneMoreEdit" xml:space="preserve">
+    <value>Edit</value>
+    <comment>A narrow lane's "more" menu submenu: copy, reduce and transform the lane.</comment>
+  </data>
   <data name="LaneCopyToFormat" xml:space="preserve">
     <value>Copy {0} to</value>
   </data>
