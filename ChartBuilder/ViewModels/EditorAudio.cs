@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using ChartBuilder.Services;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Layout;
@@ -18,6 +20,10 @@ namespace ChartBuilder.ViewModels
     {
         private readonly EditorMessages? _messages;
         private long _budget;
+        private TaskCompletionSource<AudibleRange?> _settled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Whether the stems are let go of for a save (Release), until SetTracks starts on them again.
+        private bool _released;
 
         /// <param name="messages">Where analysis says what it's doing, and what it couldn't.</param>
         public EditorAudio(EditorSong song, BuilderSettings settings, EditorMessages? messages = null)
@@ -37,6 +43,22 @@ namespace ChartBuilder.ViewModels
         /// <summary>Raised after <see cref="SetTracks"/>, once the tracks, waveforms and analysis are the new ones.</summary>
         public event EventHandler? TracksChanged;
 
+        /// <summary>Raised on the UI thread when <see cref="Audible"/> changes.</summary>
+        public event EventHandler? AudibleChanged;
+
+        /// <summary>
+        /// Where the stems are heard (<see cref="StemWaveforms.Audible"/>): not settled while they're being read, or while
+        /// they're let go of for a save (<see cref="Release"/>).
+        /// </summary>
+        public (bool Settled, AudibleRange? Range) Audible { get; private set; }
+
+        /// <summary>
+        /// Where the stems are heard, once it's settled: at once when it is, otherwise when the stems being read, or the
+        /// ones <see cref="SetTracks"/> next starts on, have been.
+        /// </summary>
+        /// <exception cref="OperationCanceledException">It was cancelled.</exception>
+        public Task<AudibleRange?> AudibleSettledAsync(CancellationToken cancellationToken) => _settled.Task.WaitAsync(cancellationToken);
+
         public SongEntry? Entry { get; private set; }
 
         /// <summary>The song's tracks as the editor plays them; a staged one is played from where it is until it's saved.</summary>
@@ -53,7 +75,11 @@ namespace ChartBuilder.ViewModels
         public AudioSource? Mix => AudioSource.MixOf(Tracks);
 
         /// <summary>Starts reading the stems' waveforms.</summary>
-        public void Start() => Waveforms.Start();
+        public void Start()
+        {
+            Waveforms.Start();
+            RefreshAudible();
+        }
 
         /// <summary>Takes up what may have changed in Settings: the spectrogram memory budget.</summary>
         public void ReloadSettings(BuilderSettings settings)
@@ -73,11 +99,31 @@ namespace ChartBuilder.ViewModels
         public void SetTracks(SongEntry? entry, IReadOnlyList<SongTrack> tracks)
         {
             ArgumentNullException.ThrowIfNull(tracks);
+            _released = false;
+            Replace(entry, tracks);
+            RefreshAudible();
+        }
+
+        /// <summary>
+        /// Lets go of every waveform and analysis read, and the files they hold open, for a save that replaces them. Where
+        /// the stems are heard isn't settled again until <see cref="SetTracks"/> starts on them once more.
+        /// </summary>
+        public void Release()
+        {
+            _released = true;
+            Replace(Entry, []);
+        }
+
+        private void Replace(SongEntry? entry, IReadOnlyList<SongTrack> tracks)
+        {
             Close();
             Entry = entry;
             Tracks = tracks;
             (Waveforms, Analysis) = Open(entry, tracks);
             Waveforms.Start();
+            if (_settled.Task.IsCompleted)
+                _settled = new TaskCompletionSource<AudibleRange?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            SetAudible((false, null));
             TracksChanged?.Invoke(this, EventArgs.Empty);
             Changed?.Invoke(this, EventArgs.Empty);
         }
@@ -112,6 +158,25 @@ namespace ChartBuilder.ViewModels
             // A disposed reader's last word, posted before it was let go of, isn't news.
             if (ReferenceEquals(sender, Waveforms) || ReferenceEquals(sender, Analysis))
                 Changed?.Invoke(this, EventArgs.Empty);
+            if (ReferenceEquals(sender, Waveforms) && !Audible.Settled)
+                RefreshAudible();
+        }
+
+        // Works out where the stems are heard again, unless they're let go of for a save.
+        private void RefreshAudible()
+        {
+            if (!_released)
+                SetAudible(Waveforms.Audible());
+        }
+
+        private void SetAudible((bool Settled, AudibleRange? Range) audible)
+        {
+            if (audible == Audible)
+                return;
+            Audible = audible;
+            if (audible.Settled)
+                _settled.TrySetResult(audible.Range);
+            AudibleChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private static long BudgetOf(BuilderSettings settings) =>

@@ -39,6 +39,7 @@ public sealed class EditorSong
     {
         Opened = opened;
         Chart = chart;
+        SongEventsOnDisk = SongEventPlacement.Strip(chart);
         _newTracks = opened is null ? tracks : [];
         _tracks = tracks;
         LoadedParts = loadedParts;
@@ -59,8 +60,24 @@ public sealed class EditorSong
     /// <summary>Whether it's a new chart, which has no folder until it's first saved.</summary>
     public bool IsNew => Opened is null;
 
-    /// <summary>The chart, in the editable model.</summary>
+    /// <summary>
+    /// The chart, in the editable model, without <c>[music_start]</c>, <c>[music_end]</c> or <c>[end]</c>: the editor places
+    /// those as it saves (<see cref="SongEventPlacement"/>).
+    /// </summary>
     public EditableChart Chart { get; }
+
+    /// <summary>
+    /// The placed song events of the chart as it was opened, taken out of <see cref="Chart"/>, or as it was last saved, in
+    /// their order; none for a new chart not yet saved.
+    /// </summary>
+    public IReadOnlyList<TextEvent> SongEventsOnDisk { get; private set; }
+
+    /// <summary>Takes up the placed song events of <paramref name="written"/>, the chart a save wrote, as <see cref="SongEventsOnDisk"/>.</summary>
+    public void SongEventsSaved(EditableChart written)
+    {
+        ArgumentNullException.ThrowIfNull(written);
+        SongEventsOnDisk = [.. written.Events.Where(SongEventPlacement.IsPlaced)];
+    }
 
     /// <summary>
     /// The song's title, as the Editor's title shows it: "Artist – Name" as the next save leaves them, or whichever of

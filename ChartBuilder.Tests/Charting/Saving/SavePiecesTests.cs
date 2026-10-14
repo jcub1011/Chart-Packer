@@ -1,7 +1,6 @@
 using System.Text;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
 using static ChartBuilder.Tests.Charting.ChartSettingsCommandTests;
 
@@ -265,37 +264,6 @@ public sealed class SavePiecesTests
         Assert.IsTrue(stack.IsDirty);
         stack.MarkSaved();
         Assert.IsFalse(stack.IsDirty);
-    }
-
-    // [end] after the last note (CHR085).
-
-    [TestMethod]
-    public void EndIsMovedToTheMeasureAfterTheLastNotesEnd()
-    {
-        var chart = NewChart(Guitar);
-        new AddNotes(Guitar, Expert, [new EditableNote(1920, 600, 0), new EditableNote(4000, 1, 1)]).Apply(chart);
-        Assert.AreEqual(0, chart.Events.AsSpan().ToArray().Single(e => e.Text == "[end]").Tick, "A new chart's [end] starts at 0.");
-
-        var move = ChartSaveFixups.MoveEnd(chart)!;
-        move.Apply(chart);
-
-        Assert.AreEqual(5760, chart.Events.AsSpan().ToArray().Single(e => e.Text == "[end]").Tick);
-        Assert.IsNull(ChartSaveFixups.MoveEnd(chart), "Already after the last note.");
-        move.Revert(chart);
-        Assert.AreEqual(0, chart.Events.AsSpan().ToArray().Single(e => e.Text == "[end]").Tick);
-    }
-
-    [TestMethod]
-    public void EndIsAddedWhenThereIsNoneAndLeftAloneWithoutNotes()
-    {
-        var chart = NewChart(Guitar);
-        Assert.IsNull(ChartSaveFixups.MoveEnd(chart), "No notes, nothing to be after.");
-
-        new RemoveTextEvent(null, TextEvent.Of(0, "[end]")).Apply(chart);
-        new AddNotes(Guitar, Expert, [new EditableNote(1920, 1, 0)]).Apply(chart);
-        ChartSaveFixups.MoveEnd(chart)!.Apply(chart);
-
-        Assert.AreEqual(3840, chart.Events.AsSpan().ToArray().Single(e => e.Text == "[end]").Tick);
     }
 
     private static ChartImportResult Import(TimeSpan? offset, ChartReadOptions options, IReadOnlyList<KeyValuePair<string, string>> values) =>

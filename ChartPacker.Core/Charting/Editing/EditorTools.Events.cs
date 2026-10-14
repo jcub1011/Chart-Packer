@@ -1,5 +1,4 @@
 using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
 
 namespace ChartPacker.Core.Charting.Editing;
@@ -79,9 +78,9 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Inserts a text event in <c>EVENTS</c>, or on <paramref name="part"/>'s track, at the cursor on the grid (charter-spec
-    /// C8 items 5 and 6), as one step. In <c>EVENTS</c>, a section where there's one already, or a second
-    /// <c>[music_start]</c>, <c>[music_end]</c> or <c>[end]</c>, is refused; a <c>[coda]</c> that becomes the first makes
-    /// the drum fills after it big rock endings in the same step (item 4).
+    /// C8 items 5 and 6), as one step. In <c>EVENTS</c>, a section where there's one already, or a <c>[music_start]</c>,
+    /// <c>[music_end]</c> or <c>[end]</c>, which are placed (<see cref="SongEventPlacement"/>), is refused; a <c>[coda]</c>
+    /// that becomes the first makes the drum fills after it big rock endings in the same step (item 4).
     /// </summary>
     /// <param name="part">The part whose track it goes on, or null for <c>EVENTS</c>.</param>
     /// <param name="text">Its text, brackets included.</param>
@@ -175,13 +174,13 @@ public sealed partial class EditorTools
 
     /// <summary>
     /// Why <paramref name="textEvent"/> can't be in <c>EVENTS</c> (when <paramref name="part"/> is null) as well as what's
-    /// there: it would stack a section on one at its tick, or add a second <c>[music_start]</c>, <c>[music_end]</c> or
-    /// <c>[end]</c>. Null when it can, and always on a part's track, whose text events are free text.
+    /// there: it would stack a section on one at its tick, or be a <c>[music_start]</c>, <c>[music_end]</c> or
+    /// <c>[end]</c>, which are placed, never edited (<see cref="SongEventPlacement"/>). Null when it can, and always on a
+    /// part's track, whose text events are free text.
     /// </summary>
     /// <remarks>
-    /// Only a duplicate the edit makes is refused. A section already at the tick, or a song event already of the kind, that
-    /// is <paramref name="leaving"/> leaves as many as there were, so a loaded chart's pair of sections at one tick, or of
-    /// <c>[end]</c>s, can still be renamed and moved.
+    /// Only a duplicate section the edit makes is refused. A section already at the tick that is <paramref name="leaving"/>
+    /// leaves as many as there were, so a loaded chart's pair of sections at one tick can still be renamed and moved.
     /// </remarks>
     /// <param name="leaving">The event it replaces, or null for one added.</param>
     private string? EventRefusal(ChartInstrument? part, TextEvent textEvent, TextEvent? leaving)
@@ -198,14 +197,8 @@ public sealed partial class EditorTools
             }
         }
 
-        if (SongEvents.KindOf(textEvent.Text) is { } kind && SongEvents.IsOnePerSong(kind) && (leaving is not { } was || SongEvents.KindOf(was.Text) != kind))
-        {
-            foreach (var other in Chart.Events)
-            {
-                if (SongEvents.KindOf(other.Text) == kind)
-                    return FormattableString.Invariant($"The song has {SongEvents.TextOf(kind)} already, at tick {other.Tick}. Move that one instead.");
-            }
-        }
+        if (SongEventPlacement.IsPlaced(textEvent) && SongEvents.KindOf(textEvent.Text) is { } kind)
+            return FormattableString.Invariant($"{SongEvents.TextOf(kind)} is placed automatically from the audio and the notes.");
 
         return null;
     }
@@ -238,7 +231,7 @@ public sealed partial class EditorTools
     /// </remarks>
     private long LatestEventTick()
     {
-        long last = ChartSaveFixups.LastNoteEnd(Chart) ?? 0;
+        long last = SongEventPlacement.LastNoteEnd(Chart) ?? 0;
         if (Chart.Events.Count > 0)
             last = Math.Max(last, Chart.Events[^1].Tick);
         foreach (var part in Chart.Parts)

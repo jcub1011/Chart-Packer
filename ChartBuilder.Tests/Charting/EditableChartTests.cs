@@ -254,7 +254,7 @@ public sealed class EditableChartTests
             [ChartInstrument.Bass, ChartInstrument.Drums, ChartInstrument.GhlGuitar], chart.Parts.Select(p => p.Instrument).ToList());
         Assert.IsTrue(chart.Parts.All(p => p.Tracks.All(t => t.Notes.Count == 0) && p.Phrases.Count == 0));
         Assert.AreEqual(DrumsVariant.FiveLane, chart.DrumsVariant);
-        Assert.AreSequenceEqual([TextEvent.Of(0, "[music_start]"), TextEvent.Of(0, "[end]")], chart.Events.ToList());
+        Assert.IsEmpty(chart.Events, "The song events are placed as it's saved.");
         Assert.IsEmpty(chart.EventsRaw);
         Assert.IsEmpty(chart.TempoTrackRaw);
         Assert.IsEmpty(chart.Passthrough);

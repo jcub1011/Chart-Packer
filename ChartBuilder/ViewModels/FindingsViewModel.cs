@@ -39,7 +39,7 @@ namespace ChartBuilder.ViewModels
         private readonly EditorSong _song;
         private readonly ChartUndoStack _undo;
         private readonly ChartEditorViewModel _editor;
-        private readonly ChartLintScheduler _scheduler = new(new ChartLinter());
+        private readonly ChartLintScheduler _scheduler = new(new ChartLinter(ChartLintRules.ForEditor));
         private readonly DispatcherTimer _timer;
         private readonly List<TaskCompletionSource> _settling = [];
         private ChartTrackKey? _focused;

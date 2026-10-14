@@ -140,7 +140,7 @@ public sealed class ChartSaveTests
         string folder = _folders.Song(name, ("notes.mid", fixture.Midi), ("song.ini", Ini(IniLinesOf(fixture.Options))));
         var opened = await OpenAsync(folder, Token);
         var song = EditorSong.Of(opened);
-        var original = opened.Chart.Clone();
+        var original = ToWrite(song);
 
         await SaveAsync(song, Token);
 
@@ -160,6 +160,28 @@ public sealed class ChartSaveTests
         Assert.AreSequenceEqual(original.EventsRaw.ToList(), [.. reload.Chart.EventsRaw]);
         foreach (var part in original.Parts)
             Assert.AreSequenceEqual(part.RawEvents.ToList(), [.. reload.Chart.PartOf(part.Instrument)!.RawEvents], $"{part.Instrument}");
+    }
+
+    [TestMethod]
+    public async Task OpeningTakesTheSongEventsOutAndSavingPutsOneOfEachWhereTheyGo()
+    {
+        // charter-spec C8 item 5: [music_start] and [end] are put where they go now, and [music_end] added; [coda] is the
+        // charter's, so it's kept.
+        string folder = _folders.Song("Song", ("notes.mid", MidiFixtures.TempoMap()), ("song.ini", Ini("name = Song")));
+        var opened = await OpenAsync(folder, Token);
+        var song = EditorSong.Of(opened);
+        Assert.AreSequenceEqual([TextEvent.Of(0, "[music_start]"), TextEvent.Of(7680, "[end]")], song.SongEventsOnDisk.ToList());
+        Assert.DoesNotContain(e => SongEventPlacement.IsPlaced(e), song.Chart.Events.ToList());
+        new AddTextEvent(null, TextEvent.Of(3840, "[coda]")).Apply(song.Chart);
+
+        await SaveAsync(song, Token);
+
+        var reopened = await OpenAsync(folder, Token);
+        var marks = SongEventPlacement.Place(song.Chart, null, song.Delay);
+        var placed = reopened.Chart.Events.Where(SongEventPlacement.IsPlaced).ToList();
+        Assert.IsTrue(SongEventPlacement.Matches(placed, marks), string.Join(", ", placed));
+        Assert.IsTrue(SongEventPlacement.Matches(song.SongEventsOnDisk, marks), "The editor knows what's on disk now.");
+        Assert.Contains(TextEvent.Of(3840, "[coda]"), reopened.Chart.Events.ToList());
     }
 
     [TestMethod]
@@ -473,7 +495,7 @@ public sealed class ChartSaveTests
 
     private async Task<string> SaveNewAsync(EditorSong song, string folderName)
     {
-        var request = ChartSaver.RequestFor(song, song.Chart.Clone(), song.PendingChanges());
+        var request = ChartSaver.RequestFor(song, ToWrite(song), song.PendingChanges());
         var written = ChartSaver.Check(request);
         Assert.IsTrue(written.IsValid, Describe(written));
         var stems = song.Tracks.Select(t => new NewChartStem(t.StagedSourcePath!, t.Stem)).ToList();

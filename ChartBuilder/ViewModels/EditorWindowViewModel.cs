@@ -89,6 +89,7 @@ namespace ChartBuilder.ViewModels
             IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
             IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
             Editor = new ChartEditorViewModel(song, _undo, Playback, Audio, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault(), services.Authoring, services.Input);
+            Audio.AudibleChanged += OnAudibleChanged;
             Audio.Start();
             Findings = new FindingsViewModel(song, _undo, Editor);
             Sections = new SectionsViewModel(Editor);
@@ -379,6 +380,13 @@ namespace ChartBuilder.ViewModels
             Playback.RefreshTempoMap();
             CountChange();
             RefreshSaveState();
+        }
+
+        // Where the stems are heard, once they're read, places [music_start], [music_end] and [end] (charter-spec C8 item 5).
+        private void OnAudibleChanged(object? sender, EventArgs e)
+        {
+            if (Audio.Audible is (true, var range))
+                Editor.Session.SetAudible(range);
         }
 
         // A track added, replaced or removed, or a save: the audio is opened again once the tracks are still.

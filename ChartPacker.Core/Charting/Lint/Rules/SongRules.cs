@@ -1,5 +1,4 @@
 using System.Globalization;
-using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Resources;
 using ChartPacker.Core.Validation;
@@ -170,7 +169,10 @@ public sealed class SongLengthRule : IChartLintRule
     }
 }
 
-/// <summary>CHR085: <c>[end]</c> is missing, or before the last note ends. Saving moves it after (<see cref="ChartSaveFixups.MoveEnd"/>).</summary>
+/// <summary>
+/// CHR085: <c>[end]</c> is missing, or before the last note ends. Chart Builder places it on save
+/// (<see cref="SongEventPlacement"/>), so only the library runs this rule (<see cref="ChartLintRules.ForEditor"/>).
+/// </summary>
 public sealed class EndEventRule : IChartLintRule
 {
     public string RuleId => ChrRules.Chr085;
@@ -183,13 +185,13 @@ public sealed class EndEventRule : IChartLintRule
 
     public IEnumerable<Finding> Check(ChartLintContext context)
     {
-        if (ChartSaveFixups.LastNoteEnd(context.Chart) is not { } last)
+        if (SongEventPlacement.LastNoteEnd(context.Chart) is not { } last)
             return [];
 
         long? end = null;
         foreach (var e in context.Chart.Events.AsSpan())
         {
-            if (e.Text == ChartSaveFixups.EndText && (end is null || e.Tick > end))
+            if (e.Text == SongEvents.EndText &&(end is null || e.Tick > end))
                 end = e.Tick;
         }
 

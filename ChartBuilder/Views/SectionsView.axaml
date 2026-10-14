@@ -17,7 +17,8 @@
         <bctl:LaneMenuConverter x:Key="Menu" Check="{StaticResource CheckStroke}" />
 
         <!-- A row: a bar on its left in the accent for a section and manila for a song event; the name or text, or a song
-             event's label; where it is; and its tick. -->
+             event's label; where it is; and its tick. A song event the editor places can't be deleted, and its tick is
+             only shown. -->
         <DataTemplate x:Key="EventRowTemplate" DataType="vm:EventItem">
             <Border Classes="event-row" Classes.section="{Binding IsSection}" Classes.song="{Binding IsSongEvent}">
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
@@ -42,6 +43,7 @@
                                 AutomationProperties.Name="{x:Static res:Strings.SectionsGoToToolTip}" />
                         <Button Classes="tool"
                                 Command="{Binding DeleteCommand}"
+                                IsVisible="{Binding !IsPlaced}"
                                 ToolTip.Tip="{x:Static res:Strings.SectionsDeleteToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.SectionsDeleteToolTip}">
                             <ctl:LineIcon Data="{StaticResource ClearStroke}" />
@@ -58,7 +60,8 @@
                         <TextBox Classes="event-field"
                                  Width="76"
                                  Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
-                                 ToolTip.Tip="{x:Static res:Strings.SectionsTickToolTip}"
+                                 IsReadOnly="{Binding IsPlaced}"
+                                 ToolTip.Tip="{Binding TickToolTip}"
                                  AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
                     </StackPanel>
                 </Grid>

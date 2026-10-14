@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartPacker.Audio.Playback;
 using ChartPacker.Audio.Waveforms;
+using ChartPacker.Core.Charting;
 using ChartPacker.Core.Scanning;
 
 namespace ChartBuilder.ViewModels
@@ -36,11 +37,17 @@ namespace ChartBuilder.ViewModels
         private readonly CancellationTokenSource _cancel = new();
         private readonly DispatcherTimer _changed;
 
-        // Under the lock: each track's peaks, how many times they've changed, and the tracks whose channels are being read.
+        // Under the lock: each track's peaks, how many times they've changed, the tracks whose channels are being read, and
+        // those that couldn't be read at all.
         private readonly Lock _lock = new();
         private readonly Dictionary<SongTrack, StemPeaks> _peaks = [];
         private readonly Dictionary<SongTrack, int> _versions = [];
         private readonly HashSet<SongTrack> _readingChannels = [];
+        private readonly HashSet<SongTrack> _failed = [];
+
+        // Under the lock: how many times any track's peaks have changed, and where the audio is heard as last worked out, at that count.
+        private int _version;
+        private (int Version, AudibleRange? Range)? _audible;
 
         // On the UI thread: the mixes made, by source and whether by channel, and those being made; and a single stem's
         // waveforms, kept so each frame draws the same ones, whose pictures the painter keeps.
@@ -94,6 +101,38 @@ namespace ChartBuilder.ViewModels
             if (peaks.Count == 1 && !source.IsMix)
                 return ((Waveform, Waveform))SingleOf(peaks[0], stereo: true);
             return MixOf(source, peaks, stereo: true)?.Channels;
+        }
+
+        /// <summary>
+        /// Where the stems are heard (<see cref="AudibleSpans"/>), once every one has been read to its end or couldn't be
+        /// read: not settled until then. The preview and the crowd aren't the song, so they don't count; with no other
+        /// stems, it's settled, and nothing is heard.
+        /// </summary>
+        public (bool Settled, AudibleRange? Range) Audible()
+        {
+            var stems = new List<StemPeaks>(_tracks.Count);
+            int version;
+            lock (_lock)
+            {
+                version = _version;
+                if (_audible is { } known && known.Version == version)
+                    return (true, known.Range);
+                foreach (var track in _tracks)
+                {
+                    if (track.Stem.Equals(AudioStems.Preview, StringComparison.OrdinalIgnoreCase)
+                        || track.Stem.Equals(AudioStems.Crowd, StringComparison.OrdinalIgnoreCase)
+                        || _failed.Contains(track))
+                        continue;
+                    if (!_peaks.TryGetValue(track, out var peaks) || peaks.ReadCount != peaks.Count)
+                        return (false, null);
+                    stems.Add(peaks);
+                }
+            }
+
+            var range = AudibleSpans.Of(stems);
+            lock (_lock)
+                _audible = (version, range);
+            return (true, range);
         }
 
         public void Dispose()
@@ -242,7 +281,11 @@ namespace ChartBuilder.ViewModels
                 {
                     // No waveform; the song still plays.
                     if (ex is not OperationCanceledException)
+                    {
                         Trace.TraceWarning($"Reading the waveform failed: {ex.Message}");
+                        if (!channels)
+                            Failed(tracks);
+                    }
                 }
             }, token);
         }
@@ -256,6 +299,7 @@ namespace ChartBuilder.ViewModels
                     return;
                 _peaks[track] = peaks;
                 _versions[track] = _versions.GetValueOrDefault(track) + 1;
+                _version++;
                 if (peaks.HasChannels)
                     _readingChannels.Remove(track);
             }
@@ -272,6 +316,25 @@ namespace ChartBuilder.ViewModels
                     return;
                 _peaks.Remove(track);
                 _versions[track] = _versions.GetValueOrDefault(track) + 1;
+                _failed.Add(track);
+                _version++;
+            }
+
+            Dispatcher.UIThread.Post(RequestChanged);
+        }
+
+        // Tracks a read couldn't open: those of them without peaks are never read, so they're passed over.
+        private void Failed(IReadOnlyList<SongTrack> tracks)
+        {
+            lock (_lock)
+            {
+                foreach (var track in tracks)
+                {
+                    if (!_peaks.ContainsKey(track))
+                        _failed.Add(track);
+                }
+
+                _version++;
             }
 
             Dispatcher.UIThread.Post(RequestChanged);

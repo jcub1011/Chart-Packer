@@ -64,6 +64,8 @@ public sealed class EditorChartChangedEventArgs(ChartChange affected, bool isPre
 /// <para>Audio time is chart time plus the song's delay (§4.4.1); this is the one place the two are related.</para>
 /// <para>A gesture, such as a drag, shows what it would do as it goes by applying a <b>preview</b> command straight to the
 /// chart, then puts it on the undo stack as one step when it ends (<see cref="CommitPreview"/>).</para>
+/// <para>Where <c>[music_start]</c>, <c>[music_end]</c> and <c>[end]</c> go is worked out again after every step done,
+/// undone or redone, and as the audio heard or the delay changes (<see cref="SongEventMarks"/>).</para>
 /// </remarks>
 public sealed class EditorSession
 {
@@ -73,6 +75,7 @@ public sealed class EditorSession
     private ChartReadOptions? _readOptions;
     private GameDiscoFlips? _discoFlips;
     private readonly Dictionary<ChartDifficulty, IReadOnlyList<DiscoFlipRange>> _discoFlipRanges = [];
+    private AudibleRange? _audible;
 
     // Each vocal part as last read, with the track it was read from: a track is never changed, only replaced (re-ticked,
     // or put back by an undo), so a part is read again only when its track isn't the one it was read from.
@@ -94,6 +97,7 @@ public sealed class EditorSession
         Fills = new FillProposals(this);
         TempoProposal = new TempoProposals(this);
         Reduce = new ReduceProposals(this);
+        SongEventMarks = SongEventsWith(null);
         undo.Changed += OnUndoChanged;
     }
 
@@ -108,6 +112,9 @@ public sealed class EditorSession
 
     /// <summary>Raised when the song's delay or <c>song.ini</c> changes (<see cref="SetSongSettings"/>), which moves or rereads every track.</summary>
     public event EventHandler? SongSettingsChanged;
+
+    /// <summary>Raised when <see cref="SongEventMarks"/> changes.</summary>
+    public event EventHandler? SongEventsPlaced;
 
     public EditableChart Chart => UndoStack.Chart;
 
@@ -137,7 +144,63 @@ public sealed class EditorSession
         ForgetDiscoFlips();
         Fills.OnChanged();
         SongSettingsChanged?.Invoke(this, EventArgs.Empty);
+        PlaceSongEvents();
         RaiseState();
+    }
+
+    /// <summary>
+    /// Where the editor puts <c>[music_start]</c>, <c>[music_end]</c> and <c>[end]</c> as the chart now is, against the audio
+    /// heard as last measured (<see cref="SetAudible"/>): charter-spec C8 item 5. The chart never holds them; a save puts
+    /// them in what it writes.
+    /// </summary>
+    public SongEventMarks SongEventMarks { get; private set; }
+
+    /// <summary>Where the audio is heard, as last measured; null with no audio, none of it heard, or none measured yet.</summary>
+    public AudibleRange? Audible => _audible;
+
+    /// <summary>
+    /// Takes up where the audio is heard, once it's measured: after it's opened, or its tracks change. The last range
+    /// measured is kept while the tracks are read again, so the song events don't jump to the notes and back.
+    /// </summary>
+    public void SetAudible(AudibleRange? range)
+    {
+        if (range == _audible)
+            return;
+        _audible = range;
+        PlaceSongEvents();
+    }
+
+    /// <summary>Where the placed song events go as the chart now is, against <paramref name="audio"/>, the vocals counted as notes.</summary>
+    public SongEventMarks SongEventsWith(AudibleRange? audio) => SongEventPlacement.Place(Chart, audio, Delay, VocalSpan());
+
+    // The first vocal note's tick and the last one's end, across the vocal parts; null for none.
+    private (long First, long End)? VocalSpan()
+    {
+        long? first = null, end = null;
+        foreach (var track in Enum.GetValues<VocalTrack>())
+        {
+            if (VocalsOf(track) is not { Notes.Count: > 0 } lane)
+                continue;
+            if (first is null || lane.Notes[0].Tick < first)
+                first = lane.Notes[0].Tick;
+            foreach (var note in lane.Notes)
+            {
+                if (end is null || note.EndTick > end)
+                    end = note.EndTick;
+            }
+        }
+
+        return first is { } f && end is { } e ? (f, e) : null;
+    }
+
+    // Works out the placed song events again, saying so when they've moved.
+    private void PlaceSongEvents()
+    {
+        var marks = SongEventsWith(_audible);
+        if (marks == SongEventMarks)
+            return;
+        SongEventMarks = marks;
+        SongEventsPlaced?.Invoke(this, EventArgs.Empty);
     }
 
     public EditorViewport Viewport { get; }
@@ -632,6 +695,7 @@ public sealed class EditorSession
             KeepPhraseKindOffered();
             Fills.OnChanged();
             Reduce.OnChanged();
+            PlaceSongEvents();
         }
 
         ChartChanged?.Invoke(this, new EditorChartChangedEventArgs(affected, isPreview));

@@ -128,6 +128,29 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
+    public void TheEditorRunsEveryRuleButTheEndRule()
+    {
+        // Chart Builder places [end] itself, and its model never holds it (charter-spec C8 item 5).
+        Assert.AreSequenceEqual(
+            ChartLintRules.All.Select(r => r.RuleId).Where(id => id != ChrRules.Chr085).ToList(),
+            [.. ChartLintRules.ForEditor.Select(r => r.RuleId)]);
+    }
+
+    [TestMethod]
+    public void MusicEndAndEndMayBeAfterTheAudioButOtherEventsArent()
+    {
+        // The last note is at 7.5 s and [end] at 8 s; the audio ends between them.
+        var (chart, input) = Clean();
+        new AddTextEvent(null, TextEvent.Of(7680, "[music_end]")).Apply(chart);
+        new AddTextEvent(null, TextEvent.Of(7680, "[crowd_normal]")).Apply(chart);
+
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input.SongIni, TimeSpan.FromSeconds(7.9))).FindingsOf(ChrRules.Chr003);
+
+        Assert.HasCount(1, findings, string.Join("; ", findings.Select(Describe)));
+        Assert.Contains("[crowd_normal]", findings[0].Message);
+    }
+
+    [TestMethod]
     [DynamicData(nameof(Triggers))]
     public void EachRuleIsTriggeredByItsChangeAndNothingElseIs(string ruleId, int count)
     {
@@ -298,7 +321,7 @@ public sealed class ChartRuleTests
         }
 
         new AddTextEvent(null, TextEvent.Of(0, "[section Intro]")).Apply(chart);
-        ChartSaveFixups.MoveEnd(chart)!.Apply(chart);
+        new AddTextEvent(null, TextEvent.Of(SongEventPlacement.Place(chart, null, TimeSpan.Zero).End, SongEvents.EndText)).Apply(chart);
         return (chart, Snapshot(chart, IniWith(extraIni, drums), audio ?? AudioLength));
     }
 
@@ -436,7 +459,7 @@ public sealed class ChartRuleTests
                 new AddVocalPart(VocalTrack.Harmony2).Apply(chart);
                 break;
             case ChrRules.Chr085:
-                var end = chart.Events.AsSpan().ToArray().Single(e => e.Text == ChartSaveFixups.EndText);
+                var end = chart.Events.AsSpan().ToArray().Single(e => e.Text == SongEvents.EndText);
                 new RemoveTextEvent(null, end).Apply(chart);
                 break;
         }

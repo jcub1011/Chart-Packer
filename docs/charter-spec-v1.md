@@ -541,7 +541,8 @@ into it is **Edit chart** ([C2](#c2-open-and-import)).
 
 - the **Default resolution** setting ([§10](#10-settings)), 120 BPM and 4/4 at tick 0;
 - a Lead (5-fret guitar) part, with no notes;
-- `EVENTS` holding `[music_start]` and `[end]`;
+- an empty `EVENTS`: `[music_start]`, `[music_end]` and `[end]` are placed as it's saved
+  ([C8](#c8-phrases-and-events) item 5);
 - the audio files it was given, as its stems:
   - Files can be `.ogg`, `.opus`, `.mp3` or `.wav`. Each is given a stem from its file name using
     `AudioStems`, e.g. `Drums.ogg` → `drums`, `song.mp3` → `song`.
@@ -1262,18 +1263,31 @@ Acceptance criteria:
    `[coda]`. On drums, the same pitches are fills, and a big rock ending is the fill markers after
    `[coda]`. Chart Builder shows those as a big rock ending, not a fill, and the fill rules (CHR042,
    CHR043) skip them. No code reads big rock endings or `[coda]` today, so this is new.
-5. **Song events**: `[music_start]`, `[music_end]`, `[end]`. `[end]` is kept after the last note
-   and moved on save if notes are added after it (CHR085): to the first measure line after the last
-   note's end, a sustain's included. The move is an undo step of its own, made once the save is going
-   ahead, so the model the editor holds is the one saved (AC C17.4). **Export copy** moves `[end]`
-   in its own snapshot only, never in the model the editor holds.
-   - *Settled in CM3:* **Insert event**, in the Sections tab, inserts `[coda]`, `[music_start]`,
-     `[music_end]` or `[end]` at the cursor, on the grid. Inserting, moving or deleting `[coda]` makes
-     the drum fills and big rock endings what it then decides, in the same step (item 4). A second
-     `[music_start]`, `[music_end]` or `[end]` is refused, as is moving or renaming another event into
-     one; the status says where the one there is, to move it instead. Either of a loaded chart's two
-     `[end]`s can still be moved. A song event is moved by its tick or deleted, but not renamed. The
-     save's move of `[end]` is as above.
+5. **Song events**: `[music_start]`, `[music_end]`, `[end]`. The editor places all three itself
+   (`SongEventPlacement`), and works out where they go again after every edit, undo or redo, and
+   whenever the stems or the delay change. Any position a user or a loaded chart gave them is
+   overwritten.
+   - `[music_start]` is where the stems are first heard. A stem is heard where it reaches -60 dBFS
+     for at least 50 ms (`AudibleSpans`); the preview and crowd stems don't count. It goes no later
+     than the first note. With no audio, or none of it heard, it's the measure line at or before the
+     first note, or tick 0 with no notes.
+   - `[music_end]` is where the stems are last heard, but no earlier than the last note's end. A
+     sustain counts, and so do the vocals. With no audio, it's the last note's end.
+   - `[end]` is the first measure line after `[music_end]`.
+   - Audio times become ticks through the tempo map, less the delay. The start is rounded down and
+     the end up.
+   - The editable model never holds them: commands undo by an event's place in `EVENTS`, so moving
+     them outside the undo stack would shift what a later undo takes back. They're taken out as a
+     chart is opened or recovered, duplicates included, and written into the snapshot a save,
+     first save or **Export copy** writes, one of each. A save waits for the stems to be read
+     (at most 30 s, then it goes with what was last heard). **Save and pack** saves first when the
+     file's song events aren't where they now go.
+   - *Settled in CM3:* **Insert event**, in the Sections tab, inserts `[coda]` at the cursor, on the
+     grid. Inserting, moving or deleting `[coda]` makes the drum fills and big rock endings what it
+     then decides, in the same step (item 4).
+   - The Sections tab lists `[music_start]`, `[music_end]` and `[end]` among `EVENTS`' events, as
+     read-only rows: they can be gone to, but not moved, deleted or renamed. Inserting one, or
+     renaming another event into one, is refused, and the status says it's placed automatically.
 6. **Free text events**, in `EVENTS` or on a part track, for anything else. Events the model
    doesn't know are shown and kept, not deleted.
    - *Settled in CM3:* **Insert event**'s **Text event…** inserts `[event]` in `EVENTS` at the cursor,
@@ -2005,7 +2019,9 @@ Acceptance criteria:
   notes, flags and star power the editor shows.
 - **AC C17.3** Saving never changes a `song.ini` key the user hasn't seen as a pending change.
 - **AC C17.4** For every fixture chart, reading the saved `notes.mid` with `MidiChartLoader` gives
-  back the model, including accents, ghosts, phrases, events, anchors and `RawEvent`s.
+  back the model, including accents, ghosts, phrases, events, anchors and `RawEvent`s, with
+  `[music_start]`, `[music_end]` and `[end]` placed as [C8](#c8-phrases-and-events) item 5
+  says.
 
 ### C18. Preview
 
@@ -2187,7 +2203,7 @@ never reused.
 | --- | --- | --- | --- |
 | CHR001 | Warning | No time signature at tick 0; the games assume 4/4 | Add 4/4 at 0 |
 | CHR002 | Warning | A tempo below 20 or above 400 BPM (probably a typo or a half/double-time mistake) | — |
-| CHR003 | Warning | A note, phrase or event other than `[end]` after the end of the audio (in audio time, [§4.4.1](#441-playback-changes)) | — |
+| CHR003 | Warning | A note, phrase or event other than `[music_end]` or `[end]` after the end of the audio (in audio time, [§4.4.1](#441-playback-changes)) | — |
 | CHR004 | Info | A note isn't on any common grid: a whole-note division from 1/1 to 1/192, or a triplet one | Snap to the nearest grid line, or the one on its other side, where no note is already; or delete |
 | CHR005 | Warning | Two tempo markers or two time signatures on the same tick | Keep the later one |
 
@@ -2244,7 +2260,7 @@ merges the group into its first phrase.
 | CHR082 | Info | The chart has no sections | — |
 | CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating |
 | CHR084 | Warning | `song_length` doesn't match the audio's length within 1 s. A charter save corrects it, so this mostly appears in the library. | Update `song_length` |
-| CHR085 | Info | `[end]` is missing or before the last note; it is moved on save | — |
+| CHR085 | Info | `[end]` is missing or before the last note. Chart Builder places it on save, so it runs this rule only in the library, not in the editor | — |
 | CHR086 | Info | Something in the chart file couldn't be loaded as written, and was left out, as the games leave it out ([§4.1](#editable-model)). Saving writes the file without it. | — |
 
 ### Vocals

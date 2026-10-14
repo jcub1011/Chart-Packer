@@ -32,6 +32,9 @@ namespace ChartBuilder.ViewModels
     {
         private static ILogger Logger => Log.ForContext<EditorWindowViewModel>();
 
+        // How long a save waits for the stems to be read, to place the song events, before going with what was last heard.
+        private static readonly TimeSpan AudibleWaitLimit = TimeSpan.FromSeconds(30);
+
         /// <summary>Whether a save, a pack or an export is running.</summary>
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(SaveAndPackCommand), nameof(ExportCopyCommand), nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand))]
@@ -122,7 +125,9 @@ namespace ChartBuilder.ViewModels
             remembered.LastTranscodeBitrateKbps = dialog.TranscodeBitrateKbps;
             _settings.Save();
 
-            if ((HasUnsavedChanges || Song.PendingChanges().Count > 0 || Song.Media.Count > 0) && !await SaveCoreAsync())
+            // The song events on disk are put where they now go, too, so the .sng packed has them there.
+            bool songEventsMoved = !SongEventPlacement.Matches(Song.SongEventsOnDisk, Editor.Session.SongEventMarks);
+            if ((HasUnsavedChanges || Song.PendingChanges().Count > 0 || Song.Media.Count > 0 || songEventsMoved) && !await SaveCoreAsync())
                 return;
             if (Song.Entry is not { } savedEntry)
                 return;
@@ -297,13 +302,12 @@ namespace ChartBuilder.ViewModels
 
             string name = entry.Kind == SongEntryKind.SngFile ? Path.GetFileNameWithoutExtension(entry.FullPath) : Path.GetFileName(entry.FullPath);
             string target = Path.Combine(parent, name);
-            // The copy is written as a save would write it, [end] after the last note, but the chart open isn't changed.
-            var snapshot = Song.Chart.Clone();
-            ChartSaveFixups.MoveEnd(snapshot)?.Apply(snapshot);
-            var request = ChartSaver.RequestFor(Song, snapshot, Song.PendingChanges(), Song.IsImport ? Song.Opened!.ChartName : null);
             IsSaving = true;
             try
             {
+                // The copy is written as a save would write it, with the song events placed.
+                var snapshot = await SnapshotToWriteAsync();
+                var request = ChartSaver.RequestFor(Song, snapshot, Song.PendingChanges(), Song.IsImport ? Song.Opened!.ChartName : null);
                 var written = await Task.Run(() => ChartSaver.Check(request));
                 if (!written.IsValid)
                 {
@@ -320,6 +324,9 @@ namespace ChartBuilder.ViewModels
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.ExportFailedFormat, ex.Message));
+            }
+            catch (OperationCanceledException)
+            {
             }
             finally
             {
@@ -368,15 +375,16 @@ namespace ChartBuilder.ViewModels
             }
 
             var entry = Song.Entry!;
-            MoveEndAfterLastNote();
-            var point = _undo.Mark();
-            int version = _version;
-            var request = ChartSaver.RequestFor(Song, Song.Chart.Clone(), changes, removeChart);
-            var slots = request.Media?.Keys.ToList() ?? [];
             bool released = false;
             IsSaving = true;
             try
             {
+                var snapshot = await SnapshotToWriteAsync();
+                var point = _undo.Mark();
+                int version = _version;
+                var request = ChartSaver.RequestFor(Song, snapshot, changes, removeChart);
+                var slots = request.Media?.Keys.ToList() ?? [];
+
                 // An autosave already being written finishes first, so it can't land on the save's recovery file.
                 await WaitForAutosaveAsync();
                 var written = await Task.Run(() => ChartSaver.Check(request));
@@ -403,6 +411,7 @@ namespace ChartBuilder.ViewModels
                 }
 
                 _undo.MarkSaved(point);
+                Song.SongEventsSaved(request.Snapshot);
                 Song.Saved(ChartSaver.SavedSong(Song, entry, request), PartsOf(request.Snapshot), new MediaSaveResult(slots, kept));
                 AfterSaved(null);
                 Messages.Info(Strings.SavedStatus);
@@ -412,6 +421,10 @@ namespace ChartBuilder.ViewModels
             {
                 Logger.Error(ex, "Saving {Song} failed", entry.FullPath);
                 Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message));
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
                 return false;
             }
             finally
@@ -438,7 +451,7 @@ namespace ChartBuilder.ViewModels
             {
                 _tracksTimer.Stop();
                 Playback.Release();
-                Audio.SetTracks(Song.Entry, []);
+                Audio.Release();
             }
 
             if (video)
@@ -499,14 +512,14 @@ namespace ChartBuilder.ViewModels
                 return false;
             }
 
-            MoveEndAfterLastNote();
-            var point = _undo.Mark();
             string keyBefore = RecoveryKey;
-            var request = ChartSaver.RequestFor(Song, Song.Chart.Clone(), Song.PendingChanges());
             var stems = Song.Tracks.Select(t => new NewChartStem(t.StagedSourcePath!, t.Stem)).ToList();
             IsSaving = true;
             try
             {
+                var snapshot = await SnapshotToWriteAsync();
+                var point = _undo.Mark();
+                var request = ChartSaver.RequestFor(Song, snapshot, Song.PendingChanges());
                 await WaitForAutosaveAsync();
                 var written = await Task.Run(() => ChartSaver.Check(request));
                 if (!written.IsValid)
@@ -523,6 +536,7 @@ namespace ChartBuilder.ViewModels
                 songLock = null;
 
                 _undo.MarkSaved(point);
+                Song.SongEventsSaved(request.Snapshot);
                 Song.Saved(ChartSaver.SavedSong(Song, entry, request), PartsOf(request.Snapshot));
                 AfterSaved(keyBefore);
                 var settings = _settings.Settings;
@@ -539,6 +553,10 @@ namespace ChartBuilder.ViewModels
                 Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, ex.Message));
                 return false;
             }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
             finally
             {
                 // Still held only if the save didn't go through.
@@ -550,13 +568,32 @@ namespace ChartBuilder.ViewModels
         private static HashSet<ChartInstrument> PartsOf(EditableChart chart) => [.. chart.Parts.Select(p => p.Instrument)];
 
         /// <summary>
-        /// Moves <c>[end]</c> after the last note (CHR085), as its own undo step, once the save is going ahead, so the model
-        /// the editor holds is the one saved.
+        /// The chart to write: a copy of the one open with <c>[music_start]</c>, <c>[music_end]</c> and <c>[end]</c> placed
+        /// (charter-spec C8 item 5), once the stems are read to say where the music is heard. A track change still waiting
+        /// is taken up first. A gesture started meanwhile is taken back, so it's never saved.
         /// </summary>
-        private void MoveEndAfterLastNote()
+        /// <exception cref="OperationCanceledException">The editor closed while the stems were read.</exception>
+        private async Task<EditableChart> SnapshotToWriteAsync()
         {
-            if (ChartSaveFixups.MoveEnd(Song.Chart) is { } moveEnd)
-                Editor.Session.Execute(moveEnd);
+            if (_tracksTimer.IsEnabled)
+                await ReloadAudioAsync();
+
+            AudibleRange? audible;
+            var settled = Audio.AudibleSettledAsync(_closing.Token);
+            if (!settled.IsCompleted)
+                Messages.Info(Strings.SaveMeasuringAudio);
+            try
+            {
+                audible = await settled.WaitAsync(AudibleWaitLimit, _closing.Token);
+            }
+            catch (TimeoutException)
+            {
+                // A stem that's still being read after this long goes with what was last heard.
+                audible = Editor.Session.Audible;
+            }
+
+            Editor.Session.Tools.Cancel();
+            return SongEventPlacement.WithSongEvents(Song.Chart, Editor.Session.SongEventsWith(audible));
         }
 
         // Nothing of the song's own can be edited, undone or redone while a save runs, as the save moves the song on to

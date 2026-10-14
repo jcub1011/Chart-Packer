@@ -18,7 +18,8 @@ namespace ChartBuilder.ViewModels
     /// <summary>
     /// A row of the Sections tab (charter-spec C8 items 3, 5 and 6): a text event, where it is, and how to go there,
     /// rename it, move it or delete it. A section is renamed by its name; a free text event's text is changed as it's
-    /// written; a song event is what its text says, so it's moved or deleted but not renamed.
+    /// written; a song event is what its text says, so it's moved or deleted but not renamed. <c>[music_start]</c>,
+    /// <c>[music_end]</c> and <c>[end]</c> are placed by the editor (<see cref="SongEventPlacement"/>), so they're only gone to.
     /// </summary>
     public sealed class EventItem : ObservableObject
     {
@@ -50,11 +51,20 @@ namespace ChartBuilder.ViewModels
 
         public bool IsText => Row.Kind == EventRowKind.Text;
 
+        /// <summary>Whether it's a song event the editor places, which can't be moved or deleted.</summary>
+        public bool IsPlaced => Row.IsPlaced;
+
+        /// <summary>Its tick field's tooltip: how to move it, or that it's placed.</summary>
+        public string TickToolTip => Row.IsPlaced ? Strings.SectionsPlacedTickToolTip : Strings.SectionsTickToolTip;
+
         /// <summary>A song event in words, e.g. "Music start"; empty for another event.</summary>
         public string Label => Row.SongEvent is { } kind ? SectionsViewModel.SongEventName(kind) : "";
 
-        /// <summary>A song event's text, as it's written, for its label's tooltip.</summary>
-        public string WrittenAs => string.Format(CultureInfo.CurrentCulture, Strings.SectionsSongEventToolTipFormat, Row.Event.Text);
+        /// <summary>A song event's text, as it's written, and whether it's placed, for its label's tooltip.</summary>
+        public string WrittenAs => string.Format(
+            CultureInfo.CurrentCulture,
+            Row.IsPlaced ? Strings.SectionsPlacedToolTipFormat : Strings.SectionsSongEventToolTipFormat,
+            Row.Event.Text);
 
         /// <summary>What's typed to rename it: a section's name, or another event's text as it's written.</summary>
         public string Name
@@ -116,7 +126,13 @@ namespace ChartBuilder.ViewModels
                 OnPropertyChanged(nameof(Label));
             }
 
-            if (old.Event.Text != row.Event.Text)
+            if (old.IsPlaced != row.IsPlaced)
+            {
+                OnPropertyChanged(nameof(IsPlaced));
+                OnPropertyChanged(nameof(TickToolTip));
+            }
+
+            if (old.Event.Text != row.Event.Text || old.IsPlaced != row.IsPlaced)
                 OnPropertyChanged(nameof(WrittenAs));
 
             string name = NameOf(row);
@@ -157,10 +173,12 @@ namespace ChartBuilder.ViewModels
     /// The Sections tab (charter-spec C8 items 3, 5 and 6): every text event of <c>EVENTS</c> in time order, sections,
     /// song events and free text alike, then the focused part's own text events, each with its time and its measure and
     /// beat. Each can be gone to, renamed, moved by its tick and deleted, as one undoable step, and <b>Insert section</b>
-    /// and <b>Insert event</b> add them at the cursor, on the grid.
+    /// and <b>Insert event</b> add them at the cursor, on the grid. The song events the editor places are listed among them,
+    /// to be gone to only.
     /// </summary>
     /// <remarks>
-    /// <para>The rows follow the chart (an edit, an undo or redo, or a drag's preview), the song's delay and the focus. They're
+    /// <para>The rows follow the chart (an edit, an undo or redo, or a drag's preview), the song's delay, where the song
+    /// events are placed and the focus. They're
     /// worked out once the changes of a moment are in, and a row whose event is still there is kept, with whatever's typed
     /// in its fields.</para>
     /// <para>They're listed in one list, <see cref="Rows"/>, the part's heading among them, which a virtualizing list shows,
@@ -198,6 +216,7 @@ namespace ChartBuilder.ViewModels
             Session.ChartChanged += OnChartChanged;
             Session.StateChanged += OnSessionState;
             Session.SongSettingsChanged += OnSongSettingsChanged;
+            Session.SongEventsPlaced += OnSongEventsPlaced;
             _focused = Session.Focused?.Instrument;
             Refresh();
         }
@@ -221,7 +240,7 @@ namespace ChartBuilder.ViewModels
         /// <summary><b>Insert section</b>'s menu: the common names, then Custom….</summary>
         public IReadOnlyList<LaneMenuItem> InsertSectionMenu { get; }
 
-        /// <summary><b>Insert event</b>'s menu: the song events, a text event, and one on the focused part's track.</summary>
+        /// <summary><b>Insert event</b>'s menu: the song events not placed, a text event, and one on the focused part's track.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<LaneMenuItem> InsertEventMenu { get; private set; }
 
@@ -245,12 +264,17 @@ namespace ChartBuilder.ViewModels
             Session.ChartChanged -= OnChartChanged;
             Session.StateChanged -= OnSessionState;
             Session.SongSettingsChanged -= OnSongSettingsChanged;
+            Session.SongEventsPlaced -= OnSongEventsPlaced;
         }
 
         /// <summary>Moves the cursor to <paramref name="item"/>'s event. The focus stays where it is.</summary>
         internal void GoTo(EventItem item) => Session.MoveCursorTo(item.Row.Event.Tick);
 
-        internal void Delete(EventItem item) => Session.Tools.DeleteEvent(item.Row.Part, item.Row.Event);
+        internal void Delete(EventItem item)
+        {
+            if (!item.Row.IsPlaced)
+                Session.Tools.DeleteEvent(item.Row.Part, item.Row.Event);
+        }
 
         /// <summary>Renames <paramref name="item"/>'s event: a section by its name, another event by its whole text.</summary>
         internal void Rename(EventItem item, string text)
@@ -268,7 +292,7 @@ namespace ChartBuilder.ViewModels
         internal void Move(EventItem item, string text)
         {
             TextEvent? now = null;
-            if (long.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick))
+            if (!item.Row.IsPlaced && long.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out long tick))
                 now = Session.Tools.MoveEvent(item.Row.Part, item.Row.Event, tick);
             Edited(item, now);
         }
@@ -296,7 +320,7 @@ namespace ChartBuilder.ViewModels
 
         private IReadOnlyList<LaneMenuItem> EventMenuOf(ChartInstrument? part)
         {
-            var items = SongEvents.All
+            var items = SongEvents.Insertable
                 .Select(kind => LaneMenuItem.Choice(SongEventName(kind), false, () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind))))
                 .ToList();
             items.Add(LaneMenuItem.Choice(Strings.SectionsTextEvent, false, () => InsertTextEvent(null)));
@@ -322,6 +346,9 @@ namespace ChartBuilder.ViewModels
 
         // The delay moves every event's time.
         private void OnSongSettingsChanged(object? sender, EventArgs e) => Schedule();
+
+        // The placed song events moved: after an edit, or as the audio was measured.
+        private void OnSongEventsPlaced(object? sender, EventArgs e) => Schedule();
 
         // The part events listed follow the focus.
         private void OnSessionState(object? sender, EventArgs e)
@@ -368,7 +395,7 @@ namespace ChartBuilder.ViewModels
                 InsertEventMenu = EventMenuOf(part);
             }
 
-            _events = Sync(_events, EventRows.Of(chart, null), map);
+            _events = Sync(_events, EventRows.Of(chart, null, Session.SongEventMarks), map);
             _partEvents = Sync(_partEvents, part is null ? [] : EventRows.Of(chart, part), map);
             HasEvents = _events.Count > 0;
             HasPartEvents = _partEvents.Count > 0;

@@ -166,7 +166,7 @@ public sealed class SectionEditingTests
         Assert.IsNull(session.Tools.ChangeEventText(null, free, name));
         Assert.IsNotNull(session.Status);
 
-        Assert.AreSequenceEqual([TextEvent.Of(0, "[music_start]"), TextEvent.Of(0, "[end]"), section, free], session.Chart.Events.ToList());
+        Assert.AreSequenceEqual([section, free], session.Chart.Events.ToList());
         Assert.AreEqual(0, session.UndoStack.UndoCount);
     }
 
@@ -245,44 +245,23 @@ public sealed class SectionEditingTests
     [TestMethod]
     [DataRow("[end]")]
     [DataRow("[music_start]")]
-    public void ASecondOfASongEventTheSongHasOneOfIsRefused(string text)
+    [DataRow(" [music_end] ")]
+    public void InsertingAPlacedSongEventIsRefused(string text)
     {
-        // A new chart has [music_start] and [end] at tick 0.
+        // The editor places [music_start], [music_end] and [end] itself (C8 item 5).
         var session = Of(Guitar());
         session.MoveCursorTo(7680);
-        var before = session.Chart.Events.ToList();
 
         Assert.IsNull(session.Tools.InsertEvent(null, text));
 
-        Assert.AreSequenceEqual(before, [.. session.Chart.Events]);
+        Assert.IsEmpty(session.Chart.Events);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
-        Assert.Contains(text, session.Status!);
+        Assert.Contains(text.Trim(), session.Status!);
+        Assert.Contains("placed automatically", session.Status!);
     }
 
     [TestMethod]
-    public void MusicEndIsInsertedOnceAndASecondIsRefused()
-    {
-        var session = Of(Guitar());
-        session.MoveCursorTo(7680);
-
-        Assert.AreEqual(TextEvent.Of(7680, "[music_end]"), session.Tools.InsertEvent(null, SongEvents.TextOf(SongEvent.MusicEnd)));
-        session.MoveCursorTo(9600);
-        Assert.IsNull(session.Tools.InsertEvent(null, "[music_end]"));
-        Assert.AreEqual(1, session.UndoStack.UndoCount);
-    }
-
-    [TestMethod]
-    public void ASongEventIsMovedRatherThanRefusedAsASecond()
-    {
-        // Moving [end] isn't adding a second one.
-        var session = Of(Guitar());
-        var end = TextEvent.Of(0, "[end]");
-
-        var moved = session.Tools.MoveEvent(null, end, 7680);
-
-        Assert.AreEqual(end with { Tick = 7680 }, moved);
-        Assert.AreSequenceEqual([TextEvent.Of(0, "[music_start]"), TextEvent.Of(7680, "[end]")], session.Chart.Events.ToList());
-    }
+    public void OnlyCodaIsOfferedToInsert() => Assert.AreSequenceEqual([SongEvent.Coda], SongEvents.Insertable.ToList());
 
     // Moving and deleting.
 
@@ -385,8 +364,6 @@ public sealed class SectionEditingTests
 
         Assert.AreSequenceEqual(
             [
-                new EventRow(null, TextEvent.Of(0, "[music_start]"), SongEvent: SongEvent.MusicStart),
-                new EventRow(null, TextEvent.Of(0, "[end]"), SongEvent: SongEvent.End),
                 new EventRow(null, TextEvent.Of(960, "[section Intro]"), SectionName: "Intro"),
                 new EventRow(null, TextEvent.Of(1920, "[prc_verse_1]"), SectionName: "verse 1"),
                 new EventRow(null, TextEvent.Of(2880, "[crowd_normal]")),
@@ -395,8 +372,29 @@ public sealed class SectionEditingTests
             ],
             rows.ToList());
         Assert.AreSequenceEqual(
-            [EventRowKind.SongEvent, EventRowKind.SongEvent, EventRowKind.Section, EventRowKind.Section, EventRowKind.Text, EventRowKind.SongEvent, EventRowKind.SongEvent],
+            [EventRowKind.Section, EventRowKind.Section, EventRowKind.Text, EventRowKind.SongEvent, EventRowKind.SongEvent],
             rows.Select(r => r.Kind).ToList());
+    }
+
+    [TestMethod]
+    public void ThePlacedSongEventsAreListedAfterTheEventsAtTheirTicksInPlaceOfAnyTheChartHas()
+    {
+        var chart = Guitar();
+        Add(chart, null, TextEvent.Of(0, "[section Intro]"));
+        Add(chart, null, TextEvent.Of(1920, "[crowd_normal]"));
+        Add(chart, null, TextEvent.Of(3840, "[music_end]"));
+
+        var rows = EventRows.Of(chart, null, new SongEventMarks(0, 1920, 3840, FromAudio: true));
+
+        Assert.AreSequenceEqual(
+            [
+                new EventRow(null, TextEvent.Of(0, "[section Intro]"), SectionName: "Intro"),
+                new EventRow(null, TextEvent.Of(0, "[music_start]"), SongEvent: SongEvent.MusicStart, IsPlaced: true),
+                new EventRow(null, TextEvent.Of(1920, "[crowd_normal]")),
+                new EventRow(null, TextEvent.Of(1920, "[music_end]"), SongEvent: SongEvent.MusicEnd, IsPlaced: true),
+                new EventRow(null, TextEvent.Of(3840, "[end]"), SongEvent: SongEvent.End, IsPlaced: true),
+            ],
+            rows.ToList());
     }
 
     [TestMethod]
@@ -462,25 +460,8 @@ public sealed class SectionEditingTests
     [TestMethod]
     [DataRow("[end]")]
     [DataRow("[music_start]")]
-    public void EitherOfTwoOfASongEventTheSongHasOneOfCanStillBeMoved(string text)
-    {
-        // A new chart has [music_start] and [end] at tick 0; this one has a second.
-        var chart = Guitar();
-        var second = TextEvent.Of(3840, text);
-        Add(chart, null, second);
-        var session = Of(chart);
-
-        Assert.AreEqual(second with { Tick = 5760 }, session.Tools.MoveEvent(null, second, 5760));
-        Assert.AreEqual(TextEvent.Of(7680, text), session.Tools.MoveEvent(null, TextEvent.Of(0, text), 7680));
-
-        Assert.IsNull(session.Status);
-        Assert.AreEqual(2, session.UndoStack.UndoCount);
-    }
-
-    [TestMethod]
-    [DataRow("[end]")]
-    [DataRow("[music_start]")]
-    public void AFreeTextEventRenamedIntoASecondOfASongEventIsRefused(string text)
+    [DataRow("[music_end]")]
+    public void AFreeTextEventRenamedIntoAPlacedSongEventIsRefused(string text)
     {
         var chart = Guitar();
         var free = TextEvent.Of(2880, "[crowd_normal]");

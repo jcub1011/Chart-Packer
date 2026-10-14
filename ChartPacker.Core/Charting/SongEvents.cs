@@ -1,4 +1,3 @@
-using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
 
 namespace ChartPacker.Core.Charting;
@@ -18,8 +17,16 @@ public enum SongEvent
 /// </summary>
 public static class SongEvents
 {
-    /// <summary>The song events, in the order <b>Insert event</b> offers them.</summary>
+    /// <summary>The text of the song's end event.</summary>
+    public const string EndText = "[end]";
+
+    /// <summary>The song events, in the order the Sections tab lists their kinds.</summary>
     public static IReadOnlyList<SongEvent> All { get; } = [SongEvent.Coda, SongEvent.MusicStart, SongEvent.MusicEnd, SongEvent.End];
+
+    /// <summary>
+    /// The song events <b>Insert event</b> offers: <c>[coda]</c>. The rest are placed (<see cref="SongEventPlacement"/>).
+    /// </summary>
+    public static IReadOnlyList<SongEvent> Insertable { get; } = [SongEvent.Coda];
 
     /// <summary>The text of <paramref name="songEvent"/>, brackets included.</summary>
     public static string TextOf(SongEvent songEvent) => songEvent switch
@@ -27,7 +34,7 @@ public static class SongEvents
         SongEvent.Coda => "[coda]",
         SongEvent.MusicStart => "[music_start]",
         SongEvent.MusicEnd => "[music_end]",
-        _ => ChartSaveFixups.EndText,
+        _ => EndText,
     };
 
     /// <summary>The song event <paramref name="text"/> is, or null when it isn't one.</summary>
@@ -43,10 +50,4 @@ public static class SongEvents
             _ => null,
         };
     }
-
-    /// <summary>
-    /// Whether a song has only one <paramref name="songEvent"/>, so the editor refuses a second: <c>[music_start]</c>,
-    /// <c>[music_end]</c> and <c>[end]</c>.
-    /// </summary>
-    public static bool IsOnePerSong(SongEvent songEvent) => songEvent != SongEvent.Coda;
 }

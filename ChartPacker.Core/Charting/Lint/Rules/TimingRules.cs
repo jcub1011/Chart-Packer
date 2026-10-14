@@ -61,7 +61,8 @@ public sealed class TempoOutOfRangeRule : IChartLintRule
 /// <summary>
 /// CHR003: a note, phrase or event after the end of the audio, in audio time (§4.4.1): one finding for each track's
 /// notes past it, one for each part's phrases, and one for each event. Nothing is checked while the audio's length isn't
-/// known. <c>[end]</c> isn't an event the players see, so it may be after the audio.
+/// known. <c>[music_end]</c> and <c>[end]</c> aren't events the players see, so they may be after the audio:
+/// <c>[music_end]</c> is placed at the audio's last sound, rounded up to a tick.
 /// </summary>
 public sealed class AfterTheAudioRule : IChartLintRule
 {
@@ -106,7 +107,7 @@ public sealed class AfterTheAudioRule : IChartLintRule
 
         foreach (var e in context.Chart.Events.Between(firstPast, long.MaxValue))
         {
-            if (e.Text != Saving.ChartSaveFixups.EndText)
+            if (SongEvents.KindOf(e.Text) is not (SongEvent.MusicEnd or SongEvent.End))
                 findings.Add(new Finding(RuleId, Severity, string.Format(CultureInfo.CurrentCulture, FindingMessages.ChrEventAfterAudioFormat, e.Text), Tick: e.Tick));
         }
 

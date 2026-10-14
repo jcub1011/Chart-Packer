@@ -50,4 +50,10 @@ public static class ChartLintRules
         new SlideWithoutNoteRule(),
         new HarmonyWithoutFirstRule(),
     ];
+
+    /// <summary>
+    /// The rules Chart Builder runs: all but CHR085, as the editor places <c>[end]</c> itself (<see cref="SongEventPlacement"/>)
+    /// and its model never holds it.
+    /// </summary>
+    public static IReadOnlyList<IChartLintRule> ForEditor { get; } = [.. All.Where(static rule => rule is not EndEventRule)];
 }

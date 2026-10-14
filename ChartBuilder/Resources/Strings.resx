@@ -1383,6 +1383,10 @@ Saving also makes these changes to song.ini:
   <data name="SavedStatus" xml:space="preserve">
     <value>Saved.</value>
   </data>
+  <data name="SaveMeasuringAudio" xml:space="preserve">
+    <value>Reading the audio to place the music's start and end…</value>
+    <comment>Shown while a save or Export copy waits for the stems to be read, to place [music_start], [music_end] and [end].</comment>
+  </data>
   <data name="FirstSavedStatusFormat" xml:space="preserve">
     <value>Saved as {0}.</value>
     <comment>{0} is the new song folder.</comment>
@@ -1817,6 +1821,14 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="SectionsTickToolTip" xml:space="preserve">
     <value>Where it is, in ticks. Type another tick and press Enter to move it there.</value>
+  </data>
+  <data name="SectionsPlacedTickToolTip" xml:space="preserve">
+    <value>Where it is, in ticks. It's placed automatically, so it can't be moved.</value>
+    <comment>The tick field's tooltip on [music_start], [music_end] or [end], which the editor places.</comment>
+  </data>
+  <data name="SectionsPlacedToolTipFormat" xml:space="preserve">
+    <value>Written as {0}. Placed automatically from the audio and the notes, and kept up to date as they change.</value>
+    <comment>The label's tooltip on [music_start], [music_end] or [end], which the editor places. {0} is its text, e.g. [music_end].</comment>
   </data>
   <data name="SectionsNameToolTip" xml:space="preserve">
     <value>The section's name. Type a new one and press Enter to rename it.</value>
