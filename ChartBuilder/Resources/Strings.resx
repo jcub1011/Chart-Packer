@@ -2690,6 +2690,16 @@ Saving also makes these changes to song.ini:
   <data name="ArtVideoNeedsFfmpeg" xml:space="preserve">
     <value>The video can't be previewed, as FFmpeg isn't installed with Chart Builder. It's still saved with the song.</value>
   </data>
+  <data name="ArtVideoStartLabel" xml:space="preserve">
+    <value>Video start (ms)</value>
+    <comment>Beside the box under the background video that sets song.ini's video_start_time.</comment>
+  </data>
+  <data name="ArtVideoStartToolTip" xml:space="preserve">
+    <value>Where in the video the song starts, to line it up with the audio: song.ini's video_start_time. Positive skips that much of the video, so it runs ahead; negative holds its first frame that long, so it runs behind. The video shows each value as you change it, at the playhead.</value>
+  </data>
+  <data name="ArtVideoStartRevertToolTip" xml:space="preserve">
+    <value>Put the video start back as saved</value>
+  </data>
   <data name="ChartSettingsDelayLabel" xml:space="preserve">
     <value>Audio delay (ms)</value>
   </data>

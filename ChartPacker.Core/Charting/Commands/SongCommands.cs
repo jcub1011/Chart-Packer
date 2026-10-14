@@ -142,6 +142,18 @@ public static class SongCommands
         return SetValues(song, values);
     }
 
+    /// <summary>
+    /// Sets <c>video_start_time</c> to <paramref name="ms"/>: where in the background video the song starts. When that's
+    /// where the saved song starts it, the key is put back as saved, so a value moved away and back leaves no change.
+    /// </summary>
+    public static SongValueCommand? SetVideoStart(EditorSong song, long ms)
+    {
+        ArgumentNullException.ThrowIfNull(song);
+        return VideoTimeline.From(song.Pairs).Start == TimeSpan.FromMilliseconds(ms)
+            ? RevertToSaved(song, TimingOffsets.VideoKey)
+            : SetValue(song, TimingOffsets.VideoKey, ms.ToString(CultureInfo.InvariantCulture));
+    }
+
     /// <summary>Sets each key of <paramref name="values"/> to its value, or removes it for null, as one step.</summary>
     public static SongValueCommand? SetValues(EditorSong song, IReadOnlyDictionary<string, string?> values)
     {

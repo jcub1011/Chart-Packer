@@ -448,7 +448,7 @@
                                                     <StackPanel Spacing="4" IsVisible="{Binding CanMove}">
                                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
                                                             <NumericUpDown Grid.Column="0"
-                                                                           ctl:DragScrub.IsEnabled="True"
+                                                                           ui:DragScrub.IsEnabled="True"
                                                                            MinWidth="0"
                                                                            HorizontalAlignment="Stretch"
                                                                            ShowButtonSpinner="False"
@@ -467,7 +467,7 @@
                                                                                    Text="{Binding LinkNote}"
                                                                                    IsVisible="{Binding HasLinkNote}" />
                                                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
-                                                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
                                                                     </StackPanel>
                                                                 </ToolTip.Tip>
                                                             </NumericUpDown>

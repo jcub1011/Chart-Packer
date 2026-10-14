@@ -597,7 +597,10 @@ and volume are only for listening: they aren't undo steps and aren't saved.
 showing what the song will have once saved; the video plays against the song while the tab is shown.
 An empty tile has **Choose…**; a tile's right-click menu has **Replace…**, **Remove** and **Revert
 to saved**. A file is checked before it's used: an image is decoded, and a video is checked to be
-one FFmpeg can play.
+one FFmpeg can play. Under the video, a **Video start** box sets `video_start_time` in milliseconds to
+line the video up with the audio: positive skips that much of the video, negative holds its first
+frame. It can be typed or dragged sideways, as Chart Packer's offset boxes can; the video shows each
+value at the playhead as it changes, and the value is set as one undo step once it's left alone.
 
 **Timing.**
 

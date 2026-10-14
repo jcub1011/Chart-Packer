@@ -142,6 +142,52 @@ public sealed class SongEditCommandsTests
     }
 
     [TestMethod]
+    public void TheVideoStartIsSetAndUndoneAndMovesTheTimeline()
+    {
+        var song = Opened([KeyValuePair.Create("video_start_time", "500")]);
+        var undo = new ChartUndoStack(song.Chart);
+
+        undo.Execute(SongCommands.SetVideoStart(song, -250)!);
+        Assert.AreEqual("-250", song.EffectiveValue("video_start_time"));
+        Assert.AreEqual(TimeSpan.FromMilliseconds(-250), VideoTimeline.From(song.EffectivePairs()).Start);
+
+        undo.Undo();
+        Assert.AreEqual("500", song.EffectiveValue("video_start_time"));
+        Assert.IsFalse(song.HasUserChanges);
+
+        undo.Redo();
+        Assert.AreEqual(TimeSpan.FromMilliseconds(-250), VideoTimeline.From(song.EffectivePairs()).Start);
+    }
+
+    [TestMethod]
+    public void AVideoStartMovedBackToTheSavedOneLeavesNoChange()
+    {
+        var song = Opened([KeyValuePair.Create("video_start_time", "500")]);
+        var undo = new ChartUndoStack(song.Chart);
+
+        Assert.IsNull(SongCommands.SetVideoStart(song, 500));
+        undo.Execute(SongCommands.SetVideoStart(song, 900)!);
+        undo.Execute(SongCommands.SetVideoStart(song, 500)!);
+
+        Assert.AreEqual("500", song.EffectiveValue("video_start_time"));
+        Assert.IsFalse(song.HasUserChanges);
+    }
+
+    [TestMethod]
+    public void AVideoStartOfZeroOnASongWithoutOneAddsNoKey()
+    {
+        var song = Opened([]);
+        var undo = new ChartUndoStack(song.Chart);
+
+        Assert.IsNull(SongCommands.SetVideoStart(song, 0));
+        undo.Execute(SongCommands.SetVideoStart(song, 120)!);
+        undo.Execute(SongCommands.SetVideoStart(song, 0)!);
+
+        Assert.IsNull(song.EffectiveValue("video_start_time"));
+        Assert.IsFalse(song.HasUserChanges);
+    }
+
+    [TestMethod]
     public async Task AnEditUndoneAfterASaveIsPendingAgain()
     {
         string folder = _folders.Song("Song", ("notes.mid", MidiFixtures.LeadGuitar()), ("song.ini", Ini("name = Old")));

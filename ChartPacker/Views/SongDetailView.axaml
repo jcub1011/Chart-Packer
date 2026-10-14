@@ -63,7 +63,7 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                                 <NumericUpDown Grid.Column="2"
-                                               ctl:DragScrub.IsEnabled="True"
+                                               ui:DragScrub.IsEnabled="True"
                                                Width="72"
                                                ShowButtonSpinner="False"
                                                VerticalAlignment="Center"
@@ -78,7 +78,7 @@
                                     <ToolTip.Tip>
                                         <StackPanel MaxWidth="320" Spacing="6">
                                             <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.HighwayOffsetToolTip}" />
-                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
                                         </StackPanel>
                                     </ToolTip.Tip>
                                 </NumericUpDown>
@@ -456,7 +456,7 @@
                                                             AutomationProperties.Name="{x:Static res:Strings.VideoOffsetName}">
                                                     <TextBlock Classes="highwayHeader" Text="{x:Static res:Strings.VideoOffsetName}" />
                                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                                        <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                                        <NumericUpDown ui:DragScrub.IsEnabled="True"
                                                                        Width="72"
                                                                        ShowButtonSpinner="False"
                                                                        VerticalAlignment="Center"
@@ -470,7 +470,7 @@
                                                             <ToolTip.Tip>
                                                                 <StackPanel MaxWidth="320" Spacing="6">
                                                                     <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.VideoOffsetToolTip}" />
-                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
                                                                 </StackPanel>
                                                             </ToolTip.Tip>
                                                         </NumericUpDown>
@@ -634,7 +634,7 @@
                                             Orientation="Horizontal"
                                             Spacing="6"
                                             IsVisible="{Binding Lyrics.HasLyrics}">
-                                    <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                    <NumericUpDown ui:DragScrub.IsEnabled="True"
                                                    Width="72"
                                                    ShowButtonSpinner="False"
                                                    VerticalAlignment="Center"
@@ -648,7 +648,7 @@
                                         <ToolTip.Tip>
                                             <StackPanel Spacing="6">
                                                 <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.LyricsOffsetToolTip}" />
-                                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
                                             </StackPanel>
                                         </ToolTip.Tip>
                                     </NumericUpDown>
@@ -762,7 +762,7 @@
                                         IsVisible="{Binding Player.HasTracks}">
                                 <TextBlock Classes="marker" VerticalAlignment="Center" Text="{Binding AudioOffset.Marker}" IsVisible="{Binding AudioOffset.HasOffset}" />
                                 <PathIcon Opacity="0.7" VerticalAlignment="Center" Data="{StaticResource OffsetIconGeometry}" />
-                                <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                                <NumericUpDown ui:DragScrub.IsEnabled="True"
                                                Width="72"
                                                ShowButtonSpinner="False"
                                                VerticalAlignment="Center"
@@ -777,7 +777,7 @@
                                     <ToolTip.Tip>
                                         <StackPanel Spacing="6">
                                             <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.AudioOffsetToolTip}" />
-                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
                                         </StackPanel>
                                     </ToolTip.Tip>
                                 </NumericUpDown>

@@ -995,10 +995,6 @@
   <data name="HighwayRevertOffsetToolTip" xml:space="preserve">
     <value>Reset this offset</value>
   </data>
-  <data name="OffsetControlsHelp" xml:space="preserve">
-    <value>Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, finer with Ctrl. Click it to type a value; Enter keeps it. While typing, Up and Down or the mouse wheel step a millisecond, ten with Shift.</value>
-    <comment>Under each offset box's own tooltip: the ways to change it.</comment>
-  </data>
   <data name="AudioOffsetName" xml:space="preserve">
     <value>Audio offset</value>
   </data>

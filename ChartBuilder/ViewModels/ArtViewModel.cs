@@ -45,6 +45,8 @@ namespace ChartBuilder.ViewModels
             AlbumArt = new ArtSlotViewModel(this, MediaSlot.AlbumArt, Strings.ArtAlbumArtTitle, () => imagePicker.PickImageAsync(Strings.ArtPickAlbumArtTitle), execute);
             BackgroundImage = new ArtSlotViewModel(this, MediaSlot.BackgroundImage, Strings.ArtBackgroundImageTitle, () => filePicker.PickBackgroundAsync(Strings.ArtPickBackgroundImageTitle), execute);
             BackgroundVideo = new ArtSlotViewModel(this, MediaSlot.BackgroundVideo, Strings.ArtBackgroundVideoTitle, () => filePicker.PickBackgroundAsync(Strings.ArtPickBackgroundVideoTitle), execute);
+            VideoStart = new VideoStartViewModel(song, execute);
+            VideoStart.PreviewChanged += OnVideoStartPreviewChanged;
             Clock = clock;
             _song.Changed += OnSongChanged;
             Refresh();
@@ -58,10 +60,16 @@ namespace ChartBuilder.ViewModels
 
         public IReadOnlyList<ArtSlotViewModel> Slots => [AlbumArt, BackgroundImage, BackgroundVideo];
 
+        /// <summary>The box under the background video that sets where in it the song starts.</summary>
+        public VideoStartViewModel VideoStart { get; }
+
         /// <summary>Where the song is playing, which the video follows.</summary>
         public Func<TimeSpan> Clock { get; }
 
-        /// <summary>How the video lines up with the song: its <c>video_start_time</c> and the like, as the next save leaves them.</summary>
+        /// <summary>
+        /// How the video lines up with the song: its <c>video_start_time</c> and the like, as the next save leaves them, but
+        /// the start while it's being typed, so the video shows it at once.
+        /// </summary>
         [ObservableProperty]
         public partial VideoTimeline Timeline { get; private set; } = VideoTimeline.Default;
 
@@ -93,7 +101,8 @@ namespace ChartBuilder.ViewModels
         /// <summary>Shows the art again, as the song has it now, once a save has let go of it.</summary>
         public void Refresh()
         {
-            Timeline = VideoTimeline.From(_song.EffectivePairs());
+            VideoStart.Load();
+            UpdateTimeline();
             foreach (var slot in Slots)
                 slot.Refresh();
         }
@@ -101,15 +110,28 @@ namespace ChartBuilder.ViewModels
         public void Dispose()
         {
             _song.Changed -= OnSongChanged;
+            VideoStart.PreviewChanged -= OnVideoStartPreviewChanged;
+            VideoStart.Dispose();
             foreach (var slot in Slots)
                 slot.Dispose();
         }
 
         partial void OnIsSavingChanged(bool value)
         {
+            VideoStart.IsSaving = value;
             foreach (var slot in Slots)
                 slot.RefreshCommands();
         }
+
+        partial void OnTimelineChanged(VideoTimeline value) => BackgroundVideo.NotifyTimeline();
+
+        private void UpdateTimeline()
+        {
+            var timeline = VideoTimeline.From(_song.EffectivePairs());
+            Timeline = VideoStart.PreviewStart is { } start ? timeline with { Start = start } : timeline;
+        }
+
+        private void OnVideoStartPreviewChanged(object? sender, EventArgs e) => UpdateTimeline();
 
         private void OnSongChanged(object? sender, EventArgs e) => Refresh();
     }
@@ -178,9 +200,16 @@ namespace ChartBuilder.ViewModels
         /// <summary>Whether the slot will hold a file once saved.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsEmpty))]
+        [NotifyPropertyChangedFor(nameof(ShowsVideoStart))]
         public partial bool HasFile { get; private set; }
 
         public bool IsEmpty => !HasFile;
+
+        /// <summary>The video start box, for the background video; null for the others.</summary>
+        public VideoStartViewModel? VideoStart => IsVideoSlot ? _owner.VideoStart : null;
+
+        /// <summary>Whether the video start box shows: under the background video, while there'll be one.</summary>
+        public bool ShowsVideoStart => IsVideoSlot && HasFile;
 
         public bool HasImage => Image is not null;
 
@@ -249,6 +278,8 @@ namespace ChartBuilder.ViewModels
         private bool CanRemove() => _owner.CanEdit && HasFile;
 
         private bool CanRevert() => _owner.CanEdit && IsChanged;
+
+        internal void NotifyTimeline() => OnPropertyChanged(nameof(Timeline));
 
         internal void RefreshCommands()
         {

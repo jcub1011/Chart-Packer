@@ -9,9 +9,8 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
-using ChartPacker.UI.Controls;
 
-namespace ChartPacker.Controls
+namespace ChartPacker.UI.Controls
 {
     /// <summary>
     /// Lets a <see cref="NumericUpDown"/> be changed by dragging sideways across it: right to raise the
