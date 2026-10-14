@@ -416,12 +416,12 @@ namespace ChartPacker.ViewModels
         public TimeSpan CurrentPosition => _player is { } player && !IsScrubbing ? player.Position : TimeSpan.FromSeconds(Math.Max(0, PositionSeconds));
 
         /// <summary>
-        /// Where to draw what's drawn against the audio (the highway, the lyrics, the background): while playing,
-        /// <see cref="CurrentPosition"/> less the calibrated latency times the speed, so it's seen as it's heard
-        /// (charter-spec C10 item 5, C11 item 4); otherwise <see cref="CurrentPosition"/>.
+        /// Where to draw what's drawn against the audio (the highway, the lyrics, the background): while playing, where
+        /// the audio is, moving smoothly (<see cref="StemPlayer.SmoothPosition"/>), less the calibrated latency times the
+        /// speed, so it's seen as it's heard (charter-spec C10 item 5, C11 item 4); otherwise <see cref="CurrentPosition"/>.
         /// </summary>
         public TimeSpan DrawnPosition => _player is { IsPlaying: true } player && !IsScrubbing
-            ? TimeSpan.FromTicks(Math.Max(0, LatencyCompensation.Drawn(player.Position, _latencyMilliseconds, player.Speed).Ticks))
+            ? TimeSpan.FromTicks(Math.Max(0, LatencyCompensation.Drawn(player.SmoothPosition, _latencyMilliseconds, player.Speed).Ticks))
             : CurrentPosition;
 
         /// <summary>
