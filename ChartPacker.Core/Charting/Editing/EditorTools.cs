@@ -1432,7 +1432,8 @@ public sealed partial class EditorTools
                 else
                     return;
             }
-            else if (Tools.HitTest(point) is { } hit)
+            // An open note's tail is drawn across the lanes, so passing over it leaves the note; its gem erases it.
+            else if (Tools.HitTest(point) is { } hit && !(hit.IsTail && hit.Note.Lane == ChartNote.OpenLane))
             {
                 _erased.Add(hit.Note);
             }

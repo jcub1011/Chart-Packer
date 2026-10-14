@@ -319,6 +319,29 @@ public sealed class EditorToolsTests
 
     [TestMethod]
     [DynamicData(nameof(Views))]
+    public void ErasingPassesOverAnOpenNotesSustain(LaneView view)
+    {
+        var session = Of(Guitar());
+        var track = Expert(session);
+        track.Notes.Add(new EditableNote(480, 480, Open));
+        int? openLane = view == LaneView.Highway ? 2 : Open;
+        session.Tool = EditorTool.Erase;
+
+        session.Tools.Press(At(session, 720, openLane, view));
+        session.Tools.Drag(At(session, 900, openLane, view));
+        session.Tools.Release(At(session, 900, openLane, view));
+
+        Assert.AreSequenceEqual([new EditableNote(480, 480, Open)], track.Notes.ToList());
+        Assert.AreEqual(0, session.UndoStack.UndoCount);
+
+        session.Tools.Press(At(session, 480, openLane, view));
+        session.Tools.Release(At(session, 480, openLane, view));
+
+        Assert.AreEqual(0, track.Notes.Count);
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Views))]
     public void TheSustainToolEndsTheSelectedNotesOnTheGrid(LaneView view)
     {
         // A disjoint chord and an extended sustain are both allowed (C5 item 3).
