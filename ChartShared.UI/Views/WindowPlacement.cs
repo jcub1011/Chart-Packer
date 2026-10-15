@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
@@ -63,6 +64,49 @@ namespace ChartShared.UI.Views
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             window.Position = Centered(center, size, screen.WorkingArea);
             return true;
+        }
+
+        /// <summary>
+        /// Puts <paramref name="window"/>, not yet shown, at the normal <paramref name="bounds"/> it was saved with: on
+        /// the screen their top left is on (or their middle is, or the first), their size made to fit that screen's
+        /// working area but no smaller than the window's own minimum where it allows, moved as little as keeps it there.
+        /// </summary>
+        /// <returns>False, leaving the window where it would have gone, when there are no screens.</returns>
+        public static bool Restore(Window window, WindowBounds bounds)
+        {
+            var screens = window.Screens.All;
+            if (screens.Count == 0)
+                return false;
+
+            // The window isn't on a screen yet, so its middle is found with the size scaled as each screen would show it.
+            var target = window.Screens.ScreenFromPoint(bounds.Position)
+                ?? screens.FirstOrDefault(s => s.Bounds.Contains(bounds.MiddleOn(s.Scaling)))
+                ?? screens[0];
+            var area = target.WorkingArea;
+
+            var pixelSize = PixelSize.FromSize(bounds.Size, target.Scaling);
+            var minPixels = PixelSize.FromSize(new Size(window.MinWidth, window.MinHeight), target.Scaling);
+            pixelSize = FitSize(pixelSize, minPixels, area);
+
+            window.Width = pixelSize.Width / target.Scaling;
+            window.Height = pixelSize.Height / target.Scaling;
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            window.Position = PlaceAt(bounds.Position, pixelSize, area);
+            return true;
+        }
+
+        /// <summary>
+        /// How <paramref name="window"/>, closing, is shown: its <paramref name="state"/>, and its
+        /// <paramref name="normalBounds"/> while that's <see cref="WindowState.Normal"/> (null otherwise).
+        /// </summary>
+        /// <returns>False while it's minimized, which doesn't say how it was shown or where it was.</returns>
+        public static bool TryCapture(Window window, out WindowState state, out WindowBounds? normalBounds)
+        {
+            state = window.WindowState;
+            normalBounds = state == WindowState.Normal
+                ? new WindowBounds(window.Position, new Size(window.Width, window.Height))
+                : null;
+            return state != WindowState.Minimized;
         }
 
         private static int Fit(int start, int length, int min, int max) => Math.Max(min, Math.Min(start, max - length));

@@ -130,16 +130,6 @@ namespace ChartBuilder.Services
 
         public double? EditorHeight { get; set; }
 
-        /// <summary>The narrowest and shortest the editor's normal size is restored as.</summary>
-        public const double MinEditorWidth = 720;
-
-        public const double MinEditorHeight = 480;
-
-        /// <summary>The widest and tallest the editor's normal size is restored as: bigger than an 8K screen.</summary>
-        public const double MaxEditorWidth = 7680;
-
-        public const double MaxEditorHeight = 4320;
-
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;
 
