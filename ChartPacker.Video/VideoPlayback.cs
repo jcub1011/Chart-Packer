@@ -229,7 +229,6 @@ public sealed class VideoPlayback : IDisposable
             bool stuck = !decoder.HasKept && atEnd;
             if (behind || far || stuck)
             {
-                Logger.Debug("{Video} seeking to {Time}", _name, target);
                 decoder.Seek(target);
                 soughtTime = target;
                 hasNext = false;
