@@ -189,6 +189,7 @@ internal static unsafe partial class Native
     public const ulong ChannelMaskMono = 0x4;
     public const ulong ChannelMaskStereo = 0x3;
     public const int PixelFormatBgra = 28;
+    // libswscale/swscale.h: SWS_BILINEAR, set through the "sws_flags" option.
     public const int SwsBilinear = 2;
     public const int SeekFlagBackward = 1;
     public const int SeekSize = 0x10000;
@@ -233,6 +234,9 @@ internal static unsafe partial class Native
 
     [LibraryImport(AvUtil, EntryPoint = "av_dict_free")]
     public static partial void av_dict_free(void** dictionary);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_opt_set_int", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial int av_opt_set_int(void* target, string name, long value, int searchFlags);
 
     // libavformat
     [LibraryImport(AvFormat, EntryPoint = "avformat_version")]
@@ -315,14 +319,17 @@ internal static unsafe partial class Native
     // libswscale
     [LibraryImport(SwScale, EntryPoint = "swscale_version")]
     public static partial uint swscale_version();
-    [LibraryImport(SwScale, EntryPoint = "sws_getContext")]
-    public static partial void* sws_getContext(int srcWidth, int srcHeight, int srcFormat, int dstWidth, int dstHeight, int dstFormat, int flags, void* srcFilter, void* dstFilter, double* param);
 
-    [LibraryImport(SwScale, EntryPoint = "sws_scale")]
-    public static partial int sws_scale(void* context, byte** srcSlice, int* srcStride, int srcSliceY, int srcSliceHeight, byte** dst, int* dstStride);
+    // The frame API: a context used without initialising takes every property (size, format, colour) from the frames
+    // themselves, and allocates the destination's buffers when they're left empty.
+    [LibraryImport(SwScale, EntryPoint = "sws_alloc_context")]
+    public static partial void* sws_alloc_context();
 
-    [LibraryImport(SwScale, EntryPoint = "sws_freeContext")]
-    public static partial void sws_freeContext(void* context);
+    [LibraryImport(SwScale, EntryPoint = "sws_scale_frame")]
+    public static partial int sws_scale_frame(void* context, AVFrame* dst, AVFrame* src);
+
+    [LibraryImport(SwScale, EntryPoint = "sws_free_context")]
+    public static partial void sws_free_context(void** context);
 
     // libswresample: only the resampler used to convert decoded audio to 48 kHz for Opus encoding.
     [LibraryImport(SwResample, EntryPoint = "swresample_version")]
