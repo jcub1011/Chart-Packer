@@ -31,14 +31,31 @@ public sealed unsafe class VideoDecoder : IDisposable
     private AVFrame* _next;
     private AVFrame* _kept;
     // swscale's frame API: the scaler takes the kept frame's size, format and colour (BT.709 or 601, limited or full range)
-    // from the frame itself, and fills _converted, a frame whose buffer it allocates. That buffer has room past each row,
-    // which its vectorised converters need: they write whole blocks of pixels, past the end of a row whose width isn't a
-    // multiple of the block (a 1176-wide video, 32 bytes past every row). CopyKept copies the rows out from there, packed.
-    // Converted straight into the caller's managed array, as frames once were, the last row's overrun landed on the .NET
-    // heap past it, which surfaced later as an ExecutionEngineException in whatever allocated or collected next.
+    // from the frame itself. Both are set up by the first CopyKept, so a decoder only opened to be checked or probed never
+    // pays for them.
     private void* _scaler;
-    private AVFrame* _converted;
+    private bool _scalerFailed;
     private bool _scaleFailureLogged;
+
+    // What swscale converts into: _converted, a frame over _convertedBuffer, FFmpeg memory of our own that's allocated once,
+    // rows RowAlignment apart, with TailPadding after the last. swscale's vectorised converters write whole blocks of
+    // pixels, so a row whose width isn't a multiple of the block runs past its end: a 1176-wide video was written 32 bytes
+    // past every row, the last included. Converted straight into the caller's managed array, as frames once were, the last
+    // row's overrun landed on the .NET heap past it, which surfaced later as an ExecutionEngineException in whatever
+    // allocated or collected next. Such writes now land here, on Canary bytes, and are logged; CopyKept copies the rows out
+    // packed. The frame has no buffer reference, so freeing it leaves the buffer, which Dispose frees itself.
+    private const int RowAlignment = 128;
+    private const int TailPadding = 4096;
+    private const byte Canary = 0xA5;
+    private AVFrame* _converted;
+    private byte* _convertedBuffer;
+    private int _convertedStride;
+    private bool _overrunLogged;
+
+    // The colour the first converted frame was tagged with, which every later one is converted as. swscale rebuilds its
+    // whole conversion when a frame's tags differ from the last one's, and some streams flip them between frames; a stream
+    // that really does change colour partway keeps the first frame's.
+    private (int Range, int Space, int Primaries, int Transfer, int ChromaLocation)? _colour;
     private readonly int _streamIndex;
     private readonly AVRational _timeBase;
     private readonly long _startTime;
@@ -99,11 +116,8 @@ public sealed unsafe class VideoDecoder : IDisposable
             _packet = Native.av_packet_alloc();
             _next = Native.av_frame_alloc();
             _kept = Native.av_frame_alloc();
-            _converted = Native.av_frame_alloc();
-            _scaler = Native.sws_alloc_context();
-            if (_packet == null || _next == null || _kept == null || _converted == null || _scaler == null)
+            if (_packet == null || _next == null || _kept == null)
                 throw new OutOfMemoryException();
-            Check(Native.av_opt_set_int(_scaler, "sws_flags", Native.SwsBilinear, 0), "The video's scaler can't be set up");
 
             var parameters = videoStream->codecpar;
             (Width, Height) = FitWidth(parameters->width, parameters->height, maxWidth);
@@ -252,11 +266,21 @@ public sealed unsafe class VideoDecoder : IDisposable
         if (!HasKept)
             return false;
 
-        if (_kept->width <= 0 || _kept->height <= 0)
+        // A frame without a picture of its own: swscale returns as if it had converted one, leaving the buffer as it was.
+        if (_kept->width <= 0 || _kept->height <= 0 || _kept->data[0] == 0)
             return false;
 
-        // Emptied, so the scaler allocates the buffer (from a pool of its own), sized and padded as it needs.
-        Native.av_frame_unref(_converted);
+        if (!EnsureScaler())
+            return false;
+
+        Normalise(_kept);
+        int rowBytes = Width * 4;
+        if (!_overrunLogged)
+            FillPadding(rowBytes);
+
+        // Given a picture, swscale converts into it rather than allocating one of its own.
+        _converted->data[0] = (ulong)_convertedBuffer;
+        _converted->linesize[0] = _convertedStride;
         _converted->width = Width;
         _converted->height = Height;
         _converted->format = Native.PixelFormatBgra;
@@ -275,12 +299,120 @@ public sealed unsafe class VideoDecoder : IDisposable
             return false;
         }
 
-        int rowBytes = Width * 4;
-        byte* rows = (byte*)_converted->data[0];
-        int stride = _converted->linesize[0];
+        if (!_overrunLogged)
+            CheckPadding(rowBytes);
         for (int y = 0; y < Height; y++)
-            new ReadOnlySpan<byte>(rows + ((long)y * stride), rowBytes).CopyTo(bgra.Slice(y * rowBytes, rowBytes));
+            new ReadOnlySpan<byte>(_convertedBuffer + ((long)y * _convertedStride), rowBytes).CopyTo(bgra.Slice(y * rowBytes, rowBytes));
         return true;
+    }
+
+    // Sets up the scaler and what it converts into, the first time a frame is converted. False when the scaler can't be
+    // set up, which is logged once; no frame is converted after, but the video still decodes, as nothing else needs it.
+    private bool EnsureScaler()
+    {
+        if (_scaler != null)
+            return true;
+        if (_scalerFailed)
+            return false;
+
+        if (_converted == null)
+        {
+            _converted = Native.av_frame_alloc();
+            if (_converted == null)
+                throw new OutOfMemoryException();
+        }
+
+        if (_convertedBuffer == null)
+        {
+            _convertedStride = ((Width * 4) + RowAlignment - 1) / RowAlignment * RowAlignment;
+            _convertedBuffer = (byte*)Native.av_malloc((nuint)(((long)_convertedStride * Height) + TailPadding));
+            if (_convertedBuffer == null)
+                throw new OutOfMemoryException();
+        }
+
+        void* scaler = Native.sws_alloc_context();
+        if (scaler == null)
+            throw new OutOfMemoryException();
+
+        int result = Native.av_opt_set_int(scaler, "sws_flags", Native.SwsBilinear, 0);
+        if (result < 0)
+        {
+            Native.sws_free_context(&scaler);
+            _scalerFailed = true;
+            Logger.Warning("The video's scaler couldn't be set up (FFmpeg error {Error}), so its frames can't be shown", result);
+            return false;
+        }
+
+        _scaler = scaler;
+        return true;
+    }
+
+    // Readies the kept frame, used for nothing but converting, to be converted the way the frames before it were, so
+    // swscale keeps the conversion it set up rather than rebuilding it.
+    private void Normalise(AVFrame* frame)
+    {
+        // Converted whole, as one picture, as frames were before the frame API: it won't convert an interlaced frame into
+        // a progressive one, and fields scaled apart look no better at the sizes shown.
+        frame->flags &= ~Native.FrameFlagInterlaced;
+
+        // HDR10+ metadata is part of what swscale compares, and it changes from frame to frame.
+        Native.av_frame_remove_side_data(frame, Native.FrameDataDynamicHdrPlus);
+
+        _colour ??= (frame->color_range, frame->colorspace, frame->color_primaries, frame->color_trc, frame->chroma_location);
+        (frame->color_range, frame->colorspace, frame->color_primaries, frame->color_trc, frame->chroma_location) = _colour.Value;
+    }
+
+    // Marks the bytes past each row and past the last row, so CheckPadding can tell whether swscale wrote there.
+    private void FillPadding(int rowBytes)
+    {
+        int slack = _convertedStride - rowBytes;
+        if (slack > 0)
+        {
+            for (int y = 0; y < Height; y++)
+                new Span<byte>(_convertedBuffer + ((long)y * _convertedStride) + rowBytes, slack).Fill(Canary);
+        }
+
+        new Span<byte>(_convertedBuffer + ((long)_convertedStride * Height), TailPadding).Fill(Canary);
+    }
+
+    private void CheckPadding(int rowBytes)
+    {
+        // How far past its end each row was written: into the slack before the next row, and for the last row on into the
+        // tail too, as it's all one run of padding.
+        int slack = _convertedStride - rowBytes;
+        int rowsOverrun = 0, furthest = 0, lastRow = 0;
+        for (int y = 0; y < Height; y++)
+        {
+            int run = y == Height - 1 ? slack + TailPadding : slack;
+            int past = new ReadOnlySpan<byte>(_convertedBuffer + ((long)y * _convertedStride) + rowBytes, run).LastIndexOfAnyExcept(Canary) + 1;
+            if (past == 0)
+                continue;
+            rowsOverrun++;
+            furthest = Math.Max(furthest, past);
+            if (y == Height - 1)
+                lastRow = past;
+        }
+
+        if (rowsOverrun == 0)
+            return;
+
+        // Once per video: it happens on every frame, so neither the marking nor the check is done again.
+        _overrunLogged = true;
+        if (lastRow == slack + TailPadding)
+        {
+            // Written up to the buffer's last byte, so perhaps past it too, onto FFmpeg's heap.
+            Logger.Warning(
+                "swscale wrote to the end of the padding past the rows it was given, and perhaps beyond, converting " +
+                "{SourceWidth}×{SourceHeight} (pixel format {SourceFormat}) to {Width}×{Height}",
+                _kept->width, _kept->height, _kept->format, Width, Height);
+            return;
+        }
+
+        Logger.Debug(
+            "swscale wrote past the rows it was given, converting {SourceWidth}×{SourceHeight} (pixel format {SourceFormat}) " +
+            "to {Width}×{Height}: {Rows} row(s), up to {Bytes} byte(s) past the end, the last row {LastRowBytes}. " +
+            "It landed in padding, so nothing was harmed",
+            _kept->width, _kept->height, _kept->format, Width, Height, rowsOverrun, furthest, lastRow);
     }
 
     /// <summary>
@@ -318,6 +450,13 @@ public sealed unsafe class VideoDecoder : IDisposable
             AVFrame* converted = _converted;
             Native.av_frame_free(&converted);
             _converted = null;
+        }
+
+        if (_convertedBuffer != null)
+        {
+            byte* buffer = _convertedBuffer;
+            Native.av_freep(&buffer);
+            _convertedBuffer = null;
         }
 
         if (_next != null)

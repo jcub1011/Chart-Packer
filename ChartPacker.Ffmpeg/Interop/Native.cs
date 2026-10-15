@@ -191,6 +191,9 @@ internal static unsafe partial class Native
     public const int PixelFormatBgra = 28;
     // libswscale/swscale.h: SWS_BILINEAR, set through the "sws_flags" option.
     public const int SwsBilinear = 2;
+    // libavutil/frame.h: AV_FRAME_FLAG_INTERLACED, and AV_FRAME_DATA_DYNAMIC_HDR_PLUS of enum AVFrameSideDataType.
+    public const int FrameFlagInterlaced = 1 << 3;
+    public const int FrameDataDynamicHdrPlus = 17;
     public const int SeekFlagBackward = 1;
     public const int SeekSize = 0x10000;
     public const int SeekForce = 0x20000;
@@ -228,6 +231,9 @@ internal static unsafe partial class Native
 
     [LibraryImport(AvUtil, EntryPoint = "av_frame_unref")]
     public static partial void av_frame_unref(AVFrame* frame);
+
+    [LibraryImport(AvUtil, EntryPoint = "av_frame_remove_side_data")]
+    public static partial void av_frame_remove_side_data(AVFrame* frame, int type);
 
     [LibraryImport(AvUtil, EntryPoint = "av_dict_set", StringMarshalling = StringMarshalling.Utf8)]
     public static partial int av_dict_set(void** dictionary, string key, string value, int flags);
