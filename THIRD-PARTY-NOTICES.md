@@ -109,21 +109,19 @@ specifications; no code from any implementation of them is used.
 | [Tune pitch](https://game-icons.net/1x1/lorc/tune-pitch.html) | [Lorc](https://lorcblog.blogspot.com) | Pitch correction |
 | [Gamepad](https://game-icons.net/1x1/delapouite/gamepad.html) | [Delapouite](https://delapouite.com) | Playtest |
 
-### Material Symbols
+### Bootstrap Icons
 
-- **Project:** [Material Symbols](https://fonts.google.com/icons) ([google/material-design-icons](https://github.com/google/material-design-icons))
-- **Pinned revision:** [`49d4db3`](https://github.com/google/material-design-icons/tree/49d4db35df873165d6bd6ba09b063c7dafbac2f4)
-- **License:** [Apache License 2.0](#apache-license-20) © Google
+- **Project:** [Bootstrap Icons](https://icons.getbootstrap.com) ([twbs/icons](https://github.com/twbs/icons))
+- **License:** [MIT](#mit-license) © The Bootstrap Authors
 - **Used for:** the program icons of Chart Packer and Chart Builder, and the icon of `.sng` files
-  without album art. The rounded, filled SVGs (`symbols/web/<name>/materialsymbolsrounded/<name>_fill1_48px.svg`)
-  are kept unchanged in `tools/IconGen/Sources`. `tools/IconGen` draws them in the app's accent colour
-  with a dark outline, and saves them as the `.ico` files below.
+  without album art. The SVGs are kept unchanged in `tools/IconGen/Sources`. `tools/IconGen` fills
+  each one in a single colour, and saves them as the `.ico` files below.
 
 | Icon | Used as |
 |---|---|
-| [inventory_2](https://fonts.google.com/icons?selected=Material+Symbols+Rounded:inventory_2) | Chart Packer (`ChartPacker/Assets/ChartPacker.ico`) |
-| [hardware](https://fonts.google.com/icons?selected=Material+Symbols+Rounded:hardware) | Chart Builder (`ChartBuilder/Assets/ChartBuilder.ico`) |
-| [album](https://fonts.google.com/icons?selected=Material+Symbols+Rounded:album) | `.sng` files (`installer/SngFile.ico`) |
+| [box-seam-fill](https://icons.getbootstrap.com/icons/box-seam-fill/) | Chart Packer (`ChartPacker/Assets/ChartPacker.ico`) |
+| [bar-chart-line-fill](https://icons.getbootstrap.com/icons/bar-chart-line-fill/) | Chart Builder (`ChartBuilder/Assets/ChartBuilder.ico`) |
+| [disc-fill](https://icons.getbootstrap.com/icons/disc-fill/) | `.sng` files (`installer/SngFile.ico`) |
 
 ## Bundled libraries
 

@@ -1,26 +1,25 @@
 using System.Buffers.Binary;
+using System.Globalization;
 using System.Xml.Linq;
 using SkiaSharp;
 
-// Renders the program icons from the Material Symbols sources in Sources/ (see README.md):
+// Renders the program icons from the Bootstrap Icons sources in Sources/ (see README.md):
 //
 //   dotnet run --project tools/IconGen
 //
-// Each source is drawn in the accent colour with a dark outline, so it reads on light and dark backgrounds,
-// and written over the .ico it's for. Run from anywhere inside the repo.
-
-// The accent of ChartPacker.UI/Styles/Theme.axaml (AccentButtonBackground), and a dark shade of it for the outline.
-var fill = SKColor.Parse("#8B5CF6");
-var outline = SKColor.Parse("#2E1A6B");
+// Each source is drawn as it is, filled in its own colour, and written over the .ico it's for. Run from anywhere
+// inside the repo.
 
 // The sizes Windows asks an icon for, from the small list view to the extra-large icons.
 int[] sizes = [16, 20, 24, 32, 40, 48, 64, 256];
 
-(string Source, string Icon)[] icons =
+// The colours are darker shades of the red, orange and blue frets (ChartPacker.UI/Controls/Highway/HighwayPalette.cs).
+// They aren't the app's theme colours, so a restyle doesn't change them.
+(string Source, string Icon, SKColor Fill)[] icons =
 [
-    ("inventory_2_fill1_48px.svg", "ChartPacker/Assets/ChartPacker.ico"),
-    ("hardware_fill1_48px.svg", "ChartBuilder/Assets/ChartBuilder.ico"),
-    ("album_fill1_48px.svg", "installer/SngFile.ico"),
+    ("box-seam-fill.svg", "ChartPacker/Assets/ChartPacker.ico", SKColor.Parse("#B22222")),
+    ("bar-chart-line-fill.svg", "ChartBuilder/Assets/ChartBuilder.ico", SKColor.Parse("#D2670A")),
+    ("disc-fill.svg", "installer/SngFile.ico", SKColor.Parse("#1E64B4")),
 ];
 
 string? repo = FindRepo(Directory.GetCurrentDirectory());
@@ -30,11 +29,11 @@ if (repo is null)
     return 1;
 }
 
-foreach (var (source, icon) in icons)
+foreach (var (source, icon, fill) in icons)
 {
     using SKPath glyph = ReadGlyph(Path.Combine(repo, "tools", "IconGen", "Sources", source));
     string target = Path.Combine(repo, icon);
-    File.WriteAllBytes(target, WriteIco([.. sizes.Select(size => (size, Render(glyph, size)))]));
+    File.WriteAllBytes(target, WriteIco([.. sizes.Select(size => (size, Render(glyph, fill, size)))]));
     Console.WriteLine($"{source} -> {icon}");
 }
 
@@ -51,30 +50,35 @@ static string? FindRepo(string folder)
     return null;
 }
 
-// A Material Symbols SVG is one path in a 960-unit box whose top is at y = -960.
+// A Bootstrap Icons SVG is one path in a square viewBox (0 0 16 16). The glyph comes back scaled to a 1-unit box, and
+// keeps the path's fill rule: box-seam-fill is even-odd, and its seams fill in solid without it.
 static SKPath ReadGlyph(string svg)
 {
     XNamespace ns = "http://www.w3.org/2000/svg";
-    string data = XDocument.Load(svg).Descendants(ns + "path").Single().Attribute("d")!.Value;
-    var path = SKPath.ParseSvgPathData(data) ?? throw new InvalidDataException($"{svg} has a path Skia can't read.");
-    path.Transform(SKMatrix.CreateTranslation(0, 960));
+    XElement root = XDocument.Load(svg).Root!;
+    XElement element = root.Descendants(ns + "path").Single();
+    var path = SKPath.ParseSvgPathData(element.Attribute("d")!.Value) ?? throw new InvalidDataException($"{svg} has a path Skia can't read.");
+    if ((string?)element.Attribute("fill-rule") == "evenodd")
+        path.FillType = SKPathFillType.EvenOdd;
+
+    float[] box = [.. root.Attribute("viewBox")!.Value.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries).Select(n => float.Parse(n, CultureInfo.InvariantCulture))];
+    if (box[2] != box[3])
+        throw new InvalidDataException($"{svg}'s viewBox isn't square.");
+
+    path.Transform(SKMatrix.CreateTranslation(-box[0], -box[1]).PostConcat(SKMatrix.CreateScale(1 / box[2], 1 / box[2])));
     return path;
 }
 
-// The glyph at size × size, as straight-alpha BGRA rows from the top, which is what an icon holds.
-byte[] Render(SKPath glyph, int size)
+// The glyph at size × size in one colour, as straight-alpha BGRA rows from the top, which is what an icon holds.
+static byte[] Render(SKPath glyph, SKColor fill, int size)
 {
     using var bitmap = new SKBitmap(new SKImageInfo(size, size, SKColorType.Bgra8888, SKAlphaType.Premul));
     using (var canvas = new SKCanvas(bitmap))
     {
         canvas.Clear(SKColors.Transparent);
-        canvas.Scale(size / 960f);
+        canvas.Scale(size);
 
-        // The outline is a stroke under the fill, so only its outer half shows: 1 px at 16 px, wider as the icon grows.
-        float outlineWidth = Math.Max(1f, size / 20f) * 960f / size;
-        using var stroke = new SKPaint { IsAntialias = true, Color = outline, Style = SKPaintStyle.Stroke, StrokeWidth = outlineWidth * 2, StrokeJoin = SKStrokeJoin.Round };
         using var body = new SKPaint { IsAntialias = true, Color = fill, Style = SKPaintStyle.Fill };
-        canvas.DrawPath(glyph, stroke);
         canvas.DrawPath(glyph, body);
     }
 

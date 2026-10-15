@@ -6,6 +6,7 @@ using Avalonia.Controls.Chrome;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Metadata;
 
 namespace ChartPacker.UI.Controls
@@ -59,6 +60,8 @@ namespace ChartPacker.UI.Controls
                 Margin = new Thickness(12, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center,
             };
+            // An .ico decodes to its largest frame (256 px), which the default filter shrinks to 16 with jagged edges.
+            RenderOptions.SetBitmapInterpolationMode(_icon, BitmapInterpolationMode.HighQuality);
             _grid = new Grid
             {
                 ColumnDefinitions =
