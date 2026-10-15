@@ -199,6 +199,12 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
     </Style>
+    <!-- A folder path on a title link, trimmed in the middle so its start and last folder stay. -->
+    <Style Selector="Button.title-link TextBlock.path">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="PathSegmentEllipsis" />
+    </Style>
 
     <Style Selector="TextBlock.caption">
         <Setter Property="FontSize" Value="12" />
