@@ -421,7 +421,7 @@ namespace ChartPacker.ViewModels
         private void StartVideo(VideoSource source)
         {
             StopVideo();
-            var playback = new VideoPlayback(source.Open, VideoDecodeWidth);
+            var playback = new VideoPlayback(source.Open, VideoDecodeWidth, source.DisplayName);
             playback.Changed += OnVideoChanged;
             _videoSource = source;
             Video = playback;

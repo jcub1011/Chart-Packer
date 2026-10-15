@@ -837,6 +837,19 @@
     <value>spectrum analyzer analyser bars visualizer visualiser performance slow</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="SettingsCategoryAppearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="AlbumArtThemeLabel" xml:space="preserve">
+    <value>Take colours from album art</value>
+  </data>
+  <data name="AlbumArtThemeDescription" xml:space="preserve">
+    <value>Tint the main window, its accent colour and the spectrum to match the selected song's album art, fading as you move between songs. When off, the app keeps its own colours.</value>
+  </data>
+  <data name="AlbumArtThemeKeywords" xml:space="preserve">
+    <value>colour color theme dynamic accent tint cover art album artwork palette</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
   <data name="FilteredSongCountFormat" xml:space="preserve">
     <value>{0:N0}/{1:N0} songs</value>
     <comment>{0} is the number of songs shown, {1} the number found. Shown while a search or filter hides some.</comment>

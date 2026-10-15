@@ -11,6 +11,7 @@ using Avalonia.Media.Immutable;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
 using ChartPacker.UI.Controls;
+using ChartPacker.UI.Theming;
 
 namespace ChartPacker.Controls
 {
@@ -137,6 +138,15 @@ namespace ChartPacker.Controls
         public static readonly StyledProperty<double> FineScrubFactorProperty =
             AvaloniaProperty.Register<LyricLaneView, double>(nameof(FineScrubFactor), LaneScrub.DefaultFineFactor);
 
+        public static readonly StyledProperty<IBrush?> NoteBrushProperty =
+            AvaloniaProperty.Register<LyricLaneView, IBrush?>(nameof(NoteBrush), new ImmutableSolidColorBrush(Color.FromRgb(0x8B, 0x5C, 0xF6)));
+
+        public static readonly StyledProperty<IBrush?> SingingBrushProperty =
+            AvaloniaProperty.Register<LyricLaneView, IBrush?>(nameof(SingingBrush), new ImmutableSolidColorBrush(Color.FromRgb(0xE9, 0xE3, 0xFF)));
+
+        public static readonly StyledProperty<IBrush?> SungBrushProperty =
+            AvaloniaProperty.Register<LyricLaneView, IBrush?>(nameof(SungBrush), new ImmutableSolidColorBrush(Color.FromRgb(0xC4, 0xB5, 0xFD)));
+
         // Where the now line sits, as a fraction of the width from the left.
         private const double NowFraction = 0.2;
 
@@ -149,28 +159,19 @@ namespace ChartPacker.Controls
         private static readonly IPen NowPen = new ImmutablePen(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF).ToUInt32(), 2);
         private static readonly IPen PitchLinePen = new ImmutablePen(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
-        // The theme's accent: the notes to come, and a brighter tint for what's being and been sung.
-        private static readonly Color NoteColor = Color.FromRgb(0x8B, 0x5C, 0xF6);
-        private static readonly Color SingingColor = Color.FromRgb(0xE9, 0xE3, 0xFF);
-        private static readonly Color SungColor = Color.FromRgb(0xC4, 0xB5, 0xFD);
-
-        private static readonly IBrush NoteBrush = new ImmutableSolidColorBrush(NoteColor);
-        private static readonly IBrush SingingBrush = new ImmutableSolidColorBrush(SingingColor);
-        private static readonly IBrush SungNoteBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, SungColor.R, SungColor.G, SungColor.B));
-        private static readonly IPen SlidePen = new ImmutablePen(Color.FromArgb(0xA0, NoteColor.R, NoteColor.G, NoteColor.B).ToUInt32(), 2);
-
-        private static readonly IBrush SungWordBrush = new ImmutableSolidColorBrush(SungColor);
         private static readonly IBrush PhraseWordBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xF2, 0xF2, 0xF6));
         private static readonly IBrush OtherWordBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x7C, 0x7F, 0x96));
-
-        // The track's waveform behind the notes, in a faint tint of what's been sung, so the notes stand out in front of it.
-        private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x1C, SungColor.R, SungColor.G, SungColor.B));
-        private static readonly IBrush WaveformLoudBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x3C, SungColor.R, SungColor.G, SungColor.B));
 
         private static readonly Typeface WordTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
         // The phrase under the pointer when the whole part is shown, lit above the others.
         private static readonly IBrush HoveredPhraseBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x2C, 0xFF, 0xFF, 0xFF));
+
+        // The brushes drawn from NoteBrush, SingingBrush and SungBrush, made again when one changes or is recoloured.
+        private LaneColours? _colours;
+        private readonly BrushWatch _noteWatch;
+        private readonly BrushWatch _singingWatch;
+        private readonly BrushWatch _sungWatch;
 
         private readonly Dictionary<(int Index, int State), FormattedText> _words = [];
         private double _spaceWidth = -1;
@@ -261,10 +262,51 @@ namespace ChartPacker.Controls
             set => SetValue(FineScrubFactorProperty, value);
         }
 
+        /// <summary>The notes still to come, in the theme's accent for marks on a dark surface. Read as a solid colour.</summary>
+        public IBrush? NoteBrush
+        {
+            get => GetValue(NoteBrushProperty);
+            set => SetValue(NoteBrushProperty, value);
+        }
+
+        /// <summary>The note being sung: a bright tint of the accent. Read as a solid colour.</summary>
+        public IBrush? SingingBrush
+        {
+            get => GetValue(SingingBrushProperty);
+            set => SetValue(SingingBrushProperty, value);
+        }
+
+        /// <summary>The notes and words already sung, and the waveform behind them, faintly. Read as a solid colour.</summary>
+        public IBrush? SungBrush
+        {
+            get => GetValue(SungBrushProperty);
+            set => SetValue(SungBrushProperty, value);
+        }
+
         public LyricLaneView()
         {
             _mode = new LaneScrubMode(this, () => !double.IsNaN(_hoverX) || _isScrubbing);
             EffectiveViewportChanged += OnEffectiveViewportChanged;
+            _noteWatch = new BrushWatch(OnColoursChanged);
+            _singingWatch = new BrushWatch(OnColoursChanged);
+            _sungWatch = new BrushWatch(OnColoursChanged);
+            _noteWatch.Watch(NoteBrush);
+            _singingWatch.Watch(SingingBrush);
+            _sungWatch.Watch(SungBrush);
+        }
+
+        private LaneColours Colours => _colours ??= new LaneColours(
+            ColourOf(NoteBrush, NoteBrushProperty), ColourOf(SingingBrush, SingingBrushProperty), ColourOf(SungBrush, SungBrushProperty));
+
+        private static Color ColourOf(IBrush? brush, StyledProperty<IBrush?> property) =>
+            (brush ?? property.GetDefaultValue(typeof(LyricLaneView))) is ISolidColorBrush solid ? solid.Color : Colors.Transparent;
+
+        // The words already sung are drawn in SungBrush's colour, so they're laid out again too.
+        private void OnColoursChanged()
+        {
+            _colours = null;
+            _words.Clear();
+            InvalidateVisual();
         }
 
         // Whether any of the control is in view: scrolled out of sight, it isn't drawn as the clock moves. Not yet laid
@@ -291,6 +333,14 @@ namespace ChartPacker.Controls
             }
             if (change.Property == SceneProperty || change.Property == IsVisibleProperty)
                 RequestFrame();
+
+            if (change.Property == NoteBrushProperty || change.Property == SingingBrushProperty || change.Property == SungBrushProperty)
+            {
+                _noteWatch.Watch(NoteBrush);
+                _singingWatch.Watch(SingingBrush);
+                _sungWatch.Watch(SungBrush);
+                OnColoursChanged();
+            }
 
             // Shown again, it scrolls with the audio until the pointer is over it again.
             if (change.Property == IsVisibleProperty && !IsVisible && !_isScrubbing)
@@ -364,12 +414,12 @@ namespace ChartPacker.Controls
                 {
                     double shift = TimeShift.TotalSeconds;
                     LaneWaveformPainter.Draw(context, waveform, new Rect(0, noteTop, bounds.Width, noteBottom - noteTop), isVertical: false,
-                        from + shift, to + shift, time => X(time - shift), WaveformPeakBrush, WaveformLoudBrush, LaneWaveformPainter.FullScaleGain(waveform), 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
+                        from + shift, to + shift, time => X(time - shift), Colours.WaveformPeak, Colours.WaveformLoud, LaneWaveformPainter.FullScaleGain(waveform), 1 / (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
                 }
 
                 int phrase = DrawPhrases(context, scene, bounds, now, from, to, X);
                 if (scene.NoteStarts.Length > 0 && noteBottom - noteTop > 6)
-                    DrawNotes(context, scene, bounds, noteTop, noteBottom, now, from, to, X);
+                    DrawNotes(context, scene, Colours, bounds, noteTop, noteBottom, now, from, to, X);
                 if (wordBand > 0)
                     DrawWords(context, scene, bounds, bounds.Height - wordBand, wordBand, now, from, to, phrase, X);
                 context.DrawLine(NowPen, new Point(nowX, 0), new Point(nowX, bounds.Height));
@@ -399,7 +449,7 @@ namespace ChartPacker.Controls
             return current;
         }
 
-        private static void DrawNotes(DrawingContext context, LyricScene scene, Rect bounds, double top, double bottom, double now, double from, double to, Func<double, double> x)
+        private static void DrawNotes(DrawingContext context, LyricScene scene, LaneColours colours, Rect bounds, double top, double bottom, double now, double from, double to, Func<double, double> x)
         {
             double thickness = Math.Clamp((bottom - top) / (Math.Max(1, scene.HighestPitch - scene.LowestPitch) + 2), 3, 8);
             double Y(int i) => NoteY(scene, i, top, bottom, thickness);
@@ -419,10 +469,10 @@ namespace ChartPacker.Controls
 
                 double y = Y(i);
                 double left = x(start), right = Math.Max(x(end), left + thickness);
-                var brush = end < now ? SungNoteBrush : start <= now ? SingingBrush : NoteBrush;
+                var brush = end < now ? colours.SungNote : start <= now ? colours.Singing : colours.Note;
 
                 if (scene.IsSlide[i] && i > 0)
-                    context.DrawLine(SlidePen, new Point(x(scene.NoteEnds[i - 1]), Y(i - 1)), new Point(left, y));
+                    context.DrawLine(colours.Slide, new Point(x(scene.NoteEnds[i - 1]), Y(i - 1)), new Point(left, y));
 
                 if (scene.IsUnpitched[i])
                 {
@@ -478,7 +528,7 @@ namespace ChartPacker.Controls
                 if (scene.NoteStarts.Length > 0 && noteBottom - noteTop > 6)
                 {
                     foreach (var bar in OverviewBarsOf(scene, bounds.Size, noteTop, noteBottom, timeline, shift))
-                        context.FillRectangle(NoteBrush, bar);
+                        context.FillRectangle(Colours.Note, bar);
                 }
 
                 if (wordBand > 0 && phrase >= 0)
@@ -724,7 +774,7 @@ namespace ChartPacker.Controls
         private FormattedText Word(LyricScene scene, int index, int state)
         {
             if (!_words.TryGetValue((index, state), out var text))
-                _words[(index, state)] = text = Text(scene.Words[index], state switch { 0 => SungWordBrush, 1 => PhraseWordBrush, _ => OtherWordBrush });
+                _words[(index, state)] = text = Text(scene.Words[index], state switch { 0 => Colours.SungWord, 1 => PhraseWordBrush, _ => OtherWordBrush });
             return text;
         }
 
@@ -804,5 +854,26 @@ namespace ChartPacker.Controls
 
         /// <summary>The whole part's note bars, and the scene, size, length of song and shift they were laid out for.</summary>
         private sealed record OverviewMarks(LyricScene Scene, Size Size, double Timeline, double Shift, List<Rect> Bars);
+
+        /// <summary>The brushes and pen the notes, sung words and waveform are drawn in, from the three colours set.</summary>
+        private sealed class LaneColours(Color note, Color singing, Color sung)
+        {
+            public IBrush Note { get; } = new ImmutableSolidColorBrush(note);
+
+            public IBrush Singing { get; } = new ImmutableSolidColorBrush(singing);
+
+            public IBrush SungNote { get; } = new ImmutableSolidColorBrush(WithAlpha(sung, 0x90));
+
+            public IPen Slide { get; } = new ImmutablePen(WithAlpha(note, 0xA0).ToUInt32(), 2);
+
+            public IBrush SungWord { get; } = new ImmutableSolidColorBrush(sung);
+
+            // The track's waveform behind the notes, in a faint tint of what's been sung, so the notes stand out in front of it.
+            public IBrush WaveformPeak { get; } = new ImmutableSolidColorBrush(WithAlpha(sung, 0x1C));
+
+            public IBrush WaveformLoud { get; } = new ImmutableSolidColorBrush(WithAlpha(sung, 0x3C));
+
+            private static Color WithAlpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
+        }
     }
 }

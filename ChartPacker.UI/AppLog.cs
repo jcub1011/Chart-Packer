@@ -1,15 +1,25 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Logging;
 using ChartPacker.Core;
+using ChartPacker.Core.Diagnostics;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using Serilog;
 using Serilog.Core;
+using Serilog.Events;
+using AvaloniaLogger = Avalonia.Logging.Logger;
+using AvaloniaLogLevel = Avalonia.Logging.LogEventLevel;
+using LogEventLevel = Serilog.Events.LogEventLevel;
+using Logger = Serilog.Core.Logger;
 
 namespace ChartPacker.UI
 {
@@ -23,6 +33,11 @@ namespace ChartPacker.UI
     {
         /// <summary>The number of daily log files kept per app.</summary>
         public const int RetainedFiles = 7;
+
+        // Which thread logged each entry, and the class it came from, so what ran just before a crash can be followed
+        // on each thread, e.g. "[14 Video playback] VideoPlayback: ...".
+        private const string OutputTemplate =
+            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{Thread}] {Source}: {Message:lj}{NewLine}{Exception}";
 
         private static readonly Lock s_gate = new();
         private static string s_appName = "app";
@@ -53,14 +68,17 @@ namespace ChartPacker.UI
             {
                 if (!ReferenceEquals(e.ExceptionObject, escaped))
                 {
-                    Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception");
+                    Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception on thread {Thread}; the app is ending", ThreadLabel());
                 }
             };
             TaskScheduler.UnobservedTaskException += (_, e) => Log.Error(e.Exception, "Unobserved task exception");
 
+            Log.Information(
+                "{App} {Version} starting: {OS}, .NET {Runtime} {Architecture}, process {ProcessId}",
+                appName, AppVersion.Semantic, RuntimeInformation.OSDescription, Environment.Version, RuntimeInformation.ProcessArchitecture, Environment.ProcessId);
+            var session = enabled ? BeginSession(appName) : null;
             try
             {
-                Log.Information("{App} {Version} starting", appName, AppVersion.Semantic);
                 int code = run();
                 Log.Information("{App} exiting with code {ExitCode}", appName, code);
                 return code;
@@ -73,7 +91,35 @@ namespace ChartPacker.UI
             }
             finally
             {
+                session?.End();
                 SetEnabled(false);
+            }
+        }
+
+        /// <summary>
+        /// Marks this session as running, and logs any earlier one that never shut down. A crash the runtime can't report
+        /// (an ExecutionEngineException, an access violation in native code) logs nothing itself, so this is the only sign
+        /// of it; the entries that session logged last show what it was doing.
+        /// </summary>
+        private static SessionMarker? BeginSession(string appName)
+        {
+            try
+            {
+                var session = SessionMarker.Begin(UserConfigPaths.LogFolder, appName, AppVersion.Semantic, DateTimeOffset.Now, Environment.ProcessId);
+                foreach (var unclean in session.Unclean)
+                {
+                    Log.Warning(
+                        "The {App} session started {Started} (version {Version}, process {ProcessId}) never shut down: it crashed, " +
+                        "was ended, or the computer stopped. Its last entries, in the log for that day, show what it was doing",
+                        appName, unclean.Started, unclean.Version, unclean.ProcessId);
+                }
+
+                return session;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Log.Warning(ex, "Couldn't mark the session as running, so a crash won't be noticed at the next start");
+                return null;
             }
         }
 
@@ -97,10 +143,15 @@ namespace ChartPacker.UI
                         .MinimumLevel.Information()
 #endif
                         .Enrich.WithProperty("App", s_appName)
+                        .Enrich.With<ThreadAndSourceEnricher>()
+                        // Each entry is passed to the system as it's written (not buffered), so whatever was logged
+                        // before a crash, even one that ends the process at once, is in the file.
                         .WriteTo.File(
                             Path.Combine(UserConfigPaths.LogFolder, s_appName + "-.log"),
+                            outputTemplate: OutputTemplate,
                             rollingInterval: RollingInterval.Day,
-                            retainedFileCountLimit: RetainedFiles)
+                            retainedFileCountLimit: RetainedFiles,
+                            buffered: false)
                         .CreateLogger();
                     Log.Logger = s_logger;
                     Log.Information("Logging on");
@@ -116,6 +167,85 @@ namespace ChartPacker.UI
                     s_logger = null;
                     closing.Dispose();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Passes Avalonia's own warnings and errors (bindings that fail, layout that can't be done) on to the log, as
+        /// well as to <paramref name="builder"/>'s sink, e.g. <c>LogToTrace</c>'s. Call it after that.
+        /// </summary>
+        public static AppBuilder LogToAppLog(this AppBuilder builder)
+        {
+            ArgumentNullException.ThrowIfNull(builder);
+            AvaloniaLogger.Sink = new AvaloniaLogSink(AvaloniaLogger.Sink);
+            return builder;
+        }
+
+        // The current thread's id, and its name when it has one, e.g. "14 Video playback".
+        private static string ThreadLabel()
+        {
+            var thread = Thread.CurrentThread;
+            return thread.Name is { Length: > 0 } name
+                ? $"{thread.ManagedThreadId.ToString(CultureInfo.InvariantCulture)} {name}"
+                : thread.ManagedThreadId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>Adds <c>Thread</c>, and <c>Source</c>: the logging class's name without its namespace, or "-".</summary>
+        private sealed class ThreadAndSourceEnricher : ILogEventEnricher
+        {
+            public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
+            {
+                logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("Thread", ThreadLabel()));
+                string source = logEvent.Properties.TryGetValue(Constants.SourceContextPropertyName, out var context)
+                    && context is ScalarValue { Value: string name }
+                    ? name[(name.LastIndexOf('.') + 1)..]
+                    : "-";
+                logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("Source", source));
+            }
+        }
+
+        /// <summary>
+        /// Avalonia's log, at Warning and up, to Serilog under the source <c>Avalonia/&lt;area&gt;</c>. A message
+        /// repeated many times (one binding failing on every row, say) is only logged the first few times.
+        /// </summary>
+        private sealed class AvaloniaLogSink(ILogSink? inner) : ILogSink
+        {
+            private const int MaxRepeats = 20;
+
+            private readonly Lock _gate = new();
+            private readonly Dictionary<(string Area, string Template), int> _counts = [];
+
+            public bool IsEnabled(AvaloniaLogLevel level, string area) =>
+                level >= AvaloniaLogLevel.Warning || inner?.IsEnabled(level, area) == true;
+
+            public void Log(AvaloniaLogLevel level, string area, object? source, string messageTemplate) =>
+                Log(level, area, source, messageTemplate, []);
+
+            public void Log(AvaloniaLogLevel level, string area, object? source, string messageTemplate, params object?[] propertyValues)
+            {
+                if (inner?.IsEnabled(level, area) == true)
+                    inner.Log(level, area, source, messageTemplate, propertyValues);
+                if (level < AvaloniaLogLevel.Warning)
+                    return;
+
+                int count;
+                lock (_gate)
+                {
+                    _counts.TryGetValue((area, messageTemplate), out count);
+                    _counts[(area, messageTemplate)] = ++count;
+                }
+
+                if (count > MaxRepeats)
+                    return;
+
+                var logger = Serilog.Log.ForContext(Constants.SourceContextPropertyName, "Avalonia/" + area)
+                    .ForContext("AvaloniaSource", source?.GetType().Name);
+                var serilogLevel = level == AvaloniaLogLevel.Warning ? LogEventLevel.Warning
+                    : level == AvaloniaLogLevel.Error ? LogEventLevel.Error
+                    : LogEventLevel.Fatal;
+                logger.Write(serilogLevel, messageTemplate, propertyValues);
+                if (count == MaxRepeats)
+                    logger.Write(serilogLevel, "(That message has been logged {Count} times; it won't be again this session)", count);
             }
         }
 

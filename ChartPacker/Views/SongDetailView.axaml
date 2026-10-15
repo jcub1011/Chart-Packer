@@ -235,7 +235,16 @@
                           Source="{Binding Player}"
                           LowColor="{DynamicResource SpectrumLowColor}"
                           MiddleColor="{DynamicResource SpectrumMiddleColor}"
-                          HighColor="{DynamicResource SpectrumHighColor}" />
+                          HighColor="{DynamicResource SpectrumHighColor}">
+            <!-- The album art's colours change the shades at once; these fade them, with the rest of the panel. -->
+            <ctl:SpectrumView.Transitions>
+                <Transitions>
+                    <ColorTransition Property="LowColor" Duration="0:0:0.4" Easing="CubicEaseInOut" />
+                    <ColorTransition Property="MiddleColor" Duration="0:0:0.4" Easing="CubicEaseInOut" />
+                    <ColorTransition Property="HighColor" Duration="0:0:0.4" Easing="CubicEaseInOut" />
+                </Transitions>
+            </ctl:SpectrumView.Transitions>
+        </ctl:SpectrumView>
 
         <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Center"
@@ -691,6 +700,9 @@
                                                    Clock="{Binding Lyrics.Clock}"
                                                    LengthSeconds="{Binding Player.TimelineSeconds}"
                                                    FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
+                                                   NoteBrush="{DynamicResource AccentMarkBrush}"
+                                                   SingingBrush="{DynamicResource AccentHighlightBrush}"
+                                                   SungBrush="{DynamicResource AccentTextBrush}"
                                                    ToolTip.Tip="{Binding Player.LyricsScrubToolTip}"
                                                    IsVisible="{Binding Lyrics.HasLyrics}" />
                                 <TextBlock Classes="muted centered"

@@ -1,3 +1,5 @@
+using Serilog;
+
 namespace ChartPacker.Video;
 
 /// <summary>
@@ -23,8 +25,11 @@ public sealed class VideoPlayback : IDisposable
     // Catching up for longer than this, in milliseconds, shows how far it has got meanwhile.
     private const long PublishInterval = 100;
 
+    private static ILogger Logger => Log.ForContext<VideoPlayback>();
+
     private readonly Func<Stream> _open;
     private readonly int _maxWidth;
+    private readonly string _name;
     private readonly Thread _thread;
     private readonly AutoResetEvent _wake = new(false);
     private readonly TaskCompletionSource _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -40,12 +45,14 @@ public sealed class VideoPlayback : IDisposable
 
     /// <param name="open">Opens the video; called once, on the playback thread. The stream is disposed with the playback.</param>
     /// <param name="maxWidth">Frames wider than this are scaled down to it.</param>
-    public VideoPlayback(Func<Stream> open, int maxWidth)
+    /// <param name="name">What the video is called in the log, e.g. its file name.</param>
+    public VideoPlayback(Func<Stream> open, int maxWidth, string? name = null)
     {
         ArgumentNullException.ThrowIfNull(open);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxWidth, 1);
         _open = open;
         _maxWidth = maxWidth;
+        _name = name ?? "a video";
         _thread = new Thread(Run) { IsBackground = true, Name = "Video playback" };
         _thread.Start();
     }
@@ -154,28 +161,42 @@ public sealed class VideoPlayback : IDisposable
             }
             catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException)
             {
-                Error = ex.Message;
-                Changed?.Invoke(this, EventArgs.Empty);
+                Logger.Warning(ex, "{Video} couldn't be opened", _name);
+                Fail(ex.Message);
                 return;
             }
 
             Width = decoder.Width;
             Height = decoder.Height;
             Duration = decoder.Duration;
+            Logger.Information("{Video} opened: {Width}×{Height}, {Duration}", _name, Width, Height, Duration);
             Changed?.Invoke(this, EventArgs.Empty);
             Play(decoder);
         }
         catch (InvalidDataException ex)
         {
-            Error = ex.Message;
-            Changed?.Invoke(this, EventArgs.Empty);
+            Logger.Warning(ex, "{Video} stopped decoding", _name);
+            Fail(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            // A bug, not a bad file; but on this thread it would end the app, so the video shows it failed instead.
+            Logger.Error(ex, "{Video} playback failed unexpectedly", _name);
+            Fail(ex.Message);
         }
         finally
         {
             decoder?.Dispose();
             _wake.Dispose();
             _closed.TrySetResult();
+            Logger.Debug("{Video} closed", _name);
         }
+    }
+
+    private void Fail(string error)
+    {
+        Error = error;
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private void Play(VideoDecoder decoder)

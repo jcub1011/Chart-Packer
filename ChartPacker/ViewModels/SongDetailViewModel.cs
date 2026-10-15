@@ -16,15 +16,18 @@ using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
+using ChartPacker.Core.Theming;
 using ChartPacker.Core.Validation;
 using ChartPacker.Core.Validation.QuickFixes;
 using ChartPacker.Resources;
 using ChartPacker.Services;
 using ChartPacker.UI.Formatting;
 using ChartPacker.UI.Services;
+using ChartPacker.UI.Theming;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Serilog;
 
 namespace ChartPacker.ViewModels
 {
@@ -152,6 +155,9 @@ namespace ChartPacker.ViewModels
         // Staged replacement images by source path.
         private Dictionary<string, StagedArt> _stagedArt = new(StringComparer.Ordinal);
 
+        // The theme each decoded image gives the window, by image hash; an image too grey for one has none.
+        private Dictionary<string, ThemeSeed> _artSeeds = new(StringComparer.Ordinal);
+
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
 
@@ -195,6 +201,11 @@ namespace ChartPacker.ViewModels
             _filePicker = filePicker;
             _videoProbe = videoProbe;
             Player = player;
+            Player.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(PlayerViewModel.AlbumArtTheming))
+                    RefreshThemeSeed();
+            };
             Background = new BackgroundViewModel(() => Player.DrawnPosition);
             Background.PropertyChanged += (_, e) =>
             {
@@ -358,6 +369,14 @@ namespace ChartPacker.ViewModels
         /// <summary>Shown in the tile instead of an image, e.g. "Album art not set" or "Album art differs".</summary>
         [ObservableProperty]
         public partial string? ArtNote { get; set; }
+
+        /// <summary>
+        /// What the main window takes its colours from (MainWindow.axaml): the shown album art's, while
+        /// <see cref="PlayerViewModel.AlbumArtTheming"/> is on; otherwise <see langword="null"/>, for the app's own. Kept
+        /// while another selection loads, so the window fades straight from one song's colours to the next.
+        /// </summary>
+        [ObservableProperty]
+        public partial ThemeSeed? ThemeSeed { get; set; }
 
         /// <summary>The shown album art's stored name, e.g. <c>album.png</c>, when it's known.</summary>
         [ObservableProperty]
@@ -550,8 +569,13 @@ namespace ChartPacker.ViewModels
             if (entries.Count == 0)
             {
                 _loadCts = null;
+                ThemeSeed = null;
                 return;
             }
+
+            // What's being looked at, so a crash's last entries say which song it was.
+            Log.ForContext<SongDetailViewModel>().Debug(
+                "Showing {Count} song(s), first {Song}{InPlace}", entries.Count, entries[0].FullPath, inPlace ? " (read again in place)" : "");
 
             // Drafts live on the UI thread, so the staged images to show are picked out here.
             var stagedSources = entries
@@ -602,7 +626,10 @@ namespace ChartPacker.ViewModels
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 if (_loadCts == cts)
+                {
                     ErrorMessage = string.Format(CultureInfo.CurrentCulture, Strings.DetailUnreadableFormat, ex.Message);
+                    ThemeSeed = null;
+                }
             }
             finally
             {
@@ -796,7 +823,7 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
-            var (art, bitmap) = await Task.Run(() => LoadStagedAsync(path, CancellationToken.None));
+            var (art, bitmap, seed) = await Task.Run(() => LoadStagedAsync(path, CancellationToken.None));
 
             // The selection may have moved on while the image was read.
             if (!ReferenceEquals(songs, _songs) || !CanEdit)
@@ -812,6 +839,8 @@ namespace ChartPacker.ViewModels
             }
 
             AddImage(art.Hash!, bitmap!);
+            if (seed is not null)
+                _artSeeds.TryAdd(art.Hash!, seed);
             _stagedArt[path] = art;
             foreach (var song in _songs)
                 song.Item.Draft.SetAlbumArt(path);
@@ -1676,6 +1705,7 @@ namespace ChartPacker.ViewModels
                 .Select(x => new EditableSong(
                     x.Song.Entry, new MetadataItem(x.Song.Pairs!, _drafts.Get(x.Song.Entry.FullPath), x.Song.DuplicateKeys), x.Song.SongIniPath, x.ArtHash, x.Backgrounds))];
             _artImages = loaded.Art.Images;
+            _artSeeds = loaded.Art.Seeds;
             _stagedArt = loaded.Art.Staged;
             _diskFiles = loaded.Files;
             _totalSize = loaded.TotalSize;
@@ -1915,6 +1945,7 @@ namespace ChartPacker.ViewModels
             }
 
             (ArtFileName, ArtFileSize) = keys is [not null] ? SharedArtFile() : (null, null);
+            RefreshThemeSeed();
             RefreshPlayback();
             SyncTimingOffsets();
             RebuildFiles();
@@ -1922,6 +1953,13 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ArtMarker));
             OnPropertyChanged(nameof(IsBackgroundChanged));
             RefreshCommands();
+        }
+
+        /// <summary>Takes the theme from the art every selected song shares, or not, as <see cref="ThemeSeed"/> says.</summary>
+        private void RefreshThemeSeed()
+        {
+            var keys = _songs.Select(EffectiveArtKey).Distinct(StringComparer.Ordinal).Take(2).ToList();
+            ThemeSeed = Player.AlbumArtTheming && keys is [{ } key] ? _artSeeds.GetValueOrDefault(key) : null;
         }
 
         /// <summary>
@@ -2234,6 +2272,7 @@ namespace ChartPacker.ViewModels
             ArtNote = null;
             DisposeLater(_artImages.Values);
             _artImages = [];
+            _artSeeds = new(StringComparer.Ordinal);
             _stagedArt = new(StringComparer.Ordinal);
         }
 
@@ -2253,12 +2292,13 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Hashes each readable song's album art, decodes the first one's (the only one that can be
-        /// what every song shares), and reads the staged replacement images.
+        /// what every song shares) and finds its theme, and reads the staged replacement images.
         /// </summary>
         private static async Task<LoadedArt> LoadArtAsync(IReadOnlyList<LoadedSong> songs, IReadOnlyList<string> stagedSources, CancellationToken cancellationToken)
         {
             var hashes = new string?[songs.Count];
             var images = new Dictionary<string, Bitmap>(StringComparer.Ordinal);
+            var seeds = new Dictionary<string, ThemeSeed>(StringComparer.Ordinal);
             var staged = new Dictionary<string, StagedArt>(StringComparer.Ordinal);
             int first = songs.ToList().FindIndex(s => s.Pairs is not null);
             var options = new ParallelOptions { MaxDegreeOfParallelism = BulkLoadParallelism, CancellationToken = cancellationToken };
@@ -2286,17 +2326,24 @@ namespace ChartPacker.ViewModels
                     hashes[i] = Hash(bytes);
                     if (i == first && Decode(bytes) is { } bitmap)
                     {
+                        var seed = ThemeSampler.FromImageBytes(bytes);
                         lock (images)
+                        {
                             images[hashes[i]!] = bitmap;
+                            if (seed is not null)
+                                seeds[hashes[i]!] = seed;
+                        }
                     }
                 }).ConfigureAwait(false);
 
                 foreach (string source in stagedSources)
                 {
-                    var (art, bitmap) = await LoadStagedAsync(source, cancellationToken).ConfigureAwait(false);
+                    var (art, bitmap, seed) = await LoadStagedAsync(source, cancellationToken).ConfigureAwait(false);
                     staged[source] = art;
                     if (bitmap is not null && !images.TryAdd(art.Hash!, bitmap))
                         bitmap.Dispose();
+                    if (seed is not null)
+                        seeds.TryAdd(art.Hash!, seed);
                 }
             }
             catch
@@ -2306,12 +2353,12 @@ namespace ChartPacker.ViewModels
                 throw;
             }
 
-            return new LoadedArt(hashes, images, staged);
+            return new LoadedArt(hashes, images, seeds, staged);
         }
 
-        /// <summary>Reads, hashes and decodes an image chosen as album art.</summary>
-        /// <returns>The image, with its decoded bitmap; or, when it can't be used, why not and no bitmap.</returns>
-        private static async Task<(StagedArt Art, Bitmap? Bitmap)> LoadStagedAsync(string path, CancellationToken cancellationToken)
+        /// <summary>Reads, hashes and decodes an image chosen as album art, and finds its theme.</summary>
+        /// <returns>The image, with its decoded bitmap and theme, if it has one; or, when it can't be used, why not and no bitmap.</returns>
+        private static async Task<(StagedArt Art, Bitmap? Bitmap, ThemeSeed? Seed)> LoadStagedAsync(string path, CancellationToken cancellationToken)
         {
             byte[] bytes;
             try
@@ -2320,19 +2367,19 @@ namespace ChartPacker.ViewModels
                 if (length > AlbumArt.DefaultMaxBytes)
                 {
                     string limit = ByteSizeFormatter.Format((ulong)AlbumArt.DefaultMaxBytes);
-                    return (new StagedArt(null, length, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtTooLargeFormat, limit)), null);
+                    return (new StagedArt(null, length, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtTooLargeFormat, limit)), null, null);
                 }
 
                 bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return (new StagedArt(null, 0, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtUnreadableFormat, ex.Message)), null);
+                return (new StagedArt(null, 0, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtUnreadableFormat, ex.Message)), null, null);
             }
 
             return Decode(bytes) is { } bitmap
-                ? (new StagedArt(Hash(bytes), bytes.Length, null), bitmap)
-                : (new StagedArt(null, bytes.Length, SharedStrings.ArtNotAnImage), null);
+                ? (new StagedArt(Hash(bytes), bytes.Length, null), bitmap, ThemeSampler.FromImageBytes(bytes))
+                : (new StagedArt(null, bytes.Length, SharedStrings.ArtNotAnImage), null, null);
         }
 
         private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
@@ -2520,8 +2567,10 @@ namespace ChartPacker.ViewModels
         /// <summary>The selection's album art as loaded off the UI thread.</summary>
         /// <param name="DiskHashes">Each loaded song's art hash, by index.</param>
         /// <param name="Images">Decoded images by hash.</param>
+        /// <param name="Seeds">The decoded images' themes by hash, for those that have one.</param>
         /// <param name="Staged">Staged replacement images by source path.</param>
-        private sealed record LoadedArt(IReadOnlyList<string?> DiskHashes, Dictionary<string, Bitmap> Images, Dictionary<string, StagedArt> Staged);
+        private sealed record LoadedArt(
+            IReadOnlyList<string?> DiskHashes, Dictionary<string, Bitmap> Images, Dictionary<string, ThemeSeed> Seeds, Dictionary<string, StagedArt> Staged);
 
         /// <summary>One song's metadata as loaded off the UI thread.</summary>
         /// <param name="Pairs">The stored pairs, or <see langword="null"/> when the song couldn't be read.</param>
@@ -2543,7 +2592,7 @@ namespace ChartPacker.ViewModels
             string? MetadataNote)
         {
             /// <summary>Filled in after the metadata by <see cref="LoadArtAsync"/>.</summary>
-            public LoadedArt Art { get; init; } = new([], [], []);
+            public LoadedArt Art { get; init; } = new([], [], [], []);
 
             /// <summary>Filled in after the metadata by <see cref="BackgroundViewModel.LoadAsync"/>.</summary>
             public LoadedBackgrounds Backgrounds { get; init; } = LoadedBackgrounds.Empty;

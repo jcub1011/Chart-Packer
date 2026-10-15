@@ -61,7 +61,7 @@ public sealed class ChartUndoStack
         _saved = startsSaved ? 0 : -1;
     }
 
-    private static ILogger Logger => Log.ForContext(typeof(ChartUndoStack));
+    private static ILogger Logger => Log.ForContext<ChartUndoStack>();
 
     /// <summary>Raised after each command is done, undone or redone, for the views and chart lint to follow.</summary>
     public event EventHandler<ChartCommandEventArgs>? Changed;

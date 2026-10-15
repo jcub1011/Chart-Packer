@@ -31,6 +31,7 @@ namespace ChartBuilder
                 .WithDeveloperTools()
 #endif
                 .WithInterFont()
-                .LogToTrace();
+                .LogToTrace()
+                .LogToAppLog();
     }
 }

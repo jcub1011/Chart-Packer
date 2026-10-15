@@ -30,6 +30,7 @@ namespace ChartPacker
                 .WithDeveloperTools()
 #endif
                 .WithInterFont()
-                .LogToTrace();
+                .LogToTrace()
+                .LogToAppLog();
     }
 }

@@ -341,7 +341,7 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            Video = new VideoPlayback(open, VideoDecodeWidth);
+            Video = new VideoPlayback(open, VideoDecodeWidth, name);
         }
 
         private async Task ShowImageAsync(MediaRef effective)

@@ -130,6 +130,7 @@ namespace ChartPacker.ViewModels
             ShowWaveforms = settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
+            AlbumArtTheming = settings.Settings.AlbumArtTheming;
             WaveformFidelity = settings.Settings.WaveformFidelity;
             ScrubStep = settings.Settings.ScrubStep;
             FineScrubMilliseconds = settings.Settings.FineScrubMilliseconds;
@@ -264,6 +265,10 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool ShowSpectrum { get; set; }
 
+        /// <summary>Whether the window showing a song takes its colours from its album art. Kept in the settings.</summary>
+        [ObservableProperty]
+        public partial bool AlbumArtTheming { get; set; }
+
         /// <summary>How finely the tracks' waveforms are read; changed, they're read again. Kept in the settings.</summary>
         [ObservableProperty]
         public partial WaveformFidelity WaveformFidelity { get; set; }
@@ -391,6 +396,7 @@ namespace ChartPacker.ViewModels
             ShowWaveforms = _settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
+            AlbumArtTheming = _settings.Settings.AlbumArtTheming;
             WaveformFidelity = _settings.Settings.WaveformFidelity;
             ScrubStep = _settings.Settings.ScrubStep;
             FineScrubMilliseconds = _settings.Settings.FineScrubMilliseconds;
@@ -1066,6 +1072,8 @@ namespace ChartPacker.ViewModels
             RaiseTracksChanged();
             StartPeaks(entry, [.. Tracks.Select(t => t.Track)]);
         }
+
+        partial void OnAlbumArtThemingChanged(bool value) => _settings.Settings.AlbumArtTheming = value;
 
         partial void OnShowSpectrumChanged(bool value)
         {

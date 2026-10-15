@@ -19,7 +19,7 @@ public sealed class CompositeCommand : ChartCommand
             throw new ArgumentException("A composite command holds commands.", nameof(commands));
     }
 
-    private static ILogger Logger => Log.ForContext(typeof(CompositeCommand));
+    private static ILogger Logger => Log.ForContext<CompositeCommand>();
 
     /// <summary>The commands, in the order they're applied.</summary>
     public IReadOnlyList<IChartCommand> Commands => _commands;

@@ -87,7 +87,7 @@ public sealed class ChartLinter
         _project = project;
     }
 
-    private static ILogger Logger => Log.ForContext(typeof(ChartLinter));
+    private static ILogger Logger => Log.ForContext<ChartLinter>();
 
     /// <summary>The rules it runs, in order.</summary>
     public IReadOnlyList<IChartLintRule> Rules => _rules;
