@@ -41,9 +41,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="InputLabel" xml:space="preserve">
-    <value>Input</value>
-  </data>
   <data name="BrowseDialogTitle" xml:space="preserve">
     <value>Choose a folder of songs</value>
   </data>
@@ -159,20 +156,20 @@
   <data name="NoOtherFiles" xml:space="preserve">
     <value>No other files</value>
   </data>
-  <data name="OutputLabel" xml:space="preserve">
-    <value>Output</value>
-  </data>
   <data name="OutputWatermark" xml:space="preserve">
     <value>Next to the scanned songs</value>
   </data>
   <data name="OutputToolTip" xml:space="preserve">
-    <value>Where Pack and Unpack write. Each item keeps its place relative to the scanned folder.</value>
+    <value>Choose where Pack and Unpack write. Each item keeps its place relative to the scanned folder.</value>
   </data>
   <data name="BrowseOutputDialogTitle" xml:space="preserve">
     <value>Choose the output folder</value>
   </data>
   <data name="BrowseOutputToolTip" xml:space="preserve">
     <value>Choose where Pack and Unpack write</value>
+  </data>
+  <data name="BrowseBusyToolTip" xml:space="preserve">
+    <value>Wait for Pack or Unpack to finish before choosing another folder</value>
   </data>
   <data name="ResetOutputToolTip" xml:space="preserve">
     <value>Write next to the scanned songs again</value>

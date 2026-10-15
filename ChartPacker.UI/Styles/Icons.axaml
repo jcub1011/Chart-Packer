@@ -87,6 +87,8 @@
     <StreamGeometry x:Key="SettingsStroke">M6.9,1 H9.1 L9.5,2.8 L10.7,3.3 L12.2,2.3 L13.7,3.8 L12.7,5.3 L13.2,6.5 L15,6.9 V9.1 L13.2,9.5 L12.7,10.7 L13.7,12.2 L12.2,13.7 L10.7,12.7 L9.5,13.2 L9.1,15 H6.9 L6.5,13.2 L5.3,12.7 L3.8,13.7 L2.3,12.2 L3.3,10.7 L2.8,9.5 L1,9.1 V6.9 L2.8,6.5 L3.3,5.3 L2.3,3.8 L3.8,2.3 L5.3,3.3 L6.5,2.8 Z M10.25,8 A2.25,2.25 0 1 1 5.75,8 A2.25,2.25 0 1 1 10.25,8 Z</StreamGeometry>
     <!-- An eye: what's shown. -->
     <StreamGeometry x:Key="ViewStroke">M1.5,8 C3.5,4.5 12.5,4.5 14.5,8 C12.5,11.5 3.5,11.5 1.5,8 Z M10,8 A2,2 0 1 1 6,8 A2,2 0 1 1 10,8 Z</StreamGeometry>
+    <!-- An arrow pointing right: from one thing to the next, such as the songs folder to the output folder. -->
+    <StreamGeometry x:Key="ArrowRightStroke">M2.5,8 H13.5 M9.5,4 L13.5,8 L9.5,12</StreamGeometry>
     <!-- A small chevron pointing down, beside a button's text: it opens a menu. -->
     <StreamGeometry x:Key="ChevronDownStroke">M4.5,6.5 L8,10 L11.5,6.5</StreamGeometry>
     <StreamGeometry x:Key="AddStroke">M8,3.5 V12.5 M3.5,8 H12.5</StreamGeometry>

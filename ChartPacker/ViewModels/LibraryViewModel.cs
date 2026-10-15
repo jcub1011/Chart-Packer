@@ -206,7 +206,11 @@ namespace ChartPacker.ViewModels
             Job.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(JobViewModel.IsRunning))
+                {
                     RefreshCommands();
+                    OnPropertyChanged(nameof(SongsFolderToolTip));
+                    OnPropertyChanged(nameof(OutputFolderToolTip));
+                }
             };
         }
 
@@ -382,6 +386,12 @@ namespace ChartPacker.ViewModels
         }
 
         private bool CanBrowse() => !Job.IsRunning;
+
+        /// <summary>The title bar's songs folder tooltip: what it does, or while a job runs, why it can't.</summary>
+        public string SongsFolderToolTip => Job.IsRunning ? Strings.BrowseBusyToolTip : Strings.BrowseToolTip;
+
+        /// <summary>The title bar's output folder tooltip: what it does, or while a job runs, why it can't.</summary>
+        public string OutputFolderToolTip => Job.IsRunning ? Strings.BrowseBusyToolTip : Strings.OutputToolTip;
 
         [RelayCommand(CanExecute = nameof(CanBrowse))]
         private async Task BrowseAsync()
