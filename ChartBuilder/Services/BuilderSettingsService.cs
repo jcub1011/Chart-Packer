@@ -6,6 +6,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder.Services
 {
@@ -99,29 +100,14 @@ namespace ChartBuilder.Services
         private static double Size(double value, double min, double fallback) =>
             double.IsFinite(value) ? Math.Clamp(value, min, BuilderSettings.MaxEditorPanelSize) : fallback;
 
-        /// <summary>
-        /// A saved editor normal size, clamped to the window's minimum and maximum; null when it isn't a
-        /// number. A bound missing any part restores none of it, so a half-saved bound is dropped whole.
-        /// </summary>
+        /// <summary>The editor's saved normal bounds, as <see cref="WindowBounds.FromSaved"/> reads them: dropped whole when half-saved.</summary>
         private static void SanitizeEditorBounds(BuilderSettings settings)
         {
-            double? width = settings.EditorWidth is { } w && double.IsFinite(w)
-                ? Math.Clamp(w, BuilderSettings.MinEditorWidth, BuilderSettings.MaxEditorWidth)
-                : null;
-            double? height = settings.EditorHeight is { } h && double.IsFinite(h)
-                ? Math.Clamp(h, BuilderSettings.MinEditorHeight, BuilderSettings.MaxEditorHeight)
-                : null;
-            if (width is null || height is null || settings.EditorX is null || settings.EditorY is null)
-            {
-                settings.EditorX = null;
-                settings.EditorY = null;
-                settings.EditorWidth = null;
-                settings.EditorHeight = null;
-                return;
-            }
-
-            settings.EditorWidth = width;
-            settings.EditorHeight = height;
+            var bounds = WindowBounds.FromSaved(settings.EditorX, settings.EditorY, settings.EditorWidth, settings.EditorHeight);
+            settings.EditorX = bounds?.Position.X;
+            settings.EditorY = bounds?.Position.Y;
+            settings.EditorWidth = bounds?.Size.Width;
+            settings.EditorHeight = bounds?.Size.Height;
         }
     }
 }

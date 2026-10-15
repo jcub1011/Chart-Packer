@@ -1,6 +1,7 @@
 using System;
 using ChartShared.Core.Library;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Services
 {
@@ -105,6 +106,18 @@ namespace ChartPacker.Services
             settings.LaneFineScrubFactor = double.IsFinite(settings.LaneFineScrubFactor)
                 ? Math.Clamp(settings.LaneFineScrubFactor, AppSettings.MinLaneFineScrubFactor, AppSettings.MaxLaneFineScrubFactor)
                 : AppSettings.DefaultLaneFineScrubFactor;
+
+            SanitizeMainWindowBounds(settings);
+        }
+
+        /// <summary>The main window's saved normal bounds, as <see cref="WindowBounds.FromSaved"/> reads them: dropped whole when half-saved.</summary>
+        private static void SanitizeMainWindowBounds(AppSettings settings)
+        {
+            var bounds = WindowBounds.FromSaved(settings.MainWindowX, settings.MainWindowY, settings.MainWindowWidth, settings.MainWindowHeight);
+            settings.MainWindowX = bounds?.Position.X;
+            settings.MainWindowY = bounds?.Position.Y;
+            settings.MainWindowWidth = bounds?.Size.Width;
+            settings.MainWindowHeight = bounds?.Size.Height;
         }
     }
 }

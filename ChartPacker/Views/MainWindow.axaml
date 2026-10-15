@@ -15,6 +15,7 @@
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1080" Height="800"
         MinWidth="640" MinHeight="360"
+        WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="30"
         theme:DynamicTheme.Seed="{Binding Detail.ThemeSeed}">

@@ -45,6 +45,18 @@ namespace ChartPacker.Services
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
 
+        /// <summary>Whether the main window was maximized when it last closed, so it opens that way.</summary>
+        public bool MainWindowMaximized { get; set; }
+
+        /// <summary>The main window's normal bounds when it last closed, in screen pixels (position) and device-independent pixels (size). Null for none yet.</summary>
+        public int? MainWindowX { get; set; }
+
+        public int? MainWindowY { get; set; }
+
+        public double? MainWindowWidth { get; set; }
+
+        public double? MainWindowHeight { get; set; }
+
         /// <summary>Whether the merge songs editor was maximized when it was last closed.</summary>
         public bool MergeWindowMaximized { get; set; }
 
