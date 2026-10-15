@@ -18,6 +18,7 @@
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         theme:DynamicTheme.Seed="{Binding Detail.ThemeSeed}">
 
     <!-- The whole window, and the menus and flyouts it opens, take their colours from the selected song's album art
@@ -27,22 +28,6 @@
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
     </Window.KeyBindings>
-
-    <!-- With the client area extended, Avalonia draws the caption buttons itself (Fluent's WindowDrawnDecorations), as in
-         Chart Builder's editor window. Its own title text is hidden, as the title bar below has the icon and menus, and
-         its full screen button, as full screen hides the caption buttons, leaving no way to restore, resize or close the
-         window. The window's Title still names it in the taskbar. -->
-    <Window.WindowDecorationsTheme>
-        <ControlTheme TargetType="WindowDrawnDecorations" BasedOn="{StaticResource {x:Type WindowDrawnDecorations}}">
-            <!-- The text, not its panel: the panel's IsVisible is template-bound, which a style can't override. -->
-            <Style Selector="^ /template/ Panel#PART_TitleTextPanel > TextBlock">
-                <Setter Property="IsVisible" Value="False" />
-            </Style>
-            <Style Selector="^ /template/ Button#PART_FullScreenButton">
-                <Setter Property="IsVisible" Value="False" />
-            </Style>
-        </ControlTheme>
-    </Window.WindowDecorationsTheme>
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>

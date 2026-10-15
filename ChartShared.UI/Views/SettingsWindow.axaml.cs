@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -15,6 +16,7 @@ namespace ChartShared.UI.Views
         public SettingsWindow()
         {
             InitializeComponent();
+            WindowTitleBar.Icon = WindowChrome.ImageOf(Icon);
 
             Opened += (_, _) =>
             {
@@ -24,6 +26,24 @@ namespace ChartShared.UI.Views
 
             // Ctrl+E focuses search, as in Visual Studio. Tunnelled, so a focused editor can't swallow it.
             AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        }
+
+        /// <summary>The program's name, which screen readers give the title bar's icon.</summary>
+        public string? AppName
+        {
+            get => WindowTitleBar.AppName;
+            set => WindowTitleBar.AppName = value;
+        }
+
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+
+            // The icon is the owner's (WindowChrome.UseOwnerIcon), so the title bar shows it as the window gets it.
+            // Null-checked, as a style can set the icon before InitializeComponent has made the title bar; the
+            // constructor copies that one over.
+            if (change.Property == IconProperty && WindowTitleBar is not null)
+                WindowTitleBar.Icon = WindowChrome.ImageOf(Icon);
         }
 
         private void OnPreviewKeyDown(object? sender, KeyEventArgs e)

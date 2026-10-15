@@ -19,13 +19,23 @@ namespace ChartShared.UI.Views
         /// </summary>
         public static WindowBounds? FromSaved(int? x, int? y, double? width, double? height)
         {
-            if (x is not { } left || y is not { } top || width is not { } w || height is not { } h
-                || !double.IsFinite(w) || !double.IsFinite(h) || w <= 0 || h <= 0)
+            if (x is not { } left || y is not { } top || SizeFromSaved(width, height) is not { } size)
                 return null;
 
-            return new WindowBounds(
-                new PixelPoint(left, top),
-                new Size(Math.Min(w, MaxSize.Width), Math.Min(h, MaxSize.Height)));
+            return new WindowBounds(new PixelPoint(left, top), size);
+        }
+
+        /// <summary>
+        /// The size saved as <paramref name="width"/> and <paramref name="height"/>, in device-independent pixels,
+        /// clamped to <see cref="MaxSize"/>. Null when either is missing or isn't a positive number, so a half-saved size
+        /// is dropped whole.
+        /// </summary>
+        public static Size? SizeFromSaved(double? width, double? height)
+        {
+            if (width is not { } w || height is not { } h || !double.IsFinite(w) || !double.IsFinite(h) || w <= 0 || h <= 0)
+                return null;
+
+            return new Size(Math.Min(w, MaxSize.Width), Math.Min(h, MaxSize.Height));
         }
 
         /// <summary>The bounds' middle, in screen pixels, with the size scaled as a screen of <paramref name="scaling"/> shows it.</summary>

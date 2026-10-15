@@ -1,7 +1,11 @@
 using System;
+using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
 
 namespace ChartShared.UI.Views
 {
@@ -30,6 +34,26 @@ namespace ChartShared.UI.Views
             var link = window.Bind(Window.IconProperty, owner.GetObservable(Window.IconProperty));
             // The owner outlives the window; drop the subscription so a closed window isn't kept alive by it.
             window.Closed += (_, _) => link.Dispose();
+        }
+
+        /// <summary>
+        /// <paramref name="icon"/> as an image, for a <see cref="ChartShared.UI.Controls.TitleBar"/> in a window that only has its
+        /// owner's icon (<see cref="UseOwnerIcon"/>). Null for no icon.
+        /// </summary>
+        /// <remarks>
+        /// Decoded once per icon and shared, as an owner's icon is the same each time a window takes it; the image lives as
+        /// long as the icon does.
+        /// </remarks>
+        public static IImage? ImageOf(WindowIcon? icon) => icon is null ? null : IconImages.GetValue(icon, Decode);
+
+        private static readonly ConditionalWeakTable<WindowIcon, IImage> IconImages = new();
+
+        private static IImage Decode(WindowIcon icon)
+        {
+            using var stream = new MemoryStream();
+            icon.Save(stream);
+            stream.Position = 0;
+            return new Bitmap(stream);
         }
     }
 }

@@ -5,6 +5,7 @@
         xmlns:svm="using:ChartShared.UI.ViewModels.Settings"
         xmlns:res="using:ChartShared.UI.Resources"
         xmlns:ctl="using:ChartShared.UI.Controls"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="560"
         x:Class="ChartShared.UI.Views.SettingsWindow"
         x:DataType="svm:SettingsWindowViewModel"
@@ -13,9 +14,26 @@
         Width="820" Height="560"
         MinWidth="560" MinHeight="360"
         ShowInTaskbar="False"
+        CanMinimize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterOwner">
 
+    <!-- Opened by AvaloniaSettingsWindowService, which centers it over its owner at the size it last closed at;
+         CenterOwner is for when that can't be worked out. It can't be minimized: a modal window with no taskbar entry
+         would have nothing to restore it from, leaving its owner disabled. -->
+
     <Window.Styles>
+        <!-- The search box in the title bar: shorter than a TextBox's usual 32, to fit the 30 high bar. -->
+        <Style Selector="TextBox.title-search">
+            <Setter Property="Width" Value="300" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
         <Style Selector="TextBlock.settings-heading">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -113,18 +131,32 @@
     </Window.DataTemplates>
 
     <Grid RowDefinitions="Auto,*,Auto">
-        <Border Grid.Row="0" Classes="toolbar">
-            <TextBox x:Name="SearchBox"
-                     Classes="clearButton"
-                     VerticalContentAlignment="Center"
-                     Text="{Binding SearchText}"
-                     PlaceholderText="{x:Static res:SharedStrings.SettingsSearchWatermark}"
-                     AutomationProperties.Name="{x:Static res:SharedStrings.SettingsSearchWatermark}">
-                <TextBox.InnerLeftContent>
-                    <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
-                </TextBox.InnerLeftContent>
-            </TextBox>
-        </Border>
+        <!-- The title bar, as the main windows' are: the icon (the owner's, set in code), the title and the search box.
+             Dragging anywhere but the search box moves the window. -->
+        <ctl:TitleBar x:Name="WindowTitleBar"
+                      Grid.Row="0"
+                      Height="31"
+                      BorderThickness="0,0,0,1"
+                      BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <StackPanel Orientation="Horizontal"
+                        Spacing="12"
+                        VerticalAlignment="Center">
+                <TextBlock FontSize="12"
+                           VerticalAlignment="Center"
+                           Text="{x:Static res:SharedStrings.SettingsWindowTitle}" />
+                <TextBox x:Name="SearchBox"
+                         Classes="clearButton title-search"
+                         chrome:WindowDecorationProperties.ElementRole="User"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding SearchText}"
+                         PlaceholderText="{x:Static res:SharedStrings.SettingsSearchWatermark}"
+                         AutomationProperties.Name="{x:Static res:SharedStrings.SettingsSearchWatermark}">
+                    <TextBox.InnerLeftContent>
+                        <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+            </StackPanel>
+        </ctl:TitleBar>
 
         <Grid Grid.Row="1" ColumnDefinitions="220,*">
             <Border Grid.Column="0"

@@ -375,7 +375,10 @@ namespace ChartBuilder.Services
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,
             settingsPicker => new SettingsWindowViewModel(
-                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings), settingsPicker, settings.Save));
+                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings), settingsPicker, settings.Save),
+            settings.Settings,
+            settings.Save,
+            Strings.AppName);
 
         /// <summary>Puts every profile's bindings back to the keyboard's defaults, keeping each device's settings.</summary>
         private void ResetBindings()

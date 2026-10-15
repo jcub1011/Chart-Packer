@@ -42,6 +42,35 @@ public sealed class WindowBoundsTests
     }
 
     [TestMethod]
+    public void ReadsASizeSavedWhole()
+    {
+        Assert.AreEqual(new Size(820, 560), WindowBounds.SizeFromSaved(820, 560));
+    }
+
+    [TestMethod]
+    public void DropsASizeMissingEitherPart()
+    {
+        Assert.IsNull(WindowBounds.SizeFromSaved(null, 560));
+        Assert.IsNull(WindowBounds.SizeFromSaved(820, null));
+    }
+
+    [TestMethod]
+    public void DropsASizeThatIsntAPositiveNumber()
+    {
+        Assert.IsNull(WindowBounds.SizeFromSaved(double.NaN, 560));
+        Assert.IsNull(WindowBounds.SizeFromSaved(820, double.NegativeInfinity));
+        Assert.IsNull(WindowBounds.SizeFromSaved(0, 560));
+        Assert.IsNull(WindowBounds.SizeFromSaved(820, -5));
+    }
+
+    [TestMethod]
+    public void ClampsASavedSizeBiggerThanAnyScreen()
+    {
+        Assert.AreEqual(WindowBounds.MaxSize, WindowBounds.SizeFromSaved(20000, 9000));
+        Assert.AreEqual(new Size(WindowBounds.MaxSize.Width, 560), WindowBounds.SizeFromSaved(20000, 560));
+    }
+
+    [TestMethod]
     public void FindsTheMiddleWithTheSizeScaledAsTheScreenShowsIt()
     {
         var bounds = new WindowBounds(new PixelPoint(-100, 50), new Size(800, 600));
