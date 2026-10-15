@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Library;
-using ChartPacker.UI;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Library;
+using ChartShared.UI;
 
 namespace ChartPacker.Services
 {

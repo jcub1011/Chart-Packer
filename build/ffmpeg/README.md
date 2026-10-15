@@ -1,10 +1,10 @@
 # FFmpeg for background video and audio
 
-`ChartPacker.Ffmpeg` binds FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`,
-`swscale`, and `swresample`, which the Opus decoder needs). `ChartPacker.Video` plays songs'
-background videos through them. `ChartPacker.Audio` decodes Vorbis, Opus and MPEG audio packets
+`ChartShared.Ffmpeg` binds FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`,
+`swscale`, and `swresample`, which the Opus decoder needs). `ChartShared.Video` plays songs'
+background videos through them. `ChartShared.Audio` decodes Vorbis, Opus and MPEG audio packets
 with them, having read the containers itself. The libraries go in
-`ChartPacker.Ffmpeg/runtimes/<rid>/native/`, which is gitignored. From there they're copied beside
+`ChartShared.Ffmpeg/runtimes/<rid>/native/`, which is gitignored. From there they're copied beside
 the executable on build and publish, as SDL's library is.
 
 Without them the app builds and runs:
@@ -87,7 +87,7 @@ cross-compile it from WSL with llvm-mingw.
    build/ffmpeg/build.sh win-x64
    ```
 
-   The first run offers to install the tools and the mingw-w64 cross-compiler with apt. It takes a few minutes. The libraries it copies into `ChartPacker.Ffmpeg/runtimes/win-x64/native/`
+   The first run offers to install the tools and the mingw-w64 cross-compiler with apt. It takes a few minutes. The libraries it copies into `ChartShared.Ffmpeg/runtimes/win-x64/native/`
    replace whatever was there, including a `fetch-prebuilt.sh` download.
 
 ## For development: `fetch-prebuilt.sh <rid>`
@@ -100,7 +100,7 @@ Don't ship them.
 
 ## Another version
 
-The bindings in `ChartPacker.Ffmpeg/Interop/Native.cs` declare the leading fields of FFmpeg's
+The bindings in `ChartShared.Ffmpeg/Interop/Native.cs` declare the leading fields of FFmpeg's
 structs for these major versions: avformat 63, avcodec 63, avutil 61, swscale 10.
 `FfmpegLibrary` refuses any other major version. To move to one:
 

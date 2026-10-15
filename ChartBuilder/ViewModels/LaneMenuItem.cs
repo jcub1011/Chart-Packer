@@ -4,10 +4,10 @@ using System.Globalization;
 using System.Linq;
 using System.Windows.Input;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charts;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels

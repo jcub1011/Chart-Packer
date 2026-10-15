@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Threading;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Library;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Validation.QuickFixes;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Library;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Validation.QuickFixes;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels

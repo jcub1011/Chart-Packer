@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Authoring;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charting.Playtest;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Launching;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charting.Playtest;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Launching;
 
 namespace ChartBuilder.Services
 {
@@ -46,7 +46,7 @@ namespace ChartBuilder.Services
         /// <summary>The most a saved panel width or timeline height is restored as: wider than an 8K screen.</summary>
         public const double MaxEditorPanelSize = 8192;
 
-        /// <summary>Whether Chart Builder writes log files (<see cref="ChartPacker.UI.AppLog"/>).</summary>
+        /// <summary>Whether Chart Builder writes log files (<see cref="ChartShared.UI.AppLog"/>).</summary>
         public bool LoggingEnabled { get; set; } = true;
 
         /// <summary>The name a new chart's <c>charter</c> is filled in with. Empty for none.</summary>
@@ -143,7 +143,7 @@ namespace ChartBuilder.Services
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;
 
-        /// <summary>The songs opened lately, the latest first, as the File menu's Open recent lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
+        /// <summary>The songs opened lately, the latest first, as the File menu's Open recent lists them (<see cref="ChartShared.Core.Launching.RecentSongs"/>).</summary>
         public List<RecentSong> RecentSongs { get; set; } = [];
 
         /// <summary>The fewest minutes between autosaves.</summary>

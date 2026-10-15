@@ -1,5 +1,5 @@
-using ChartPacker.Core.Calibration;
-using ChartPacker.Core.Settings;
+using ChartShared.Core.Calibration;
+using ChartShared.Core.Settings;
 
 namespace ChartBuilder.Tests.Calibration;
 

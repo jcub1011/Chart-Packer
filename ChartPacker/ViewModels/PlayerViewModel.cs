@@ -7,19 +7,19 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Threading;
-using ChartPacker.Audio.Mixing;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Audio.Spectrum;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Audio.Mixing;
+using ChartShared.Audio.Playback;
+using ChartShared.Audio.Spectrum;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PreviewStartTime = ChartPacker.Core.Metadata.PreviewStart;
+using PreviewStartTime = ChartShared.Core.Metadata.PreviewStart;
 
 namespace ChartPacker.ViewModels
 {

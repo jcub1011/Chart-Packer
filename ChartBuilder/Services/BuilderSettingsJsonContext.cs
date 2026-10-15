@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using ChartPacker.Core.Charting.Authoring;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Launching;
+using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Launching;
 
 namespace ChartBuilder.Services
 {

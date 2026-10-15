@@ -13,7 +13,7 @@ using SkiaSharp;
 // The sizes Windows asks an icon for, from the small list view to the extra-large icons.
 int[] sizes = [16, 20, 24, 32, 40, 48, 64, 256];
 
-// The colours are darker shades of the red, orange and blue frets (ChartPacker.UI/Controls/Highway/HighwayPalette.cs).
+// The colours are darker shades of the red, orange and blue frets (ChartShared.UI/Controls/Highway/HighwayPalette.cs).
 // They aren't the app's theme colours, so a restyle doesn't change them.
 (string Source, string Icon, SKColor Fill)[] icons =
 [

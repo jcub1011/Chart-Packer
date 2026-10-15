@@ -1,4 +1,4 @@
-using ChartPacker.UI.ViewModels;
+using ChartShared.UI.ViewModels;
 using ChartBuilder.Tests.Charting.Saving;
 using static ChartBuilder.Tests.Charting.Saving.SaveFolders;
 
@@ -58,7 +58,7 @@ public sealed class TrackStagingTests
     {
         var options = TrackStaging.OptionsFor(["guitar"], _ => new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }));
 
-        Assert.HasCount(ChartPacker.Core.Scanning.AudioStems.Stems.Count, options);
+        Assert.HasCount(ChartShared.Core.Scanning.AudioStems.Stems.Count, options);
         Assert.AreNotEqual("guitar", options.Single(o => o.Stem == "guitar").Label);
         Assert.AreEqual("bass", options.Single(o => o.Stem == "bass").Label);
     }

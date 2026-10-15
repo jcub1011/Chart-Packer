@@ -46,8 +46,8 @@ $isWindowsRuntime = $Runtime -like 'win-*'
 $outputDir = Join-Path $repoRoot "publish/$Runtime"
 $stagingDir = Join-Path $repoRoot "publish/$Runtime.staging"
 
-# ChartPacker.Ffmpeg copies these beside the executables, but only if they're there to copy.
-$ffmpegDir = Join-Path $repoRoot "ChartPacker.Ffmpeg/runtimes/$Runtime/native"
+# ChartShared.Ffmpeg copies these beside the executables, but only if they're there to copy.
+$ffmpegDir = Join-Path $repoRoot "ChartShared.Ffmpeg/runtimes/$Runtime/native"
 
 # Why the FFmpeg in $ffmpegDir can't be published, or $null when it can. Only builds with the audio
 # decoders have swresample, which the Opus decoder needs; without it, audio would play on the managed decoders.

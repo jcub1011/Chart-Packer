@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Scanning;
 using ScanBench;
 
 // Times the library scan on a real library (see README.md):

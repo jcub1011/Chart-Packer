@@ -4,12 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Input;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Input;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

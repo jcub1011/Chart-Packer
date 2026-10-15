@@ -1,12 +1,12 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Trash;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Trash;
+using ChartShared.UI.Services;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Services
 {

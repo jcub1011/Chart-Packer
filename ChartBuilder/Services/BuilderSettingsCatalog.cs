@@ -2,14 +2,14 @@ using System;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Authoring;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charting.Playtest;
-using ChartPacker.Core.Settings;
-using ChartPacker.Resources;
-using ChartPacker.UI;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charting.Playtest;
+using ChartShared.Core.Settings;
+using ChartShared.UI;
+using ChartShared.UI.Resources;
 
 namespace ChartBuilder.Services
 {

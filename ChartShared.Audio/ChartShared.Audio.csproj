@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- The SDL3 bindings take pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Concentus" />
+    <PackageReference Include="NLayer" />
+    <PackageReference Include="NVorbis" />
+    <PackageReference Include="ppy.SDL3-CS" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The decoder tests simulate FFmpeg lacking a decoder, through an internal overload. -->
+    <InternalsVisibleTo Include="ChartShared.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChartShared.Core\ChartShared.Core.csproj" />
+    <!-- FFmpeg's audio decoders, used when its libraries are present. -->
+    <ProjectReference Include="..\ChartShared.Ffmpeg\ChartShared.Ffmpeg.csproj" />
+  </ItemGroup>
+</Project>

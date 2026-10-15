@@ -1,7 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:res="using:ChartBuilder.Resources"
-                    xmlns:ctl="using:ChartPacker.UI.Controls"
+                    xmlns:ctl="using:ChartShared.UI.Controls"
                     xmlns:bctl="using:ChartBuilder.Controls">
 
     <!-- The Editor's side panels (EditorSidePanel.cs): compact tabs along the top, like a docked tool window, or,

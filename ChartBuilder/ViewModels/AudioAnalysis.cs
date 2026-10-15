@@ -8,10 +8,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
-using ChartPacker.Audio.Analysis;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Charting.Analysis;
-using ChartPacker.Core.Scanning;
+using ChartShared.Audio.Analysis;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Charting.Analysis;
+using ChartShared.Core.Scanning;
 
 namespace ChartBuilder.ViewModels
 {

@@ -5,17 +5,17 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core;
-using ChartPacker.Core.Launching;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
-using ChartPacker.Ffmpeg;
 using ChartPacker.Services;
-using ChartPacker.UI.Services;
 using ChartPacker.ViewModels;
-using ChartPacker.ViewModels.Settings;
 using ChartPacker.Views;
+using ChartShared.Audio.Playback;
+using ChartShared.Core;
+using ChartShared.Core.Launching;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.Ffmpeg;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels.Settings;
 
 namespace ChartPacker
 {

@@ -1,6 +1,6 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Tests.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Tests.Charts;
 using static ChartBuilder.Tests.Charting.MidiChartLoaderTests;
 
 namespace ChartBuilder.Tests.Charting;

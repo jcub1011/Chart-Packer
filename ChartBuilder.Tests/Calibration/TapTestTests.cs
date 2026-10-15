@@ -1,4 +1,4 @@
-using ChartPacker.Core.Calibration;
+using ChartShared.Core.Calibration;
 
 namespace ChartBuilder.Tests.Calibration;
 

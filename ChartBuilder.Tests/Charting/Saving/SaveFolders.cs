@@ -1,10 +1,10 @@
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Saving;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Scanning;
 
 namespace ChartBuilder.Tests.Charting.Saving;
 
@@ -111,7 +111,7 @@ internal sealed class SaveFolders : IDisposable
         var slots = request.Media!.Keys.ToList();
         var kept = stash is null ? new Dictionary<MediaSlot, string>() : await stash.KeepAsync(song, slots, cancellationToken);
         var findings = await ChartSaver.SaveAsync(song.Entry!, request, written, cancellationToken);
-        Assert.DoesNotContain(f => f.Severity == ChartPacker.Core.Validation.Severity.Error, findings, string.Join("; ", findings.Select(f => f.Message)));
+        Assert.DoesNotContain(f => f.Severity == ChartShared.Core.Validation.Severity.Error, findings, string.Join("; ", findings.Select(f => f.Message)));
         song.SongEventsSaved(request.Snapshot);
         song.Saved(ChartSaver.SavedSong(song, song.Entry!, request), song.Chart.Parts.Select(p => p.Instrument).ToHashSet(), new MediaSaveResult(slots, kept));
         return request;

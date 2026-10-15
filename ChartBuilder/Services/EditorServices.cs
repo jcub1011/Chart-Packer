@@ -1,7 +1,7 @@
 using System;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.UI.Services;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Charting.Recovery;
+using ChartShared.UI.Services;
 
 namespace ChartBuilder.Services
 {

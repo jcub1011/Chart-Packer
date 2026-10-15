@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Scanning;
 
 namespace ChartPacker.ViewModels
 {

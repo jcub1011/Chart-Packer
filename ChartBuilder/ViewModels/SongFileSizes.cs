@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Sng;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Sng;
 
 namespace ChartBuilder.ViewModels
 {

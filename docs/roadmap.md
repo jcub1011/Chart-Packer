@@ -31,7 +31,7 @@ its exit criteria. This file owns only the order and the status.
 
 **Status: done.**
 
-Both apps build from one solution, share `ChartPacker.UI`, and publish and install together.
+Both apps build from one solution, share `ChartShared.UI`, and publish and install together.
 Chart Builder has its launcher, `BuilderArgs`, `BuilderSettings` and `JsonSettingsFile<T>`. Chart
 Packer's **Edit chart** is in place, and was turned on in CM2.
 
@@ -41,7 +41,7 @@ gone. A new chart's first save writes its folder with `NewChartCreator.CreateAsy
 
 **Left for when it's needed:**
 
-- **`MessageDialog`** is still in `ChartPacker/Views`. It moves to `ChartPacker.UI` when Chart
+- **`MessageDialog`** is still in `ChartPacker/Views`. It moves to `ChartShared.UI` when Chart
   Builder first needs it, as `ConfirmDialog` did.
 - **`ViewLocator`.** Chart Builder has none. Its lanes and canvases are built in code, so nothing
   needs one yet ([§4.5](charter-spec-v1.md#45-app-chartbuilder)).
@@ -50,7 +50,7 @@ gone. A new chart's first save writes its folder with `NewChartCreator.CreateAsy
 
 **Status: done.**
 
-Most of it is in `ChartPacker.Core/Charting/`, with its tests in the new `ChartBuilder.Tests`.
+Most of it is in `ChartShared.Core/Charting/`, with its tests in the new `ChartBuilder.Tests`.
 
 **What was built:**
 
@@ -73,7 +73,7 @@ Most of it is in `ChartPacker.Core/Charting/`, with its tests in the new `ChartB
   `GameNotes` share the note pairing and the drum rules with the loader and the game view.
 - **Saving.** `SongFolderFiles.ApplyAsync` now moves new files in before deleting
   ([AC C2.4](charter-spec-v1.md#c2-open-and-import)).
-- **Logging.** Both apps log through Serilog (`ChartPacker.UI/AppLog.cs`), with a Logging setting
+- **Logging.** Both apps log through Serilog (`ChartShared.UI/AppLog.cs`), with a Logging setting
   that opens the log folder.
 
 **Left for later:**
@@ -136,7 +136,7 @@ engine. Its design decisions are recorded in the spec, as *Settled in CM2* and *
   overview, Properties; [C4](charter-spec-v1.md#c4-tempo-map-and-grid) the tempo map, anchors,
   snap and tap tempo; [C5](charter-spec-v1.md#c5-5-fret-notes) 5-fret notes;
   [C10](charter-spec-v1.md#c10-playback) the transport bar, regions, the loop and following. The
-  highway's drawing moved to `ChartPacker.UI`.
+  highway's drawing moved to `ChartShared.UI`.
 - **Saving** ([C17](charter-spec-v1.md#c17-save-and-export)): Save, a new chart's first save,
   **New chart in this song**, Save and pack, Export copy, and the pending changes with Revert and
   Restore. [C15](charter-spec-v1.md#c15-editing-ergonomics) autosave and recovery.
@@ -155,7 +155,7 @@ engine. Its design decisions are recorded in the spec, as *Settled in CM2* and *
   Chart Inspector rates parts.
 - **The Chart Inspector** was a placeholder. Done since: it edits the song's metadata, ratings,
   delay and album art, and lists its tracks and files, sharing Chart Packer's metadata section
-  (`MetadataEditorViewModel` in `ChartPacker.UI`). Adding, replacing and removing tracks and files
+  (`MetadataEditorViewModel` in `ChartShared.UI`). Adding, replacing and removing tracks and files
   there is still to do. A new chart's name and artist are set in it, and its first save asks only
   where the folder goes.
 - **Device IDs on macOS and Linux.** A Core Audio device UID and a PulseAudio or PipeWire sink
@@ -220,7 +220,7 @@ decisions are recorded in the spec, as *Settled in CM4*.
 
 **What was built:**
 
-- **Analysis** (`ChartPacker.Audio/Analysis/`). Audio read at its full rate, a stem or several
+- **Analysis** (`ChartShared.Audio/Analysis/`). Audio read at its full rate, a stem or several
   mixed (`AnalysisInput`), on threads below normal priority that take the most wanted chunk next
   (`AnalysisWorkers`), with two frames to an FFT (`RealFftPair`). The plain data and beat arithmetic
   the editor uses are in Core (`Charting/Analysis/`: `BeatProposal`, `DetectedOnset`, `BeatMath`).
@@ -285,7 +285,7 @@ recorded in the spec, as *Settled in CM5*.
 - **Lint in the library** ([C16](charter-spec-v1.md#c16-chart-lint) item 5). `SongChartLint` and its
   session cache, on the Validator's workers; a song's chart findings in the Validator and the detail
   panel. Packing is never blocked. `SongOpener.LoadChart` reads a chart the same way in both apps.
-- **Preview** ([C18](charter-spec-v1.md#c18-preview)). `NoteHighwayView` moved to `ChartPacker.UI`;
+- **Preview** ([C18](charter-spec-v1.md#c18-preview)). `NoteHighwayView` moved to `ChartShared.UI`;
   the Preview tab and window, practice over the loop, and the suggested rating
   (`DifficultyEstimator`), used through a pending change (`EditorSong.SetRating`) or CHR083's fix.
 

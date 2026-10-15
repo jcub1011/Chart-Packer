@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Scanning;
 
 namespace ChartPacker.Thumbnails;
 

@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.UI.Services;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Services
 {

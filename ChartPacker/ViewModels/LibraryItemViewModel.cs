@@ -1,10 +1,10 @@
 using System;
 using Avalonia.Media.Imaging;
-using ChartPacker.Core.Library;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
-using ChartPacker.UI.Formatting;
+using ChartShared.Core.Library;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.UI.Formatting;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartPacker.ViewModels

@@ -1,7 +1,7 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Metadata;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Metadata;
 using static ChartBuilder.Tests.Charting.ChartSettingsCommandTests;
 
 namespace ChartBuilder.Tests.Charting;
@@ -161,7 +161,7 @@ public sealed class PendingSongIniChangesTests
         Assert.AreSequenceEqual(
             [new PendingSongIniChange("delay", "0", PendingChangeReason.DelayFromDownbeat), new PendingSongIniChange("delay_seconds", null, PendingChangeReason.DelayFromDownbeat)],
             changes.ToList());
-        Assert.AreEqual(TimeSpan.Zero, ChartPacker.Core.Charts.SongChartSettings.DelayOf(PendingSongIniChanges.Apply(inputs.Pairs, changes), (TimeSpan?)null));
+        Assert.AreEqual(TimeSpan.Zero, ChartShared.Core.Charts.SongChartSettings.DelayOf(PendingSongIniChanges.Apply(inputs.Pairs, changes), (TimeSpan?)null));
     }
 
     [TestMethod]

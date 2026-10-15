@@ -8,8 +8,8 @@ using Avalonia.Threading;
 using ChartBuilder.Instruments;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Input;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Input;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

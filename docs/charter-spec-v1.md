@@ -94,13 +94,13 @@ saved as `pro_drums` and `five_lane_drums` in `song.ini`, as the games read it
 Chart-Packer.slnx
 ├── ChartPacker/                  Chart Packer app: library, inspector, packing. Launches Chart Builder (§4.8)
 ├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases, calibration tool
-├── ChartPacker.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
+├── ChartBuilder.Devices/         Instrument devices (new, C19): SDL3 game controllers, and MIDI input on Windows (winmm)
+├── ChartShared.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
 │                                 settings window, shared controls, and the drawing of notes and waveforms
-├── ChartPacker.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synthesis/ (`Synth`: click, beep, hit sounds)
-├── ChartPacker.Input/            Instrument devices (new, C19): SDL3 game controllers, and MIDI input on Windows (winmm)
-├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions, playtest), + SongLock,
+├── ChartShared.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synthesis/ (`Synth`: click, beep, hit sounds)
+├── ChartShared.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions, playtest), + SongLock,
 │                                 + Input/ (bindings, routing and timing of instrument input, C19)
-└── ChartPacker.Core.Tests/       + Charting/, Audio/Analysis/ tests
+└── ChartShared.Core.Tests/       + Charting/, Audio/Analysis/ tests
 ```
 
 Chart Packer and Chart Builder are two executables. They are built against the same package
@@ -109,14 +109,14 @@ folder and one copy of each native library (SDL3, Skia, HarfBuzz, ANGLE and FFmp
 installs both ([project-spec §4](project-spec-v1.md#4-architecture)).
 
 Core stays UI-free and Avalonia-free, as now
-([project-spec §4.1](project-spec-v1.md#41-chartpackercore)). Chart Builder's model, commands, writer
+([project-spec §4.1](project-spec-v1.md#41-chartsharedcore)). Chart Builder's model, commands, writer
 and lint all live in Core, so Chart Packer (for lint in the library, [C16](#c16-chart-lint)) and a
-later CLI can use them. UI code that both apps need lives in `ChartPacker.UI`, and moves there only
+later CLI can use them. UI code that both apps need lives in `ChartShared.UI`, and moves there only
 when the second app first needs it.
 
 <a id="editable-model"></a>
 
-### 4.1 Editable model (`ChartPacker.Core/Charting/`)
+### 4.1 Editable model (`ChartShared.Core/Charting/`)
 
 The existing `ChartDocument` (`Charts/ChartModel.cs`) is **immutable and lossy by design**. It
 holds what the library, the highway and the merger need: resolved notes, with HOPOs worked out
@@ -267,7 +267,7 @@ changed in this way. Keeping ticks (the default) never touches passthrough track
   differently (for example an open note in a chord, CHR022). So a chart with lint errors still
   passes the check and can be saved.
 
-### 4.4 Audio analysis (`ChartPacker.Audio/Analysis/`)
+### 4.4 Audio analysis (`ChartShared.Audio/Analysis/`)
 
 | Component | Responsibility |
 | --------- | -------------- |
@@ -367,7 +367,7 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
     editor's state, UI-free, so its tests need no canvas. The canvases only map the pointer to a
     tick and a lane, through `LaneProjection`.
   - Drawing uses `GemPainter`, `HighwayPalette` and `LaneWaveformPainter`, which moved from
-    Chart Packer's `NoteHighwayView` into `ChartPacker.UI`.
+    Chart Packer's `NoteHighwayView` into `ChartShared.UI`.
   - Chart Packer's player and highway view models stay in Chart Packer. They're built round the
     inspector's song, drafts and offsets, which the editor doesn't have.
 - **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
@@ -377,8 +377,8 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   `.sng`, which opens it
   ([C2](#c2-open-and-import)). Chart Packer's main window takes no drops for Chart Builder.
 - Strings go in Chart Builder's own `Strings.resx`, and strings both apps use go in
-  `ChartPacker.UI`'s `SharedStrings.resx`. New icons come from game-icons.net and are credited in
-  `THIRD-PARTY-NOTICES.md`. Styling follows the shared theme in `ChartPacker.UI/Styles/`.
+  `ChartShared.UI`'s `SharedStrings.resx`. New icons come from game-icons.net and are credited in
+  `THIRD-PARTY-NOTICES.md`. Styling follows the shared theme in `ChartShared.UI/Styles/`.
 
 ### 4.6 Saving
 
@@ -431,7 +431,7 @@ devices through Windows's own winmm, called with `LibraryImport`.
 
 The one addition is **Serilog** (`Serilog` and `Serilog.Sinks.File`, Apache 2.0). Both apps log
 through it to daily files in the per-user log folder (`UserConfigPaths.LogFolder`), which is kept
-outside the config folder. It is configured in code (`ChartPacker.UI/AppLog.cs`), never from a
+outside the config folder. It is configured in code (`ChartShared.UI/AppLog.cs`), never from a
 settings file, and nothing is logged with `{@…}` destructuring, so no reflection is needed. Core
 logs through Serilog's static `Log`, which is silent until an app configures it, so tests write no
 logs.
@@ -468,7 +468,7 @@ which Chart Packer uses when Chart Builder isn't beside it. Release builds have 
 **One song per Chart Builder process.** Each Chart Builder window has at most one song open, and
 several can run at once on different songs.
 
-**Song lock (`ChartPacker.Core/Scanning/SongLock`).**
+**Song lock (`ChartShared.Core/Scanning/SongLock`).**
 
 - While a song is open, Chart Builder holds a lock file for it in the per-user config folder
   (`locks/<hash of the song's full path>`), opened with `FileShare.None`. .NET maps `FileShare` to
@@ -2047,7 +2047,7 @@ Acceptance criteria:
 - **Where the preview is.** A **Preview** tab in the Editor's right panel, and a window of its own
   (**Window**), which F11 makes full screen. Both show the lane in focus, or a part and difficulty
   picked, with practice, the speed and how far ahead it looks. A scrub on the highway moves
-  playback there. The control is Chart Packer's inspector's, moved to `ChartPacker.UI`.
+  playback there. The control is Chart Packer's inspector's, moved to `ChartShared.UI`.
 - **Rebuilt by track.** After an edit that touches the track shown, the whole track's scene is
   built again from its game view, at most once a frame and only while it's shown, not only the
   range the edit touched, as the game view is worked out a track at a time.
@@ -2476,7 +2476,7 @@ Editor straight away, with no dialog before it.
   resize the lanes. Each lane's ▾ menu switches its part (each part is shown at most once), + adds a
   lane (a highway to the right of the last one, a vocal part the full width along the bottom), and ✕
   closes it. The lanes, where they are and their sizes are saved (`LaneDockLayout`, in
-  `ChartPacker.Core/Charting/Layout/`).
+  `ChartShared.Core/Charting/Layout/`).
 - « and » collapse a panel to a strip along that edge, with its tab titles turned on their side.
   Clicking a title brings the panel back on that tab. The panel widths, whether each is collapsed, and the
   timeline's height (the ═ splitter above it) are saved.
@@ -2743,9 +2743,9 @@ fails the run if anything there changes anyway.
 
 | Milestone | Contents | Exit criteria |
 | --------- | -------- | ------------- |
-| **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartPacker.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and **New chart**, which opens the Editor. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; New chart opens the Editor from Chart Builder's home screen and from dropped audio files |
+| **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartShared.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and **New chart**, which opens the Editor. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; New chart opens the Editor from Chart Builder's home screen and from dropped audio files |
 | **CM1: Model, writer and lint engine** | `EditableChart` and friends, `MidiChartLoader`, `MidiChartWriter`, passthrough and re-ticking, the game-view projection and extended read-back check, `MidiChartReader` reading dynamics, commands and undo. The lint engine: rule scopes, `Finding`'s chart location, and chart quick fixes. The `SongFolderFiles` order change. And the tests. | Every round-trip and writer-vs-reader test passes, and AC C2.4; zero AOT warnings |
-| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart and Chart settings (without **Detect from audio**), C2 open and import, with **Edit chart** turned on, `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), the highway's drawing moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
+| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart and Chart settings (without **Detect from audio**), C2 open and import, with **Edit chart** turned on, `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), the highway's drawing moved to `ChartShared.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
 | **CM3: Drums and GHL** | C6 all three drum variants and conversion, C7 GHL, C8 phrases and events, and the drums and phrase lint rules | AC C6, C7 and C8 pass |
 | **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and new chart's **Detect from audio** | AC C12, C13 and C14 pass |
 | **CM5: Authoring tools** | C9 reduction, C15 record mode, clipboard and transforms, C16 lint in the library, C18 preview and suggested difficulty | AC C9, C15, C16 and C18 pass |
@@ -2775,7 +2775,7 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
 
 - **Format:** Chart Builder saves `notes.mid` only, and `.chart` is import only.
 - **Placement:** a separate app, Chart Builder, installed with Chart Packer by the same installer.
-  The two share code (`ChartPacker.Core`, `.Audio`, `.Video`, `.UI`) but no process. They
+  The two share code (`ChartShared.Core`, `.Audio`, `.Video`, `.UI`) but no process. They
   coordinate through command-line launches, a per-song lock file, and Chart Packer re-reading the
   songs Chart Builder changed. There is no IPC ([§4.8](#48-launching-and-coordination)).
 - **Drafts:** each app keeps its own. Chart Packer asks to save or discard a song's drafts before

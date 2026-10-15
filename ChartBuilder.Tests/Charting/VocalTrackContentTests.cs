@@ -1,6 +1,6 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Tests.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Tests.Charts;
 using static ChartBuilder.Tests.Charting.MidiChartWriterTests;
 
 namespace ChartBuilder.Tests.Charting;
@@ -141,8 +141,8 @@ public sealed class VocalTrackContentTests
         var chart = MidiChartLoader.Load(MidiFixtures.Passthrough(), ChartReadOptions.Default).Chart;
         int index = chart.Passthrough.ToList().FindIndex(t => t.Name == "PART VOCALS");
         var content = VocalTrackContent.Of(chart.Passthrough[index]);
-        new ChartPacker.Core.Charting.Commands.ChangeVocals(
-            ChartPacker.Core.Charting.Layout.VocalTrack.Vocals,
+        new ChartShared.Core.Charting.Commands.ChangeVocals(
+            ChartShared.Core.Charting.Layout.VocalTrack.Vocals,
             content.With(notes: content.Notes.Select(n => n with { Pitch = n.Pitch + 2 }))).Apply(chart);
         var after = MidiChartWriter.SettingsAfterSave(chart, ChartReadOptions.Default);
 

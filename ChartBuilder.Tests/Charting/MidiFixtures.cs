@@ -1,5 +1,5 @@
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Tests.Charts;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Tests.Charts;
 
 namespace ChartBuilder.Tests.Charting;
 

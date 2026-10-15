@@ -5,10 +5,10 @@ using System.Linq;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting.Authoring;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charts;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

@@ -56,13 +56,16 @@ Goals:
 ```txt
 Chart-Packer.slnx
 ├── ChartPacker/              Chart Packer: Avalonia desktop app (MVVM)            (exists)
-├── ChartBuilder/             Chart Builder: the chart editor, a second app ([charter-spec](charter-spec-v1.md))
-├── ChartPacker.UI/           Avalonia library shared by both apps: theme, dialogs, pickers, settings window
-├── ChartPacker.Audio/        Audio decoding, mixing and playback (F7)
-├── ChartPacker.Core/         UI-free library: format, validation, pack/unpack pipelines
 ├── ChartPacker.Thumbnails/   Windows only: Explorer's .sng thumbnail handler, a Native AOT COM DLL
-└── ChartPacker.Core.Tests/   MSTest tests for Core and Audio
+├── ChartBuilder/             Chart Builder: the chart editor, a second app ([charter-spec](charter-spec-v1.md))
+├── ChartShared.UI/           Avalonia library shared by both apps: theme, dialogs, pickers, settings window
+├── ChartShared.Audio/        Audio decoding, mixing and playback (F7)
+├── ChartShared.Core/         UI-free library: format, validation, pack/unpack pipelines
+└── ChartShared.Core.Tests/   MSTest tests for Core and Audio
 ```
+
+A project's prefix says who uses it: `ChartPacker.*` projects are Chart Packer's alone, `ChartBuilder.*`
+projects Chart Builder's alone, and `ChartShared.*` projects are shared by both.
 
 **Two apps, one install.** Chart Packer and Chart Builder are separate Native AOT executables that
 share the libraries above. Both build against the same package versions (central package
@@ -75,7 +78,7 @@ a disc icon, and an **Open with Chart Builder** folder action. It also registers
 `ChartPacker.Thumbnails`, which shows a `.sng`'s album art as its thumbnail in Explorer. How the two
 apps work together is in [charter-spec §4.8](charter-spec-v1.md#48-launching-and-coordination).
 
-### 4.1 `ChartPacker.Core`
+### 4.1 `ChartShared.Core`
 
 Core must not reference Avalonia or any UI type. Main components:
 
@@ -112,7 +115,7 @@ through `IProgress<T>`.
 | Constraint | How it is enforced |
 | ---------- | ------------------ |
 | AOT publish | `<PublishAot>true</PublishAot>` on `ChartPacker` (already set in the scaffold) and on `ChartBuilder` |
-| AOT-safe library | `<IsAotCompatible>true</IsAotCompatible>` on `ChartPacker.Core` and `ChartPacker.Audio`, which turns on the trim, AOT and single-file analyzers |
+| AOT-safe library | `<IsAotCompatible>true</IsAotCompatible>` on `ChartShared.Core` and `ChartShared.Audio`, which turns on the trim, AOT and single-file analyzers |
 | No warnings | Trim and AOT warnings (`IL2xxx`, `IL3xxx`) are **errors** in Release builds |
 | Compiled bindings only | `<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>`. Reflection bindings are not used. |
 | Source-generated MVVM | CommunityToolkit.Mvvm generators only. No reflection-based `INotifyPropertyChanged` helpers. |
@@ -121,8 +124,8 @@ through `IProgress<T>`.
 
 **Dependency budget.**
 
-- `ChartPacker.Core` has **zero** third-party packages; it uses only the BCL.
-- `ChartPacker`, `ChartBuilder` and `ChartPacker.UI` may use `Avalonia`, `Avalonia.Desktop`,
+- `ChartShared.Core` has **zero** third-party packages; it uses only the BCL.
+- `ChartPacker`, `ChartBuilder` and `ChartShared.UI` may use `Avalonia`, `Avalonia.Desktop`,
   `Avalonia.Themes.Fluent`, `Avalonia.Fonts.Inter` and `CommunityToolkit.Mvvm`. It may also use
   `AvaloniaUI.DiagnosticsSupport`, but only in **Debug** builds (the scaffold already excludes
   it from other configurations).
@@ -135,9 +138,9 @@ through `IProgress<T>`.
 - Image preview uses Avalonia's built-in Skia `Bitmap`.
 - The one exception to Core's budget: it uses `z440.atl.core` (ATL.NET, MIT) to read audio
   durations from file headers, for the library list's length when a song has no `song_length`.
-- `ChartPacker.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:
+- `ChartShared.Audio` plays audio (F7). It keeps codecs and native code out of Core, and uses:
   - FFmpeg's `vorbis`, `opus` and `mp1float`/`mp2float`/`mp3float` decoders, through
-    `ChartPacker.Ffmpeg`, for mono and stereo streams when the libraries have them. Decoding is
+    `ChartShared.Ffmpeg`, for mono and stereo streams when the libraries have them. Decoding is
     nearly all of a waveform read's time, and they're about 2× (Opus), 3× (Vorbis) and 8× (MP3)
     faster per core than the managed decoders (`tools/DecodeBench/RESULTS.md`). Only packets go to
     FFmpeg: the Ogg container, the MP3 frame index and gapless trim, and WAV are read in-house on
@@ -150,11 +153,11 @@ through `IProgress<T>`.
     SDL's audio subsystem is initialised. It ships SDL's native library for each RID, which
     publishes beside the executable.
   - `NVorbis` is a 1.0 release candidate: 0.10.x lands seeks hundreds of samples late.
-- `ChartPacker.Video` decodes background videos for the detail panel's background tile (F5). It
+- `ChartShared.Video` decodes background videos for the detail panel's background tile (F5). It
   keeps native code out of Core, and has no packages. No managed library decodes H.264, VP8/VP9,
   Theora and MPEG video. LibVLC was considered, but it's far larger and doesn't fit the lockstep
   stem mixer.
-- `ChartPacker.Ffmpeg` binds, by hand with `[LibraryImport]`, the few functions Video and Audio
+- `ChartShared.Ffmpeg` binds, by hand with `[LibraryImport]`, the few functions Video and Audio
   need from FFmpeg 9.0's shared libraries (`avformat`, `avcodec`, `avutil`, `swscale` and
   `swresample`, LGPL 2.1+), and has no packages. Audio uses it through a safe wrapper,
   `FfmpegAudioDecoder`; Video calls the bindings directly.
@@ -776,7 +779,7 @@ temp files and folders only. Two things enforce this:
 - **Explicit paths.** Services that persist state (such as `SettingsService`) take their file
   path as an argument and have no default. Only the app's composition root passes the real
   location, from `UserConfigPaths`. Tests pass a temp path.
-- **Run guard.** Every test project includes a guard (`ChartPacker.Core.Tests/Isolation/UserConfigGuard.cs`
+- **Run guard.** Every test project includes a guard (`ChartShared.Core.Tests/Isolation/UserConfigGuard.cs`
   is the reference). It snapshots the real config folder before the run and fails the run if
   anything in it was created, modified or deleted.
 

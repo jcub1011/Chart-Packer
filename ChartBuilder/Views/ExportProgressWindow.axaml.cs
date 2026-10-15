@@ -1,5 +1,5 @@
 using Avalonia.Controls;
-using ChartPacker.UI.Views;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
 {

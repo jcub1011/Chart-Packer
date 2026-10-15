@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia.Input;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Input;
+using ChartShared.Core.Input;
 
 namespace ChartBuilder.Instruments
 {

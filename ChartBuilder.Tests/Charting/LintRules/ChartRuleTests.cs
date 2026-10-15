@@ -1,13 +1,13 @@
 using System.Globalization;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charting.Lint;
-using ChartPacker.Core.Charting.Saving;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Validation;
-using ChartPacker.Core.Validation.QuickFixes;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charting.Lint;
+using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
+using ChartShared.Core.Validation.QuickFixes;
 
 namespace ChartBuilder.Tests.Charting.LintRules;
 

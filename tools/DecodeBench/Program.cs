@@ -7,7 +7,7 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Order;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
-using ChartPacker.Audio.Decoding;
+using ChartShared.Audio.Decoding;
 using DecodeBench;
 
 // Times the app's audio decoders with BenchmarkDotNet, on the managed and FFmpeg backends (see RESULTS.md):
@@ -159,7 +159,7 @@ static string FindFixtures()
     {
         for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
         {
-            string fixtures = Path.Combine(dir.FullName, "ChartPacker.Core.Tests", "Audio", "Fixtures");
+            string fixtures = Path.Combine(dir.FullName, "ChartShared.Core.Tests", "Audio", "Fixtures");
             if (Directory.Exists(fixtures))
                 return fixtures;
         }

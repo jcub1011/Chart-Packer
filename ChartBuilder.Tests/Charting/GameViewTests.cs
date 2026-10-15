@@ -1,5 +1,5 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Charting.MidiChartLoaderTests;
 
 namespace ChartBuilder.Tests.Charting;

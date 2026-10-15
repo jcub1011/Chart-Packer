@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.UI.Views;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder.Services
 {

@@ -9,9 +9,9 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Media.Immutable;
 using ChartBuilder.ViewModels;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Validation;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Validation;
 
 namespace ChartBuilder.Controls
 {

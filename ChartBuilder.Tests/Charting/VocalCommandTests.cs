@@ -1,7 +1,7 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Charting.CommandChecks;
 using static ChartBuilder.Tests.Charting.MidiChartWriterTests;
 using static ChartBuilder.Tests.Editing.EditorSessions;
@@ -59,7 +59,7 @@ public sealed class VocalCommandTests
     [TestMethod]
     public void APartTheChartHasUnderAnotherCaseIsntAddedAgain()
     {
-        byte[] midi = new ChartPacker.Core.Tests.Charts.MidiBuilder(480).Track("Song").Tempo(0, 120).TimeSignature(0, 4, 2)
+        byte[] midi = new ChartShared.Core.Tests.Charts.MidiBuilder(480).Track("Song").Tempo(0, 120).TimeSignature(0, 4, 2)
             .Track("harm1 ").Note(0, 60, 240)
             .Build();
         var chart = MidiChartLoader.Load(midi, ChartReadOptions.Default).Chart;

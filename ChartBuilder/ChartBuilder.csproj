@@ -30,10 +30,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ChartPacker.Audio\ChartPacker.Audio.csproj" />
-    <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
-    <ProjectReference Include="..\ChartPacker.Input\ChartPacker.Input.csproj" />
-    <ProjectReference Include="..\ChartPacker.UI\ChartPacker.UI.csproj" />
+    <ProjectReference Include="..\ChartBuilder.Devices\ChartBuilder.Devices.csproj" />
+    <ProjectReference Include="..\ChartShared.Audio\ChartShared.Audio.csproj" />
+    <ProjectReference Include="..\ChartShared.Core\ChartShared.Core.csproj" />
+    <ProjectReference Include="..\ChartShared.UI\ChartShared.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

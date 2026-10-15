@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Globalization;
-using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Validation;
+using ChartShared.UI.ViewModels;
 
 namespace ChartPacker.Services
 {

@@ -1,7 +1,7 @@
-using ChartPacker.Core.Charting.Playtest;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting.Playtest;
+using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Playtest.Plays;
-using static ChartPacker.Core.Input.InstrumentAction;
+using static ChartShared.Core.Input.InstrumentAction;
 
 namespace ChartBuilder.Tests.Playtest;
 

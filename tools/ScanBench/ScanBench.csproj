@@ -8,6 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <ProjectReference Include="..\..\ChartShared.Core\ChartShared.Core.csproj" />
   </ItemGroup>
 </Project>

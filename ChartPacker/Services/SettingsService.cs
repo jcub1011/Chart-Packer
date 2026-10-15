@@ -1,6 +1,6 @@
 using System;
-using ChartPacker.Core.Library;
-using ChartPacker.Core.Settings;
+using ChartShared.Core.Library;
+using ChartShared.Core.Settings;
 
 namespace ChartPacker.Services
 {

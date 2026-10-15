@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Avalonia.Input;
 using ChartBuilder.Instruments;
 using ChartBuilder.Services;
-using ChartPacker.Core.Input;
+using ChartShared.Core.Input;
 
 namespace ChartBuilder.ViewModels
 {

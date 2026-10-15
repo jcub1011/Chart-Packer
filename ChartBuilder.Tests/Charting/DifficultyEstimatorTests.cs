@@ -1,9 +1,9 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Difficulty;
-using ChartPacker.Core.Charting.Lint;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Validation;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Difficulty;
+using ChartShared.Core.Charting.Lint;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
 using static ChartBuilder.Tests.Charting.MidiChartWriterTests;
 
 namespace ChartBuilder.Tests.Charting;
@@ -169,7 +169,7 @@ public sealed class DifficultyEstimatorTests
     {
         var chart = Chart(Guitar, Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, i % 4)));
         var song = new OpenedSong(
-            new ChartPacker.Core.Scanning.SongEntry(ChartPacker.Core.Scanning.SongEntryKind.SongFolder, "C:\\Song", ".", "Song"),
+            new ChartShared.Core.Scanning.SongEntry(ChartShared.Core.Scanning.SongEntryKind.SongFolder, "C:\\Song", ".", "Song"),
             [KeyValuePair.Create("name", "Song"), KeyValuePair.Create("diff_guitar", "-1")],
             [],
             "notes.mid",

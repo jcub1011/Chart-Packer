@@ -1,8 +1,8 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Tests.Isolation;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Recovery;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Tests.Isolation;
 using ChartBuilder.Tests.Charting.Saving;
 using static ChartBuilder.Tests.Charting.Saving.SaveFolders;
 

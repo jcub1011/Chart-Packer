@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Library;
-using ChartPacker.Core.Merging;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Library;
+using ChartShared.Core.Merging;
+using ChartShared.UI.Resources;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

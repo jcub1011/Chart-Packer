@@ -4,7 +4,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using ChartPacker.Audio.Spectrum;
+using ChartShared.Audio.Spectrum;
 
 namespace ChartPacker.Controls
 {

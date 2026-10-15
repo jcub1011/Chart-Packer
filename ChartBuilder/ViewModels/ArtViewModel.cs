@@ -8,16 +8,16 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Ffmpeg;
-using ChartPacker.Resources;
-using ChartPacker.UI.Formatting;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
-using ChartPacker.Video;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Ffmpeg;
+using ChartShared.UI.Formatting;
+using ChartShared.UI.Resources;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
+using ChartShared.Video;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -367,7 +367,7 @@ namespace ChartBuilder.ViewModels
                     case MediaRef.StoredRef when song.Entry is { } entry && StoredName() is { } stored:
                         name = stored;
                         sizeKey = stored;
-                        byte[]? bytes = await SongFile.ReadAsync(entry, stored, ChartPacker.Core.Scanning.AlbumArt.DefaultMaxBytes, cts.Token);
+                        byte[]? bytes = await SongFile.ReadAsync(entry, stored, ChartShared.Core.Scanning.AlbumArt.DefaultMaxBytes, cts.Token);
                         bitmap = bytes is null ? null : await Task.Run(() => Decode(bytes), cts.Token);
                         break;
                     default:
@@ -421,7 +421,7 @@ namespace ChartBuilder.ViewModels
         private string? StoredName()
         {
             var files = _owner.Song.StoredFilesOf(Slot);
-            return Slot.Kind == MediaKind.AlbumArt ? ChartPacker.Core.Scanning.AlbumArt.Pick(files, n => n) : SongBackgrounds.Pick(files, n => n, Slot.BackgroundKind!.Value);
+            return Slot.Kind == MediaKind.AlbumArt ? ChartShared.Core.Scanning.AlbumArt.Pick(files, n => n) : SongBackgrounds.Pick(files, n => n, Slot.BackgroundKind!.Value);
         }
 
         private string NoteFor(MediaRef effective) =>
@@ -465,8 +465,8 @@ namespace ChartBuilder.ViewModels
             try
             {
                 long length = new FileInfo(path).Length;
-                if (length > ChartPacker.Core.Scanning.AlbumArt.DefaultMaxBytes)
-                    return (null, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtTooLargeFormat, ByteSizeFormatter.Format((ulong)ChartPacker.Core.Scanning.AlbumArt.DefaultMaxBytes)));
+                if (length > ChartShared.Core.Scanning.AlbumArt.DefaultMaxBytes)
+                    return (null, string.Format(CultureInfo.CurrentCulture, SharedStrings.ArtTooLargeFormat, ByteSizeFormatter.Format((ulong)ChartShared.Core.Scanning.AlbumArt.DefaultMaxBytes)));
                 bytes = File.ReadAllBytes(path);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

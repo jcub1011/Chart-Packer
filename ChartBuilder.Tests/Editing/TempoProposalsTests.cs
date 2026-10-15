@@ -1,8 +1,8 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Analysis;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Analysis;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Editing.EditorSessions;
 using static ChartBuilder.Tests.Editing.ProposedTempoMapTests;
 
@@ -97,7 +97,7 @@ public sealed class TempoProposalsTests
 
         Assert.IsFalse(proposals.IsActive);
         Assert.AreEqual(0, session.UndoStack.UndoCount);
-        Assert.IsEmpty(ChartPacker.Core.Charting.ChartModelComparer.Differences(before, session.Chart));
+        Assert.IsEmpty(ChartShared.Core.Charting.ChartModelComparer.Differences(before, session.Chart));
     }
 
     [TestMethod]

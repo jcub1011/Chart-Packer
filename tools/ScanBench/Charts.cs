@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Library;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Library;
+using ChartShared.Core.Scanning;
 
 namespace ScanBench;
 
