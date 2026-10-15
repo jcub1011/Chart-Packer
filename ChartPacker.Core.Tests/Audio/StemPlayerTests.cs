@@ -725,7 +725,8 @@ public sealed class StemPlayerTests
         player.Sounds = new Schedule(new ScheduledSound(Rate, Constant(0.25f, Rate / 10)));
         player.Play();
         PlayFor(output, Rate);
-        WaitUntil(() => output.QueuedFrames > 0);
+        // What's queued can end partway through the sound, so it waits for what's written to get past its end.
+        WaitUntil(() => output.WrittenFrames >= Rate + (Rate / 4));
 
         float[] written = output.WrittenLeft();
         int length = written.Count(sample => sample != 0f);
