@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using ChartPacker.Ffmpeg;
 using ChartPacker.Ffmpeg.Interop;
+using Serilog;
 
 namespace ChartPacker.Video;
 
@@ -19,6 +20,8 @@ public sealed unsafe class VideoDecoder : IDisposable
 {
     private const int IoBufferSize = 64 * 1024;
 
+    private static ILogger Logger => Log.ForContext<VideoDecoder>();
+
     private readonly Stream _stream;
     private GCHandle _streamHandle;
     private AVIOContext* _io;
@@ -29,6 +32,19 @@ public sealed unsafe class VideoDecoder : IDisposable
     private AVFrame* _kept;
     private void* _scaler;
     private (int Width, int Height, int Format) _scalerSource;
+
+    // What swscale converts into: FFmpeg's own memory, rows RowAlignment apart, with TailPadding after the last, from
+    // which CopyKept copies into the caller's buffer. swscale's vectorised converters write whole blocks of pixels, so a
+    // row whose width isn't a multiple of the block runs past its end: a 1176-wide video was written 32 bytes past every
+    // row, the last included. Converted straight into a managed array of exactly the frame's size, as it once was, that
+    // overwrote the .NET heap past the array, which surfaced later as an ExecutionEngineException in whatever allocated
+    // or collected next. Such writes now land here, on Canary bytes, and are logged (at Debug: they're expected).
+    private const int RowAlignment = 128;
+    private const int TailPadding = 4096;
+    private const byte Canary = 0xA5;
+    private byte* _converted;
+    private int _convertedStride;
+    private bool _overrunLogged;
     private readonly int _streamIndex;
     private readonly AVRational _timeBase;
     private readonly long _startTime;
@@ -252,12 +268,72 @@ public sealed unsafe class VideoDecoder : IDisposable
                 return false;
         }
 
-        fixed (byte* output = bgra)
+        int rowBytes = Width * 4;
+        if (_converted == null)
         {
-            byte** dst = stackalloc byte*[4] { output, null, null, null };
-            int* dstStride = stackalloc int[4] { Width * 4, 0, 0, 0 };
-            return Native.sws_scale(_scaler, (byte**)_kept->data, _kept->linesize, 0, source.Height, dst, dstStride) > 0;
+            _convertedStride = (rowBytes + RowAlignment - 1) / RowAlignment * RowAlignment;
+            _converted = (byte*)Native.av_malloc((nuint)(((long)_convertedStride * Height) + TailPadding));
+            if (_converted == null)
+                throw new OutOfMemoryException();
         }
+
+        FillPadding(rowBytes);
+        byte** dst = stackalloc byte*[4] { _converted, null, null, null };
+        int* dstStride = stackalloc int[4] { _convertedStride, 0, 0, 0 };
+        if (Native.sws_scale(_scaler, (byte**)_kept->data, _kept->linesize, 0, source.Height, dst, dstStride) <= 0)
+            return false;
+
+        CheckPadding(rowBytes, source);
+        for (int y = 0; y < Height; y++)
+            new ReadOnlySpan<byte>(_converted + ((long)y * _convertedStride), rowBytes).CopyTo(bgra.Slice(y * rowBytes, rowBytes));
+        return true;
+    }
+
+    // Marks the bytes past each row and past the last row, so CheckPadding can tell whether swscale wrote there.
+    private void FillPadding(int rowBytes)
+    {
+        int slack = _convertedStride - rowBytes;
+        if (slack > 0)
+        {
+            for (int y = 0; y < Height; y++)
+                new Span<byte>(_converted + ((long)y * _convertedStride) + rowBytes, slack).Fill(Canary);
+        }
+
+        new Span<byte>(_converted + ((long)_convertedStride * Height), TailPadding).Fill(Canary);
+    }
+
+    private void CheckPadding(int rowBytes, (int Width, int Height, int Format) source)
+    {
+        if (_overrunLogged)
+            return;
+
+        // How far past its end each row was written: into the slack before the next row, and for the last row on into the
+        // tail too, as it's all one run of padding.
+        int slack = _convertedStride - rowBytes;
+        int rowsOverrun = 0, furthest = 0, lastRow = 0;
+        for (int y = 0; y < Height; y++)
+        {
+            int run = y == Height - 1 ? slack + TailPadding : slack;
+            int past = new ReadOnlySpan<byte>(_converted + ((long)y * _convertedStride) + rowBytes, run).LastIndexOfAnyExcept(Canary) + 1;
+            if (past == 0)
+                continue;
+            rowsOverrun++;
+            furthest = Math.Max(furthest, past);
+            if (y == Height - 1)
+                lastRow = past;
+        }
+
+        if (rowsOverrun == 0)
+            return;
+
+        // Once per video: it happens on every frame. Packed into a buffer of exactly the frame's size, as these once were,
+        // a row's overrun lands on the next row, but the last row's lands past the end of the buffer: on the .NET heap.
+        _overrunLogged = true;
+        Logger.Debug(
+            "swscale wrote past the rows it was given, converting {SourceWidth}×{SourceHeight} (pixel format {SourceFormat}) " +
+            "to {Width}×{Height}: {Rows} row(s), up to {Bytes} byte(s) past the end, the last row {LastRowBytes}. " +
+            "It landed in padding, so nothing was harmed",
+            source.Width, source.Height, source.Format, Width, Height, rowsOverrun, furthest, lastRow);
     }
 
     /// <summary>
@@ -287,6 +363,13 @@ public sealed unsafe class VideoDecoder : IDisposable
         {
             Native.sws_freeContext(_scaler);
             _scaler = null;
+        }
+
+        if (_converted != null)
+        {
+            byte* converted = _converted;
+            Native.av_freep(&converted);
+            _converted = null;
         }
 
         if (_next != null)
@@ -370,6 +453,11 @@ public sealed unsafe class VideoDecoder : IDisposable
             throw new InvalidDataException($"{message} (FFmpeg error {result}).");
     }
 
+    // Read and Seek are called by FFmpeg, so no exception may leave them: it can't unwind through FFmpeg's frames, and the
+    // runtime ends the process instead, with an ExecutionEngineException and nothing logged. Each catches everything and
+    // tells FFmpeg the read failed, which it reports as a damaged or unreadable video. What isn't an expected I/O failure
+    // is logged, as it's a bug in the stream.
+
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int Read(void* opaque, byte* buffer, int size)
     {
@@ -381,6 +469,12 @@ public sealed unsafe class VideoDecoder : IDisposable
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or UnauthorizedAccessException)
         {
+            Logger.Debug(ex, "A video read failed");
+            return Native.ErrorIo;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "A video read threw unexpectedly; FFmpeg is told the read failed");
             return Native.ErrorIo;
         }
     }
@@ -405,6 +499,12 @@ public sealed unsafe class VideoDecoder : IDisposable
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or NotSupportedException or ArgumentException)
         {
+            Logger.Debug(ex, "A video seek to {Offset} ({Whence}) failed", offset, whence);
+            return Native.ErrorIo;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "A video seek to {Offset} ({Whence}) threw unexpectedly; FFmpeg is told it failed", offset, whence);
             return Native.ErrorIo;
         }
     }

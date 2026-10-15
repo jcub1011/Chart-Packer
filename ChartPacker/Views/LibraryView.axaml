@@ -48,12 +48,10 @@
         <Style Selector="ListBox#EntryList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
             <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="BorderBrush">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </Style>
         <Style Selector="ListBox#EntryList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#558B5CF6" />
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
         </Style>
 
         <Style Selector="Border.art-tile">
@@ -87,9 +85,7 @@
             <Setter Property="Foreground" Value="White" />
         </Style>
         <Style Selector="Button.tilePlay:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
         <Style Selector="Button.tilePlay PathIcon">
@@ -479,11 +475,8 @@
                                      Width="8" Height="8"
                                      VerticalAlignment="Center"
                                      IsVisible="{Binding HasDrafts}"
-                                     ToolTip.Tip="{x:Static res:Strings.UnsavedToolTip}">
-                                <Ellipse.Fill>
-                                    <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-                                </Ellipse.Fill>
-                            </Ellipse>
+                                     Fill="{DynamicResource AccentBrush}"
+                                     ToolTip.Tip="{x:Static res:Strings.UnsavedToolTip}" />
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>

@@ -12,8 +12,18 @@
         <SolidColorBrush x:Key="SubtleBorderBrush" Color="#262836" />
         <SolidColorBrush x:Key="ToolHoverBrush" Color="#16FFFFFF" />
         <SolidColorBrush x:Key="ToolPressedBrush" Color="#0CFFFFFF" />
+        <!-- The accent as a brush, Fluent's SystemAccentColor. Use this rather than a brush of SystemAccentColor:
+             DynamicTheme can recolour a brush key, but not a colour Fluent resolves where it defines it. -->
+        <SolidColorBrush x:Key="AccentBrush" Color="#8B5CF6" />
         <SolidColorBrush x:Key="AccentTintBrush" Color="#408B5CF6" />
+        <!-- The accent tint at other strengths: faint behind a notice, stronger for a selected row under the pointer,
+             and a border round either. -->
+        <SolidColorBrush x:Key="AccentTintFaintBrush" Color="#1F8B5CF6" />
+        <SolidColorBrush x:Key="AccentTintStrongBrush" Color="#558B5CF6" />
+        <SolidColorBrush x:Key="AccentBorderBrush" Color="#668B5CF6" />
         <SolidColorBrush x:Key="AccentTextBrush" Color="#C4B5FD" />
+        <!-- The palest accent: what is lit up, e.g. the syllable being sung. -->
+        <SolidColorBrush x:Key="AccentHighlightBrush" Color="#E9E3FF" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
         <!-- Metadata that fails validation: an orange bar and tint on its row, and the message under it. -->
         <SolidColorBrush x:Key="InvalidBrush" Color="#FB923C" />
@@ -133,9 +143,7 @@
         <Setter Property="HorizontalAlignment" Value="Right" />
         <Setter Property="VerticalAlignment" Value="Top" />
         <Setter Property="Margin" Value="0,2,2,0" />
-        <Setter Property="Background">
-            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-        </Setter>
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     </Style>
     <Style Selector="Border.badge > TextBlock">
         <Setter Property="FontSize" Value="9" />
@@ -240,8 +248,8 @@
         <Setter Property="Padding" Value="8,5" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="BorderBrush" Value="#668B5CF6" />
-        <Setter Property="Background" Value="#1F8B5CF6" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
     </Style>
     <Style Selector="Border.banner.error">
         <Setter Property="BorderBrush" Value="#66F87171" />
@@ -285,7 +293,7 @@
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
     <Style Selector="ToggleButton.filterChip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#558B5CF6" />
+        <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
 </Styles>

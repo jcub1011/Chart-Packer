@@ -50,6 +50,30 @@ public sealed class VideoDecoderTests
         Assert.IsLessThan(0.01, Math.Abs(times[^1].TotalSeconds - 1.9), $"Last frame at {times[^1]}");
     }
 
+    // swscale writes rows in whole blocks of pixels, past the end of a row whose width isn't a multiple of the block
+    // (as these widths aren't); none of it may reach past the frame's own bytes in the caller's buffer.
+    [TestMethod]
+    [DataRow("tiny.mp4")]
+    [DataRow("tiny.webm")]
+    public void ConvertingWritesNothingPastTheFrame(string name)
+    {
+        const int guard = 256;
+        const byte unwritten = 0xA5;
+        for (int maxWidth = 10; maxWidth <= 63; maxWidth++)
+        {
+            using var decoder = Open(name, maxWidth);
+            int frameBytes = decoder.Width * decoder.Height * 4;
+            var buffer = new byte[guard + frameBytes + guard];
+            buffer.AsSpan().Fill(unwritten);
+            Assert.IsTrue(decoder.Next(out _));
+            decoder.Keep();
+
+            Assert.IsTrue(decoder.CopyKept(buffer.AsSpan(guard, frameBytes)));
+            Assert.IsFalse(buffer.AsSpan(0, guard).ContainsAnyExcept(unwritten), $"Written before the frame at width {maxWidth}");
+            Assert.IsFalse(buffer.AsSpan(guard + frameBytes).ContainsAnyExcept(unwritten), $"Written past the frame at width {maxWidth}");
+        }
+    }
+
     [TestMethod]
     public void WideFramesAreScaledDownKeepingTheirShape()
     {

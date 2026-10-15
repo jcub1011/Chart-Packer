@@ -50,9 +50,7 @@
     <!-- Row markers: * edited, + added; removed rows are struck through. -->
     <Style Selector="TextBlock.marker">
         <Setter Property="FontWeight" Value="Bold" />
-        <Setter Property="Foreground">
-            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-        </Setter>
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
     </Style>
     <Style Selector="TextBlock.removed">
         <Setter Property="TextDecorations" Value="Strikethrough" />
@@ -226,9 +224,7 @@
     <!-- A pending change rings the icon in the accent, as * marks an edited row. -->
     <Style Selector="Border.instrumentCircle.edited">
         <Setter Property="BorderThickness" Value="2" />
-        <Setter Property="BorderBrush">
-            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-        </Setter>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
     </Style>
     <Style Selector="Border.instrumentCircle PathIcon">
         <Setter Property="Width" Value="22" />

@@ -4,6 +4,7 @@
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartPacker.UI.Controls"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
+        xmlns:theme="using:ChartPacker.UI.Theming"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1080" d:DesignHeight="800"
@@ -15,7 +16,11 @@
         Width="1080" Height="800"
         MinWidth="640" MinHeight="360"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="30">
+        ExtendClientAreaTitleBarHeightHint="30"
+        theme:DynamicTheme.Seed="{Binding Detail.ThemeSeed}">
+
+    <!-- The whole window, and the menus and flyouts it opens, take their colours from the selected song's album art
+         (DynamicTheme), fading from song to song; see SongDetailViewModel.ThemeSeed. -->
 
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />

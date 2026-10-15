@@ -42,10 +42,11 @@ namespace ChartPacker.Services
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
             var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var appearance = new SettingCategory("general.appearance", Strings.SettingsCategoryAppearance, general);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, logging],
+                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, appearance, logging],
                 [
                     new IntegerSetting
                     {
@@ -322,6 +323,17 @@ namespace ChartPacker.Services
                         Format = factor => string.Format(CultureInfo.CurrentCulture, Strings.LaneFineScrubFormat, factor),
                         Get = () => player.LaneFineScrubFactor,
                         Set = factor => player.LaneFineScrubFactor = factor,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "general.albumArtTheme",
+                        Category = appearance,
+                        Label = Strings.AlbumArtThemeLabel,
+                        Description = Strings.AlbumArtThemeDescription,
+                        Keywords = SettingKeywords.Split(Strings.AlbumArtThemeKeywords),
+                        DefaultValue = true,
+                        Get = () => player.AlbumArtTheming,
+                        Set = theme => player.AlbumArtTheming = theme,
                     },
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
                 ]);

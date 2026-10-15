@@ -112,6 +112,9 @@ namespace ChartPacker.Services
         /// <summary>Whether the spectrum is drawn behind the details panel. Off, it isn't worked out at all.</summary>
         public bool ShowSpectrum { get; set; } = true;
 
+        /// <summary>Whether the main window takes its colours from the selected song's album art. Off, it keeps the app's own.</summary>
+        public bool AlbumArtTheming { get; set; } = true;
+
         /// <summary>Whether the chart's notes are drawn.</summary>
         public bool ShowNoteHighway { get; set; } = true;
 

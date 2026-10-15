@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using ChartPacker.Audio.Waveforms;
+using ChartPacker.UI.Theming;
 
 namespace ChartPacker.UI.Controls
 {
@@ -93,6 +94,10 @@ namespace ChartPacker.UI.Controls
         private (Column[] Columns, Size Size, double Scaling, double Shown, IBrush? Played, IBrush? Unplayed) _barsKey;
         private int _drawnPlayed = -1;
 
+        // A brush recoloured in place, as a themed one fades, leaves the pictures in its old colour; draw them again.
+        private readonly BrushWatch _playedWatch;
+        private readonly BrushWatch _unplayedWatch;
+
         // How far in, in seconds, the waveform is drawn, moving towards TargetSeconds at _revealSpeed seconds a second.
         private double _shownSeconds;
         private double _revealSpeed;
@@ -106,7 +111,14 @@ namespace ChartPacker.UI.Controls
             CursorProperty.OverrideDefaultValue<WaveformView>(new Cursor(StandardCursorType.Hand));
         }
 
-        public WaveformView() => _fine = new FineDrag(this);
+        public WaveformView()
+        {
+            _fine = new FineDrag(this);
+            _playedWatch = new BrushWatch(OnBrushRecoloured);
+            _unplayedWatch = new BrushWatch(OnBrushRecoloured);
+            _playedWatch.Watch(PlayedBrush);
+            _unplayedWatch.Watch(UnplayedBrush);
+        }
 
         /// <summary>Raised when the pointer goes down on the waveform, before <see cref="PositionSeconds"/> moves.</summary>
         public event EventHandler? ScrubStarted;
@@ -178,8 +190,18 @@ namespace ChartPacker.UI.Controls
                 OnWaveformChanged(change.GetOldValue<Waveform?>(), change.GetNewValue<Waveform?>());
             else if (change.Property == LengthSecondsProperty)
                 Retarget();
+            else if (change.Property == PlayedBrushProperty)
+                _playedWatch.Watch(PlayedBrush);
+            else if (change.Property == UnplayedBrushProperty)
+                _unplayedWatch.Watch(UnplayedBrush);
             else if (change.Property == PositionSecondsProperty && PlayedColumns(ColumnCount(Bounds.Width)) != _drawnPlayed)
                 InvalidateVisual();
+        }
+
+        private void OnBrushRecoloured()
+        {
+            _barsKey = default;
+            InvalidateVisual();
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

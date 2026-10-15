@@ -34,7 +34,7 @@ namespace ChartPacker.UI.Controls
             AvaloniaProperty.RegisterAttached<ShrinkPanel, Control, bool>("CanShrink");
 
         // The shrinking children, gathered each measure; kept so a resize doesn't allocate a list every pass.
-        private readonly List<Control> _shrinking = new();
+        private readonly List<Control> _shrinking = [];
 
         static ShrinkPanel()
         {
