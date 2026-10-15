@@ -150,10 +150,6 @@
     <value>{0} - Chart Builder</value>
     <comment>The editor window's title. {0} is the chart's name.</comment>
   </data>
-  <data name="VersionFormat" xml:space="preserve">
-    <value>v{0}</value>
-    <comment>The program version in the editor's title bar, e.g. "v0.3.0".</comment>
-  </data>
   <data name="ComingSoonToolTip" xml:space="preserve">
     <value>Coming soon.</value>
     <comment>On editor controls that are only placeholders so far.</comment>

@@ -23,7 +23,7 @@ namespace ChartPacker.Services
     /// The main window's panel. It lets go of its songs' files while the Validator is open, as the Validator may save
     /// them, and shows them again afterwards; its player and highway then take up the settings the Validator's changed.
     /// </param>
-    /// <param name="notice">Where downloads report, under the main window's toolbar.</param>
+    /// <param name="notice">Where downloads report, along the bottom of the main window.</param>
     /// <param name="songFiles">Keeps saving a song apart from copies of it being downloaded, in either window.</param>
     /// <param name="latency">The calibrated audio latency, which the inspector's highway allows for.</param>
     public sealed class AvaloniaValidatorWindowService(

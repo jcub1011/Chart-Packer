@@ -47,17 +47,11 @@
   <data name="BrowseDialogTitle" xml:space="preserve">
     <value>Choose a folder of songs</value>
   </data>
-  <data name="BrowseButton" xml:space="preserve">
-    <value>Songs folder</value>
-  </data>
   <data name="BrowseToolTip" xml:space="preserve">
     <value>Choose the folder to search for songs</value>
   </data>
   <data name="FolderPathWatermark" xml:space="preserve">
     <value>No folder selected</value>
-  </data>
-  <data name="RescanButton" xml:space="preserve">
-    <value>Scan</value>
   </data>
   <data name="RescanToolTip" xml:space="preserve">
     <value>Search the chosen folder for songs (F5)</value>
@@ -177,17 +171,11 @@
   <data name="BrowseOutputDialogTitle" xml:space="preserve">
     <value>Choose the output folder</value>
   </data>
-  <data name="BrowseOutputButton" xml:space="preserve">
-    <value>Output folder</value>
-  </data>
   <data name="BrowseOutputToolTip" xml:space="preserve">
     <value>Choose where Pack and Unpack write</value>
   </data>
   <data name="ResetOutputToolTip" xml:space="preserve">
     <value>Write next to the scanned songs again</value>
-  </data>
-  <data name="ResetOutputButton" xml:space="preserve">
-    <value>Reset output folder</value>
   </data>
   <data name="OverwriteLabel" xml:space="preserve">
     <value>If the output exists</value>
@@ -204,14 +192,8 @@
   <data name="OverwriteRename" xml:space="preserve">
     <value>Keep both</value>
   </data>
-  <data name="PackButton" xml:space="preserve">
-    <value>Pack</value>
-  </data>
   <data name="PackToolTip" xml:space="preserve">
     <value>Pack the selected song folders into .sng files</value>
-  </data>
-  <data name="UnpackButton" xml:space="preserve">
-    <value>Unpack</value>
   </data>
   <data name="UnpackToolTip" xml:space="preserve">
     <value>Unpack the selected .sng files into song folders</value>
@@ -292,6 +274,61 @@
     <value>Chart Packer - v{0}</value>
     <comment>{0} is the program's semantic version, e.g. 1.2.0.</comment>
   </data>
+  <data name="AppName" xml:space="preserve">
+    <value>Chart Packer</value>
+    <comment>The app's name, for its icon in the main window's title bar.</comment>
+  </data>
+  <data name="MenuFile" xml:space="preserve">
+    <value>_File</value>
+    <comment>The title bar's menus. An underscore marks the access key, unique among a menu's items.</comment>
+  </data>
+  <data name="MenuChooseSongsFolder" xml:space="preserve">
+    <value>_Choose songs folder…</value>
+  </data>
+  <data name="MenuRescan" xml:space="preserve">
+    <value>_Rescan</value>
+  </data>
+  <data name="MenuChooseOutputFolder" xml:space="preserve">
+    <value>Choose _output folder…</value>
+  </data>
+  <data name="MenuResetOutputFolder" xml:space="preserve">
+    <value>R_eset output folder</value>
+  </data>
+  <data name="MenuSettings" xml:space="preserve">
+    <value>_Settings…</value>
+  </data>
+  <data name="MenuPack" xml:space="preserve">
+    <value>_Pack</value>
+  </data>
+  <data name="MenuPackSelection" xml:space="preserve">
+    <value>_Pack</value>
+    <comment>The Pack menu's item that packs the selection.</comment>
+  </data>
+  <data name="MenuUnpack" xml:space="preserve">
+    <value>_Unpack</value>
+  </data>
+  <data name="MenuOverwrite" xml:space="preserve">
+    <value>If the output _exists</value>
+    <comment>A submenu of the overwrite policies, the one in use checked.</comment>
+  </data>
+  <data name="MenuFlatPack" xml:space="preserve">
+    <value>Pack into one _folder (flat)</value>
+  </data>
+  <data name="MenuTools" xml:space="preserve">
+    <value>_Tools</value>
+  </data>
+  <data name="MenuEditChart" xml:space="preserve">
+    <value>_Edit chart</value>
+  </data>
+  <data name="MenuMerge" xml:space="preserve">
+    <value>_Merge…</value>
+  </data>
+  <data name="MenuValidate" xml:space="preserve">
+    <value>_Validate…</value>
+  </data>
+  <data name="MenuDeduplicate" xml:space="preserve">
+    <value>_Deduplicate…</value>
+  </data>
   <data name="JobProgressWindowTitle" xml:space="preserve">
     <value>Job progress</value>
   </data>
@@ -366,6 +403,14 @@
   </data>
   <data name="UnsavedToolTip" xml:space="preserve">
     <value>This item has unsaved changes</value>
+  </data>
+  <data name="UnsavedChangesLabel" xml:space="preserve">
+    <value>Unsaved changes</value>
+    <comment>Beside Save and Discard, at the bottom of the details panel while the selection has unsaved changes.</comment>
+  </data>
+  <data name="SavingChangesLabel" xml:space="preserve">
+    <value>Saving changes…</value>
+    <comment>In place of "Unsaved changes", beside Save and Discard, while the selection's changes are being saved.</comment>
   </data>
   <data name="EditValueToolTip" xml:space="preserve">
     <value>Click to edit</value>
@@ -694,9 +739,6 @@
   <data name="LyricsSourceHasNoneFormat" xml:space="preserve">
     <value>{0} has no lyrics or vocal notes.</value>
     <comment>{0} is the file name.</comment>
-  </data>
-  <data name="SettingsButton" xml:space="preserve">
-    <value>Settings</value>
   </data>
   <data name="SettingsToolTip" xml:space="preserve">
     <value>Change how songs are scanned, packed and played (Ctrl+,)</value>
@@ -1470,7 +1512,7 @@
     <value>Keep at least one part.</value>
   </data>
   <data name="MergeTargetExistsFormat" xml:space="preserve">
-    <value>{0} already exists. Choose Overwrite or Rename in the toolbar to merge anyway.</value>
+    <value>{0} already exists. Choose Overwrite or Rename under Pack, If the output exists, to merge anyway.</value>
   </data>
   <data name="MergeTargetIsSourceFormat" xml:space="preserve">
     <value>{0} is one of the songs being merged, so it can't be written over.</value>
@@ -1525,9 +1567,6 @@
   </data>
   <data name="MergePreviewNote" xml:space="preserve">
     <value>This is a preview of the merged song. Offsets set on its note highway are applied when it's merged; everything else can be edited once it's merged.</value>
-  </data>
-  <data name="DedupButton" xml:space="preserve">
-    <value>Deduplicate</value>
   </data>
   <data name="DedupToolTip" xml:space="preserve">
     <value>Find duplicate copies of songs across the whole library, and different charts of the same song, and move the copies you don't need to the trash. Rescans the library first, so it compares what's on disk now.</value>
@@ -2012,9 +2051,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
   </data>
   <data name="SaveAnywayButton" xml:space="preserve">
     <value>Save anyway</value>
-  </data>
-  <data name="ValidateButton" xml:space="preserve">
-    <value>Validate</value>
   </data>
   <data name="ValidateToolTip" xml:space="preserve">
     <value>Check the selected songs' metadata for values games may misread, such as a word where a number belongs, and fix them in place. Unsaved changes are checked as drafted.</value>

@@ -15,7 +15,6 @@ using ChartPacker.Core.Charting.Saving;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
-using ChartPacker.UI;
 using ChartPacker.UI.Services;
 using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -169,8 +168,6 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The song's audio as the lanes draw and analyse it (charter-spec C12–C14).</summary>
         public EditorAudio Audio { get; }
-
-        public string VersionText { get; } = string.Format(CultureInfo.CurrentCulture, Strings.VersionFormat, AppVersion.Semantic);
 
         /// <summary>What the Editor has had to say, the latest on the message bar along the bottom of the window.</summary>
         public EditorMessages Messages { get; } = new();

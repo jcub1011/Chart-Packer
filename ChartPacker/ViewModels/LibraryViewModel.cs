@@ -25,8 +25,17 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
-    /// <summary>An overwrite policy as offered in the policy picker.</summary>
-    public sealed record OverwriteOption(OverwritePolicy Value, string Label);
+    /// <summary>An overwrite policy as offered in the Pack menu's "If the output exists".</summary>
+    public sealed partial class OverwriteOption(OverwritePolicy value, string label) : ObservableObject
+    {
+        public OverwritePolicy Value { get; } = value;
+
+        public string Label { get; } = label;
+
+        /// <summary>It's the policy in use (<see cref="LibraryViewModel.SelectedOverwriteOption"/>): checked in the menu.</summary>
+        [ObservableProperty]
+        public partial bool IsSelected { get; set; }
+    }
 
     /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Validate/Deduplicate.</summary>
     /// <remarks>
@@ -268,7 +277,11 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
+        [NotifyPropertyChangedFor(nameof(IsSingleSelection))]
         public partial int SelectedCount { get; set; }
+
+        /// <summary>One song is selected: the right-click menu offers Edit Chart.</summary>
+        public bool IsSingleSelection => SelectedCount == 1;
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
         [ObservableProperty]
@@ -688,7 +701,16 @@ namespace ChartPacker.ViewModels
             SyncSelection();
         }
 
-        partial void OnSelectedOverwriteOptionChanged(OverwriteOption value) => _settings.Settings.OverwritePolicy = value.Value;
+        partial void OnSelectedOverwriteOptionChanged(OverwriteOption value)
+        {
+            _settings.Settings.OverwritePolicy = value.Value;
+            foreach (var option in OverwriteOptions)
+                option.IsSelected = option == value;
+        }
+
+        /// <summary>Picks a policy from the Pack menu.</summary>
+        [RelayCommand]
+        private void SelectOverwriteOption(OverwriteOption option) => SelectedOverwriteOption = option;
 
         partial void OnFlatPackOutputChanged(bool value) => _settings.Settings.FlatPackOutput = value;
 

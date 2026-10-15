@@ -18,7 +18,7 @@ namespace ChartPacker.Services
     /// <remarks>
     /// Settings are read and written through the view models that own the live values rather than through
     /// <see cref="AppSettings"/> directly. The view models already persist a change and refresh what depends
-    /// on it, so the toolbar and player stay in step with the window. Window layout (pane sizes) isn't listed.
+    /// on it, so the menus and player stay in step with the window. Window layout (pane sizes) isn't listed.
     /// </remarks>
     public static class AppSettingsCatalog
     {

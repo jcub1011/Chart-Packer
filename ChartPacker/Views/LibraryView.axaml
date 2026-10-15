@@ -150,7 +150,7 @@
     </UserControl.Styles>
 
     <DockPanel>
-        <!-- Where songs are read from and where Pack/Unpack write; both are chosen from the toolbar. -->
+        <!-- Where songs are read from and where Pack/Unpack write; both are chosen from the File menu. -->
         <Border DockPanel.Dock="Top"
                 Padding="12,10"
                 BorderThickness="0,0,0,1"
@@ -419,9 +419,14 @@
                      Selection="{Binding Selection}"
                      SelectionMode="Multiple"
                      AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
-                <!-- Right-clicking a row selects it, or keeps the selection it's part of, so the menu acts on the selection. -->
+                <!-- Right-clicking a row selects it, or keeps the selection it's part of, so the menu acts on the selection.
+                     Edit Chart is there only with one song selected, the one it opens in Chart Builder. -->
                 <ListBox.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="{x:Static res:Strings.EditChartButton}"
+                                  Command="{Binding EditChartCommand}"
+                                  IsVisible="{Binding IsSingleSelection}" />
+                        <Separator IsVisible="{Binding IsSingleSelection}" />
                         <MenuItem Header="{x:Static vm:LibraryViewModel.RevealLabel}" Command="{Binding RevealCommand}" />
                         <MenuItem Header="{x:Static res:Strings.MenuDownloadAllFiles}" Command="{Binding DownloadAllCommand}" />
                     </ContextMenu>

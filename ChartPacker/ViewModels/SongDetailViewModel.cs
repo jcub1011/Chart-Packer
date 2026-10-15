@@ -130,6 +130,9 @@ namespace ChartPacker.ViewModels
         private IReadOnlyList<SongEntry> _entries = [];
         private IReadOnlyList<EditableSong> _songs = [];
 
+        // The selection being saved, while a save runs.
+        private IReadOnlyList<SongEntry>? _savingEntries;
+
         // Why there's no metadata, from loading, e.g. the folder has no song.ini.
         private string? _loadNote;
 
@@ -478,6 +481,22 @@ namespace ChartPacker.ViewModels
 
         /// <summary>A selected song has unsaved changes.</summary>
         public bool HasDrafts => _songs.Any(s => !s.Item.Draft.IsEmpty);
+
+        /// <summary>
+        /// The songs shown are the ones being saved. While another selection's save runs, these songs aren't edited
+        /// (<see cref="CanEdit"/>), but nothing of theirs is being saved.
+        /// </summary>
+        public bool IsSavingShown => IsSaving && ReferenceEquals(_savingEntries, _entries);
+
+        /// <summary>
+        /// The Save and Discard bar shows at the bottom of the panel: while a selected song has unsaved changes, and
+        /// through their save, so its spinner shows until the save is done. Never in a preview
+        /// (<see cref="PreviewNote"/>), whose drafts are its offsets for the Merge window to apply.
+        /// </summary>
+        public bool ShowSaveBar => PreviewNote is null && (HasDrafts || IsSavingShown);
+
+        /// <summary>What the save bar says: that there are unsaved changes, or that they're being saved.</summary>
+        public string SaveBarLabel => IsSavingShown ? Strings.SavingChangesLabel : Strings.UnsavedChangesLabel;
 
         // Counts the other files there will be once the staged changes are saved.
         public string OtherFilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.OtherFilesHeaderFormat, Files.Count(f => !f.IsRemoved));
@@ -1319,6 +1338,7 @@ namespace ChartPacker.ViewModels
             dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
 
             MetadataEditor.CancelAddCommand.Execute(null);
+            _savingEntries = entries;
             IsSaving = true;
             SaveError = null;
             try
@@ -1331,6 +1351,7 @@ namespace ChartPacker.ViewModels
             }
             finally
             {
+                _savingEntries = null;
                 IsSaving = false;
             }
 
@@ -2346,6 +2367,9 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(IsEditable));
             OnPropertyChanged(nameof(CanEdit));
             OnPropertyChanged(nameof(HasDrafts));
+            OnPropertyChanged(nameof(IsSavingShown));
+            OnPropertyChanged(nameof(ShowSaveBar));
+            OnPropertyChanged(nameof(SaveBarLabel));
             OnPropertyChanged(nameof(OtherFilesHeader));
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));

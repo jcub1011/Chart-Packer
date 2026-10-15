@@ -145,12 +145,59 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <!-- Toolbar buttons with an icon and a label: Pack, Unpack, Save. -->
+    <!-- Buttons with an icon and a label, such as the details panel's Save and Discard. -->
     <Style Selector="Button.labelled">
         <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="8,0" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!-- The title bar a window draws for itself (TitleBar), as Chart Packer's main window and Chart Builder's editor do:
+         its menus flat on the frame's colour, like the caption buttons. 30 high, as Fluent's caption buttons are. -->
+    <Style Selector="Border.title-bar">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+    </Style>
+    <Style Selector="Border.title-bar Menu">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.title-bar Menu > MenuItem">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <!-- A menu item's icon (a LineIcon, drawn in the inherited text colour) follows its text: lit while highlighted and
+         dimmed while disabled, which Fluent does for the header but not the icon. Disabled last, so it wins. -->
+    <Style Selector="MenuItem:selected /template/ ContentControl#PART_IconPresenter">
+        <Setter Property="Foreground" Value="{DynamicResource MenuFlyoutItemForegroundPointerOver}" />
+    </Style>
+    <Style Selector="MenuItem:disabled /template/ ContentControl#PART_IconPresenter">
+        <Setter Property="Foreground" Value="{DynamicResource MenuFlyoutItemForegroundDisabled}" />
+    </Style>
+    <!-- A link in a window's own title bar, such as Chart Builder's song title or the version: flat, lit on hover, and
+         plain text while disabled. -->
+    <Style Selector="Button.title-link">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="6,3" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.title-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <Style Selector="Button.title-link:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+    </Style>
+    <Style Selector="Button.title-link:disabled">
+        <Setter Property="Cursor" Value="Arrow" />
+    </Style>
+    <Style Selector="Button.title-link:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
     </Style>
 
     <Style Selector="TextBlock.caption">
