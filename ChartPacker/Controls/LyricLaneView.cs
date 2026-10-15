@@ -262,7 +262,7 @@ namespace ChartPacker.Controls
             set => SetValue(FineScrubFactorProperty, value);
         }
 
-        /// <summary>The notes still to come, in the theme's accent. Read as a solid colour.</summary>
+        /// <summary>The notes still to come, in the theme's accent for marks on a dark surface. Read as a solid colour.</summary>
         public IBrush? NoteBrush
         {
             get => GetValue(NoteBrushProperty);

@@ -700,7 +700,7 @@
                                                    Clock="{Binding Lyrics.Clock}"
                                                    LengthSeconds="{Binding Player.TimelineSeconds}"
                                                    FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
-                                                   NoteBrush="{DynamicResource AccentBrush}"
+                                                   NoteBrush="{DynamicResource AccentMarkBrush}"
                                                    SingingBrush="{DynamicResource AccentHighlightBrush}"
                                                    SungBrush="{DynamicResource AccentTextBrush}"
                                                    ToolTip.Tip="{Binding Player.LyricsScrubToolTip}"

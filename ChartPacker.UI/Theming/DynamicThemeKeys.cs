@@ -42,6 +42,7 @@ namespace ChartPacker.UI.Theming
             Role("AccentBorderBrush", ThemeRole.Accent),
             Role("AccentTextBrush", ThemeRole.AccentText),
             Role("AccentHighlightBrush", ThemeRole.AccentHighlight),
+            Role("AccentMarkBrush", ThemeRole.AccentMark),
             Role("AccentButtonBackground", ThemeRole.Accent),
             Role("AccentButtonBackgroundPointerOver", ThemeRole.AccentHover),
             Role("AccentButtonBackgroundPressed", ThemeRole.AccentPressed),

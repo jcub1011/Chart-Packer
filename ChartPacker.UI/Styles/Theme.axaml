@@ -24,6 +24,9 @@
         <SolidColorBrush x:Key="AccentTextBrush" Color="#C4B5FD" />
         <!-- The palest accent: what is lit up, e.g. the syllable being sung. -->
         <SolidColorBrush x:Key="AccentHighlightBrush" Color="#E9E3FF" />
+        <!-- The accent for marks drawn on a dark surface, e.g. the lyric lane's notes. The accent itself here; a
+             themed accent darkens for white text on it, but this one stays light, so the marks still stand out. -->
+        <SolidColorBrush x:Key="AccentMarkBrush" Color="#8B5CF6" />
         <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
         <!-- Metadata that fails validation: an orange bar and tint on its row, and the message under it. -->
         <SolidColorBrush x:Key="InvalidBrush" Color="#FB923C" />

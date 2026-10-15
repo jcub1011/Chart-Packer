@@ -24,6 +24,12 @@ public enum ThemeRole
     /// <summary>The palest accent, almost white: what is lit up, e.g. the syllable being sung.</summary>
     AccentHighlight,
 
+    /// <summary>
+    /// The accent for marks drawn on a dark surface, e.g. the lyric lane's notes: kept light rather than darkened for
+    /// text on it, so they stand out over the background and the waveform behind them.
+    /// </summary>
+    AccentMark,
+
     /// <summary>The spectrum's bass: the seed's hue turned one way.</summary>
     SpectrumLow,
 

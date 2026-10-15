@@ -29,6 +29,9 @@ public sealed class ThemePalette
     private const double AccentTextLightness = 0.82;
     private const double AccentHighlightLightness = 0.93;
 
+    // Marks on a dark surface aren't darkened for white text, so a hue the accent had to darken still shows over a waveform.
+    private const double AccentMarkLightness = 0.72;
+
     // How strongly greys are tinted: a little of the seed's own chroma, kept between a hint and a wash.
     private const double MinTintChroma = 0.012;
     private const double MaxTintChroma = 0.028;
@@ -61,6 +64,7 @@ public sealed class ThemePalette
             : Oklab.FromLchInGamut(0.18, TintChroma, hue).ToSrgb();
         AccentText = Oklab.FromLchInGamut(AccentTextLightness, Math.Clamp(seed.Chroma, 0.06, 0.11), hue).ToSrgb();
         AccentHighlight = Oklab.FromLchInGamut(AccentHighlightLightness, Math.Clamp(seed.Chroma, 0.03, 0.045), hue).ToSrgb();
+        AccentMark = Oklab.FromLchInGamut(AccentMarkLightness, accentChroma, hue).ToSrgb();
 
         double spectrumChroma = Math.Clamp(seed.Chroma * 1.2, 0.1, 0.17);
         SpectrumLow = Oklab.FromLchInGamut(SpectrumLightness, spectrumChroma, hue - SpectrumHueSpread).ToSrgb();
@@ -91,6 +95,9 @@ public sealed class ThemePalette
 
     /// <inheritdoc cref="ThemeRole.AccentHighlight"/>
     public ThemeColor AccentHighlight { get; }
+
+    /// <inheritdoc cref="ThemeRole.AccentMark"/>
+    public ThemeColor AccentMark { get; }
 
     /// <inheritdoc cref="ThemeRole.SpectrumLow"/>
     public ThemeColor SpectrumLow { get; }
@@ -123,6 +130,7 @@ public sealed class ThemePalette
             ThemeRole.AccentForeground => AccentForeground,
             ThemeRole.AccentText => AccentText,
             ThemeRole.AccentHighlight => AccentHighlight,
+            ThemeRole.AccentMark => AccentMark,
             ThemeRole.SpectrumLow => SpectrumLow,
             ThemeRole.SpectrumMiddle => SpectrumMiddle,
             ThemeRole.SpectrumHigh => SpectrumHigh,

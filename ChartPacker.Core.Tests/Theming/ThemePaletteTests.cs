@@ -47,6 +47,20 @@ public sealed class ThemePaletteTests
 
     [TestMethod]
     [DynamicData(nameof(Seeds))]
+    public void MarksStandOutOverTheWaveform(int hue, double chroma)
+    {
+        var palette = ThemePalette.From(new(hue, chroma));
+        var background = palette.Retint(Background);
+
+        // The lyric lane's waveform at its loudest: AccentText at 0x3C over the background.
+        var waveform = Over(palette.AccentText.WithAlpha(0x3C), background);
+
+        Assert.IsGreaterThanOrEqualTo(ThemePalette.TextContrast, ThemeColor.Contrast(palette.AccentMark, background));
+        Assert.IsGreaterThanOrEqualTo(ThemePalette.ComponentContrast, ThemeColor.Contrast(palette.AccentMark, waveform));
+    }
+
+    [TestMethod]
+    [DynamicData(nameof(Seeds))]
     public void RetintingKeepsLightness(int hue, double chroma)
     {
         var palette = ThemePalette.From(new(hue, chroma));
@@ -100,6 +114,7 @@ public sealed class ThemePaletteTests
     [DataRow(ThemeRole.Neutral)]
     [DataRow(ThemeRole.Accent)]
     [DataRow(ThemeRole.AccentText)]
+    [DataRow(ThemeRole.AccentMark)]
     [DataRow(ThemeRole.SpectrumMiddle)]
     public void ResolveKeepsTheOriginalsAlpha(ThemeRole role)
     {
@@ -122,6 +137,14 @@ public sealed class ThemePaletteTests
     public void FromANullSeedThrows()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => ThemePalette.From(null!));
+    }
+
+    // Translucent top over opaque bottom, blended in sRGB as the renderer does.
+    private static ThemeColor Over(ThemeColor top, ThemeColor bottom)
+    {
+        double a = top.A / 255.0;
+        byte Mix(byte t, byte b) => (byte)Math.Round((t * a) + (b * (1 - a)));
+        return new(255, Mix(top.R, bottom.R), Mix(top.G, bottom.G), Mix(top.B, bottom.B));
     }
 
     private static void AssertHue(double expected, ThemeColor colour, double tolerance)
