@@ -8,7 +8,7 @@
         mc:Ignorable="d" d:DesignWidth="360" d:DesignHeight="320"
         x:Class="ChartBuilder.Views.LaneMappingWindow"
         x:DataType="vm:LaneMappingViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartBuilder.ico"
         Title="{x:Static res:Strings.LaneMappingTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
         WindowStartupLocation="CenterOwner"

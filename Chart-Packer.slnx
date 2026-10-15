@@ -7,10 +7,12 @@
   <Project Path="ChartPacker.Core.Tests/ChartPacker.Core.Tests.csproj" />
   <Project Path="ChartPacker.Input/ChartPacker.Input.csproj" />
   <Project Path="ChartPacker.Ffmpeg/ChartPacker.Ffmpeg.csproj" />
+  <Project Path="ChartPacker.Thumbnails/ChartPacker.Thumbnails.csproj" />
   <Project Path="ChartPacker.UI/ChartPacker.UI.csproj" />
   <Project Path="ChartPacker.Video/ChartPacker.Video.csproj" />
   <Folder Name="/tools/">
     <Project Path="tools/DecodeBench/DecodeBench.csproj" />
+    <Project Path="tools/IconGen/IconGen.csproj" />
     <Project Path="tools/ScanBench/ScanBench.csproj" />
   </Folder>
 </Solution>

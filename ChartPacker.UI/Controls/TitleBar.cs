@@ -22,7 +22,7 @@ namespace ChartPacker.UI.Controls
     /// </remarks>
     /// <example>
     /// <code>
-    /// &lt;ctl:TitleBar Icon="/Assets/avalonia-logo.ico" AppName="{x:Static res:Strings.AppName}"&gt;
+    /// &lt;ctl:TitleBar Icon="/Assets/ChartPacker.ico" AppName="{x:Static res:Strings.AppName}"&gt;
     ///     &lt;ctl:TitleBar.Menu&gt;&lt;Menu chrome:WindowDecorationProperties.ElementRole="User"&gt;…&lt;/Menu&gt;&lt;/ctl:TitleBar.Menu&gt;
     ///     &lt;ctl:VersionLink chrome:WindowDecorationProperties.ElementRole="User" /&gt;
     /// &lt;/ctl:TitleBar&gt;

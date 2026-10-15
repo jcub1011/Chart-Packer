@@ -12,7 +12,7 @@
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
         x:Class="ChartBuilder.Views.EditorWindow"
         x:DataType="vm:EditorWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartBuilder.ico"
         Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1280" Height="800"
@@ -102,7 +102,7 @@
         <StackPanel x:Name="TopBand" Grid.Row="0">
             <!-- The window draws its own title bar (TitleBar): the icon, the File and Edit menus, and the window's title and
                  the program version. Dragging anywhere but the menus, the title and the version moves the window. -->
-            <ctl:TitleBar Icon="/Assets/avalonia-logo.ico" AppName="{x:Static res:Strings.AppName}">
+            <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}">
                 <ctl:TitleBar.Menu>
                     <Menu chrome:WindowDecorationProperties.ElementRole="User">
                         <MenuItem Header="{x:Static res:Strings.MenuFile}">

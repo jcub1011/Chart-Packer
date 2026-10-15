@@ -74,6 +74,24 @@ public static class AlbumArt
             cancellationToken);
     }
 
+    /// <summary>
+    /// Reads the album art of the <c>.sng</c> in <paramref name="sng"/>, which must be readable and seekable,
+    /// and stays open. For a <c>.sng</c> that isn't a file of its own, such as the stream Explorer hands a
+    /// thumbnail handler.
+    /// </summary>
+    /// <returns>
+    /// The image file's bytes, unmasked, or <see langword="null"/> when the <c>.sng</c>'s header can't be read,
+    /// it has no art, or the art is larger than <paramref name="maxBytes"/>.
+    /// </returns>
+    /// <exception cref="ArgumentException"><paramref name="sng"/> can't be read or can't seek.</exception>
+    /// <exception cref="IOException">The stream can't be read, or the stored image runs past its end.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    public static byte[]? ReadFromSng(Stream sng, long maxBytes = DefaultMaxBytes, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(maxBytes);
+        return ReadFromSng(SngInput.Of(sng), maxBytes, cancellationToken);
+    }
+
     private static Task<byte[]?> ReadFromFolderAsync(string folder, long maxBytes, CancellationToken cancellationToken)
     {
         var files = Directory.EnumerateFiles(folder).ToList();
@@ -84,12 +102,17 @@ public static class AlbumArt
     private static Task<byte[]?> ReadFromSng(string path, long maxBytes, CancellationToken cancellationToken)
     {
         using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var read = SngReader.Read(handle, cancellationToken);
+        return Task.FromResult(ReadFromSng(SngInput.Of(handle), maxBytes, cancellationToken));
+    }
+
+    private static byte[]? ReadFromSng(SngInput sng, long maxBytes, CancellationToken cancellationToken)
+    {
+        var read = SngReader.Read(sng, cancellationToken);
         if (read.Header is not { } header)
-            return Task.FromResult<byte[]?>(null);
+            return null;
 
         var file = Pick(read.Files, f => f.Name);
-        return Task.FromResult(file is null ? null : SongFile.ReadFromSng(handle, header, file, maxBytes, cancellationToken));
+        return file is null ? null : SongFile.ReadFromSng(sng, header, file, maxBytes, cancellationToken);
     }
 
     /// <summary>The first of <paramref name="items"/> whose name is the most preferred album-art name.</summary>

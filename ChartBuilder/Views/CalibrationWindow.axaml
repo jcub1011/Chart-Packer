@@ -9,7 +9,7 @@
         mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="620"
         x:Class="ChartBuilder.Views.CalibrationWindow"
         x:DataType="vm:CalibrationViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartBuilder.ico"
         Title="{x:Static res:Strings.CalibrationWindowTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
         WindowStartupLocation="CenterOwner"

@@ -9,7 +9,7 @@
         mc:Ignorable="d" d:DesignWidth="1080" d:DesignHeight="800"
         x:Class="ChartPacker.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartPacker.ico"
         Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1080" Height="800"
@@ -64,7 +64,7 @@
                       Height="31"
                       BorderThickness="0,0,0,1"
                       BorderBrush="{DynamicResource SubtleBorderBrush}"
-                      Icon="/Assets/avalonia-logo.ico"
+                      Icon="/Assets/ChartPacker.ico"
                       AppName="{x:Static res:Strings.AppName}">
             <ctl:TitleBar.Menu>
                 <Menu chrome:WindowDecorationProperties.ElementRole="User">
