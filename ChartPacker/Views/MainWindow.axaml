@@ -129,6 +129,7 @@
                             </MenuItem.ItemContainerTheme>
                         </MenuItem>
                         <MenuItem Header="{x:Static res:Strings.MenuFlatPack}"
+                                  Classes="check-end"
                                   ToggleType="CheckBox"
                                   IsChecked="{Binding Library.FlatPackOutput, Mode=TwoWay}"
                                   ToolTip.Tip="{x:Static res:Strings.FlatPackToolTip}">
@@ -276,11 +277,12 @@
             </Grid>
         </Border>
 
-        <!-- Pack/unpack summary, always under both panels. Clicking it opens the progress window. -->
+        <!-- The status bar, always under both panels: the pack/unpack job, or the library's scan. Clicking it opens
+             the progress window. -->
         <ContentControl Grid.Row="3"
                         Grid.Column="0"
                         Grid.ColumnSpan="3"
-                        Content="{Binding Job}" />
+                        Content="{Binding StatusBar}" />
     </Grid>
 
 </Window>

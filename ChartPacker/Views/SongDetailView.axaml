@@ -145,7 +145,7 @@
             <Setter Property="Background" Value="{DynamicResource ToolTipStripBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
             <Setter Property="BorderThickness" Value="0,1,0,0" />
-            <Setter Property="Padding" Value="20,8" />
+            <Setter Property="Padding" Value="12,8" />
             <Setter Property="TextElement.FontSize" Value="12" />
         </Style>
         <!-- While the save bar shows, over the bottom of the panel, the tip strip sits on it, and the details end above
@@ -154,10 +154,10 @@
             <Setter Property="Margin" Value="0,0,0,45" />
         </Style>
         <Style Selector="StackPanel.details">
-            <Setter Property="Margin" Value="20,16" />
+            <Setter Property="Margin" Value="12,10" />
         </Style>
         <Style Selector="StackPanel.details.save-bar">
-            <Setter Property="Margin" Value="20,16,20,61" />
+            <Setter Property="Margin" Value="12,10,12,55" />
         </Style>
 
         <!-- The background's Image | Video switch: radio buttons, so one is always picked, drawn as
@@ -282,7 +282,7 @@
                  concerns. -->
             <Border DockPanel.Dock="Top"
                     Classes="banner error"
-                    Margin="20,12,20,0"
+                    Margin="12,10,12,0"
                     IsVisible="{Binding HasSaveError}">
                 <SelectableTextBlock TextWrapping="Wrap" Text="{Binding SaveError}" />
             </Border>
@@ -330,8 +330,9 @@
 
                     <!-- Album art on the left and the background beside it, each in its own shape, as tall as
                          lets both fit the panel's width, with a caption below each. The row, captions included,
-                         is at most 512px or 40% of the window's height, whichever is smaller. -->
-                    <ctl:MediaRow Margin="0,16,0,0" MaxRowHeight="512" MaxViewportFraction="0.4" FooterHeight="32" ClipToBounds="True">
+                         is at most 512px or 40% of the window's height, whichever is smaller. The rows here are spaced
+                         as the panel is padded: 12 between tiles side by side, 10 between rows. -->
+                    <ctl:MediaRow Margin="0,10,0,0" Spacing="12" MaxRowHeight="512" MaxViewportFraction="0.4" FooterHeight="32" ClipToBounds="True">
                         <!-- The file's name, with its actions beside it, and its size in a chip, under the tile; a - for
                              each when there's none. -->
                         <DockPanel ctl:MediaRow.AspectRatio="{Binding ArtAspect}">
@@ -580,7 +581,7 @@
                     <!-- The one selected song's vocals as a karaoke lane, in step with the audio, shown while it has
                          a vocals track or vocals in its chart. Captioned and edited like the art. While Shift is held
                          over the lane it shows the whole part, to scrub through. -->
-                    <DockPanel Margin="0,16,0,0" IsVisible="{Binding Lyrics.IsVisible}">
+                    <DockPanel Margin="0,10,0,0" IsVisible="{Binding Lyrics.IsVisible}">
                         <!-- The name, which gives way on a narrow panel, with its actions beside it, then the offset at the
                              right, as the highway's instruments have in their flyout. -->
                         <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
@@ -722,7 +723,7 @@
                          settings put them here rather than over the background. Captioned like the lyrics: the button at the
                          right shows or hides the highways, and its arrow opens their options. -->
                     <Panel IsVisible="{Binding ShowSongFiles}">
-                        <DockPanel Margin="0,16,0,0" IsVisible="{Binding Highway.IsInRow}">
+                        <DockPanel Margin="0,10,0,0" IsVisible="{Binding Highway.IsInRow}">
                             <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
                                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6">
                                     <TextBlock Grid.Column="0"
@@ -1178,7 +1179,7 @@
                 Background="{DynamicResource ToolbarBrush}"
                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                 BorderThickness="0,1,0,0"
-                Padding="20,8">
+                Padding="12,8">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
                 <TextBlock Grid.Column="0"
                            Classes="muted"

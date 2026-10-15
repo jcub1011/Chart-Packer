@@ -88,6 +88,14 @@
         <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#1C1D27" />
         <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#34364A" />
 
+        <!-- Menu items: Compact density pads them 4 on the left, so an icon sat against the menu's edge. 12, as between
+             the icon and the text. The menu bar's own items have their own padding. -->
+        <Thickness x:Key="MenuFlyoutItemThemePaddingNarrow">8,4,8,4</Thickness>
+
+        <!-- An expanded scroll bar's thumb, the palette's BaseLow. Fluent gives it as a colour (ScrollBarThumbBackgroundColor),
+             which DynamicTheme could only swap at once; as a brush it fades with the rest. See the ScrollBar style below. -->
+        <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#2E3040" />
+
         <!-- The caption buttons of a window that draws its own title bar (ctl:TitleBar): with the client area extended,
              Avalonia draws them itself (Fluent's WindowDrawnDecorations), not Windows. Its own title text is hidden, as
              the title bar has the icon and title, and its full screen button, as full screen hides the caption buttons,
@@ -103,6 +111,11 @@
             </Style>
         </ControlTheme>
     </Styles.Resources>
+
+    <!-- An expanded scroll bar's thumb, in a brush DynamicTheme recolours rather than Fluent's colour. -->
+    <Style Selector="ScrollBar[IsExpanded=true] /template/ Thumb">
+        <Setter Property="Background" Value="{DynamicResource ScrollBarThumbBrush}" />
+    </Style>
 
     <!-- Toolbar -->
     <Style Selector="Border.toolbar">
@@ -201,6 +214,15 @@
     </Style>
     <Style Selector="MenuItem:disabled /template/ ContentControl#PART_IconPresenter">
         <Setter Property="Foreground" Value="{DynamicResource MenuFlyoutItemForegroundDisabled}" />
+    </Style>
+    <!-- A check box item with its own icon (check-end) has its check at the end of the row, in the input gesture's
+         column, rather than in a column before the icon. The space is kept while unchecked, so checking it doesn't
+         widen the menu. -->
+    <Style Selector="MenuItem.check-end /template/ ContentControl#PART_ToggleIconPresenter">
+        <Setter Property="Grid.Column" Value="3" />
+        <Setter Property="Margin" Value="12,0,0,0" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="IsVisible" Value="True" />
     </Style>
     <!-- A link in a window's own title bar, such as Chart Builder's song title or the version: flat, lit on hover, and
          plain text while disabled. -->
