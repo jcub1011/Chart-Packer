@@ -7,6 +7,7 @@ using ChartPacker.Core.Library;
 using ChartPacker.Core.Merging;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -61,11 +62,11 @@ namespace ChartPacker.ViewModels
                 Strings.FilterStemsLabel,
                 [
                     (Strings.FilterStemSong, (int)LibraryStems.Song),
-                    (Strings.InstrumentGuitar, (int)LibraryStems.Guitar),
-                    (Strings.InstrumentRhythm, (int)LibraryStems.Rhythm),
-                    (Strings.InstrumentBass, (int)LibraryStems.Bass),
-                    (Strings.InstrumentKeys, (int)LibraryStems.Keys),
-                    (Strings.InstrumentDrums, (int)LibraryStems.Drums),
+                    (SharedStrings.InstrumentGuitar, (int)LibraryStems.Guitar),
+                    (SharedStrings.InstrumentRhythm, (int)LibraryStems.Rhythm),
+                    (SharedStrings.InstrumentBass, (int)LibraryStems.Bass),
+                    (SharedStrings.InstrumentKeys, (int)LibraryStems.Keys),
+                    (SharedStrings.InstrumentDrums, (int)LibraryStems.Drums),
                     (Strings.FilterStemVocals, (int)LibraryStems.Vocals),
                     (Strings.FilterStemCrowd, (int)LibraryStems.Crowd),
                     (Strings.FilterStemPreview, (int)LibraryStems.Preview),

@@ -46,11 +46,6 @@ public sealed record ChartConversion(byte[] Midi, TimeSpan? Offset, ChartReadOpt
 /// </remarks>
 public static class ChartToMidi
 {
-    private const int FaceOffPitch = 105;
-    private const int DrumFillPitch = 120;
-    private const int KickLanePitch = 125;
-    private const int RollPitch = 126;
-    private const int TrillPitch = 127;
     private const int VocalPhrasePitch = 105;
 
     // A note no longer than this, so its end is never further from the last event than a MIDI delta can say.
@@ -154,7 +149,8 @@ public static class ChartToMidi
             warnings.Clear();
             foreach (var (key, notes) in expected)
             {
-                var result = NoteCheck.Compare(notes, reads, key);
+                // The .chart's notes are read without their accents and ghosts, which the MIDI read back has.
+                var result = NoteCheck.Compare(notes, reads, key, NoteFlags.Accent | NoteFlags.Ghost);
                 string name = TrackNames[key.Instrument];
                 if (result.HopoFixes.Count > 0 && pass == 0)
                 {
@@ -401,14 +397,14 @@ public static class ChartToMidi
                     Shared(difficulty, MidiLayout.StarPowerPitch, e.Tick, e.Tick + e.Length);
                     break;
                 case 0 or 1:
-                    Shared(difficulty, FaceOffPitch + e.Number, e.Tick, e.Tick + e.Length);
+                    Shared(difficulty, MidiLayout.FaceOffPitch + e.Number, e.Tick, e.Tick + e.Length);
                     break;
                 case 64 when drums:
                     for (int lane = 0; lane < 5; lane++)
-                        Shared(difficulty, DrumFillPitch + lane, e.Tick, e.Tick + e.Length);
+                        Shared(difficulty, MidiLayout.DrumFillPitch + lane, e.Tick, e.Tick + e.Length);
                     break;
                 case 65 or 66 or 67 when drums:
-                    var key = (e.Number switch { 65 => RollPitch, 66 => TrillPitch, _ => KickLanePitch }, e.Tick);
+                    var key = (e.Number switch { 65 => MidiLayout.RollPitch, 66 => MidiLayout.TrillPitch, _ => MidiLayout.KickLanePitch }, e.Tick);
                     if (!lanes.TryGetValue(key, out var lane0))
                         lanes[key] = lane0 = (e.Length, []);
                     lane0.Difficulties.Add(difficulty);

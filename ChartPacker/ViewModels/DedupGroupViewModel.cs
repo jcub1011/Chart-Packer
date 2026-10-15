@@ -8,8 +8,9 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Scanning;
-using ChartPacker.Formatting;
 using ChartPacker.Resources;
+using ChartPacker.UI.Formatting;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

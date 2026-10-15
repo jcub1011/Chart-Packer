@@ -76,29 +76,8 @@ public static class SongLengthEstimator
         return songEnd > TimeSpan.Zero ? (long)Math.Ceiling(songEnd.TotalMilliseconds) : null;
     }
 
-    private static long? LongestAudio(SongEntry entry, MetadataDraft draft, IReadOnlyList<string> stored, CancellationToken cancellationToken)
-    {
-        long? longest = null;
-        foreach (var track in SongTracks.Resolve(stored, draft))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (track.Stem.Equals(AudioStems.Preview, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            try
-            {
-                using var stream = Open(entry, track.StoredName, track.StagedSourcePath, cancellationToken);
-                if (stream is not null && AudioLength.MeasureMs(stream, track.StoredName) is { } ms)
-                    longest = Math.Max(longest ?? 0, ms);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentOutOfRangeException)
-            {
-                // One unreadable track doesn't hide the others.
-            }
-        }
-
-        return longest;
-    }
+    private static long? LongestAudio(SongEntry entry, MetadataDraft draft, IReadOnlyList<string> stored, CancellationToken cancellationToken) =>
+        SongAudioLength.LongestMs(entry, SongTracks.Resolve(stored, draft), cancellationToken);
 
     private static long? ChartEnd(SongEntry entry, MetadataDraft draft, IReadOnlyList<KeyValuePair<string, string>> pairs, IReadOnlyList<string> stored, CancellationToken cancellationToken)
     {

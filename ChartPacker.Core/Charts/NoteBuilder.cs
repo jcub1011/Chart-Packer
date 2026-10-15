@@ -99,8 +99,9 @@ internal static class NoteBuilder
     }
 
     /// <summary>
-    /// Drum notes without sustains, one for each gem with the flags given, in tick, then lane, then flags order, those
-    /// alike in the order given; two at the same tick and lane are both kept, as YARG keeps them.
+    /// Drum notes without sustains, one for each gem with the flags given, in tick, then lane, then flags order (but
+    /// for accents and ghosts), those alike in the order given; two at the same tick and lane are both kept, as YARG
+    /// keeps them.
     /// </summary>
     /// <param name="gems">Sorted in place.</param>
     public static List<ChartNote> Drums(List<(Gem Gem, NoteFlags Flags)> gems, IReadOnlyList<StarPowerPhrase> starPower)
@@ -127,8 +128,12 @@ internal static class NoteBuilder
             notes.Add(new ChartNote(gem.Tick, 0, gem.Lane, InStarPower(starPower, gem.Tick) ? flags | NoteFlags.StarPower : flags));
         return notes;
 
-        static bool SortsAfter((Gem Gem, NoteFlags Flags) a, (Gem Gem, NoteFlags Flags) b) =>
-            a.Gem.Lane != b.Gem.Lane ? a.Gem.Lane > b.Gem.Lane : a.Flags > b.Flags;
+        // Accents and ghosts don't count, so a MIDI chart that has them sorts as it would read without them.
+        static bool SortsAfter((Gem Gem, NoteFlags Flags) a, (Gem Gem, NoteFlags Flags) b)
+        {
+            const NoteFlags dynamics = NoteFlags.Accent | NoteFlags.Ghost;
+            return a.Gem.Lane != b.Gem.Lane ? a.Gem.Lane > b.Gem.Lane : (a.Flags & ~dynamics) > (b.Flags & ~dynamics);
+        }
     }
 
     /// <summary>

@@ -57,6 +57,18 @@ public enum NoteFlags
 
     /// <summary>Inside a star-power phrase.</summary>
     StarPower = 16,
+
+    /// <summary>
+    /// A drum accent, hit harder: a pad note, never the kick. Read from a MIDI chart only on a drums track with
+    /// <c>[ENABLE_CHART_DYNAMICS]</c>.
+    /// </summary>
+    Accent = 32,
+
+    /// <summary>
+    /// A drum ghost note, hit softer: a pad note, never the kick. Read from a MIDI chart only on a drums track with
+    /// <c>[ENABLE_CHART_DYNAMICS]</c>.
+    /// </summary>
+    Ghost = 64,
 }
 
 /// <summary>One note of a chart.</summary>

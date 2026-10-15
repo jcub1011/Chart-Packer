@@ -27,8 +27,32 @@ public abstract class SettingDefinition
     /// </summary>
     public string? RequiresId { get; init; }
 
+    /// <summary>
+    /// Buttons shown beside the setting's editor, such as one that opens the folder a setting writes to. They
+    /// act straight away, not on OK or Apply, and stay usable while the setting itself is locked or off.
+    /// </summary>
+    public IReadOnlyList<SettingAction> Actions { get; init; } = [];
+
     /// <summary>Starts staging a change to this setting, from its current value.</summary>
     public abstract SettingEdit BeginEdit();
+}
+
+/// <summary>A button in a setting's row, and what it does when clicked.</summary>
+/// <param name="Label">The button's text; with an <paramref name="IconKey"/>, its tooltip and accessible name instead.</param>
+/// <param name="Run">What the button does.</param>
+/// <param name="IconKey">
+/// The resource key of a line icon to show instead of the text, such as <c>InputFolderStroke</c>, or
+/// <see langword="null"/> for a text button. The settings window looks the key up in its app's resources.
+/// </param>
+public sealed record SettingAction(string Label, Action Run, string? IconKey = null);
+
+/// <summary>
+/// A row with no value of its own, only its <see cref="SettingDefinition.Actions"/>: for what's edited
+/// elsewhere, such as the audio latency, which the calibration tool edits.
+/// </summary>
+public sealed class ActionSetting : SettingDefinition
+{
+    public override SettingEdit BeginEdit() => new ActionSettingEdit(this);
 }
 
 /// <summary>A setting whose value is a <typeparamref name="T"/>.</summary>
@@ -111,6 +135,30 @@ public sealed class ChoiceSetting<T> : SettingDefinition<T>
 
 /// <summary>A value of a <see cref="ChoiceSetting{T}"/> and the text shown for it.</summary>
 public sealed record SettingChoice<T>(T Value, string Label);
+
+/// <summary>A line of text.</summary>
+public sealed class TextSetting : SettingDefinition<string>
+{
+    /// <summary>What to show in the box while it's empty.</summary>
+    public string? Placeholder { get; init; }
+
+    /// <summary>Characters the value can't hold, which are dropped as they're typed, e.g. what <c>song.ini</c> can't store.</summary>
+    public string ForbiddenCharacters { get; init; } = "";
+
+    /// <summary>
+    /// Null becomes empty, and line breaks and <see cref="ForbiddenCharacters"/> are dropped. Spaces are
+    /// kept, even at the ends, since the value is coerced as it's typed.
+    /// </summary>
+    public override string Coerce(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "";
+
+        return value.AsSpan().IndexOfAny(ForbiddenCharacters + "\r\n") < 0
+            ? value
+            : string.Concat(value.Where(c => c is not ('\r' or '\n') && !ForbiddenCharacters.Contains(c)));
+    }
+}
 
 /// <summary>A folder path, or <see langword="null"/> for none.</summary>
 public sealed class FolderSetting : SettingDefinition<string?>

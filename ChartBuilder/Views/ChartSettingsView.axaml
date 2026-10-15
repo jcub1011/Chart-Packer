@@ -1,0 +1,176 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:ui="using:ChartPacker.UI.Controls"
+             xmlns:uiviews="using:ChartPacker.UI.Views"
+             xmlns:conv="using:ChartPacker.UI.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="900"
+             x:Class="ChartBuilder.Views.ChartSettingsView"
+             x:DataType="vm:EditorWindowViewModel"
+             Focusable="True"
+             FocusAdorner="{x:Null}"
+             ui:CommitOnClickAway.IsEnabled="True">
+
+    <!-- Chart settings (charter-spec C1): everything a chart needs, each change an undo step as it's made: the parts, a
+         chip each with its rating; the song's metadata, as Chart Packer's inspector edits it; and its tracks, with their
+         mix. The timing (the resolution, the delay and the tempo map) is in the Tempo map tab. Each field's label is above it, as the panel can be narrow. Focusable so a click on
+         empty space can take focus from an edit box, which commits it. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <Style Selector="StackPanel.field">
+            <Setter Property="Spacing" Value="4" />
+        </Style>
+        <!-- A part's rating while the part is off: faded, as it can't be picked. -->
+        <Style Selector="Button.preset:disabled Border.presetFace">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <!-- A part chip: rounded, like a filter chip, holding the part's name and its rating. -->
+        <Style Selector="Border.partChip">
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Border.partChip.checked">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        </Style>
+        <Style Selector="Border.partChip.checked ToggleButton.partChipLabel">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <!-- The chip's name toggles the part; fully plain in every state so only the chip itself reads as highlighted. -->
+        <Style Selector="ToggleButton.partChipLabel">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="ToggleButton.partChipLabel /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+        <Style Selector="ToggleButton.partChipLabel:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.partChipLabel:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.partChipLabel:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <Style Selector="ToggleButton.partChipLabel:pressed">
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <!-- The rating swatch reads smaller inside a chip than in the difficulty flyout. -->
+        <Style Selector="Border.partChip Border.presetFace">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Border.partChip Border.presetFace TextBlock">
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.Resources>
+        <!-- A song.ini tier, 0 to 6 and up; unset is grey. -->
+        <conv:DifficultyBrushConverter x:Key="DifficultyTierBrush"
+                                       Level0="{StaticResource DifficultyTier0Brush}"
+                                       Level1="{StaticResource DifficultyTier1Brush}"
+                                       Level2="{StaticResource DifficultyTier2Brush}"
+                                       Level3="{StaticResource DifficultyTier3Brush}"
+                                       Level4="{StaticResource DifficultyTier4Brush}"
+                                       Level5="{StaticResource DifficultyTier5Brush}"
+                                       Level6="{StaticResource DifficultyTier6Brush}"
+                                       Fallback="{StaticResource DifficultyUnsetBrush}" />
+        <!-- A part's rating: its tier's swatch, ? while it's unrated, as the flyout it opens shows each tier. -->
+        <DataTemplate x:Key="RatingTemplate" x:DataType="vm:ChartRatingViewModel">
+            <Button Classes="preset"
+                    VerticalAlignment="Center"
+                    ToolTip.Tip="{x:Static res:Strings.ChartSettingsDifficultyToolTip}"
+                    AutomationProperties.Name="{Binding Name}">
+                <Border Classes="presetFace"
+                        Classes.unset="{Binding Tier, Converter={x:Static ObjectConverters.IsNull}}"
+                        Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}">
+                    <TextBlock Text="{Binding Text}" />
+                </Border>
+                <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedRight">
+                        <uiviews:DifficultyPicker />
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="12,10" Spacing="0">
+            <!-- A chip per part: on when the chart has it, with its rating inside it, which opens the inspector's
+                 difficulty flyout. Drums are three chips sharing one part: 4-lane, Pro and 5-lane. -->
+            <TextBlock Classes="caption" Margin="0,2,0,4" Text="{x:Static res:Strings.ChartSettingsSectionParts}" />
+            <StackPanel Spacing="8">
+                <ItemsControl ItemsSource="{Binding ChartSettings.PartChips}"
+                              AutomationProperties.Name="{x:Static res:Strings.ChartSettingsSectionParts}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ChartPartChipViewModel">
+                            <Border Classes="partChip" Classes.checked="{Binding IsChecked}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="marker"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding Marker}"
+                                               IsVisible="{Binding Marker, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    <ToggleButton Classes="partChipLabel"
+                                                  VerticalAlignment="Center"
+                                                  Content="{Binding Label}"
+                                                  IsChecked="{Binding IsChecked}"
+                                                  ToolTip.Tip="{x:Static res:Strings.ChartSettingsPartToolTip}"
+                                                  AutomationProperties.Name="{Binding Label}" />
+                                    <ContentControl Content="{Binding Rating}"
+                                                    ContentTemplate="{StaticResource RatingTemplate}"
+                                                    IsEnabled="{Binding IsChecked}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="muted"
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Text="{x:Static res:Strings.ChartSettingsDrumsToolTip}"
+                           IsVisible="{Binding ChartSettings.HasDrums}" />
+            </StackPanel>
+
+            <!-- The song's metadata, as Chart Packer's inspector edits it; Revert and Remove are on a row's right-click menu. -->
+            <TextBlock Classes="caption" Margin="0,10,0,4" Text="{x:Static res:Strings.ChartSettingsSectionMetadata}" />
+            <uiviews:MetadataEditorView DataContext="{Binding Metadata.MetadataEditor}" />
+
+            <!-- The song's tracks, with their mix; Replace and Remove are on a row's right-click menu. -->
+            <TextBlock Classes="caption" Margin="0,10,0,4" Text="{x:Static res:Strings.ChartSettingsSectionTracks}" />
+            <StackPanel Spacing="4">
+                <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12" Text="{x:Static res:Strings.ChartSettingsTracksNote}" />
+                <uiviews:TrackListView Tracks="{Binding Tracks.Tracks}"
+                                       RemovedTracks="{Binding Tracks.RemovedTracks}"
+                                       AddTrackOptions="{Binding Tracks.AddTrackOptions}"
+                                       CanEdit="{Binding Tracks.CanEdit}"
+                                       ActionsInContextMenu="True"
+                                       PositionSeconds="{Binding Playback.PositionSeconds}"
+                                       LengthSeconds="{Binding Playback.LengthSeconds}"
+                                       ReplaceTrackCommand="{Binding Tracks.ReplaceTrackCommand}"
+                                       RemoveTrackCommand="{Binding Tracks.RemoveTrackCommand}"
+                                       RestoreTrackCommand="{Binding Tracks.RestoreTrackCommand}" />
+                <TextBlock Classes="error" Text="{Binding Tracks.Error}" IsVisible="{Binding Tracks.HasError}" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

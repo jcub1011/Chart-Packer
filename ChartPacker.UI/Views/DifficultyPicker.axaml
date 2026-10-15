@@ -1,0 +1,101 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ChartPacker.UI.ViewModels"
+             xmlns:res="using:ChartPacker.Resources"
+             xmlns:conv="using:ChartPacker.UI.Converters"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="160"
+             x:Class="ChartPacker.UI.Views.DifficultyPicker"
+             x:DataType="vm:IDifficultyPicker">
+    <!-- A difficulty's flyout: the part's name and key, its note counts, a button for each tier, and a box for any other.
+         Chart Packer's inspector's instrument icons and Chart Builder's Chart settings' ratings open it. The view hosting
+         it includes Inspector.axaml, whose preset and nudge styles it uses. -->
+
+    <UserControl.Resources>
+        <!-- A song.ini tier, 0 to 6 and up; unset is grey. -->
+        <conv:DifficultyBrushConverter x:Key="DifficultyTierBrush"
+                                       Level0="{StaticResource DifficultyTier0Brush}"
+                                       Level1="{StaticResource DifficultyTier1Brush}"
+                                       Level2="{StaticResource DifficultyTier2Brush}"
+                                       Level3="{StaticResource DifficultyTier3Brush}"
+                                       Level4="{StaticResource DifficultyTier4Brush}"
+                                       Level5="{StaticResource DifficultyTier5Brush}"
+                                       Level6="{StaticResource DifficultyTier6Brush}"
+                                       Fallback="{StaticResource DifficultyUnsetBrush}" />
+        <!-- "Expert   1,234 notes": the labels line up in a column. -->
+        <DataTemplate x:Key="NoteCountRowTemplate" x:DataType="vm:NoteCountRow">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="NoteCountLabel" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Classes="muted" Text="{Binding Label}" />
+                <TextBlock Grid.Column="1" Text="{Binding Count}" />
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <StackPanel Spacing="8">
+        <StackPanel>
+            <TextBlock Classes="highwayHeader" Text="{Binding Name}" />
+            <TextBlock Classes="muted" FontSize="12" Text="{Binding Key}" />
+        </StackPanel>
+        <ItemsControl Grid.IsSharedSizeScope="True"
+                      ItemsSource="{Binding NoteCounts}"
+                      ItemTemplate="{StaticResource NoteCountRowTemplate}"
+                      IsVisible="{Binding HasNoteCounts}" />
+        <!-- ? unsets it; 0 to 6 set it, closing the flyout. -->
+        <ItemsControl ItemsSource="{Binding Presets}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="4" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DifficultyPresetViewModel">
+                    <Button Classes="preset"
+                            Classes.current="{Binding IsCurrent}"
+                            Command="{Binding Command}"
+                            CommandParameter="{Binding Tier}"
+                            Click="OnChosen"
+                            AutomationProperties.Name="{Binding Text}">
+                        <Border Classes="presetFace"
+                                Classes.unset="{Binding Tier, Converter={x:Static ObjectConverters.IsNull}}"
+                                Background="{Binding Tier, Converter={StaticResource DifficultyTierBrush}}">
+                            <TextBlock Text="{Binding Text}" />
+                        </Border>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <!-- A tier past the buttons. Enter sets it and leaves the flyout open. -->
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock VerticalAlignment="Center" Text="{x:Static res:SharedStrings.DifficultyOtherLabel}" />
+            <NumericUpDown Width="110"
+                           VerticalAlignment="Center"
+                           Value="{Binding OtherValue}"
+                           Increment="1"
+                           Minimum="0"
+                           Maximum="2147483647"
+                           FormatString="0"
+                           AutomationProperties.Name="{x:Static res:SharedStrings.DifficultyOtherLabel}">
+                <NumericUpDown.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding ApplyOtherCommand}" />
+                </NumericUpDown.KeyBindings>
+            </NumericUpDown>
+            <Button Classes="nudge"
+                    Content="{x:Static res:SharedStrings.DifficultySetButton}"
+                    Command="{Binding ApplyOtherCommand}"
+                    Click="OnChosen" />
+            <Button Classes="nudge"
+                    Command="{Binding RevertCommand}"
+                    IsVisible="{Binding IsEdited}"
+                    Click="OnChosen"
+                    ToolTip.Tip="{x:Static res:SharedStrings.DifficultyRevertButton}"
+                    AutomationProperties.Name="{x:Static res:SharedStrings.DifficultyRevertButton}">
+                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+            </Button>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

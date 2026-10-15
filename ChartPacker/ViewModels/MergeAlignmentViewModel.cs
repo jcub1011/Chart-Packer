@@ -10,6 +10,7 @@ using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Merging;
 using ChartPacker.Resources;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

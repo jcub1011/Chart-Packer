@@ -1,4 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
+using ChartPacker.Core.Charting;
+using ChartPacker.Core.Charting.Commands;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Metadata;
 
 namespace ChartPacker.Core.Validation.QuickFixes;
@@ -9,7 +12,8 @@ namespace ChartPacker.Core.Validation.QuickFixes;
 /// </summary>
 /// <remarks>
 /// A fix is worked out from the metadata as drafted, at the time it's asked for, so it's never stale. To add one,
-/// write a strategy and list it in <see cref="Strategies"/>.
+/// write a strategy and list it in <see cref="Strategies"/>. Chart lint's fixes, which change the chart rather than its
+/// metadata, are listed apart, in <see cref="ChartStrategies"/>.
 /// </remarks>
 public static class QuickFixRegistry
 {
@@ -24,6 +28,13 @@ public static class QuickFixRegistry
     ];
 
     private static readonly Dictionary<string, IQuickFixStrategy> ByRule = Strategies.ToDictionary(s => s.RuleId, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Every chart fix strategy, for chart lint findings, at most one per rule (charter-spec C16 item 3). They're kept
+    /// apart from <see cref="Strategies"/>, so the metadata fixes (<see cref="IsSupported"/>, <see cref="FixKey"/>) don't
+    /// see them.
+    /// </summary>
+    public static IReadOnlyList<IChartQuickFixStrategy> ChartStrategies { get; } = Charting.Lint.ChartFixes.All;
 
     /// <summary>Whether findings of <paramref name="ruleId"/> can have a quick fix.</summary>
     public static bool IsSupported(string ruleId)
@@ -60,6 +71,44 @@ public static class QuickFixRegistry
         }
 
         return fixes;
+    }
+
+    /// <summary>The fix for the chart lint finding <paramref name="finding"/>, from <see cref="ChartStrategies"/>.</summary>
+    /// <param name="finding">A chart lint finding.</param>
+    /// <param name="chart">The chart it was found in, as it is now.</param>
+    /// <param name="options">The settings the chart is read with, as lint read it.</param>
+    /// <returns>
+    /// Each way to fix it, an undoable command to run through the chart's undo stack; none when the rule has no fix or
+    /// nothing here can fix this finding.
+    /// </returns>
+    public static IReadOnlyList<ChartFixOption> ProposeChartFixes(Finding finding, EditableChart chart, ChartReadOptions options) => ProposeChartFixes(finding, chart, options, ChartStrategies);
+
+    /// <summary>The ways to fix the chart lint finding <paramref name="finding"/>, from the first of <paramref name="strategies"/> for its rule.</summary>
+    /// <param name="finding">A chart lint finding.</param>
+    /// <param name="chart">The chart it was found in, as it is now.</param>
+    /// <param name="options">The settings the chart is read with, as lint read it.</param>
+    /// <param name="strategies">The strategies to look in, such as <see cref="ChartStrategies"/>.</param>
+    /// <returns>Each way to fix it; none when no strategy is for the rule, or nothing here can fix this finding.</returns>
+    public static IReadOnlyList<ChartFixOption> ProposeChartFixes(Finding finding, EditableChart chart, ChartReadOptions options, IEnumerable<IChartQuickFixStrategy> strategies)
+    {
+        ArgumentNullException.ThrowIfNull(finding);
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(strategies);
+        foreach (var strategy in strategies)
+        {
+            if (string.Equals(strategy.RuleId, finding.RuleId, StringComparison.Ordinal))
+                return strategy.Propose(finding, chart, options);
+        }
+
+        return [];
+    }
+
+    /// <summary>The way to fix <paramref name="finding"/> that's <paramref name="optionId"/>, as <see cref="ProposeChartFixes(Finding, EditableChart, ChartReadOptions)"/> works them out; null when that way has nothing to do here.</summary>
+    public static IChartCommand? ProposeChartFix(Finding finding, EditableChart chart, ChartReadOptions options, string optionId)
+    {
+        ArgumentNullException.ThrowIfNull(optionId);
+        return ProposeChartFixes(finding, chart, options).FirstOrDefault(o => o.Id == optionId)?.Command;
     }
 
     /// <summary>

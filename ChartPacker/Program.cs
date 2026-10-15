@@ -1,4 +1,7 @@
 ﻿using Avalonia;
+using ChartPacker.Core;
+using ChartPacker.Services;
+using ChartPacker.UI;
 using System;
 
 namespace ChartPacker
@@ -9,13 +12,20 @@ namespace ChartPacker
         // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
         // yet and stuff might break.
         [STAThread]
-        public static void Main(string[] args) => BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        public static int Main(string[] args)
+        {
+            // Read ahead of App, which loads the settings again, so that startup is logged too.
+            bool logging = SettingsService.Load(UserConfigPaths.SettingsFile).Settings.LoggingEnabled;
+            return AppLog.Run("chartpacker", logging, () => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args));
+        }
 
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
+                // Room on the GPU for the lanes' waveform pictures beside the window itself: within Avalonia's own
+                // ~28 MB they were dropped and uploaded again every frame. A ceiling Skia keeps under, not an allocation.
+                .With(new SkiaOptions { MaxGpuResourceSizeBytes = 256 * 1024 * 1024 })
 #if DEBUG
                 .WithDeveloperTools()
 #endif

@@ -16,6 +16,8 @@ using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Text;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -143,7 +145,7 @@ namespace ChartPacker.ViewModels
 
         /// <summary>The per-source cells, without the leave-out option the Include checkbox stands for.</summary>
         /// <remarks>Worked out once, when first shown: the options are all added before then, and a fresh list would regenerate the cells.</remarks>
-        public IReadOnlyList<MergeOptionViewModel> SourceOptions => _sourceOptions ??= Options.Where(o => o.Source is not null).ToList();
+        public IReadOnlyList<MergeOptionViewModel> SourceOptions => _sourceOptions ??= [.. Options.Where(o => o.Source is not null)];
 
         /// <summary>The leave-out option the Include checkbox stands for, if the row has one.</summary>
         public MergeOptionViewModel? LeaveOutOption => Options.FirstOrDefault(o => o.Source is null);
@@ -158,7 +160,7 @@ namespace ChartPacker.ViewModels
 
         public bool IsExcluded => CanExclude && !IsIncluded;
 
-        public string IncludeToolTip => Strings.MergeIncludeToolTip;
+        public static string IncludeToolTip => Strings.MergeIncludeToolTip;
 
         public string IncludeName => string.Format(CultureInfo.CurrentCulture, Strings.MergeIncludeNameFormat, Label);
 
@@ -322,6 +324,8 @@ namespace ChartPacker.ViewModels
     /// </param>
     /// <param name="previewDrafts">The preview's drafts: the offsets set on it, which the merge applies.</param>
     /// <param name="settings">Persisted window state: whether the window was maximized and the split ratio.</param>
+    /// <param name="confirmation">Asks before overwriting a <c>.sng</c> that Chart Builder has open.</param>
+    /// <param name="isOpenInChartBuilder">Whether Chart Builder has the song at a path open (charter-spec §4.8).</param>
     public sealed partial class MergeWindowViewModel(
         IReadOnlyList<SongEntry> entries,
         IReadOnlyList<bool> hasDrafts,
@@ -330,7 +334,9 @@ namespace ChartPacker.ViewModels
         IVideoDurationProbe video,
         SongDetailViewModel preview,
         MetadataDraftStore previewDrafts,
-        SettingsService settings) : ViewModelBase
+        SettingsService settings,
+        IConfirmationService? confirmation = null,
+        Func<string, bool>? isOpenInChartBuilder = null) : ViewModelBase
     {
         private readonly SettingsService _settings = settings;
 
@@ -461,7 +467,7 @@ namespace ChartPacker.ViewModels
 
         public bool HasWarnings => Warnings.Count > 0;
 
-        public string CloseLabel => IsDone ? Strings.CloseButton : Strings.CancelButton;
+        public string CloseLabel => IsDone ? Strings.CloseButton : SharedStrings.CancelButton;
 
         /// <summary>Reads the songs and builds the choices.</summary>
         public async Task LoadAsync()
@@ -565,7 +571,7 @@ namespace ChartPacker.ViewModels
                     difficultyItems: has && difficulties is not null
                         ? difficulties(i).Select(d => new MergeDifficultyItem(d, ChartLabels.DifficultyLetter(d))).ToList()
                         : [],
-                    noteCountItems: noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture))).ToList(),
+                    noteCountItems: [.. noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture)))],
                     warning: warning?.Invoke(i)));
             }
 
@@ -813,6 +819,15 @@ namespace ChartPacker.ViewModels
         {
             if (Plan() is not { } plan)
                 return;
+
+            // Chart Builder would save over the merge with the song it has open.
+            if (SongMerger.TargetFor(plan, outputFolder, policy) is { } target && File.Exists(target)
+                && !await ChartBuilderSongs.ConfirmWriteAsync(
+                    confirmation, isOpenInChartBuilder, target, Path.GetFileName(target),
+                    Strings.ChartBuilderOpenOverwriteFormat, Strings.OverwriteAnywayButton))
+            {
+                return;
+            }
 
             _cts?.Dispose();
             _cts = new CancellationTokenSource();

@@ -13,7 +13,7 @@ public sealed class StagingPathTests
         string staging = StagingPath.For(target);
 
         Assert.AreEqual(Path.GetDirectoryName(target), Path.GetDirectoryName(staging));
-        StringAssert.StartsWith(Path.GetFileName(staging), ".Artist - Song.");
+        Assert.StartsWith(".Artist - Song.", Path.GetFileName(staging));
         StringAssert.EndsWith(staging, StagingPath.Suffix);
     }
 
@@ -25,7 +25,7 @@ public sealed class StagingPathTests
         string staging = StagingPath.For(target + Path.DirectorySeparatorChar);
 
         Assert.AreEqual(Path.GetDirectoryName(target), Path.GetDirectoryName(staging));
-        StringAssert.StartsWith(Path.GetFileName(staging), ".Song.");
+        Assert.StartsWith(".Song.", Path.GetFileName(staging));
     }
 
     [TestMethod]

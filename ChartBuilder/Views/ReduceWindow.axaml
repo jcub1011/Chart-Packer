@@ -1,0 +1,116 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartPacker.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="420"
+        x:Class="ChartBuilder.Views.ReduceWindow"
+        x:DataType="vm:ReduceViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{Binding Title}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Width="420">
+
+    <!-- Reduce (charter-spec C9 item 2): the rules for the part's family, the draft drawn over the target as they change. -->
+    <StackPanel Margin="20" Spacing="14">
+        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                   Text="{x:Static res:Strings.ReduceIntro}" IsVisible="{Binding IsRun}" />
+        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                   Text="{x:Static res:Strings.ReduceDefaultsIntro}" IsVisible="{Binding IsDefaults}" />
+
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                       Text="{x:Static res:Strings.ReduceFamilyLabel}" IsVisible="{Binding IsDefaults}" />
+            <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" IsVisible="{Binding IsDefaults}"
+                      ItemsSource="{Binding FamilyChoices}"
+                      SelectedItem="{Binding SelectedFamily}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:FamilyChoice}"
+                      AutomationProperties.Name="{x:Static res:Strings.ReduceFamilyLabel}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                       Text="{x:Static res:Strings.ReduceFromLabel}" IsVisible="{Binding IsRun}" />
+            <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" IsVisible="{Binding IsRun}"
+                      ItemsSource="{Binding FromChoices}"
+                      SelectedItem="{Binding SelectedFrom}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
+                      AutomationProperties.Name="{x:Static res:Strings.ReduceFromLabel}" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                       Text="{x:Static res:Strings.ReduceToLabel}" />
+            <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding ToChoices}"
+                      SelectedItem="{Binding SelectedTo}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
+                      AutomationProperties.Name="{x:Static res:Strings.ReduceToLabel}" />
+        </Grid>
+
+        <!-- 5-fret and GHL. -->
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" IsVisible="{Binding IsFrets}">
+            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ReduceChordSizeLabel}" />
+            <NumericUpDown Grid.Row="0" Grid.Column="1" Width="120"
+                           Value="{Binding MaxChordSize}" Minimum="1" Maximum="{Binding ChordSizeMaximum}"
+                           Increment="1" FormatString="0" ParsingNumberStyle="Integer"
+                           AutomationProperties.Name="{x:Static res:Strings.ReduceChordSizeLabel}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{Binding LaneLimitLabel}" />
+            <ComboBox Grid.Row="1" Grid.Column="1" Width="120"
+                      ItemsSource="{Binding LaneLimitChoices}"
+                      SelectedItem="{Binding HighestLane}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:LaneLimitChoice}"
+                      AutomationProperties.Name="{Binding LaneLimitLabel}" />
+            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ReduceThinningLabel}" />
+            <ComboBox Grid.Row="2" Grid.Column="1" Width="120"
+                      ItemsSource="{Binding DivisionChoices}"
+                      SelectedItem="{Binding Thinning}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                      AutomationProperties.Name="{x:Static res:Strings.ReduceThinningLabel}" />
+            <CheckBox Grid.Row="3" Grid.ColumnSpan="2" Content="{x:Static res:Strings.ReduceKeepForcing}" IsChecked="{Binding KeepForcedHopoAndTap}" />
+            <CheckBox Grid.Row="4" Grid.ColumnSpan="2" Content="{x:Static res:Strings.ReduceKeepShortSustains}" IsChecked="{Binding KeepShortSustains}" />
+        </Grid>
+
+        <!-- Drums. -->
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" IsVisible="{Binding IsDrums}">
+            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ReducePadsLabel}" />
+            <NumericUpDown Grid.Row="0" Grid.Column="1" Width="120"
+                           Value="{Binding PadsPerHit}" Minimum="1" Maximum="5"
+                           Increment="1" FormatString="0" ParsingNumberStyle="Integer"
+                           AutomationProperties.Name="{x:Static res:Strings.ReducePadsLabel}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ReduceThinningLabel}" />
+            <ComboBox Grid.Row="1" Grid.Column="1" Width="120"
+                      ItemsSource="{Binding DivisionChoices}"
+                      SelectedItem="{Binding Thinning}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                      AutomationProperties.Name="{x:Static res:Strings.ReduceThinningLabel}" />
+            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.ReduceKickLabel}" />
+            <ComboBox Grid.Row="2" Grid.Column="1" Width="120"
+                      ItemsSource="{Binding KickChoices}"
+                      SelectedItem="{Binding KickThinning}"
+                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                      AutomationProperties.Name="{x:Static res:Strings.ReduceKickLabel}" />
+        </Grid>
+
+        <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding Summary}" IsVisible="{Binding IsRun}" />
+
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+            <Button Grid.Column="0"
+                    Content="{x:Static res:Strings.ReduceResetButton}"
+                    Command="{Binding ResetCommand}"
+                    ToolTip.Tip="{x:Static res:Strings.ReduceResetToolTip}"
+                    AutomationProperties.Name="{x:Static res:Strings.ReduceResetButton}" />
+            <Button Grid.Column="2"
+                    Classes="accent"
+                    Content="{Binding ApplyLabel}"
+                    Command="{Binding ApplyCommand}"
+                    IsDefault="True"
+                    AutomationProperties.Name="{Binding ApplyLabel}" />
+            <Button Grid.Column="3"
+                    Content="{x:Static sres:SharedStrings.CancelButton}"
+                    Command="{Binding CancelCommand}"
+                    IsCancel="True"
+                    AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+        </Grid>
+    </StackPanel>
+</Window>

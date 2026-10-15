@@ -1,12 +1,10 @@
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Text.Json;
 using ChartPacker.Core.Library;
+using ChartPacker.Core.Settings;
 
 namespace ChartPacker.Services
 {
-    /// <summary>Loads and saves <see cref="AppSettings"/> as JSON.</summary>
+    /// <summary>Loads and saves <see cref="AppSettings"/> as JSON, through <see cref="JsonSettingsFile{T}"/>.</summary>
     /// <remarks>
     /// The file path is always passed in, never defaulted, so nothing but the composition root
     /// (which passes <see cref="Core.UserConfigPaths.SettingsFile"/>) can touch the real settings.
@@ -14,11 +12,11 @@ namespace ChartPacker.Services
     /// </remarks>
     public sealed class SettingsService
     {
-        private readonly string _filePath;
+        private readonly JsonSettingsFile<AppSettings> _file;
 
-        private SettingsService(string filePath, AppSettings settings)
+        private SettingsService(JsonSettingsFile<AppSettings> file, AppSettings settings)
         {
-            _filePath = filePath;
+            _file = file;
             Settings = settings;
         }
 
@@ -39,46 +37,14 @@ namespace ChartPacker.Services
         /// <summary>Loads settings from <paramref name="filePath"/>, falling back to defaults when it's missing or unreadable.</summary>
         public static SettingsService Load(string filePath)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-            AppSettings? settings = null;
-
-            try
-            {
-                if (File.Exists(filePath))
-                {
-                    using var stream = File.OpenRead(filePath);
-                    settings = JsonSerializer.Deserialize(stream, AppSettingsJsonContext.Default.AppSettings);
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-            {
-                Trace.TraceWarning($"Ignoring unreadable settings file '{filePath}': {ex.Message}");
-            }
-
-            settings ??= new AppSettings();
+            var file = new JsonSettingsFile<AppSettings>(filePath, AppSettingsJsonContext.Default.AppSettings);
+            var settings = file.Load();
             Sanitize(settings);
-            return new SettingsService(filePath, settings);
+            return new SettingsService(file, settings);
         }
 
-        /// <summary>Writes settings to a temp file and renames it into place.</summary>
-        public void Save()
-        {
-            var tempPath = _filePath + ".tmp";
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-                using (var stream = File.Create(tempPath))
-                {
-                    JsonSerializer.Serialize(stream, Settings, AppSettingsJsonContext.Default.AppSettings);
-                }
-                File.Move(tempPath, _filePath, overwrite: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                Trace.TraceWarning($"Couldn't save settings to '{_filePath}': {ex.Message}");
-                try { File.Delete(tempPath); } catch (Exception) { }
-            }
-        }
+        /// <summary>Writes the settings changed in this run to the file, keeping other processes' changes to the rest.</summary>
+        public void Save() => _file.Save(Settings);
 
         private static void Sanitize(AppSettings settings)
         {

@@ -1,9 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
-using Avalonia.LogicalTree;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -30,16 +28,6 @@ namespace ChartPacker.Views
             // The tips of everything in the panel show along its bottom rather than beside the pointer.
             TipStrip.Region = this;
 
-            // The new-row key box acts as a dropdown of known keys: it opens when the editor appears
-            // and whenever the box is clicked, not only on Down/F4 as AutoCompleteBox does by itself.
-            NewKeyBox.PropertyChanged += (_, e) =>
-            {
-                if (e.Property == IsVisibleProperty && e.NewValue is true)
-                    Dispatcher.UIThread.Post(OpenKeyDropDown, DispatcherPriority.Loaded);
-            };
-            NewKeyBox.AddHandler(PointerReleasedEvent, OnKeyBoxPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
-            NewKeyBox.AddHandler(KeyDownEvent, OnKeyBoxKeyDown, RoutingStrategies.Tunnel);
-
             // While the waveform is held the position stops following playback; letting go seeks there.
             SeekBar.ScrubStarted += (_, _) => Player?.BeginScrub();
             SeekBar.ScrubEnded += (_, _) => EndScrub();
@@ -64,8 +52,6 @@ namespace ChartPacker.Views
             PlaybackSpeedBox.DropDownClosed += (_, _) => Dispatcher.UIThread.Post(() => CommitPlaybackSpeed(leave: true), DispatcherPriority.Input);
             PlaybackSpeedBox.LostFocus += (_, _) => CommitPlaybackSpeed(leave: false);
             PlaybackSpeedBox.AddHandler(KeyDownEvent, OnPlaybackSpeedKeyDown, RoutingStrategies.Tunnel);
-
-            AddHandler(PointerPressedEvent, OnPointerPressedAnywhere, RoutingStrategies.Bubble, handledEventsToo: true);
         }
 
         /// <summary>Sets the playback speed from the speed box, then shows it there as it was taken: tidied, kept in range, or as before.</summary>
@@ -150,26 +136,9 @@ namespace ChartPacker.Views
         }
 
         /// <summary>
-        /// A click outside the focused edit box takes focus from it, so it commits as it does when focus
-        /// moves to another control. Clicks on empty space and labels otherwise leave the box focused.
-        /// Runs after the clicked control's own handling, so a click that already moved focus is left alone.
-        /// </summary>
-        private void OnPointerPressedAnywhere(object? sender, PointerPressedEventArgs e)
-        {
-            if (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is not TextBox box
-                || !this.IsVisualAncestorOf(box))
-                return;
-
-            if (e.Source is Visual source && (source == box || box.IsVisualAncestorOf(source)))
-                return;
-
-            Focus();
-        }
-
-        /// <summary>
         /// A click on the empty space or a label of a flyout with an offset box in it, the highway options or the video
         /// offset, takes focus from the box, keeping what was typed, and leaves the flyout open. The flyout is a popup
-        /// of its own, so <see cref="OnPointerPressedAnywhere"/> doesn't see its clicks. Clicks the controls handle don't reach this.
+        /// of its own, so the panel's commit on a click away doesn't see its clicks. Clicks the controls handle don't reach this.
         /// </summary>
         private void OnOffsetFlyoutPressed(object? sender, PointerPressedEventArgs e)
         {
@@ -187,20 +156,6 @@ namespace ChartPacker.Views
         {
             HighwayOverlayView.Classes.Set("tuning", isTuning);
             HighwayRowView.Classes.Set("tuning", isTuning);
-        }
-
-        /// <summary>
-        /// Choosing a difficulty in an instrument's flyout closes it. The flyout is a popup of its own,
-        /// so the button it belongs to is found through the popup it's shown in.
-        /// </summary>
-        /// <remarks>
-        /// A button raises Click before it runs its command, and closing the flyout takes the button
-        /// out of the tree, which clears its bound command. So the flyout closes once the command has run.
-        /// </remarks>
-        private void OnDifficultyChosen(object? sender, RoutedEventArgs e)
-        {
-            if (sender is ILogical control && control.FindLogicalAncestorOfType<Popup>() is { PlacementTarget: Button { Flyout: { } flyout } })
-                Dispatcher.UIThread.Post(flyout.Hide);
         }
 
         private PlayerViewModel? Player => (DataContext as SongDetailViewModel)?.Player;
@@ -242,48 +197,6 @@ namespace ChartPacker.Views
             _wheelNotches -= steps;
             double to = vm.Highway.StepNotes(player.CurrentPosition.TotalSeconds, steps, ScrubSteps.QuartersOf(player.ScrubStep));
             player.PositionSeconds = Math.Clamp(to, 0, player.TimelineSeconds);
-        }
-
-        /// <summary>Clicking away from a value's edit box keeps what was typed, like pressing Enter.</summary>
-        private void OnEditLostFocus(object? sender, RoutedEventArgs e)
-        {
-            if (sender is Control { DataContext: MetadataRowViewModel row })
-                row.CommitCommand.Execute(null);
-        }
-
-        private void OpenKeyDropDown()
-        {
-            if (NewKeyBox.IsEffectivelyVisible)
-                NewKeyBox.IsDropDownOpen = true;
-        }
-
-        private void OnKeyBoxPointerReleased(object? sender, PointerReleasedEventArgs e)
-        {
-            // Only clicks on the text box itself: a click on a suggestion bubbles here too, just as
-            // the dropdown closes, and must not open it again.
-            if (e.Source is Visual source && source.FindAncestorOfType<TextBox>(includeSelf: true) is not null)
-                OpenKeyDropDown();
-        }
-
-        /// <summary>
-        /// With the dropdown closed, Enter moves on to the value and Escape cancels the new row. With it
-        /// open, AutoCompleteBox keeps both keys to pick or dismiss a suggestion.
-        /// </summary>
-        private void OnKeyBoxKeyDown(object? sender, KeyEventArgs e)
-        {
-            if (NewKeyBox.IsDropDownOpen || DataContext is not SongDetailViewModel vm)
-                return;
-
-            if (e.Key == Key.Enter)
-            {
-                NewValueBox.Focus();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Escape)
-            {
-                vm.CancelAddCommand.Execute(null);
-                e.Handled = true;
-            }
         }
     }
 }

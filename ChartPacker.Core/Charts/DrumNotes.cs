@@ -4,7 +4,8 @@ namespace ChartPacker.Core.Charts;
 /// <param name="Pad">0 kick, 1 red, 2 yellow, 3 blue, 4 the fourth pad (green, or five-lane orange), 5 the fifth (five-lane green).</param>
 /// <param name="Cymbal">Marked a cymbal: yellow, blue and the fourth pad only.</param>
 /// <param name="DoubleKick">An Expert+ second kick.</param>
-internal readonly record struct DrumGem(long Tick, int Pad, bool Cymbal, bool DoubleKick);
+/// <param name="Dynamics"><see cref="NoteFlags.Accent"/>, <see cref="NoteFlags.Ghost"/>, or none: added to the note's flags as it is.</param>
+internal readonly record struct DrumGem(long Tick, int Pad, bool Cymbal, bool DoubleKick, NoteFlags Dynamics = NoteFlags.None);
 
 /// <summary>
 /// Text events as YARG reads them (<c>TextEvents</c> in YARG.Core): the text between the first <c>[</c> and
@@ -56,8 +57,9 @@ internal static class DrumNotes
 {
     /// <summary>
     /// Each difficulty's notes, from <paramref name="gems"/> and its <paramref name="mixes"/>, the mix events at
-    /// their ticks for it. A mix event takes effect from the first note at or after it, and, as YARG has it,
-    /// one still in effect at a difficulty's last note carries on into the next difficulty up.
+    /// their ticks for it, in the order they're read. Each note's disco flip is <see cref="GameDiscoFlips"/>': a mix
+    /// event takes effect from the first note at or after it, and, as YARG has it, one still in effect at a difficulty's
+    /// last note carries on into the next difficulty up.
     /// </summary>
     public static Dictionary<ChartDifficulty, List<ChartNote>> Build(
         IReadOnlyDictionary<ChartDifficulty, List<DrumGem>> gems,
@@ -66,24 +68,19 @@ internal static class DrumNotes
         DrumsLayout layout)
     {
         var result = new Dictionary<ChartDifficulty, List<ChartNote>>();
-        bool flip = false;
+        var flips = GameDiscoFlips.Read(LastTicks(gems), mixes, layout);
         foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
         {
             if (!gems.TryGetValue(difficulty, out var list))
                 continue;
 
-            var events = mixes.GetValueOrDefault(difficulty) ?? [];
-            int next = 0;
             var built = new List<(Gem, NoteFlags)>(list.Count);
             foreach (var gem in TickOrder.Sorted(list, static g => g.Tick))
             {
-                while (next < events.Count && events[next].Tick <= gem.Tick)
-                    flip = events[next++].DiscoFlip;
-
                 // Expert+ kicks are only played on Expert.
                 if (gem.DoubleKick && difficulty != ChartDifficulty.Expert)
                     continue;
-                built.Add(Shape(gem, layout, flip));
+                built.Add(Shape(gem, layout, flips.IsFlipped(difficulty, gem.Tick)));
             }
 
             result[difficulty] = NoteBuilder.Drums(built, starPower.GetValueOrDefault(difficulty) ?? []);
@@ -92,9 +89,22 @@ internal static class DrumNotes
         return result;
     }
 
+    /// <summary>The tick of each difficulty's last note, Expert+ kicks among them; a difficulty without notes left out.</summary>
+    private static Dictionary<ChartDifficulty, long> LastTicks(IReadOnlyDictionary<ChartDifficulty, List<DrumGem>> gems)
+    {
+        var last = new Dictionary<ChartDifficulty, long>();
+        foreach (var (difficulty, list) in gems)
+        {
+            if (list.Count > 0)
+                last[difficulty] = list.Max(static g => g.Tick);
+        }
+
+        return last;
+    }
+
     private static (Gem, NoteFlags) Shape(DrumGem gem, DrumsLayout layout, bool flip)
     {
-        var flags = gem.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None;
+        var flags = (gem.DoubleKick ? NoteFlags.DoubleKick : NoteFlags.None) | gem.Dynamics;
         if (gem.Pad == 0)
             return (new Gem(gem.Tick, 0, ChartNote.OpenLane), flags);
         if (layout == DrumsLayout.FiveLane)

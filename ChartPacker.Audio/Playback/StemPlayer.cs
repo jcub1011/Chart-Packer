@@ -17,6 +17,8 @@ namespace ChartPacker.Audio.Playback;
 /// way to the output, which mixes what it holds again when a switch changes, so the switch is heard
 /// less than 40 ms later than that, as the grain it was putting together fades out. The player owns
 /// the output but not the mixer's sources; dispose it before them.
+/// <para><see cref="Sounds"/> are laid over the mix after it's stretched, each where the frames played reach its frame
+/// of the mix, so a click is never smeared and stays on its beat at any speed (charter-spec §4.4.1).</para>
 /// </remarks>
 public sealed class StemPlayer : IDisposable
 {
@@ -28,6 +30,17 @@ public sealed class StemPlayer : IDisposable
     // The least time between mixing the stretcher's input again for a change of volume, so a slider dragged doesn't
     // seek every stem each chunk.
     private const int VolumeRemixMilliseconds = 150;
+
+    // Stretched, each grain's frames are mapped in this many pieces, so the map follows the grains' fade closely.
+    private const int PiecesPerGrain = 8;
+
+    // How far SmoothPosition may drift from what the device has taken before it's put straight back on it.
+    private const int SmoothSnapMilliseconds = 50;
+
+    // How long SmoothPosition takes to make up how far it is from what the device has taken, and the most faster or
+    // slower than the device it runs meanwhile.
+    private const double SmoothSlewSeconds = 0.2;
+    private const double SmoothMaxTrim = 0.1;
 
     private readonly StemMixer _mixer;
     private readonly IAudioOutput _output;
@@ -52,6 +65,12 @@ public sealed class StemPlayer : IDisposable
     // A new Speed or PitchCorrection for the playback thread to take up without dropping the queue.
     private bool _retune;
 
+    // The region played (charter-spec C10 item 2), in frames of the mix: looped, or played once to its end; none when
+    // _regionEnd is negative.
+    private long _regionStart;
+    private long _regionEnd = -1;
+    private bool _regionLoops;
+
     // Frames written to the output since it was opened: what's been played is this less what's still queued.
     private long _writtenFrames;
 
@@ -65,16 +84,44 @@ public sealed class StemPlayer : IDisposable
     private int _mixedVolumes;
     private long _volumesRemixedAt;
 
-    // Which frame of the mix each frame written stands for. Under _lock, with _writtenFrames.
+    // Which frame of the mix each frame written stands for: the grains played, and, for SmoothPosition, where the speed
+    // says the mix has got to, which runs on evenly where the grains don't. Under _lock, with _writtenFrames.
     private readonly PositionMap _map = new();
+    private readonly PositionMap _nominal = new();
 
     // What was written lately, by output frame, for TryReadHeard. Written and read under _lock, with _writtenFrames.
     private readonly OutputTap _tap = new();
     private bool _capturesHeard = true;
 
+    // The sounds laid over the mix: the schedule, set from any thread; and, on the playback thread, the frame of the
+    // mix it's been asked up to, the sounds playing, the pieces of the chunk being written, and the sounds' mix of it.
+    private ISoundSchedule? _sounds;
+    private float _soundVolume = 1;
+    private long _soundsFrom;
+    private readonly List<ScheduledSound> _found = [];
+    private readonly List<Voice> _voices = [];
+    private readonly List<Piece> _pieces = [];
+    private readonly float[] _soundMix;
+
+    // SmoothPosition's clock, and where it was last put: _smoothOutput frames of the output played at _smoothAt, when the
+    // device had taken _smoothSeen, running _smoothTrim times as fast as the device from there. Under _lock.
+    private readonly TimeProvider _clock;
+    private bool _smoothValid;
+    private double _smoothOutput;
+    private long _smoothAt;
+    private long _smoothSeen;
+    private double _smoothTrim = 1;
+
     /// <param name="mixer">What to play.</param>
     /// <param name="output">Where to play it, at <paramref name="mixer"/>'s rate. The player owns it.</param>
-    public StemPlayer(StemMixer mixer, IAudioOutput output)
+    /// <param name="clock">What <see cref="SmoothPosition"/> runs on; the system's monotonic clock if not given.</param>
+    public StemPlayer(StemMixer mixer, IAudioOutput output, TimeProvider? clock = null)
+        : this(mixer, output, clock, QueueMilliseconds)
+    {
+    }
+
+    /// <param name="queueMilliseconds">How much to keep queued, for tests that play minutes at a time.</param>
+    internal StemPlayer(StemMixer mixer, IAudioOutput output, TimeProvider? clock, int queueMilliseconds)
     {
         ArgumentNullException.ThrowIfNull(mixer);
         ArgumentNullException.ThrowIfNull(output);
@@ -86,7 +133,9 @@ public sealed class StemPlayer : IDisposable
         _speed = float.IsFinite(output.Speed) && output.Speed > 0 ? output.Speed : 1;
         _stretcher = new TimeStretcher(mixer.OutputRate, mixer.Mix);
         _chunk = new float[mixer.OutputRate * ChunkMilliseconds / 1000 * 2];
-        _queueTarget = mixer.OutputRate * QueueMilliseconds / 1000;
+        _soundMix = new float[_chunk.Length / 2];
+        _clock = clock ?? TimeProvider.System;
+        _queueTarget = (int)((long)mixer.OutputRate * queueMilliseconds / 1000);
         _minimumChunk = Math.Max(1, mixer.OutputRate / 1000);
         _thread = new Thread(Run) { IsBackground = true, Name = "Audio playback" };
         _thread.Start();
@@ -156,10 +205,91 @@ public sealed class StemPlayer : IDisposable
         }
     }
 
+    /// <summary>
+    /// <see cref="Position"/> moving smoothly, for what's drawn against the audio (charter-spec §4.4.1). What the device
+    /// has played only moves when it takes more of the queue, every few milliseconds, so this carries it on between by a
+    /// monotonic clock, at the device's own rate; and stretched, the grains played step back and forth around where the
+    /// speed says the mix has got to, so this is where the speed says. When the device takes more, this runs up to 10%
+    /// faster or slower until it has made up how far apart they are, never stepping back; past 50 ms, or after a seek, a
+    /// change of speed, playing or pausing, it's put straight back on it. While paused it's <see cref="Position"/>.
+    /// </summary>
+    public TimeSpan SmoothPosition
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_pendingSeek is { } target)
+                {
+                    _smoothValid = false;
+                    return FramesToTime(target);
+                }
+
+                if (!_playing)
+                {
+                    _smoothValid = false;
+                    return FramesToTime(HeardSourceFrame());
+                }
+
+                long played = Math.Max(0, _writtenFrames - _output.QueuedFrames);
+                long now = _clock.GetTimestamp();
+                if (!_smoothValid)
+                {
+                    _smoothValid = true;
+                    _smoothOutput = _smoothSeen = played;
+                    _smoothAt = now;
+                    _smoothTrim = 1;
+                    return FramesToTime(_nominal.SourceAt(played));
+                }
+
+                // The device plays what's written at its own speed: 1 while the mix is stretched.
+                double framesPerSecond = _mixer.OutputRate * (double)_output.Speed;
+                double smooth = _smoothOutput + ((now - _smoothAt) * framesPerSecond * _smoothTrim / _clock.TimestampFrequency);
+                if (played != _smoothSeen)
+                {
+                    double error = played - smooth;
+                    if (Math.Abs(error) > framesPerSecond * SmoothSnapMilliseconds / 1000)
+                    {
+                        smooth = played;
+                        _smoothTrim = 1;
+                    }
+                    else
+                    {
+                        _smoothTrim = 1 + Math.Clamp(error / (framesPerSecond * SmoothSlewSeconds), -SmoothMaxTrim, SmoothMaxTrim);
+                    }
+
+                    _smoothOutput = smooth;
+                    _smoothAt = now;
+                    _smoothSeen = played;
+                }
+
+                return FramesToTime(_nominal.SourceAt(smooth));
+            }
+        }
+    }
+
     public float Volume
     {
         get => _output.Volume;
         set => _output.Volume = value;
+    }
+
+    /// <summary>
+    /// The sounds laid over the mix, such as the metronome's clicks; none if <see langword="null"/>. A new schedule is
+    /// taken up from the next chunk mixed: sounds already playing play out, and the new one's sounds start from where the
+    /// last one's were asked up to.
+    /// </summary>
+    public ISoundSchedule? Sounds
+    {
+        get => Volatile.Read(ref _sounds);
+        set => Volatile.Write(ref _sounds, value);
+    }
+
+    /// <summary>How loud <see cref="Sounds"/> are, from 0, apart from the stems; under <see cref="Volume"/>, which is the output's.</summary>
+    public float SoundVolume
+    {
+        get => Volatile.Read(ref _soundVolume);
+        set => Volatile.Write(ref _soundVolume, float.IsFinite(value) ? Math.Max(0, value) : 1);
     }
 
     /// <summary>
@@ -183,6 +313,7 @@ public sealed class StemPlayer : IDisposable
                 if (speed == _speed)
                     return;
                 _speed = speed;
+                _smoothValid = false;
                 ApplySpeed();
             }
         }
@@ -206,6 +337,7 @@ public sealed class StemPlayer : IDisposable
                 if (value == _pitchCorrection)
                     return;
                 _pitchCorrection = value;
+                _smoothValid = false;
                 ApplySpeed();
             }
         }
@@ -254,6 +386,55 @@ public sealed class StemPlayer : IDisposable
         }
     }
 
+    /// <summary>
+    /// The region being played (charter-spec C10 item 2): <see cref="PlayRegion"/>'s span, or null for the whole song.
+    /// </summary>
+    public (TimeSpan Start, TimeSpan End, bool Loops)? Region
+    {
+        get
+        {
+            lock (_lock)
+                return _regionEnd < 0 ? null : (FramesToTime(_regionStart), FramesToTime(_regionEnd), _regionLoops);
+        }
+    }
+
+    /// <summary>
+    /// Plays from <paramref name="start"/> to <paramref name="end"/>: over and over when <paramref name="loops"/>, as a
+    /// loop region for practising a passage, otherwise once, pausing at the end (charter-spec C10 item 2).
+    /// </summary>
+    /// <remarks>
+    /// The mix goes on from the region's start where it reaches the end, without dropping what's queued, and the sounds
+    /// start again from there. Played as mixed, it turns at the end's very frame; stretched, at most a chunk past it.
+    /// </remarks>
+    public void PlayRegion(TimeSpan start, TimeSpan end, bool loops)
+    {
+        long from = Math.Max(0, (long)(start.TotalSeconds * _mixer.OutputRate));
+        long to = (long)(end.TotalSeconds * _mixer.OutputRate);
+        if (to <= from)
+            throw new ArgumentOutOfRangeException(nameof(end), end, "A region ends after it starts.");
+
+        lock (_lock)
+        {
+            if (_disposed || _error is not null)
+                return;
+
+            (_regionStart, _regionEnd, _regionLoops) = (from, to, loops);
+            _pendingSeek = from;
+            _ended = false;
+            _playing = true;
+            _smoothValid = false;
+            _output.Resume();
+            Monitor.PulseAll(_lock);
+        }
+    }
+
+    /// <summary>Goes back to playing the whole song, from where it is.</summary>
+    public void ClearRegion()
+    {
+        lock (_lock)
+            _regionEnd = -1;
+    }
+
     /// <summary>Starts or resumes playing; after the end, from the start.</summary>
     public void Play()
     {
@@ -269,6 +450,7 @@ public sealed class StemPlayer : IDisposable
             }
 
             _playing = true;
+            _smoothValid = false;
             _output.Resume();
             Monitor.PulseAll(_lock);
         }
@@ -282,12 +464,15 @@ public sealed class StemPlayer : IDisposable
                 return;
 
             _playing = false;
+            _smoothValid = false;
             _output.Pause();
             Monitor.PulseAll(_lock);
         }
     }
 
-    /// <summary>Moves playback to <paramref name="position"/>, playing or not.</summary>
+    /// <summary>
+    /// Moves playback to <paramref name="position"/>, playing or not. A region played once is dropped; a loop goes on.
+    /// </summary>
     public void Seek(TimeSpan position)
     {
         long frame = Math.Max(0, (long)(position.TotalSeconds * _mixer.OutputRate));
@@ -296,6 +481,8 @@ public sealed class StemPlayer : IDisposable
             if (_disposed || _error is not null)
                 return;
 
+            if (!_regionLoops)
+                _regionEnd = -1;
             _pendingSeek = frame;
             _ended = false;
             Monitor.PulseAll(_lock);
@@ -319,7 +506,7 @@ public sealed class StemPlayer : IDisposable
         _output.Dispose();
     }
 
-    private TimeSpan FramesToTime(long frames) => TimeSpan.FromSeconds((double)frames / _mixer.OutputRate);
+    private TimeSpan FramesToTime(double frames) => TimeSpan.FromSeconds(frames / _mixer.OutputRate);
 
     /// <summary>The frame of the mix being heard now. Under <see cref="_lock"/>.</summary>
     private long HeardSourceFrame() => (long)Math.Round(_map.SourceAt(Math.Max(0, _writtenFrames - _output.QueuedFrames)));
@@ -415,6 +602,7 @@ public sealed class StemPlayer : IDisposable
                         _stretching = _pitchCorrection && _speed != 1;
                         _output.Speed = _stretching ? 1 : _speed;
                         _map.Reset(_writtenFrames, _mixer.PositionFrames);
+                        _nominal.Reset(_writtenFrames, _mixer.PositionFrames);
                         _tap.Clear();
                         _retune = false;
                         if (_pendingSeek == seek)
@@ -427,6 +615,9 @@ public sealed class StemPlayer : IDisposable
                         }
                     }
 
+                    // Sounds start again from where the mix does; those playing are dropped with the queue.
+                    _voices.Clear();
+                    _soundsFrom = frame;
                     _mixedSwitches = _mixer.SwitchVersion;
                     _mixedVolumes = _mixer.VolumeVersion;
                     continue;
@@ -457,19 +648,47 @@ public sealed class StemPlayer : IDisposable
                 }
 
                 var chunk = _chunk.AsSpan(0, Math.Min(_chunk.Length, target * 2));
-                double from = _stretching ? _stretcher.SourcePosition : _mixer.PositionFrames;
-                int frames = _stretching ? _stretcher.Read(chunk) : _mixer.Mix(chunk);
+                switch (AtRegionEnd(ref chunk))
+                {
+                    case RegionEnd.Wrapped:
+                        continue;
+                    case RegionEnd.Played:
+                        // Once what's queued has played, playback pauses there, and goes back to the whole song.
+                        if (_output.QueuedFrames == 0)
+                        {
+                            lock (_lock)
+                                _regionEnd = -1;
+                            Stop(ended: false, error: null);
+                        }
+                        else
+                        {
+                            Wait();
+                        }
+
+                        continue;
+                }
+
+                _pieces.Clear();
+                int frames = _stretching ? ReadStretched(chunk) : ReadMixed(chunk);
                 if (frames > 0)
                 {
-                    double to = _stretching ? _stretcher.SourcePosition : _mixer.PositionFrames;
+                    var written = _chunk.AsSpan(0, frames * 2);
+                    bool sounds = MixSounds(frames);
 
-                    // Together, so Position never sees one without the other. Queuing only copies.
+                    // Together, so Position never sees one without the other. Queuing only copies. What's heard is
+                    // kept without the sounds, which aren't the song.
                     lock (_lock)
                     {
-                        _output.Write(_chunk.AsSpan(0, frames * 2));
                         if (_capturesHeard)
-                            _tap.Write(_chunk.AsSpan(0, frames * 2), _writtenFrames);
-                        _map.Add(_writtenFrames, frames, from, to);
+                            _tap.Write(written, _writtenFrames);
+                        if (sounds)
+                            AddSounds(written);
+                        _output.Write(written);
+                        foreach (var piece in _pieces)
+                        {
+                            _map.Add(_writtenFrames + piece.Offset, piece.Frames, piece.From, piece.To);
+                            _nominal.Add(_writtenFrames + piece.Offset, piece.Frames, piece.NominalFrom, piece.NominalTo);
+                        }
                         _writtenFrames += frames;
                     }
                 }
@@ -486,6 +705,167 @@ public sealed class StemPlayer : IDisposable
             {
                 Stop(ended: false, error: ex.Message);
             }
+        }
+    }
+
+    /// <summary>
+    /// Where the mix is against the region's end: short of it, with <paramref name="chunk"/> cut so it ends there when
+    /// played as mixed; turned back to the region's start, for a loop; or there, for a region played once. On the
+    /// playback thread.
+    /// </summary>
+    private RegionEnd AtRegionEnd(ref Span<float> chunk)
+    {
+        long start, end;
+        bool loops;
+        lock (_lock)
+            (start, end, loops) = (_regionStart, _regionEnd, _regionLoops);
+        if (end < 0)
+            return RegionEnd.Before;
+
+        double at = _stretching ? _stretcher.PlayedPosition : _mixer.PositionFrames;
+        if (at < end)
+        {
+            if (!_stretching)
+                chunk = chunk[..(int)Math.Min(chunk.Length, Math.Max(2, (end - (long)at) * 2))];
+            return RegionEnd.Before;
+        }
+
+        if (!loops)
+            return RegionEnd.Played;
+
+        // On from the start, without dropping the queue: the map takes the jump as the next piece, and the sounds
+        // playing play out.
+        _mixer.Seek(start);
+        if (_stretching)
+            _stretcher.Reset(_mixer.PositionFrames);
+        _soundsFrom = start;
+        return RegionEnd.Wrapped;
+    }
+
+    /// <summary>Mixes the next frames into <paramref name="chunk"/> as they are, as one piece. On the playback thread.</summary>
+    private int ReadMixed(Span<float> chunk)
+    {
+        double from = _mixer.PositionFrames;
+        int frames = _mixer.Mix(chunk);
+        if (frames > 0)
+            _pieces.Add(new Piece(0, frames, from, _mixer.PositionFrames, from, _mixer.PositionFrames));
+        return frames;
+    }
+
+    /// <summary>
+    /// Stretches the next frames into <paramref name="chunk"/>, a few pieces to each grain, so each piece's frames play
+    /// the mix evenly between where it starts and ends. On the playback thread.
+    /// </summary>
+    private int ReadStretched(Span<float> chunk)
+    {
+        int frames = chunk.Length / 2;
+        int most = Math.Max(1, _stretcher.GrainStep / PiecesPerGrain);
+        int done = 0;
+        while (done < frames)
+        {
+            int left = _stretcher.FramesToNextGrain;
+            int count = Math.Min(frames - done, left > 0 ? Math.Min(left, most) : most);
+            double from = _stretcher.PlayedPosition, nominalFrom = _stretcher.SourcePosition;
+            int read = _stretcher.Read(chunk.Slice(done * 2, count * 2));
+            if (read == 0)
+                break;
+
+            _pieces.Add(new Piece(done, read, from, _stretcher.PlayedPosition, nominalFrom, _stretcher.SourcePosition));
+            done += read;
+        }
+
+        return done;
+    }
+
+    /// <summary>
+    /// Starts the sounds the frames in <see cref="_pieces"/> reach, and mixes every sound playing into
+    /// <see cref="_soundMix"/> for those <paramref name="frames"/>. On the playback thread.
+    /// </summary>
+    /// <returns>Whether any sound plays in them.</returns>
+    private bool MixSounds(int frames)
+    {
+        if (Sounds is { } schedule)
+        {
+            // Stretched, the frames played can step back a little; a sound starts once they first reach it.
+            double reached = double.MinValue;
+            foreach (var piece in _pieces)
+                reached = Math.Max(reached, Math.Max(piece.From, piece.To));
+
+            long to = (long)Math.Floor(reached) + 1;
+            if (to > _soundsFrom)
+            {
+                _found.Clear();
+                schedule.SoundsBetween(_soundsFrom, to, _found);
+                _soundsFrom = to;
+
+                // Played as mixed, the device plays it at the speed, so each sound is read that much faster or slower
+                // to be heard at its own pitch and length.
+                double speed = _stretching ? 1 : Math.Max(TimeStretcher.MinRatio, _output.Speed);
+                foreach (var sound in _found)
+                {
+                    if (sound.Gain > 0)
+                        _voices.Add(new Voice(sound.Sound, sound.Gain, OffsetOf(sound.SourceFrame), sound.Sound.SampleRate / (_mixer.OutputRate * speed)));
+                }
+            }
+        }
+
+        if (_voices.Count == 0)
+            return false;
+
+        var mix = _soundMix.AsSpan(0, frames);
+        mix.Clear();
+        for (int v = _voices.Count - 1; v >= 0; v--)
+        {
+            var voice = _voices[v];
+            var samples = voice.Sound.Samples;
+            int n = voice.Start;
+            double at = voice.At;
+            for (; n < frames && at < samples.Length; n++, at += voice.Step)
+            {
+                int i = (int)at;
+                double fraction = at - i;
+                float next = i + 1 < samples.Length ? samples[i + 1] : 0f;
+                mix[n] += voice.Gain * (float)(samples[i] + ((next - samples[i]) * fraction));
+            }
+
+            if (at >= samples.Length)
+                _voices.RemoveAt(v);
+            else
+                _voices[v] = voice with { Start = Math.Max(0, voice.Start - frames), At = at };
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Which frame of the chunk in <see cref="_pieces"/> first plays <paramref name="sourceFrame"/> of the mix: the
+    /// first, if it was played before it; past the chunk, if only its very end does.
+    /// </summary>
+    private int OffsetOf(long sourceFrame)
+    {
+        foreach (var piece in _pieces)
+        {
+            if (sourceFrame > Math.Max(piece.From, piece.To))
+                continue;
+            if (sourceFrame <= Math.Min(piece.From, piece.To))
+                return piece.Offset + (piece.To >= piece.From ? 0 : piece.Frames);
+
+            double into = (sourceFrame - piece.From) / (piece.To - piece.From);
+            return piece.Offset + (int)Math.Round(into * piece.Frames);
+        }
+
+        return 0;
+    }
+
+    /// <summary>Adds <see cref="_soundMix"/>, at <see cref="SoundVolume"/>, to both channels of <paramref name="stereo"/>.</summary>
+    private void AddSounds(Span<float> stereo)
+    {
+        float volume = SoundVolume;
+        for (int n = 0; n < stereo.Length / 2; n++)
+        {
+            float sound = _soundMix[n] * volume;
+            stereo[2 * n] = Math.Clamp(stereo[2 * n] + sound, -1f, 1f);
+            stereo[(2 * n) + 1] = Math.Clamp(stereo[(2 * n) + 1] + sound, -1f, 1f);
         }
     }
 
@@ -519,9 +899,30 @@ public sealed class StemPlayer : IDisposable
             _playing = false;
             _ended = ended;
             _error = error;
+            _smoothValid = false;
             _output.Pause();
         }
 
         Stopped?.Invoke(this, EventArgs.Empty);
     }
+
+    private enum RegionEnd
+    {
+        Before,
+        Wrapped,
+        Played,
+    }
+
+    /// <summary>
+    /// <paramref name="Frames"/> frames from <paramref name="Offset"/> into a chunk, playing the mix evenly from
+    /// <paramref name="From"/> to <paramref name="To"/>, while the speed says it goes from <paramref name="NominalFrom"/> to
+    /// <paramref name="NominalTo"/>.
+    /// </summary>
+    private readonly record struct Piece(int Offset, int Frames, double From, double To, double NominalFrom, double NominalTo);
+
+    /// <summary>
+    /// A sound playing: from frame <paramref name="Start"/> of the next chunk on, it's read from <paramref name="At"/>
+    /// frames in, <paramref name="Step"/> of its frames to each frame written.
+    /// </summary>
+    private readonly record struct Voice(SynthSound Sound, float Gain, int Start, double Step, double At = 0);
 }

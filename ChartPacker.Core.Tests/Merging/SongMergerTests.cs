@@ -349,7 +349,7 @@ public sealed class SongMergerTests
         // The second song's drums and guitar move half a second later; the base's bass doesn't move at all.
         Assert.AreEqual(500, shifts.Tracks[new ChartTrackKey(ChartInstrument.Drums, ChartDifficulty.Expert)]);
         Assert.AreEqual(500, shifts.Tracks[new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Easy)]);
-        Assert.IsFalse(shifts.Tracks.Keys.Any(k => k.Instrument == ChartInstrument.Bass));
+        Assert.DoesNotContain(k => k.Instrument == ChartInstrument.Bass, shifts.Tracks.Keys);
         Assert.AreEqual(0, shifts.VocalsMs);
 
         // Moving what's staged by the shifts shows what staging the choice stages, to a few milliseconds a note.
@@ -363,11 +363,11 @@ public sealed class SongMergerTests
         {
             var want = fresh.Tracks[key].Notes;
             var got = live.Tracks[key].Notes;
-            Assert.AreEqual(want.Count, got.Count, key.ToString());
+            Assert.HasCount(want.Count, got, key.ToString());
             for (int i = 0; i < want.Count; i++)
             {
                 double off = Math.Abs(fresh.Tempo.SecondsAt(want[i].Tick) - live.Tempo.SecondsAt(got[i].Tick));
-                Assert.IsTrue(off < 0.005, $"{key} note {i} is {off:0.000} s apart");
+                Assert.IsLessThan(0.005, off, $"{key} note {i} is {off:0.000} s apart");
             }
         }
     }
@@ -386,7 +386,7 @@ public sealed class SongMergerTests
         // delay, while the base's own drums stay where they are. (Shifting the staged chart itself that far
         // would move the guitar's first note before the start, which the highway reports instead of showing.)
         Assert.AreEqual(-200, shifts.Tracks[new ChartTrackKey(ChartInstrument.Guitar, ChartDifficulty.Expert)]);
-        Assert.IsFalse(shifts.Tracks.Keys.Any(k => k.Instrument == ChartInstrument.Drums));
+        Assert.DoesNotContain(k => k.Instrument == ChartInstrument.Drums, shifts.Tracks.Keys);
         Assert.AreEqual("200", SongMerger.BuildMetadata(pending).First(p => p.Key == "delay").Value);
     }
 

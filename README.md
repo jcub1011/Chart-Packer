@@ -1,11 +1,14 @@
 # Chart-Packer
 A GUI application used to pack and unpack charts for Clone Hero, YARG, and other rhythm games that use the .SNG format.
 
+It installs with **Chart Builder**, a separate app for creating and editing charts
+([docs/charter-spec-v1.md](docs/charter-spec-v1.md)). The two share code and one installer.
+
 ## Releasing
 
-1. Set `<Version>` in `ChartPacker/ChartPacker.csproj`. The release is tagged `v<Version>`.
-2. Run **Actions → Release**. It builds FFmpeg (cached between runs), runs the tests, publishes the
-   app, and attaches an installer (`ChartPacker-<version>-win-x64-setup.exe`) and a portable zip to
+1. Set `<Version>` in `Directory.Build.props`. Both apps share it. The release is tagged `v<Version>`.
+2. Run **Actions → Release**. It builds FFmpeg (cached between runs), runs the tests, publishes
+   both apps into one folder, and attaches an installer (`ChartPacker-<version>-win-x64-setup.exe`) and a portable zip to
    a new GitHub release. Both include FFmpeg, so users don't need to install anything else. Options:
    - **prerelease** marks the release as a pre-release.
    - **overwrite** replaces an existing release and tag for this version. Without it, the run fails

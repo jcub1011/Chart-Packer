@@ -29,9 +29,9 @@ internal sealed class MidiBuilder(int resolution = 480)
     public MidiBuilder Text(long tick, string text) => Meta(tick, 0x01, Encoding.ASCII.GetBytes(text));
 
     /// <summary>A note from <paramref name="tick"/> held for <paramref name="length"/>, its end a note-on at velocity 0.</summary>
-    public MidiBuilder Note(long tick, int pitch, long length = 60)
+    public MidiBuilder Note(long tick, int pitch, long length = 60, int velocity = 100)
     {
-        Current.Add((tick, [0x90, (byte)pitch, 100]));
+        Current.Add((tick, [0x90, (byte)pitch, (byte)velocity]));
         Current.Add((tick + length, [0x90, (byte)pitch, 0]));
         return this;
     }

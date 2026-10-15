@@ -1,0 +1,428 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:ctl="using:ChartPacker.UI.Controls"
+             xmlns:bctl="using:ChartBuilder.Controls"
+             xmlns:edit="using:ChartBuilder.Controls.Editing"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="480"
+             x:Class="ChartBuilder.Controls.EditorLane"
+             x:DataType="vm:EditorLaneViewModel"
+             Background="{DynamicResource SurfaceBrush}">
+
+    <!-- One of the Editor's lanes: a header like a docked tool window's, which picks the part and the difficulty, a
+         ghost difficulty and the view, adds and closes lanes, and is dragged to dock the lane elsewhere (LaneDockHost);
+         and the lane's body, its editor canvas as a highway or a timeline (charter-spec C3). -->
+    <UserControl.Resources>
+        <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
+
+        <!-- The lane's audio settings: the audio button's, and the "more" menu's in a narrow lane. -->
+        <Flyout x:Key="AudioFlyout" Placement="BottomEdgeAlignedRight">
+            <StackPanel Spacing="8" Width="260" DataContext="{Binding Audio}" x:DataType="vm:LaneAudioViewModel">
+                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.LaneNoAudio}" IsVisible="{Binding !HasAudio}" />
+                <StackPanel Spacing="8" IsVisible="{Binding HasAudio}">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{x:Static res:Strings.LaneAudioSourceLabel}" />
+                        <ComboBox HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding SourceChoices}"
+                                  SelectedItem="{Binding SelectedSource}"
+                                  AutomationProperties.Name="{x:Static res:Strings.LaneAudioSourceLabel}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AudioSourceChoice">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{x:Static res:Strings.LaneShowLabel}" ToolTip.Tip="{x:Static res:Strings.LaneShowToolTip}" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <RadioButton Content="{x:Static res:Strings.LaneShowWaveform}" IsChecked="{Binding IsWaveform}" />
+                            <RadioButton Content="{x:Static res:Strings.LaneShowSpectrogram}" IsChecked="{Binding IsSpectrogram}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{x:Static res:Strings.LanePlacementLabel}" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <RadioButton Content="{x:Static res:Strings.LanePlacementBehind}" IsChecked="{Binding IsBehind}" />
+                            <RadioButton Content="{x:Static res:Strings.LanePlacementBeside}" IsChecked="{Binding IsBeside}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- The waveform's channels and gain (C12 item 4). -->
+                    <StackPanel Spacing="4" IsVisible="{Binding IsWaveform}">
+                        <CheckBox Content="{x:Static res:Strings.LaneStereo}" IsChecked="{Binding IsStereo}" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.LaneGainLabel}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="muted" Margin="0,0,6,0" Text="{Binding GainText}" />
+                            <Button Grid.Column="2" Content="{x:Static res:Strings.LaneGainReset}" Command="{Binding ResetGainCommand}" />
+                        </Grid>
+                        <Slider Minimum="{x:Static vm:LaneAudioViewModel.MinGainDb}"
+                                Maximum="{x:Static vm:LaneAudioViewModel.MaxGainDb}"
+                                SmallChange="1"
+                                LargeChange="6"
+                                TickFrequency="1"
+                                IsSnapToTickEnabled="True"
+                                Value="{Binding GainDb}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneGainLabel}" />
+                    </StackPanel>
+
+                    <!-- The spectrogram's band and contrast (C13 items 1 and 4). -->
+                    <StackPanel Spacing="4" IsVisible="{Binding IsSpectrogram}">
+                        <TextBlock Text="{x:Static res:Strings.LaneBandLabel}" />
+                        <ComboBox HorizontalAlignment="Stretch"
+                                  ItemsSource="{x:Static vm:LaneAudioViewModel.BandChoices}"
+                                  SelectedItem="{Binding SelectedBand}"
+                                  AutomationProperties.Name="{x:Static res:Strings.LaneBandLabel}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:BandChoice">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneContrastLabel}" />
+                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding ContrastText}" />
+                        </Grid>
+                        <Slider Minimum="{x:Static vm:LaneAudioViewModel.MinFloorDb}"
+                                Maximum="-6"
+                                SmallChange="1"
+                                LargeChange="6"
+                                TickFrequency="1"
+                                IsSnapToTickEnabled="True"
+                                Value="{Binding FloorDb}"
+                                ToolTip.Tip="{x:Static res:Strings.LaneContrastFloorLabel}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneContrastFloorLabel}" />
+                        <Slider Minimum="{x:Static vm:LaneAudioViewModel.MinCeilingDb}"
+                                Maximum="0"
+                                SmallChange="1"
+                                LargeChange="6"
+                                TickFrequency="1"
+                                IsSnapToTickEnabled="True"
+                                Value="{Binding CeilingDb}"
+                                ToolTip.Tip="{x:Static res:Strings.LaneContrastCeilingLabel}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneContrastCeilingLabel}" />
+                    </StackPanel>
+
+                    <!-- The onsets beside the lanes, and how many there are (C14 item 1). -->
+                    <StackPanel Spacing="4">
+                        <CheckBox Content="{x:Static res:Strings.LaneShowOnsets}" IsChecked="{Binding ShowOnsets}" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneSensitivityLabel}" />
+                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding SensitivityText}" />
+                        </Grid>
+                        <Slider Minimum="0"
+                                Maximum="1"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                TickFrequency="0.01"
+                                IsSnapToTickEnabled="True"
+                                Value="{Binding OnsetSensitivity}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneSensitivityLabel}" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Flyout>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- The part picker: the lane's title, with a chevron for its menu. -->
+        <Style Selector="Button.lane-part">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="8,0,6,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.lane-part:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Button.lane-part:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+
+        <!-- The difficulty letters: in the detail panel's difficulty colours where the difficulty has notes, grey where
+             it's empty (charter-spec C3 item 3), and the lane's own marked. -->
+        <Style Selector="Button.difficulty">
+            <Setter Property="MinWidth" Value="20" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyUnsetBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.difficulty.has.easy">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyEasyBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.has.medium">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyMediumBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.has.hard">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyHardBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.has.expert">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyExpertBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty.current">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+        <Style Selector="Button.difficulty:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+
+        <!-- The drop-down in their place in a narrow lane: the lane's letter, and the difficulties' names, coloured alike.
+             Fixed to one letter plus the chevron: sizing to the full names would push the lane's tools aside. -->
+        <Style Selector="ComboBox.difficulty">
+            <Setter Property="Width" Value="60" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="8,0,0,0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.difficulty">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyUnsetBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.easy">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyEasyBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.medium">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyMediumBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.hard">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyHardBrush}" />
+        </Style>
+        <Style Selector="TextBlock.difficulty.has.expert">
+            <Setter Property="Foreground" Value="{DynamicResource DifficultyExpertBrush}" />
+        </Style>
+
+        <!-- The lane being dragged, while it is. -->
+        <Style Selector="bctl|EditorLane.dragging">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+        <Border x:Name="Header"
+                DockPanel.Dock="Top"
+                Height="34"
+                Padding="3,0"
+                Background="{DynamicResource ToolbarBrush}"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Cursor="DragMove"
+                ToolTip.Tip="{x:Static res:Strings.LaneDragToolTip}">
+            <Grid x:Name="HeaderGrid" ColumnDefinitions="Auto,*,Auto">
+                <Button x:Name="PartButton"
+                        Grid.Column="0"
+                        Classes="lane-part"
+                        ToolTip.Tip="{x:Static res:Strings.LanePartToolTip}"
+                        AutomationProperties.Name="{Binding Title}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock FontSize="13"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding Title}" />
+                        <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                    </StackPanel>
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                    ItemsSource="{Binding PartMenu, Converter={StaticResource LaneMenu}}" />
+                    </Button.Flyout>
+                </Button>
+
+                <!-- The letters, or where the lane is too narrow for them, a drop-down (EditorLane.axaml.cs). -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="1" Margin="6,0,0,0" VerticalAlignment="Center">
+                    <ComboBox x:Name="DifficultyPicker"
+                              Classes="difficulty"
+                              IsVisible="False"
+                              ItemsSource="{Binding Difficulties}"
+                              SelectedIndex="{Binding SelectedDifficultyIndex, Mode=TwoWay}"
+                              ToolTip.Tip="{x:Static res:Strings.LaneDifficultyPickerToolTip}"
+                              AutomationProperties.Name="{x:Static res:Strings.LaneDifficultyPickerToolTip}">
+                        <ComboBox.SelectionBoxItemTemplate>
+                            <DataTemplate x:DataType="vm:DifficultyLetter">
+                                <TextBlock Classes="difficulty"
+                                           Classes.has="{Binding HasNotes}"
+                                           Classes.easy="{Binding IsEasy}"
+                                           Classes.medium="{Binding IsMedium}"
+                                           Classes.hard="{Binding IsHard}"
+                                           Classes.expert="{Binding IsExpert}"
+                                           Text="{Binding Letter}" />
+                            </DataTemplate>
+                        </ComboBox.SelectionBoxItemTemplate>
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DifficultyLetter">
+                                <TextBlock Classes="difficulty"
+                                           Classes.has="{Binding HasNotes}"
+                                           Classes.easy="{Binding IsEasy}"
+                                           Classes.medium="{Binding IsMedium}"
+                                           Classes.hard="{Binding IsHard}"
+                                           Classes.expert="{Binding IsExpert}"
+                                           Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ItemsControl x:Name="DifficultyLetters" ItemsSource="{Binding Difficulties}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="1" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DifficultyLetter">
+                                <Button Classes="difficulty"
+                                        Classes.has="{Binding HasNotes}"
+                                        Classes.current="{Binding IsCurrent}"
+                                        Classes.easy="{Binding IsEasy}"
+                                        Classes.medium="{Binding IsMedium}"
+                                        Classes.hard="{Binding IsHard}"
+                                        Classes.expert="{Binding IsExpert}"
+                                        Content="{Binding Letter}"
+                                        Command="{Binding Show}"
+                                        ToolTip.Tip="{Binding Name, StringFormat={x:Static res:Strings.LaneDifficultyToolTipFormat}}"
+                                        AutomationProperties.Name="{Binding Name}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel x:Name="LaneTools" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <!-- The lane's look-ahead: how far beyond the strike line it shows. -->
+                    <Button Classes="lane-part"
+                            ToolTip.Tip="{x:Static res:Strings.LaneLookAheadToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}">
+                        <TextBlock FontSize="12" VerticalAlignment="Center" Text="{Binding LookAheadText}" />
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <StackPanel Spacing="4" Width="220">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.LaneLookAheadLabel}" />
+                                        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding LookAheadText}" />
+                                    </Grid>
+                                    <Slider Minimum="{x:Static vm:EditorLaneViewModel.MinLookAhead}"
+                                            Maximum="{x:Static vm:EditorLaneViewModel.MaxLookAhead}"
+                                            SmallChange="0.5"
+                                            LargeChange="5"
+                                            TickFrequency="0.5"
+                                            IsSnapToTickEnabled="True"
+                                            Value="{Binding LookAhead}"
+                                            AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}" />
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <!-- The tools that fold into the "more" menu when the lane is narrow. -->
+                    <StackPanel x:Name="OverflowTools" Orientation="Horizontal" Spacing="2">
+                        <!-- The lane's audio (charter-spec C12–C14): which, as a waveform or a spectrogram, where, and its onsets. -->
+                        <Button Classes="tool"
+                                IsVisible="{Binding !IsVocal}"
+                                Flyout="{StaticResource AudioFlyout}"
+                                ToolTip.Tip="{x:Static res:Strings.LaneAudioToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneAudioToolTip}">
+                            <PathIcon Width="14" Height="14" Data="{StaticResource VolumeIconGeometry}" />
+                        </Button>
+                        <Button Classes="tool"
+                                IsVisible="{Binding ShowsEditMenu}"
+                                ToolTip.Tip="{x:Static res:Strings.LaneEditToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneEditToolTip}">
+                            <ctl:LineIcon Data="{StaticResource EditChartStroke}" />
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                            ItemsSource="{Binding EditMenu, Converter={StaticResource LaneMenu}}" />
+                            </Button.Flyout>
+                        </Button>
+                        <Button Classes="tool"
+                                IsVisible="{Binding !IsVocal}"
+                                ToolTip.Tip="{x:Static res:Strings.LaneGhostToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneGhostToolTip}">
+                            <ctl:LineIcon Data="{StaticResource ViewStroke}" />
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                            ItemsSource="{Binding GhostMenu, Converter={StaticResource LaneMenu}}" />
+                            </Button.Flyout>
+                        </Button>
+                        <Button Classes="tool"
+                                IsVisible="{Binding !IsVocal}"
+                                Command="{Binding ToggleViewCommand}"
+                                ToolTip.Tip="{Binding ViewToolTip}"
+                                AutomationProperties.Name="{Binding ViewToolTip}">
+                            <Panel>
+                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />
+                                <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" IsVisible="{Binding IsTimeline}" />
+                            </Panel>
+                        </Button>
+                    </StackPanel>
+                    <!-- Where the lane is too narrow for them, the tools above fold into this menu (EditorLane.axaml.cs). -->
+                    <Panel x:Name="MoreHost" IsVisible="False">
+                        <Button x:Name="MoreButton"
+                                Classes="tool"
+                                IsVisible="{Binding !IsVocal}"
+                                ToolTip.Tip="{x:Static res:Strings.LaneMoreToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.LaneMoreToolTip}">
+                            <ctl:LineIcon Data="{StaticResource MoreStroke}" />
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuItem Header="{x:Static res:Strings.LaneMoreAudio}" Click="OnAudioMenuClick" />
+                                    <MenuItem Header="{Binding ViewToolTip}" Command="{Binding ToggleViewCommand}" />
+                                    <MenuItem Header="{x:Static res:Strings.LaneMoreGhost}"
+                                              ItemsSource="{Binding GhostMenu, Converter={StaticResource LaneMenu}}" />
+                                    <MenuItem Header="{x:Static res:Strings.LaneMoreEdit}"
+                                              IsVisible="{Binding ShowsEditMenu}"
+                                              ItemsSource="{Binding EditMenu, Converter={StaticResource LaneMenu}}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                    </Panel>
+                    <Button Classes="tool"
+                            ToolTip.Tip="{x:Static res:Strings.LaneAddToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneAddToolTip}">
+                        <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                        ItemsSource="{Binding AddMenu, Converter={StaticResource LaneMenu}}" />
+                        </Button.Flyout>
+                    </Button>
+                    <Button Classes="tool"
+                            Command="{Binding CloseCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.LaneCloseToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.LaneCloseToolTip}">
+                        <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Panel>
+            <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
+                                      AccentBrush="{DynamicResource AccentTextBrush}"
+                                      LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <edit:TimelineEditorCanvas IsVisible="{Binding ShowsTimeline}"
+                                       AccentBrush="{DynamicResource AccentTextBrush}"
+                                       LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <StackPanel Classes="placeholder" IsVisible="{Binding HasPlaceholder}">
+                <TextBlock Classes="muted centered" TextWrapping="Wrap" Text="{Binding Placeholder}" />
+                <!-- A vocal part the chart hasn't can be added here, to chart it from nothing (charter-spec C3 item 7). -->
+                <Button Classes="labelled"
+                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0"
+                        IsVisible="{Binding CanAddVocalPart}"
+                        Content="{Binding AddVocalPartText}"
+                        Command="{Binding AddVocalPartCommand}" />
+            </StackPanel>
+        </Panel>
+    </DockPanel>
+</UserControl>

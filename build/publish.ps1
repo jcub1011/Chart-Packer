@@ -1,9 +1,13 @@
 <#
 .SYNOPSIS
-    Publishes ChartPacker as a Native AOT build, without debug symbols, to <repo>/publish/<rid>/.
+    Publishes Chart Packer and Chart Builder as Native AOT builds, without debug symbols, to <repo>/publish/<rid>/.
 
 .DESCRIPTION
-    The output holds the executable and every native library it loads: SDL3, Avalonia's Skia,
+    The two apps are installed together, so they're published into one folder. Each is published on its
+    own first, then the two are merged; a file both have must be identical in each, which
+    Directory.Packages.props ensures for the native libraries, and the script stops if one isn't.
+
+    The output holds the executables and every native library they load: SDL3, Avalonia's Skia,
     HarfBuzz and ANGLE libraries, and FFmpeg. FFmpeg isn't in the repo. If it's missing, or is a
     build from before the audio decoders were added, the script offers to build it with
     build/ffmpeg/build.sh (see build/ffmpeg/README.md). If you decline, it stops rather than publish
@@ -32,10 +36,12 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$project = Join-Path $repoRoot 'ChartPacker/ChartPacker.csproj'
+# Each app's project is <repo>/<name>/<name>.csproj, and its executable is named after it.
+$apps = 'ChartPacker', 'ChartBuilder'
 $outputDir = Join-Path $repoRoot "publish/$Runtime"
+$stagingDir = Join-Path $repoRoot "publish/$Runtime.staging"
 
-# ChartPacker.Ffmpeg copies these beside the executable, but only if they're there to copy.
+# ChartPacker.Ffmpeg copies these beside the executables, but only if they're there to copy.
 $ffmpegDir = Join-Path $repoRoot "ChartPacker.Ffmpeg/runtimes/$Runtime/native"
 
 # Why the FFmpeg in $ffmpegDir can't be published, or $null when it can. Only builds with the audio
@@ -104,23 +110,48 @@ if ($problem) {
     }
 }
 
-if (Test-Path $outputDir) {
-    Remove-Item $outputDir -Recurse -Force
+foreach ($dir in $outputDir, $stagingDir) {
+    if (Test-Path $dir) {
+        Remove-Item $dir -Recurse -Force
+    }
 }
 
-dotnet publish $project `
-    --configuration $Configuration `
-    --runtime $Runtime `
-    --output $outputDir `
-    -p:DebugType=none `
-    -p:DebugSymbols=false `
-    -p:CopyOutputSymbolsToPublishDirectory=false
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet publish failed with exit code $LASTEXITCODE."
+foreach ($app in $apps) {
+    $appDir = Join-Path $stagingDir $app
+    dotnet publish (Join-Path $repoRoot "$app/$app.csproj") `
+        --configuration $Configuration `
+        --runtime $Runtime `
+        --output $appDir `
+        -p:DebugType=none `
+        -p:DebugSymbols=false `
+        -p:CopyOutputSymbolsToPublishDirectory=false
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish of $app failed with exit code $LASTEXITCODE."
+    }
+
+    # The properties above cover the app's own symbols; this catches any a package ships.
+    Get-ChildItem $appDir -Recurse -Include '*.pdb', '*.dbg' | Remove-Item -Force
 }
 
-# The properties above cover the app's own symbols; this catches any a package ships.
-Get-ChildItem $outputDir -Recurse -Include '*.pdb', '*.dbg' | Remove-Item -Force
+# Merges the apps into one folder. A file both have is copied once, and must be byte-for-byte the same in each:
+# two different copies of a native library can't share a folder.
+New-Item -ItemType Directory $outputDir | Out-Null
+foreach ($app in $apps) {
+    $appDir = Join-Path $stagingDir $app
+    foreach ($file in Get-ChildItem $appDir -Recurse -File) {
+        $relative = [IO.Path]::GetRelativePath($appDir, $file.FullName)
+        $target = Join-Path $outputDir $relative
+        if (Test-Path $target) {
+            if ((Get-FileHash $target).Hash -ne (Get-FileHash $file.FullName).Hash) {
+                throw "$relative differs between the apps, so they can't share $outputDir. Both must build against the same packages (Directory.Packages.props)."
+            }
+            continue
+        }
+        New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+        Copy-Item $file.FullName $target
+    }
+}
+Remove-Item $stagingDir -Recurse -Force
 
 $files = Get-ChildItem $outputDir -Recurse -File | Sort-Object FullName
 $files | Format-Table @{ Label = 'File'; Expression = { [IO.Path]::GetRelativePath($outputDir, $_.FullName) } },

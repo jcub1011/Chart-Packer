@@ -11,8 +11,9 @@ using Avalonia.Threading;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Ffmpeg;
-using ChartPacker.Formatting;
 using ChartPacker.Resources;
+using ChartPacker.UI.Formatting;
+using ChartPacker.UI.ViewModels;
 using ChartPacker.Video;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -637,7 +638,7 @@ namespace ChartPacker.ViewModels
 
             return Decode(bytes) is { } bitmap
                 ? (new StagedBackground(BackgroundKind.Image, Hash(bytes), bytes.Length, null), bitmap)
-                : (new StagedBackground(BackgroundKind.Image, "unusable:" + path, bytes.Length, Strings.ArtNotAnImage), null);
+                : (new StagedBackground(BackgroundKind.Image, "unusable:" + path, bytes.Length, SharedStrings.ArtNotAnImage), null);
         }
 
         /// <summary>Disposes <paramref name="bitmaps"/> once the UI has rendered without them.</summary>

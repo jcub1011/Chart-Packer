@@ -47,6 +47,12 @@
   <data name="BrowseDialogTitle" xml:space="preserve">
     <value>Choose a folder of songs</value>
   </data>
+  <data name="BrowseButton" xml:space="preserve">
+    <value>Songs folder</value>
+  </data>
+  <data name="BrowseToolTip" xml:space="preserve">
+    <value>Choose the folder to search for songs</value>
+  </data>
   <data name="FolderPathWatermark" xml:space="preserve">
     <value>No folder selected</value>
   </data>
@@ -140,16 +146,6 @@
   <data name="FindingsListName" xml:space="preserve">
     <value>Problems</value>
   </data>
-  <data name="MetadataListName" xml:space="preserve">
-    <value>Metadata</value>
-  </data>
-  <data name="MetadataHeaderFormat" xml:space="preserve">
-    <value>Metadata ({0:N0})</value>
-    <comment>{0} is the number of metadata keys.</comment>
-  </data>
-  <data name="NoMetadata" xml:space="preserve">
-    <value>No metadata</value>
-  </data>
   <data name="NoSongIni" xml:space="preserve">
     <value>This folder has no song.ini</value>
   </data>
@@ -169,26 +165,6 @@
   <data name="NoOtherFiles" xml:space="preserve">
     <value>No other files</value>
   </data>
-  <data name="SizeBytesFormat" xml:space="preserve">
-    <value>{0:N0} B</value>
-    <comment>{0} is a size in bytes.</comment>
-  </data>
-  <data name="SizeKilobytesFormat" xml:space="preserve">
-    <value>{0:0.#} KB</value>
-    <comment>{0} is a size in kilobytes (1024 bytes).</comment>
-  </data>
-  <data name="SizeMegabytesFormat" xml:space="preserve">
-    <value>{0:0.#} MB</value>
-    <comment>{0} is a size in megabytes (1024 KB).</comment>
-  </data>
-  <data name="SizeGigabytesFormat" xml:space="preserve">
-    <value>{0:0.##} GB</value>
-    <comment>{0} is a size in gigabytes (1024 MB).</comment>
-  </data>
-  <data name="StoredMillisecondsFormat" xml:space="preserve">
-    <value>Stored value: {0} (milliseconds)</value>
-    <comment>Tooltip on a time shown as HH:MM:SS:mmm. {0} is the value as stored, e.g. "225123".</comment>
-  </data>
   <data name="OutputLabel" xml:space="preserve">
     <value>Output</value>
   </data>
@@ -201,8 +177,17 @@
   <data name="BrowseOutputDialogTitle" xml:space="preserve">
     <value>Choose the output folder</value>
   </data>
+  <data name="BrowseOutputButton" xml:space="preserve">
+    <value>Output folder</value>
+  </data>
+  <data name="BrowseOutputToolTip" xml:space="preserve">
+    <value>Choose where Pack and Unpack write</value>
+  </data>
   <data name="ResetOutputToolTip" xml:space="preserve">
     <value>Write next to the scanned songs again</value>
+  </data>
+  <data name="ResetOutputButton" xml:space="preserve">
+    <value>Reset output folder</value>
   </data>
   <data name="OverwriteLabel" xml:space="preserve">
     <value>If the output exists</value>
@@ -353,9 +338,6 @@
   <data name="JobResultsListName" xml:space="preserve">
     <value>Pack and unpack results</value>
   </data>
-  <data name="CancelButton" xml:space="preserve">
-    <value>Cancel</value>
-  </data>
   <data name="FlatPackLabel" xml:space="preserve">
     <value>Pack into one folder (flat)</value>
   </data>
@@ -365,10 +347,6 @@
   <data name="JobDuplicateOutputFormat" xml:space="preserve">
     <value>Skipped because {0} was already written by "{1}" in this job.</value>
     <comment>{0} is the output path; {1} the earlier item's path relative to the scanned folder.</comment>
-  </data>
-  <data name="DistinctValues" xml:space="preserve">
-    <value>&lt;&lt;contains distinct values&gt;&gt;</value>
-    <comment>Shown for a metadata row whose value differs between the selected items, or that some of them don't have.</comment>
   </data>
   <data name="BulkSubtitleFormat" xml:space="preserve">
     <value>{0:N0} .sng files · {1:N0} folders</value>
@@ -389,53 +367,11 @@
   <data name="UnsavedToolTip" xml:space="preserve">
     <value>This item has unsaved changes</value>
   </data>
-  <data name="AddRowButton" xml:space="preserve">
-    <value>Add row</value>
-  </data>
-  <data name="AddButton" xml:space="preserve">
-    <value>Add</value>
-  </data>
-  <data name="NewKeyWatermark" xml:space="preserve">
-    <value>Key</value>
-  </data>
-  <data name="NewKeyToolTip" xml:space="preserve">
-    <value>Pick a known key, or type your own</value>
-  </data>
-  <data name="NewValueWatermark" xml:space="preserve">
-    <value>Value</value>
-  </data>
   <data name="EditValueToolTip" xml:space="preserve">
     <value>Click to edit</value>
   </data>
-  <data name="RevertRowToolTip" xml:space="preserve">
-    <value>Undo the changes to this row</value>
-  </data>
-  <data name="RemoveRowToolTip" xml:space="preserve">
-    <value>Remove this row</value>
-  </data>
-  <data name="AutoSetLengthToolTip" xml:space="preserve">
-    <value>Set each song's length to its longest part (the chart's last note, the longest audio track or the background video) plus 1 second</value>
-  </data>
-  <data name="AutoSetLengthButton" xml:space="preserve">
-    <value>Auto-set song length</value>
-  </data>
   <data name="AutoSetLengthFailedFormat" xml:space="preserve">
     <value>Couldn't work out the length of {0} song(s); they were left as they are.</value>
-  </data>
-  <data name="ValueEmpty" xml:space="preserve">
-    <value>Enter a value, or remove the row instead.</value>
-  </data>
-  <data name="ValueForbidden" xml:space="preserve">
-    <value>Values can't contain ; or line breaks.</value>
-  </data>
-  <data name="KeyEmpty" xml:space="preserve">
-    <value>Enter a key.</value>
-  </data>
-  <data name="KeyForbidden" xml:space="preserve">
-    <value>Keys can't contain ;, = or line breaks.</value>
-  </data>
-  <data name="KeyExists" xml:space="preserve">
-    <value>This key already exists. Edit its row instead.</value>
   </data>
   <data name="SngHasErrorsFormat" xml:space="preserve">
     <value>Editing is off: "{0}" has structural errors.</value>
@@ -501,20 +437,6 @@
   <data name="PickArtTitle" xml:space="preserve">
     <value>Choose album art</value>
   </data>
-  <data name="ArtFileTypeName" xml:space="preserve">
-    <value>Images (png, jpg, jpeg)</value>
-  </data>
-  <data name="ArtUnreadableFormat" xml:space="preserve">
-    <value>That image can't be used: {0}</value>
-    <comment>{0} is the reason.</comment>
-  </data>
-  <data name="ArtNotAnImage" xml:space="preserve">
-    <value>That file isn't a png, jpg or jpeg image that can be read.</value>
-  </data>
-  <data name="ArtTooLargeFormat" xml:space="preserve">
-    <value>That image is too large. Album art can be up to {0}.</value>
-    <comment>{0} is the size limit, e.g. "16 MB".</comment>
-  </data>
   <data name="BackgroundName" xml:space="preserve">
     <value>Background</value>
     <comment>Automation name of the background tile beside the album art.</comment>
@@ -565,18 +487,6 @@
   <data name="PickBackgroundTitle" xml:space="preserve">
     <value>Choose a background image or video</value>
   </data>
-  <data name="BackgroundFileTypeFormat" xml:space="preserve">
-    <value>Backgrounds ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions, e.g. "png, jpg, mp4".</comment>
-  </data>
-  <data name="ImageFileTypeFormat" xml:space="preserve">
-    <value>Images ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions.</comment>
-  </data>
-  <data name="VideoFileTypeFormat" xml:space="preserve">
-    <value>Videos ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions.</comment>
-  </data>
   <data name="BackgroundNotSupported" xml:space="preserve">
     <value>That file isn't a png, jpg or jpeg image, or an mp4, avi, webm, vp8, ogv or mpeg video.</value>
   </data>
@@ -623,9 +533,6 @@
   <data name="NoTracks" xml:space="preserve">
     <value>No audio tracks.</value>
   </data>
-  <data name="TracksListName" xml:space="preserve">
-    <value>Audio tracks</value>
-  </data>
   <data name="PlayToolTip" xml:space="preserve">
     <value>Play</value>
   </data>
@@ -669,48 +576,6 @@
   <data name="PitchCorrectionToolTip" xml:space="preserve">
     <value>Keep the pitch when playing faster or slower. When off, the pitch rises and falls with the speed.</value>
   </data>
-  <data name="TrackVolumeName" xml:space="preserve">
-    <value>Track volume in the mix</value>
-  </data>
-  <data name="MuteToolTip" xml:space="preserve">
-    <value>Mute this track</value>
-  </data>
-  <data name="SoloToolTip" xml:space="preserve">
-    <value>Play only the soloed tracks</value>
-  </data>
-  <data name="MuteButton" xml:space="preserve">
-    <value>M</value>
-    <comment>Short label for the mute toggle on a track row.</comment>
-  </data>
-  <data name="SoloButton" xml:space="preserve">
-    <value>S</value>
-    <comment>Short label for the solo toggle on a track row.</comment>
-  </data>
-  <data name="RemoveTrackToolTip" xml:space="preserve">
-    <value>Remove this track</value>
-  </data>
-  <data name="AddTrackButton" xml:space="preserve">
-    <value>Add track</value>
-  </data>
-  <data name="ReplaceTrackFormat" xml:space="preserve">
-    <value>Replace {0}</value>
-    <comment>{0} is the stem, e.g. "guitar".</comment>
-  </data>
-  <data name="PickTrackTitleFormat" xml:space="preserve">
-    <value>Choose the {0} track</value>
-    <comment>{0} is the stem, e.g. "guitar".</comment>
-  </data>
-  <data name="AudioFileTypeName" xml:space="preserve">
-    <value>Audio (ogg, opus, mp3, wav)</value>
-  </data>
-  <data name="TrackNotAudioFormat" xml:space="preserve">
-    <value>{0} isn't an ogg, opus, mp3 or wav file.</value>
-    <comment>{0} is the file name.</comment>
-  </data>
-  <data name="TrackUnusableFormat" xml:space="preserve">
-    <value>{0} can't be used as a track: {1}</value>
-    <comment>{0} is the file name; {1} is the reason.</comment>
-  </data>
   <data name="TrackUnplayableFormat" xml:space="preserve">
     <value>Can't be played: {0}</value>
     <comment>{0} is the reason.</comment>
@@ -735,15 +600,6 @@
   </data>
   <data name="CharterToolTip" xml:space="preserve">
     <value>Charter</value>
-  </data>
-  <data name="ReplaceTrackToolTip" xml:space="preserve">
-    <value>Replace this track</value>
-  </data>
-  <data name="RemovedTracksListName" xml:space="preserve">
-    <value>Removed tracks</value>
-  </data>
-  <data name="UndoRemoveTrackToolTip" xml:space="preserve">
-    <value>Keep this track</value>
   </data>
   <data name="ChartHeader" xml:space="preserve">
     <value>Chart</value>
@@ -771,10 +627,6 @@
   </data>
   <data name="PickChartTitle" xml:space="preserve">
     <value>Choose a chart</value>
-  </data>
-  <data name="ChartFileTypeFormat" xml:space="preserve">
-    <value>Charts ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi".</comment>
   </data>
   <data name="ChartNotSupportedFormat" xml:space="preserve">
     <value>{0} isn't a .chart, .mid or .midi file.</value>
@@ -835,10 +687,6 @@
   <data name="PickLyricsTitle" xml:space="preserve">
     <value>Choose a chart or .sng to take the lyrics from</value>
   </data>
-  <data name="LyricsSourceFileTypeFormat" xml:space="preserve">
-    <value>Charts and songs ({0})</value>
-    <comment>A file-picker filter. {0} is the extensions, e.g. "chart, mid, midi, sng".</comment>
-  </data>
   <data name="LyricsSourceUnreadableFormat" xml:space="preserve">
     <value>{0} can't be read: {1}</value>
     <comment>{0} is the file name; {1} is the reason.</comment>
@@ -851,37 +699,7 @@
     <value>Settings</value>
   </data>
   <data name="SettingsToolTip" xml:space="preserve">
-    <value>Settings (Ctrl+,)</value>
-  </data>
-  <data name="SettingsWindowTitle" xml:space="preserve">
-    <value>Settings</value>
-  </data>
-  <data name="SettingsSearchWatermark" xml:space="preserve">
-    <value>Search settings (Ctrl+E)</value>
-  </data>
-  <data name="SettingsAllCategories" xml:space="preserve">
-    <value>All settings</value>
-    <comment>The first entry in the Settings window's category tree; it shows every category.</comment>
-  </data>
-  <data name="SettingsCategoriesName" xml:space="preserve">
-    <value>Setting categories</value>
-    <comment>The accessible name of the category tree in the Settings window.</comment>
-  </data>
-  <data name="SettingsNoMatchesFormat" xml:space="preserve">
-    <value>No settings match "{0}".</value>
-    <comment>{0} is the search text.</comment>
-  </data>
-  <data name="SettingsResetToolTip" xml:space="preserve">
-    <value>Reset to default</value>
-  </data>
-  <data name="SettingsBrowseButton" xml:space="preserve">
-    <value>Browse…</value>
-  </data>
-  <data name="OkButton" xml:space="preserve">
-    <value>OK</value>
-  </data>
-  <data name="ApplyButton" xml:space="preserve">
-    <value>Apply</value>
+    <value>Change how songs are scanned, packed and played (Ctrl+,)</value>
   </data>
   <data name="SettingsCategoryLibrary" xml:space="preserve">
     <value>Library</value>
@@ -1192,10 +1010,6 @@
   <data name="HighwayRevertOffsetToolTip" xml:space="preserve">
     <value>Reset this offset</value>
   </data>
-  <data name="OffsetControlsHelp" xml:space="preserve">
-    <value>Drag sideways across it to change it as you watch: a millisecond a pixel, ten with Shift, finer with Ctrl. Click it to type a value; Enter keeps it. While typing, Up and Down or the mouse wheel step a millisecond, ten with Shift.</value>
-    <comment>Under each offset box's own tooltip: the ways to change it.</comment>
-  </data>
   <data name="AudioOffsetName" xml:space="preserve">
     <value>Audio offset</value>
   </data>
@@ -1291,10 +1105,6 @@
     <value>Ultra (2.5 ms)</value>
     <comment>A choice of Waveform detail: how long each bar of the waveform is.</comment>
   </data>
-  <data name="SettingLockedFormat" xml:space="preserve">
-    <value>Turn on {0} to change this.</value>
-    <comment>Under a setting that only applies while another is on: {0} is that setting's label, e.g. Show waveforms.</comment>
-  </data>
   <data name="LaneWaveformsToolTip" xml:space="preserve">
     <value>Show the audio behind the notes, to line them up with it</value>
   </data>
@@ -1346,88 +1156,6 @@
     <value>{0} {1}</value>
     <comment>{0} is a difficulty, {1} an instrument, e.g. 'Expert Guitar'.</comment>
   </data>
-  <data name="InstrumentGuitar" xml:space="preserve">
-    <value>Guitar</value>
-  </data>
-  <data name="InstrumentBass" xml:space="preserve">
-    <value>Bass</value>
-  </data>
-  <data name="InstrumentDrums" xml:space="preserve">
-    <value>Drums</value>
-  </data>
-  <data name="InstrumentKeys" xml:space="preserve">
-    <value>Keys</value>
-  </data>
-  <data name="InstrumentRhythm" xml:space="preserve">
-    <value>Rhythm</value>
-  </data>
-  <data name="InstrumentGuitarCoop" xml:space="preserve">
-    <value>Guitar Co-op</value>
-  </data>
-  <data name="InstrumentGhlGuitar" xml:space="preserve">
-    <value>GHL Guitar</value>
-  </data>
-  <data name="InstrumentGhlBass" xml:space="preserve">
-    <value>GHL Bass</value>
-  </data>
-  <data name="InstrumentGhlRhythm" xml:space="preserve">
-    <value>GHL Rhythm</value>
-  </data>
-  <data name="InstrumentGhlCoop" xml:space="preserve">
-    <value>GHL Guitar Co-op</value>
-  </data>
-  <data name="InstrumentProDrums" xml:space="preserve">
-    <value>Pro Drums</value>
-  </data>
-  <data name="InstrumentProDrumsPs" xml:space="preserve">
-    <value>Pro Drums (PS)</value>
-    <comment>Phase Shift's pro drums difficulty.</comment>
-  </data>
-  <data name="InstrumentProKeysPs" xml:space="preserve">
-    <value>Pro Keys (PS)</value>
-    <comment>Phase Shift's pro keys difficulty.</comment>
-  </data>
-  <data name="InstrumentBand" xml:space="preserve">
-    <value>Band</value>
-    <comment>The whole band's difficulty.</comment>
-  </data>
-  <data name="InstrumentsListName" xml:space="preserve">
-    <value>Instrument difficulties</value>
-    <comment>Accessible name of the instrument icons above the metadata rows.</comment>
-  </data>
-  <data name="InstrumentsShowAllFormat" xml:space="preserve">
-    <value>Show all ({0} more)</value>
-    <comment>{0} is how many instruments are hidden: not charted, with no difficulty set.</comment>
-  </data>
-  <data name="InstrumentsShowFewer" xml:space="preserve">
-    <value>Show fewer</value>
-  </data>
-  <data name="InstrumentCaptionSeparator" xml:space="preserve">
-    <value> - </value>
-    <comment>Between an instrument's name and its charted difficulties' letters, e.g. 'Guitar - EMHX'.</comment>
-  </data>
-  <data name="InstrumentNotCharted" xml:space="preserve">
-    <value>The chart has no notes for this part.</value>
-  </data>
-  <data name="InstrumentAccessibleNameFormat" xml:space="preserve">
-    <value>{0}, difficulty {1}</value>
-    <comment>{0} is an instrument, {1} its song.ini difficulty, e.g. 'Guitar, difficulty 4'.</comment>
-  </data>
-  <data name="NoteCountFormat" xml:space="preserve">
-    <value>{0:N0} notes</value>
-    <comment>{0} is how many notes a difficulty has, more than one, e.g. '1,234 notes'. A chord counts as one note.</comment>
-  </data>
-  <data name="NoteCountOne" xml:space="preserve">
-    <value>1 note</value>
-  </data>
-  <data name="NoteCountVocals" xml:space="preserve">
-    <value>Notes</value>
-    <comment>Labels the note count of a vocal part, which has no difficulties.</comment>
-  </data>
-  <data name="NoteCountHarmonyFormat" xml:space="preserve">
-    <value>Harmony {0}</value>
-    <comment>Labels one harmony line's note count; {0} is the line, 1 to 3.</comment>
-  </data>
   <data name="NoteCountLineFormat" xml:space="preserve">
     <value>{0}: {1}</value>
     <comment>One line of a note count tooltip: {0} is a difficulty or harmony line, {1} its count, e.g. 'Expert: 1,234 notes'.</comment>
@@ -1435,65 +1163,6 @@
   <data name="MergeNoteCountSeparator" xml:space="preserve">
     <value> · </value>
     <comment>Goes between a merge cell's note counts, e.g. '312 · 640 · 980 · 1,234'.</comment>
-  </data>
-  <data name="DifficultyTagCoop" xml:space="preserve">
-    <value>2P</value>
-    <comment>Tag on the co-op guitar's icon. Keep it to 3 characters.</comment>
-  </data>
-  <data name="DifficultyTagPro" xml:space="preserve">
-    <value>PRO</value>
-    <comment>Tag on a pro instrument's icon. Keep it to 3 characters.</comment>
-  </data>
-  <data name="DifficultyTagPro22" xml:space="preserve">
-    <value>22</value>
-    <comment>Tag on a 22-fret pro instrument's icon. Keep it to 3 characters.</comment>
-  </data>
-  <data name="DifficultyTagGhl" xml:space="preserve">
-    <value>GHL</value>
-    <comment>Tag on a six-fret (Guitar Hero Live) instrument's icon. Keep it to 3 characters.</comment>
-  </data>
-  <data name="DifficultyTagPhaseShift" xml:space="preserve">
-    <value>PS</value>
-    <comment>Tag on a Phase Shift instrument's icon. Keep it to 3 characters.</comment>
-  </data>
-  <data name="DifficultyUnsetBadge" xml:space="preserve">
-    <value>?</value>
-    <comment>The badge of an instrument with no difficulty set.</comment>
-  </data>
-  <data name="DifficultyDistinctBadge" xml:space="preserve">
-    <value>*</value>
-    <comment>The badge of an instrument whose difficulty differs between the selected songs.</comment>
-  </data>
-  <data name="DifficultyUnsetToolTip" xml:space="preserve">
-    <value>No difficulty (stored as -1)</value>
-  </data>
-  <data name="DifficultyDistinctToolTip" xml:space="preserve">
-    <value>The selected songs have different difficulties.</value>
-  </data>
-  <data name="DifficultyStoredValueFormat" xml:space="preserve">
-    <value>Stored as "{0}", which isn't a difficulty.</value>
-    <comment>{0} is the value in song.ini.</comment>
-  </data>
-  <data name="DifficultyOtherLabel" xml:space="preserve">
-    <value>Other</value>
-  </data>
-  <data name="DifficultySetButton" xml:space="preserve">
-    <value>Set</value>
-  </data>
-  <data name="DifficultyRevertButton" xml:space="preserve">
-    <value>Revert</value>
-  </data>
-  <data name="DifficultyEasy" xml:space="preserve">
-    <value>Easy</value>
-  </data>
-  <data name="DifficultyMedium" xml:space="preserve">
-    <value>Medium</value>
-  </data>
-  <data name="DifficultyHard" xml:space="preserve">
-    <value>Hard</value>
-  </data>
-  <data name="DifficultyExpert" xml:space="preserve">
-    <value>Expert</value>
   </data>
   <data name="MergeButton" xml:space="preserve">
     <value>Merge</value>
@@ -1791,18 +1460,6 @@
   <data name="MergePartPresent" xml:space="preserve">
     <value>Yes</value>
   </data>
-  <data name="MergeDifficultyEasyLetter" xml:space="preserve">
-    <value>E</value>
-  </data>
-  <data name="MergeDifficultyMediumLetter" xml:space="preserve">
-    <value>M</value>
-  </data>
-  <data name="MergeDifficultyHardLetter" xml:space="preserve">
-    <value>H</value>
-  </data>
-  <data name="MergeDifficultyExpertLetter" xml:space="preserve">
-    <value>X</value>
-  </data>
   <data name="MergeNoParts" xml:space="preserve">
     <value>None of the songs has a chart that can be read.</value>
   </data>
@@ -1853,36 +1510,6 @@
   </data>
   <data name="MergeIssueMoreTimesFormat" xml:space="preserve">
     <value>{0} and {1} more</value>
-  </data>
-  <data name="MergePartProKeys" xml:space="preserve">
-    <value>Pro Keys</value>
-  </data>
-  <data name="MergePartVocals" xml:space="preserve">
-    <value>Vocals</value>
-  </data>
-  <data name="MergePartHarmonies" xml:space="preserve">
-    <value>Harmonies</value>
-  </data>
-  <data name="MergePartProGuitar" xml:space="preserve">
-    <value>Pro Guitar</value>
-  </data>
-  <data name="MergePartProGuitar22" xml:space="preserve">
-    <value>Pro Guitar (22)</value>
-  </data>
-  <data name="MergePartProBass" xml:space="preserve">
-    <value>Pro Bass</value>
-  </data>
-  <data name="MergePartProBass22" xml:space="preserve">
-    <value>Pro Bass (22)</value>
-  </data>
-  <data name="MergePartGhlRhythm" xml:space="preserve">
-    <value>GHL Rhythm</value>
-  </data>
-  <data name="MergePartGhlCoop" xml:space="preserve">
-    <value>GHL Co-op</value>
-  </data>
-  <data name="MergePartDance" xml:space="preserve">
-    <value>Dance</value>
   </data>
   <data name="MergePreviewHeading" xml:space="preserve">
     <value>Preview</value>
@@ -2178,18 +1805,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>{0:N0} moved to the {1}, {2:N0} deleted permanently, {3:N0} skipped or failed</value>
     <comment>{0}, {2} and {3} are counts, {1} is "Recycle Bin" or "Trash".</comment>
   </data>
-  <data name="RevealInExplorer" xml:space="preserve">
-    <value>Show in Explorer</value>
-    <comment>Right-click menu item on Windows.</comment>
-  </data>
-  <data name="RevealInFinder" xml:space="preserve">
-    <value>Show in Finder</value>
-    <comment>Right-click menu item on macOS.</comment>
-  </data>
-  <data name="RevealInFolder" xml:space="preserve">
-    <value>Show in folder</value>
-    <comment>Right-click menu item on Linux, and the download notice's button.</comment>
-  </data>
   <data name="MenuDownloadAllFiles" xml:space="preserve">
     <value>Download all files</value>
     <comment>Library right-click menu: saves each selected song as a song folder.</comment>
@@ -2388,13 +2003,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>{0:0.0} ms/px</value>
     <comment>The Ctrl+drag speed setting's value: {0} is milliseconds of the song for each pixel dragged.</comment>
   </data>
-  <data name="IssueSongCountFormat" xml:space="preserve">
-    <value>{0} ({1} of {2} songs)</value>
-    <comment>A metadata row's validation message with several songs selected: {0} is the message, {1} how many of the songs fail, {2} how many are selected.</comment>
-  </data>
-  <data name="HiddenIssuesListName" xml:space="preserve">
-    <value>Difficulties that fail validation</value>
-  </data>
   <data name="SaveInvalidTitle" xml:space="preserve">
     <value>Save metadata that fails validation?</value>
   </data>
@@ -2562,12 +2170,105 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Couldn't be read</value>
     <comment>A song whose metadata couldn't be read at all.</comment>
   </data>
-  <data name="QuickFixMenu" xml:space="preserve">
-    <value>Quick Fix</value>
-    <comment>Right-click menu item on a metadata row that applies the row's quick fix to the draft; disabled when it has none.</comment>
+  <data name="ChartBuilderMissingFormat" xml:space="preserve">
+    <value>Chart Builder isn't installed. It should be at {0}.</value>
+    <comment>{0} is the path Chart Packer looked for it at.</comment>
   </data>
-  <data name="QuickFixMenuFormat" xml:space="preserve">
-    <value>Quick Fix: {0}</value>
-    <comment>Right-click menu item on a metadata row. {0} is what the fix does, e.g. "Change to True".</comment>
+  <data name="ChartBuilderStartFailedFormat" xml:space="preserve">
+    <value>Couldn't start Chart Builder: {0}</value>
+    <comment>{0} is the error message.</comment>
+  </data>
+  <data name="EditChartButton" xml:space="preserve">
+    <value>Edit chart</value>
+  </data>
+  <data name="EditChartToolTip" xml:space="preserve">
+    <value>Open the selected song's chart in Chart Builder. Select one song to edit it.</value>
+  </data>
+  <data name="EditChartUnsavedTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="EditChartUnsavedMessageFormat" xml:space="preserve">
+    <value>{0} has metadata changes that aren't saved. Chart Builder opens the song as it is on disk, so save or discard them first.</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="ChartBuilderOpenTitle" xml:space="preserve">
+    <value>Open in Chart Builder</value>
+  </data>
+  <data name="ChartBuilderOpenSaveOneFormat" xml:space="preserve">
+    <value>Chart Builder has {0} open. It may overwrite these changes when it saves the song. Save anyway?</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="ChartBuilderOpenSaveManyFormat" xml:space="preserve">
+    <value>Chart Builder has {0} of these songs open. It may overwrite these changes when it saves them. Save anyway?</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="ChartBuilderOpenDeleteOneFormat" xml:space="preserve">
+    <value>Chart Builder has {0} open. Delete it anyway?</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="ChartBuilderOpenDeleteManyFormat" xml:space="preserve">
+    <value>Chart Builder has {0} of these songs open. Delete them anyway?</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="DeleteAnywayButton" xml:space="preserve">
+    <value>Delete anyway</value>
+  </data>
+  <data name="ChartBuilderOpenOverwriteFormat" xml:space="preserve">
+    <value>Chart Builder has {0} open. It may overwrite the merged song when it saves. Overwrite anyway?</value>
+    <comment>{0} is the .sng's file name.</comment>
+  </data>
+  <data name="OverwriteAnywayButton" xml:space="preserve">
+    <value>Overwrite anyway</value>
+  </data>
+  <data name="AudioLatencyLabel" xml:space="preserve">
+    <value>Audio/visual latency</value>
+  </data>
+  <data name="AudioLatencyDescription" xml:space="preserve">
+    <value>How much later the audio is heard than the screen shows it, measured for each output device by Chart Builder's calibration tool. The highway, lyrics and background are drawn that much earlier.</value>
+  </data>
+  <data name="AudioLatencyKeywords" xml:space="preserve">
+    <value>latency delay offset sync calibrate calibration audio video lag bluetooth</value>
+  </data>
+  <data name="CalibrateButton" xml:space="preserve">
+    <value>Calibrate…</value>
+  </data>
+  <data name="ChartFindingFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="ChartFindingTimesFormat" xml:space="preserve">
+    <value>{0} (×{1})</value>
+  </data>
+  <data name="ChartFindingWhereFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="ChartFindingPlaceFormat" xml:space="preserve">
+    <value>m{0} beat {1:0.##}</value>
+  </data>
+  <data name="ChartFindingTrackFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+  </data>
+  <data name="ChartFindingPartPlaceFormat" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="ValidatorTypeChartTiming" xml:space="preserve">
+    <value>Chart: timing</value>
+  </data>
+  <data name="ValidatorTypeChartFrets" xml:space="preserve">
+    <value>Chart: frets</value>
+  </data>
+  <data name="ValidatorTypeChartDrums" xml:space="preserve">
+    <value>Chart: drums</value>
+  </data>
+  <data name="ValidatorTypeChartPhrases" xml:space="preserve">
+    <value>Chart: phrases and events</value>
+  </data>
+  <data name="ValidatorTypeChartSong" xml:space="preserve">
+    <value>Chart: song</value>
+  </data>
+  <data name="ValidatorTypeChartVocals" xml:space="preserve">
+    <value>Chart: vocals</value>
+  </data>
+  <data name="ValidatorTypeChartLoad" xml:space="preserve">
+    <value>Chart: load</value>
   </data>
 </root>

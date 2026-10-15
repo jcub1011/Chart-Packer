@@ -66,6 +66,9 @@ public static class SngRules
     /// <summary>There are bytes after the end of the FileData section.</summary>
     public const string Sng043 = "SNG043";
 
+    /// <summary>There is no registered audio stem.</summary>
+    public const string Sng052 = "SNG052";
+
     /// <summary><c>song.ini</c> is stored as a file.</summary>
     public const string Sng053 = "SNG053";
 
@@ -74,6 +77,9 @@ public static class SngRules
 
     /// <summary>An empty value. It is dropped when packing.</summary>
     public const string Sng061 = "SNG061";
+
+    /// <summary>A key of a part the chart has no notes for. It is dropped when packing.</summary>
+    public const string Sng062 = "SNG062";
 
     /// <summary>There is no <c>song.ini</c>.</summary>
     public const string Sng070 = "SNG070";

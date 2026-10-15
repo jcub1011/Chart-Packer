@@ -1,5 +1,5 @@
 # Builds the Windows installer and portable zip, and publishes them as a GitHub release tagged
-# v<Version>, with <Version> read from ChartPacker/ChartPacker.csproj. Bump it there before running this.
+# v<Version>, with <Version> read from Directory.Build.props. Bump it there before running this.
 name: Release
 
 on:
@@ -45,9 +45,9 @@ jobs:
         id: version
         shell: bash
         run: |
-          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' ChartPacker/ChartPacker.csproj | head -n 1 | tr -d '[:space:]')"
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1 | tr -d '[:space:]')"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error file=ChartPacker/ChartPacker.csproj::<Version> is '$version', which isn't a semantic version such as 1.2.3 or 1.2.3-beta.1."
+            echo "::error file=Directory.Build.props::<Version> is '$version', which isn't a semantic version such as 1.2.3 or 1.2.3-beta.1."
             exit 1
           fi
           {
@@ -95,7 +95,7 @@ jobs:
             elif [[ "$OVERWRITE" == true ]]; then
               echo "::warning::$TAG already exists and will be replaced."
             else
-              echo "::error::$TAG already exists. Bump <Version> in ChartPacker/ChartPacker.csproj, or run again with overwrite."
+              echo "::error::$TAG already exists. Bump <Version> in Directory.Build.props, or run again with overwrite."
               exit 1
             fi
           fi
@@ -151,6 +151,10 @@ jobs:
       - name: Test
         shell: pwsh
         run: dotnet test --project ChartPacker.Core.Tests/ChartPacker.Core.Tests.csproj --configuration Release
+
+      - name: Test Chart Builder
+        shell: pwsh
+        run: dotnet test --project ChartBuilder.Tests/ChartBuilder.Tests.csproj --configuration Release
 
       - name: Publish
         shell: pwsh

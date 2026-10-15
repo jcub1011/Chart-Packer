@@ -58,6 +58,11 @@ public sealed class TimeStretcher
     private double _lastCenter;
     private double _ratio = 1;
 
+    // The two grains _ready is made of: the last one carrying on (from _readyNatural) and the one fading in (from
+    // _readyGrain), for PlayedPosition.
+    private long _readyNatural;
+    private long _readyGrain;
+
     /// <summary>Reads the next frames of input into an interleaved stereo span.</summary>
     /// <returns>How many frames were read; 0 once the input has ended.</returns>
     public delegate int ReadStereo(Span<float> stereo);
@@ -79,6 +84,7 @@ public sealed class TimeStretcher
         _natural = new float[_hop];
         _overlap = new float[_hop * 2];
         _ready = new float[_hop * 2];
+        _readyNatural = _readyGrain = -_hop;
     }
 
     /// <summary>
@@ -91,8 +97,38 @@ public sealed class TimeStretcher
         set => _ratio = double.IsFinite(value) ? Math.Clamp(value, MinRatio, MaxRatio) : 1;
     }
 
-    /// <summary>The input frame the next output frame stands for: where it's heard to have got to in the input.</summary>
+    /// <summary>
+    /// The input frame the next output frame stands for, as the speed has it: where the input has got to by the ratio,
+    /// whichever grains were taken.
+    /// </summary>
     public double SourcePosition { get; private set; }
+
+    /// <summary>
+    /// The input frame the next output frame actually plays: the two grains it's made of, weighted as they're faded into
+    /// each other. A grain is taken up to 12 ms from where <see cref="SourcePosition"/> says, so this can be that far
+    /// from it, and isn't always moving forward; it's what's heard, and what audio laid over the output has to line up
+    /// with (charter-spec §4.4.1).
+    /// </summary>
+    public double PlayedPosition
+    {
+        get
+        {
+            if (_readyOffset >= _readyCount)
+                return _readyGrain + _hop;
+
+            int n = _readyOffset;
+            return _readyNatural + n + (_window[n] * (_readyGrain - _readyNatural));
+        }
+    }
+
+    /// <summary>Output frames between grains: how many each grain adds.</summary>
+    public int GrainStep => _hop;
+
+    /// <summary>
+    /// How many more output frames come from the grains being faded together now; 0 when the next frame starts the next
+    /// grain. Between grains, <see cref="PlayedPosition"/> moves smoothly.
+    /// </summary>
+    public int FramesToNextGrain => _readyCount - _readyOffset;
 
     /// <summary>
     /// Forgets everything held, for input that starts again at <paramref name="sourceFrame"/>, as after a seek. The
@@ -110,6 +146,7 @@ public sealed class TimeStretcher
         _finished = false;
         _lastCenter = sourceFrame;
         SourcePosition = sourceFrame;
+        _readyNatural = _readyGrain = sourceFrame - _hop;
     }
 
     /// <summary>
@@ -214,6 +251,8 @@ public sealed class TimeStretcher
         }
 
         _readyRatio = _ratio;
+        _readyNatural = natural;
+        _readyGrain = grain;
         _lastGrain = grain;
         _lastCenter = center;
     }

@@ -164,12 +164,14 @@ internal static unsafe partial class Native
     public const string AvCodec = "avcodec";
     public const string AvUtil = "avutil";
     public const string SwScale = "swscale";
+    public const string SwResample = "swresample";
 
     // The major versions the struct layouts above are written for.
     public const int AvFormatMajor = 63;
     public const int AvCodecMajor = 63;
     public const int AvUtilMajor = 61;
     public const int SwScaleMajor = 10;
+    public const int SwResampleMajor = 7;
 
     public const long NoPtsValue = long.MinValue;
     public const int TimeBase = 1_000_000;
@@ -182,6 +184,10 @@ internal static unsafe partial class Native
 
     // libavcodec/defs.h: AV_INPUT_BUFFER_PADDING_SIZE, zeroed bytes every buffer given to a decoder must have after it.
     public const int InputBufferPadding = 64;
+    // libavutil/channel_layout.h: AV_CHANNEL_ORDER_NATIVE and the channel masks.
+    public const int ChannelOrderNative = 1;
+    public const ulong ChannelMaskMono = 0x4;
+    public const ulong ChannelMaskStereo = 0x3;
     public const int PixelFormatBgra = 28;
     public const int SwsBilinear = 2;
     public const int SeekFlagBackward = 1;
@@ -309,7 +315,6 @@ internal static unsafe partial class Native
     // libswscale
     [LibraryImport(SwScale, EntryPoint = "swscale_version")]
     public static partial uint swscale_version();
-
     [LibraryImport(SwScale, EntryPoint = "sws_getContext")]
     public static partial void* sws_getContext(int srcWidth, int srcHeight, int srcFormat, int dstWidth, int dstHeight, int dstFormat, int flags, void* srcFilter, void* dstFilter, double* param);
 
@@ -318,4 +323,29 @@ internal static unsafe partial class Native
 
     [LibraryImport(SwScale, EntryPoint = "sws_freeContext")]
     public static partial void sws_freeContext(void* context);
+
+    // libswresample: only the resampler used to convert decoded audio to 48 kHz for Opus encoding.
+    [LibraryImport(SwResample, EntryPoint = "swresample_version")]
+    public static partial uint swresample_version();
+
+    [LibraryImport(SwResample, EntryPoint = "swr_alloc_set_opts2")]
+    public static partial int swr_alloc_set_opts2(
+        void** ps,
+        AVChannelLayout* out_ch_layout,
+        int out_sample_fmt,
+        int out_sample_rate,
+        AVChannelLayout* in_ch_layout,
+        int in_sample_fmt,
+        int in_sample_rate,
+        int log_offset,
+        void* log_ctx);
+
+    [LibraryImport(SwResample, EntryPoint = "swr_init")]
+    public static partial int swr_init(void* s);
+
+    [LibraryImport(SwResample, EntryPoint = "swr_convert")]
+    public static partial int swr_convert(void* s, byte** output, int out_count, byte** input, int in_count);
+
+    [LibraryImport(SwResample, EntryPoint = "swr_free")]
+    public static partial void swr_free(void** s);
 }

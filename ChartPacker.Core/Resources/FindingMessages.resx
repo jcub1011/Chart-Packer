@@ -196,6 +196,58 @@
     <value>"{0}" has an empty value and was left out.</value>
     <comment>{0} is the key.</comment>
   </data>
+  <data name="FixSnapNearest" xml:space="preserve">
+    <value>Snap to the nearest grid line</value>
+    <comment>A way to fix an off-grid note (CHR004), as its menu lists it.</comment>
+  </data>
+  <data name="FixSnapBefore" xml:space="preserve">
+    <value>Snap to the grid line before</value>
+    <comment>A way to fix an off-grid note (CHR004) when the nearest grid line is after it.</comment>
+  </data>
+  <data name="FixSnapAfter" xml:space="preserve">
+    <value>Snap to the grid line after</value>
+    <comment>A way to fix an off-grid note (CHR004) when the nearest grid line is before it.</comment>
+  </data>
+  <data name="FixDeleteChord" xml:space="preserve">
+    <value>Delete the note</value>
+    <comment>A way to fix an off-grid note or chord (CHR004).</comment>
+  </data>
+  <data name="FixMakePlain" xml:space="preserve">
+    <value>Make it a plain note</value>
+    <comment>A way to fix a sustain shorter than the cutoff (CHR021).</comment>
+  </data>
+  <data name="FixLengthenToCutoff" xml:space="preserve">
+    <value>Lengthen it to the sustain cutoff</value>
+    <comment>A way to fix a sustain shorter than the cutoff (CHR021).</comment>
+  </data>
+  <data name="FixRemoveOpen" xml:space="preserve">
+    <value>Remove the open note</value>
+    <comment>A way to fix an open note in a chord (CHR022).</comment>
+  </data>
+  <data name="FixKeepOpen" xml:space="preserve">
+    <value>Keep only the open note</value>
+    <comment>A way to fix an open note in a chord (CHR022): the frets are removed.</comment>
+  </data>
+  <data name="FixDeleteLater" xml:space="preserve">
+    <value>Delete the later note</value>
+    <comment>A way to fix two notes too close together (CHR026).</comment>
+  </data>
+  <data name="FixDeleteEarlier" xml:space="preserve">
+    <value>Delete the earlier note</value>
+    <comment>A way to fix two notes too close together (CHR026).</comment>
+  </data>
+  <data name="FixSwitchToPro" xml:space="preserve">
+    <value>Switch to Pro drums</value>
+    <comment>A way to fix tom markers on 4-lane drums (CHR045).</comment>
+  </data>
+  <data name="FixRemoveTomMarkers" xml:space="preserve">
+    <value>Remove the tom markers</value>
+    <comment>A way to fix tom markers on 4-lane drums (CHR045).</comment>
+  </data>
+  <data name="PartKeyDroppedFormat" xml:space="preserve">
+    <value>"{0}" is for a part the chart has no notes for, and was left out.</value>
+    <comment>{0} is the key.</comment>
+  </data>
   <data name="MetadataNotWrittenFormat" xml:space="preserve">
     <value>"{0}" was left out of song.ini because its key or value contains a character song.ini can't hold.</value>
     <comment>{0} is the key.</comment>
@@ -258,6 +310,9 @@
     <value>Remove the repeats</value>
     <comment>A quick fix that keeps one line of a key stored more than once, with the value it has.</comment>
   </data>
+  <data name="NoAudioStem" xml:space="preserve">
+    <value>There's no audio stem (song, guitar, drums and the like), so the song plays in silence.</value>
+  </data>
   <data name="NoSongIni" xml:space="preserve">
     <value>There's no song.ini, so the .sng will have no metadata.</value>
   </data>
@@ -278,5 +333,186 @@
   <data name="ExcludedSubfolderFormat" xml:space="preserve">
     <value>The subfolder "{0}" was left out because subfolders aren't included.</value>
     <comment>{0} is a folder path.</comment>
+  </data>
+  <data name="ChrNoTimeSignatureAtStart" xml:space="preserve">
+    <value>There's no time signature at the start; the games assume 4/4.</value>
+  </data>
+  <data name="ChrTempoOutOfRangeFormat" xml:space="preserve">
+    <value>A tempo of {0} BPM is outside 20 to 400, which is probably a typo or a half- or double-time mistake.</value>
+    <comment>{0} is the tempo.</comment>
+  </data>
+  <data name="ChrNotesAfterAudioFormat" xml:space="preserve">
+    <value>Notes after the end of the audio: {0}.</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="ChrPhrasesAfterAudioFormat" xml:space="preserve">
+    <value>Phrases after the end of the audio: {0}.</value>
+    <comment>{0} is how many.</comment>
+  </data>
+  <data name="ChrEventAfterAudioFormat" xml:space="preserve">
+    <value>The event "{0}" is after the end of the audio.</value>
+    <comment>{0} is the event's text.</comment>
+  </data>
+  <data name="ChrOffGrid" xml:space="preserve">
+    <value>The note isn't on any common grid (1/1 to 1/192, or a triplet).</value>
+  </data>
+  <data name="ChrDuplicateTempo" xml:space="preserve">
+    <value>Two tempo markers are on the same tick; the games read only the last.</value>
+  </data>
+  <data name="ChrDuplicateTimeSignature" xml:space="preserve">
+    <value>Two time signatures are on the same tick; the games read only the last.</value>
+  </data>
+  <data name="ChrSustainIntoNext" xml:space="preserve">
+    <value>The sustain runs into the next note on its lane, so the games cut it short.</value>
+  </data>
+  <data name="ChrSustainUnderCutoffFormat" xml:space="preserve">
+    <value>The sustain is shorter than the sustain cutoff ({0} ticks), so the games read it as a plain note.</value>
+    <comment>{0} is the cutoff in ticks.</comment>
+  </data>
+  <data name="ChrOpenInChord" xml:space="preserve">
+    <value>An open note is in a chord with frets; the games read it differently.</value>
+  </data>
+  <data name="ChrRedundantForceHopo" xml:space="preserve">
+    <value>The chord is forced HOPO, but it's a HOPO anyway.</value>
+  </data>
+  <data name="ChrRedundantForceStrum" xml:space="preserve">
+    <value>The chord is forced strum, but it's a strum anyway.</value>
+  </data>
+  <data name="ChrForcedRepeat" xml:space="preserve">
+    <value>A forced HOPO repeats the note or chord before it exactly, so it can't be hammered on.</value>
+  </data>
+  <data name="ChrFirstNoteHopo" xml:space="preserve">
+    <value>The part's first note is a HOPO; there's nothing to hammer on from.</value>
+  </data>
+  <data name="ChrCloseNotes" xml:space="preserve">
+    <value>Two notes on the same lane are closer than 1/64 of a whole note; the later is probably a stray duplicate.</value>
+  </data>
+  <data name="ChrTomMarkerCoversNothing" xml:space="preserve">
+    <value>The tom marker covers no note on its pad, so it does nothing.</value>
+  </data>
+  <data name="ChrTooManyPads" xml:space="preserve">
+    <value>More than two pads are hit at once, not counting the kick: more hands than a drummer has.</value>
+  </data>
+  <data name="ChrFillInStarPower" xml:space="preserve">
+    <value>The drum fill overlaps a star power phrase.</value>
+  </data>
+  <data name="ChrFillEndsWithoutNoteFormat" xml:space="preserve">
+    <value>The drum fill's last note isn't on {0}, so there's nothing to activate star power on there.</value>
+    <comment>{0} is the difficulty, e.g. Hard.</comment>
+  </data>
+  <data name="ChrRollTooFew" xml:space="preserve">
+    <value>The roll has fewer than two notes in it.</value>
+  </data>
+  <data name="ChrTrillTooFew" xml:space="preserve">
+    <value>The trill has fewer than two notes in it.</value>
+  </data>
+  <data name="ChrTrillOnePad" xml:space="preserve">
+    <value>The trill covers only one pad; a trill goes between two.</value>
+  </data>
+  <data name="ChrTomMarkersOnFourLane" xml:space="preserve">
+    <value>4-lane drums have tom markers. The games would read them as Pro drums, so saving leaves them out.</value>
+  </data>
+  <data name="ChrFifthPadNotFiveLane" xml:space="preserve">
+    <value>A fifth-pad note (5-lane green) on drums that aren't 5-lane.</value>
+  </data>
+  <data name="ChrDrums2xTrack" xml:space="preserve">
+    <value>The chart has a PART DRUMS_2X track. It's kept as it is, and doesn't follow edits to PART DRUMS.</value>
+  </data>
+  <data name="ChrEmptyStarPower" xml:space="preserve">
+    <value>The star power phrase has no notes in it.</value>
+  </data>
+  <data name="ChrEmptySolo" xml:space="preserve">
+    <value>The solo has no notes in it.</value>
+  </data>
+  <data name="ChrOverlappingStarPower" xml:space="preserve">
+    <value>Two star power phrases overlap; saving merges them.</value>
+  </data>
+  <data name="ChrOverlappingSolos" xml:space="preserve">
+    <value>Two solos overlap; saving merges them.</value>
+  </data>
+  <data name="ChrNotesInBigRockEnding" xml:space="preserve">
+    <value>Notes are inside a big rock ending, which the games skip.</value>
+  </data>
+  <data name="ChrEmptyPart" xml:space="preserve">
+    <value>The part is in the chart but has no notes on any difficulty.</value>
+  </data>
+  <data name="ChrLowerDifficultyDenserFormat" xml:space="preserve">
+    <value>{0} has more notes per second ({1:0.0}) than {2} ({3:0.0}).</value>
+    <comment>{0} and {2} are difficulties, the lower first; {1} and {3} are their chords per second.</comment>
+  </data>
+  <data name="ChrNoSections" xml:space="preserve">
+    <value>The chart has no sections.</value>
+  </data>
+  <data name="ChrUnratedFormat" xml:space="preserve">
+    <value>The part has notes but {0} is unset or -1.</value>
+    <comment>{0} is the song.ini key, e.g. diff_guitar.</comment>
+  </data>
+  <data name="ChrSongLengthFormat" xml:space="preserve">
+    <value>song_length ({0} ms) doesn't match the audio's length ({1} ms).</value>
+    <comment>{0} is song.ini's value; {1} is the audio's length.</comment>
+  </data>
+  <data name="ChrEndMissing" xml:space="preserve">
+    <value>There's no [end] event; saving adds one after the last note.</value>
+  </data>
+  <data name="ChrEndEarly" xml:space="preserve">
+    <value>[end] is before the last note; saving moves it after it.</value>
+  </data>
+  <data name="ChrLoadUnholdableTempo" xml:space="preserve">
+    <value>A tempo marker of 0 microseconds per beat was left out, as the games skip it.</value>
+  </data>
+  <data name="ChrLoadUnholdableTimeSignature" xml:space="preserve">
+    <value>A time signature of 0 beats was left out, as the games skip it.</value>
+  </data>
+  <data name="ChrLoadStrayAnchor" xml:space="preserve">
+    <value>An anchor that isn't on a tempo marker, or a second one on it, was left out, as it anchors nothing.</value>
+  </data>
+  <data name="ChrLoadFirstEventDropped" xml:space="preserve">
+    <value>The track's first event, which the games never read, wasn't its name, and was left out.</value>
+  </data>
+  <data name="ChrLoadDuplicateNote" xml:space="preserve">
+    <value>A second note on a lane at one tick was left out, as the games leave it out.</value>
+  </data>
+  <data name="ChrLoadDuplicateOpen" xml:space="preserve">
+    <value>A note made open by a Phase Shift open phrase, in a chord that already has an open note, was left out.</value>
+  </data>
+  <data name="ChrLoadOpenBeforeEnhancedOpens" xml:space="preserve">
+    <value>A note below green before [ENHANCED_OPENS], which the games don't read, was left out.</value>
+  </data>
+  <data name="ChrLoadUnpairedNoteEvent" xml:space="preserve">
+    <value>A note-on or note-off that the games pair with nothing was left out.</value>
+  </data>
+  <data name="ChrLoadUnpairedSysexEvent" xml:space="preserve">
+    <value>A Phase Shift open or tap event that the games pair with nothing was left out.</value>
+  </data>
+  <data name="ChrLoadUnusedMarker" xml:space="preserve">
+    <value>A force HOPO, force strum, tap or open marker that covers no note was left out.</value>
+  </data>
+  <data name="ChrLoadUnreadStarPower" xml:space="preserve">
+    <value>A star power phrase on pitch 116 was left out, as multiplier_note puts star power on 103 and the games don't read it.</value>
+  </data>
+  <data name="ChrLoadDuplicateStarPower" xml:space="preserve">
+    <value>A second star power phrase starting at one tick was left out, as the games leave it out.</value>
+  </data>
+  <data name="ChrVocalNotesOverlap" xml:space="preserve">
+    <value>The vocal note runs into the next one; a part sings one note at a time.</value>
+  </data>
+  <data name="ChrVocalNoteWithoutLyric" xml:space="preserve">
+    <value>The vocal note has no lyric.</value>
+  </data>
+  <data name="ChrVocalNoteOutsidePhrase" xml:space="preserve">
+    <value>The vocal note is outside every phrase, so the games don't show it.</value>
+  </data>
+  <data name="ChrLyricWithoutNote" xml:space="preserve">
+    <value>The lyric isn't on a vocal note's start.</value>
+  </data>
+  <data name="ChrSlideWithoutNote" xml:space="preserve">
+    <value>The slide has no sung note before it in its phrase to carry on from.</value>
+  </data>
+  <data name="ChrHarmonyWithoutFirst" xml:space="preserve">
+    <value>The chart has this harmony without HARM1, which the games need to show harmonies.</value>
+  </data>
+  <data name="ChrLoadWithPitchFormat" xml:space="preserve">
+    <value>{0} (MIDI note {1})</value>
+    <comment>{0} is what was left out; {1} is its MIDI note number.</comment>
   </data>
 </root>

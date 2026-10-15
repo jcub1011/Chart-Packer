@@ -1,0 +1,181 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:ctl="using:ChartPacker.UI.Controls"
+             xmlns:bctl="using:ChartBuilder.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="600"
+             x:Class="ChartBuilder.Views.SectionsView"
+             x:DataType="vm:SectionsViewModel">
+
+    <!-- Sections (charter-spec C8 items 3, 5 and 6), a tab in the Editor's left panel: EVENTS' text events in time order,
+         then the focused part's own, each with a go-to, a delete, and fields that rename and move it once Enter is pressed
+         or the field is left. Insert section and Insert event add them at the cursor, on the grid. -->
+    <UserControl.Resources>
+        <bctl:LaneMenuConverter x:Key="Menu" Check="{StaticResource CheckStroke}" />
+
+        <!-- A row: a bar on its left in the accent for a section and manila for a song event; the name or text, or a song
+             event's label; where it is; and its tick. A song event the editor places can't be deleted, and its tick is
+             only shown. -->
+        <DataTemplate x:Key="EventRowTemplate" DataType="vm:EventItem">
+            <Border Classes="event-row" Classes.section="{Binding IsSection}" Classes.song="{Binding IsSongEvent}">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
+                    <TextBox Grid.Row="0" Grid.Column="0"
+                             Name="NameBox"
+                             Classes="event-field event-name"
+                             Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
+                             IsVisible="{Binding !IsSongEvent}" />
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Classes="song-label"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Label}"
+                               ToolTip.Tip="{Binding WrittenAs}"
+                               IsVisible="{Binding IsSongEvent}" />
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                        <Button Classes="labelled"
+                                FontSize="12"
+                                Content="{x:Static res:Strings.SectionsGoToButton}"
+                                Command="{Binding GoToCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.SectionsGoToToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.SectionsGoToToolTip}" />
+                        <Button Classes="tool"
+                                Command="{Binding DeleteCommand}"
+                                IsVisible="{Binding !IsPlaced}"
+                                ToolTip.Tip="{x:Static res:Strings.SectionsDeleteToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.SectionsDeleteToolTip}">
+                            <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                               Classes="muted"
+                               FontSize="11"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Where}" />
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                        <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsTickLabel}" />
+                        <TextBox Classes="event-field"
+                                 Width="76"
+                                 Text="{Binding TickText, UpdateSourceTrigger=LostFocus}"
+                                 IsReadOnly="{Binding IsPlaced}"
+                                 ToolTip.Tip="{Binding TickToolTip}"
+                                 AutomationProperties.Name="{x:Static res:Strings.SectionsTickLabel}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Border.event-row">
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="CornerRadius" Value="0,4,4,0" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+        </Style>
+        <Style Selector="Border.event-row.section">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="Border.event-row.song">
+            <Setter Property="BorderBrush" Value="{DynamicResource FolderTextBrush}" />
+        </Style>
+        <Style Selector="TextBox.event-field">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="Padding" Value="6,3" />
+        </Style>
+        <!-- A free text event's text is shown as it's written; a section's name is the row's title. -->
+        <Style Selector="TextBox.event-name">
+            <Setter Property="ToolTip.Tip" Value="{x:Static res:Strings.SectionsTextToolTip}" />
+            <Setter Property="AutomationProperties.Name" Value="{x:Static res:Strings.SectionsTextToolTip}" />
+        </Style>
+        <Style Selector="Border.event-row.section TextBox.event-name">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="ToolTip.Tip" Value="{x:Static res:Strings.SectionsNameToolTip}" />
+            <Setter Property="AutomationProperties.Name" Value="{x:Static res:Strings.SectionsNameToolTip}" />
+        </Style>
+        <!-- A song event is named in words, in its bar's colour, rather than typed. -->
+        <Style Selector="TextBlock.song-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="Foreground" Value="{DynamicResource FolderTextBrush}" />
+            <Setter Property="Margin" Value="7,0,0,0" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+        <WrapPanel DockPanel.Dock="Top" Margin="12,8,12,6" ItemSpacing="6" LineSpacing="6">
+            <Button Classes="labelled"
+                    FontSize="12"
+                    ToolTip.Tip="{x:Static res:Strings.SectionsInsertSectionToolTip}"
+                    AutomationProperties.Name="{x:Static res:Strings.SectionsInsertSectionButton}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsInsertSectionButton}" />
+                    <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                </StackPanel>
+                <Button.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                ItemsSource="{Binding InsertSectionMenu, Converter={StaticResource Menu}}" />
+                </Button.Flyout>
+            </Button>
+            <Button Classes="labelled"
+                    FontSize="12"
+                    ToolTip.Tip="{x:Static res:Strings.SectionsInsertEventToolTip}"
+                    AutomationProperties.Name="{x:Static res:Strings.SectionsInsertEventButton}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsInsertEventButton}" />
+                    <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                </StackPanel>
+                <Button.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                ItemsSource="{Binding InsertEventMenu, Converter={StaticResource Menu}}" />
+                </Button.Flyout>
+            </Button>
+        </WrapPanel>
+
+        <TextBlock DockPanel.Dock="Bottom"
+                   Classes="muted"
+                   FontSize="11"
+                   Margin="12,4,12,8"
+                   TextWrapping="Wrap"
+                   Text="{x:Static res:Strings.SectionsKeysHint}" />
+
+        <TextBlock DockPanel.Dock="Top"
+                   Classes="caption"
+                   Margin="12,2,12,4"
+                   Text="{x:Static res:Strings.SectionsEventsHeading}"
+                   IsVisible="{Binding HasEvents}" />
+        <TextBlock DockPanel.Dock="Top"
+                   Classes="muted"
+                   FontSize="12"
+                   Margin="12,4,12,8"
+                   TextWrapping="Wrap"
+                   Text="{x:Static res:Strings.SectionsNone}"
+                   IsVisible="{Binding !HasEvents}" />
+
+        <!-- EVENTS' rows, then the focused part's own text events under their heading, when it has any (C8 item 6): one
+             virtualizing list, so only the rows on screen are made. Not a ListBox, whose keys would take the fields' arrows. -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="EventList" Margin="8,0,8,8" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.DataTemplates>
+                    <DataTemplate DataType="vm:PartEventsHeading">
+                        <TextBlock Classes="caption" Margin="4,10,0,4" Text="{Binding Text}" />
+                    </DataTemplate>
+                    <StaticResource ResourceKey="EventRowTemplate" />
+                </ItemsControl.DataTemplates>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

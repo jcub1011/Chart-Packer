@@ -1,0 +1,238 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:ChartPacker.UI.Controls">
+
+    <!-- The app is dark only. Colours not covered by the Fluent palette in AppTheme.axaml live here.
+         These come after FluentTheme, so the Accent* keys override its accent-button colours. -->
+    <Styles.Resources>
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0E0F14" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#14151C" />
+        <SolidColorBrush x:Key="ToolbarBrush" Color="#181922" />
+        <SolidColorBrush x:Key="ToolbarGroupBrush" Color="#1D1E29" />
+        <SolidColorBrush x:Key="SubtleBorderBrush" Color="#262836" />
+        <SolidColorBrush x:Key="ToolHoverBrush" Color="#16FFFFFF" />
+        <SolidColorBrush x:Key="ToolPressedBrush" Color="#0CFFFFFF" />
+        <SolidColorBrush x:Key="AccentTintBrush" Color="#408B5CF6" />
+        <SolidColorBrush x:Key="AccentTextBrush" Color="#C4B5FD" />
+        <SolidColorBrush x:Key="WarningTextBrush" Color="#FBBF24" />
+        <!-- Metadata that fails validation: an orange bar and tint on its row, and the message under it. -->
+        <SolidColorBrush x:Key="InvalidBrush" Color="#FB923C" />
+        <SolidColorBrush x:Key="InvalidTintBrush" Color="#1FFB923C" />
+        <!-- Something left out, e.g. a filter chip set to Excludes: the rose of the spectrum's bass. -->
+        <SolidColorBrush x:Key="ExcludeTintBrush" Color="#40F2587A" />
+        <SolidColorBrush x:Key="ExcludeTextBrush" Color="#FDA4AF" />
+        <!-- The part of the waveform still to be played; the part played is AccentTextBrush. -->
+        <SolidColorBrush x:Key="WaveformBrush" Color="#5B5E78" />
+        <!-- Behind the tip strip along the bottom of the details panel: 90% opaque, so the rows only faintly show past it. -->
+        <SolidColorBrush x:Key="ToolTipStripBrush" Color="#E61D1E29" />
+        <!-- The spectrum behind the details panel while a song plays: a shade for each bar, stepped from rose at
+             the bass through a periwinkle near the accent to orchid at the treble. SpectrumView sets how faint. -->
+        <Color x:Key="SpectrumLowColor">#F2587A</Color>
+        <Color x:Key="SpectrumMiddleColor">#6E8BF7</Color>
+        <Color x:Key="SpectrumHighColor">#E27BF2</Color>
+        <!-- Manila folder, for the FOLDER chip in the library list. -->
+        <SolidColorBrush x:Key="FolderTintBrush" Color="#40E4C98F" />
+        <SolidColorBrush x:Key="FolderTextBrush" Color="#F0DBAE" />
+        <!-- The chart's difficulties, as the games colour them: Easy green, Medium yellow, Hard red, Expert purple. -->
+        <SolidColorBrush x:Key="DifficultyEasyBrush" Color="#4ADE80" />
+        <SolidColorBrush x:Key="DifficultyMediumBrush" Color="#FACC15" />
+        <SolidColorBrush x:Key="DifficultyHardBrush" Color="#F87171" />
+        <SolidColorBrush x:Key="DifficultyExpertBrush" Color="#C084FC" />
+        <!-- A song.ini difficulty's tier, 0 to 6 (anything higher is 6), from cool to hot, on the badge of its
+             instrument; an unset one is a neutral grey. The badge's number is dark on every tier. -->
+        <SolidColorBrush x:Key="DifficultyTier0Brush" Color="#94A3B8" />
+        <SolidColorBrush x:Key="DifficultyTier1Brush" Color="#38BDF8" />
+        <SolidColorBrush x:Key="DifficultyTier2Brush" Color="#34D399" />
+        <SolidColorBrush x:Key="DifficultyTier3Brush" Color="#A3E635" />
+        <SolidColorBrush x:Key="DifficultyTier4Brush" Color="#FACC15" />
+        <SolidColorBrush x:Key="DifficultyTier5Brush" Color="#FB923C" />
+        <SolidColorBrush x:Key="DifficultyTier6Brush" Color="#F43F5E" />
+        <SolidColorBrush x:Key="DifficultyUnsetBrush" Color="#3A3C4E" />
+        <SolidColorBrush x:Key="DifficultyBadgeTextBrush" Color="#0E0F14" />
+
+        <SolidColorBrush x:Key="AccentButtonBackground" Color="#8B5CF6" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#9D74F8" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#7547E6" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#23242F" />
+        <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#E9E3FF" />
+        <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#5E6073" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="Transparent" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="Transparent" />
+        <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="Transparent" />
+
+        <!-- Fluent outlines inputs in near-white on dark; soften them to match the surfaces. -->
+        <SolidColorBrush x:Key="TextControlBackground" Color="#1C1D27" />
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#222330" />
+        <SolidColorBrush x:Key="TextControlBorderBrush" Color="#34364A" />
+        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#4A4D66" />
+        <SolidColorBrush x:Key="ComboBoxBackground" Color="#1C1D27" />
+        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#222330" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#34364A" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#4A4D66" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#1C1D27" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#34364A" />
+    </Styles.Resources>
+
+    <!-- Toolbar -->
+    <Style Selector="Border.toolbar">
+        <Setter Property="Background" Value="{DynamicResource ToolbarBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="8,6" />
+    </Style>
+    <!-- One toolbar section. An outlined group rather than divider lines, so it still reads as a section after wrapping. -->
+    <Style Selector="Border.toolbar-group">
+        <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="3" />
+    </Style>
+
+    <!-- Icon-only toolbar buttons. Tooltips show even when disabled, so a greyed-out icon can still be identified. -->
+    <Style Selector=":is(Button).tool">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+    </Style>
+    <Style Selector=":is(Button).tool:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <Style Selector=":is(Button).tool:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+    </Style>
+    <Style Selector=":is(Button).tool:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ToggleButton.tool:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+
+    <!-- A filter button is tinted while a filter narrows its list, with the number of filters in a badge. -->
+    <Style Selector="Button.tool.active">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.tool.active /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+    </Style>
+    <Style Selector="Border.badge">
+        <Setter Property="MinWidth" Value="14" />
+        <Setter Property="Height" Value="14" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="Padding" Value="3,0" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="0,2,2,0" />
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+        </Setter>
+    </Style>
+    <Style Selector="Border.badge > TextBlock">
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Toolbar buttons with an icon and a label: Pack, Unpack, Save. -->
+    <Style Selector="Button.labelled">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.caption">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.55" />
+    </Style>
+
+    <!-- Small right-aligned labels at the end of a line: a song's kind, length or size, or its charter.
+         "large" is for the detail panel's header lines. -->
+    <Style Selector="Border.chip">
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="Border.chip > TextBlock">
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+    <Style Selector="Border.chip.large">
+        <Setter Property="Padding" Value="6,1" />
+    </Style>
+    <Style Selector="Border.chip.large > TextBlock">
+        <Setter Property="FontSize" Value="11" />
+    </Style>
+
+    <!-- An inline notice: accent-tinted, or red for an error. -->
+    <Style Selector="Border.banner">
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="#668B5CF6" />
+        <Setter Property="Background" Value="#1F8B5CF6" />
+    </Style>
+    <Style Selector="Border.banner.error">
+        <Setter Property="BorderBrush" Value="#66F87171" />
+        <Setter Property="Background" Value="#1FF87171" />
+    </Style>
+
+    <!-- A filter flyout's sections. -->
+    <Style Selector="StackPanel.filter-section">
+        <Setter Property="Spacing" Value="6" />
+    </Style>
+    <Style Selector="StackPanel.filter-section TextBlock.label">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="StackPanel.filter-section NumericUpDown">
+        <Setter Property="ShowButtonSpinner" Value="False" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+    </Style>
+
+    <!-- Filter chips: plain while off, the accent while on. The library's three-state chips add their own
+         Includes and Excludes looks in LibraryView.axaml. -->
+    <Style Selector=":is(Button).filterChip">
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="CornerRadius" Value="11" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+    </Style>
+    <Style Selector=":is(Button).filterChip ctl|LineIcon">
+        <Setter Property="StrokeThickness" Value="1.75" />
+        <Setter Property="Margin" Value="-3,0,0,0" />
+    </Style>
+    <Style Selector="ToggleButton.filterChip:checked">
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.filterChip:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.filterChip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#558B5CF6" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+</Styles>

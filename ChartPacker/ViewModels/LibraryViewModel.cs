@@ -13,10 +13,13 @@ using Avalonia.Controls.Selection;
 using Avalonia.Threading;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
+using ChartPacker.Core.Launching;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -57,7 +60,26 @@ namespace ChartPacker.ViewModels
         private readonly IValidatorWindowService _validatorWindow;
         private readonly IFileRevealService _reveal;
         private readonly IDownloadService _downloads;
+        private readonly IChartBuilderLauncher _chartBuilder;
+        private readonly NoticeViewModel _notice;
         private readonly Dictionary<string, LibraryItemViewModel> _itemsByPath = new(StringComparer.Ordinal);
+
+        // The songs opened in Chart Builder, and what each was on disk when last read, to re-read them once it has
+        // changed them (charter-spec §4.8). A background poller re-reads them a save or two after Chart Builder
+        // writes, so the library shows the latest version without waiting for the window to be activated.
+        private readonly Dictionary<string, (SongEntry Entry, EntryStamp? Stamp)> _editedSongs = new(StringComparer.Ordinal);
+
+        // A changed stamp seen once by the poller but not yet re-read, waiting for a second sighting so a
+        // folder save caught between its files isn't read half-written. The activation path re-reads at once.
+        private readonly Dictionary<string, EntryStamp?> _pendingEditedStamps = new(StringComparer.Ordinal);
+
+        // How often songs opened in Chart Builder are checked for saves while this app runs.
+        private static readonly TimeSpan EditedSongsPollInterval = TimeSpan.FromSeconds(2);
+
+        private readonly DispatcherTimer _editedSongsTimer;
+
+        // A poller tick is already re-reading; activation may call in at the same time.
+        private bool _refreshingEditedSongs;
 
         // Every scanned song, in scan order (by Position), whether or not it passes the filters.
         private readonly List<LibraryItemViewModel> _allItems = [];
@@ -96,6 +118,8 @@ namespace ChartPacker.ViewModels
         /// <param name="validatorWindow">Shows the Validator window for the selected songs.</param>
         /// <param name="reveal">Shows the selected songs in the file manager.</param>
         /// <param name="downloads">Saves copies of the selected songs as song folders.</param>
+        /// <param name="chartBuilder">Starts Chart Builder to edit the selected song's chart.</param>
+        /// <param name="notice">Says why Chart Builder couldn't be started.</param>
         public LibraryViewModel(
             IFolderPickerService folderPicker,
             SettingsService settings,
@@ -106,7 +130,9 @@ namespace ChartPacker.ViewModels
             IDedupWindowService dedupWindow,
             IValidatorWindowService validatorWindow,
             IFileRevealService reveal,
-            IDownloadService downloads)
+            IDownloadService downloads,
+            IChartBuilderLauncher chartBuilder,
+            NoticeViewModel notice)
         {
             _folderPicker = folderPicker;
             _settings = settings;
@@ -116,6 +142,8 @@ namespace ChartPacker.ViewModels
             _validatorWindow = validatorWindow;
             _reveal = reveal;
             _downloads = downloads;
+            _chartBuilder = chartBuilder;
+            _notice = notice;
             Player = player;
             Player.PropertyChanged += (_, e) =>
             {
@@ -140,6 +168,9 @@ namespace ChartPacker.ViewModels
             Filter.QueryChanged += () => ScheduleApply(immediate: true);
             _applyTimer = new DispatcherTimer(MetadataApplyDelay, DispatcherPriority.Background, (_, _) => ApplyQuery());
             _applyTimer.Stop();
+
+            _editedSongsTimer = new DispatcherTimer(EditedSongsPollInterval, DispatcherPriority.Background, (_, _) => _ = PollEditedSongsAsync());
+            _editedSongsTimer.Stop();
 
             Selection = new SelectionModel<LibraryItemViewModel> { SingleSelect = false, Source = Entries };
             Selection.PropertyChanged += OnSelectionPropertyChanged;
@@ -236,6 +267,7 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
         public partial int SelectedCount { get; set; }
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
@@ -449,6 +481,132 @@ namespace ChartPacker.ViewModels
         /// <summary>Opens the Validator window, which lists the selected songs whose metadata fails validation, to fix them.</summary>
         [RelayCommand(CanExecute = nameof(CanValidate))]
         private Task ValidateAsync() => _validatorWindow.ShowAsync(SelectedEntries);
+
+        // One song at a time, and not while a job may be writing it.
+        private bool CanEditChart() => SelectedCount == 1 && !Job.IsRunning;
+
+        public static string EditChartToolTip => Strings.EditChartToolTip;
+
+        /// <summary>
+        /// Asked before a song opens in Chart Builder, which can't see this app's drafts: whatever has to be done
+        /// first, such as saving or discarding them (charter-spec C2 item 4). False stops it.
+        /// </summary>
+        public Func<SongEntry, Task<bool>>? PrepareEditChart { get; set; }
+
+        /// <summary>Opens the selected song in Chart Builder (charter-spec C2). Only one song is edited at a time.</summary>
+        [RelayCommand(CanExecute = nameof(CanEditChart))]
+        private async Task EditChartAsync()
+        {
+            if (SelectedEntries is not [var song])
+                return;
+            if (PrepareEditChart is { } prepare && !await prepare(song))
+                return;
+
+            var stamp = await StampAsync(song);
+            if (_chartBuilder.Start(BuilderArgs.ForSong(song.FullPath)) is { } problem)
+            {
+                _notice.ShowError(problem);
+                return;
+            }
+
+            _editedSongs[song.FullPath] = (song, stamp);
+            _pendingEditedStamps.Remove(song.FullPath);
+            if (!_editedSongsTimer.IsEnabled)
+                _editedSongsTimer.Start();
+        }
+
+        /// <summary>Raised on the UI thread when the background poller re-reads songs Chart Builder saved.</summary>
+        public event EventHandler<IReadOnlyList<SongEntry>>? EditedSongsChanged;
+
+        /// <summary>
+        /// The poller's tick: re-reads the songs Chart Builder has saved since they were last read, and tells the
+        /// window so the inspector can follow. Never throws; a tick already running is skipped.
+        /// </summary>
+        private async Task PollEditedSongsAsync()
+        {
+            IReadOnlyList<SongEntry> changed = [];
+            try
+            {
+                changed = await RefreshEditedSongsAsync(requireStable: true);
+            }
+            catch (Exception ex)
+            {
+                // Nothing awaits this, so anything not caught here would be lost.
+                System.Diagnostics.Trace.TraceError($"Re-reading the songs Chart Builder changed failed: {ex}");
+                return;
+            }
+
+            if (changed.Count > 0)
+                EditedSongsChanged?.Invoke(this, changed);
+        }
+
+        /// <summary>
+        /// Re-reads the songs opened in Chart Builder that have changed since they were last read, as when the user comes
+        /// back from saving there (charter-spec §4.8). Chart Builder's processes aren't kept, so every song opened in it
+        /// is checked, for as long as this app runs.
+        /// </summary>
+        /// <param name="requireStable">
+        /// For the background poller: only re-read a change seen on two checks in a row, so a folder save caught
+        /// between writing <c>notes.mid</c> and <c>song.ini</c> isn't read half-written. The activation path passes
+        /// <see langword="false"/> and re-reads at once.
+        /// </param>
+        /// <returns>The songs that had changed.</returns>
+        public async Task<IReadOnlyList<SongEntry>> RefreshEditedSongsAsync(bool requireStable = false)
+        {
+            if (_refreshingEditedSongs)
+                return [];
+            _refreshingEditedSongs = true;
+            try
+            {
+                var changed = new List<SongEntry>();
+                foreach (var (path, (entry, stamp)) in _editedSongs.ToList())
+                {
+                    var now = await StampAsync(entry);
+                    if (now == stamp)
+                    {
+                        _pendingEditedStamps.Remove(path);
+                        continue;
+                    }
+
+                    if (requireStable)
+                    {
+                        if (!_pendingEditedStamps.TryGetValue(path, out var pending) || pending != now)
+                        {
+                            _pendingEditedStamps[path] = now;
+                            continue;
+                        }
+                    }
+
+                    _pendingEditedStamps.Remove(path);
+                    _editedSongs[path] = (entry, now);
+                    changed.Add(entry);
+                    if (_itemsByPath.TryGetValue(path, out var item))
+                    {
+                        await ReloadSummaryAsync(item);
+                        _albumArt.Reload(item);
+                    }
+                }
+
+                return changed;
+            }
+            finally
+            {
+                _refreshingEditedSongs = false;
+            }
+        }
+
+        /// <summary>What the song is on disk now, or null when it's gone or can't be read.</summary>
+        private static Task<EntryStamp?> StampAsync(SongEntry entry) => Task.Run(() =>
+        {
+            try
+            {
+                return EntryStamps.Capture(entry.FullPath, entry.Kind);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        });
 
         private bool CanDeduplicate() => FolderPath is not null && !Job.IsRunning;
 
@@ -778,7 +936,7 @@ namespace ChartPacker.ViewModels
         public void OnItemRealized(LibraryItemViewModel item) => _albumArt.Realized(item);
 
         /// <summary>The list let go of <paramref name="item"/>'s row.</summary>
-        public void OnItemUnrealized(LibraryItemViewModel item) => _albumArt.Unrealized(item);
+        public void OnItemUnrealized(LibraryItemViewModel item) => AlbumArtLoader.Unrealized(item);
 
         /// <summary>The song's unsaved changes, without creating an empty draft for every listed song.</summary>
         private MetadataDraft? DraftFor(string path) => _drafts.HasDrafts(path) ? _drafts.Get(path) : null;
@@ -930,6 +1088,7 @@ namespace ChartPacker.ViewModels
             MergeCommand.NotifyCanExecuteChanged();
             ValidateCommand.NotifyCanExecuteChanged();
             DeduplicateCommand.NotifyCanExecuteChanged();
+            EditChartCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>

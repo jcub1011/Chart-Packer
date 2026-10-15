@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartBuilder.ViewModels"
+             xmlns:res="using:ChartBuilder.Resources"
+             xmlns:sres="using:ChartPacker.Resources"
+             xmlns:ui="using:ChartPacker.UI.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="900"
+             x:Class="ChartBuilder.Views.ArtView"
+             x:DataType="vm:ArtViewModel">
+
+    <!-- The Art tab (charter-spec C1): the album art, the background image and the background video, a tile each, the
+         video playing against the song. An empty tile has Choose; a tile's right-click menu has Replace, Remove and Revert
+         to saved. Under the video, its start, to line it up with the audio. Each change is an undo step, saved with the
+         song. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <ItemsControl Margin="12,10" ItemsSource="{Binding Slots}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="10" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ArtSlotViewModel">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="caption" Text="{Binding Title}" />
+                        <Border Classes="artTile" AutomationProperties.Name="{Binding Title}">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{x:Static res:Strings.ArtReplaceMenu}" Command="{Binding ChooseCommand}" />
+                                    <MenuItem Header="{x:Static res:Strings.ArtRemoveMenu}" Command="{Binding RemoveCommand}" />
+                                    <MenuItem Header="{x:Static res:Strings.ArtRevertMenu}" Command="{Binding RevertCommand}" />
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <!-- A square's height for the art, a 16:9 frame's for a background; the picture fits inside it. -->
+                            <Panel Height="{Binding TileHeight}">
+                                <Image Source="{Binding Image}" Stretch="Uniform" IsVisible="{Binding HasImage}" />
+                                <ui:VideoFrameView Playback="{Binding Video}"
+                                                   Timeline="{Binding Timeline}"
+                                                   Clock="{Binding Clock}"
+                                                   IsVisible="{Binding HasVideo}" />
+                                <StackPanel VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            Margin="8"
+                                            Spacing="8"
+                                            IsVisible="{Binding HasNote}">
+                                    <TextBlock Classes="muted note"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               Text="{Binding Note}" />
+                                    <Button HorizontalAlignment="Center"
+                                            Content="{x:Static res:Strings.ArtChooseButton}"
+                                            Command="{Binding ChooseCommand}"
+                                            IsVisible="{Binding IsEmpty}" />
+                                </StackPanel>
+                            </Panel>
+                        </Border>
+                        <!-- The file's name, marked while it's a pending change, and its size. -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4" IsVisible="{Binding HasFile}">
+                            <TextBlock Grid.Column="0" Classes="marker" VerticalAlignment="Center" Text="{Binding Marker}" />
+                            <TextBlock Grid.Column="1"
+                                       Classes="muted note artName"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding FileName}"
+                                       ToolTip.Tip="{Binding FileName}" />
+                            <Border Grid.Column="2" Classes="chip" IsVisible="{Binding FileSize, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <TextBlock Text="{Binding FileSize}" />
+                            </Border>
+                        </Grid>
+                        <!-- Under the background video: where in it the song starts, marked while it's a pending change. The
+                             video shows each value as it's typed or dragged; it's set as one undo step once left alone. -->
+                        <Panel IsVisible="{Binding ShowsVideoStart}">
+                            <Grid DataContext="{Binding VideoStart}"
+                                  x:DataType="vm:VideoStartViewModel"
+                                  ColumnDefinitions="Auto,*,Auto,Auto"
+                                  ColumnSpacing="4">
+                                <TextBlock Grid.Column="0" Classes="marker" VerticalAlignment="Center" Text="{Binding Marker}" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="muted note"
+                                           VerticalAlignment="Center"
+                                           Text="{x:Static res:Strings.ArtVideoStartLabel}" />
+                                <NumericUpDown Grid.Column="2"
+                                               ui:DragScrub.IsEnabled="True"
+                                               Width="96"
+                                               ShowButtonSpinner="False"
+                                               VerticalAlignment="Center"
+                                               Value="{Binding StartMs}"
+                                               IsEnabled="{Binding CanEdit}"
+                                               Increment="1"
+                                               Minimum="{x:Static vm:VideoStartViewModel.MinStartMs}"
+                                               Maximum="{x:Static vm:VideoStartViewModel.MaxStartMs}"
+                                               FormatString="+0;-0;0"
+                                               ParsingNumberStyle="Integer"
+                                               AutomationProperties.Name="{x:Static res:Strings.ArtVideoStartLabel}">
+                                    <ToolTip.Tip>
+                                        <StackPanel MaxWidth="320" Spacing="6">
+                                            <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.ArtVideoStartToolTip}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
+                                        </StackPanel>
+                                    </ToolTip.Tip>
+                                </NumericUpDown>
+                                <Button Grid.Column="3"
+                                        Classes="nudge"
+                                        Command="{Binding RevertCommand}"
+                                        ToolTip.Tip="{x:Static res:Strings.ArtVideoStartRevertToolTip}"
+                                        AutomationProperties.Name="{x:Static res:Strings.ArtVideoStartRevertToolTip}">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                </Button>
+                            </Grid>
+                        </Panel>
+                        <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
+</UserControl>

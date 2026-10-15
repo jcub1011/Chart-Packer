@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartPacker.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="520" d:DesignHeight="360"
+        x:Class="ChartBuilder.Views.FirstSaveWindow"
+        x:DataType="vm:FirstSaveViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{x:Static res:Strings.FirstSaveTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Width="520">
+
+    <!-- A new chart's first save (charter-spec C1): where its folder goes. Its name and artist are set in the Chart
+         Inspector, and shown here. -->
+    <StackPanel Margin="20" Spacing="14">
+        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{x:Static res:Strings.FirstSaveIntro}" />
+
+        <StackPanel Spacing="6">
+            <TextBlock Classes="caption" Text="{x:Static res:Strings.FirstSaveSongLabel}" />
+            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding SongTitle}" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+            <TextBlock Classes="caption" Text="{x:Static res:Strings.FirstSaveParentLabel}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Grid.Column="0" Text="{Binding ParentFolder}" AutomationProperties.Name="{x:Static res:Strings.FirstSaveParentLabel}" />
+                <Button Grid.Column="1" Content="{x:Static res:Strings.FirstSaveBrowseButton}" Command="{Binding BrowseCommand}" />
+            </Grid>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+            <TextBlock Classes="caption" Text="{x:Static res:Strings.FirstSaveFolderLabel}" />
+            <TextBox Text="{Binding FolderName}" AutomationProperties.Name="{x:Static res:Strings.FirstSaveFolderLabel}" />
+            <TextBlock Classes="muted"
+                       FontSize="12"
+                       Text="{Binding TargetPath}"
+                       TextTrimming="PathSegmentEllipsis"
+                       ToolTip.Tip="{Binding TargetPath}"
+                       IsVisible="{Binding !HasProblem}" />
+            <TextBlock FontSize="12"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource WarningTextBrush}"
+                       Text="{Binding Problem}"
+                       IsVisible="{Binding HasProblem}" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Classes="accent"
+                    Content="{x:Static res:Strings.SaveButton}"
+                    Command="{Binding SaveCommand}"
+                    IsDefault="True"
+                    AutomationProperties.Name="{x:Static res:Strings.SaveButton}" />
+            <Button Content="{x:Static sres:SharedStrings.CancelButton}"
+                    IsCancel="True"
+                    Click="OnCancel"
+                    AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+        </StackPanel>
+    </StackPanel>
+</Window>

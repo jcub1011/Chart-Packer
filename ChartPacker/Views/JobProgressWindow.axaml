@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
-        xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:ctl="using:ChartPacker.UI.Controls"
         mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="560"
         x:Class="ChartPacker.Views.JobProgressWindow"
         x:DataType="vm:JobViewModel"
@@ -221,10 +221,10 @@
                 </StackPanel>
                 <Button Grid.Column="1"
                         VerticalAlignment="Center"
-                        Content="{x:Static res:Strings.CancelButton}"
+                        Content="{x:Static res:SharedStrings.CancelButton}"
                         Command="{Binding CancelCommand}"
                         IsVisible="{Binding IsRunning}"
-                        AutomationProperties.Name="{x:Static res:Strings.CancelButton}" />
+                        AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
             </Grid>
         </Border>
 

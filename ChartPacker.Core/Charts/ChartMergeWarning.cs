@@ -37,7 +37,11 @@ internal static class NoteCheck
     public readonly record struct Result(ChartMergeIssue? Issue, IReadOnlyList<(long Tick, bool Hopo)> HopoFixes, IReadOnlyList<long> Ticks);
 
     /// <summary>Compares <paramref name="actual"/> with <paramref name="expected"/>, note by note, by tick and lane.</summary>
-    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote>? actual)
+    /// <param name="ignore">
+    /// The flags not compared: accents and ghosts when the notes expected come from a <c>.chart</c> read, which hasn't
+    /// them though the MIDI chart read back has; none when both are MIDI reads.
+    /// </param>
+    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote>? actual, NoteFlags ignore)
     {
         actual ??= [];
         ChartMergeIssue? issue = null;
@@ -51,24 +55,19 @@ internal static class NoteCheck
 
         // A note on one side only moved or changed lane, or, when there are fewer, was lost.
         var unmatched = actual.Count < expected.Count ? ChartMergeIssue.NotesLost : ChartMergeIssue.NotesChanged;
-        int i = 0, j = 0;
-        while (i < expected.Count || j < actual.Count)
+        foreach (var (e, a) in Join(expected, actual))
         {
-            int order = i == expected.Count ? 1
-                : j == actual.Count ? -1
-                : (expected[i].Tick, expected[i].Lane).CompareTo((actual[j].Tick, actual[j].Lane));
-            if (order != 0)
+            if (e is not { } want || a is not { } got)
             {
-                Found(unmatched, order < 0 ? expected[i++].Tick : actual[j++].Tick);
+                Found(unmatched, (e ?? a)!.Value.Tick);
                 continue;
             }
 
-            var (want, got) = (expected[i++], actual[j++]);
             if ((want.Length > 0) != (got.Length > 0))
                 Found(ChartMergeIssue.SustainsChanged, want.Tick);
 
             // A force marker puts a HOPO right whatever else differs, unless the note is a tap.
-            var differ = want.Flags ^ got.Flags;
+            var differ = (want.Flags ^ got.Flags) & ~ignore;
             if ((differ & NoteFlags.Hopo) != 0 && ((want.Flags | got.Flags) & NoteFlags.Tap) == 0 && (fixes.Count == 0 || fixes[^1].Item1 != want.Tick))
                 fixes.Add((want.Tick, (want.Flags & NoteFlags.Hopo) != 0));
             if ((differ & ~NoteFlags.Hopo) != 0)
@@ -76,6 +75,27 @@ internal static class NoteCheck
         }
 
         return new Result(issue, fixes, [.. ticks]);
+    }
+
+    /// <summary>
+    /// The notes of <paramref name="expected"/> and <paramref name="actual"/>, each in tick then lane order, paired by
+    /// tick and lane in order: a note on one side only is paired with null on the other.
+    /// </summary>
+    public static IEnumerable<(ChartNote? Expected, ChartNote? Actual)> Join(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartNote> actual)
+    {
+        int i = 0, j = 0;
+        while (i < expected.Count || j < actual.Count)
+        {
+            int order = i == expected.Count ? 1
+                : j == actual.Count ? -1
+                : (expected[i].Tick, expected[i].Lane).CompareTo((actual[j].Tick, actual[j].Lane));
+            if (order < 0)
+                yield return (expected[i++], null);
+            else if (order > 0)
+                yield return (null, actual[j++]);
+            else
+                yield return (expected[i++], actual[j++]);
+        }
     }
 
     /// <summary>
@@ -97,9 +117,10 @@ internal static class NoteCheck
     /// Compares <paramref name="expected"/> with <paramref name="key"/>'s notes in each of <paramref name="reads"/>,
     /// from <see cref="ReadEveryWay"/>: what the first read finds, and the HOPO fixes any of them need.
     /// </summary>
-    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartDocument> reads, ChartTrackKey key)
+    /// <param name="ignore">The flags not compared, as <see cref="Compare(IReadOnlyList{ChartNote}, IReadOnlyList{ChartNote}?, NoteFlags)"/> takes them.</param>
+    public static Result Compare(IReadOnlyList<ChartNote> expected, IReadOnlyList<ChartDocument> reads, ChartTrackKey key, NoteFlags ignore)
     {
-        var results = reads.Select(r => Compare(expected, r.Tracks.GetValueOrDefault(key)?.Notes)).ToList();
+        var results = reads.Select(r => Compare(expected, r.Tracks.GetValueOrDefault(key)?.Notes, ignore)).ToList();
         return results[0] with { HopoFixes = [.. results.SelectMany(r => r.HopoFixes).DistinctBy(f => f.Tick).OrderBy(f => f.Tick)] };
     }
 
@@ -131,10 +152,9 @@ internal static class NoteCheck
             yield break;
 
         int b = MidiLayout.BaseOf(kind, difficulty);
-        int forceHopo = kind == ChartInstrumentKind.SixFret ? b + 7 : b + 5;
         foreach (var (tick, hopo) in fixes)
         {
-            int pitch = hopo ? forceHopo : forceHopo + 1;
+            int pitch = b + (hopo ? MidiLayout.ForceHopoOffset(kind) : MidiLayout.ForceStrumOffset(kind));
             yield return MidiMessage.NoteOn(tick, pitch);
             yield return MidiMessage.NoteOff(tick + 1, pitch);
         }
