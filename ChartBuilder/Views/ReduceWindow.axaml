@@ -8,7 +8,7 @@
         mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="420"
         x:Class="ChartBuilder.Views.ReduceWindow"
         x:DataType="vm:ReduceViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartBuilder.ico"
         Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
         WindowStartupLocation="CenterOwner"

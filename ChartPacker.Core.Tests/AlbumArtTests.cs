@@ -124,6 +124,58 @@ public sealed class AlbumArtTests
     }
 
     [TestMethod]
+    public void SngStreamGivesTheUnmaskedImageBytesAndStaysOpen()
+    {
+        var builder = new SngBuilder();
+        builder.AddFile("notes.chart", Masked(builder, [5, 5, 5])).AddFile("album.jpg", Masked(builder, Jpg));
+        using var stream = new MemoryStream(builder.Build());
+
+        Assert.AreSequenceEqual(Jpg, AlbumArt.ReadFromSng(stream, cancellationToken: TestContext.CancellationToken));
+        Assert.IsTrue(stream.CanRead);
+    }
+
+    [TestMethod]
+    public void SngStreamPrefersPngIgnoringCase()
+    {
+        var builder = new SngBuilder();
+        builder.AddFile("album.jpeg", Masked(builder, Jpg)).AddFile("ALBUM.png", Masked(builder, Png));
+
+        Assert.AreSequenceEqual(Png, AlbumArt.ReadFromSng(new MemoryStream(builder.Build()), cancellationToken: TestContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public void SngStreamWithoutArtGivesNull()
+    {
+        var builder = new SngBuilder();
+        builder.AddFile("notes.chart", Masked(builder, [5]));
+
+        Assert.IsNull(AlbumArt.ReadFromSng(new MemoryStream(builder.Build()), cancellationToken: TestContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public void SngStreamArtOverTheCapGivesNull()
+    {
+        var builder = new SngBuilder();
+        builder.AddFile("album.png", Masked(builder, Png));
+
+        Assert.IsNull(AlbumArt.ReadFromSng(new MemoryStream(builder.Build()), maxBytes: Png.Length - 1, TestContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public void SngStreamArtPastTheEndThrows()
+    {
+        var builder = new SngBuilder();
+        builder.AddFile("album.png", Masked(builder, Png));
+        builder.LengthOverrides[0] = (ulong)Png.Length + 100;
+
+        Assert.ThrowsExactly<EndOfStreamException>(() => AlbumArt.ReadFromSng(new MemoryStream(builder.Build()), cancellationToken: TestContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public void NotAnSngStreamGivesNull() =>
+        Assert.IsNull(AlbumArt.ReadFromSng(new MemoryStream([1, 2, 3]), cancellationToken: TestContext.CancellationToken));
+
+    [TestMethod]
     public async Task CancelledReadThrows()
     {
         string folder = CreateFolder(("album.png", Png));

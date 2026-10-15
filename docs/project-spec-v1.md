@@ -60,6 +60,7 @@ Chart-Packer.slnx
 ├── ChartPacker.UI/           Avalonia library shared by both apps: theme, dialogs, pickers, settings window
 ├── ChartPacker.Audio/        Audio decoding, mixing and playback (F7)
 ├── ChartPacker.Core/         UI-free library: format, validation, pack/unpack pipelines
+├── ChartPacker.Thumbnails/   Windows only: Explorer's .sng thumbnail handler, a Native AOT COM DLL
 └── ChartPacker.Core.Tests/   MSTest tests for Core and Audio
 ```
 
@@ -68,8 +69,11 @@ share the libraries above. Both build against the same package versions (central
 management in `Directory.Packages.props`), so they publish into one folder and share one copy of
 each native library. The version is set once, in `Directory.Build.props`. `build/publish.ps1`
 publishes both, and fails if the two would put different files under the same name. The installer
-(`installer/ChartPacker.iss`) installs both, with a Start menu entry for each. How the two apps
-work together is in [charter-spec §4.8](charter-spec-v1.md#48-launching-and-coordination).
+(`installer/ChartPacker.iss`) installs Chart Packer and, unless it's deselected, Chart Builder, with
+a Start menu entry for each. It registers the `.sng` type, which opens in Chart Builder and shows
+a disc icon, and an **Open with Chart Builder** folder action. It also registers
+`ChartPacker.Thumbnails`, which shows a `.sng`'s album art as its thumbnail in Explorer. How the two
+apps work together is in [charter-spec §4.8](charter-spec-v1.md#48-launching-and-coordination).
 
 ### 4.1 `ChartPacker.Core`
 

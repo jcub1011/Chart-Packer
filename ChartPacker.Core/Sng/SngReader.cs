@@ -69,13 +69,29 @@ public static class SngReader
     /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
     public static SngReadResult Read(SafeFileHandle handle, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(handle);
-        return new Parser(handle, cancellationToken).Parse();
+        return Read(SngInput.Of(handle), cancellationToken);
     }
 
-    private sealed class Parser(SafeFileHandle handle, CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads the <c>.sng</c> in <paramref name="stream"/>, which must be readable and seekable, and stays open
+    /// with its position moved. Malformed content produces findings; only I/O failures throw.
+    /// </summary>
+    /// <remarks>For a <c>.sng</c> that isn't a file of its own, such as the stream Explorer hands a thumbnail handler.</remarks>
+    /// <exception cref="ArgumentException"><paramref name="stream"/> can't be read or can't seek.</exception>
+    /// <exception cref="IOException">The stream can't be read.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    public static SngReadResult Read(Stream stream, CancellationToken cancellationToken = default) =>
+        Read(SngInput.Of(stream), cancellationToken);
+
+    /// <summary>Reads the <c>.sng</c> in <paramref name="input"/>, so a caller can read its stored files from the same input.</summary>
+    /// <exception cref="IOException">The input can't be read.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    internal static SngReadResult Read(SngInput input, CancellationToken cancellationToken = default) =>
+        new Parser(input, cancellationToken).Parse();
+
+    private sealed class Parser(SngInput input, CancellationToken cancellationToken)
     {
-        private readonly long _length = RandomAccess.GetLength(handle);
+        private readonly long _length = input.Length;
         // The file's first bytes, read once; reads inside them are served from here.
         private byte[] _prefix = [];
         private readonly List<Finding> _findings = [];
@@ -402,7 +418,7 @@ public static class SngReader
             int filled = 0;
             while (filled < prefix.Length)
             {
-                int read = RandomAccess.Read(handle, prefix.AsSpan(filled), filled);
+                int read = input.Read(prefix.AsSpan(filled), filled);
                 if (read == 0)
                     break;
                 filled += read;
@@ -422,14 +438,7 @@ public static class SngReader
                 offset += cached;
             }
 
-            while (!buffer.IsEmpty)
-            {
-                int read = RandomAccess.Read(handle, buffer, offset);
-                if (read == 0)
-                    throw new EndOfStreamException("The file got shorter while it was being read.");
-                buffer = buffer[read..];
-                offset += read;
-            }
+            input.ReadExactly(buffer, offset);
         }
     }
 

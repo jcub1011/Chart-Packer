@@ -158,7 +158,16 @@ public static class SongFile
     /// </summary>
     /// <exception cref="IOException">The file can't be read, or the stored file runs past its end.</exception>
     /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
-    internal static byte[]? ReadFromSng(SafeFileHandle sng, SngHeader header, SngFileEntry file, long maxBytes, CancellationToken cancellationToken)
+    internal static byte[]? ReadFromSng(SafeFileHandle sng, SngHeader header, SngFileEntry file, long maxBytes, CancellationToken cancellationToken) =>
+        ReadFromSng(SngInput.Of(sng), header, file, maxBytes, cancellationToken);
+
+    /// <summary>
+    /// Unmasks the stored <paramref name="file"/> of the <c>.sng</c> in <paramref name="sng"/>, or returns
+    /// <see langword="null"/> when it's larger than <paramref name="maxBytes"/>.
+    /// </summary>
+    /// <exception cref="IOException">The input can't be read, or the stored file runs past its end.</exception>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    internal static byte[]? ReadFromSng(SngInput sng, SngHeader header, SngFileEntry file, long maxBytes, CancellationToken cancellationToken)
     {
         if (!Fits(file, maxBytes))
             return null;
@@ -167,17 +176,7 @@ public static class SongFile
 
         // Read straight into the result and unmasked there, rather than through a copy buffer.
         var data = new byte[(int)file.Length];
-        Span<byte> rest = data;
-        long offset = checked((long)file.Offset);
-        while (!rest.IsEmpty)
-        {
-            int read = RandomAccess.Read(sng, rest, offset);
-            if (read == 0)
-                throw new EndOfStreamException("The file got shorter while it was being read.");
-            rest = rest[read..];
-            offset += read;
-        }
-
+        sng.ReadExactly(data, checked((long)file.Offset));
         SngMask.Apply(data, header.Mask.Span);
         return data;
     }

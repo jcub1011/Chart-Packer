@@ -6,6 +6,7 @@ using Avalonia.Controls.Chrome;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Metadata;
 
 namespace ChartPacker.UI.Controls
@@ -22,7 +23,7 @@ namespace ChartPacker.UI.Controls
     /// </remarks>
     /// <example>
     /// <code>
-    /// &lt;ctl:TitleBar Icon="/Assets/avalonia-logo.ico" AppName="{x:Static res:Strings.AppName}"&gt;
+    /// &lt;ctl:TitleBar Icon="/Assets/ChartPacker.ico" AppName="{x:Static res:Strings.AppName}"&gt;
     ///     &lt;ctl:TitleBar.Menu&gt;&lt;Menu chrome:WindowDecorationProperties.ElementRole="User"&gt;…&lt;/Menu&gt;&lt;/ctl:TitleBar.Menu&gt;
     ///     &lt;ctl:VersionLink chrome:WindowDecorationProperties.ElementRole="User" /&gt;
     /// &lt;/ctl:TitleBar&gt;
@@ -59,6 +60,8 @@ namespace ChartPacker.UI.Controls
                 Margin = new Thickness(12, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center,
             };
+            // An .ico decodes to its largest frame (256 px), which the default filter shrinks to 16 with jagged edges.
+            RenderOptions.SetBitmapInterpolationMode(_icon, BitmapInterpolationMode.HighQuality);
             _grid = new Grid
             {
                 ColumnDefinitions =

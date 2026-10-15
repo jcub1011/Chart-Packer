@@ -310,6 +310,44 @@ public sealed class SngReaderTests
         Assert.AreEqual(new FileInfo(path).Length, RandomAccess.GetLength(handle));
     }
 
+    [TestMethod]
+    public void ReadingAStreamMatchesReadingThePathAndLeavesItOpen()
+    {
+        byte[] bytes = TwoFiles(_ => { });
+        var byPath = SngReader.Read(Write(bytes), TestContext.CancellationToken);
+
+        using var stream = new MemoryStream(bytes);
+        var byStream = SngReader.Read(stream, TestContext.CancellationToken);
+
+        Assert.AreSequenceEqual([.. byPath.Metadata], [.. byStream.Metadata]);
+        Assert.AreSequenceEqual([.. byPath.Files], [.. byStream.Files]);
+        Assert.IsEmpty(byStream.Findings);
+        Assert.IsTrue(stream.CanRead);
+    }
+
+    [TestMethod]
+    public void ReadingAStreamPastTheFirstReadMatchesReadingThePath()
+    {
+        // The metadata is larger than the first read, so the rest of the stream is read where the sections are.
+        string value = new('v', 2 * SngReader.PrefixSize);
+        byte[] full = new SngBuilder().AddMetadata("k", value).AddFile("notes.chart", [1, 2, 3]).Build();
+
+        var byStream = SngReader.Read(new MemoryStream(full), TestContext.CancellationToken);
+
+        Assert.IsEmpty(byStream.Findings);
+        Assert.AreEqual(value, byStream.Metadata.Single().Value);
+        Assert.AreSequenceEqual([.. Read(full).Files], [.. byStream.Files]);
+        AssertOnly(SngReader.Read(new MemoryStream(full[..(SngReader.PrefixSize + 10)]), TestContext.CancellationToken), SngRules.Sng003);
+    }
+
+    [TestMethod]
+    public void AStreamThatCantSeekIsRefused()
+    {
+        using var stream = new NonSeekableStream(WorkedExample);
+
+        Assert.ThrowsExactly<ArgumentException>(() => SngReader.Read(stream, TestContext.CancellationToken));
+    }
+
     /// <summary>
     /// Where file data starts for <see cref="TwoFiles"/>: header 26, metadataLen 8, metadata
     /// 8 + (4 + 4 + 4 + 3), fileMetaLen 8, index 8 + 2 × (1 + 5 + 16), fileDataLen 8.
@@ -344,6 +382,11 @@ public sealed class SngReaderTests
     }
 
     private SngReadResult Read(byte[] bytes) => SngReader.Read(Write(bytes), TestContext.CancellationToken);
+
+    private sealed class NonSeekableStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public override bool CanSeek => false;
+    }
 
     private string Write(byte[] bytes)
     {

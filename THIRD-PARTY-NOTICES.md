@@ -109,6 +109,20 @@ specifications; no code from any implementation of them is used.
 | [Tune pitch](https://game-icons.net/1x1/lorc/tune-pitch.html) | [Lorc](https://lorcblog.blogspot.com) | Pitch correction |
 | [Gamepad](https://game-icons.net/1x1/delapouite/gamepad.html) | [Delapouite](https://delapouite.com) | Playtest |
 
+### Bootstrap Icons
+
+- **Project:** [Bootstrap Icons](https://icons.getbootstrap.com) ([twbs/icons](https://github.com/twbs/icons))
+- **License:** [MIT](#mit-license) © The Bootstrap Authors
+- **Used for:** the program icons of Chart Packer and Chart Builder, and the icon of `.sng` files
+  without album art. The SVGs are kept unchanged in `tools/IconGen/Sources`. `tools/IconGen` fills
+  each one in a single colour, and saves them as the `.ico` files below.
+
+| Icon | Used as |
+|---|---|
+| [box-seam-fill](https://icons.getbootstrap.com/icons/box-seam-fill/) | Chart Packer (`ChartPacker/Assets/ChartPacker.ico`) |
+| [bar-chart-line-fill](https://icons.getbootstrap.com/icons/bar-chart-line-fill/) | Chart Builder (`ChartBuilder/Assets/ChartBuilder.ico`) |
+| [disc-fill](https://icons.getbootstrap.com/icons/disc-fill/) | `.sng` files (`installer/SngFile.ico`) |
+
 ## Bundled libraries
 
 A release is a single native executable (.NET Native AOT) plus the native libraries below it
