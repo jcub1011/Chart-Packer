@@ -17,7 +17,7 @@ namespace ChartPacker
             null => null,
             LibraryViewModel => new LibraryView(),
             SongDetailViewModel => new SongDetailView(),
-            JobViewModel => new JobView(),
+            StatusBarViewModel => new StatusBarView(),
             _ => new TextBlock { Text = "No view registered for " + param.GetType().Name },
         };
 

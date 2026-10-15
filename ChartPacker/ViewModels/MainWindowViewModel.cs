@@ -37,6 +37,7 @@ namespace ChartPacker.ViewModels
             _confirmation = confirmation;
             _settingsWindow = settingsWindow;
             Notice = notice;
+            StatusBar = new StatusBarViewModel(library);
 
             Library.PropertyChanged += (_, e) =>
             {
@@ -142,8 +143,8 @@ namespace ChartPacker.ViewModels
         /// <summary>What the latest download did, shown along the bottom for a few seconds.</summary>
         public NoticeViewModel Notice { get; }
 
-        /// <summary>The pack/unpack results panel, always shown under both panels.</summary>
-        public JobViewModel Job => Library.Job;
+        /// <summary>The status bar, always shown under both panels: the pack/unpack job, or the library's scan.</summary>
+        public StatusBarViewModel StatusBar { get; }
 
         /// <summary>Persisted width of the library panel. The view applies it on open and writes it back on close.</summary>
         public double LibraryPaneWidth

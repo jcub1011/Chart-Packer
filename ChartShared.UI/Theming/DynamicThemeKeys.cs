@@ -81,6 +81,19 @@ namespace ChartShared.UI.Theming
             Neutral("ToolTipBackground"),
             Neutral("ToolTipBorderBrush"),
 
+            // Scroll bars: the track, the thumb (thin while panning, then full width, under the pointer and pressed),
+            // the line buttons under the pointer and pressed, and the corner between two bars. Opaque greys in this
+            // palette; the transparent keys are left as they are.
+            Neutral("ScrollBarTrackFill"),
+            Neutral("ScrollBarTrackFillPointerOver"),
+            Neutral("ScrollBarPanningThumbBackground"),
+            Neutral("ScrollBarThumbBrush"),
+            Neutral("ScrollBarThumbFillPointerOver"),
+            Neutral("ScrollBarThumbFillPressed"),
+            Neutral("ScrollBarButtonBackgroundPointerOver"),
+            Neutral("ScrollBarButtonBackgroundPressed"),
+            Neutral("ScrollViewerScrollBarsSeparatorBackground"),
+
             // Rows and items under the pointer or pressed: opaque greys in this palette, so tinted with the rest.
             Neutral("SystemControlHighlightListLowBrush"),
             Neutral("SystemControlHighlightListMediumBrush"),
