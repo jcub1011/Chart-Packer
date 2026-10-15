@@ -83,7 +83,7 @@ FFmpeg speed-up per core, median, on JIT and NativeAOT:
 
 ## Cheap fixes spotted in the wrappers (not measured; no profiler was run)
 
-- **`MpegFrame.ReadBits`** (`ChartPacker.Audio/Decoding/MpegFrame.cs:117`) reads **one bit per
+- **`MpegFrame.ReadBits`** (`ChartShared.Audio/Decoding/MpegFrame.cs:117`) reads **one bit per
   loop iteration**. NLayer calls it for every header field and Huffman symbol. It's our code, and
   it may account for a large share of MP3's 8× gap. Reading up to 32 bits at a time, from a
   64-bit window, is a small change.
@@ -108,12 +108,12 @@ FFmpeg speed-up per core, median, on JIT and NativeAOT:
 
 Suggested order, if you go ahead: **Opus first** (most used, low risk, about 2×), then **MP3**
 (8×, after trying `ReadBits`), then **Vorbis** last (3×, highest risk). If about 2× on Opus isn't
-worth adding swresample and the new `ChartPacker.Ffmpeg` project, the alternative is the cheap
+worth adding swresample and the new `ChartShared.Ffmpeg` project, the alternative is the cheap
 fixes above, which help MP3 most and Opus hardly at all.
 
 ## Phase 2: FFmpeg decodes the app's audio
 
-All three formats went to FFmpeg, through `ChartPacker.Ffmpeg`'s `FfmpegAudioDecoder`, for mono and
+All three formats went to FFmpeg, through `ChartShared.Ffmpeg`'s `FfmpegAudioDecoder`, for mono and
 stereo stems. Only packets go to FFmpeg, and the app's own container code keeps the timing, trims
 and seeks. The managed decoders stay as the fallback.
 
@@ -141,7 +141,7 @@ signal. That's inaudible, and stems still line up.
 
 **Not measured after Phase 2.** The benchmarks weren't re-run, at the user's call. Phase 1 had
 already measured FFmpeg's decoders at about 2× (Opus), 3× (Vorbis) and 8× (MP3) the managed ones
-per core, and `ChartPacker.Audio` now feeds them the same packets. To measure it, run the commands
+per core, and `ChartShared.Audio` now feeds them the same packets. To measure it, run the commands
 under [Setup](#setup): each benchmark then has an `FFmpeg speed-up` column.
 
 ## Waveform fidelity
@@ -174,7 +174,7 @@ All values are medians.
 
 ## Full results
 
-### Fixtures (`ChartPacker.Core.Tests/Audio/Fixtures`, 1 s each)
+### Fixtures (`ChartShared.Core.Tests/Audio/Fixtures`, 1 s each)
 
 | Method | Job | Audio | Median | RTF | Decode share | FFmpeg speed-up |
 | --------------- | ---------- | -------------------------------------------------- | ------------: | ------: | -------------: | ----------------: |

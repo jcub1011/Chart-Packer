@@ -1,6 +1,6 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
 using static ChartBuilder.Tests.Editing.EditorSessions;
 
 namespace ChartBuilder.Tests.Editing;

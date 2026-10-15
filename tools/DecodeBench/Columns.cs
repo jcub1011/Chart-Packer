@@ -1,7 +1,7 @@
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
-using ChartPacker.Audio.Decoding;
+using ChartShared.Audio.Decoding;
 
 namespace DecodeBench;
 

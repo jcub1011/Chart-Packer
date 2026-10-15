@@ -1,6 +1,6 @@
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
-using ChartPacker.Core.Jobs;
+using ChartShared.Core.Jobs;
 
 namespace ChartBuilder.Tests.Charting.Export;
 

@@ -6,12 +6,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Validation;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

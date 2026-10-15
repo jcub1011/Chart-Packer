@@ -6,8 +6,8 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
 
 namespace ChartPacker.ViewModels
 {

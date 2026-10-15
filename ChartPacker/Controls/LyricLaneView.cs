@@ -8,10 +8,10 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.Controls;
-using ChartPacker.UI.Theming;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charts;
+using ChartShared.UI.Controls;
+using ChartShared.UI.Theming;
 
 namespace ChartPacker.Controls
 {

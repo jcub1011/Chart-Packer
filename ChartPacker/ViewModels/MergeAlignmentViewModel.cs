@@ -5,12 +5,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
-using ChartPacker.Audio.Alignment;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Merging;
 using ChartPacker.Resources;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Audio.Alignment;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Merging;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

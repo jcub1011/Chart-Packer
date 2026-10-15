@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Scanning;
-using ChartPacker.UI.Controls;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Scanning;
+using ChartShared.UI.Controls;
 
 namespace ChartBuilder.ViewModels
 {

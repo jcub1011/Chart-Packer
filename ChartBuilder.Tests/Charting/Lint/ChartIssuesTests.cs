@@ -1,7 +1,7 @@
 using System.Collections.Specialized;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Validation;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
+using ChartShared.UI.ViewModels;
 
 namespace ChartBuilder.Tests.Charting.Lint;
 

@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Resources\FindingMessages.resx">
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>ChartShared.Core.Resources</StronglyTypedNamespace>
+      <StronglyTypedClassName>FindingMessages</StronglyTypedClassName>
+      <StronglyTypedFileName>$(IntermediateOutputPath)FindingMessages.Designer.cs</StronglyTypedFileName>
+      <PublicClass>false</PublicClass>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resources\KnownKeyDescriptions.resx">
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>ChartShared.Core.Resources</StronglyTypedNamespace>
+      <StronglyTypedClassName>KnownKeyDescriptions</StronglyTypedClassName>
+      <StronglyTypedFileName>$(IntermediateOutputPath)KnownKeyDescriptions.Designer.cs</StronglyTypedFileName>
+      <PublicClass>false</PublicClass>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- The language server's design-time build doesn't run CoreResGen, which is what adds the
+       generated FindingMessages and KnownKeyDescriptions classes to the compile; hand it the last
+       build's copies. -->
+  <ItemGroup Condition="'$(DesignTimeBuild)' == 'true'">
+    <Compile Include="$(IntermediateOutputPath)FindingMessages.Designer.cs"
+             Condition="Exists('$(IntermediateOutputPath)FindingMessages.Designer.cs')" />
+    <Compile Include="$(IntermediateOutputPath)KnownKeyDescriptions.Designer.cs"
+             Condition="Exists('$(IntermediateOutputPath)KnownKeyDescriptions.Designer.cs')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChartShared.Core.Tests" />
+    <InternalsVisibleTo Include="ChartBuilder.Tests" />
+    <InternalsVisibleTo Include="ScanBench" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="z440.atl.core" />
+  </ItemGroup>
+</Project>

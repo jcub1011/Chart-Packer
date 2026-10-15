@@ -1,6 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.4.1">
   <!-- Tests for Chart Builder's code: the editable chart model, its loader and writer, commands and lint
-       (ChartPacker.Core/Charting). Chart Packer's code is tested in ChartPacker.Core.Tests. -->
+       (ChartShared.Core/Charting). The rest of the shared libraries' code is tested in
+       ChartShared.Core.Tests. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -10,19 +11,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <ProjectReference Include="..\ChartShared.Core\ChartShared.Core.csproj" />
     <!-- For the highway preview's scene (charter-spec C18), whose timing is checked against the editor's. -->
-    <ProjectReference Include="..\ChartPacker.UI\ChartPacker.UI.csproj" />
+    <ProjectReference Include="..\ChartShared.UI\ChartShared.UI.csproj" />
     <!-- For the editor canvas's Ctrl+wheel zoom stepping. -->
     <ProjectReference Include="..\ChartBuilder\ChartBuilder.csproj" />
   </ItemGroup>
 
-  <!-- Shared with ChartPacker.Core.Tests rather than copied: the MIDI fixture builder, and the guard that fails the
+  <!-- Shared with ChartShared.Core.Tests rather than copied: the MIDI fixture builder, and the guard that fails the
        run if a test touches the real config folder (every test project carries one). -->
   <ItemGroup>
-    <Compile Include="..\ChartPacker.Core.Tests\Charts\MidiBuilder.cs" Link="Shared\MidiBuilder.cs" />
-    <Compile Include="..\ChartPacker.Core.Tests\Isolation\FolderSnapshot.cs" Link="Shared\FolderSnapshot.cs" />
-    <Compile Include="..\ChartPacker.Core.Tests\Isolation\UserConfigGuard.cs" Link="Shared\UserConfigGuard.cs" />
+    <Compile Include="..\ChartShared.Core.Tests\Charts\MidiBuilder.cs" Link="Shared\MidiBuilder.cs" />
+    <Compile Include="..\ChartShared.Core.Tests\Isolation\FolderSnapshot.cs" Link="Shared\FolderSnapshot.cs" />
+    <Compile Include="..\ChartShared.Core.Tests\Isolation\UserConfigGuard.cs" Link="Shared\UserConfigGuard.cs" />
   </ItemGroup>
 
   <ItemGroup>

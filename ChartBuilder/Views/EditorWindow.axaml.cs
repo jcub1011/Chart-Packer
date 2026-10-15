@@ -7,7 +7,7 @@ using Avalonia.Threading;
 using ChartBuilder.Controls;
 using ChartBuilder.Services;
 using ChartBuilder.ViewModels;
-using ChartPacker.UI.Views;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
 {

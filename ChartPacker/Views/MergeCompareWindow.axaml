@@ -4,8 +4,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
         xmlns:ctl="using:ChartPacker.Controls"
-        xmlns:ui="using:ChartPacker.UI.Controls"
+        xmlns:ui="using:ChartShared.UI.Controls"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="640"
         x:Class="ChartPacker.Views.MergeCompareWindow"
         x:DataType="vm:MergeCompareViewModel"
@@ -83,7 +84,7 @@
                         <ToolTip.Tip>
                             <StackPanel Spacing="6">
                                 <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
-                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                             </StackPanel>
                         </ToolTip.Tip>
                     </NumericUpDown>
@@ -156,10 +157,10 @@
                         AutomationProperties.Name="{x:Static res:Strings.MergeCompareApplyButton}" />
                 <Button MinWidth="80"
                         HorizontalContentAlignment="Center"
-                        Content="{x:Static res:SharedStrings.CancelButton}"
+                        Content="{x:Static sres:SharedStrings.CancelButton}"
                         Command="{Binding CancelCommand}"
                         IsCancel="True"
-                        AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
+                        AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
             </StackPanel>
         </Border>
     </Grid>

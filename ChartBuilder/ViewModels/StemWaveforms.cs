@@ -6,10 +6,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Scanning;
+using ChartShared.Audio.Playback;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Scanning;
 
 namespace ChartBuilder.ViewModels
 {

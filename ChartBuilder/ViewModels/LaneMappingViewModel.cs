@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charts;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartBuilder.ViewModels

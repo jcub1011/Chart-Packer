@@ -10,13 +10,13 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Resources;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Metadata;
+using ChartShared.UI.Resources;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -68,7 +68,7 @@ namespace ChartBuilder.ViewModels
 
     /// <summary>
     /// A part's rating in Chart settings: a number, unset as <c>?</c>, that opens a flyout as Chart Packer's inspector's
-    /// instrument icons do (<see cref="ChartPacker.UI.Views.DifficultyPicker"/>). <c>?</c> clears it, 0 to 6 set it, and Other sets any other
+    /// instrument icons do (<see cref="ChartShared.UI.Views.DifficultyPicker"/>). <c>?</c> clears it, 0 to 6 set it, and Other sets any other
     /// tier, each at once as one undo step.
     /// </summary>
     public sealed partial class ChartRatingViewModel : ObservableObject, IDifficultyPicker

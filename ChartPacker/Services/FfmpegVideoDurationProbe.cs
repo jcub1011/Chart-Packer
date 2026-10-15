@@ -1,7 +1,7 @@
 using System;
 using System.IO;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Video;
+using ChartShared.Core.Metadata;
+using ChartShared.Video;
 
 namespace ChartPacker.Services
 {

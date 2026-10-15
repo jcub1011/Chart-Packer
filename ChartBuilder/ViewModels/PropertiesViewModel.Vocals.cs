@@ -2,9 +2,9 @@ using System;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

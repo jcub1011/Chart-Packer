@@ -1,4 +1,4 @@
-using ChartPacker.Core.Input;
+using ChartShared.Core.Input;
 
 namespace ChartBuilder.Tests.InstrumentInput;
 

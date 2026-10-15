@@ -1,18 +1,18 @@
 using System;
 using System.Linq;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Authoring;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Playtest;
-using ChartPacker.Core.Launching;
-using ChartPacker.Core.Settings;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Playtest;
+using ChartShared.Core.Launching;
+using ChartShared.Core.Settings;
 
 namespace ChartBuilder.Services
 {
     /// <summary>Loads and saves <see cref="BuilderSettings"/> as JSON, through <see cref="JsonSettingsFile{T}"/>.</summary>
     /// <remarks>
     /// The file path is always passed in, never defaulted, so nothing but the composition root
-    /// (which passes <see cref="ChartPacker.Core.UserConfigPaths.BuilderSettingsFile"/>) can touch the real
+    /// (which passes <see cref="ChartShared.Core.UserConfigPaths.BuilderSettingsFile"/>) can touch the real
     /// settings. Tests must pass a temp file. Several Chart Builders can run at once, and the file keeps each
     /// one's changes.
     /// </remarks>

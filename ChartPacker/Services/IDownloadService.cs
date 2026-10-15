@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
 
 namespace ChartPacker.Services
 {

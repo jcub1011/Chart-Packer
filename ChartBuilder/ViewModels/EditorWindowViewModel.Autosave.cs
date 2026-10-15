@@ -3,10 +3,10 @@ using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Threading;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Recovery;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Scanning;
 using ChartBuilder.Resources;
 
 namespace ChartBuilder.ViewModels

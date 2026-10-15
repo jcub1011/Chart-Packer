@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ChartPacker.UI.ViewModels;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartPacker.ViewModels

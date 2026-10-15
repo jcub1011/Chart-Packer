@@ -4,10 +4,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
         xmlns:ctl="using:ChartPacker.Controls"
         xmlns:conv="using:ChartPacker.Converters"
-        xmlns:ui="using:ChartPacker.UI.Controls"
-        xmlns:uiconv="using:ChartPacker.UI.Converters"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:uiconv="using:ChartShared.UI.Converters"
         xmlns:views="using:ChartPacker.Views"
         mc:Ignorable="d" d:DesignWidth="1560" d:DesignHeight="900"
         x:Class="ChartPacker.Views.MergeWindow"
@@ -467,7 +468,7 @@
                                                                                    Text="{Binding LinkNote}"
                                                                                    IsVisible="{Binding HasLinkNote}" />
                                                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
-                                                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                                                     </StackPanel>
                                                                 </ToolTip.Tip>
                                                             </NumericUpDown>

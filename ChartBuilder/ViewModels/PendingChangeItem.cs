@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
+using ChartShared.Core.Charting;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels

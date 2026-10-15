@@ -4,10 +4,11 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:res="using:ChartPacker.Resources"
+             xmlns:sres="using:ChartShared.UI.Resources"
              xmlns:ctl="using:ChartPacker.Controls"
-             xmlns:hw="using:ChartPacker.UI.Controls.Highway"
-             xmlns:ui="using:ChartPacker.UI.Controls"
-             xmlns:uiviews="using:ChartPacker.UI.Views"
+             xmlns:hw="using:ChartShared.UI.Controls.Highway"
+             xmlns:ui="using:ChartShared.UI.Controls"
+             xmlns:uiviews="using:ChartShared.UI.Views"
              mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
              x:Class="ChartPacker.Views.SongDetailView"
              x:DataType="vm:SongDetailViewModel"
@@ -78,7 +79,7 @@
                                     <ToolTip.Tip>
                                         <StackPanel MaxWidth="320" Spacing="6">
                                             <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.HighwayOffsetToolTip}" />
-                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                         </StackPanel>
                                     </ToolTip.Tip>
                                 </NumericUpDown>
@@ -133,7 +134,7 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <StyleInclude Source="avares://ChartShared.UI/Styles/Inspector.axaml" />
         <!-- A flyout floats over the panel, and can cover the tip strip, so its tips pop up as usual. -->
         <Style Selector="FlyoutPresenter">
             <Setter Property="ToolTip.ServiceEnabled" Value="True" />
@@ -493,7 +494,7 @@
                                                             <ToolTip.Tip>
                                                                 <StackPanel MaxWidth="320" Spacing="6">
                                                                     <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.VideoOffsetToolTip}" />
-                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                                                 </StackPanel>
                                                             </ToolTip.Tip>
                                                         </NumericUpDown>
@@ -671,7 +672,7 @@
                                         <ToolTip.Tip>
                                             <StackPanel Spacing="6">
                                                 <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.LyricsOffsetToolTip}" />
-                                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                             </StackPanel>
                                         </ToolTip.Tip>
                                     </NumericUpDown>
@@ -803,7 +804,7 @@
                                     <ToolTip.Tip>
                                         <StackPanel Spacing="6">
                                             <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.AudioOffsetToolTip}" />
-                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                         </StackPanel>
                                     </ToolTip.Tip>
                                 </NumericUpDown>
@@ -1147,10 +1148,10 @@
                         <Button Grid.Column="1"
                                 Classes="labelled"
                                 VerticalAlignment="Center"
-                                Content="{x:Static res:SharedStrings.ChartIssuesViewButton}"
+                                Content="{x:Static sres:SharedStrings.ChartIssuesViewButton}"
                                 Command="{Binding ViewChartIssuesCommand}"
                                 IsVisible="{Binding CanViewChartIssues}"
-                                ToolTip.Tip="{x:Static res:SharedStrings.ChartIssuesViewToolTip}" />
+                                ToolTip.Tip="{x:Static sres:SharedStrings.ChartIssuesViewToolTip}" />
                     </Grid>
 
                     <TextBlock Classes="section" Text="{Binding MetadataEditor.MetadataHeader}" />

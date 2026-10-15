@@ -118,7 +118,7 @@ jobs:
         id: ffmpeg-cache
         uses: actions/cache/restore@v6
         with:
-          path: ChartPacker.Ffmpeg/runtimes/${{ env.RID }}/native
+          path: ChartShared.Ffmpeg/runtimes/${{ env.RID }}/native
           key: ffmpeg-${{ env.RID }}-${{ hashFiles('build/ffmpeg/build.sh') }}
 
       - name: Set up MSYS2
@@ -144,13 +144,13 @@ jobs:
         if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
-          path: ChartPacker.Ffmpeg/runtimes/${{ env.RID }}/native
+          path: ChartShared.Ffmpeg/runtimes/${{ env.RID }}/native
           key: ${{ steps.ffmpeg-cache.outputs.cache-primary-key }}
 
       # After FFmpeg is in place, so the FFmpeg decoder tests run rather than being skipped as inconclusive.
       - name: Test
         shell: pwsh
-        run: dotnet test --project ChartPacker.Core.Tests/ChartPacker.Core.Tests.csproj --configuration Release
+        run: dotnet test --project ChartShared.Core.Tests/ChartShared.Core.Tests.csproj --configuration Release
 
       - name: Test Chart Builder
         shell: pwsh

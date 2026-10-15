@@ -1,8 +1,8 @@
 using System;
 using System.Globalization;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Jobs;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Jobs;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

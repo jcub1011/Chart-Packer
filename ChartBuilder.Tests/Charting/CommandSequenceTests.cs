@@ -1,6 +1,6 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Charting.CommandChecks;
 using static ChartBuilder.Tests.Charting.MidiChartWriterTests;
 
@@ -142,7 +142,7 @@ public sealed class CommandSequenceTests
             long from = Tick();
             long to = from + (random.Next(1, 16) * Snap);
             long newTo = from + (random.Next(1, 16) * Snap);
-            return ChartPacker.Core.Charting.Editing.TempoMapEdits.Stretch(chart, from, to, newTo).Command;
+            return ChartShared.Core.Charting.Editing.TempoMapEdits.Stretch(chart, from, to, newTo).Command;
         }
 
         private IChartCommand? Next(EditableChart chart, int roll) => roll switch

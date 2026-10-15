@@ -7,12 +7,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
-using ChartPacker.Core.Packing;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
-using ChartPacker.UI.Services;
 using ChartPacker.ViewModels;
+using ChartShared.Core.Packing;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Validation;
+using ChartShared.UI.Services;
 
 namespace ChartPacker.Services
 {

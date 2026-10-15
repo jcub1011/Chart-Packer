@@ -3,13 +3,13 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using ChartBuilder.Services;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core;
-using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.Core.Charting.Saving;
-using ChartPacker.Input;
-using ChartPacker.Core.Launching;
-using ChartPacker.Core.Settings;
+using ChartShared.Audio.Playback;
+using ChartShared.Core;
+using ChartShared.Core.Charting.Recovery;
+using ChartShared.Core.Charting.Saving;
+using ChartBuilder.Devices;
+using ChartShared.Core.Launching;
+using ChartShared.Core.Settings;
 
 namespace ChartBuilder
 {

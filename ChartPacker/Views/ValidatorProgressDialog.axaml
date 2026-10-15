@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
         mc:Ignorable="d"
         x:Class="ChartPacker.Views.ValidatorProgressDialog"
         x:DataType="vm:ValidatorWindowViewModel"
@@ -28,9 +29,9 @@
         <Button HorizontalAlignment="Right"
                 MinWidth="80"
                 HorizontalContentAlignment="Center"
-                Content="{x:Static res:SharedStrings.CancelButton}"
+                Content="{x:Static sres:SharedStrings.CancelButton}"
                 IsCancel="True"
                 Click="OnCancel"
-                AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
+                AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
     </StackPanel>
 </Window>

@@ -1,5 +1,5 @@
-using ChartPacker.Core.Input;
-using ChartPacker.Core.Settings;
+using ChartShared.Core.Input;
+using ChartShared.Core.Settings;
 
 namespace ChartBuilder.Services
 {

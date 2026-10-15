@@ -1,7 +1,7 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Validation;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
 using static ChartBuilder.Tests.Charting.CommandChecks;
 
 namespace ChartBuilder.Tests.Charting;

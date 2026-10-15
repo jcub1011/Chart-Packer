@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:res="using:ChartPacker.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
         mc:Ignorable="d"
         x:Class="ChartPacker.Views.MessageDialog"
         SizeToContent="WidthAndHeight"
@@ -18,10 +19,10 @@
                 MinWidth="80"
                 HorizontalContentAlignment="Center"
                 Classes="accent"
-                Content="{x:Static res:SharedStrings.OkButton}"
+                Content="{x:Static sres:SharedStrings.OkButton}"
                 IsDefault="True"
                 IsCancel="True"
                 Click="OnOk"
-                AutomationProperties.Name="{x:Static res:SharedStrings.OkButton}" />
+                AutomationProperties.Name="{x:Static sres:SharedStrings.OkButton}" />
     </StackPanel>
 </Window>

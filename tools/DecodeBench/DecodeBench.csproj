@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Brings FFmpeg's libraries with it, through ChartPacker.Ffmpeg. -->
-    <ProjectReference Include="..\..\ChartPacker.Audio\ChartPacker.Audio.csproj" />
+    <!-- Brings FFmpeg's libraries with it, through ChartShared.Ffmpeg. -->
+    <ProjectReference Include="..\..\ChartShared.Audio\ChartShared.Audio.csproj" />
   </ItemGroup>
 </Project>

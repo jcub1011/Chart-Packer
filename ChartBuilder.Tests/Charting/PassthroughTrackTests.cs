@@ -1,4 +1,4 @@
-using ChartPacker.Core.Charting;
+using ChartShared.Core.Charting;
 
 namespace ChartBuilder.Tests.Charting;
 

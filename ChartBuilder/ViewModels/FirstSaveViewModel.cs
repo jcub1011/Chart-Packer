@@ -1,10 +1,10 @@
 using System.IO;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Saving;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Saving;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

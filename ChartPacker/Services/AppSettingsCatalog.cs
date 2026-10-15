@@ -1,13 +1,14 @@
 using System;
 using System.Globalization;
 using System.Linq;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
-using ChartPacker.UI;
 using ChartPacker.ViewModels;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Settings;
+using ChartShared.UI;
+using ChartShared.UI.Resources;
 
 namespace ChartPacker.Services
 {

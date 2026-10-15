@@ -11,17 +11,17 @@ using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Input;
-using ChartPacker.Core.Launching;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.Views;
-using ChartPacker.ViewModels.Settings;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Recovery;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Input;
+using ChartShared.Core.Launching;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels.Settings;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder.Services
 {

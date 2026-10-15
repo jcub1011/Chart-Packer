@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartShared.UI.ViewModels"
+        xmlns:views="using:ChartShared.UI.Views"
+        xmlns:res="using:ChartShared.UI.Resources"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="640"
+        x:Class="ChartShared.UI.Views.ChartIssuesWindow"
+        x:DataType="vm:ChartIssuesViewModel"
+        Title="{Binding Title}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="560" Height="640"
+        MinWidth="360" MinHeight="300"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <!-- A chart's findings in a window of their own (GitHub issue #53): the headline, then every finding, grouped by
+         reading the chart file, the chart as a whole, and each part and difficulty. It keeps up as they change. -->
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="16,12,16,4" Spacing="2">
+            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Headline}" />
+            <TextBlock Classes="muted" FontSize="12" Text="{Binding Summary}" />
+        </StackPanel>
+        <Button DockPanel.Dock="Bottom"
+                HorizontalAlignment="Right"
+                Margin="16,8,16,12"
+                MinWidth="80"
+                IsCancel="True"
+                Content="{x:Static res:SharedStrings.ChartIssuesCloseButton}"
+                Click="OnClose" />
+        <views:ChartIssuesView />
+    </DockPanel>
+</Window>

@@ -9,7 +9,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using ChartBuilder.ViewModels;
-using ChartPacker.Core.Charting.Layout;
+using ChartShared.Core.Charting.Layout;
 
 namespace ChartBuilder.Controls
 {

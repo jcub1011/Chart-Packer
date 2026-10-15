@@ -6,13 +6,13 @@ using System.Linq;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Difficulty;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Lint;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.Controls.Highway;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Difficulty;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Lint;
+using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Highway;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -250,7 +250,7 @@ namespace ChartBuilder.ViewModels
 
         private void OnChartChanged(object? sender, EditorChartChangedEventArgs e)
         {
-            if (e.Affected.Song.HasFlag(ChartPacker.Core.Charting.Commands.SongChanges.Parts))
+            if (e.Affected.Song.HasFlag(ChartShared.Core.Charting.Commands.SongChanges.Parts))
                 RefreshChoices();
             if (Track is { } track && e.Affected.Touches(track))
                 ScheduleRebuild();

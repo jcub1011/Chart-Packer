@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Scanning;
 
 namespace ChartPacker.Services
 {

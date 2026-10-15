@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Controls;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
 {

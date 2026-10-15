@@ -5,8 +5,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using ChartPacker.Services;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
 {

@@ -5,7 +5,7 @@
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartPacker.Controls"
-        xmlns:ui="using:ChartPacker.UI.Controls"
+        xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:views="using:ChartPacker.Views"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="880"
         x:Class="ChartPacker.Views.ValidatorWindow"

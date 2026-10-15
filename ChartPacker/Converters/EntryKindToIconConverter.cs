@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Scanning;
 
 namespace ChartPacker.Converters
 {

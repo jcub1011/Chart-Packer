@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Scanning;
 
 namespace ChartBuilder.Views
 {

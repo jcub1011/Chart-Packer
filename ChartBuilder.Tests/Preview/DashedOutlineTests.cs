@@ -1,5 +1,5 @@
 using Avalonia;
-using ChartPacker.UI.Controls.Highway;
+using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Tests.Preview;
 

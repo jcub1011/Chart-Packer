@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Analysis;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Analysis;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charts;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

@@ -1,10 +1,10 @@
 using System.Diagnostics;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Ini;
-using ChartPacker.Core.Library;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Sng;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Ini;
+using ChartShared.Core.Library;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Sng;
 using Microsoft.Win32.SafeHandles;
 
 namespace ScanBench;

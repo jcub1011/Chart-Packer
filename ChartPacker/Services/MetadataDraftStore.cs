@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using ChartPacker.Core.Metadata;
+using ChartShared.Core.Metadata;
 
 namespace ChartPacker.Services
 {
