@@ -46,6 +46,15 @@ public abstract class SettingDefinition
 /// </param>
 public sealed record SettingAction(string Label, Action Run, string? IconKey = null);
 
+/// <summary>
+/// A row with no value of its own, only its <see cref="SettingDefinition.Actions"/>: for what's edited
+/// elsewhere, such as the audio latency, which the calibration tool edits.
+/// </summary>
+public sealed class ActionSetting : SettingDefinition
+{
+    public override SettingEdit BeginEdit() => new ActionSettingEdit(this);
+}
+
 /// <summary>A setting whose value is a <typeparamref name="T"/>.</summary>
 public abstract class SettingDefinition<T> : SettingDefinition
 {

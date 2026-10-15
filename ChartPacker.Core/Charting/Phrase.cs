@@ -33,6 +33,18 @@ public enum PhraseKind
 /// </param>
 public readonly record struct Phrase(PhraseKind Kind, long Tick, long Length, ChartDifficulty? LowestDifficulty = null)
 {
+    /// <summary>
+    /// The tick after the last one it covers: it covers from its start to the tick before its end, or its start alone
+    /// when it has no length, as the games read a marker.
+    /// </summary>
+    public long CoverEnd => Tick + Math.Max(1, Length);
+
+    /// <summary>Whether it covers <paramref name="tick"/>, as the games read it (see <see cref="CoverEnd"/>).</summary>
+    public bool Covers(long tick) => tick >= Tick && tick < CoverEnd;
+
+    /// <summary>Whether it and <paramref name="other"/> cover a tick in common.</summary>
+    public bool Overlaps(Phrase other) => Tick < other.CoverEnd && other.Tick < CoverEnd;
+
     /// <summary>Whether a phrase of <paramref name="kind"/> has a <see cref="LowestDifficulty"/>.</summary>
     public static bool HasLowestDifficulty(PhraseKind kind) => kind is PhraseKind.Roll or PhraseKind.Trill;
 

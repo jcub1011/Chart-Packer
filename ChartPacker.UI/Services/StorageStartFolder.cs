@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Platform.Storage;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     public static class StorageStartFolder
     {

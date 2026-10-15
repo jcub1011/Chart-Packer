@@ -1,0 +1,150 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:sres="using:ChartPacker.Resources"
+        xmlns:bctl="using:ChartBuilder.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="620"
+        x:Class="ChartBuilder.Views.CalibrationWindow"
+        x:DataType="vm:CalibrationViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{x:Static res:Strings.CalibrationWindowTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        Width="640" Height="620"
+        MinWidth="520" MinHeight="520">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="20" RowSpacing="14">
+        <StackPanel Grid.Row="0" Spacing="6">
+            <TextBlock Text="{Binding DeviceText}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
+            <TextBlock Text="{x:Static res:Strings.CalibrationInstructions}"
+                       Opacity="0.8"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding IsManual}" />
+            <TextBlock Text="{Binding TapStatus}"
+                       Foreground="{DynamicResource AccentTextBrush}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding IsTapTesting}" />
+        </StackPanel>
+
+        <!-- The light and the highway. A click on them is a tap in the tap test. -->
+        <bctl:CalibrationView x:Name="View"
+                              Grid.Row="1"
+                              MinHeight="200"
+                              Beats="{Binding Beats}"
+                              ShowLight="{Binding IsLightShown}"
+                              ShowHighway="{Binding IsHighwayShown}"
+                              Cursor="Hand" />
+
+        <!-- The latency: a slider, steps, and a number box, each within ±500 ms (AudioLatencyFile.MaxMilliseconds). -->
+        <StackPanel Grid.Row="2" Spacing="8" IsEnabled="{Binding IsManual}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.CalibrationLatencyLabel}" VerticalAlignment="Center" />
+                <Slider Grid.Column="1"
+                        Value="{Binding Value}"
+                        Minimum="-500"
+                        Maximum="500"
+                        SmallChange="1"
+                        LargeChange="10"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{x:Static res:Strings.CalibrationLatencyLabel}" />
+                <NumericUpDown Grid.Column="2"
+                               Value="{Binding Value}"
+                               Minimum="-500"
+                               Maximum="500"
+                               Increment="1"
+                               FormatString="+0;−0;0"
+                               ParsingNumberStyle="Integer"
+                               ClipValueToMinMax="True"
+                               Width="120"
+                               AutomationProperties.Name="{x:Static res:Strings.CalibrationLatencyLabel}" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+                <ItemsControl Grid.Column="0" ItemsSource="{x:Static vm:CalibrationViewModel.Steps}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:LatencyStep">
+                            <Button Content="{Binding Label}"
+                                    MinWidth="44"
+                                    HorizontalContentAlignment="Center"
+                                    Command="{Binding $parent[Window].((vm:CalibrationViewModel)DataContext).NudgeCommand}"
+                                    CommandParameter="{Binding Amount}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                    <CheckBox Content="{x:Static res:Strings.CalibrationShowLight}" IsChecked="{Binding ShowLight}" />
+                    <CheckBox Content="{x:Static res:Strings.CalibrationShowHighway}" IsChecked="{Binding ShowHighway}" />
+                </StackPanel>
+            </Grid>
+            <TextBlock Text="{x:Static res:Strings.CalibrationKeysHint}" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- The tap test: a measured starting value for the manual test. -->
+        <Border Grid.Row="3"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Static res:Strings.CalibrationTapTestDescription}"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding !HasTapResult}" />
+                    <TextBlock Text="{Binding TapResult}"
+                               TextWrapping="Wrap"
+                               Classes.warning="{Binding IsTapResultWide}"
+                               IsVisible="{Binding HasTapResult}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Content="{x:Static res:Strings.CalibrationUseTapEstimate}"
+                            Command="{Binding UseTapEstimateCommand}"
+                            IsVisible="{Binding HasTapResult}" />
+                    <Button Content="{x:Static res:Strings.CalibrationStartTapTest}"
+                            Command="{Binding StartTapTestCommand}"
+                            IsVisible="{Binding IsManual}" />
+                    <Button Content="{x:Static res:Strings.CalibrationStopTapTest}"
+                            Command="{Binding StopTapTestCommand}"
+                            IsVisible="{Binding IsTapTesting}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="4"
+                   Text="{Binding Message}"
+                   Foreground="{DynamicResource WarningTextBrush}"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding HasMessage}" />
+
+        <Grid Grid.Row="5" ColumnDefinitions="Auto,*,Auto">
+            <Button Grid.Column="0"
+                    Content="{x:Static res:Strings.CalibrationReset}"
+                    Command="{Binding ResetCommand}"
+                    IsEnabled="{Binding IsManual}" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <Button Content="{x:Static sres:SharedStrings.CancelButton}"
+                        IsCancel="True"
+                        Click="OnCancel" />
+                <Button Classes="accent"
+                        Content="{x:Static res:Strings.CalibrationSave}"
+                        Command="{Binding SaveCommand}"
+                        IsEnabled="{Binding IsManual}" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+
+    <Window.Styles>
+        <Style Selector="TextBlock.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+    </Window.Styles>
+</Window>

@@ -106,7 +106,7 @@ public static class MidiChartLoader
         ArgumentNullException.ThrowIfNull(chartBytes);
         ArgumentNullException.ThrowIfNull(options);
         var conversion = ChartToMidi.Convert(chartBytes, options);
-        return new ChartImportResult(Load(conversion.Midi, conversion.Options), conversion.Offset, conversion.Options, conversion.Warnings);
+        return new ChartImportResult(Load(conversion.Midi, conversion.Options), conversion.Offset, conversion.Options, conversion.Warnings, ChartSongSection.Read(chartBytes));
     }
 
     /// <summary>
@@ -211,7 +211,7 @@ public static class MidiChartLoader
     }
 
     /// <summary>The audio time an anchor event gives, written exactly as the writer writes one, so it's written back the same.</summary>
-    private static long? AnchorOf(string text)
+    internal static long? AnchorOf(string text)
     {
         if (!text.StartsWith(AnchorStart, StringComparison.Ordinal) || !text.EndsWith(AnchorEnd, StringComparison.Ordinal) || text.Length <= AnchorStart.Length + AnchorEnd.Length)
             return null;

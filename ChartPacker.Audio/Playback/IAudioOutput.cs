@@ -31,6 +31,15 @@ public interface IAudioOutput : IDisposable
 
     /// <summary>Starts, or carries on, playing the queue.</summary>
     void Resume();
+
+    /// <summary>The device the queue is playing on.</summary>
+    AudioDevice Device { get; }
+
+    /// <summary>
+    /// Raised with the new device when the queue moves to another device, as it does when the OS's
+    /// default output changes. It may be raised on any thread.
+    /// </summary>
+    event Action<AudioDevice>? DeviceChanged;
 }
 
 /// <summary>The audio device couldn't be opened or used.</summary>

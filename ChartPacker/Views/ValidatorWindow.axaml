@@ -5,6 +5,7 @@
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:ui="using:ChartPacker.UI.Controls"
         xmlns:views="using:ChartPacker.Views"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="880"
         x:Class="ChartPacker.Views.ValidatorWindow"
@@ -24,7 +25,7 @@
                           ToolTip.Tip="{Binding ToolTip}"
                           AutomationProperties.Name="{Binding Label}">
                 <StackPanel Orientation="Horizontal" Spacing="3">
-                    <ctl:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsOn}" />
+                    <ui:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsOn}" />
                     <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
                 </StackPanel>
             </ToggleButton>
@@ -37,7 +38,7 @@
                           ToolTip.Tip="{Binding ToolTip}"
                           AutomationProperties.Name="{Binding Label}">
                 <StackPanel Orientation="Horizontal" Spacing="3">
-                    <ctl:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsOn}" />
+                    <ui:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsOn}" />
                     <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontFamily="Consolas, Menlo, monospace" />
                 </StackPanel>
             </ToggleButton>
@@ -130,6 +131,13 @@
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+        <!-- A chart lint finding (charter-spec C16 item 5): coloured as the detail panel colours findings. -->
+        <Style Selector="TextBlock.issue.chartWarning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.issue.chartError">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
         <Style Selector="TextBlock.fix">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Opacity" Value="0.65" />
@@ -192,7 +200,7 @@
                                 ToolTip.Tip="{x:Static res:Strings.ValidatorFilterToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.ValidatorFilterToolTip}">
                             <Panel Width="32" Height="32">
-                                <ctl:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
+                                <ui:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
                                 <Border Classes="badge" IsVisible="{Binding HasActiveFilters}">
                                     <TextBlock Text="{Binding ActiveFilterCount}" />
                                 </Border>
@@ -296,7 +304,7 @@
                                 ToolTip.Tip="{x:Static res:Strings.ValidatorSaveAllToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.ValidatorSaveAll}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ctl:LineIcon Data="{StaticResource SaveStroke}" />
+                                <ui:LineIcon Data="{StaticResource SaveStroke}" />
                                 <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ValidatorSaveAll}" />
                             </StackPanel>
                         </Button>
@@ -349,8 +357,8 @@
                                                FontSize="11"
                                                VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
-                                               ctl:RichTextMarkup.Prefix="{Binding BylinePrefix}"
-                                               ctl:RichTextMarkup.Text="{Binding Charter}"
+                                               ui:RichTextMarkup.Prefix="{Binding BylinePrefix}"
+                                               ui:RichTextMarkup.Text="{Binding Charter}"
                                                IsVisible="{Binding ShowByline}" />
 
                                     <Border Grid.Row="0" Grid.Column="2"
@@ -397,7 +405,11 @@
                                                             <Border Grid.Column="0" Classes="key" IsVisible="{Binding HasKey}">
                                                                 <TextBlock Text="{Binding Key}" />
                                                             </Border>
-                                                            <TextBlock Grid.Column="1" Classes="issue" Text="{Binding Message}" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Classes="issue"
+                                                                       Classes.chartWarning="{Binding IsChartWarning}"
+                                                                       Classes.chartError="{Binding IsChartError}"
+                                                                       Text="{Binding Message}" />
                                                         </Grid>
                                                         <TextBlock Classes="fix" IsVisible="{Binding IsFixable}" Text="{Binding FixText}" />
                                                     </StackPanel>
@@ -446,14 +458,14 @@
                                         Command="{Binding Inspector.DiscardCommand}"
                                         ToolTip.Tip="{x:Static res:Strings.DiscardToolTip}"
                                         AutomationProperties.Name="{x:Static res:Strings.DiscardButton}">
-                                    <ctl:LineIcon Data="{StaticResource UndoStroke}" />
+                                    <ui:LineIcon Data="{StaticResource UndoStroke}" />
                                 </Button>
                                 <Button Classes="labelled accent"
                                         Command="{Binding Inspector.SaveCommand}"
                                         ToolTip.Tip="{x:Static res:Strings.SaveToolTip}"
                                         AutomationProperties.Name="{x:Static res:Strings.SaveButton}">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <ctl:LineIcon Data="{StaticResource SaveStroke}" />
+                                        <ui:LineIcon Data="{StaticResource SaveStroke}" />
                                         <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SaveButton}" />
                                     </StackPanel>
                                 </Button>

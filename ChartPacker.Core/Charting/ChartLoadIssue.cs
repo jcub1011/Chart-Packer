@@ -73,4 +73,10 @@ public sealed record ChartLoadResult(EditableChart Chart, IReadOnlyList<ChartLoa
 /// <param name="Offset">The <c>.chart</c>'s <c>[Song]</c> <c>Offset</c>, which song.ini's <c>delay</c> takes over.</param>
 /// <param name="Options">The song.ini settings the converted chart reads the same as the <c>.chart</c> with; see <see cref="ChartConversion.Options"/>.</param>
 /// <param name="Warnings">The conversion's warnings: tracks that didn't come out exactly as the <c>.chart</c> has them.</param>
-public sealed record ChartImportResult(ChartLoadResult Load, TimeSpan? Offset, ChartReadOptions Options, IReadOnlyList<ChartMergeWarning> Warnings);
+/// <param name="SongValues">The <c>.chart</c>'s <c>[Song]</c> metadata, as <c>song.ini</c> pairs (<see cref="ChartSongSection"/>).</param>
+public sealed record ChartImportResult(
+    ChartLoadResult Load,
+    TimeSpan? Offset,
+    ChartReadOptions Options,
+    IReadOnlyList<ChartMergeWarning> Warnings,
+    IReadOnlyList<KeyValuePair<string, string>> SongValues);

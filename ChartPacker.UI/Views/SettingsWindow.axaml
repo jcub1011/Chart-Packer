@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:svm="using:ChartPacker.ViewModels.Settings"
         xmlns:res="using:ChartPacker.Resources"
-        xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:ctl="using:ChartPacker.UI.Controls"
         mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="560"
         x:Class="ChartPacker.Views.SettingsWindow"
         x:DataType="svm:SettingsWindowViewModel"
@@ -105,6 +105,10 @@
                         Content="{x:Static res:SharedStrings.SettingsBrowseButton}"
                         AutomationProperties.Name="{Binding Label}" />
             </StackPanel>
+        </DataTemplate>
+        <!-- No editor: the row is its label and its buttons. -->
+        <DataTemplate DataType="svm:ActionSettingViewModel">
+            <Panel />
         </DataTemplate>
     </Window.DataTemplates>
 

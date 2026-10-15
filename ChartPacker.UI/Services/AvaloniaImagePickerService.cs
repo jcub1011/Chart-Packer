@@ -4,7 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using ChartPacker.Resources;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     public sealed class AvaloniaImagePickerService(Func<TopLevel?> topLevel) : IImagePickerService
     {

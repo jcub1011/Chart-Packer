@@ -1,0 +1,269 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ChartPacker.UI.ViewModels"
+             xmlns:views="using:ChartPacker.UI.Views"
+             xmlns:res="using:ChartPacker.Resources"
+             xmlns:ui="using:ChartPacker.UI.Controls"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="200"
+             x:Class="ChartPacker.UI.Views.TrackListView"
+             x:DataType="views:TrackListView">
+    <!-- A song's audio tracks, Chart Packer's inspector's and Chart Builder's Chart settings': a row per track with its
+         mute and solo switches, size, name, waveform and volume, then the tracks a staged change removes, then Add track.
+         Replace and Remove are buttons on each row, or with ActionsInContextMenu, items of its right-click menu, which a
+         row then says it has as it's hovered. Too narrow for a row on one line (the compact class, set as the control is
+         sized), each track's waveform and volume go on a second line under its name. Every value comes from this
+         control's properties, which the view around it binds. -->
+
+    <UserControl.Styles>
+        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <!-- A track's waveform fades while the track isn't heard, as the mix leaves it out. -->
+        <Style Selector="ui|WaveformView.track">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ui|WaveformView.track.unheard">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <!-- Where a row's name, waveform and volume go: on one line, or, compact, the waveform and volume under the name,
+             which takes the line's room. Set here rather than on the elements, as the compact styles move them. -->
+        <Style Selector="TextBlock.trackName">
+            <Setter Property="Grid.Column" Value="3" />
+            <Setter Property="MaxWidth" Value="160" />
+        </Style>
+        <Style Selector="ui|WaveformView.track">
+            <Setter Property="Grid.Column" Value="4" />
+        </Style>
+        <Style Selector="Slider.trackVolume">
+            <Setter Property="Grid.Column" Value="5" />
+            <Setter Property="Width" Value="90" />
+        </Style>
+        <Style Selector="views|TrackListView.compact TextBlock.trackName">
+            <Setter Property="Grid.ColumnSpan" Value="3" />
+            <Setter Property="MaxWidth" Value="Infinity" />
+        </Style>
+        <Style Selector="views|TrackListView.compact ui|WaveformView.track">
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Grid.ColumnSpan" Value="4" />
+        </Style>
+        <Style Selector="views|TrackListView.compact Slider.trackVolume">
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Width" Value="80" />
+        </Style>
+
+        <!-- With Replace and Remove on the right-click menu, a row lights up as it's hovered and says it has one. -->
+        <Style Selector="Border.trackRow">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="2,1" />
+        </Style>
+        <Style Selector="views|TrackListView.menuActions Border.trackRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+        <Style Selector="views|TrackListView.menuActions Border.trackRow.kept">
+            <Setter Property="ToolTip.Tip" Value="{x:Static res:SharedStrings.TrackRowMenuToolTip}" />
+        </Style>
+        <Style Selector="views|TrackListView.menuActions Border.trackRow.removedTrack">
+            <Setter Property="ToolTip.Tip" Value="{x:Static res:SharedStrings.RemovedTrackRowMenuToolTip}" />
+        </Style>
+        <Style Selector="ToggleButton.trackSwitch">
+            <Setter Property="MinWidth" Value="24" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- The track rows and the removed-track rows share their column widths, so the sizes, names, waveforms and buttons
+         line up: every column but the waveform's is shared, so each track's waveform starts and ends at the same place, on
+         the one time axis of the song's length. -->
+    <StackPanel Grid.IsSharedSizeScope="True">
+        <ItemsControl ItemsSource="{Binding $parent[views:TrackListView].Tracks}"
+                      AutomationProperties.Name="{x:Static res:SharedStrings.TracksListName}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TrackRowViewModel">
+                    <!-- Transparent so the whole row, gaps and waveform included, takes a right-click. -->
+                    <Border Classes="trackRow kept">
+                        <Border.ContextMenu>
+                            <ContextMenu Opening="OnRowMenuOpening">
+                                <MenuItem Tag="replace" Header="{x:Static res:SharedStrings.ReplaceTrackToolTip}" />
+                                <MenuItem Tag="remove" Header="{x:Static res:SharedStrings.RemoveTrackToolTip}" />
+                                <MenuItem Header="{Binding DownloadHeader}"
+                                          Command="{Binding DownloadCommand}"
+                                          IsVisible="{Binding CanDownload}" />
+                            </ContextMenu>
+                        </Border.ContextMenu>
+                        <Grid ColumnSpacing="6" RowSpacing="2" RowDefinitions="Auto,Auto,Auto">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSwitches" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSize" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackName" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackVolume" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackActions" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Classes="marker"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding Marker}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                <ToggleButton Classes="trackSwitch"
+                                              Content="{x:Static res:SharedStrings.MuteButton}"
+                                              IsChecked="{Binding IsMuted}"
+                                              ToolTip.Tip="{x:Static res:SharedStrings.MuteToolTip}"
+                                              AutomationProperties.Name="{x:Static res:SharedStrings.MuteToolTip}" />
+                                <ToggleButton Classes="trackSwitch"
+                                              Content="{x:Static res:SharedStrings.SoloButton}"
+                                              IsChecked="{Binding IsSolo}"
+                                              ToolTip.Tip="{x:Static res:SharedStrings.SoloToolTip}"
+                                              AutomationProperties.Name="{x:Static res:SharedStrings.SoloToolTip}" />
+                            </StackPanel>
+                            <Border Grid.Column="2" Classes="chip" HorizontalAlignment="Left" IsVisible="{Binding HasSize}">
+                                <TextBlock Text="{Binding Size}" />
+                            </Border>
+                            <!-- Capped on one line, so one long name doesn't squeeze every track's waveform. -->
+                            <TextBlock Classes="trackName"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="{Binding Name}"
+                                       Text="{Binding Name}" />
+                            <!-- The track's own waveform, faded while it isn't heard. It only shows; the seek bar seeks.
+                                 Hidden while waveforms are off, leaving its column so the rows still line up. -->
+                            <ui:WaveformView Classes="track"
+                                             Classes.unheard="{Binding !IsHeard}"
+                                             IsVisible="{Binding $parent[views:TrackListView].ShowWaveforms}"
+                                             Height="20"
+                                             VerticalAlignment="Center"
+                                             IsHitTestVisible="False"
+                                             Waveform="{Binding Waveform}"
+                                             PositionSeconds="{Binding $parent[views:TrackListView].PositionSeconds, Mode=OneWay}"
+                                             LengthSeconds="{Binding $parent[views:TrackListView].LengthSeconds}"
+                                             PlayedBrush="{DynamicResource AccentTextBrush}"
+                                             UnplayedBrush="{DynamicResource WaveformBrush}" />
+                            <!-- How loud the track is in the mix. -->
+                            <Slider Classes="trackVolume"
+                                    Minimum="0"
+                                    Maximum="1"
+                                    Value="{Binding Volume}"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="{x:Static res:SharedStrings.TrackVolumeName}"
+                                    AutomationProperties.Name="{x:Static res:SharedStrings.TrackVolumeName}" />
+                            <StackPanel Grid.Column="6"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding $parent[views:TrackListView].ShowsActionButtons}">
+                                <!-- Replaces the stem's track, in whatever format it was, as Add track does. -->
+                                <Button Classes="icon"
+                                        Padding="4"
+                                        VerticalAlignment="Center"
+                                        Command="{Binding $parent[views:TrackListView].ReplaceTrackCommand}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{x:Static res:SharedStrings.ReplaceTrackToolTip}"
+                                        AutomationProperties.Name="{x:Static res:SharedStrings.ReplaceTrackToolTip}">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource ReplaceIconGeometry}" />
+                                </Button>
+                                <Button Classes="icon"
+                                        Padding="4"
+                                        VerticalAlignment="Center"
+                                        Command="{Binding $parent[views:TrackListView].RemoveTrackCommand}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{x:Static res:SharedStrings.RemoveTrackToolTip}"
+                                        AutomationProperties.Name="{x:Static res:SharedStrings.RemoveTrackToolTip}">
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                </Button>
+                            </StackPanel>
+                            <!-- Below the row, so a long reason doesn't make the waveform taller. -->
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="2"
+                                       Grid.ColumnSpan="5"
+                                       Classes="error"
+                                       Margin="0,0,0,2"
+                                       Text="{Binding Error}"
+                                       IsVisible="{Binding HasError}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding $parent[views:TrackListView].RemovedTracks}"
+                      AutomationProperties.Name="{x:Static res:SharedStrings.RemovedTracksListName}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RemovedTrackRow">
+                    <!-- As tall as a track row, which its switches and slider set, so the list keeps its rhythm. -->
+                    <Border Classes="trackRow removedTrack">
+                        <Border.ContextMenu>
+                            <ContextMenu Opening="OnRowMenuOpening">
+                                <MenuItem Tag="restore" Header="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}" />
+                            </ContextMenu>
+                        </Border.ContextMenu>
+                        <Grid ColumnSpacing="6" MinHeight="20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSwitches" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackSize" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackName" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackVolume" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="TrackActions" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="2" Classes="chip" HorizontalAlignment="Left">
+                                <TextBlock Classes="removed" Text="{Binding Size}" />
+                            </Border>
+                            <TextBlock Classes="trackName removed"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="{Binding Name}"
+                                       Text="{Binding Name}" />
+                            <Button Grid.Column="6"
+                                    Classes="icon"
+                                    Padding="4"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Right"
+                                    Command="{Binding $parent[views:TrackListView].RestoreTrackCommand}"
+                                    CommandParameter="{Binding}"
+                                    IsVisible="{Binding $parent[views:TrackListView].ShowsActionButtons}"
+                                    ToolTip.Tip="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}"
+                                    AutomationProperties.Name="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- One entry per stem; a stem the song has already is replaced, in whatever format it was. -->
+        <Button x:Name="AddButton"
+                Classes="icon"
+                Margin="10,4,0,0"
+                HorizontalAlignment="Left"
+                IsVisible="{Binding $parent[views:TrackListView].CanEdit}"
+                AutomationProperties.Name="{x:Static res:SharedStrings.AddTrackButton}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                <TextBlock Text="{x:Static res:SharedStrings.AddTrackButton}" />
+            </StackPanel>
+            <Button.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                    <MenuFlyout.ItemContainerTheme>
+                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:StemOption">
+                            <Setter Property="Header" Value="{Binding Label}" />
+                            <Setter Property="Command" Value="{Binding Command}" />
+                            <Setter Property="CommandParameter" Value="{Binding Stem}" />
+                        </ControlTheme>
+                    </MenuFlyout.ItemContainerTheme>
+                </MenuFlyout>
+            </Button.Flyout>
+        </Button>
+    </StackPanel>
+</UserControl>

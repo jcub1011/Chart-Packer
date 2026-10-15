@@ -282,7 +282,7 @@ public sealed class SngReaderTests
         var result = Read(new SngBuilder().AddMetadata("name", "Big").AddMetadata("lyrics", value).AddFile("notes.chart", [1, 2, 3]).Build());
 
         Assert.IsEmpty(result.Findings);
-        Assert.AreSequenceEqual(["Big", value], result.Metadata.Select(p => p.Value).ToArray());
+        Assert.AreSequenceEqual(["Big", value], [.. result.Metadata.Select(p => p.Value)]);
         Assert.AreEqual("notes.chart", result.Files.Single().Name);
     }
 
@@ -303,8 +303,8 @@ public sealed class SngReaderTests
         using var handle = File.OpenHandle(path);
         var byHandle = SngReader.Read(handle, TestContext.CancellationToken);
 
-        Assert.AreSequenceEqual(byPath.Metadata.ToArray(), byHandle.Metadata.ToArray());
-        Assert.AreSequenceEqual(byPath.Files.ToArray(), byHandle.Files.ToArray());
+        Assert.AreSequenceEqual([.. byPath.Metadata], [.. byHandle.Metadata]);
+        Assert.AreSequenceEqual([.. byPath.Files], [.. byHandle.Files]);
         Assert.IsEmpty(byHandle.Findings);
         Assert.IsFalse(handle.IsClosed);
         Assert.AreEqual(new FileInfo(path).Length, RandomAccess.GetLength(handle));

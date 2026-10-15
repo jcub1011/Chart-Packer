@@ -82,43 +82,11 @@ public sealed class JsonSettingsFile<T>
                 merged[name] = value?.DeepClone();
         }
 
-        string tempPath = $"{_path}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_path))!);
-            using (var stream = File.Create(tempPath))
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
-            {
-                merged.WriteTo(writer);
-            }
-            File.Move(tempPath, _path, overwrite: true);
+        if (JsonFiles.WriteAtomically(_path, merged))
             _baseline = current;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Trace.TraceWarning($"Couldn't save settings to '{_path}': {ex.Message}");
-            try { File.Delete(tempPath); } catch (Exception) { }
-        }
     }
 
     private JsonObject ToJson(T settings) => JsonSerializer.SerializeToNode(settings, _typeInfo) as JsonObject ?? [];
 
-    // The file's JSON object, or null when it's missing, unreadable or not an object.
-    private JsonObject? Read(bool warn)
-    {
-        try
-        {
-            if (!File.Exists(_path))
-                return null;
-
-            using var stream = File.OpenRead(_path);
-            return JsonNode.Parse(stream) as JsonObject;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            if (warn)
-                Trace.TraceWarning($"Ignoring unreadable settings file '{_path}': {ex.Message}");
-            return null;
-        }
-    }
+    private JsonObject? Read(bool warn) => JsonFiles.ReadObject(_path, warn);
 }

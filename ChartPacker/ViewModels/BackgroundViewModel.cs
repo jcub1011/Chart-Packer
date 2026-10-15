@@ -11,8 +11,9 @@ using Avalonia.Threading;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Ffmpeg;
-using ChartPacker.Formatting;
 using ChartPacker.Resources;
+using ChartPacker.UI.Formatting;
+using ChartPacker.UI.ViewModels;
 using ChartPacker.Video;
 using CommunityToolkit.Mvvm.ComponentModel;
 

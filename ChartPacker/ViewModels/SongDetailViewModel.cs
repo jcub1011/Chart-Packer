@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using ChartPacker.Audio.Decoding;
 using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Library;
@@ -19,9 +18,11 @@ using ChartPacker.Core.Scanning;
 using ChartPacker.Core.Sng;
 using ChartPacker.Core.Validation;
 using ChartPacker.Core.Validation.QuickFixes;
-using ChartPacker.Formatting;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartPacker.UI.Formatting;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -51,25 +52,8 @@ namespace ChartPacker.ViewModels
         public string DownloadHeader => SongFileSource.DownloadHeaderFor(Name);
     }
 
-    /// <summary>A track a staged change removes, shown struck through so that its removal can be undone.</summary>
-    public sealed record RemovedTrackRow(string Name, string Size);
-
     /// <summary>A structural problem found in a <c>.sng</c>.</summary>
     public sealed record FindingRow(string RuleId, string Message, bool IsError);
-
-    /// <summary>Why a key that has no metadata row, such as a difficulty, fails validation.</summary>
-    /// <param name="QuickFixDescription">What the quick fix does, when that's one thing.</param>
-    /// <param name="QuickFixCommand">Applies the key's quick fixes from its right-click menu; disabled when it has none.</param>
-    public sealed record MetadataIssueRow(string Key, string Message, string? QuickFixDescription, IRelayCommand QuickFixCommand)
-    {
-        /// <summary>The right-click menu's Quick Fix item, saying what it does when that's one thing.</summary>
-        public string QuickFixHeader => QuickFixDescription is { } description
-            ? string.Format(CultureInfo.CurrentCulture, Strings.QuickFixMenuFormat, description)
-            : Strings.QuickFixMenu;
-    }
-
-    /// <summary>An entry of the Add track menu: a stem, labelled to say whether choosing it replaces the song's track for it.</summary>
-    public sealed record StemOption(string Stem, string Label, IAsyncRelayCommand Command);
 
     /// <summary>
     /// The right panel: the album art, background and metadata of the songs selected in the
@@ -86,11 +70,9 @@ namespace ChartPacker.ViewModels
     /// applied, play in <see cref="Player"/>. It holds the files open while it plays, so it's
     /// unloaded before saving.</para>
     /// </remarks>
-    public partial class SongDetailViewModel : ViewModelBase
+    public partial class SongDetailViewModel : ViewModelBase, IMetadataEditorHost
     {
         private const int BulkLoadParallelism = 4;
-
-        internal const string SongLengthKey = "song_length";
 
         // A square tile at its 512px largest, at 2x scaling.
         private const int ArtDecodeWidth = 1024;
@@ -104,8 +86,13 @@ namespace ChartPacker.ViewModels
         private readonly IFileRevealService? _reveal;
         private readonly SongFileGate _songFiles;
         private readonly IConfirmationService? _confirmation;
+
+        // Whether Chart Builder has the song at a path open, so saving asks first (charter-spec §4.8).
+        private readonly Func<string, bool>? _isOpenInChartBuilder;
         private readonly DraftSaver _saver;
         private CancellationTokenSource? _loadCts;
+        private CancellationTokenSource? _chartLintCts;
+        private readonly IChartIssuesWindowService? _chartIssuesWindow;
 
         // This panel is telling the draft store about its own change, which it needn't hear back.
         private bool _notifyingDrafts;
@@ -165,10 +152,6 @@ namespace ChartPacker.ViewModels
         // One command per stem for the Add track menu, whose labels change with the song's tracks.
         private readonly Dictionary<string, IAsyncRelayCommand> _addTrackCommands = [];
 
-        // The Quick Fix commands of keys without a row, and the keys some selected song has a quick fix for.
-        private readonly Dictionary<string, IRelayCommand> _quickFixKeyCommands = new(StringComparer.OrdinalIgnoreCase);
-        private HashSet<string> _keysWithQuickFix = new(StringComparer.OrdinalIgnoreCase);
-
         /// <param name="downloads">Saves copies of the song's files from their right-click menus; none for a panel that only previews.</param>
         /// <param name="reveal">Shows the selected songs in the file manager; none for a panel that only previews.</param>
         /// <param name="songFiles">
@@ -189,8 +172,12 @@ namespace ChartPacker.ViewModels
             IFileRevealService? reveal = null,
             SongFileGate? songFiles = null,
             IConfirmationService? confirmation = null,
-            DraftSaver? saver = null)
+            DraftSaver? saver = null,
+            Func<string, bool>? isOpenInChartBuilder = null,
+            IChartIssuesWindowService? chartIssuesWindow = null)
         {
+            _isOpenInChartBuilder = isOpenInChartBuilder;
+            _chartIssuesWindow = chartIssuesWindow;
             _drafts = drafts;
             _downloads = downloads;
             _reveal = reveal;
@@ -205,7 +192,7 @@ namespace ChartPacker.ViewModels
             _filePicker = filePicker;
             _videoProbe = videoProbe;
             Player = player;
-            Background = new BackgroundViewModel(() => Player.CurrentPosition);
+            Background = new BackgroundViewModel(() => Player.DrawnPosition);
             Background.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(BackgroundViewModel.ShownKind))
@@ -218,12 +205,13 @@ namespace ChartPacker.ViewModels
                     RefreshTimingOffsetsEditable();
                 }
             };
+            MetadataEditor = new MetadataEditorViewModel(this);
             Highway = highway;
             Highway.OffsetsChanged += (_, _) => OnOffsetsChanged();
             Highway.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(HighwayViewModel.ChartParts))
-                    RefreshInstruments();
+                    MetadataEditor.RefreshInstruments();
                 else if (e.PropertyName == nameof(HighwayViewModel.ChartOffset))
                 {
                     // The audio offset is worked out against the chart's own, which is only known once the chart is read.
@@ -233,7 +221,6 @@ namespace ChartPacker.ViewModels
             };
             AudioOffset.OffsetChanged += (_, _) => OnTimingChanged();
             VideoOffset.OffsetChanged += (_, _) => OnTimingChanged();
-            Instruments = [.. DifficultySlots.All.Select(s => new InstrumentDifficultyViewModel(this, s))];
             Lyrics = new LyricsViewModel(Player);
             Lyrics.OffsetChanged += (_, _) => OnOffsetsChanged();
 
@@ -254,25 +241,8 @@ namespace ChartPacker.ViewModels
                 RefreshCommands();
         }
 
-        public AvaloniaList<MetadataRowViewModel> Metadata { get; } = [];
-
-        /// <summary>An icon per song.ini difficulty, above the metadata rows, which leave the difficulties out.</summary>
-        public IReadOnlyList<InstrumentDifficultyViewModel> Instruments { get; }
-
-        /// <summary>Whether the icons of instruments that aren't charted and have no difficulty are shown too.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(InstrumentsToggleText))]
-        public partial bool ShowAllInstruments { get; set; }
-
-        /// <summary>The instruments' icons are shown: some selected song's metadata was read.</summary>
-        public bool ShowInstruments => _songs.Count > 0;
-
-        /// <summary>Some icons are hidden until Show all.</summary>
-        public bool HasHiddenInstruments => Instruments.Any(i => i.IsHidden);
-
-        public string InstrumentsToggleText => ShowAllInstruments
-            ? Strings.InstrumentsShowFewer
-            : string.Format(CultureInfo.CurrentCulture, Strings.InstrumentsShowAllFormat, Instruments.Count(i => i.IsHidden));
+        /// <summary>The metadata: the selected songs' difficulties as icons, and a row per other key, merged.</summary>
+        public MetadataEditorViewModel MetadataEditor { get; }
 
         /// <summary>The one selected song's files that aren't its album art, background, tracks, chart or song.ini.</summary>
         public AvaloniaList<FileRow> Files { get; } = [];
@@ -285,16 +255,24 @@ namespace ChartPacker.ViewModels
 
         public AvaloniaList<FindingRow> Findings { get; } = [];
 
-        /// <summary>Validation failures of keys that have no row, such as a difficulty, shown under their icons.</summary>
-        public AvaloniaList<MetadataIssueRow> HiddenIssues { get; } = [];
+        /// <summary>
+        /// The one song's chart findings (charter-spec C16 item 5), counted here in a line (GitHub issue #53); View issues
+        /// lists them in a window of their own, by part and difficulty.
+        /// </summary>
+        public ChartIssuesViewModel ChartIssues { get; } = new();
 
-        public bool HasHiddenIssues => HiddenIssues.Count > 0;
+        /// <summary>Whether the song's chart has been linted, so its findings are counted.</summary>
+        [ObservableProperty]
+        public partial bool HasChartIssues { get; private set; }
+
+        /// <summary>Whether View issues can open its window here.</summary>
+        public bool CanViewChartIssues => _chartIssuesWindow is not null;
 
         /// <summary>How many keys, shown as rows or not, fail validation as drafted.</summary>
-        public int FailingFieldCount => Metadata.Count(r => r.HasIssue) + HiddenIssues.Count;
+        public int FailingFieldCount => MetadataEditor.FailingFieldCount;
 
         /// <summary>Some selected song's metadata, as drafted, fails validation; saving asks first.</summary>
-        public bool HasValidationIssues => FailingFieldCount > 0;
+        public bool HasValidationIssues => MetadataEditor.HasValidationIssues;
 
         /// <summary>Plays the one selected song's audio tracks.</summary>
         public PlayerViewModel Player { get; }
@@ -342,10 +320,6 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial string? ErrorMessage { get; set; }
 
-        /// <summary>Why there is no metadata table, e.g. the folder has no song.ini.</summary>
-        [ObservableProperty]
-        public partial string? MetadataNote { get; set; }
-
         /// <summary>Why the metadata can't be edited, e.g. a selected .sng has structural errors.</summary>
         [ObservableProperty]
         public partial string? ReadOnlyNote { get; set; }
@@ -371,23 +345,6 @@ namespace ChartPacker.ViewModels
 
         [ObservableProperty]
         public partial string? SaveError { get; set; }
-
-        /// <summary>The new-row editor is open.</summary>
-        [ObservableProperty]
-        public partial bool IsAdding { get; set; }
-
-        [ObservableProperty]
-        public partial string NewKey { get; set; } = "";
-
-        [ObservableProperty]
-        public partial string NewValue { get; set; } = "";
-
-        [ObservableProperty]
-        public partial string? NewRowError { get; set; }
-
-        /// <summary>Known keys to offer for a new row: every one the selection doesn't already use.</summary>
-        [ObservableProperty]
-        public partial IReadOnlyList<KnownKey> AvailableKeys { get; set; } = [];
 
         /// <summary>The album art every selected song has once its draft is applied, or <see langword="null"/> when there's none to show.</summary>
         [ObservableProperty]
@@ -476,13 +433,9 @@ namespace ChartPacker.ViewModels
 
         public bool HasFindings => Findings.Count > 0;
 
-        public bool HasMetadataNote => MetadataNote is not null;
-
         public bool HasReadOnlyNote => ReadOnlyNote is not null;
 
         public bool HasSaveError => SaveError is not null;
-
-        public bool HasNewRowError => NewRowError is not null;
 
         /// <summary>One song is selected, so its tracks, chart and other files are shown.</summary>
         public bool ShowSongFiles => !IsBulk;
@@ -511,11 +464,6 @@ namespace ChartPacker.ViewModels
 
         public bool CanEdit => IsEditable && !IsSaving;
 
-        public bool ShowAddRow => CanEdit && !IsAdding;
-
-        /// <summary>No selected song has a <c>song_length</c> row, so Auto Set is offered beside Add row instead.</summary>
-        public bool ShowAutoSetLengthFallback => CanEdit && !Metadata.Any(r => r.IsSongLength);
-
         /// <summary>The songs' lengths are being worked out.</summary>
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(AutoSetSongLengthCommand))]
@@ -531,22 +479,18 @@ namespace ChartPacker.ViewModels
         /// <summary>A selected song has unsaved changes.</summary>
         public bool HasDrafts => _songs.Any(s => !s.Item.Draft.IsEmpty);
 
-        public string MetadataHeader => string.Format(CultureInfo.CurrentCulture, Strings.MetadataHeaderFormat, Metadata.Count);
-
         // Counts the other files there will be once the staged changes are saved.
         public string OtherFilesHeader => string.Format(CultureInfo.CurrentCulture, Strings.OtherFilesHeaderFormat, Files.Count(f => !f.IsRemoved));
 
-        /// <summary>Why <paramref name="value"/> can't be stored, or <see langword="null"/> when it can.</summary>
-        public static string? ValidateValue(string value) =>
-            value.Length == 0 ? Strings.ValueEmpty
-            : MetadataRules.ValueHasForbiddenCharacter(value) ? Strings.ValueForbidden
-            : null;
+        IReadOnlyList<MetadataItem> IMetadataEditorHost.Items => Items();
 
-        /// <summary>Why <paramref name="key"/> can't be stored, or <see langword="null"/> when it can.</summary>
-        public static string? ValidateKey(string key) =>
-            key.Length == 0 ? Strings.KeyEmpty
-            : MetadataRules.KeyHasForbiddenCharacter(key) ? Strings.KeyForbidden
-            : null;
+        IReadOnlyDictionary<string, ChartPart>? IMetadataEditorHost.ChartParts => Highway.ChartParts;
+
+        string? IMetadataEditorHost.LoadNote => _loadNote;
+
+        IRelayCommand? IMetadataEditorHost.AutoSetSongLengthCommand => AutoSetSongLengthCommand;
+
+        bool IMetadataEditorHost.CanEditKey(string key) => true;
 
         /// <summary>Loads <paramref name="entries"/>, replacing whatever is shown. A newer call cancels an older one.</summary>
         /// <param name="inPlace">
@@ -671,13 +615,14 @@ namespace ChartPacker.ViewModels
             _diskFiles = [];
             _totalSize = 0;
             ReleaseArt();
-            Metadata.Clear();
+            MetadataEditor.Clear();
             Files.Clear();
             Charts.Clear();
             RemovedTracks.Clear();
             Findings.Clear();
-            HiddenIssues.Clear();
-            OnPropertyChanged(nameof(HasHiddenIssues));
+            ChartIssues.Clear();
+            HasChartIssues = false;
+            OnPropertyChanged(nameof(FailingFieldCount));
             OnPropertyChanged(nameof(HasValidationIssues));
             Title = entries.Count switch
             {
@@ -689,7 +634,6 @@ namespace ChartPacker.ViewModels
             Charter = null;
             Subtitle = null;
             SizeText = null;
-            MetadataNote = null;
             ReadOnlyNote = null;
             ErrorMessage = null;
             SaveError = null;
@@ -700,34 +644,23 @@ namespace ChartPacker.ViewModels
             TracksError = null;
             ChartError = null;
             AutoLengthNote = null;
-            CancelAdd();
             IsLoading = entries.Count > 0;
             RefreshState();
         }
 
-        /// <summary>Ends editing on every row but <paramref name="row"/>, dropping text that wasn't committed.</summary>
-        internal void CancelOtherEdits(MetadataRowViewModel? row)
-        {
-            foreach (var other in Metadata)
-            {
-                if (other != row && other.IsEditing)
-                    other.CancelCommand.Execute(null);
-            }
-        }
-
-        internal void SetValue(string key, string value)
+        public void SetValue(string key, string value)
         {
             BulkMetadata.Set(Items(), key, value);
             OnDraftsChanged();
         }
 
-        internal void RemoveKey(string key)
+        public void RemoveKey(string key)
         {
             BulkMetadata.Remove(Items(), key);
             OnDraftsChanged();
         }
 
-        internal void RevertKey(string key)
+        public void RevertKey(string key)
         {
             BulkMetadata.Revert(Items(), key);
             OnDraftsChanged();
@@ -737,7 +670,7 @@ namespace ChartPacker.ViewModels
         /// Applies every quick fix for <paramref name="key"/> to each selected song's draft, each worked out from that
         /// song's own value. Nothing is saved.
         /// </summary>
-        internal void ApplyQuickFixes(string key)
+        public void ApplyQuickFixes(string key)
         {
             bool applied = false;
             foreach (var song in _songs)
@@ -746,41 +679,11 @@ namespace ChartPacker.ViewModels
                 OnDraftsChanged();
         }
 
-        /// <summary>
-        /// The Quick Fix command of a key without a row, kept per key so a listed failure keeps its command, and the
-        /// list its rows, while the key's validation stays the same.
-        /// </summary>
-        private IRelayCommand QuickFixCommandFor(string key)
-        {
-            if (!_quickFixKeyCommands.TryGetValue(key, out var command))
-            {
-                command = new RelayCommand(() => ApplyQuickFixes(key), () => CanEdit && _keysWithQuickFix.Contains(key));
-                _quickFixKeyCommands[key] = command;
-            }
-
-            return command;
-        }
-
-        private void RefreshQuickFixKeyCommands()
-        {
-            foreach (var command in _quickFixKeyCommands.Values)
-                command.NotifyCanExecuteChanged();
-        }
-
         /// <summary>Unsets the difficulty <paramref name="key"/>: <c>-1</c> where one is stored, and no change elsewhere.</summary>
-        internal void UnsetDifficulty(string key)
+        public void UnsetDifficulty(string key)
         {
             MetadataDifficulty.Unset(Items(), key);
             OnDraftsChanged();
-        }
-
-        [RelayCommand]
-        private void ToggleShowAllInstruments() => ShowAllInstruments = !ShowAllInstruments;
-
-        partial void OnShowAllInstrumentsChanged(bool value)
-        {
-            foreach (var instrument in Instruments)
-                instrument.RefreshShown();
         }
 
         private bool CanAutoSetLength() => CanEdit && !IsAutoSettingLength;
@@ -793,8 +696,7 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanAutoSetLength))]
         private async Task AutoSetSongLengthAsync()
         {
-            CancelOtherEdits(null);
-            CancelAdd();
+            MetadataEditor.CancelEdits();
             AutoLengthNote = null;
 
             // Drafts live on the UI thread and can change while the files are read, so each is copied here.
@@ -843,53 +745,13 @@ namespace ChartPacker.ViewModels
             for (int i = 0; i < songs.Count; i++)
             {
                 if (lengths[i] is { } ms)
-                    BulkMetadata.Set([songs[i].Item], SongLengthKey, ms.ToString(CultureInfo.InvariantCulture));
+                    BulkMetadata.Set([songs[i].Item], MetadataEditRules.SongLengthKey, ms.ToString(CultureInfo.InvariantCulture));
             }
 
             int missed = lengths.Count(l => l is null);
             if (missed > 0)
                 AutoLengthNote = string.Format(CultureInfo.CurrentCulture, Strings.AutoSetLengthFailedFormat, missed);
             OnDraftsChanged();
-        }
-
-        [RelayCommand(CanExecute = nameof(CanEdit))]
-        private void BeginAdd()
-        {
-            NewKey = "";
-            NewValue = "";
-            NewRowError = null;
-            RefreshAvailableKeys();
-            IsAdding = true;
-        }
-
-        [RelayCommand]
-        private void CommitAdd()
-        {
-            if (!IsAdding)
-                return;
-
-            string key = NewKey.Trim();
-            string value = NewValue.Trim();
-
-            // A hidden unset difficulty isn't a row, so adding it edits the stored value.
-            string? error = ValidateKey(key)
-                ?? (Metadata.Any(r => !r.IsRemoved && r.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) ? Strings.KeyExists : null)
-                ?? ValidateValue(value);
-            if (error is not null)
-            {
-                NewRowError = error;
-                return;
-            }
-
-            CancelAdd();
-            SetValue(key, value);
-        }
-
-        [RelayCommand]
-        private void CancelAdd()
-        {
-            IsAdding = false;
-            NewRowError = null;
         }
 
         /// <summary>Asks for an image and stages it as every selected song's album art.</summary>
@@ -1262,53 +1124,29 @@ namespace ChartPacker.ViewModels
         private async Task AddTrackAsync(string stem)
         {
             var songs = _songs;
-            string? path = await _filePicker.PickAudioAsync(string.Format(CultureInfo.CurrentCulture, Strings.PickTrackTitleFormat, stem));
+            string? path = await _filePicker.PickAudioAsync(TrackStaging.PickTitleFor(stem));
             if (path is null || !ReferenceEquals(songs, _songs) || !CanChangeFiles())
                 return;
 
-            string fileName = Path.GetFileName(path);
-            string extension = Path.GetExtension(path).ToLowerInvariant();
             TracksError = null;
-            if (!AudioStems.IsAudioExtension(extension))
-            {
-                TracksError = string.Format(CultureInfo.CurrentCulture, Strings.TrackNotAudioFormat, fileName);
-                return;
-            }
-
-            // Decoding a little of it now catches a file that isn't what its extension says.
-            var (length, problem) = await Task.Run(() =>
-            {
-                try
-                {
-                    AudioDecoder.Check(path);
-                    return (new FileInfo(path).Length, (string?)null);
-                }
-                catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
-                {
-                    return (0L, ex.Message);
-                }
-            });
-
+            var check = await TrackStaging.CheckAsync(path);
             if (!ReferenceEquals(songs, _songs) || !CanChangeFiles())
                 return;
-            if (problem is not null)
+            if (check.Error is { } error)
             {
-                TracksError = string.Format(CultureInfo.CurrentCulture, Strings.TrackUnusableFormat, fileName, problem);
+                TracksError = error;
                 return;
             }
 
-            string storedName = stem + extension;
+            string storedName = TrackStaging.StoredNameFor(stem, path);
             var draft = songs[0].Item.Draft;
             foreach (string added in SongTracks.FilesOfStem(draft.AddedFiles.Select(f => f.StoredName), stem))
                 draft.RevertFile(added);
 
-            // A stored file that differs only in case is still replaced, on a case-sensitive file system too.
             // Recorded as replaced by the add, so removing the added track brings them back.
-            var replaced = SongTracks.FilesOfStem(_diskFiles.Select(f => f.Path), stem)
-                .Where(stored => !stored.Equals(storedName, StringComparison.Ordinal))
-                .ToList();
+            var replaced = TrackStaging.Replaced(_diskFiles.Select(f => f.Path), stem, storedName);
 
-            draft.AddFile(new AddedFile(storedName, path, length), replaced);
+            draft.AddFile(new AddedFile(storedName, path, check.Length), replaced);
             OnDraftsChanged();
         }
 
@@ -1469,7 +1307,18 @@ namespace ChartPacker.ViewModels
                 dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
             }
 
-            CancelAdd();
+            if (!await ChartBuilderSongs.ConfirmWriteAsync(
+                    _confirmation, _isOpenInChartBuilder, [.. dirty.Select(s => s.Entry)],
+                    Strings.ChartBuilderOpenSaveOneFormat, Strings.ChartBuilderOpenSaveManyFormat, Strings.SaveAnywayButton))
+            {
+                return;
+            }
+
+            if (!ReferenceEquals(entries, _entries) || !CanSave())
+                return;
+            dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
+
+            MetadataEditor.CancelAddCommand.Execute(null);
             IsSaving = true;
             SaveError = null;
             try
@@ -1516,7 +1365,7 @@ namespace ChartPacker.ViewModels
         [RelayCommand(CanExecute = nameof(CanDiscard))]
         private void Discard()
         {
-            CancelAdd();
+            MetadataEditor.CancelAddCommand.Execute(null);
             BackgroundError = null;
             LyricsError = null;
             FilesError = null;
@@ -1547,15 +1396,9 @@ namespace ChartPacker.ViewModels
 
         partial void OnErrorMessageChanged(string? value) => RefreshState();
 
-        partial void OnMetadataNoteChanged(string? value) => RefreshState();
-
         partial void OnReadOnlyNoteChanged(string? value) => RefreshState();
 
         partial void OnSaveErrorChanged(string? value) => OnPropertyChanged(nameof(HasSaveError));
-
-        partial void OnNewRowErrorChanged(string? value) => OnPropertyChanged(nameof(HasNewRowError));
-
-        partial void OnIsAddingChanged(bool value) => OnPropertyChanged(nameof(ShowAddRow));
 
         partial void OnIsSavingChanged(bool value) => RefreshState();
 
@@ -1566,6 +1409,8 @@ namespace ChartPacker.ViewModels
             NotifyDrafts(_songs);
             RebuildRows();
             RefreshArt();
+            if (!IsBulk && _songs.Count == 1)
+                _ = LoadChartFindingsAsync(_songs[0]);
         }
 
         /// <summary>Tells the draft store that <paramref name="songs"/>' drafts changed, without this panel hearing it back.</summary>
@@ -1605,7 +1450,7 @@ namespace ChartPacker.ViewModels
                 return;
 
             // Never under an edit in progress here: try again once it's done.
-            if (IsSaving || IsAdding || Metadata.Any(r => r.IsEditing))
+            if (IsSaving || MetadataEditor.IsEditingAny)
             {
                 _externalChangeTimer.Start();
                 return;
@@ -1847,130 +1692,72 @@ namespace ChartPacker.ViewModels
             Findings.AddRange(loaded.Findings);
             RebuildRows();
             RefreshArt();
+            if (!IsBulk && _songs.Count == 1)
+                _ = LoadChartFindingsAsync(_songs[0]);
         }
 
         /// <summary>
-        /// Merges the songs' metadata and drafts into rows, updating the existing row view models in
-        /// place so that a row being clicked isn't replaced under the pointer.
+        /// Lints the song's chart with its <c>song.ini</c> as drafted (charter-spec C16 item 5), off the UI thread, and counts
+        /// what it finds, for View issues to list. A newer load or lint takes its place.
+        /// </summary>
+        private async Task LoadChartFindingsAsync(EditableSong song)
+        {
+            _chartLintCts?.Cancel();
+            using var cts = new CancellationTokenSource();
+            _chartLintCts = cts;
+            try
+            {
+                var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
+                var entry = song.Entry;
+                var (report, chartName) = await Task.Run(
+                    async () => (await SongChartLint.LintAsync(entry, pairs, null, LibraryChartLint.Cache, cts.Token), ChartNameOf(entry, cts.Token)),
+                    cts.Token);
+                if (_chartLintCts != cts || _songs.Count != 1 || !ReferenceEquals(_songs[0], song))
+                    return;
+
+                ChartIssues.FileName = chartName ?? "";
+                ChartIssues.Title = string.Format(CultureInfo.CurrentCulture, SharedStrings.ChartIssuesWindowTitleFormat, Title);
+                ChartIssues.Show(report.Findings, static f => f.Finding, static f => new FindingItem(f.Finding, _ => LibraryChartLint.Where(f)));
+                HasChartIssues = report.Status == SongChartLintStatus.Linted;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                if (_chartLintCts == cts)
+                    _chartLintCts = null;
+            }
+        }
+
+        /// <summary>The chart file the song's chart is read from, as linting picks it, e.g. notes.mid; null when it can't be listed.</summary>
+        private static string? ChartNameOf(SongEntry entry, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return ChartReader.Pick(SongFile.ListTopLevel(entry, cancellationToken).Select(static f => f.Name));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Lists the song's chart findings, by part and difficulty, in a window of their own.</summary>
+        [RelayCommand]
+        private void ViewChartIssues() => _chartIssuesWindow?.Show(ChartIssues);
+
+        /// <summary>
+        /// Merges the songs' metadata and drafts into the metadata's rows and icons, which are updated in place so that a
+        /// row being clicked isn't replaced under the pointer.
         /// </summary>
         private void RebuildRows()
         {
-            var byKey = Metadata.ToDictionary(r => r.Key, StringComparer.OrdinalIgnoreCase);
-            var next = BulkMetadata.BuildRows(Items(), DifficultySlots.Contains)
-                .Select(r => byKey.TryGetValue(r.Key, out var existing) ? existing.Update(r) : new MetadataRowViewModel(this, r))
-                .ToList();
-
-            for (int i = 0; i < next.Count; i++)
-            {
-                if (i < Metadata.Count && ReferenceEquals(Metadata[i], next[i]))
-                    continue;
-
-                int from = Metadata.IndexOf(next[i]);
-                if (from >= 0)
-                    Metadata.Move(from, i);
-                else
-                    Metadata.Insert(i, next[i]);
-            }
-
-            while (Metadata.Count > next.Count)
-                Metadata.RemoveAt(Metadata.Count - 1);
-
-            RefreshInstruments();
-            MetadataNote = _loadNote ?? (Metadata.Count == 0 && Instruments.All(i => i.IsAllUnset) ? Strings.NoMetadata : null);
-            OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
-            RefreshAvailableKeys();
+            MetadataEditor.Refresh();
             RefreshHeadline();
-            RefreshValidation();
-            RefreshState();
-        }
-
-        /// <summary>
-        /// Checks each selected song's metadata as drafted, so what's marked is what saving would write: each row
-        /// gets its key's failures and hints, and the failures of keys without a row are listed apart.
-        /// </summary>
-        private void RefreshValidation()
-        {
-            // Per key, every failing finding with the song it's in, the first hint, and what its quick fixes do.
-            var failing = new Dictionary<string, List<(int Song, Finding Finding)>>(StringComparer.OrdinalIgnoreCase);
-            var hints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var fixes = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < _songs.Count; i++)
-            {
-                var song = _songs[i];
-                var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
-                foreach (var finding in MetadataValidator.Validate(pairs, song.Item.RemainingDuplicateKeys()))
-                {
-                    string key = finding.Key ?? "";
-                    if (QuickFixRegistry.Propose(finding, pairs) is { } fix)
-                    {
-                        if (!fixes.TryGetValue(key, out var descriptions))
-                            fixes[key] = descriptions = new HashSet<string>(StringComparer.Ordinal);
-                        descriptions.Add(fix.Description);
-                    }
-
-                    if (MetadataValidator.IsFailing(finding))
-                    {
-                        if (!failing.TryGetValue(key, out var list))
-                            failing[key] = list = [];
-                        list.Add((i, finding));
-                    }
-                    else
-                    {
-                        hints.TryAdd(key, finding.Message);
-                    }
-                }
-            }
-
-            _keysWithQuickFix = new HashSet<string>(fixes.Keys, StringComparer.OrdinalIgnoreCase);
-
-            // A key's fixes are named when they're one; several, e.g. different values across songs, are just "Quick Fix".
-            (bool Available, string? Description) QuickFixOf(string key) => fixes.TryGetValue(key, out var descriptions)
-                ? (true, descriptions.Count == 1 ? descriptions.First() : null)
-                : (false, null);
-
-            foreach (var row in Metadata)
-                row.SetValidation(DescribeIssue(failing.GetValueOrDefault(row.Key)), hints.GetValueOrDefault(row.Key), QuickFixOf(row.Key));
-
-            var rowKeys = Metadata.Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var hidden = failing
-                .Where(f => !rowKeys.Contains(f.Key))
-                .Select(f => new MetadataIssueRow(f.Key, DescribeIssue(f.Value)!, QuickFixOf(f.Key).Description, QuickFixCommandFor(f.Key)))
-                .ToList();
-            if (!hidden.SequenceEqual(HiddenIssues))
-            {
-                HiddenIssues.Clear();
-                HiddenIssues.AddRange(hidden);
-            }
-
-            OnPropertyChanged(nameof(HasHiddenIssues));
             OnPropertyChanged(nameof(FailingFieldCount));
             OnPropertyChanged(nameof(HasValidationIssues));
-            RefreshQuickFixKeyCommands();
-        }
-
-        /// <summary>A key's failures as one message: each distinct one on its own line, and for several songs, how many fail.</summary>
-        private string? DescribeIssue(List<(int Song, Finding Finding)>? failures)
-        {
-            if (failures is null or [])
-                return null;
-
-            string message = string.Join(Environment.NewLine, failures.Select(f => f.Finding.Message).Distinct(StringComparer.Ordinal));
-            int songs = failures.Select(f => f.Song).Distinct().Count();
-            return IsBulk ? string.Format(CultureInfo.CurrentCulture, Strings.IssueSongCountFormat, message, songs, _songs.Count) : message;
-        }
-
-        /// <summary>
-        /// Brings the instruments' icons up to date with the drafts and, for one song, with what its
-        /// chart has, as the highway read it.
-        /// </summary>
-        private void RefreshInstruments()
-        {
-            var items = Items();
-            var parts = IsBulk ? null : Highway.ChartParts;
-            foreach (var instrument in Instruments)
-                instrument.Update(BulkMetadata.RowOf(items, instrument.Key), MetadataDifficulty.IsUnsetIn(items, instrument.Key), parts);
-            OnPropertyChanged(nameof(HasHiddenInstruments));
-            OnPropertyChanged(nameof(InstrumentsToggleText));
+            RefreshState();
         }
 
         /// <summary>
@@ -1995,19 +1782,6 @@ namespace ChartPacker.ViewModels
                 _ => _entries[0].DisplayName,
             };
             Charter = SongHeadline.CharterMarkup(pairs);
-        }
-
-        /// <summary>
-        /// Offers the known keys that aren't a row yet. A removed row's key is offered again, since
-        /// adding it back is allowed. The difficulties are left out, as their icons set them.
-        /// Apart from that, this is the same test <see cref="CommitAdd"/> uses to reject a key.
-        /// </summary>
-        private void RefreshAvailableKeys()
-        {
-            var used = Metadata.Where(r => !r.IsRemoved).Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var available = KnownKeys.All.Where(k => !used.Contains(k.Key) && !DifficultySlots.Contains(k.Key)).ToList();
-            if (!available.SequenceEqual(AvailableKeys))
-                AvailableKeys = available;
         }
 
         private static async Task<LoadedSelection> LoadSingleAsync(SongEntry entry, CancellationToken cancellationToken)
@@ -2275,6 +2049,7 @@ namespace ChartPacker.ViewModels
             {
                 row.Size = TrackSize(row.Track, draft);
                 row.DownloadCommand = DownloadCommandFor(_entries[0], row.Track.StoredName, row.Track.StagedSourcePath);
+                row.DownloadHeader = SongFileSource.DownloadHeaderFor(row.Name);
             }
 
             // A stem with a track staged to replace it isn't missing a track, so what it replaces isn't listed.
@@ -2296,12 +2071,7 @@ namespace ChartPacker.ViewModels
 
             OnPropertyChanged(nameof(HasRemovedTracks));
 
-            var stems = tracks.Select(t => t.Stem).ToHashSet(StringComparer.Ordinal);
-            AddTrackOptions = [.. AudioStems.Stems
-                .Select(stem => new StemOption(
-                    stem,
-                    stems.Contains(stem) ? string.Format(CultureInfo.CurrentCulture, Strings.ReplaceTrackFormat, stem) : stem,
-                    _addTrackCommands[stem]))];
+            AddTrackOptions = TrackStaging.OptionsFor(tracks.Select(t => t.Stem), stem => _addTrackCommands[stem]);
         }
 
         /// <summary><paramref name="track"/>'s file size, formatted: the file to be added, or the one stored.</summary>
@@ -2565,11 +2335,9 @@ namespace ChartPacker.ViewModels
         private void RefreshState()
         {
             OnPropertyChanged(nameof(ShowPlaceholder));
-            OnPropertyChanged(nameof(ShowInstruments));
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(ShowDetails));
             OnPropertyChanged(nameof(HasFindings));
-            OnPropertyChanged(nameof(HasMetadataNote));
             OnPropertyChanged(nameof(HasReadOnlyNote));
             OnPropertyChanged(nameof(ShowSongFiles));
             OnPropertyChanged(nameof(ShowVideoOffset));
@@ -2577,10 +2345,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ShowChartMissing));
             OnPropertyChanged(nameof(IsEditable));
             OnPropertyChanged(nameof(CanEdit));
-            OnPropertyChanged(nameof(ShowAddRow));
-            OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
             OnPropertyChanged(nameof(HasDrafts));
-            OnPropertyChanged(nameof(MetadataHeader));
             OnPropertyChanged(nameof(OtherFilesHeader));
             OnPropertyChanged(nameof(IsArtChanged));
             OnPropertyChanged(nameof(ArtMarker));
@@ -2598,7 +2363,6 @@ namespace ChartPacker.ViewModels
         {
             SaveCommand.NotifyCanExecuteChanged();
             DiscardCommand.NotifyCanExecuteChanged();
-            BeginAddCommand.NotifyCanExecuteChanged();
             AutoSetSongLengthCommand.NotifyCanExecuteChanged();
             ReplaceArtCommand.NotifyCanExecuteChanged();
             RemoveArtCommand.NotifyCanExecuteChanged();
@@ -2617,14 +2381,10 @@ namespace ChartPacker.ViewModels
             RevertChartCommand.NotifyCanExecuteChanged();
             DownloadArtCommand.NotifyCanExecuteChanged();
             DownloadBackgroundCommand.NotifyCanExecuteChanged();
-            RefreshQuickFixKeyCommands();
             RefreshLyricsCommands();
             foreach (var command in _addTrackCommands.Values)
                 command.NotifyCanExecuteChanged();
-            foreach (var row in Metadata)
-                row.RefreshCommands();
-            foreach (var instrument in Instruments)
-                instrument.RefreshCommands();
+            MetadataEditor.RefreshCommands();
         }
 
         private void RefreshLyricsCommands()

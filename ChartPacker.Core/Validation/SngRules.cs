@@ -78,6 +78,9 @@ public static class SngRules
     /// <summary>An empty value. It is dropped when packing.</summary>
     public const string Sng061 = "SNG061";
 
+    /// <summary>A key of a part the chart has no notes for. It is dropped when packing.</summary>
+    public const string Sng062 = "SNG062";
+
     /// <summary>There is no <c>song.ini</c>.</summary>
     public const string Sng070 = "SNG070";
 

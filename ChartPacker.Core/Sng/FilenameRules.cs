@@ -18,7 +18,7 @@ public static class FilenameRules
     /// <summary>The <c>filenameLen</c> field is one byte.</summary>
     public const int MaxStoredNameBytes = 255;
 
-    private static readonly SearchValues<char> ReservedChars = SearchValues.Create("<>:\"/\\|?*");
+    internal static readonly SearchValues<char> ReservedChars = SearchValues.Create("<>:\"/\\|?*");
 
     private static readonly HashSet<string> WindowsReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {

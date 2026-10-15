@@ -53,9 +53,9 @@ public sealed class ChartLintResult
 }
 
 /// <summary>
-/// The order lint findings are kept and shown in: those without a chart location first, then by part, difficulty
-/// (every difficulty first), tick, last tick, rule ID, then the rest of the finding, so the order never depends on how
-/// they were found.
+/// The order lint findings are kept and shown in: those without a chart location first, by their tick, then by part,
+/// difficulty (every difficulty first), tick, last tick, rule ID, then the rest of the finding, so the order never
+/// depends on how they were found.
 /// </summary>
 internal static class FindingOrder
 {
@@ -71,6 +71,10 @@ internal static class FindingOrder
             return 1;
 
         int c = CompareLocations(a.Location, b.Location);
+        if (c == 0)
+            c = string.CompareOrdinal(a.Track, b.Track);
+        if (c == 0)
+            c = Nullable.Compare(a.Tick, b.Tick);
         if (c == 0)
             c = string.CompareOrdinal(a.RuleId, b.RuleId);
         if (c == 0)

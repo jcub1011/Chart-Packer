@@ -166,7 +166,6 @@ internal static class GameNotes
         DrumsLayout layout)
     {
         var gems = new Dictionary<ChartDifficulty, List<DrumGem>>();
-        var mixes = new Dictionary<ChartDifficulty, List<(long, bool)>>();
         var tomIndexes = toms.Select(TickSpanIndex.Of).ToArray();
         foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
         {
@@ -182,17 +181,26 @@ internal static class GameNotes
             TickOrder.KeepFirstOfEach(list, static g => g.Tick, static g => g.Pad);
 
             gems[difficulty] = list;
-            mixes[difficulty] =
-            [
-                .. texts
-                    .Select(t => ChartTextEvents.TryParseMix(t.Text, out var d, out bool flip) && d == difficulty ? (t.Tick, (bool?)flip) : (t.Tick, null))
-                    .Where(m => m.Item2 is not null)
-                    .Select(m => (m.Tick, m.Item2!.Value)),
-            ];
         }
 
         var starPowerOf = Enum.GetValues<ChartDifficulty>().ToDictionary(d => d, _ => starPower);
-        return DrumNotes.Build(gems, mixes, starPowerOf, layout);
+        return DrumNotes.Build(gems, MixesOf(texts), starPowerOf, layout);
+    }
+
+    /// <summary>
+    /// Each difficulty's drums mix events among <paramref name="texts"/>, in order: its tick, and whether it turns disco
+    /// flip on. Every difficulty is given, those without one empty.
+    /// </summary>
+    public static Dictionary<ChartDifficulty, List<(long Tick, bool DiscoFlip)>> MixesOf(IReadOnlyList<(long Tick, string Text)> texts)
+    {
+        var mixes = Enum.GetValues<ChartDifficulty>().ToDictionary(d => d, _ => new List<(long, bool)>());
+        foreach (var (tick, text) in texts)
+        {
+            if (ChartTextEvents.TryParseMix(text, out var difficulty, out bool flip))
+                mixes[difficulty].Add((tick, flip));
+        }
+
+        return mixes;
     }
 
     /// <summary>The star-power phrases of <paramref name="spans"/> in order, the first given of two that start together kept.</summary>

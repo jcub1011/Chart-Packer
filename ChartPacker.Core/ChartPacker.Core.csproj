@@ -24,6 +24,16 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- The language server's design-time build doesn't run CoreResGen, which is what adds the
+       generated FindingMessages and KnownKeyDescriptions classes to the compile; hand it the last
+       build's copies. -->
+  <ItemGroup Condition="'$(DesignTimeBuild)' == 'true'">
+    <Compile Include="$(IntermediateOutputPath)FindingMessages.Designer.cs"
+             Condition="Exists('$(IntermediateOutputPath)FindingMessages.Designer.cs')" />
+    <Compile Include="$(IntermediateOutputPath)KnownKeyDescriptions.Designer.cs"
+             Condition="Exists('$(IntermediateOutputPath)KnownKeyDescriptions.Designer.cs')" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="ChartPacker.Core.Tests" />
     <InternalsVisibleTo Include="ChartBuilder.Tests" />

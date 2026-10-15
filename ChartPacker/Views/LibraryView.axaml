@@ -5,6 +5,7 @@
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:conv="using:ChartPacker.Converters"
              xmlns:ctl="using:ChartPacker.Controls"
+             xmlns:ui="using:ChartPacker.UI.Controls"
              xmlns:res="using:ChartPacker.Resources"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="600"
              x:Class="ChartPacker.Views.LibraryView"
@@ -25,8 +26,8 @@
                     ToolTip.Tip="{Binding ToolTip}"
                     AutomationProperties.Name="{Binding AutomationName}">
                 <StackPanel Orientation="Horizontal" Spacing="3">
-                    <ctl:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsIncluded}" />
-                    <ctl:LineIcon Data="{StaticResource ClearStroke}" IsVisible="{Binding IsExcluded}" />
+                    <ui:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsIncluded}" />
+                    <ui:LineIcon Data="{StaticResource ClearStroke}" IsVisible="{Binding IsExcluded}" />
                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                 </StackPanel>
             </Button>
@@ -209,7 +210,7 @@
                              PlaceholderText="{x:Static res:Strings.SearchWatermark}"
                              AutomationProperties.Name="{x:Static res:Strings.SearchName}">
                         <TextBox.InnerLeftContent>
-                            <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                            <ui:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
                         </TextBox.InnerLeftContent>
                         <TextBox.KeyBindings>
                             <KeyBinding Gesture="Escape" Command="{Binding Filter.ClearSearchCommand}" />
@@ -223,7 +224,7 @@
                             ToolTip.Tip="{x:Static res:Strings.FilterToolTip}"
                             AutomationProperties.Name="{x:Static res:Strings.FilterToolTip}">
                         <Panel Width="32" Height="32">
-                            <ctl:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
+                            <ui:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
                             <Border Classes="badge" IsVisible="{Binding Filter.HasActiveFilters}">
                                 <TextBlock Text="{Binding Filter.ActiveFilterCount}" />
                             </Border>
@@ -252,8 +253,8 @@
                                                               ToolTip.Tip="{x:Static res:Strings.SortDescendingToolTip}"
                                                               AutomationProperties.Name="{x:Static res:Strings.SortDescendingToolTip}">
                                                     <Panel>
-                                                        <ctl:LineIcon Data="{StaticResource SortAscendingStroke}" IsVisible="{Binding !Filter.SortDescending}" />
-                                                        <ctl:LineIcon Data="{StaticResource SortDescendingStroke}" IsVisible="{Binding Filter.SortDescending}" />
+                                                        <ui:LineIcon Data="{StaticResource SortAscendingStroke}" IsVisible="{Binding !Filter.SortDescending}" />
+                                                        <ui:LineIcon Data="{StaticResource SortDescendingStroke}" IsVisible="{Binding Filter.SortDescending}" />
                                                     </Panel>
                                                 </ToggleButton>
                                             </Grid>
@@ -484,8 +485,8 @@
                                            IsVisible="{Binding ShowDetails}" />
                                 <TextBlock Grid.Row="1" Grid.Column="0"
                                            Classes="muted"
-                                           ctl:RichTextMarkup.Prefix="{Binding BylinePrefix}"
-                                           ctl:RichTextMarkup.Text="{Binding Charter}"
+                                           ui:RichTextMarkup.Prefix="{Binding BylinePrefix}"
+                                           ui:RichTextMarkup.Text="{Binding Charter}"
                                            FontSize="11"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis"

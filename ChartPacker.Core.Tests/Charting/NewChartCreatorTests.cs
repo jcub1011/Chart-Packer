@@ -28,15 +28,27 @@ public sealed class NewChartCreatorTests
     [TestCleanup]
     public void DeleteRoot() => _root.Delete(recursive: true);
 
-    private NewChartRequest Request(params NewChartStem[] stems) => new()
+    private static readonly NewChartSettings Settings =
+        new("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro);
+
+    private NewSongFolder Request(params NewChartStem[] stems) => Request(Settings, "", stems);
+
+    /// <summary>A new chart's folder as its first save gives it: the new chart, and the song.ini its pending changes make.</summary>
+    private NewSongFolder Request(NewChartSettings settings, string charter, params NewChartStem[] stems)
     {
-        ParentFolder = _library,
-        FolderName = "Artist - Song",
-        Name = "Song",
-        Artist = "Artist",
-        Stems = stems,
-        Chart = new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro),
-    };
+        var song = EditorSong.New(EditableChart.CreateNew(settings), []);
+        song.Values = [KeyValuePair.Create("name", "Song"), KeyValuePair.Create("artist", "Artist")];
+        song.DefaultCharter = charter;
+        song.AudioLengthMs = 1000;
+        return new NewSongFolder
+        {
+            ParentFolder = _library,
+            FolderName = "Artist - Song",
+            NotesMid = MidiChartWriter.Write(song.Chart),
+            SongIni = song.EffectivePairs(),
+            Stems = stems,
+        };
+    }
 
     [TestMethod]
     public async Task TheFolderHoldsTheStemsArtChartAndMetadata()
@@ -67,47 +79,51 @@ public sealed class NewChartCreatorTests
     }
 
     [TestMethod]
-    public async Task TheSongIsAsLongAsItsLongestStemButNotThePreview()
+    [DataRow(DrumsVariant.FourLane)]
+    [DataRow(DrumsVariant.Pro)]
+    [DataRow(DrumsVariant.FiveLane)]
+    public async Task ACreatedChartReopensWithItsTempoMapPartsAndMetadata(DrumsVariant drums)
     {
-        var request = Request(
-            new NewChartStem(Wav("a.wav", seconds: 1), "song"),
-            new NewChartStem(Wav("b.wav", seconds: 2), "guitar"),
-            new NewChartStem(Wav("c.wav", seconds: 3), "preview"));
+        // AC C1.1 and C1.5: it reopens in the editor as it was created, the drums read with their layout.
+        var settings = new NewChartSettings("Song", 960, 145.5, 7, 8, new HashSet<ChartInstrument> { ChartInstrument.Bass, ChartInstrument.GhlGuitar, ChartInstrument.Drums }, drums);
+        var request = Request(settings, "Me", new NewChartStem(Wav("mix.wav", seconds: 1), "song"));
 
         string folder = await NewChartCreator.CreateAsync(request, TestContext.CancellationToken);
+        var opened = await SongOpener.OpenAsync(SongOpener.EntryOf(folder)!, TestContext.CancellationToken);
 
-        var ini = await SongIni.ReadAsync(Path.Combine(folder, SongIni.FileName), TestContext.CancellationToken);
-        Assert.AreEqual("2000", ini.Pairs.Single(p => p.Key == "song_length").Value);
+        Assert.IsNull(opened.Problem);
+        var song = opened.Song!;
+        var chart = song.Chart;
+        Assert.AreEqual(960, chart.Resolution);
+        Assert.AreSequenceEqual([new TempoChange(0, EditableTempoMap.MicrosecondsPerQuarterOf(145.5))], chart.TempoMap.Tempos.ToList());
+        Assert.AreSequenceEqual([(0L, 7, 8)], chart.TempoMap.TimeSignatures.Select(s => (s.Tick, s.Numerator, s.Denominator)).ToList());
+        Assert.AreSequenceEqual([ChartInstrument.Bass, ChartInstrument.Drums, ChartInstrument.GhlGuitar], chart.Parts.Select(p => p.Instrument).ToList());
+        Assert.AreEqual(drums, chart.DrumsVariant);
+        Assert.AreEqual("Song", song.Value("name"));
+        Assert.AreEqual("Artist", song.Value("artist"));
+        Assert.AreEqual("Me", song.Value("charter"));
+        Assert.AreEqual("-1", song.Value("diff_bass"));
+        Assert.IsEmpty(PendingSongIniChanges.Of(chart, chart.Parts.Select(p => p.Instrument).ToHashSet(), song.Pairs), "Nothing is left to write.");
+        Assert.AreEqual(
+            drums switch { DrumsVariant.FourLane => DrumsLayout.FourLane, DrumsVariant.FiveLane => DrumsLayout.FiveLane, _ => DrumsLayout.Pro },
+            new DrumsLayouts(song.Options, midi: true).Layout);
     }
 
     [TestMethod]
     public async Task ASongWithOneStemValidatesAndPacks()
     {
-        // AC C1.1, as far as it can go before the editor exists.
+        // AC C1.1.
         string folder = await NewChartCreator.CreateAsync(Request(new NewChartStem(Wav("mix.wav", seconds: 1), "song")), TestContext.CancellationToken);
 
         var plan = await PackPlanner.PlanAsync(folder, cancellationToken: TestContext.CancellationToken);
         Assert.IsFalse(plan.HasErrors, string.Join(Environment.NewLine, plan.Findings));
-        Assert.IsFalse(plan.Findings.Any(f => f.RuleId == SngRules.Sng052));
+        Assert.DoesNotContain(f => f.RuleId == SngRules.Sng052, plan.Findings);
         Assert.IsEmpty(MetadataValidator.Validate(plan.Metadata).Where(MetadataValidator.IsFailing));
 
         string sng = Path.Combine(_root.FullName, "Artist - Song.sng");
         var findings = await Packer.PackAsync(plan, sng, overwrite: false, cancellationToken: TestContext.CancellationToken);
-        Assert.IsFalse(findings.Any(f => f.Severity == Severity.Error));
-        Assert.IsTrue(SngReader.Read(sng, TestContext.CancellationToken).Files.Any(f => f.Name == "notes.mid"));
-    }
-
-    [TestMethod]
-    public async Task ASongWithoutAudioTakesTheEnteredLengthAndWarnsOfIt()
-    {
-        string folder = await NewChartCreator.CreateAsync(Request() with { Length = TimeSpan.FromMinutes(3) }, TestContext.CancellationToken);
-
-        var ini = await SongIni.ReadAsync(Path.Combine(folder, SongIni.FileName), TestContext.CancellationToken);
-        Assert.AreEqual("180000", ini.Pairs.Single(p => p.Key == "song_length").Value);
-
-        var plan = await PackPlanner.PlanAsync(folder, cancellationToken: TestContext.CancellationToken);
-        Assert.IsFalse(plan.HasErrors);
-        Assert.AreEqual(Severity.Warning, plan.Findings.Single(f => f.RuleId == SngRules.Sng052).Severity);
+        Assert.DoesNotContain(f => f.Severity == Severity.Error, findings);
+        Assert.Contains(f => f.Name == "notes.mid", SngReader.Read(sng, TestContext.CancellationToken).Files);
     }
 
     [TestMethod]
@@ -216,7 +232,7 @@ public sealed class NewChartCreatorTests
         Source(name, TestAudio.Wav((int)(seconds * SampleRate), SampleRate, 1, (_, _) => 0));
 
     private void AssertNothingStaged() =>
-        Assert.IsFalse(Directory.EnumerateFileSystemEntries(_library).Any(p => p.EndsWith(StagingPath.Suffix, StringComparison.Ordinal)));
+        Assert.DoesNotContain(p => p.EndsWith(StagingPath.Suffix, StringComparison.Ordinal), Directory.EnumerateFileSystemEntries(_library));
 
     public TestContext TestContext { get; set; }
 }

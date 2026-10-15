@@ -27,6 +27,7 @@ public static class ChunkedPeaksRead
     /// <param name="progress">Handed a track's peaks read so far, as <see cref="StemPeaksReader"/> hands them, until it fails.</param>
     /// <param name="progressInterval">How often <paramref name="progress"/> is called for each track at most.</param>
     /// <param name="cancellationToken">Stops the read.</param>
+    /// <param name="channels">Read the left and right channels' peaks too (<see cref="StemPeaks.HasChannels"/>).</param>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public static void Read(
         SongAudio audio,
@@ -35,7 +36,8 @@ public static class ChunkedPeaksRead
         Action<OpenedTrack>? failed = null,
         Action<OpenedTrack, StemPeaks>? progress = null,
         TimeSpan progressInterval = default,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool channels = false)
     {
         ArgumentNullException.ThrowIfNull(audio);
         ArgumentNullException.ThrowIfNull(completed);
@@ -43,7 +45,7 @@ public static class ChunkedPeaksRead
         var reads = audio.Tracks
             .Where(t => t.Source is not null)
             .OrderByDescending(t => t.Source!.LengthFrames)
-            .Select(opened => new TrackRead(opened, progress is null ? null : partial => progress(opened, partial), progressInterval, resolution))
+            .Select(opened => new TrackRead(opened, progress is null ? null : partial => progress(opened, partial), progressInterval, resolution, channels))
             .ToList();
         var chunks = reads
             .SelectMany(read => Enumerable.Range(0, read.Reader.ChunkCount).Select(index => (Read: read, Index: index)))
@@ -94,7 +96,7 @@ public static class ChunkedPeaksRead
         private int _remaining;
 
         /// <param name="progress">Handed the peaks read so far, unless the read has failed.</param>
-        public TrackRead(OpenedTrack opened, Action<StemPeaks>? progress, TimeSpan progressInterval, WaveformResolution resolution)
+        public TrackRead(OpenedTrack opened, Action<StemPeaks>? progress, TimeSpan progressInterval, WaveformResolution resolution, bool channels)
         {
             Action<StemPeaks>? report = null;
             if (progress is { } handOn)
@@ -110,7 +112,7 @@ public static class ChunkedPeaksRead
             }
 
             Opened = opened;
-            Reader = new StemPeaksReader(opened.Track.StoredName, opened.Source!, report, progressInterval, resolution: resolution);
+            Reader = new StemPeaksReader(opened.Track.StoredName, opened.Source!, report, progressInterval, resolution: resolution, channels: channels);
             _remaining = Reader.ChunkCount;
         }
 

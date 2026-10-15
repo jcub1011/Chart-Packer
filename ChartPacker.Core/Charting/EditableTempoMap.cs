@@ -56,8 +56,17 @@ public sealed class EditableTempoMap
         Anchors = source.Anchors.Clone();
     }
 
-    /// <summary>Ticks per beat.</summary>
-    public int Resolution { get; }
+    /// <summary>Ticks per beat. Only <see cref="Commands.ChangeResolution"/> changes it, with every marker's tick.</summary>
+    public int Resolution
+    {
+        get;
+        internal set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
+            field = value;
+            _cached = null;
+        }
+    }
 
     /// <summary>The tempo markers, in microseconds per quarter note as MIDI stores them, in tick order, then the order they came in.</summary>
     public TickList<TempoChange> Tempos { get; }

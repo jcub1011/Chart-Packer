@@ -1,6 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:ctl="using:ChartPacker.Controls">
+        xmlns:ctl="using:ChartPacker.UI.Controls">
 
     <!-- The app is dark only. Colours not covered by the Fluent palette in AppTheme.axaml live here.
          These come after FluentTheme, so the Accent* keys override its accent-button colours. -->

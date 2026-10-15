@@ -3,8 +3,8 @@ using Avalonia.Media.Imaging;
 using ChartPacker.Core.Library;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
-using ChartPacker.Formatting;
 using ChartPacker.Resources;
+using ChartPacker.UI.Formatting;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartPacker.ViewModels

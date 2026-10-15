@@ -1,3 +1,4 @@
+using ChartPacker.Core.Charting.Commands;
 using ChartPacker.Core.Charts;
 using Serilog;
 
@@ -74,6 +75,8 @@ internal sealed class ChartTickSnapshot
 /// <para>Items that land on one place in a list that holds one per place (two notes on one tick and lane, two chord
 /// markings on one tick) keep the first in the list's order; each other is left out and reported, never lost unseen.
 /// Items that land on one tick in other lists are all kept, in the order they were.</para>
+/// <para>A drum fill moved onto or after <c>[coda]</c>'s tick becomes the big rock ending the games will read it as
+/// (<see cref="DrumFills"/>).</para>
 /// <para>Keeping ticks, the default, never re-ticks.</para>
 /// </remarks>
 internal static class ChartRetick
@@ -114,6 +117,14 @@ internal static class ChartRetick
             moved += Move(chart.EventsRaw, e => e.At(map(e.Tick)), previous);
             foreach (var part in chart.Parts)
                 moved += MovePart(part, map, previous, collisions);
+
+            // Rounding can move a drum fill onto [coda]'s tick, which makes it a big rock ending.
+            if (chart.PartOf(ChartInstrument.Drums) is { } drums)
+            {
+                var phrases = drums.Phrases.AsSpan().ToArray();
+                if (!DrumFills.Reclassify(chart, new EditLog()).IsEmpty)
+                    previous.Keep(drums.Phrases, phrases);
+            }
 
             foreach (var (index, track, _) in tracks)
                 previous.Keep(chart, index, chart.SetPassthrough(index, track));

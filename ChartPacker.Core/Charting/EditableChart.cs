@@ -91,9 +91,9 @@ public sealed class EditableChart
 
     /// <summary>The chart a new song starts with, from what the new-chart wizard asked for (charter-spec C1).</summary>
     /// <remarks>
-    /// A tempo marker and a time signature at tick 0, an empty part for each one asked for, and <c>EVENTS</c> holding
-    /// <c>[music_start]</c> and <c>[end]</c>, both at tick 0 while there are no notes; saving moves <c>[end]</c> after
-    /// the last note (CHR085). The tempo track is named after the song.
+    /// A tempo marker and a time signature at tick 0, an empty part for each one asked for, and an empty <c>EVENTS</c>:
+    /// <c>[music_start]</c>, <c>[music_end]</c> and <c>[end]</c> are placed as it's saved (<see cref="SongEventPlacement"/>).
+    /// The tempo track is named after the song.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">The resolution, tempo or time signature can't be written.</exception>
     public static EditableChart CreateNew(NewChartSettings settings)
@@ -114,8 +114,6 @@ public sealed class EditableChart
             chart.AddPart(instrument);
         if (settings.Parts.Contains(ChartInstrument.Drums))
             chart.DrumsVariant = settings.Drums;
-        chart.Events.Add(TextEvent.Of(0, "[music_start]"));
-        chart.Events.Add(TextEvent.Of(0, "[end]"));
         return chart;
     }
 

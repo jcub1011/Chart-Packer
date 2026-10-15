@@ -1,7 +1,10 @@
 using System.Diagnostics;
 using ChartPacker.Audio.Decoding;
+using ChartPacker.Audio.Dsp;
 using ChartPacker.Audio.Mixing;
 using ChartPacker.Audio.Playback;
+using ChartPacker.Audio.Synthesis;
+using ChartPacker.Core.Charts;
 using static ChartPacker.Core.Tests.Audio.TestAudio;
 
 namespace ChartPacker.Core.Tests.Audio;
@@ -12,6 +15,11 @@ public sealed class StemPlayerTests
 {
     private const int Rate = 48000;
     private const int QueueTarget = Rate * StemPlayer.QueueMilliseconds / 1000;
+
+    // Stretched, Position is where the grains played are, which the stretcher takes up to 12 ms from where the speed
+    // says (TimeStretcher.PlayedPosition). On this player's stem, a steady ramp, every grain is taken nearly as far back as it
+    // can be at any speed over 1 (about 10 ms at 1.5), as that lines up best with the grain before it carrying on.
+    private const double Stretched = 0.013;
 
     [TestMethod]
     public void PlayingKeepsAboutTheQueueTargetQueued()
@@ -101,24 +109,24 @@ public sealed class StemPlayerTests
     {
         using var output = new FakeOutput();
         using var player = Player(output, seconds: 0.1);
-        int stops = 0;
-        player.Stopped += (_, _) => Interlocked.Increment(ref stops);
+        var stops = new StopCounter(player);
 
         player.Play();
-        WaitUntil(() => player.Mixer.IsEnded);
-        output.Drain(output.QueuedFrames);
-        WaitUntil(() => player.IsEnded);
+        stops.WaitForStop(output);
 
-        Thread.Sleep(30);
-        Assert.AreEqual(1, stops);
+        Assert.IsTrue(player.IsEnded);
         Assert.IsFalse(player.IsPlaying);
         Assert.IsNull(player.Error);
         Assert.AreEqual(0.1, player.Length.TotalSeconds, 0.001);
 
+        // The song fits in the queue, which isn't drained, so it can't end again.
         player.Play();
         WaitUntil(() => output.QueuedFrames > 0);
         Assert.AreEqual(0f, output.FirstSampleAfterLastClear ?? float.NaN, 1e-6f);
         Assert.IsFalse(player.IsEnded);
+
+        player.Dispose();
+        Assert.AreEqual(1, stops.Count);
     }
 
     [TestMethod]
@@ -146,15 +154,16 @@ public sealed class StemPlayerTests
     {
         using var output = new FakeOutput { FailWrites = true };
         using var player = Player(output, seconds: 10);
-        int stops = 0;
-        player.Stopped += (_, _) => Interlocked.Increment(ref stops);
+        var stops = new StopCounter(player);
 
         player.Play();
-        WaitUntil(() => Volatile.Read(ref stops) == 1);
+        stops.WaitForStop();
 
         Assert.AreEqual("The device went away.", player.Error);
         Assert.IsFalse(player.IsPlaying);
-        Assert.AreEqual(1, stops);
+
+        player.Dispose();
+        Assert.AreEqual(1, stops.Count);
     }
 
     [TestMethod]
@@ -325,7 +334,7 @@ public sealed class StemPlayerTests
         PlayFor(output, Rate / 2);
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
         player.Pause();
-        Assert.AreEqual(1, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual(1, player.Position.TotalSeconds, Stretched);
     }
 
     [TestMethod]
@@ -368,7 +377,7 @@ public sealed class StemPlayerTests
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
 
         player.Speed = 1.5f;
-        Assert.AreEqual(0.25 * from, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual(0.25 * from, player.Position.TotalSeconds, Stretched);
 
         // What was queued, and stretched at the old speed meanwhile, plays out; what follows is at the new speed.
         PlayFor(output, QueueTarget * 2);
@@ -378,7 +387,7 @@ public sealed class StemPlayerTests
         WaitUntil(() => output.QueuedFrames >= QueueTarget);
         player.Pause();
 
-        Assert.AreEqual(before + 0.75, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual(before + 0.75, player.Position.TotalSeconds, Stretched);
         Assert.AreEqual(0, output.Clears);
         Assert.AreEqual(1f, output.Speed);
     }
@@ -457,7 +466,7 @@ public sealed class StemPlayerTests
         });
 
         Assert.IsNull(player.Error);
-        Assert.AreEqual(0.1, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual(0.1, player.Position.TotalSeconds, Stretched);
     }
 
     [TestMethod]
@@ -469,6 +478,392 @@ public sealed class StemPlayerTests
         Assert.ThrowsExactly<ArgumentException>(() => new StemPlayer(mixer, output));
     }
 
+    [TestMethod]
+    [DataRow(0.5f, true)]
+    [DataRow(1f, false)]
+    [DataRow(1.5f, false)]
+    [TestCategory("Slow")]
+    public void MetronomeClicksStayOnTheBeatOverAWholeSong(float speed, bool pitchCorrection)
+    {
+        // AC C10.1. Five minutes of noise at 120 BPM, silent for 60 ms either side of each beat so a click can be found
+        // in the mixed output, with the grains free to move around it while stretched.
+        const int seconds = 300;
+        const int beat = Rate / 2;
+        const int quiet = Rate * 60 / 1000;
+        long frames = (long)seconds * Rate;
+        float Noise(long n, int channel)
+        {
+            long fromBeat = n % beat;
+            if (fromBeat < quiet || fromBeat > beat - quiet)
+                return 0f;
+            uint hash = (uint)(n * 2654435761L) ^ (uint)(channel * 40503);
+            hash ^= hash >> 15;
+            hash *= 2246822519;
+            hash ^= hash >> 13;
+            return ((hash & 0xFFFF) / 65535f * 0.6f) - 0.3f;
+        }
+
+        var tempoMap = new TempoMap(480, [new TempoChange(0, 500_000)], [new TimeSignature(0, 4, 4)]);
+        var metronome = new MetronomeSchedule(tempoMap, TimeSpan.Zero, TimeSpan.FromSeconds(seconds), Rate);
+        Assert.AreEqual((2 * seconds) + 1, metronome.Count, "A beat every half second, the end's included.");
+
+        // Each click is where a run of silence first breaks near its beat.
+        var onsets = new List<long>();
+        long silentFor = 0;
+        using var output = new FakeOutput
+        {
+            KeepsWritten = false,
+            Written = (first, stereo) =>
+            {
+                for (int i = 0; i < stereo.Length / 2; i++)
+                {
+                    if (stereo[2 * i] == 0f)
+                    {
+                        silentFor++;
+                        continue;
+                    }
+
+                    if (silentFor >= Rate / 40)
+                        onsets.Add(first + i);
+                    silentFor = 0;
+                }
+            },
+        };
+
+        var source = new FakeSource(Rate, 2, frames, Noise);
+        using var player = new StemPlayer(new StemMixer([KeyValuePair.Create("song", (IPcmSource)source)]), output, null, queueMilliseconds: 3000)
+        {
+            PitchCorrection = pitchCorrection,
+            Speed = speed,
+            Sounds = metronome,
+        };
+        player.Play();
+        PlayToTheEnd(output, player, TimeSpan.FromSeconds(120));
+
+        // Stretched, the output stands for the grains it plays, which a second stretcher over the same audio gives
+        // frame for frame. Played as mixed, each frame written is a frame of the mix.
+        var stretcher = pitchCorrection
+            ? new TimeStretcher(Rate, new StemMixer([KeyValuePair.Create("song", (IPcmSource)new FakeSource(Rate, 2, frames, Noise))]).Mix) { Ratio = speed }
+            : null;
+        stretcher?.Reset(0);
+        var skip = new float[Rate * 2];
+        long stretched = 0;
+        double SourceOf(long outputFrame)
+        {
+            if (stretcher is null)
+                return outputFrame;
+            while (stretched < outputFrame)
+                stretched += stretcher.Read(skip.AsSpan(0, (int)Math.Min(Rate, outputFrame - stretched) * 2));
+            return stretcher.PlayedPosition;
+        }
+
+        double worst = 0;
+        double outputPerSource = pitchCorrection ? 1 / speed : 1;
+        for (int k = 1; k < metronome.Count - 1; k++)
+        {
+            long at = metronome.FrameAt(k);
+            long expected = (long)(at * outputPerSource);
+            long onset = onsets.Where(o => Math.Abs(o - expected) < Rate * 40 / 1000).DefaultIfEmpty(-1).First();
+            Assert.AreNotEqual(-1, onset, $"No click was found near beat {k}.");
+
+            // A click's first sample is 0, as it's a sine from its start: it starts the frame before.
+            worst = Math.Max(worst, Math.Abs(SourceOf(onset - 1) - at));
+        }
+
+        Assert.IsLessThanOrEqualTo(2.0 * Rate / 1000, worst, $"A click was {worst * 1000 / Rate:F2} ms from its beat.");
+    }
+
+    [TestMethod]
+    public void ALoopTurnsBackAtItsEndWithoutDroppingTheQueue()
+    {
+        // Charter-spec C10 item 2: the loop region.
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.5), loops: true);
+        PlayFor(output, Rate * 3 / 4);
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The ramp's value is the time over 10 s: from 1 s to 1.5 s, then from 1 s again.
+        float[] written = output.WrittenLeft();
+        Assert.AreEqual(0.1f, written[0], 1e-4f);
+        Assert.AreEqual(0.15f, written[(Rate / 2) - 1], 1e-4f);
+        Assert.AreEqual(0.1f, written[Rate / 2], 1e-4f);
+        Assert.AreEqual(1, output.Clears, "Only the start of the region dropped the queue.");
+        Assert.AreEqual(1.25, player.Position.TotalSeconds, 0.001);
+        Assert.AreEqual((TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.5), true), player.Region);
+    }
+
+    [TestMethod]
+    public void ARegionPlayedOncePausesAtItsEnd()
+    {
+        using var output = new FakeOutput();
+        using var player = Player(output, seconds: 10);
+        var stops = new StopCounter(player);
+
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.2), loops: false);
+        stops.WaitForStop(output);
+
+        Assert.IsFalse(player.IsPlaying);
+        Assert.IsFalse(player.IsEnded);
+        Assert.IsNull(player.Region);
+        Assert.AreEqual(Rate / 5, output.WrittenFrames, 1);
+        Assert.AreEqual(1.2, player.Position.TotalSeconds, 0.001);
+
+        player.Dispose();
+        Assert.AreEqual(1, stops.Count);
+    }
+
+    [TestMethod]
+    public void SoundsInALoopPlayEachTimeRound()
+    {
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10);
+        player.Sounds = new Schedule(new ScheduledSound(Rate + (Rate / 10), Constant(0.25f, Rate / 100)));
+
+        player.PlayRegion(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.2), loops: true);
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        foreach (int round in new[] { 0, 1, 2 })
+        {
+            int at = (round * Rate / 5) + (Rate / 10);
+            Assert.AreEqual(0f, written[at - 1], $"Round {round}.");
+            Assert.AreEqual(0.25f, written[at], 1e-6f, $"Round {round}.");
+        }
+    }
+
+    [TestMethod]
+    public void SoundsAreLaidOverTheMixButNotKeptAsHeard()
+    {
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 1);
+        player.Sounds = new Schedule(new ScheduledSound(Rate / 10, Constant(0.25f, Rate / 100)));
+        player.Play();
+        PlayFor(output, Rate / 5);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        Assert.AreEqual(0f, written[(Rate / 10) - 1]);
+        Assert.AreEqual(0.25f, written[Rate / 10], 1e-6f);
+        Assert.AreEqual(0.25f, written[(Rate / 10) + (Rate / 100) - 1], 1e-6f);
+        Assert.AreEqual(0f, written[(Rate / 10) + (Rate / 100)]);
+
+        var heard = new float[Rate / 5];
+        Assert.IsTrue(player.TryReadHeard(heard, out _));
+        Assert.IsTrue(heard.All(sample => sample == 0f), "The sound was kept as heard.");
+    }
+
+    [TestMethod]
+    public void SoundVolumeScalesTheSoundsAndTheMixIsClamped()
+    {
+        using var output = new FakeOutput();
+        using var player = new StemPlayer(new StemMixer([KeyValuePair.Create("song", (IPcmSource)new FakeSource(Rate, 2, Rate, (_, _) => 0.9f))]), output)
+        {
+            Sounds = new Schedule(new ScheduledSound(0, Constant(0.25f, Rate / 100)), new ScheduledSound(Rate / 2, Constant(0.25f, Rate / 100))),
+            SoundVolume = 0.2f,
+        };
+        player.Play();
+        PlayFor(output, Rate / 4);
+        player.SoundVolume = 2;
+        PlayFor(output, Rate / 2);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        Assert.AreEqual(0.95f, written[0], 1e-6f);
+        Assert.AreEqual(1f, written[Rate / 2], "Past full scale, it's clamped.");
+    }
+
+    [TestMethod]
+    public void ASeekDropsTheSoundsPlaying()
+    {
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10);
+        player.Sounds = new Schedule(new ScheduledSound(0, Constant(0.25f, Rate)));
+        player.Play();
+        PlayFor(output, Rate / 10);
+        Assert.AreEqual(0.25f, output.WrittenLeft()[Rate / 20], 1e-6f);
+
+        int clears = output.Clears;
+        player.Seek(TimeSpan.FromSeconds(5));
+        WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
+
+        float[] written = output.WrittenLeft();
+        Assert.AreEqual(0f, output.FirstSampleAfterLastClear);
+        Assert.IsTrue(written[^QueueTarget..].All(sample => sample == 0f), "The sound played on after the seek.");
+    }
+
+    [TestMethod]
+    public void ANewScheduleLetsTheSoundsPlayingPlayOut()
+    {
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10);
+        player.Sounds = new Schedule(new ScheduledSound(0, Constant(0.25f, Rate)), new ScheduledSound(2 * Rate, Constant(0.5f, Rate / 10)));
+        player.Play();
+        PlayFor(output, Rate / 10);
+
+        player.Sounds = new Schedule(new ScheduledSound(3 * Rate, Constant(0.125f, Rate / 10)));
+        PlayFor(output, 4 * Rate);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        Assert.AreEqual(0.25f, written[Rate - 1], 1e-6f, "The sound playing was cut short.");
+        Assert.AreEqual(0f, written[Rate]);
+        Assert.AreEqual(0f, written[2 * Rate], "The old schedule's sound played.");
+        Assert.AreEqual(0.125f, written[3 * Rate], 1e-6f, "The new schedule's sound didn't play.");
+    }
+
+    [TestMethod]
+    public void PlayedAsMixedASoundIsReadAtTheSpeedSoItKeepsItsLength()
+    {
+        // The device plays what's written twice as fast, so the sound is written over twice as many frames, to be heard
+        // as long as it is and at its own pitch.
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10);
+        player.Speed = 2;
+        player.Sounds = new Schedule(new ScheduledSound(Rate, Constant(0.25f, Rate / 10)));
+        player.Play();
+        PlayFor(output, Rate);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        int length = written.Count(sample => sample != 0f);
+        Assert.AreEqual(Rate / 5, length, 1);
+        Assert.AreEqual(0f, written[Rate - 1]);
+        Assert.AreNotEqual(0f, written[Rate]);
+    }
+
+    [TestMethod]
+    public void WhilePausedTheSmoothPositionIsThePosition()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        PlayFor(output, Rate / 4);
+        player.Pause();
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.AreEqual(player.Position, player.SmoothPosition);
+    }
+
+    [TestMethod]
+    public void TheSmoothPositionMovesOnBetweenTheDevicesTakings()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        Assert.AreEqual(TimeSpan.Zero, player.SmoothPosition);
+
+        // The device takes 10 ms every 10 ms: between, it moves on with the clock, and lands on each taking.
+        for (int step = 1; step <= 20; step++)
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(4));
+            Assert.AreEqual((step - 1) * 10 + 4, player.SmoothPosition.TotalMilliseconds, 1e-3);
+            clock.Advance(TimeSpan.FromMilliseconds(6));
+            output.Drain(Rate / 100);
+            WaitUntil(() => output.QueuedFrames >= QueueTarget);
+            Assert.AreEqual(step * 10, player.SmoothPosition.TotalMilliseconds, 1e-3);
+            Assert.AreEqual(player.Position.TotalMilliseconds, player.SmoothPosition.TotalMilliseconds, 1e-3);
+        }
+    }
+
+    [TestMethod]
+    public void TheSmoothPositionMovesEvenlyThoughTheDeviceTakesUnevenly()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The device takes 10 ms at a time, 10 ms apart on average but up to 4 ms early or late, and the screen reads at
+        // 60 Hz, between them at any point.
+        var random = new Random(7);
+        var frames = Watch(player, output, clock, n => (n + 1) * 10 + (random.NextDouble() * 8) - 4, Rate / 100, QueueTarget, 3000);
+
+        AssertMovesEvenly(frames, speed: 1, near: 10);
+    }
+
+    [TestMethod]
+    public void TheSmoothPositionFollowsADeviceThatRunsSlowerThanTheClock()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The device's clock runs 0.5% slower than the system's: the smooth position runs that much slower too.
+        var frames = Watch(player, output, clock, n => (n + 1) * 10.05, Rate / 100, QueueTarget, 3000);
+
+        AssertMovesEvenly(frames, speed: 1, near: 10);
+    }
+
+    [TestMethod]
+    public void AStalledDevicePutsTheSmoothPositionStraightBackOnIt()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        // The device takes nothing for 100 ms from 500 ms: the smooth position runs on meanwhile, then, 50 ms past it,
+        // lands on it.
+        var frames = Watch(player, output, clock, n => n < 50 ? (n + 1) * 10 : (n + 11) * 10, Rate / 100, QueueTarget, 1000);
+
+        var after = frames.First(f => f.At > 610);
+        Assert.AreEqual(after.Position, after.Smooth, 1e-3);
+    }
+
+    [TestMethod]
+    public void StretchedTheSmoothPositionMovesEvenlyAtTheSpeed()
+    {
+        // At a quarter speed the grains played step back and forth around where the speed says, up to 12 ms either way
+        // on noise; what's drawn has to move on evenly at a quarter speed regardless.
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        var source = new FakeSource(Rate, 2, 10L * Rate, (n, channel) => ((uint)(n * 2654435761L) ^ (uint)(channel * 40503)) / (float)uint.MaxValue - 0.5f);
+        using var player = new StemPlayer(new StemMixer([KeyValuePair.Create("song", (IPcmSource)source)]), output, clock)
+        {
+            PitchCorrection = true,
+            Speed = 0.25f,
+        };
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+
+        var frames = Watch(player, output, clock, n => (n + 1) * 10, Rate / 100, QueueTarget, 3000);
+
+        AssertMovesEvenly(frames, speed: 0.25, near: Stretched * 1000 + 3);
+    }
+
+    [TestMethod]
+    public void ASeekPutsTheSmoothPositionStraightThere()
+    {
+        var clock = new ManualClock();
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10, clock);
+        player.Play();
+        WaitUntil(() => output.QueuedFrames >= QueueTarget);
+        _ = player.SmoothPosition;
+        clock.Advance(TimeSpan.FromMilliseconds(30));
+        PlayFor(output, Rate / 50);
+
+        int clears = output.Clears;
+        player.Seek(TimeSpan.FromSeconds(5));
+        Assert.AreEqual(TimeSpan.FromSeconds(5), player.SmoothPosition);
+        WaitUntil(() => output.Clears > clears && output.QueuedFrames >= QueueTarget);
+        clock.Advance(TimeSpan.FromMilliseconds(30));
+        Assert.AreEqual(5000, player.SmoothPosition.TotalMilliseconds, 1e-3);
+        clock.Advance(TimeSpan.FromMilliseconds(5));
+        Assert.AreEqual(5005, player.SmoothPosition.TotalMilliseconds, 1e-3);
+    }
+
     /// <summary>A player of one stem whose value rises from 0 to 1 over <paramref name="seconds"/>.</summary>
     private static StemPlayer Player(FakeOutput output, double seconds)
     {
@@ -477,134 +872,95 @@ public sealed class StemPlayerTests
         return new StemPlayer(new StemMixer([KeyValuePair.Create("song", (IPcmSource)source)]), output);
     }
 
-    /// <summary>Has the device play <paramref name="frames"/> frames, as the player keeps queuing them.</summary>
-    private static void PlayFor(FakeOutput output, int frames)
+    /// <summary>What the screen read of the player in a frame, in milliseconds: when, and where the player was.</summary>
+    private sealed record Frame(double At, double Smooth, double Position);
+
+    /// <summary>
+    /// Plays for <paramref name="milliseconds"/> of <paramref name="clock"/> from now: the device takes
+    /// <paramref name="take"/> frames at each of <paramref name="takingAt"/>'s times, the player filling the queue back
+    /// to <paramref name="target"/> after each, and the screen reads the player at 60 Hz between.
+    /// </summary>
+    private static List<Frame> Watch(StemPlayer player, FakeOutput output, ManualClock clock, Func<int, double> takingAt, int take, int target, double milliseconds)
     {
-        while (frames > 0)
+        // In microseconds, so the clock doesn't drift from rounding.
+        const double FrameMicroseconds = 1_000_000 / 60.0;
+        var frames = new List<Frame>();
+        long now = 0, end = (long)(milliseconds * 1000);
+        int taking = 0, frame = 1;
+        long nextTaking = (long)(takingAt(0) * 1000);
+        while (now < end)
         {
-            WaitUntil(() => output.QueuedFrames > 0);
-            int count = Math.Min(frames, output.QueuedFrames);
-            output.Drain(count);
-            frames -= count;
+            long nextFrame = (long)(frame * FrameMicroseconds);
+            long next = Math.Min(nextFrame, nextTaking);
+            clock.Advance(TimeSpan.FromTicks((next - now) * 10));
+            now = next;
+            if (next == nextTaking)
+            {
+                output.Drain(take);
+                WaitUntil(() => output.QueuedFrames >= target);
+                nextTaking = (long)(takingAt(++taking) * 1000);
+            }
+            else
+            {
+                frames.Add(new Frame(now / 1000.0, player.SmoothPosition.TotalMilliseconds, player.Position.TotalMilliseconds));
+                frame++;
+            }
+        }
+
+        return frames;
+    }
+
+    /// <summary>
+    /// Asserts each frame moved on by within 15% of the time between them times <paramref name="speed"/>, so never back;
+    /// and from half a second in, was within <paramref name="near"/> ms of <see cref="StemPlayer.Position"/>.
+    /// </summary>
+    private static void AssertMovesEvenly(List<Frame> frames, double speed, double near)
+    {
+        for (int i = 1; i < frames.Count; i++)
+        {
+            var (last, frame) = (frames[i - 1], frames[i]);
+            double expected = (frame.At - last.At) * speed;
+            double moved = frame.Smooth - last.Smooth;
+            Assert.IsTrue(
+                moved >= expected * 0.85 && moved <= expected * 1.15,
+                $"At {frame.At:F1} ms it moved {moved:F3} ms, against {expected:F3} ms.");
+            if (frame.At >= 500)
+            {
+                Assert.IsLessThanOrEqualTo(
+                    near, Math.Abs(frame.Smooth - frame.Position), $"At {frame.At:F1} ms it was at {frame.Smooth:F3} ms, against {frame.Position:F3} ms.");
+            }
         }
     }
 
-    private static void WaitUntil(Func<bool> condition)
+    /// <summary>A player of one silent stem <paramref name="seconds"/> long.</summary>
+    private static StemPlayer SilentPlayer(FakeOutput output, double seconds, TimeProvider? clock = null)
+    {
+        var source = new FakeSource(Rate, 2, (long)(seconds * Rate), (_, _) => 0f);
+        return new StemPlayer(new StemMixer([KeyValuePair.Create("song", (IPcmSource)source)]), output, clock);
+    }
+
+    /// <summary>A sound of <paramref name="frames"/> frames at <paramref name="value"/>.</summary>
+    private static SynthSound Constant(float value, int frames) => new([.. Enumerable.Repeat(value, frames)], Rate);
+
+    /// <summary>Has the device play everything the player queues until it reaches the end.</summary>
+    private static void PlayToTheEnd(FakeOutput output, StemPlayer player, TimeSpan timeout)
     {
         var clock = Stopwatch.StartNew();
-        while (!condition())
+        while (!player.IsEnded)
         {
-            if (clock.Elapsed > TimeSpan.FromSeconds(10))
-                Assert.Fail("Timed out waiting for the player.");
-            Thread.Sleep(2);
+            if (clock.Elapsed > timeout)
+                Assert.Fail("Timed out playing to the end.");
+            output.Drain(output.QueuedFrames);
+            Thread.Sleep(1);
         }
+
+        Assert.IsNull(player.Error);
     }
 
-    /// <summary>An output whose queue only drains when <see cref="Drain"/> says the device played it.</summary>
-    private sealed class FakeOutput : IAudioOutput
+    /// <summary>The sounds given, in order.</summary>
+    private sealed class Schedule(params ScheduledSound[] sounds) : ISoundSchedule
     {
-        private readonly Lock _lock = new();
-        private int _queued;
-        private int _largestWrite;
-        private float? _firstAfterClear;
-        private readonly List<float> _writtenLeft = [];
-
-        public int SampleRate => Rate;
-
-        public bool FailWrites { get; init; }
-
-        public bool IsPlaying { get; private set; }
-
-        public bool IsDisposed { get; private set; }
-
-        public int Clears { get; private set; }
-
-        public float Volume { get; set; } = 1;
-
-        public float Speed { get; set; } = 1;
-
-        /// <summary>The most frames written at once.</summary>
-        public int LargestWrite
-        {
-            get
-            {
-                lock (_lock)
-                    return _largestWrite;
-            }
-        }
-
-        /// <summary>The first left sample written since the last <see cref="Clear"/>, or since the start.</summary>
-        public float? FirstSampleAfterLastClear
-        {
-            get
-            {
-                lock (_lock)
-                    return _firstAfterClear;
-            }
-        }
-
-        public int QueuedFrames
-        {
-            get
-            {
-                lock (_lock)
-                    return _queued;
-            }
-        }
-
-        /// <summary>How many frames have been written since the start.</summary>
-        public long WrittenFrames
-        {
-            get
-            {
-                lock (_lock)
-                    return _writtenLeft.Count;
-            }
-        }
-
-        /// <summary>The left channel of everything written since the start.</summary>
-        public float[] WrittenLeft()
-        {
-            lock (_lock)
-                return [.. _writtenLeft];
-        }
-
-        public void Write(ReadOnlySpan<float> stereo)
-        {
-            if (FailWrites)
-                throw new AudioDeviceException("The device went away.");
-
-            lock (_lock)
-            {
-                if (_queued == 0 && _firstAfterClear is null)
-                    _firstAfterClear = stereo[0];
-                _queued += stereo.Length / 2;
-                _largestWrite = Math.Max(_largestWrite, stereo.Length / 2);
-                for (int i = 0; i < stereo.Length; i += 2)
-                    _writtenLeft.Add(stereo[i]);
-            }
-        }
-
-        public void Drain(int frames)
-        {
-            lock (_lock)
-                _queued = Math.Max(0, _queued - frames);
-        }
-
-        public void Clear()
-        {
-            lock (_lock)
-            {
-                _queued = 0;
-                _firstAfterClear = null;
-                Clears++;
-            }
-        }
-
-        public void Pause() => IsPlaying = false;
-
-        public void Resume() => IsPlaying = true;
-
-        public void Dispose() => IsDisposed = true;
+        public void SoundsBetween(long fromSourceFrame, long toSourceFrame, List<ScheduledSound> into) =>
+            into.AddRange(sounds.Where(s => s.SourceFrame >= fromSourceFrame && s.SourceFrame < toSourceFrame));
     }
 }

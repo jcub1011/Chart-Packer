@@ -25,6 +25,15 @@ public enum SongChanges
 
     /// <summary>The song's drum variant.</summary>
     DrumsVariant = 8,
+
+    /// <summary>A <c>song.ini</c> value of the song, set in Chart settings; the chart itself is as it was.</summary>
+    SongIni = 16,
+
+    /// <summary>The song's album art, a background or an audio track, staged for the next save; the chart is as it was.</summary>
+    Media = 32,
+
+    /// <summary>A vocal part's track: added, or its notes, lyrics or phrases changed (charter-spec C3 item 7).</summary>
+    Vocals = 64,
 }
 
 /// <summary>
@@ -60,6 +69,30 @@ public sealed class ChartChange
 
     /// <summary>Whether nothing was touched.</summary>
     public bool IsEmpty => _regions.Length == 0 && Song == SongChanges.None;
+
+    /// <summary>
+    /// Whether every track's game view must be worked out again: a part added or removed, the drum variant or the tempo
+    /// map changed, which moves or rereads everything.
+    /// </summary>
+    public bool RebuildsAllTracks => (Song & (SongChanges.Parts | SongChanges.DrumsVariant | SongChanges.TempoMap)) != 0;
+
+    /// <summary>
+    /// Whether the change touched <paramref name="track"/>'s game view: a region of its part on its difficulty or on every
+    /// difficulty, or anywhere on the drums, whose difficulties share their markers; or a change that rebuilds every track.
+    /// </summary>
+    public bool Touches(ChartTrackKey track)
+    {
+        if (RebuildsAllTracks)
+            return true;
+        bool drums = ChartInstruments.KindOf(track.Instrument) == ChartInstrumentKind.Drums;
+        foreach (var region in _regions)
+        {
+            if (region.Part == track.Instrument && (drums || region.Difficulty is null || region.Difficulty == track.Difficulty))
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>A change to the song as a whole.</summary>
     public static ChartChange Of(SongChanges song) => song == SongChanges.None ? None : new([], song);

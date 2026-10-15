@@ -19,6 +19,10 @@ internal static class EditableChartSamples
         chart.TempoMap.TimeSignatures.Add(new TimeSignatureMarker(3840, 3, 4));
         chart.TempoMap.Anchors.Add(new TempoAnchor(1920, 2_000_000));
         chart.TempoTrackRaw.Add(new RawEvent(0, [0xFF, 0x59, 2, 0, 0]));
+
+        // Song events as a chart loaded from disk has them; the editor's own model never holds these.
+        chart.Events.Add(TextEvent.Of(0, "[music_start]"));
+        chart.Events.Add(TextEvent.Of(0, "[end]"));
         chart.Events.Add(TextEvent.Of(960, "[section Intro]"));
         chart.EventsRaw.Add(new RawEvent(480, [0x90, 24, 100]));
 

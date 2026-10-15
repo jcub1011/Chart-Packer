@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 
-namespace ChartPacker.Services
+namespace ChartPacker.UI.Services
 {
     public sealed class AvaloniaFolderPickerService(Func<TopLevel?> topLevel) : IFolderPickerService
     {

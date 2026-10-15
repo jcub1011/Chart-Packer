@@ -42,6 +42,12 @@ public sealed class ChartLintContext
     /// <summary>How long the song's audio is, or null when it isn't known.</summary>
     public TimeSpan? AudioLength => _run.Input.AudioLength;
 
+    /// <summary>How much later than its ticks say the chart plays against the audio.</summary>
+    public TimeSpan Delay => _run.Input.Delay;
+
+    /// <summary>The chart's tempo map, for times and the grid, made once in a run.</summary>
+    public TempoMap TempoMap => _run.TempoMap;
+
     /// <summary>
     /// What the games read from the chart (<see cref="Charting.GameView.Project"/>, with <see cref="Options"/>). It's
     /// worked out the first time a rule asks for it, and at most once in a run, as it's costly on a big chart.
@@ -68,6 +74,12 @@ public sealed class ChartLintContext
 
     /// <summary>The parts to check, in <see cref="ChartInstrument"/> order.</summary>
     public IReadOnlyList<EditablePart> Parts => _parts;
+
+    /// <summary>
+    /// The vocal parts the chart has, in <see cref="Layout.VocalTrack"/> order, each read from the first track of its
+    /// name as the editor edits it; one that can't be read is left out. Read once in a run.
+    /// </summary>
+    public IReadOnlyList<(Layout.VocalTrack Track, VocalTrackContent Content)> VocalParts => _run.VocalParts;
 
     /// <summary>The tracks of <paramref name="part"/> to check, Easy to Expert: the region's difficulty, or every one.</summary>
     public IReadOnlyList<EditableTrack> TracksOf(EditablePart part)

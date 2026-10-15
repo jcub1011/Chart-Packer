@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ChartPacker.Core.Metadata;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

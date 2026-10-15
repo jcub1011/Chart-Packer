@@ -108,7 +108,7 @@ public sealed class JsonSettingsFileTests
 
         file.Save(settings);
 
-        CollectionAssert.AreEqual(new[] { "settings.json" }, _root.GetFiles().Select(f => f.Name).ToArray());
+        Assert.AreSequenceEqual(new[] { "settings.json" }, [.. _root.GetFiles().Select(f => f.Name)]);
     }
 
     private JsonSettingsFile<TestSettings> Open() => new(_path, TestSettingsJsonContext.Default.TestSettings);

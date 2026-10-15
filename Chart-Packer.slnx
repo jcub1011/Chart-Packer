@@ -5,6 +5,7 @@
   <Project Path="ChartPacker.Audio/ChartPacker.Audio.csproj" />
   <Project Path="ChartPacker.Core/ChartPacker.Core.csproj" />
   <Project Path="ChartPacker.Core.Tests/ChartPacker.Core.Tests.csproj" />
+  <Project Path="ChartPacker.Input/ChartPacker.Input.csproj" />
   <Project Path="ChartPacker.Ffmpeg/ChartPacker.Ffmpeg.csproj" />
   <Project Path="ChartPacker.UI/ChartPacker.UI.csproj" />
   <Project Path="ChartPacker.Video/ChartPacker.Video.csproj" />

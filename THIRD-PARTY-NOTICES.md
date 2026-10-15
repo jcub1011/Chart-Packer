@@ -84,9 +84,10 @@ specifications; no code from any implementation of them is used.
 - **Project:** [game-icons.net](https://game-icons.net) ([game-icons/icons](https://github.com/game-icons/icons))
 - **License:** [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)
 - **Used for:** the instrument icons of the difficulties in the details panel, the lyrics
-  lane's waveform button, the audio and video offsets, and the pitch correction button
-  (`ChartPacker/Styles/Icons.axaml`, the `Instrument*Geometry`, `WaveformIconGeometry`,
-  `OffsetIconGeometry` and `PitchCorrectionIconGeometry` resources). The SVG paths are
+  lane's waveform button, the audio and video offsets, the pitch correction button, and Chart
+  Builder's Playtest button (`ChartPacker/Styles/Icons.axaml`, the `Instrument*Geometry`,
+  `WaveformIconGeometry`, `OffsetIconGeometry`, `PitchCorrectionIconGeometry` and
+  `PlaytestIconGeometry` resources). The SVG paths are
   used unchanged, except that each command is written out in full so that Avalonia's path
   parser reads it. They're drawn at a smaller size, and recoloured.
 
@@ -106,6 +107,7 @@ specifications; no code from any implementation of them is used.
 | [Sound waves](https://game-icons.net/1x1/skoll/sound-waves.html) | Skoll | Lane waveforms |
 | [Stopwatch](https://game-icons.net/1x1/lorc/stopwatch.html) | [Lorc](https://lorcblog.blogspot.com) | Audio and video offsets |
 | [Tune pitch](https://game-icons.net/1x1/lorc/tune-pitch.html) | [Lorc](https://lorcblog.blogspot.com) | Pitch correction |
+| [Gamepad](https://game-icons.net/1x1/delapouite/gamepad.html) | [Delapouite](https://delapouite.com) | Playtest |
 
 ## Bundled libraries
 

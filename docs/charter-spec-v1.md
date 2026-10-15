@@ -50,9 +50,11 @@ This spec **supersedes** the "editing charts" non-goal in
 
 ## 2. Non-goals for v1
 
-- **Vocals and harmonies editing.** `PART VOCALS` and `HARM1`–`HARM3` are kept byte for byte on
-  save ([§4.2](#lossless-passthrough)). The existing vocals tools (`VocalsEditor`, lyrics lane)
-  are unchanged.
+- **Vocal percussion, overdrive and lyric shifts.** The editor's vocal lanes edit the notes, lyrics
+  and phrases of `PART VOCALS` and `HARM1`–`HARM3` ([C3](#c3-editor-layout) item 7). Their
+  percussion notes (96, 97), overdrive (116), lyric and range shifts and any other events are kept
+  as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are imported only. The
+  existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
 - **Pro keys, keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are.
 - **Venue, lighting, camera and crowd events.** Kept as they are.
 - **Writing `.chart`.** `.chart` is imported only ([C2](#c2-open-and-import)).
@@ -61,15 +63,16 @@ This spec **supersedes** the "editing charts" non-goal in
 - **Audio editing or encoding.** Stems are added, replaced and removed as files, as in
   [project-spec F7](project-spec-v1.md#f7-audio-playback), but never cut, mixed down or
   re-encoded.
-- **Playing the chart with a controller** (scoring, hit windows). Previewing uses autoplay
-  ([C18](#c18-preview)).
+- **A game mode** (score, star power, failing, multiplayer). Previewing uses autoplay
+  ([C18](#c18-preview)). Playtesting in the editor judges hits against hit windows to check a chart
+  plays right, and stops there ([C19](#c19-playtest-and-instrument-input)).
 
 ## 3. Users and scope
 
 | | |
 | --- | --- |
 | **Users** | Chart authors, from first-time charters to people moving from Moonscraper or Editor on Fire |
-| **Platforms** | As the app: Windows, macOS and Linux, Native AOT ([project-spec §3](project-spec-v1.md#3-target-users-and-platforms)) |
+| **Platforms** | As the app: Windows, macOS and Linux, Native AOT ([project-spec §3](project-spec-v1.md#3-target-users-and-platforms)). MIDI devices as instruments are Windows only for now ([C19](#c19-playtest-and-instrument-input)). |
 
 Instruments and variants in v1:
 
@@ -92,9 +95,11 @@ Chart-Packer.slnx
 ├── ChartPacker/                  Chart Packer app: library, inspector, packing. Launches Chart Builder (§4.8)
 ├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases, calibration tool
 ├── ChartPacker.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
-│                                 settings window, shared controls, and later the player and highway view models
-├── ChartPacker.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synth/ (click, beep, hit sounds)
-├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions), + SongLock
+│                                 settings window, shared controls, and the drawing of notes and waveforms
+├── ChartPacker.Audio/            + Analysis/ (spectrogram, onsets, tempo estimation), + Synthesis/ (`Synth`: click, beep, hit sounds)
+├── ChartPacker.Input/            Instrument devices (new, C19): SDL3 game controllers, and MIDI input on Windows (winmm)
+├── ChartPacker.Core/             + Charting/ (editable model, commands, MIDI chart writer, lint, reductions, playtest), + SongLock,
+│                                 + Input/ (bindings, routing and timing of instrument input, C19)
 └── ChartPacker.Core.Tests/       + Charting/, Audio/Analysis/ tests
 ```
 
@@ -179,13 +184,18 @@ While loading:
 - **What can't be loaded as written** (a duplicate note, a note that never ends, a marker that
   covers no note…) is left out or kept as a `RawEvent`, so the chart still plays as it did. The
   loader reports each one as a `ChartLoadIssue` with its part, difficulty and tick. *Settled in
-  CM1:* these are not `Finding`s yet; CM2 shows them when a chart is opened.
+  CM2:* the Editor says how many there are when the chart opens, and lists each one under
+  Findings as CHR086 ([§6](#lint-rules)) until a save writes the file without it. They aren't
+  lint rules: they describe the file as loaded, so they aren't checked again as the chart is
+  edited, and their ticks are the file's.
 
 **Commands and undo.** Every change is an `IChartCommand` with `Apply` and `Revert` (add notes,
 delete notes, move, change sustain, toggle flags, add phrase, edit tempo…). A composite command
 groups the changes of one gesture, so a drag or a paste undoes in one step. Commands store changes,
 not copies of the chart. The undo stack keeps every step of the session; the budget in
 [§11](#11-non-functional-requirements) is a size target for that, not a limit that drops steps.
+*Settled in CM2:* a drag applies its command to the chart as it goes, and is put on the undo stack
+once, when it ends. Undo during a drag takes the drag back first.
 
 **Snapshots.** Work off the UI thread (save, lint, autosave) runs on an immutable snapshot of the
 model taken when the work starts, so editing never waits for it and it never sees a half-applied
@@ -209,6 +219,15 @@ The tracks Chart Builder does edit are rebuilt from the model:
 - **The part tracks** are rebuilt from the model, with their `RawEvent`s written back at their
   ticks.
 - **`BEAT`** is not kept. It is regenerated from the tempo map on every save.
+
+**Vocal tracks.** `PART VOCALS` and `HARM1`–`HARM3` are passthrough tracks that the vocal lanes edit
+([C3](#c3-editor-layout) item 7). An edit replaces the track with one written again
+(`VocalTrackContent`): its sung notes (36–84), phrases (105, 106) and lyrics are written from what
+was edited, and every other event (its name, percussion, overdrive, animations) is kept with its
+bytes, at its tick, in its order. A vocal track that hasn't been edited is still written byte for
+byte. One that has reads back as what was edited, though its bytes differ: running status isn't
+kept, the notes are on the first channel, and at a tick the kept events come first, then the
+lyrics, after the note-offs and before the note-ons.
 
 **When the tempo map changes in a way that keeps times.** Passthrough tracks hold ticks, so a tempo
 edit with *keep times* on ([C4](#c4-tempo-map-and-grid)), or a stretch
@@ -272,13 +291,38 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
 - **The true source position.** While stretching, `TimeStretcher.SourcePosition` is the nominal
   position, and the grain actually played can be up to ±12 ms away. The stretcher reports the
   source position of the grain it actually plays, and `PositionMap` records that.
-- **A smooth clock.** `Position` only moves when SDL takes a buffer. Drawing uses
-  `SmoothPosition`, which interpolates between those updates with a monotonic clock, scaled by the
-  speed, and is pulled back onto `Position` when they differ.
+- **A smooth clock.** `Position` only moves when SDL takes a buffer, and while stretching it follows
+  the grains, back and forth. Drawing uses `SmoothPosition`, which interpolates between those
+  updates with a monotonic clock and follows the speed's nominal position rather than the grains.
+
+*Settled in CM2:*
+
+- **The grains played.** An output frame of a stretched hop is the last grain carrying on and the
+  next fading in, weighted by the window. The position it stands for is the same blend of the two
+  grains' positions (`TimeStretcher.PlayedPosition`). `StemPlayer` maps each grain in eight pieces,
+  so the map follows the fade. Where two grains are nearly as loud as each other, a click in the
+  stems is heard twice, a few milliseconds apart, which no one position can match.
+- **Laying sounds over the mix.** `StemPlayer.Sounds` is an `ISoundSchedule` the playback thread
+  asks for the sounds starting in each chunk's stretch of the mix. A sound starts where the frames
+  played first reach it. A new schedule is handed over whole, never edited, and a seek drops the
+  sounds playing. Played as mixed at another speed, sounds are read at that speed, so the device's
+  resampling leaves them at their own pitch.
+- **`SmoothPosition`** runs on a `TimeProvider` (the system's monotonic clock), in output frames,
+  which the device plays at its own steady rate. Each time SDL takes more, it runs up to 10% faster or
+  slower until it has made up how far it is from what has been taken (over about 200 ms), so it
+  never steps back. It is put straight onto what has been taken past 50 ms, or after a seek, a change
+  of speed, playing or pausing. It maps output frames to the mix by a second `PositionMap` of the
+  stretcher's nominal `SourcePosition`, which moves evenly at the speed. `Position` and the sounds laid
+  over the mix stay on the grains played.
+- **Regions.** Play selection and the loop are a region that `StemPlayer` plays. A loop carries on
+  from the region's start without dropping the queue. Played as mixed, it turns on the region's end
+  frame; stretched, within a chunk (20 ms) of it. A seek drops a region played once, but not a loop.
 
 **Latency and speed.** The calibrated latency ([C11](#c11-calibration-tool)) is in real time, and
 `Position` is in song time. Everything drawn against the audio is drawn at
 **`SmoothPosition` − latency × speed**, so at 50% speed a 40 ms latency is 20 ms of song.
+*Settled in CM2:* the latency is taken off only while playing. Paused, what is drawn is at the
+audio's own position.
 
 **Audio time and chart time.** The song's delay is how much later than its ticks say the chart plays
 against the audio. It comes from `SongChartSettings.DelayOf` (`delay`, then `delay_seconds`, then
@@ -293,34 +337,44 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
   are. Settings are Chart Builder's own ([§10](#10-settings)).
 - **Launcher** (the home screen), shown when no song is given on the command line: icon tiles for
   **New chart**, **Open chart** (a folder or `.sng`) and **Settings**, and recent songs. It is a
-  window of its own. **New chart**, or opening a song, closes it and opens an **Editor window** in
-  its place. Closing the Editor brings the launcher back.
+  window of its own. **New chart** opens a new chart in the Editor ([C1](#c1-new-chart-and-chart-settings)).
+  Creating the chart there, or opening a song, closes the launcher and opens an **Editor window**
+  in its place. Closing the Editor brings the launcher back.
 - **Editor window** ([§8](#8-ui-outline)):
-  - **Toolbar.** It shows the program's icon and version, a **Settings** menu with **Chart
-    settings** and **Program settings**, the editing tools, and **Undo** and **Redo**. Its groups
-    wrap onto more rows as the window narrows rather than scrolling.
+  - **Toolbar.** It shows the program's icon and version, a **Settings** button that opens
+    **Program settings**, the editing tools, and **Undo** and **Redo**. Its groups wrap onto more
+    rows as the window narrows rather than scrolling.
   - **Side panels, tabbed and docked like Visual Studio's tool windows.** The left one has the
-    **Chart Inspector** tab: Chart Packer's inspector without the background video or image, the
-    note highway or the lyric lane, which the editor itself shows. The right one has the
-    **Properties** tab, which shows the selection ([C3](#c3-editor-layout)).
-  - Each panel can be resized, and collapsed to a strip along the window's edge that brings it back
-    when clicked. Their widths and whether each is collapsed are saved
+    **Chart settings** tab, with its parts and ratings, metadata and tracks; the **Art** tab, with
+    its album art and backgrounds ([C1](#c1-new-chart-and-chart-settings)); the **Sections** tab;
+    and the **Tempo map** tab, with the resolution, the delay and the tempo map
+    ([C4](#c4-tempo-map-and-grid)). The right one has the
+    **Properties** tab, which shows
+    the selection ([C3](#c3-editor-layout)), the **Pending changes** tab
+    ([C17](#c17-save-and-export)) and the **Findings** tab ([C3](#c3-editor-layout) item 5).
+  - Each panel can be resized, and collapsed to a strip along the window's edge showing its tabs'
+    titles, each of which brings the panel back on that tab. Their widths and whether each is collapsed are saved
     ([§10](#10-settings)).
   - **Timeline**, along the bottom at the window's full width. It shows the chart's notes over the
     waveform of the whole mix. It can be resized (the height is saved) and scrubbed.
   - The chart's canvas (below) fills the middle.
-- **`ChartEditorView` / `ChartEditorViewModel`**, added to the explicit mapping in `ViewLocator`
-  (there is no reflection-based lookup).
+- **`ChartEditorViewModel`**, which joins the editor's state to playback. *Settled in CM2:* the
+  lanes are built in code, so nothing needs a `ViewLocator` yet.
 - **Two custom-drawn canvases over one model**: `HighwayEditorCanvas` (vertical) and
   `TimelineEditorCanvas` (horizontal). They share one tool and hit-testing layer, `EditorTools`
-  (place, select, erase, sustain, phrase, tempo), so behaviour is the same in both. Drawing builds
-  on `NoteHighwayView`/`HighwayScene` (note shapes, lane colours, beat lines) and
-  `LaneWaveformPainter`.
+  (place, select, erase, sustain, phrase, tempo), so behaviour is the same in both.
+  - *Settled in CM2:* `EditorTools` lives in Core (`Charting/Editing/`) with the rest of the
+    editor's state, UI-free, so its tests need no canvas. The canvases only map the pointer to a
+    tick and a lane, through `LaneProjection`.
+  - Drawing uses `GemPainter`, `HighwayPalette` and `LaneWaveformPainter`, which moved from
+    Chart Packer's `NoteHighwayView` into `ChartPacker.UI`.
+  - Chart Packer's player and highway view models stay in Chart Packer. They're built round the
+    inspector's song, drafts and offsets, which the editor doesn't have.
 - **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
   `WindowChrome` for the dark title bar and icon, as the other dialogs do.
 - **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
-  with them ([C1](#c1-new-chart-from-scratch), which says how they're treated until Chart settings
-  can take audio), and a dropped song folder or `.sng`, which opens it
+  with them as its stems ([C1](#c1-new-chart-and-chart-settings)), and a dropped song folder or
+  `.sng`, which opens it
   ([C2](#c2-open-and-import)). Chart Packer's main window takes no drops for Chart Builder.
 - Strings go in Chart Builder's own `Strings.resx`, and strings both apps use go in
   `ChartPacker.UI`'s `SharedStrings.resx`. New icons come from game-icons.net and are credited in
@@ -351,11 +405,19 @@ metadata editor. Chart Packer's unsaved drafts for a song are never written by C
 
 - A `.sng` save is atomic, because `SngWriter.RewriteAsync` writes a temp file and renames it.
 - A song folder save is atomic **per file**: each file is written to a temp file and renamed.
-- `SongFolderFiles.ApplyAsync` today deletes removed files before it moves the new ones in. Chart
-  Builder changes that order to **move in first, then delete**. Otherwise a crash during a
-  `.chart` import's first save could leave the folder with neither `notes.chart` nor `notes.mid`.
-  With the new order, the worst case is a folder holding both, and `ChartReader.Pick` then reads
-  the new `notes.mid`.
+- **A folder save's order** (`DraftWriter.SaveFolderAsync`, `SongFolderFiles.ApplyAsync`):
+  1. every added file is copied to a temp file beside its target, so nothing has changed yet;
+  2. the temp files are moved into place;
+  3. `song.ini` is written;
+  4. the removed files are deleted.
+
+  A copy that fails leaves the folder, `song.ini` included, as it was (AC C17.3). The removals come
+  last, so a crash during a `.chart` import's first save can't leave the folder with neither
+  `notes.chart` nor `notes.mid` (AC C2.4); the worst case is a folder holding both, and
+  `ChartReader.Pick` then reads the new `notes.mid`. A removed `notes.chart` goes only once
+  `song.ini` holds what was taken from it. A crash between steps 2 and 3 leaves the new `notes.mid`
+  with the old `song.ini`, which matters only for the drum layout keys and `multiplier_note`; the
+  recovery file written at the start of the save ([C15](#c15-editing-ergonomics)) covers it.
 
 ### 4.7 Dependencies
 
@@ -363,6 +425,9 @@ metadata editor. Chart Packer's unsaved drafts for a song are never written by C
 writing, and the settings are all in-house or already budgeted
 ([project-spec §4.3](project-spec-v1.md#43-native-aot-constraints-required)). The AOT constraints
 apply unchanged: compiled bindings, source-generated MVVM and JSON, and no reflection.
+Instrument input ([C19](#c19-playtest-and-instrument-input)) adds none either: game controllers
+are read through SDL3's joystick subsystem, from the SDL3 package already used for audio, and MIDI
+devices through Windows's own winmm, called with `LibraryImport`.
 
 The one addition is **Serilog** (`Serilog` and `Serilog.Sinks.File`, Apache 2.0). Both apps log
 through it to daily files in the per-user log folder (`UserConfigPaths.LogFolder`), which is kept
@@ -387,7 +452,7 @@ same song at once, and Chart Packer re-reads the songs Chart Builder may have ch
 | --------- | ----- |
 | *(none)* | The home screen ([§4.5](#45-app-chartbuilder)) |
 | `[--] <song path>` | That song folder or `.sng` in the editor ([C2](#c2-open-and-import)) |
-| `--new [--] [<audio file>…]` | A new chart in the Editor window, with the audio files ([C1](#c1-new-chart-from-scratch)) |
+| `--new [--] [<audio file>…]` | A new chart in the editor, with the audio files as its stems ([C1](#c1-new-chart-and-chart-settings)) |
 | `--calibrate` | The calibration tool ([C11](#c11-calibration-tool)) |
 
 `--` ends the options, so a path that starts with `-` is still a path. Paths are made absolute against
@@ -410,6 +475,8 @@ several can run at once on different songs.
   `flock` on Linux and macOS, so the lock works on every platform, and the OS releases it if the
   process dies.
 - Opening a song that another Chart Builder has open says so, and doesn't open it a second time.
+  *Settled in CM2:* checking the lock opens its file for a moment, so taking the lock tries twice,
+  50 ms apart, before saying another Chart Builder has the song open.
 - Before Chart Packer writes to a song (a metadata save, delete, dedup, merge into it, or replacing
   it with a download), it checks the lock. When Chart Builder has the song open, it warns that
   Chart Builder may overwrite the change, and the user can go ahead or cancel.
@@ -420,9 +487,10 @@ several can run at once on different songs.
 Chart Packer doesn't keep the Chart Builder processes it starts. It checks for changes when its
 window is activated, as it is when the user comes back from Chart Builder.
 
-- Chart Packer remembers the songs it opened in Chart Builder, with each one's chart and
-  `song.ini` sizes and modified times. When its window is activated, it re-reads the songs that
-  changed, so the library, inspector and packer show them.
+- Chart Packer remembers every song it has opened in Chart Builder since it started, with a stamp
+  of it: the size and modified time of every file in the folder, or of the `.sng`. When its window
+  is activated, it re-reads the songs whose stamp changed, so the library, inspector and packer
+  show them.
 - Chart Packer never starts a new chart, so a song Chart Builder creates appears in its
   library on the next scan.
 - Chart Packer re-reads the shared latency file ([§10](#10-settings)) when its window is
@@ -435,103 +503,228 @@ window is activated, as it is when the user comes back from Chart Builder.
 Every feature lists numbered acceptance criteria (**AC C*n*.*m***). "Findings" are `Finding`s
 shown in the app's findings panel. Chart lint rules are listed in [§6](#lint-rules).
 
-### C1. New chart from scratch
+### C1. New chart and Chart settings
+
+**New chart** opens a new chart in the Editor straight away. There is no wizard or dialog before it:
+the chart starts on defaults, and everything about it is set in the Editor.
+
+- **Chart settings** is a tab in the Editor's left panel that sets everything a chart needs: its
+  timing and `delay`, its parts and their difficulty ratings, the song's metadata (name, artist,
+  charter, album, genre, year and any other `song.ini` key) and its tracks. It is the same for a new
+  chart and a song that was opened.
+- The **Art** tab beside it sets the album art, the background image and the background video.
+- Every edit in either tab is an undo step, as the chart's edits are.
+- A new chart has no song folder until it is first saved. The first save asks where it goes
+  ([C17](#c17-save-and-export)).
 
 **Input:** nothing, or one or more audio files.
-**Output:** a new song folder containing `notes.mid`, `song.ini`, its stems and (optionally) album
-art. It is opened in the editor, and appears in Chart Packer's library
+**Output:** a new chart in the Editor. Its first save writes a new song folder containing
+`notes.mid`, `song.ini` and its stems. From then on it is a song like any other: Chart Builder holds
+its lock, it is on the recent songs, and it appears in Chart Packer's library
 ([§4.8](#48-launching-and-coordination)).
 
-**Entry points.** A new chart is started from:
+**Entry points.**
 
-- **New chart** on Chart Builder's launcher;
-- audio files dropped on the launcher ([§4.5](#45-app-chartbuilder));
-- `ChartBuilder --new` on the command line ([§4.8](#48-launching-and-coordination)).
-
-Each closes the launcher and opens an empty **Editor window** ([§4.5](#45-app-chartbuilder)).
-Until Chart settings can take audio, audio files given by a drop or `--new` aren't added; the
-Editor says so in a notice under its toolbar, which the user can dismiss.
+- **New chart** on Chart Builder's launcher, audio files dropped on the launcher
+  ([§4.5](#45-app-chartbuilder)), and `ChartBuilder --new` on the command line
+  ([§4.8](#48-launching-and-coordination)). Each closes the launcher and opens the Editor with a new
+  chart (below).
+- The **Chart settings** tab in the Editor's left panel, for whatever chart is open.
+- A song with neither chart file is offered **New chart in this song** when it is opened
+  ([C2](#c2-open-and-import)). That opens the Editor with a new chart in that song, and its first
+  save adds `notes.mid` and the `song.ini` keys to the song through its draft ([§4.6](#46-saving)).
 
 Chart Packer has no **New chart**. Charts are created in Chart Builder, and Chart Packer's only way
 into it is **Edit chart** ([C2](#c2-open-and-import)).
 
-> **Superseded: the wizard has been removed.** The song is to be set up from the Editor's **Chart
-> settings** instead, and that design is still to be specified. Until then, the empty Editor doesn't
-> use the audio files it was started with. The wizard's steps, **Create** and acceptance criteria
-> below are kept as the reference for what setting up a song has to cover. They no longer describe
-> the app.
+**A new chart** starts with:
 
-**Behaviour (superseded):** a four-step wizard. **Back** and **Next** keep every step's values.
+- the **Default resolution** setting ([§10](#10-settings)), 120 BPM and 4/4 at tick 0;
+- a Lead (5-fret guitar) part, with no notes;
+- an empty `EVENTS`: `[music_start]`, `[music_end]` and `[end]` are placed as it's saved
+  ([C8](#c8-phrases-and-events) item 5);
+- the audio files it was given, as its stems:
+  - Files can be `.ogg`, `.opus`, `.mp3` or `.wav`. Each is given a stem from its file name using
+    `AudioStems`, e.g. `Drums.ogg` → `drums`, `song.mp3` → `song`.
+  - `AudioStems` gives no stem for a name it doesn't recognise. The first such file is then given
+    `song` if no other file has it (`NewChartStems`).
+  - A file that isn't audio, has no stem, or would share a stem is left out, and the Editor's notice
+    says which and why.
+  - Until the first save, each stem is played from where it is. A file that doesn't decode is said
+    by playback, as for any song ([C10](#c10-playback)).
+- **No audio is allowed.** The chart is made against a silent timeline. The song then has finding
+  SNG052 (no audio stem) until a stem is added in Chart settings' Tracks.
 
-1. **Song.**
-   - Fields: name, artist, album, genre, year and charter.
-   - They are prefilled from the first audio file's tags where it has them, and the charter from
-     the **Default charter name** setting ([§10](#10-settings)). Core uses ATL today only for audio
-     lengths; reading the title, artist, album, genre and year tags is new, with the same package.
-   - Optional album art, with the same types and limits as
-     [project-spec F5](project-spec-v1.md#f5-metadata-editor).
-2. **Audio.**
-   - Drop or pick audio files (`.ogg`, `.opus`, `.mp3`, `.wav`). Each is assigned a stem from its
-     file name using `AudioStems`, e.g. `Drums.ogg` → `drums`, `song.mp3` → `song`.
-     `AudioStems` gives no stem for a name it doesn't recognise. The wizard then assigns `song` if
-     no other file has it, and otherwise leaves the file unassigned.
-   - The stem can be changed from a dropdown. Two files can't share a stem, and **Next** stays
-     disabled, saying why, while a file is unassigned or two files clash.
-   - Each file is decoded briefly to check it is what its extension says, as in
-     [F7](project-spec-v1.md#f7-audio-playback).
-   - **No audio is allowed.** The user enters a length and charts against a silent timeline. The
-     song then has finding SNG052 (no audio stem) until a stem is added. SNG052 is in the
-     project-spec catalogue ([project-spec F3](project-spec-v1.md#f3-validate)) but isn't
-     implemented yet; this work implements it, as a Warning.
-3. **Timing.**
-   - Starting BPM (default 120) and time signature (default 4/4).
-   - **Detect from audio** runs [C14](#c14-onset-and-beat-assist)'s tempo estimate on the mix and
-     fills in the starting BPM, plus a proposed tempo map to review once the editor opens. It
-     appears once C14 is built ([§13](#13-milestones)); until then the step has manual entry only.
-   - Resolution is 480 by default. It can be set to 192, 480 or 960, the values at which every
-     common snap lands on a whole tick.
-   - Optional audio lead-in, saved as `delay`.
-4. **Parts.**
-   - Tick the parts to create: 5-fret Lead, Bass, Rhythm and Co-op; GHL Guitar, Bass, Rhythm and
-     Co-op; Drums with a choice of 4-lane, Pro or 5-lane.
-   - MIDI has no empty difficulties, so a part starts with all four difficulties empty. Each one
-     exists as soon as it has a note.
-   - Parts can be added later ([C2](#c2-open-and-import)).
+In Chart settings' Metadata, a new chart's name and artist are filled from the first stem's tags
+where it has them (`AudioFileInfo.Read`), and its charter from the **Default charter name** setting
+([§10](#10-settings)).
 
-**Create (superseded):**
+*Settled after CM5:* the album, genre and year are filled from the tags too. An edit to the song
+takes the place of whatever else would change its key (the default charter, `song_length`, a rating
+or a delay), and the keys the chart decides (the drum layout keys, `multiplier_note` and an import's
+`sustain_cutoff_threshold`) can't be edited. The song's edits count as unsaved changes, so closing
+asks first and autosave keeps them, and none can be made, undone or redone while a save runs.
 
-- The **location** is chosen on the Parts step, beside **Create**. It is a parent folder (by
-  default the last one used, or the library root) plus
-  a folder name (by default `<artist> - <name>`, with characters that aren't allowed in a path
-  replaced, and the name checked against the `.sng` filename rules).
-- An **existing folder is never used or overwritten**. If the name is taken, Create is disabled
-  and says why.
-- **What is written:**
+*Revised after CM5:* the Chart Inspector, which edited the song as Chart Packer's inspector does, is
+gone. Its edits were pending changes taken back with Revert rather than undo steps, and its tracks
+were only listed. Chart settings and the Art tab take its place:
+
+- Each edit to the song (a `song.ini` value, a rating, the delay, the art, a background or a track)
+  is an **undo step** on the chart's undo stack, and still a pending change until saved
+  ([C17](#c17-save-and-export) item 2). It is kept as the values the save would write, before and
+  after (`SongValueCommand`, `MediaCommand`), so undoing an edit made before a save gives back what
+  the song had, as a new pending change.
+- A file a save replaces or removes (art, a background or a track) is copied first to a temp folder
+  of the Editor window's own (`MediaStash`), deleted as the window closes, so an undo past the save
+  can put the file back. The copies a crash leaves are swept a day later.
+- The tracks are played and drawn as they'll be saved: adding, replacing or removing one, or undoing
+  it, opens the audio again, keeping the playhead, playing on, and each stem's mute, solo and volume.
+
+**The tab.** Chart settings is a tab in the Editor's left panel, the first. Its sections,
+**Timing**, **Parts**, **Metadata** and **Tracks**, are one under the other, with each field's label
+above it, as the panel can be narrow (mock-up in [§8](#8-ui-outline)). The panel opens on it.
+
+**Metadata** is Chart Packer's inspector's metadata, shared with it (`MetadataEditorView`): a row per
+`song.ini` key, edited in place, and a row to add one. The ratings are left to Parts. A row's
+**Revert** (back to the song as saved) and **Remove** are on its right-click menu, with Quick Fix.
+
+**Tracks** is Chart Packer's inspector's track list, shared with it (`TrackListView`): a row per
+track with its mute, solo, volume and waveform, the tracks a pending change removes, and **Add
+track**. A row's **Replace** and **Remove**, and a removed track's **Keep**, are on its right-click
+menu. It takes the place of the transport bar's Stems menu ([C10](#c10-playback)). The mute, solo
+and volume are only for listening: they aren't undo steps and aren't saved.
+
+**The Art tab** has a tile each for the album art, the background image and the background video,
+showing what the song will have once saved; the video plays against the song while the tab is shown.
+An empty tile has **Choose…**; a tile's right-click menu has **Replace…**, **Remove** and **Revert
+to saved**. A file is checked before it's used: an image is decoded, and a video is checked to be
+one FFmpeg can play. Under the video, a **Video start** box sets `video_start_time` in milliseconds to
+line the video up with the audio: positive skips that much of the video, negative holds its first
+frame. It can be typed or dragged sideways, as Chart Packer's offset boxes can; the video shows each
+value at the playhead as it changes, and the value is set as one undo step once it's left alone.
+
+**Timing.**
+
+- **Resolution**: 192, 480 or 960, the values at which every common snap lands on a whole tick. A
+  chart opened at another resolution shows that value too. Changing it re-ticks the chart (below).
+- **Starting BPM**: 10 to 1000, with up to three decimals.
+- **Starting time signature**: any that [C4](#c4-tempo-map-and-grid) allows.
+- The starting BPM and time signature are the tempo and time signature markers at tick 0. Changing
+  them is a tempo edit ([C4](#c4-tempo-map-and-grid)): it follows the *keep ticks* or *keep times*
+  setting, and keeps anchors where they are.
+- **Detect from audio** comes with [C14](#c14-onset-and-beat-assist) (CM4). It runs the tempo
+  estimate on the mix, fills in the starting BPM, and proposes a tempo map to review in the editor.
+  *Settled in CM4:* it's a button under Starting BPM. The BPM is the first confident stretch's,
+  tidied to a whole BPM when it's within 0.05 of one (`BpmTidy`), and set as one undoable step, as
+  a BPM typed is. The proposal for the whole song then shows in the editor, as C14 item 4's does.
+- *Settled after CM4:* the timing is in the Tempo map tab ([C4](#c4-tempo-map-and-grid) item 9),
+  not Chart settings. Its **Timing** has the resolution and the audio delay; the starting BPM and
+  time signature are the first row of its list, the song's start; and **Detect from audio** is in
+  its **From the audio**. A starting BPM or time signature out of range that the chart already has
+  doesn't hold up the other settings.
+
+**Parts.**
+
+- A row for each v1 part: 5-fret Lead, Bass, Rhythm and Co-op; GHL Guitar, Bass, Rhythm and Co-op;
+  Drums, with a choice of 4-lane, Pro or 5-lane. Each row has a tick box, ticked when the chart has
+  the part, and the part's difficulty rating (`diff_<part>`), empty while it's unrated, with an ✕ that
+  clears it to `-1`. Pro drums have a second rating, `diff_drums_real`. A rating typed is applied
+  once the typing pauses, as a BPM is, and each is an undo step.
+- MIDI has no empty difficulties, so a new part starts with all four difficulties empty. Each one
+  exists as soon as it has a note.
+- Unticking a part that has notes asks for confirmation, as **Remove part** does
+  ([C2](#c2-open-and-import)).
+- The drum variant of a drums part that has notes is changed with the conversion in
+  [C6](#c6-drums-4-lane-pro-and-5-lane) item 8 when it goes to or from 5-lane. Switching between
+  4-lane and Pro is a setting (C6 item 9), and keeps the notes as they are.
+
+**Applying.**
+
+- Each change is applied as it is made, so the starting BPM and time signature can be found by ear
+  while the song plays; playback goes on, and its beats follow. A BPM or beats per measure being
+  typed is applied once the typing (or the spinner) pauses for 0.6 s, so a burst of typing is one
+  step. A value out of range is said under the field and applies nothing.
+- Each applied change (resolution, tempo, time signature, parts or drum variant) is **one undoable
+  command**. Undo and redo show in the tab.
+- Their `song.ini` effects are added to Chart Builder's pending changes
+  ([C17](#c17-save-and-export)): `diff_<part> = -1` for each added part, and
+  `pro_drums`/`five_lane_drums` for the drum variant. A new chart has no `song.ini` yet, so every
+  part's `diff_<part> = -1` and the drum keys are pending until its first save writes them.
+- A change that leaves the chart as it was adds no undo step and no pending change.
+
+**Changing the resolution.**
+
+- The chart is re-ticked so that everything keeps its time (`ChartRetick` with
+  `TickMaps.KeepTimes`). The tempo and time signature markers' ticks are scaled by the new resolution
+  over the old, their tempos (microseconds per quarter note) are unchanged, and each anchor moves with
+  its marker. Everything else is re-ticked as a *keep times* tempo edit is
+  ([C4](#c4-tempo-map-and-grid)), the passthrough tracks included
+  ([§4.2](#lossless-passthrough)).
+  *Settled in CM2:* a marker's scaled tick is rounded to the nearest tick, halves up. Tempo or time
+  signature markers that land on one tick are all kept, and the warning says the games read only
+  the last of them. An anchor that lands on another anchor's tick is left out, and listed.
+- **Warning.** Before anything is changed, the re-tick is worked out on a copy, and finds:
+  - every item whose tick doesn't scale to a whole tick, so that its time would move: a tempo or time
+    signature marker, a note's start or sustain end, a chord marking, a phrase, an event, a
+    `RawEvent` or a passthrough event. A move of more than a microsecond counts;
+  - every item that would be left out because another lands on the same place (`RetickReport`'s
+    collisions).
+
+  If there are any, the user is warned before the change is made. The warning gives how many items
+  would move, per part (and for the tempo map, the events and the passthrough tracks), the largest
+  move in milliseconds, and each item that would be left out. The user can **Change anyway** or
+  **Cancel**. A change that moves nothing, such as 480 → 960, gives no warning.
+- The change is one undoable step, and undoing it puts every tick back as it was.
+- Byte-for-byte passthrough no longer holds for the next save, as after any *keep times* edit.
+
+**The first save** of a new chart ([C17](#c17-save-and-export)).
+
+- The song's **name and artist** are set in Chart settings' Metadata. The save can't go ahead until
+  both are set: it says so and brings Chart settings up. The dialog shows them, and starts the
+  folder name from them.
+- It asks where the song folder goes: a parent folder and a folder name.
+  - The parent folder is by default the last one used for a new chart, otherwise Chart Packer's
+    library root (read from Chart Packer's settings, never written).
+  - The folder name starts as `<artist> - <name>`, with characters that aren't allowed in a path
+    replaced (`NewChartFolder.NameFor`). It is checked against the `.sng` filename
+    rules (`NewChartFolder.ProblemOf`).
+  - An **existing folder is never used or overwritten**. If the name is taken, the save can't go
+    ahead, and the dialog says why.
+- **What is written** (`NewChartCreator`):
   - each stem, copied as `<stem>.<ext>` in lowercase;
-  - `album.<ext>`, if art was chosen;
-  - `notes.mid`, with the tempo map, an empty track for each chosen part, `EVENTS` holding
-    `[music_start]` and `[end]`, and `BEAT`;
-  - `song.ini`, with a `[song]` section holding the metadata, `diff_<part> = -1` for each part
-    (the keys are in [§7.5](#75-songini-keys-chart-builder-writes)), `pro_drums`/`five_lane_drums` as
-    the drum variant needs, `song_length` from the longest stem (or the length entered), and
-    `delay` if one was set.
+  - `notes.mid`, written from the chart as any save is ([§4.3](#43-writing-midichartwriter));
+  - `song.ini`, holding the chart's pending changes ([C17](#c17-save-and-export)) that weren't
+    reverted: the name, artist and charter, `diff_<part> = -1` for each part (the keys are in
+    [§7.5](#75-songini-keys-chart-builder-writes)), `pro_drums`/`five_lane_drums` as the drum
+    variant needs, and `song_length` from the longest stem.
 - **How it is written.** Everything is written into a temp folder beside the target, which is then
   renamed into place. A failure or cancel leaves nothing behind.
+- The song is then locked and added to the recent songs, and the Editor goes on with it as a song
+  opened from that folder.
 
-Acceptance criteria (superseded with the wizard; to be restated for Chart settings):
+Acceptance criteria:
 
-- **AC C1.1** A chart created with one stem and no notes validates with no errors
+- **AC C1.1** A new chart with one stem and no notes, once saved, validates with no errors
   ([project-spec F3](project-spec-v1.md#f3-validate)), packs to a `.sng`, and reopens in the editor
   with the same tempo map, parts and metadata.
-- **AC C1.2** Cancelling the wizard at any step, or failing to copy a stem, leaves no folder or
-  temp folder behind.
-- **AC C1.3** Create is unavailable while the target folder exists, and an existing folder's
+- **AC C1.2** Cancelling a new chart's first save, or failing to copy a stem during it, leaves no
+  folder or temp folder behind.
+- **AC C1.3** A new chart's first save can't use an existing folder, and an existing folder's
   contents are never touched.
-- **AC C1.4** Dropping `Guitar.OGG`, `Drums.ogg` and `mix.mp3` assigns `guitar`, `drums` and
-  `song`, and the folder contains `guitar.ogg`, `drums.ogg` and `song.mp3`. Dropping `mix.mp3`
-  and `other.mp3` assigns `song` to one and leaves the other unassigned, with Next disabled.
-- **AC C1.5** Choosing Pro drums writes `pro_drums = True` and choosing 5-lane writes
-  `five_lane_drums = True`. The reopened chart's drums are read with the same layout.
+- **AC C1.4** Giving `Guitar.OGG`, `Drums.ogg` and `mix.mp3` makes them the stems `guitar`, `drums`
+  and `song`, and the saved folder contains `guitar.ogg`, `drums.ogg` and `song.mp3`. Giving
+  `mix.mp3` and `other.mp3` makes one `song` and leaves the other out, saying so.
+- **AC C1.5** Choosing Pro drums gives `pro_drums = True`, and choosing 5-lane gives
+  `five_lane_drums = True`, as pending changes and in the saved `song.ini`. The reopened chart's
+  drums are read with the same layout.
+- **AC C1.6** Changing a chart's resolution from 480 to 960 moves nothing in time and gives no
+  warning. From 480 to 192, a chart with a note at tick 1 gives the warning, with the number of
+  items that would move and the largest move. **Cancel** leaves the chart unchanged and puts the
+  resolution back. **Change anyway** is one undo step, and undoing it gives a model equal to the one
+  before.
+- **AC C1.7** A change that leaves the chart as it was adds no undo step and no pending change, and
+  typing a BPM adds one undo step once the typing pauses. Adding a part through Chart settings shows
+  its `diff_<part> = -1` as a pending change.
 
 ### C2. Open and import
 
@@ -542,26 +735,30 @@ Acceptance criteria (superseded with the wizard; to be restated for Chart settin
 1. **Opening a song.**
    - In Chart Packer, the **Edit chart** button on the toolbar runs `ChartBuilder <song path>`
      ([§4.8](#48-launching-and-coordination)). It is enabled only while exactly one song is
-     selected and no job (pack, unpack, merge, validate, deduplicate) is running. Until Chart
-     Builder can open songs (CM2), it stays disabled, and its tooltip says it comes with the
-     chart editor (`ChartBuilderLauncher.CanOpenSongs`).
-   - In Chart Builder, songs open from **Open** and the recent songs on the home screen, or by
-     dropping a song folder or `.sng` on the window.
+     selected and no job (pack, unpack, merge, validate, deduplicate) is running.
+   - In Chart Builder, songs open from **Open chart** (Ctrl+O) and the recent songs on the home
+     screen, or by dropping a song folder or `.sng` on the window. A folder is picked by a file in
+     it (its `song.ini` or chart), as one dialog can't pick both files and folders, and a file
+     dropped from a song folder opens the folder too.
    - Each Chart Builder window has one chart open. A song that another Chart Builder already has
      open isn't opened a second time ([§4.8](#48-launching-and-coordination)).
 2. **Which chart is opened.** `ChartReader.Pick` chooses: `notes.mid` if there is one, otherwise
-   `notes.chart`. A song with neither is offered **New chart in this song**, which sets up its
-   timing and parts as a new chart does ([C1](#c1-new-chart-from-scratch)).
+   `notes.chart`. A song with neither is offered **New chart in this song**, which opens it in the
+   editor with a new chart, as New chart does ([C1](#c1-new-chart-and-chart-settings)).
 3. **`.chart` import.**
    - The chart is converted with `ChartToMidi`. Any `ChartMergeWarning`s are shown before the
      editor opens, with the times they happen at, and the user can go ahead or cancel.
    - `ChartToMidi` returns the `.chart`'s `Offset` but doesn't write it anywhere. When `song.ini`
      sets no `delay`, the import adds the Offset as a pending `delay` change, as `SongMerger`
      already does through `SongChartSettings.DelayOf`.
-   - **The `.chart`'s `[Song]` metadata** (`Name`, `Artist`, `Album`, `Genre`, `Year`, `Charter`,
-     `PreviewStart` and the like) isn't read anywhere in the app today. The import reads it and adds
-     each value as a pending `song.ini` change wherever `song.ini` has no value for that key. That
-     way, removing `notes.chart` loses nothing.
+   - **The `.chart`'s `[Song]` metadata** is read by `ChartSongSection`, and each value is added as
+     a pending `song.ini` change wherever `song.ini` has no value for that key. That way, removing
+     `notes.chart` loses nothing. `Name`, `Artist`, `Album`, `Genre` and `Charter` become their own
+     keys; `Year` becomes `year`, without the `", "` Moonscraper writes before it; `PreviewStart`, in
+     seconds, becomes `preview_start_time` in milliseconds; and `Difficulty` becomes `diff_band`. The
+     resolution, the audio streams and `MediaType` belong to the `.chart` alone.
+   - When the conversion needs a `sustain_cutoff_threshold` to keep the `.chart`'s sustains
+     sustains (`ChartConversion.SustainCutoff`), that's a pending change too, which can't be reverted.
    - On the first save, `notes.chart` is staged for removal after a confirmation, so the song
      doesn't carry two charts that the games might pick between differently.
 4. **Drafts.** Chart Packer's unsaved metadata drafts don't reach Chart Builder
@@ -569,11 +766,14 @@ Acceptance criteria (superseded with the wizard; to be restated for Chart settin
    **Save** them, **Discard** them, or **Cancel**, and Chart Builder opens only after a save or a
    discard. Chart Builder's own pending `song.ini` changes ([C17](#c17-save-and-export)) are saved
    with the chart, and the save confirmation lists them.
-5. **Add part.** A menu adds any v1 part that isn't there yet. Adding drums asks for the variant if
-   the song doesn't set one.
+5. **Add part.** Chart settings' Parts section, and the lanes' + menu, add any v1 part that isn't
+   there yet ([C1](#c1-new-chart-and-chart-settings)). Adding drums asks for the variant if the song
+   doesn't set one.
 6. **Remove part** removes a part's track, after a confirmation. It can be undone.
-7. **Recovery.** If an autosave exists that is newer than the chart on disk
-   ([C15](#c15-editing-ergonomics)), the user is offered **Recover** or **Discard**.
+7. **Recovery.** If the song has an autosave ([C15](#c15-editing-ergonomics)), the user is offered
+   **Recover** or **Discard**, or can cancel the open. The offer warns when the song's chart has
+   changed on disk since the autosave. An autosave that is the song's chart byte for byte (a save
+   that went through, then a crash before its autosave was deleted) is deleted without asking.
 
 Acceptance criteria:
 
@@ -607,8 +807,13 @@ Acceptance criteria:
      and lining notes up with the audio.
 
    The selection, the cursor, zoom (as seconds on screen) and the tool all carry across a switch.
+   *Settled in CM2:* each docked lane has its own view, and `V` switches the lane in focus. Every
+   lane shares the cursor, selection and tool. Zoom is each lane's own look-ahead (C10 item 6), which
+   a switch keeps.
 2. **Overview strip** along the edge. It shows the whole song: sections, note density, star power,
-   solos, lint marks and the current view, and clicking or dragging it jumps there.
+   solos, lint marks and the current view, and clicking or dragging it jumps there. *Settled in
+   CM2:* it's the timeline along the Editor's bottom, which already spans the song. It shows the
+   lane in focus.
 3. **Part and difficulty picker.** Every part with its four difficulties. The letters use the
    detail panel's difficulty colours from `Theme.axaml` (green, yellow, red, purple) where the
    difficulty has notes, and grey where it is empty. The detail panel shows only charted
@@ -620,13 +825,71 @@ Acceptance criteria:
    - **Notes:** tick, time, measure and beat, lane, length, and flags. The chord's forcing and
      the part's cymbal/tom flag are shown as such ([§4.1](#editable-model)).
    - **Phrases:** start and end, plus for rolls and trills the lowest difficulty they reach.
+     *Settled in CM3:* the end is the tick after the last one the phrase covers. Properties also
+     shows the kind, which it doesn't change, and the start's time. A start or end typed there moves
+     that end of every selected phrase, each keeping its other end, as one undoable step.
+   - *Settled in CM3:* **Disco flip ranges** ([C6](#c6-drums-4-lane-pro-and-5-lane) item 7): start
+     and end, set as a phrase's are, as one undoable step, and the difficulty, which is only shown.
+     A range without an end shows an empty end.
    - **Tempo markers:** BPM, time signature, and whether it's anchored.
    - With several items selected, a field shows `<<multiple>>` when the values differ, and
      editing it sets every item. This is the same model as the metadata editor's bulk editing.
 5. **Findings panel**: the [§6](#lint-rules) lint findings, each linked to the place in the chart
-   where it happens.
+   where it happens. *Settled in CM2:* the Findings tab's title doesn't show the counts, as a
+   collapsed panel's strip reads the titles only once. The counts are at the top of the panel.
 6. **Transport bar**: play and pause, position, speed, pitch correction, loop, metronome, hit
-   sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)).
+   sounds, stem mute and solo, and the calibration value ([C11](#c11-calibration-tool)). Beside
+   Record, the Playtest button (never on with Record; both can be off), the playtest's stats, the
+   Problems list and Clear ([C19](#c19-playtest-and-instrument-input)).
+7. **Vocal lanes.** A lane showing `PART VOCALS` or `HARM1`–`HARM3` is always drawn along a
+   timeline, as a piano roll:
+   - one row per semitone, every pitch a part sings (36 to 84) whatever its notes, so any pitch can
+     be placed and the rows never move as notes are edited, with black keys' rows darker and each C
+     named at the left edge;
+   - each sung note a bar on its pitch's row; a slide (`+`) a line from the note before; a spoken
+     note (`#`, `^`) an outline along the middle row, middle C's;
+   - the phrases shaded behind the rows, and as bars in a strip above them; and the lyrics in a band
+     under the rows, each syllable at its tick, with a hyphen where it joins the next. A syllable
+     that would run into the one before is left out, as the lane is zoomed out;
+   - the beats, sections, tempo markers, loop and selection as a highway's lane has them;
+   - what's on the strike line lit, as Chart Packer's lyrics lane lights it, wherever the cursor is,
+     playing or not: the note being sung near white with a glow where it crosses the line, its
+     syllable in the same tint, and its phrase shaded a little more than the others.
+
+   Scrolling, zoom (look-ahead) and the keys that move the cursor or play work as in any lane. A
+   lane whose track the chart hasn't says so, and offers to add it, empty. The part is read from its
+   passthrough track ([§4.2](#lossless-passthrough)) by `EditorSession.VocalsOf` into a `VocalLane`,
+   in ticks, and read again when the track is edited, re-ticked or put back by an undo.
+
+   *Settled with vocal editing:* the lane edits its part with the editor's tools, each edit one
+   undoable step that replaces the part's track ([§4.2](#lossless-passthrough)):
+   - **Select** picks a note (Shift adds it or takes it away), and dragging it moves the selected
+     notes in time, to the grid, and in pitch, by the rows crossed, never past 36 or 84. A note's
+     end resizes the selected notes. A press between notes draws a box over ticks and rows. As the
+     rows are thin, a note is hit on the row either side of its own when no note is on the
+     pointer's.
+   - **Place** puts a note a grid step long on the grid step and row pressed, and a drag stretches
+     it, never past the next note's start; Shift places a slide. On a note, it moves it.
+   - **Erase** removes each note passed over, **Sustain** drags the selected notes' end, **Phrase**
+     draws a phrase from the grid step pressed, and **Tempo** adds and drags tempo markers as in a
+     highway's lane.
+   - **The phrase strip** works with any tool, as a highway's phrase rail does: a press on a bar
+     selects its phrase (Shift adds it or takes it away), and a drag moves the selected phrases, or
+     resizes one by the end grabbed. A part's phrases never overlap. A new phrase is written as
+     105, or as 105 and 106 when every phrase the part has is.
+   - **Lyrics** belong to the notes that start on their tick: a note moved or deleted takes its
+     lyric with it, unless a note that stays starts there. A lyric on no note's start stays where
+     it is.
+   - **Properties** shows the selected notes' tick, pitch (a MIDI number, or a name such as `F#3`),
+     length and lyric, symbols included, with Slide and Spoken, and the selected phrases' start and
+     end. **Type lyrics…** gives a typed line's syllables to the selected notes in turn, a slide
+     skipped, split at spaces and after hyphens (`Hel-lo world`).
+   - **Keys** ([§9](#9-keyboard-shortcuts)): Alt and the arrows move the selected notes a grid step or
+     a semitone, an octave with Shift; Ctrl+A selects the part's notes; Delete and Ctrl+X, C and V
+     work on its notes, with their lyrics. A vocal part's notes paste only into a vocal lane, and a
+     highway's never into one. The keys that change a highway's notes or a part's audio do nothing.
+   - The vocal findings ([§6](#lint-rules)) name their part, and going to one opens its lane and
+     selects the notes on its tick.
 
 Acceptance criteria:
 
@@ -657,24 +920,52 @@ Acceptance criteria:
      offers to unanchor it, or to add a marker one beat before it.
    - Dragging an anchored marker in time changes the BPMs on both sides of it. This is how a
      tempo map is fitted to a live recording, beat by beat.
+   - *Settled in CM2:*
+     - The segment that absorbs a change is the last one before the anchor that starts after the
+       edited marker. Only the first anchor after an edit can move.
+     - Removing or moving a marker is absorbed in the same way.
+     - A marker can't be moved past an anchor.
+     - Every tempo edit is one `ChangeTempoMap` (`TempoMapEdits`), so it undoes exactly.
 3. **When a tempo changes, notes keep their ticks (the default) or their times.**
    - Keeping ticks means the notes move in time with the grid, which is right while the tempo map
      is still being built.
    - Keeping times re-ticks, after the change, every note start and sustain end, phrase, event
      and `RawEvent`, and the passthrough tracks too ([§4.2](#lossless-passthrough)).
+   - *Settled in CM2:* keeping times leaves the tempo markers on their ticks. Anchored markers
+     keep their times by absorption (item 2).
 4. **Snap.**
    - From 1/1 to 1/192 of a whole note, including triplets (1/12, 1/24, 1/48…), plus a custom
      value.
    - `[` and `]` step through the common values. Snap can be switched off.
    - At resolutions 192, 480 and 960 every common snap lands on a whole tick. Where a snap doesn't
      (a custom snap, or an imported chart at another resolution), the nearest tick is used.
-5. **Tap tempo.** Tapping `B` in time with the playing song sets the BPM of the segment at the
-   cursor from the median interval of the taps.
+   - *Settled in CM2:* the snap counts from the time signature in force, and ends at the next one.
+     It rounds to the nearest tick. With snap off, notes go to the nearest tick, but the cursor
+     keys still step by the snap.
+5. **Tap tempo.** Tapping `B` in time with the playing song sets the BPM from the median interval
+   of the taps. *Restated in CM2:* it needs three taps. It sets the segment the first tap was in,
+   once the taps have stopped for 2 s, as one undoable step, with the anchor offer (item 2) when it
+   needs one.
 6. **Set BPM from selection.** Select a span and say how many beats it lasts, and the BPM is
    computed. This is the quickest way to fit one bar to the waveform.
 7. **Proposed tempo maps** from [C14](#c14-onset-and-beat-assist) arrive as one undoable command.
 8. **Beat lines** come from `TempoMap.BeatLines`. Measure lines are stronger, and measure numbers
    are shown.
+9. **The Tempo map tab** in the left panel lists every tick where the tempo or the time signature
+   changes, the song's start among them, in time order, each with its time and its measure and
+   beat. The change in force at the cursor is marked.
+   - Each row has a BPM field and a time signature's beats and note value. A field with nothing
+     placed at its tick shows what's in force there, greyed. Typing in it places a marker there;
+     emptying it removes the marker. Each edit is one undoable step, with the anchor offer
+     (item 2) when it needs one.
+   - A row can be gone to, anchored, moved by its tick (its tempo marker and time signature
+     together) and removed. Where both are at one tick, removing asks which.
+   - **Add tempo change** adds a marker at the cursor, on the grid. **Add time signature** puts one
+     at the start of the measure the cursor is in.
+   - A time signature stands on its own: it needs no tempo marker at its tick.
+   - Above the list, **Timing** has the resolution and the audio delay
+     ([C1](#c1-new-chart-and-chart-settings)), and **From the audio** has **Detect from audio**,
+     **Propose tempo map** and **Find first downbeat** ([C14](#c14-onset-and-beat-assist)).
 
 Acceptance criteria:
 
@@ -685,26 +976,34 @@ Acceptance criteria:
   event's time, and every passthrough event's time within half a tick of where it was.
 - **AC C4.3** Tick ↔ seconds round trips agree with the existing `TempoMap` to within half a tick
   for every tempo map in the test fixtures.
-- **AC C4.4** Anchors survive a save, a pack to `.sng` and a reopen. Loading and saving a chart
-  without edits gives the same tempo values (microseconds per quarter note), time signatures and
-  anchors.
+- **AC C4.4** Anchors survive a save and a reopen. Loading and saving a chart without edits gives
+  the same tempo values (microseconds per quarter note), time signatures and anchors. A pack to
+  `.sng` keeps the tempos and time signatures but leaves the anchors out
+  ([§7.3](#73-text-events)).
 
 ### C5. 5-fret notes
 
 **Behaviour:**
 
 1. **Lanes:** green, red, yellow, blue and orange, plus **open**, which is drawn across the whole
-   highway.
-2. **Chords:** several frets on one tick. The editor won't place an open note in a chord with frets,
-   or a fret on an open. A loaded chart that has one is flagged (CHR022, an Error). The editor shows
-   the chord as the games read it, so the read-back check still passes and the chart can be saved
+   highway. *Settled in CM2:* on a highway, the Place tool puts an open note with Alt-click or
+   `0`. A timeline gives open notes a row of their own.
+2. **Chords:** several frets on one tick. An open note can be placed in a chord with frets, and a
+   fret on an open: YARG plays them, and charts in the wild have them. Such a chord is still flagged
+   (CHR022, an Error), as other games read it differently. The editor shows the chord as the games
+   read it, so the read-back check still passes and the chart can be saved
    ([§4.3](#43-writing-midichartwriter)).
 3. **Sustains:**
-   - A sustain is drawn by dragging the note's tail, or set with the sustain tool.
+   - A sustain is drawn by dragging the note's tail, by placing a note with a Ctrl-drag, or set
+     with the sustain tool; the selected notes' sustains change by a Ctrl-drag on one of them or a
+     right-drag ([§9](#9-keyboard-shortcuts)).
    - Sustains snap to the grid.
    - A sustain shorter than the song's sustain cutoff (`sustain_cutoff_threshold`, otherwise a
      third of a beat in MIDI) is drawn as a plain note with a dashed tail, because that's how the
      games will read it.
+   - A sustain dragged shorter than the cutoff (by its tail, a Ctrl-drag or a right-drag) becomes a
+     plain note as it's dragged, since the games would read it as one anyway. A loaded chart's short
+     sustains are kept as they are, and CHR021 offers to make them plain.
    - **Extended sustains** (one note held while others are played) and **disjoint chords**
      (notes of one chord with different lengths) are allowed.
 4. **Forcing:**
@@ -714,6 +1013,8 @@ Acceptance criteria:
      every note on a tick. Setting one on a note sets it for the note's chord. They are drawn as
      distinct markers.
    - A force that changes nothing is flagged (CHR023), with a quick fix that removes it.
+   - *Settled in CM2:* H, G and T set the flag on every selected chord, or clear it when all of
+     them have it. Force HOPO and force strum exclude each other; tap goes with either.
 5. **Star power** shows on notes as the games colour them. The phrases themselves are edited in
    [C8](#c8-phrases-and-events).
 
@@ -742,12 +1043,20 @@ Acceptance criteria:
      there, the status bar says so. The author never manages the markers by hand.
    - Red is always a snare. 5-lane has no markers: yellow and orange are cymbals, and blue and
      green are toms.
+   - *Settled in CM3:* a toggle makes the fewest marker changes that flip only the notes toggled. A
+     marker grows only across ticks with no note on its pad, so neighbouring notes keep what they
+     were. Toggling a selection makes every note a tom, or every note a cymbal when all of them are
+     toms already. A note that is moved takes the cymbal or tom of the tick it lands on, as the
+     markers stay where they are.
 4. **Accents and ghosts.**
    - Per note, on any pad.
    - Saved as velocity 127 (accent) or 1 (ghost), with `[ENABLE_CHART_DYNAMICS]` added to the
      track automatically while the track has any, and removed when it has none.
    - Every other note is written with velocity 100. Velocities in a loaded chart without
      `[ENABLE_CHART_DYNAMICS]` are not read as accents or ghosts ([§4.1](#editable-model)).
+   - *Settled in CM3:* an accent is drawn with a bright ring around it, and a ghost faded with a
+     dashed edge, on both apps' highways. The editor shows them as soon as they're added, as the save
+     will write `[ENABLE_CHART_DYNAMICS]` for them.
 5. **Drum fills (activation lanes).**
    - A phrase on every difficulty. Its last note is where star power is activated.
    - **Generate fills** proposes fills over the selection or the whole part. The author picks,
@@ -762,6 +1071,36 @@ Acceptance criteria:
      fits at a spot, the fill is left out. The proposals are shown as ghosts, and the author keeps
      or drops each one. Fills are never added silently, and the accepted ones are added as one
      undoable command.
+   - *Settled in CM3:* a fill covers the notes from its start up to, but not including, its end
+     (only its start, if it has no length), as the games read markers. Its last such note on a
+     difficulty is where star power is activated there.
+   - *Settled in CM3:* whether a drums phrase on pitches 120–124 is a fill or a big rock ending
+     follows `[coda]` ([C8](#c8-phrases-and-events) item 4). Adding, moving or removing `[coda]`
+     changes the phrases it decides in the same undoable step, and a fill can't be added after
+     `[coda]`, nor a big rock ending before it.
+   - *Settled in CM3:* Generate fills proposes at measure lines. A fill at one lasts the fill length
+     in measures, by the time signatures in force, and ends on the first beat of the measure after:
+     its **activation note**. That must be a crash (or, for any note, a note other than a 2× kick) on
+     the hardest difficulty with notes, and every difficulty with notes must have a note other than a
+     2× kick there, or the spot is left out. The fill ends the tick after that note, as CHR043's fix
+     ends one ([§6](#6-chart-lint-rule-catalogue)), so the note is the last it covers and CHR043
+     never fires on it. A crash on Pro is a green note no tom marker covers; 4-lane's green is a crash
+     whatever its markers say. Spots are taken earliest first, from where the second star power
+     phrase ends (overlapping phrases count as one, as saving merges them). A fill never overlaps
+     star power (CHR042), another fill or a big rock ending, ends before the first `[coda]`, and
+     starts at least the spacing in measures from every other fill's start, those already there and
+     those proposed. Over the selection, a fill starts at or after the selection's start and ends on
+     a note at or before its end.
+   - *Settled in CM3:* **Generate fills…** is beside the Phrase tool's picker, for a drums lane with
+     notes, and its options are in its flyout, kept while the editor is open. The proposals are
+     drawn as dashed ghosts in the rail's fills row, over the bars there, with a faint band across the
+     lanes; a dropped one is faint and struck through. A click on a ghost keeps or drops it, before
+     anything else under it. While they're shown, a bar over the lanes counts those kept, with
+     **Keep all**, **Drop all**, **Add fills** and **Cancel**; `Esc` cancels too, once nothing
+     focused has taken it (a drag is taken back first, and a field keeps its own `Esc`). Any change to the
+     chart but the run's own, an undo included, or to the song's settings, ends the run and says so,
+     as the proposals were worked out from the chart before it. When nothing fits, the message says
+     why: no drum notes, fewer than two star power phrases, or no spot.
 6. **Rolls and trills.**
    - Single-lane roll and two-lane trill phrases.
    - New ones reach Expert only, as the games default to. Each can be extended down to Hard,
@@ -771,6 +1110,34 @@ Acceptance criteria:
    ranges per difficulty ([§4.1](#editable-model)). Notes are always stored on the pads the file
    uses, so moving or resizing a range never changes the file's notes. Inside a range they are
    drawn on the pads the player hits.
+   - *Settled in CM3:* the model keeps the mix events, and a range is read from them: it starts at
+     a `d` mix and ends at the next mix without one. A new range writes a `d` mix at its start and
+     a plain mix at its end, each with the stem configuration in force there, and turns plain mixes
+     inside it into `d` ones. Removing a range turns its mixes back, and leaves out any that then
+     change nothing. A range can't overlap another, or cover a mix with another setting.
+   - *Settled in CM3:* inside a range, Pro drums' notes are drawn where the games play them: red as
+     a yellow cymbal in yellow's column, and yellow, cymbal or tom, as a red pad in red's. This holds
+     on the highway and the timeline, in the strike glow, and for a ghost difficulty. Whether a note
+     is flipped is the game view's, so the editor can't disagree with the games: a mix takes effect
+     from the first note at or after it, and one still on at a difficulty's last note carries into
+     the next difficulty up. 4-lane and 5-lane drums are never flipped, as the games flip Pro only.
+   - *Settled in CM3:* editing inside a range works on the pads drawn. A click hits the note drawn
+     in the column, and the Place tool and the number keys place the pad drawn there, so yellow's
+     column places red; the hover shows it as it will be drawn. A box selects by the columns drawn.
+     A move across columns, by a drag or `Alt`+arrows, gives each note the pad drawn in the column
+     it lands in, at the tick it lands on, so red moved one column right inside a range is blue.
+     When that isn't the same lane step for every note, the move is made as removing the notes and
+     adding them again, in one undoable step. A move only in time keeps the pads stored, so a note
+     moved into or out of a range is then drawn in the other column.
+   - *Settled in CM3:* the phrase rail ([C8](#c8-phrases-and-events) item 1) beside a drums lane
+     has a last row, **Disco flip**, with the ranges of the lane's difficulty, on every drum variant.
+     A range a loaded file never ends runs to the far end of the view. The Phrase tool's picker
+     offers **Disco flip** on Pro drums only, and draws a range on the lane's difficulty. Ranges are
+     selected, moved, resized and deleted in the rail as phrases are, each drag one undoable step,
+     and Delete removes them with the rest of the selection. A drag that would overlap another
+     range, or cover a mix with another setting, is refused in the status. A range without an end
+     can be selected, deleted and given an end in Properties, but not moved, nor its start changed,
+     until it has one.
 8. **4-lane ↔ 5-lane conversion helper.**
    - Converts a whole drum part with the fixed mapping in [§7.6](#76-drum-layout-conversion).
      Clone Hero and YARG each convert in their own slightly different way when they play one
@@ -779,9 +1146,19 @@ Acceptance criteria:
      already has one on that tick) are left out. They are listed, with their times, in a report
      when the command finishes. Undoing the command brings them back. Lint can't see notes that
      are no longer in the chart, so the report is the only place they are listed.
+   - *Settled in CM3:* of two notes landing on one pad, the one that maps back to where it came
+     from is kept (the blue tom on 5-lane blue, the green cymbal on 5-lane orange). Converting
+     5-lane to Pro, a tick where one difficulty's note becomes a cymbal and another's a tom on the
+     same pad takes the hardest difficulty's, as `ChartToMidi` does, and the other note is listed
+     too. A fifth-pad note in a 4-lane or Pro chart converts as a green tom.
+   - *Settled in CM3:* the report is a message. When it lists notes, or the drums were 4-lane, it's
+     a warning and the Messages dialog opens on it; otherwise it only says the drums were converted.
 9. **Drum variant.**
    - Switching between 4-lane and Pro is a song setting (`pro_drums`), not a conversion: a 4-lane
-     chart's tom markers are kept, and are ignored while `pro_drums` is `False`.
+     chart's tom markers are kept, so switching back to Pro brings them back.
+   - *Settled in CM3:* the games read any tom marker as Pro drums, whatever `pro_drums` says
+     (`DrumsLayouts`). So the markers of 4-lane drums are kept only while the chart is open: saving
+     leaves them out, and CHR045 says so until then.
    - Switching to or from 5-lane runs the conversion helper. Converting from plain 4-lane uses the
      cymbal/tom flags as they stand, which the player never saw; the helper says so.
 
@@ -802,8 +1179,15 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **Lanes:** white 1–3 and black 1–3 (drawn stacked per column, as in the game), plus open.
+   - *Settled in CM3:* both views have three columns (a timeline's rows), plus the open note's. A
+     column's black fret has its first half across the view, the left of a highway's column and the
+     top of a timeline's row, and its white fret the second. A click places or picks the fret of the
+     half it's in, or the other fret when that's the only one there, and a drag into the other half
+     switches the selected notes between white and black when they're all one or the other. A gem
+     alone fills its column; in a barre, the black covers the top half of the white. The keys `1`–`6`
+     are white 1–3, then black 1–3.
 2. **Chords**, including the "barre" chords where a white and a black share a column. As in
-   5-fret, an open note can't be placed in a chord with frets (CHR022).
+   5-fret, an open note can be placed in a chord with frets, which CHR022 flags.
 3. **Sustains, forced HOPO, forced strum and tap**, as for 5-fret ([C5](#c5-5-fret-notes)),
    including forcing per chord.
 4. Star power, solos and sections work as for 5-fret.
@@ -818,18 +1202,99 @@ Acceptance criteria:
 **Behaviour:**
 
 1. **Star power** phrases. Every difficulty shares them, as MIDI stores them (pitch 116).
+   - *Settled in CM3:* the **Phrase tool** draws a phrase of the kind picked beside it in the
+     toolbar, from the grid step pressed to the one let go, either way, as one undoable step. A click
+     adds nothing. The picker offers only the kinds the part in focus can have: star power, solo and
+     big rock ending on 5-fret and GHL; star power, solo, drum fill, roll and trill on drums, where a
+     fill drawn at or after `[coda]` is made a big rock ending (item 4). Pro drums also offer disco
+     flip ([C6](#c6-drums-4-lane-pro-and-5-lane) item 7). When the focus moves to a part that can't
+     have the kind picked, or the drums stop being Pro, it goes back to star power. New rolls and
+     trills reach Expert only ([C6](#c6-drums-4-lane-pro-and-5-lane) item 6).
+   - *Settled in CM3:* each lane draws its part's phrases as bars in a **phrase rail**: right of a
+     highway's forcing marks, and above a timeline's. The rail has a row for each kind the part can
+     have, in the picker's order, so overlapping phrases don't hide each other; a drums big rock
+     ending is in the fills' row. With any tool, pressing a bar selects its phrase (Shift adds it or
+     takes it away). Dragging a bar's body moves the selected phrases in time to the grid, keeping
+     their lengths; dragging within a few pixels of an end moves that end to the grid, never closer
+     than a grid step to the other. Each drag is one undoable step. Delete removes the selected
+     phrases, with any selected notes and tempo markers, in one step. Selecting notes or tempo markers
+     drops the selected phrases, and the other way round, unless Shift adds them. On drums, a last
+     row holds the lane's difficulty's disco flip ranges ([C6](#c6-drums-4-lane-pro-and-5-lane)
+     item 7), which are edited the same way.
+   - *Settled in CM3:* star power and solos also tint the lanes faintly behind the notes. Fills, big
+     rock endings, rolls and trills are drawn only in the rail.
+   - *Settled in CM3:* `S` ([§9](#9-keyboard-shortcuts)) puts star power over the selected notes:
+     from the first one's tick to where the last to end is let go, or a tick past it when it has no
+     sustain, so it covers every note as the games read markers. With no notes selected, it covers
+     the span selected, in the focused lane's part. When a star power phrase already starts and ends
+     exactly there, `S` removes it instead. With nothing selected, the status says so.
 2. **Solos** (pitch 103), drawn as a shaded band with a note count.
+   - *Settled in CM3:* the count is drawn at the solo's start. It counts the notes the solo covers on
+     the difficulty shown, a chord once.
 3. **Sections** in `EVENTS`. They are named freely and shown in the overview strip and in a new
    section list beside it. Sections can be renamed in the list, and **Insert section** takes the
    name from a menu of common ones (Intro, Verse 1, Chorus 1, Bridge, Solo, Outro…).
+   - *Settled in CM3:* the list is the **Sections** tab, in the left panel after Chart settings. It
+     lists every text event of `EVENTS` in time order, each with its time and its measure and beat:
+     a section by its name; a song event (item 5, and `[coda]`) by what it is, set apart from the
+     sections; anything else as it's written. Under them, headed by the part, are the focused lane's
+     part's own text events, when it has any (item 6). Each row has a go-to, which moves the cursor
+     there and leaves the focus where it is; its name or text, typed to rename it; its tick, typed to
+     move it; and a delete. Each is one undoable step. A section is renamed by its name and keeps its
+     `[section …]` or `[prc_…]` style, and an empty name is refused. The list follows edits, undo and
+     redo, a drag's preview and the focus, and a row whose event hasn't changed keeps what's being
+     typed in it.
+   - *Settled in CM3:* **Insert section** inserts `[section <name>]` at the cursor, on the grid. Its
+     menu has the common names and **Custom…**, which inserts one named "Section" (or the next free
+     "Section 2", "Section 3"…) with its name ready to type over. Where there's a section at that tick
+     already, it's refused rather than stacking two, as is moving or renaming an event into one there.
+     Only a duplicate an edit makes is refused, so a loaded chart's sections already sharing a tick
+     can still be renamed and moved. A name with `[` or `]` is refused, as the event's own brackets
+     end at the first `]`. A tick typed far past the end of the song (later than an hour in, or 64
+     measures past the chart's last note, event or tempo marker) is refused, for any text event.
+   - *Settled in CM3:* `Ctrl`+`↑` ([§9](#9-keyboard-shortcuts)) moves the cursor to the start of the
+     next section after it, and `Ctrl`+`↓` to the previous one's, in either view: up is later, as `↑`
+     is on a highway and `PgUp` is. Only sections count, and sections at one tick are one start. With
+     none that way, the cursor stays and the status says so.
+   - *Settled in CM3:* each lane draws a section as a faint line across the lanes and the labels'
+     margin, with its name in the margin: in a highway's rail above the measure number, cut short to
+     fit, and in a timeline's ruler after the measure number and any tempo there.
 4. **Big rock ending** (all five pitches 120–124 held together on a guitar or bass track) and
    `[coda]`. On drums, the same pitches are fills, and a big rock ending is the fill markers after
    `[coda]`. Chart Builder shows those as a big rock ending, not a fill, and the fill rules (CHR042,
    CHR043) skip them. No code reads big rock endings or `[coda]` today, so this is new.
-5. **Song events**: `[music_start]`, `[music_end]`, `[end]`. `[end]` is kept after the last note
-   and moved on save if notes are added after it (CHR085).
+5. **Song events**: `[music_start]`, `[music_end]`, `[end]`. The editor places all three itself
+   (`SongEventPlacement`), and works out where they go again after every edit, undo or redo, and
+   whenever the stems or the delay change. Any position a user or a loaded chart gave them is
+   overwritten.
+   - `[music_start]` is where the stems are first heard. A stem is heard where it reaches -60 dBFS
+     for at least 50 ms (`AudibleSpans`); the preview and crowd stems don't count. It goes no later
+     than the first note. With no audio, or none of it heard, it's the measure line at or before the
+     first note, or tick 0 with no notes.
+   - `[music_end]` is where the stems are last heard, but no earlier than the last note's end. A
+     sustain counts, and so do the vocals. With no audio, it's the last note's end.
+   - `[end]` is the first measure line after `[music_end]`.
+   - Audio times become ticks through the tempo map, less the delay. The start is rounded down and
+     the end up.
+   - The editable model never holds them: commands undo by an event's place in `EVENTS`, so moving
+     them outside the undo stack would shift what a later undo takes back. They're taken out as a
+     chart is opened or recovered, duplicates included, and written into the snapshot a save,
+     first save or **Export copy** writes, one of each. A save waits for the stems to be read
+     (at most 30 s, then it goes with what was last heard). **Save and pack** saves first when the
+     file's song events aren't where they now go.
+   - *Settled in CM3:* **Insert event**, in the Sections tab, inserts `[coda]` at the cursor, on the
+     grid. Inserting, moving or deleting `[coda]` makes the drum fills and big rock endings what it
+     then decides, in the same step (item 4).
+   - The Sections tab lists `[music_start]`, `[music_end]` and `[end]` among `EVENTS`' events, as
+     read-only rows: they can be gone to, but not moved, deleted or renamed. Inserting one, or
+     renaming another event into one, is refused, and the status says it's placed automatically.
 6. **Free text events**, in `EVENTS` or on a part track, for anything else. Events the model
    doesn't know are shown and kept, not deleted.
+   - *Settled in CM3:* **Insert event**'s **Text event…** inserts `[event]` in `EVENTS` at the cursor,
+     on the grid, with its text ready to type over, and **Text event on *part*…** puts one on the
+     focused part's track. Free text is edited as it's written, brackets and all; text left empty is
+     refused, as deleting is how one is taken away. A part's text events are free text, so none is
+     refused for what it says.
 
 Acceptance criteria:
 
@@ -868,6 +1333,28 @@ Acceptance criteria:
 3. **Difficulty letters** in the part picker show which difficulties have notes
    ([C3](#c3-editor-layout)).
 
+*Settled in CM5:*
+
+- **Where they are.** Copy difficulty and Reduce are in each lane's **Edit** menu. Copy difficulty
+  asks first when the target has notes, leaves out 2× kicks below Expert, and copies the drum
+  mixes, which hold disco flip. Tom markers and phrases are the part's, so they're shared already.
+- **The dialog.** Reduce opens over the Editor with the rules for the part's family and target,
+  from the defaults. Each change draws the draft again over the target, whose own notes fade
+  behind it. Apply (Enter) adds it in place of what the target had, as one step; Cancel (Esc) adds
+  nothing. An edit to the chart while it's shown drops the draft. Settings' **Default reduction
+  rules** opens the same dialog on the defaults, with **Reset** beside it.
+- **Thinning** ranks each chord by where it falls (a measure's first beat, a beat, then each
+  halving, triplets just after the halving they're nearest) and takes them in that order where no
+  chord taken is closer than the grid, on either side.
+- **Chords** keep their lowest and highest columns, then inner ones up to the limit. A chord past
+  the highest column moves down as a whole; only notes it would push below green are pressed
+  together, the longer sustain kept. GHL notes keep their colour. Sustains a reduction runs into
+  the next note on their lane end there.
+- **Drums** are thinned kick and pads together, then the kicks on their own grid. Each hit keeps
+  red first, then cymbals, then toms, by the pads as shown inside a disco flip.
+- **GHL's columns.** The table's Hard "all" and Medium "1–3" are the same, as GHL has three
+  columns; the table ships as written.
+
 Acceptance criteria:
 
 - **AC C9.1** Reducing Expert to Easy never makes a chord or a note closer than the Easy thinning
@@ -887,7 +1374,8 @@ Acceptance criteria:
    sharp and in time with the stems at any speed.
 4. **Hit sounds**: a short sound on each note as it reaches the strike line, mixed in the same way.
    There is one sound per part, and a pad sound for each drum pad. The volume is separate from the
-   stems'.
+   stems'. *Settled in CM2:* hit sounds follow the game view ([§4.3](#43-writing-midichartwriter))
+   of the lanes shown: a fret sound for 5-fret and GHL, and one per pad for drums.
 5. **Latency compensation.** Everything drawn against the audio (the cursor, highway, waveform,
    spectrogram and overview) is drawn at **`SmoothPosition` − latency × speed**
    ([§4.4.1](#441-playback-changes), [C11](#c11-calibration-tool)).
@@ -895,8 +1383,20 @@ Acceptance criteria:
    - The calibration covers everything after that: SDL's device buffer and the output device's
      own latency, which the app can't see.
    - The latency is in real time, so it is scaled by the playback speed to give song time.
+   - *Settled in CM2:* it's taken off only while playing. Paused, what is drawn is at the audio's
+     own position.
 6. **Following.** While playing, the view keeps the cursor at a fixed place, a quarter of the way
-   from the strike end. Scrolling pauses following until playback is restarted.
+   from the strike end. Scrolling pauses following until playback is restarted. *Restated in
+   CM2:*
+   - The cursor is always at that place: it's the lane's strike line.
+    - Scrolling moves the song past it a grid step a notch, through the tempo map, so the strike
+      line stays on the grid across tempo and time-signature changes. The cursor moves with it,
+      and the audio seeks there, playing or paused. A touchpad's part-notches add up to grid steps.
+      With `Shift` held, a notch moves four grid steps instead.
+   - Pausing leaves the cursor where playback stopped, and Space plays from there.
+   - Each lane's look-ahead, the seconds it shows beyond the strike line, is its own. It's set
+     from the lane's header, or with Ctrl+wheel, `+` and `−`, and saved with the lane layout. A
+     lane that hasn't had one set uses the **Editor highway speed** setting's: 2 s at 1×.
 
 Acceptance criteria:
 
@@ -964,21 +1464,21 @@ The tool is part of Chart Builder. It opens:
      ±500 ms range.
    - **Visual phase.** The user taps in time with 16 flashes, with no sound.
    - **Audio phase.** The user taps in time with 16 beeps, with the screen blank.
-   - Taps are mouse clicks or touches on the tile, or presses of the Space key.
+   - Taps are mouse clicks or touches on the tile. (Not the Space key: see the timestamps below.)
    - The first 4 taps of each phase are warm-up and are ignored.
    - Each tap's error is measured against its nearest beat. Taps more than 1.5 interquartile
      ranges from the median are dropped.
-   - **Latency = median audio error − median visual error.** The user's reaction time and the
-     keyboard's latency are the same in both phases, so they cancel out. What's left is how much
-     later the audio arrives than the display.
-   - The result shows the estimate, its spread (the interquartile range), and how many taps were
-     kept. **Use this value** puts it into the manual test to be checked. A spread over 30 ms
-     suggests trying again.
+   - **Latency = mean audio error − mean visual error**, over the taps kept. The user's reaction
+     time and the mouse's latency are the same in both phases, so they cancel out. What's left is
+     how much later the audio arrives than the display.
+   - The result shows the estimate, its spread (the larger of the two phases' interquartile
+     ranges), and how many taps were kept. **Use this value** puts it into the manual test to be
+     checked. A spread over 30 ms suggests trying again.
    - **Tap times** come from the input events' own timestamps, not from when the UI thread handles
      them.
      - In Avalonia 12, pointer events carry a timestamp (`PointerEventArgs.Timestamp`) but key
-       events don't. Key taps need the raw input events, which do have one
-       (`RawInputEventArgs.Timestamp`). If those can't be reached from app code in Avalonia 12, the
+       events don't. The raw input events that do (`RawInputEventArgs.Timestamp`) can't be reached
+       from app code (`InputManager` and `RawKeyEventArgs`' members aren't public in 12.1), so the
        tap test takes pointer taps only.
      - A timestamp is on the OS input clock. It is moved onto the app's clock by subtracting, at
        handling time, how long the event waited: the input clock's current time minus the event's
@@ -990,14 +1490,16 @@ The tool is part of Chart Builder. It opens:
      (for example, a Windows endpoint ID or a Core Audio device UID), and otherwise by its name.
      SDL's device names may change across reboots or docks, and its device handles only last for
      one session, so the ID is preferred when there is one.
-   - `IAudioOutput` gains a `DeviceName`, an optional `DeviceId` and a `DeviceChanged` event,
-     which `SdlAudioOutput` fills in. Getting a stable ID may need a small platform call beside
-     SDL. A platform without one uses the name alone.
+   - `IAudioOutput` gains a `Device` (an `AudioDevice`: a name and an optional ID) and a
+     `DeviceChanged` event, which `SdlAudioOutput` fills in. The name is SDL's. The ID needs a
+     small platform call beside SDL: on Windows it is the default render endpoint's ID, from the
+     MMDevice API (`WindowsAudioEndpoint`). Other platforms use the name alone for now.
    - **Which device.** The app has no device chooser. It always plays on the OS default device,
-     and SDL moves the stream when the default changes, without telling the app.
-     `SdlAudioOutput` therefore checks which device it is on when SDL reports an audio device
-     event and when playback starts, and raises `DeviceChanged` when it differs. Chart Builder and
-     the tool then load that device's latency.
+     and SDL moves the stream when the default changes, without telling the app. SDL's own device
+     events only reach an SDL event loop, which the app doesn't run, and a silent move raises
+     none. `SdlAudioOutput` therefore checks which device it is on when playback starts and once a
+     second, and raises `DeviceChanged` when it differs. Chart Builder, the tool and Chart Packer
+     then load that device's latency.
    - **Lookup order:** the stored value for the device's ID, then for its name, then a **global
      fallback**. When a device is found by name, its value is also saved under its ID if it has
      one, so a later rename doesn't lose it.
@@ -1006,11 +1508,30 @@ The tool is part of Chart Builder. It opens:
    - Chart Builder ([C10](#c10-playback));
    - **record mode**, where key presses are shifted by the latency before they're quantised
      ([C15](#c15-editing-ergonomics));
-   - Chart Packer's inspector highway (`NoteHighwayView`), lyrics lane and waveform playhead, with
-     the same scaling by speed. Chart Packer reads the value from the shared latency file
-     ([§10](#10-settings)).
+   - Chart Packer's inspector highway (`NoteHighwayView`) with its lane waveforms, lyrics lane and
+     background, with the same scaling by speed. Chart Packer reads the value from the shared
+     latency file ([§10](#10-settings)). The seek bar's waveform isn't moved: it marks what has
+     played a column at a time, where tens of milliseconds don't show, and its position is the
+     seek position. The merge window resumes from the audio's own position, not the drawn one.
 5. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
    previous value. **Reset** sets 0.
+
+*Settled in CM2:*
+
+- **The tap test's estimate is a mean, not a median.** Once the outliers are dropped, about ten
+  taps are left in each phase. With so few, the median's spread is too wide for AC C11.2: 92% of
+  estimates fell within ±20 ms in its test. The mean gives 96.5%.
+- **One schedule, re-anchored.** The beeps are a `CalibrationSchedule` over a silent mix. It ties
+  the monotonic clock to `SmoothPosition` at an anchor, and is replaced when the latency changes
+  and once a second, so the device's clock can't drift from the system's.
+  - The schedules share a record of the beats already given (`CalibrationBeepsGiven`), so a
+    re-anchor never plays a beep twice.
+  - A latency raised past what's already queued skips one beep.
+- **The first-use prompt** comes the first time a song plays in the Editor on a device with only
+  the fallback. Each device is offered it once (`BuilderSettings.CalibrationPrompted`), whatever
+  the answer.
+- **The Settings rows.** The latency is an action-only row (`ActionSetting`), with a
+  **Calibrate…** button, in both apps' Settings.
 
 Acceptance criteria:
 
@@ -1041,6 +1562,28 @@ Acceptance criteria:
 4. **Display.** Mono (the stereo channels combined) or stereo (split). The gain can be adjusted for
    quiet stems. `StemPeaks` averages the channels today, so stereo needs per-channel peaks, which
    are new.
+
+*Settled in CM4:*
+
+- **Where the options are.** Each lane's header has an audio button, whose flyout picks the audio
+  (the part's own stems, the mix, or any one stem), waveform or spectrogram, behind or beside, and
+  each one's own options, and the onsets (C14). They're kept with the lane layout
+  (`LaneAudioOptions`). The **Lanes show** setting picks waveform or spectrogram for a lane that
+  hasn't been switched.
+- **Resolution.** Every stem is read once at 5 ms a bucket (`WaveformResolution.High`), and drawn
+  with a power of two of buckets to a bar, as many as fit in a screen pixel, so one read serves
+  every zoom. The editor's waveforms come from one place, `StemWaveforms`, which also gives the
+  bottom timeline its mix.
+- **Stereo.** A stem's channels are read only when a lane first shows it in stereo
+  (`StemPeaksReader`'s `channels`); until then it's drawn in mono. Left is drawn beside right on a
+  highway, above it on a timeline, both at one gain.
+- **Gain** is in dB, from −12 to +24, on top of the gain that brings the loudest peak to full
+  scale.
+- **Beside** is a column right of a highway's phrase rail. A timeline's strip is always drawn at
+  full strength; Behind also draws the audio faintly behind its rows.
+- **AC C12.1.** Pictures of the waveform are drawn within a budget of 6 ms in each 16 ms
+  (`PaintBudget`). One there's no time for is stood in for by the neighbouring zoom's picture, and
+  drawn once the frame is out.
 
 Acceptance criteria:
 
@@ -1083,6 +1626,27 @@ Acceptance criteria:
 5. **Placement** is the same as for the waveform: behind the lanes, beside them, or as the strip
    in the Timeline view. The waveform and the spectrogram can be switched with one key.
 
+*Settled in CM4:*
+
+- **Levels.** Each byte is an absolute level, −120 dB plus half a decibel a step, a full-scale sine
+  reading 0 dB. The contrast is applied as it's drawn, so changing it computes nothing again; the
+  floor and ceiling are each lane's own (default −80 dB and 0 dB).
+- **Low rows.** A row that holds an FFT bin takes the loudest of its bins. Below about 870 Hz the
+  rows hold none, and each is read off a parabola through the levels of the louder bin either side
+  and its neighbours.
+- **Colours** run from black through violet, magenta and orange to pale yellow, blended in OKLab with
+  lightness rising evenly (`SpectrogramColors`). A band preset dims the rows outside it to 30%.
+- **Computing.** Columns are computed in chunks of 256 on threads below normal priority
+  (`AnalysisWorkers`), the chunk nearest the middle of the view first, and frames two to an FFT.
+  Chunks near the view come before onsets; the rest of the song after.
+- **The budget.** A spectrogram counts at its full size from the moment it's started. One used in
+  the last 2 s isn't released to make room for another: the newcomer is refused, and the editor
+  says so, so two lanes that don't both fit don't take turns releasing each other. The budget is
+  64 MB to 4096 MB.
+- **Drawing.** As the waveform's, in pictures of 256 columns, each a column or the loudest of a
+  power of two of them, drawn within the same budget, and drawn again as more of their columns are
+  ready, at most every 100 ms. Behind the lanes it's at 45% opacity.
+
 Acceptance criteria:
 
 - **AC C13.1** Opening a 10-minute song shows the first screen of spectrogram within 1 s on a
@@ -1122,8 +1686,53 @@ Acceptance criteria:
      that the next measure starts on the downbeat.
    - **Delay**: `delay` is changed so that tick 0 lands on the downbeat. This is shown as a pending
      change ([C17](#c17-save-and-export)).
+   - *Settled after CM4:* **Propose tempo map** and **Find first downbeat** are in the Tempo map
+     tab's **From the audio** ([C4](#c4-tempo-map-and-grid) item 9), with **Detect from audio**,
+     not the toolbar.
 6. Everything here is a hint. Nothing changes the chart without an explicit action, and every
    action can be undone.
+
+*Settled in CM4:*
+
+- **Onsets** have their own STFT, separate from the spectrogram's: a 1024-sample window every 128
+  samples, twelve bands an octave, each compared with the frame two before (spectral flux). The
+  whole spectrum is compressed hard, so soft onsets in a loud mix count; the drum bands gently, so
+  one band's leakage from a loud hit in another doesn't. A drum band's onset that's weak for its
+  band, at the same moment as a strong one in another, is taken as leakage and left out. Each onset
+  is timed off the audio itself, at the 32-sample block where the level rises most, which puts a
+  sharp hit within a millisecond whatever its level.
+- **Sensitivity** is each lane's own, in its audio flyout: a threshold on how far an onset stands
+  out, so changing it computes nothing again. Onsets are drawn in a strip of 6 px per band: left of
+  a highway's lanes, under a timeline's rows. Drums have three bands, kick nearest the lanes, in the
+  colours of the pads they likely belong to.
+- **Snap to onset** (`O`, and the toolbar) applies to placing a note with the mouse and to moving
+  notes: the note grabbed goes to the onset, the others keep their places around it. Keys, sustains,
+  phrases and tempo markers keep to the grid. The reach is half a step of the snap in the toolbar,
+  even with the grid off. The onsets are those of the lane showing the part, at its sensitivity.
+- **Nudge to onsets** (`Shift`+`O`) moves chord by chord, each by its own amount, keeping each
+  chord's forcing with it. Two chords after one onset: the nearer has it. A chord can't land on a
+  note that isn't moving. The report gives every chord's move in milliseconds, and opens the
+  Messages dialog when any chord stayed.
+- **The proposal** is estimated from the mix by default, or the lane in focus, over the selection or
+  the whole song. Its downbeat is Find first downbeat's (item 5). It's reviewed in a bar over the
+  lanes (Double, Halve, the downbeat a beat either way, Reset, Accept, Discard) and stays through
+  edits, a delay change included, until it's accepted or discarded. Dragging a beat's handle pins
+  it, and the beats either side are spaced evenly again up to the nearest pinned beat or two
+  measures away.
+- **Accepting.** For the whole song, the downbeat goes on measure 2's line and measure 1 leads in to
+  it; every tempo marker and anchor is replaced, and the time signatures are kept. Beats share a
+  marker while each is within the **merge** tolerance (5 ms by default) of its segment's tempo.
+  Anchors go on measures 1 + n, 1 + 2n, …, and on both ends of each unsure stretch, which is one
+  segment. For a selection, its first beat goes on the beat line nearest it, the segment before it
+  takes up the change, the tempo in force after its last beat carries on, and the next anchor stays
+  where it is.
+- **Find first downbeat** chooses the beat of each measure with the strongest kick, and more weakly
+  the strongest onsets, at the first such beat from where the music starts. It's shown as a line
+  labelled **Downbeat?**, with a bar to step it a beat either way. **Lead-in** sets the first tempo
+  so measure 2 starts on it; measure 1's other unanchored markers go. It's refused when the
+  downbeat isn't after the chart's start, when measure 1 would be faster than 1000 BPM or slower
+  than 10, or when an anchor inside measure 1 would move. **Delay** sets `delay` in place of the
+  song's (`delay_seconds` goes too when it's 0), as a pending change Revert takes back.
 
 Acceptance criteria:
 
@@ -1142,7 +1751,8 @@ Acceptance criteria:
 
 1. **Undo and redo** (Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z) for every change, tempo map included.
 2. **Selection**:
-   - click, Shift+click, and box select;
+   - click, Shift+click, and box select; holding Shift gives any tool the select tool's press on
+     a highway, the first press while it's held selecting afresh;
    - select a time range across lanes;
    - select a whole lane;
    - select everything in a section.
@@ -1169,8 +1779,10 @@ Acceptance criteria:
    - Each pass is one undoable command. Recording can overwrite the selected range or merge with
      what's there.
    - This works at any speed, so a fast passage can be recorded at 50%.
+   - Game controllers and MIDI devices record too, through their bindings, each press timed by its
+     own event ([C19](#c19-playtest-and-instrument-input) item 7).
 6. **Autosave and recovery.**
-   - Every 2 minutes (configurable), and when playback stops, the model is written to a recovery
+   - Every 2 minutes (configurable, 1 to 60), and when playback stops, the model is written to a recovery
      file in the per-user config folder (`Recovery/`), never into the song. Nothing is written
      when nothing has changed since the last autosave.
    - **What it holds.** The model, as a `notes.mid` from `MidiChartWriter` (so anchors and
@@ -1180,10 +1792,67 @@ Acceptance criteria:
    - **Which song it belongs to.** A recovery file is matched to a song by its full path. If the
      chart on disk has changed since the recovery file's manifest recorded it, recovery still
      offers it, but warns that the song has changed since.
-   - Saving deletes it. Opening a song with a newer recovery file offers to restore it
-     ([C2](#c2-open-and-import)).
+   - Saving deletes it. Opening a song with a recovery file offers to restore it
+     ([C2](#c2-open-and-import)). *Settled in CM2:* the recovery file is also deleted once nothing
+     is unsaved, and a recovered chart opens unsaved.
+   - **How it is written** (`RecoveryStore`). The chart, then a JSON manifest, each to a temp file
+     renamed into place. The manifest holds the chart's length and SHA-256, so a chart without a
+     manifest that matches it, as a crash between the two would leave, is ignored. A song's files are
+     named by a hash of its full path, as its lock is. The manifest also holds the song's `song.ini`
+     as the next save would leave it, which the chart is read back with, and the keys of the pending
+     changes the user reverted, which stay reverted.
+   - **A save** writes the recovery file from the bytes it's about to save, before it touches the
+     song, and deletes it once the save has gone through. A crash mid-save always leaves one.
+   - **A new chart never saved** is autosaved too, under an ID of its own, with its name, artist and
+     the paths of its audio. The home screen lists these under **Unsaved new charts**, with
+     **Recover** and **Discard**. Once it's first saved, its autosave moves to its song's.
+   - **Closing** with Discard deletes it. When the OS shuts down, which won't wait for the close
+     prompt, the chart is autosaved there and then.
 7. **Closing** Chart Builder, or the app, with unsaved changes asks: Save, Discard or Cancel.
 8. **Keyboard shortcuts** are listed in [§9](#9-keyboard-shortcuts).
+
+*Settled in CM5:*
+
+- **Selection.** The notes selected stay one track's, so Properties and the keys that change notes
+  one at a time keep to it. A **range across lanes** (Alt+drag, or Ctrl+Shift+A for the section
+  the cursor is in, from its start to the tick before the next) covers the lanes shown; delete,
+  cut and copy, Alt+arrow moves in time, H, G and T, and the transforms act on every track it
+  covers. **Select lane** is in the lane's Edit menu.
+- **The clipboard** is the app's own, not the OS's, so a passage pastes into the next chart too. It
+  holds notes in ticks from the passage's start, scaled when the resolutions differ, so a passage
+  lands on the grid at any tempo. It keeps the lanes as shown, so a passage from inside a disco
+  flip keeps the pads the player sees, and Pro drums keep which pads were toms. Phrases and disco
+  flip sections aren't copied.
+- **Paste.** Ctrl+V clears the span the passage covers, then puts it in; Ctrl+Shift+V merges: on
+  frets each chord pasted takes the place of the chord at its tick, and on drums each note takes
+  the place only of the note at its place. A passage of one track pastes into the focused lane; one
+  of several, into the same parts and difficulties. 5-fret and GHL paste into each other through a
+  lane mapping the user confirms, starting from the one last confirmed that way.
+- **Transforms** are in the lane's Edit menu: lefty flip, shift a lane (also Alt+Shift+arrows
+  across), and sustains cleared, one grid step, or until the next chord. Lefty flip mirrors GHL's
+  columns, each note keeping its colour; drums aren't flipped, as that would change their cymbals,
+  toms and disco flip. Shifting stops each note at the edge, joining notes that meet; opens and
+  kicks stay.
+- **Stretch timing** (×2, ×1.5, ×⅔, ×½, or to end at the cursor) works on the selection's span. It's
+  a tempo-map edit: the tempos inside the span are scaled, everything keeps its time, and what's
+  after the span moves by the change in its length. The passthrough tracks are re-ticked to match
+  (§4.2), and anchors keep their times.
+- **Record mode.** R starts a pass into the focused lane, playing from the cursor if the song isn't
+  playing; R, Space or the song stopping ends it, as one step, and Esc cancels it. The transport
+  bar has the Record button and Merge or Overwrite. (*Revised in CM6:* R and the Record button turn
+  record mode on and off, and playing the song with it on starts a pass from where the song is; the
+  song stopping ends it, as one step, and the next play starts another. Turned on while the song
+  plays, a pass starts there; turned off, the pass ends. Esc cancels the pass and turns record mode
+  off. Record mode and playtest ([C19](#c19-playtest-and-instrument-input) item 4) are never on
+  together, and with both off, playing just plays.) Overwrite clears the range selected, or the
+  stretch played, and leaves out presses outside a range selected. Presses on one tick make a
+  chord, and a fret takes an open note's place. A key let go less than a grid step after it was
+  pressed leaves a plain note; drums ignore holds. The pass is drawn as a ghost until it ends.
+- **Press times** are read from the playback clock when the key event is handled, on every OS, as
+  key events carry no timestamp. The wait before an event is handled isn't corrected; at 50% speed
+  it's halved in song time. Keys held when the window loses focus are let go then. (*Revised in
+  CM6:* controllers and MIDI devices carry timestamps, and are corrected
+  ([C19](#c19-playtest-and-instrument-input) item 3).)
 
 Acceptance criteria:
 
@@ -1207,15 +1876,36 @@ Acceptance criteria:
    - **part** rules (such as CHR080 and CHR081) re-check the parts the change touched;
    - **song** rules (such as CHR003, CHR083 and CHR084), and every rule after a tempo-map edit,
      re-check the whole chart.
+
+   *Settled in CM2:* lint runs a moment (150 ms) after the edits stop, one run at a time, and never
+   during a drag. Edits made while it runs are linted, against its result, by the next run.
 2. **How findings are shown.** Findings use the existing `Finding` type, with rule IDs `CHRnnn`
    and messages in `FindingMessages.resx`. They appear in the findings panel and as marks on the
    overview strip, and each one links to its place in the chart. `Finding` gains an optional chart
    location (part, difficulty and tick range) for that, beside its existing byte offset and
-   metadata key.
+   metadata key. A finding about the song as a whole rather than a part, such as a tempo marker
+   (CHR001, CHR002, CHR005, CHR082, CHR085), has a tick instead (`Finding.Tick`).
 3. **Quick fixes.** The existing `QuickFixRegistry` and `IQuickFixStrategy` only edit metadata
    (`QuickFix.ApplyTo(MetadataItem)`). Chart Builder adds a chart kind of fix, which proposes an
    `IChartCommand` for a finding, and registers chart fixes with the same registry. Each fix is
-   one undoable command (see the table for which rules have one).
+   one undoable command (see the table for which rules have one). It's given the read options lint
+   used, for fixes that depend on them, such as CHR021's sustain cutoff. A fix that changes
+   `song.ini` instead (CHR084's) restores the pending change the user reverted; it isn't an undo
+   step, as reverting isn't.
+   - **More than one right answer.** Where a finding can be fixed more than one right way, such as
+     which of two notes too close together to delete (CHR026), each way is offered, labelled, for the
+     author to pick. A way that would do something wrong, such as snapping a note onto another, isn't
+     offered. Each way has an ID that's the same for every finding of its rule, so Fix All applies
+     the same way to each.
+   - **The finding's menu.** A finding's fixes are on its right-click menu, worked out as it opens
+     from the chart as it is then. For a rule with one way to fix it: **Fix**, **Fix All For
+     <part>** (every finding of its rule in its part, every difficulty) and **Fix All** (every
+     finding of its rule in the chart). For one with more: a list of the ways, each with those three
+     under it. Each Fix All is one undo step, its fixes worked out against the chart the fixes before
+     them leave, so one an earlier fix has already seen to is passed over. Fix All is only offered
+     for chart fixes, not CHR083's or CHR084's, and Fix All For only for a finding in a part. A
+     finding without a fix shows a greyed-out **No Fixes Available**. The library's list, which
+     fixes nothing, has no menu.
 4. **Severity.**
    - Lint **never blocks saving**. A chart in progress must always be saveable.
    - **Errors** are things the author wrote that the games read differently, such as an open note
@@ -1233,6 +1923,23 @@ Acceptance criteria:
    - CHR004 uses only the common grids, never the editor's current snap, so it gives the same
      result in the library and in Chart Builder.
 
+*Settled in CM5:*
+
+- **What's read.** The library lints the chart as stored, with `song.ini` as drafted, and reads it
+  with the options as loaded, as the games read it today, not as a Chart Builder save would write
+  them. The audio is measured for CHR003 and CHR084; a `.sng`'s from inside it.
+- **The cache** is in memory, for the session (`SongChartLintCache`): a song whose chart file,
+  drafted `song.ini`, audio files and language are as they were is answered from it, and the audio
+  isn't measured again when only `song.ini` changed. Nothing is written to disk.
+- **In the Validator,** a song's chart findings follow its metadata issues, one line per rule and
+  key with how many and where the first is, coloured by severity, and filtered by six chart types,
+  one per group of the catalogue. They have no fix there. A song is listed for a chart Warning or
+  Error, not for Info alone, and counts as failing until both its metadata and its chart pass.
+  Save all asks only about metadata that still fails. A drafted song is linted again a moment after
+  its draft changes.
+- **In the detail panel,** the chart findings of the one song shown follow its own, with where
+  each is.
+
 Acceptance criteria:
 
 - **AC C16.1** Every CHR rule has a fixture that triggers it, and a clean fixture triggers none.
@@ -1247,13 +1954,23 @@ Acceptance criteria:
    2. reads it back and compares it with the model. **A difference stops the save.**
    3. stages the bytes to a temp file and saves through `MetadataDraft`/`DraftWriter`
       ([§4.6](#46-saving)).
+
+   A new chart's first save asks where its song folder goes instead, and writes it with
+   `NewChartCreator` ([C1](#c1-new-chart-and-chart-settings), The first save).
+
+   *Settled in CM2:* the Editor isn't reopened after a save. It moves on to the saved song, so the
+   undo stack, the cursor, the lanes and playback carry on. After a new chart's first save, its
+   audio keeps playing from the files it was given until the song is next opened. A save marks the
+   undo stack where its snapshot was taken, so edits made while it runs stay unsaved.
 2. **`song.ini` changes.** Every change Chart Builder makes to `song.ini` is shown as a pending
    change in Chart Builder's **Pending changes** list (beside the findings panel) as soon as it is
    made, not only at save. Each change can be reverted there. Chart Packer's metadata editor
    doesn't see these changes until they are saved ([§4.6](#46-saving)). The full list:
-   - `song_length`, when it is unset or no longer matches the audio's length within 1 s. This
-     happens on save, so CHR084 only appears for charts linted outside Chart Builder;
-   - `pro_drums` and `five_lane_drums`, for the drum variant: when the variant is chosen, switched
+   - `song_length`, when it is unset or no longer matches the audio's length within 1 s, worked out
+     once the audio has been measured. Chart Builder lints the `song.ini` its save would write, so
+     CHR084 appears there only when this change has been reverted;
+   - `pro_drums` and `five_lane_drums`, for the drum variant: when the variant is chosen in Chart
+     settings ([C1](#c1-new-chart-and-chart-settings)), switched
      ([C6](#c6-drums-4-lane-pro-and-5-lane)), or detected on load ([§4.1](#editable-model));
    - `charter`, if empty, from the **Default charter name** setting ([§10](#10-settings));
    - `diff_<part> = -1` for new parts ([§7.5](#75-songini-keys-chart-builder-writes)). The
@@ -1261,17 +1978,37 @@ Acceptance criteria:
      say-so;
    - `multiplier_note` removed, when the chart had star power on 103
      ([§7.2](#72-shared-markers-every-difficulty));
-   - `delay`, from a new chart's lead-in ([C1](#c1-new-chart-from-scratch)), a `.chart` import's
-     Offset ([C2](#c2-open-and-import)), or **Find first downbeat**
+   - `delay`, from a `.chart` import's Offset ([C2](#c2-open-and-import)), or **Find first downbeat**
      ([C14](#c14-onset-and-beat-assist));
-   - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import)).
+   - the `.chart`'s `[Song]` values, on import ([C2](#c2-open-and-import));
+   - a new chart's name, artist, album, genre and year, from its first stem's tags
+     ([C1](#c1-new-chart-and-chart-settings));
+   - Chart settings' edits ([C1](#c1-new-chart-and-chart-settings)): any key, a part's rating and
+     `delay`. The Art tab's and Tracks' file changes are listed with them when Save asks first;
+   - `sustain_cutoff_threshold`, on an import whose sustains need it to stay sustains once they're
+     MIDI ([C2](#c2-open-and-import)).
 
-   `sustain_cutoff_threshold` and the HOPO threshold are never changed by Chart Builder. Its display
-   follows them.
+   Changes the chart is read by can't be reverted, as leaving one out would save a chart that plays
+   differently from what the editor shows: the drum layout keys, an import's
+   `sustain_cutoff_threshold` and `multiplier_note`. The rest can, and a reverted change stays
+   listed, struck through, until it's restored. Reverting isn't an undo step, and stays across saves.
+
+   *Settled in CM2:* the list isn't kept as edits are made. It's worked out from the chart as it
+   stands against `song.ini` as it was opened, so undoing an edit takes its change away. A part's
+   rating is listed only for a part added since the song was opened. Only the reverts are kept.
+
+   Otherwise, `sustain_cutoff_threshold` and the HOPO threshold are never changed by Chart Builder.
+   Its display follows them.
+
+   **Save asks first** only when it changes `song.ini` or removes a file, listing what it changes.
+   An import's first save always asks, with **Remove notes.chart** and **Keep notes.chart**.
 3. **Save and pack** saves, then packs the song to a `.sng`
    ([project-spec F1](project-spec-v1.md#f1-pack-song-folder--sng)) with Core's packing
    (`PackPlanner`, `SongJob`). It uses Chart Packer's output folder and overwrite settings, which
    Chart Builder reads from Chart Packer's settings file and never writes.
+   - The `.sng` leaves out what only Chart Builder reads: the tempo anchors ([§7.3](#73-text-events))
+     and the `song.ini` keys of parts the chart has no notes in (SNG062). A song opened from a
+     `.sng` is copied the same way.
 4. **Export copy** writes the song with its draft applied to another folder, using the existing
    `SongExport`.
 
@@ -1282,7 +2019,9 @@ Acceptance criteria:
   notes, flags and star power the editor shows.
 - **AC C17.3** Saving never changes a `song.ini` key the user hasn't seen as a pending change.
 - **AC C17.4** For every fixture chart, reading the saved `notes.mid` with `MidiChartLoader` gives
-  back the model, including accents, ghosts, phrases, events, anchors and `RawEvent`s.
+  back the model, including accents, ghosts, phrases, events, anchors and `RawEvent`s, with
+  `[music_start]`, `[music_end]` and `[end]` placed as [C8](#c8-phrases-and-events) item 5
+  says.
 
 ### C18. Preview
 
@@ -1303,10 +2042,142 @@ Acceptance criteria:
    - It is shown with what it was based on, and is only a suggestion.
    - The weights are fixed in v1 and will be tuned against rated charts.
 
+*Settled in CM5:*
+
+- **Where the preview is.** A **Preview** tab in the Editor's right panel, and a window of its own
+  (**Window**), which F11 makes full screen. Both show the lane in focus, or a part and difficulty
+  picked, with practice, the speed and how far ahead it looks. A scrub on the highway moves
+  playback there. The control is Chart Packer's inspector's, moved to `ChartPacker.UI`.
+- **Rebuilt by track.** After an edit that touches the track shown, the whole track's scene is
+  built again from its game view, at most once a frame and only while it's shown, not only the
+  range the edit touched, as the game view is worked out a track at a time.
+- **Practice** turns the loop on, from the selection when there's none yet, and plays it from its
+  start; turning the loop off ends practice.
+- **The suggested rating** is the part's highest charted difficulty's, as one `diff_*` key rates the
+  whole part. It's shown in the preview's header, with what it was worked out from and each
+  difficulty's own tier in its tooltip. **Use as diff_…** sets the part's keys that `song.ini`
+  rates otherwise, as pending changes Revert takes back; it's never written otherwise. It's also
+  CHR083's fix. Peak density is over any two seconds; the weights are `DifficultyWeights`.
+
 Acceptance criteria:
 
 - **AC C18.1** Preview follows the latency calibration and stays within one frame of the editor
   view while both are shown.
+
+### C19. Playtest and instrument input
+
+The keyboard, game controllers and MIDI devices can be played as instruments: to playtest a chart in
+the editor, judged as the games judge it, and to record into it ([C15](#c15-editing-ergonomics)
+item 5).
+
+**Behaviour:**
+
+1. **Devices.**
+   - **Game controllers** (gamepads, guitar and drum controllers) are read through SDL3's joystick
+     subsystem as raw buttons, axes and hats, so a guitar SDL doesn't know as a gamepad still works.
+     They're read while the window is in the background too.
+   - **MIDI devices** (drum kits, pad controllers, keyboards) are read through winmm, on Windows
+     only for now. Other OSes list none. Each backend is an `IInputSource`, so another can be added
+     without changing anything else.
+   - Devices are opened the first time the Editor's song plays, or the Input devices window opens,
+     and kept open until the Editor and the window close, so a MIDI port is free for other apps
+     until then. A port another app holds is shown as in use.
+2. **Bindings.** Each instrument family has a profile that binds controls to its actions.
+   - 5-fret: Green, Red, Yellow, Blue, Orange, Strum up, Strum down, Whammy and Star power.
+   - Drums: Kick, Red, Yellow tom, Yellow cymbal, Blue tom, Blue cymbal, Green tom, Green cymbal and
+     Orange (a 5-lane kit's fifth pad).
+   - An action can have several controls (two kick pedals, or a keyboard and a guitar). A control
+     has one action in each profile.
+   - The **Input devices** window lists the devices, each with a meter showing its activity, and the
+     profiles. **Bind** takes the next control pressed: a key, a button, a hat direction, a MIDI note,
+     or an axis moved past half way from where it rested. Controls already held are ignored, so a
+     resting pedal or a stuck axis isn't taken. Binding a control another action has asks to move it.
+   - Presets: the keyboard defaults (the number keys, as record mode's, with Enter and the arrow keys
+     to strum), a General MIDI drum map, and the usual layout of Xbox 360 guitars.
+   - Each device has an input offset in milliseconds, for wireless controllers and drum modules that
+     add their own delay. A MIDI device also has a velocity floor (against crosstalk), a retrigger
+     time (against double triggers), and the velocities taken as an accent and as a ghost.
+   - Space, Esc, P and N are the editor's while playtesting, and can't be bound.
+3. **Timing.** Every input is timed by its own event's timestamp, on one monotonic clock, and turned
+   into song time through the playback clock as it was at that moment:
+   **`SmoothPosition` − latency × speed**, as everything drawn is ([C10](#c10-playback) item 5), less
+   the device's offset. When the event is handled doesn't change it, so controllers and MIDI devices,
+   read on threads of their own, are judged as exactly as they're timed. Keys carry no timestamp
+   ([C15](#c15-editing-ergonomics)), and are timed when they're handled.
+4. **Playtest.** P and the Playtest button turn playtest on and off. With it on, playing the song
+   playtests the focused lane's part and difficulty: inputs are judged against its game view
+   ([§4.3](#43-writing-midichartwriter)) by the rules in items 5 and 6. While it's paused, the editor
+   works as it always does, so a missed note can be fixed straight away and the passage played
+   again. Playtest and record mode ([C15](#c15-editing-ergonomics) item 5) are never on together:
+   turning one on turns the other off. Both can be off, and then playing just plays.
+   - While playing, a key bound to the lane's instrument plays, and doesn't edit, wherever focus is
+     (but a text box). Other keys work as they always do; Space, Esc, P and N are never bound.
+   - The strike line shows what's pressed, as the games show their frets and pads: a fret's target
+     while it's held, a pad's or the kick's as it's hit, and a strum across the lanes, each in its
+     colour. Only notes hit light their columns, as autoplay's do in the preview, with a burst out of
+     the target. A missed note is marked where it is, and stays marked until it's played again. A
+     meter at the strike line shows how early or late the last hits were.
+   - The transport bar shows the accuracy, the combo and the mean offset. N and Shift+N move the
+     cursor to the next and previous problem: a miss, an overstrum, an overhit or a dropped sustain.
+     The Problems list shows every one, with how many passes it happened on.
+   - Each lane played keeps what was found in it, marked over its notes, until **Clear** forgets
+     every lane's marks, problems and stats. The stats and problems shown are the lane played last.
+   - Each pass over the loop region, and each play, starts its stats afresh; problems add up over
+     the passes.
+   - Seeking, and the loop's jump back, judge nothing they skip.
+   - The hit window is in real time, so at 50% speed it's half as long in song time, as the notes
+     come half as fast.
+   - Vocals and 6-fret aren't playtested in v1.
+5. **5-fret rules.** As the games play, close enough to check a chart; each number is a setting.
+   - The hit window is 70 ms either side of the note.
+   - A single note is played with its fret held and none above it; frets below may be held
+     (anchoring). A chord needs exactly its frets. An open note needs none.
+   - A strum note is hit by a strum in the window, with its frets held. A strum up to 50 ms before
+     the frets are right still counts once they are.
+   - A HOPO is hit by pressing or lifting to its frets, while the combo is going; a tap, at any time.
+     A strum up to 80 ms after such a hit is part of it. Pressing a fret that's wrong for the next
+     HOPO or tap in the window (ghosting) means that one must be strummed.
+   - A strum with nothing to hit, or the wrong frets, is an **overstrum**, and breaks the combo.
+     Hitting a later note in the window misses the ones before it.
+   - A sustain is held to its end with its frets held. Letting go more than 50 ms early is a
+     dropped sustain, which counts as a problem but doesn't break the combo.
+   - Whammy and star power are read but not judged.
+6. **Drums rules.**
+   - The hit window is 70 ms either side. Each note is hit by its own pad; a pad hit with no note to
+     hit is an **overhit**, which breaks the combo (a setting).
+   - Pro drums: a cymbal note needs a cymbal and a tom note a tom, for each colour whose cymbal and
+     tom are bound to different controls; with one control for a colour, either counts. Notes in a
+     disco flip are played as the game view has them.
+   - 5-lane drums: a 5-lane kit's pads play their own lanes. A 4-lane kit's play them as
+     [§7.6](#76-drum-layout-conversion) turns Pro into 5-lane.
+   - The kick, and on Expert the 2× kick, which can be left out of the judging (a setting).
+   - Accents and ghosts can be judged by velocity (a setting, off by default).
+7. **Recording from devices** ([C15](#c15-editing-ergonomics) item 5).
+   - Guitar: a strum places the frets held, or an open note, and letting go of a fret ends its
+     sustain. As a setting, each fret can place a note as it's pressed instead, as the number keys
+     do.
+   - Drums: each hit places a note on its pad's lane. With **Dynamics from velocity** on, a hard hit
+     is an accent and a soft one a ghost. A cymbal or a tom isn't recorded in v1, only the pad's
+     colour.
+8. **Recording a performance (later).** Every input becomes one stream of timed actions, which the
+   judge and record mode each take. The judge gives the same result from the same actions, so a
+   performance kept as its actions could be judged again after the chart changes.
+
+*Settings* ([§10](#10-settings)): the early and late hit windows, cymbals must match, judge the 2×
+kick, overhits break the combo, judge accents and ghosts, the guitar's record style and dynamics
+from velocity. The bindings and each device's offset and MIDI settings are in the Input devices
+window, kept in `input-bindings.json`.
+
+Acceptance criteria:
+
+- **AC C19.1** An input whose timestamp is exactly on a note is judged 0 ms off however long after
+  it is handled, up to 100 ms, at 100% and at 50% speed, with a latency of 40 ms.
+- **AC C19.2** Every rule in items 5 and 6 has a test of synthetic inputs that hits, misses,
+  overstrums or overhits as described.
+- **AC C19.3** Bindings are kept in `input-bindings.json` and found again for a controller
+  reconnected or plugged into another port.
+- **AC C19.4** Seeking while playtesting, or the loop jumping back, marks no note it skipped as
+  missed.
 
 ---
 
@@ -1332,8 +2203,8 @@ never reused.
 | --- | --- | --- | --- |
 | CHR001 | Warning | No time signature at tick 0; the games assume 4/4 | Add 4/4 at 0 |
 | CHR002 | Warning | A tempo below 20 or above 400 BPM (probably a typo or a half/double-time mistake) | — |
-| CHR003 | Warning | A note, phrase or event after the end of the audio (in audio time, [§4.4.1](#441-playback-changes)) | — |
-| CHR004 | Info | A note isn't on any common grid: a whole-note division from 1/1 to 1/192, or a triplet one | Snap to grid |
+| CHR003 | Warning | A note, phrase or event other than `[music_end]` or `[end]` after the end of the audio (in audio time, [§4.4.1](#441-playback-changes)) | — |
+| CHR004 | Info | A note isn't on any common grid: a whole-note division from 1/1 to 1/192, or a triplet one | Snap to the nearest grid line, or the one on its other side, where no note is already; or delete |
 | CHR005 | Warning | Two tempo markers or two time signatures on the same tick | Keep the later one |
 
 ### 5-fret and GHL
@@ -1341,12 +2212,12 @@ never reused.
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
 | CHR020 | Warning | A sustain runs into the next note on its lane, so the games will cut it short | Trim sustain |
-| CHR021 | Info | A sustain is shorter than the sustain cutoff, so the games read it as a plain note | Remove sustain |
-| CHR022 | Error | An open note in a chord with frets | Remove open |
-| CHR023 | Info | A force HOPO or force strum that doesn't change the chord | Remove force |
+| CHR021 | Info | A sustain is shorter than the sustain cutoff, so the games read it as a plain note. Only lengths of at least a sixteenth note count, as many charts hold every plain note a sixteenth. | Make it a plain note, or lengthen it to the cutoff |
+| CHR022 | Error | An open note in a chord with frets | Remove the open note, or keep only it |
+| CHR023 | Info | A force HOPO or force strum that doesn't change the chord at any HOPO threshold a MIDI chart can be read with | Remove force |
 | CHR024 | Warning | A forced HOPO on a chord that repeats the previous note or chord exactly. The games play it as a HOPO, but the same frets can't be hammered on again. | Remove force |
 | CHR025 | Warning | The first note of a part is a HOPO (forced or tap) | Remove force |
-| CHR026 | Warning | Two notes on the same lane closer than 1/64 of a whole note in ticks (likely a stray duplicate) | Delete the later one |
+| CHR026 | Warning | Two notes on the same lane closer than 1/64 of a whole note in ticks (likely a stray duplicate) | Delete the later one, or the earlier |
 
 ### Drums
 
@@ -1357,10 +2228,15 @@ never reused.
 | CHR042 | Warning | A drum fill overlaps a star power phrase (not counting a big rock ending) | — |
 | CHR043 | Warning | A drum fill whose last tick has no note on some difficulty, so there is nothing to activate on there (not counting a big rock ending) | Move end to last note |
 | CHR044 | Warning | A roll or trill phrase with fewer than two notes, or a trill covering only one pad | — |
-| CHR045 | Warning | Tom markers on a song whose `pro_drums` is `False`, so they will be ignored | Set `pro_drums = True` |
-| CHR046 | Warning | Orange notes on a 4-lane or Pro song | — |
-| CHR047 | Info | An accent or ghost on a kick, which some games ignore | — |
+| CHR045 | Warning | Tom markers on 4-lane drums. The games would read them as Pro, so saving leaves them out ([C6](#c6-drums-4-lane-pro-and-5-lane) item 9). | Switch to Pro, or remove the markers |
+| CHR046 | Warning | A fifth-pad note (5-lane green) on a 4-lane or Pro song | — |
+| CHR047 | — | *Retired in CM3.* An accent or ghost on a kick. The games never read one, so the loader doesn't keep one, and the editor can't place one. | — |
 | CHR048 | Warning | The chart has a `PART DRUMS_2X` track. It is kept as it is and doesn't follow edits to `PART DRUMS`. | — |
+
+*Settled in CM3:* a phrase covers the notes from its start up to, but not including, its end, as the games read
+markers. CHR043's fill ends on the last note it covers on any difficulty, and its fix ends the fill on the last such
+note every difficulty with notes has. CHR044 checks Expert, and each lower difficulty a roll or trill reaches where it
+covers a note.
 
 ### Phrases and events
 
@@ -1370,18 +2246,36 @@ never reused.
 | CHR061 | Warning | A solo with no notes in it | Delete phrase |
 | CHR062 | Warning | Two star power phrases, or two solos, overlap | Merge |
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
-| CHR064 | Info | A disco flip section that starts or ends between notes of a chord | — |
+| CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
+
+*Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
+merges the group into its first phrase.
 
 ### Song
 
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
-| CHR080 | Warning | A part has notes on some difficulties and none on others | Reduce ([C9](#c9-difficulty-authoring)) |
-| CHR081 | Info | A lower difficulty has more notes per second than the one above it | — |
+| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is fine. | — |
+| CHR081 | Info | A lower difficulty has more chords per second than the one above it | — |
 | CHR082 | Info | The chart has no sections | — |
 | CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating |
 | CHR084 | Warning | `song_length` doesn't match the audio's length within 1 s. A charter save corrects it, so this mostly appears in the library. | Update `song_length` |
-| CHR085 | Info | `[end]` is missing or before the last note; it is moved on save | — |
+| CHR085 | Info | `[end]` is missing or before the last note. Chart Builder places it on save, so it runs this rule only in the library, not in the editor | — |
+| CHR086 | Info | Something in the chart file couldn't be loaded as written, and was left out, as the games leave it out ([§4.1](#editable-model)). Saving writes the file without it. | — |
+
+### Vocals
+
+| ID | Sev. | Rule | Fix |
+| --- | --- | --- | --- |
+| CHR090 | Warning | A vocal note runs into the next one; a part sings one note at a time | — |
+| CHR091 | Warning | A vocal note has no lyric (a slide's is `+`) | — |
+| CHR092 | Warning | A vocal note is outside every phrase, so the games don't show it | — |
+| CHR093 | Info | A lyric isn't on a vocal note's start | — |
+| CHR094 | Warning | A slide has no sung note before it in its phrase to carry on from | — |
+| CHR095 | Warning | `HARM2` or `HARM3` without `HARM1`, which the games need to show harmonies | — |
+
+*Settled with vocal editing:* the vocal rules check the whole song after any edit, as a vocal part isn't one of the
+model's parts. Each finding names its part's track and the tick at fault.
 
 ---
 
@@ -1459,7 +2353,7 @@ down to Easy, 31–40 down to Medium, 41–50 down to Hard. The writer uses 25, 
 | `[mix <d> drums<n>]`, `[mix <d> drums<n>d]` | drums track | Drum mix per difficulty; the `d` suffix is disco flip (parsed by `ChartTextEvents.TryParseMix`) |
 | `[section <name>]` / `[prc_<name>]` | `EVENTS` | Practice sections |
 | `[music_start]`, `[music_end]`, `[coda]`, `[end]` | `EVENTS` | Song events |
-| `[chartpacker_anchor <µs>]` | tempo track, at the anchored marker's tick | A tempo anchor ([C4](#c4-tempo-map-and-grid)). The number is the anchor's audio time in whole microseconds. The games ignore it. |
+| `[chartpacker_anchor <µs>]` | tempo track, at the anchored marker's tick | A tempo anchor ([C4](#c4-tempo-map-and-grid)). The number is the anchor's audio time in whole microseconds. The games ignore it, so a packed or exported `.sng` leaves it out (`ExportCleanup`). A save keeps it, including a save into a `.sng` the song was opened from. |
 
 ### 7.4 Tracks the writer creates
 
@@ -1525,7 +2419,8 @@ are unchanged, and red stays red.
 
 Chart Builder has two top-level windows, and only one is open at a time. The launcher (the home
 screen) shows until a chart is started or opened. Then the Editor window takes its place, with the
-editor's tools in its toolbar, and closing the Editor brings the launcher back.
+editor's tools in its toolbar, and closing the Editor brings the launcher back. New chart opens the
+Editor straight away, with no dialog before it.
 
 **Launcher (home screen):**
 
@@ -1553,14 +2448,14 @@ editor's tools in its toolbar, and closing the Editor brings the launcher back.
 ┌ Untitled chart - Chart Builder ───────────────────────────────────────────────────────┐
 │ [◎ Chart Builder v0.3.0] [⚙ ◉] [Select|Place|Erase|Sustain|Phrase|Tempo] [⟲ ⟳]        │
 ├─────────────────────┬────────────────────────────────────────────┬────────────────────┤
-│ Chart Inspector   « │ Guitar·X ▾ + ✕┃Bass·X ▾ + ✕┃Drums·X ▾ + ✕  │ Properties       » │
+│ Inspector│Settings «│ Guitar·X ▾ + ✕┃Bass·X ▾ + ✕┃Drums·X ▾ + ✕  │ Properties       » │
 │                     │              ┃             ┃               │                    │
 │ Artist – Title      │   highway    ┃   highway   ┃   highway     │ Note  m41 · beat 3 │
 │ [album art]         │              ┃             ┃               │ Tick  78,960       │
 │ Tracks              │              ┃             ┃               │ …                  │
 │ Chart files         ├━━━━━━━━━━━━━━┻━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━┤                    │
-│ Other files         │ Vocals ▾                              + ✕  │                    │
-│ Findings            │   vocals                                   │                    │
+│ Other files         │ Vocals ▾                        2.0 s + ✕  │                    │
+│ Findings            │   piano roll, lyrics under it              │                    │
 │ Metadata            │                                            │                    │
 ╞═════════════════════╧════════════════════════════════════════════╧════════════════════╡
 │ Timeline                                                              1:38.4 / 4:12.0 │
@@ -1569,10 +2464,12 @@ editor's tools in its toolbar, and closing the Editor brings the launcher back.
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- The ⚙ menu has **Chart settings** and **Program settings**. The ◉ (View) menu will choose which
-  lanes are shown; it is a placeholder so far. The toolbar's groups wrap onto more rows as the
+- ⚙ opens **Program settings** (Ctrl+,). The left panel's tabs are **Chart settings**, **Art** and
+  **Sections** ([C8](#c8-phrases-and-events) item 3). The ◉ (View) menu will choose which lanes are shown; it is a placeholder so
+  far. The toolbar's groups wrap onto more rows as the
   window narrows.
-- The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part. They are
+- The middle shows **lanes**: each a part's highway at one difficulty, or a vocal part, drawn as a
+  piano roll ([C3](#c3-editor-layout) item 7). They are
   docked like Visual Studio's tool windows: dragging a lane's header shows guides on the lane under
   the pointer and on the edges of the whole area, and dropping on one docks the lane against that
   edge. A lane's highway is always vertical; only the room it takes is tall or wide. ━ splitters
@@ -1581,7 +2478,7 @@ editor's tools in its toolbar, and closing the Editor brings the launcher back.
   closes it. The lanes, where they are and their sizes are saved (`LaneDockLayout`, in
   `ChartPacker.Core/Charting/Layout/`).
 - « and » collapse a panel to a strip along that edge, with its tab titles turned on their side.
-  Clicking a title brings the panel back. The panel widths, whether each is collapsed, and the
+  Clicking a title brings the panel back on that tab. The panel widths, whether each is collapsed, and the
   timeline's height (the ═ splitter above it) are saved.
 - Dragging or clicking on the timeline scrubs the playhead.
 
@@ -1605,7 +2502,7 @@ layout, so their part picker, findings and transport bar have still to be placed
 │ [+ Add part] │ ══════╪══╪══╪══╪══╪══╪═ strike ═══════   │ FINDINGS  0 ⨯ · 2 ⚠ · 1 ℹ │
 │              │ ▁▂▅▇█▇▅▃▂▁▂▃▅▇▅▃▁▂▃▅▇█▇▅  overview  ▕▮▕   │ ⚠ CHR020 sustain cut  →  │
 ├──────────────┴────────────────────────────────────────────┴──────────────────────────┤
-│ ▶ 1:38.4 / 4:12.0   Speed [75%] ♪PC   ⟲Loop  ♩Metro  🔊Hits   Stems ▾   Latency 42 ms │
+│ ▶ 1:38.4 / 4:12.0   Speed [75%] ♪PC   ⟲Loop  ♩Metro  🔊Hits   Latency 42 ms           │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1622,6 +2519,39 @@ layout, so their part picker, findings and transport bar have still to be placed
 │   Orange     │                                                                        │
 │   Open       │ ═══════════                                                            │
 │   Onsets     │ ·  ·  ·   ·  · · ·   ·  ·   ·                                          │
+```
+
+**Chart settings** (the left panel's tab, for a new chart or a song opened; each change applies as
+it is made):
+
+```txt
+┌──────────────────────────────────────┐
+│ Chart settings │ Art │ Sections │ … «│
+├──────────────────────────────────────┤
+│ Parts                                │
+│ ┌──────────────────────────────────┐ │
+│ │                    Difficulty    │ │
+│ │ ☑ Lead              [ 3  ] ✕     │ │
+│ │ ☐ Bass              [    ] ✕     │ │
+│ │ ☐ Rhythm  …                      │ │
+│ │ ☑ Drums             [ 4  ] ✕     │ │
+│ │     Pro drums       [ 5  ] ✕     │ │
+│ │ Drums                            │ │
+│ │ [ Pro ▾ ]                        │ │
+│ └──────────────────────────────────┘ │
+│ Metadata                             │
+│ ┌──────────────────────────────────┐ │
+│ │ name      Song                   │ │
+│ │ artist    Band                   │ │
+│ │ + Add                            │ │
+│ └──────────────────────────────────┘ │
+│ Tracks                               │
+│ ┌──────────────────────────────────┐ │
+│ │ M S 3.1 MB song.ogg ▁▃▅▃▁ ━━●━   │ │
+│ │ M S 1.2 MB guitar.ogg ▂▅▂ ━━●━   │ │
+│ │ + Add track                      │ │
+│ └──────────────────────────────────┘ │
+└──────────────────────────────────────┘
 ```
 
 **Calibration tool:**
@@ -1655,19 +2585,26 @@ These are the defaults. Rebinding is future work.
 
 | Keys | Action |
 | ---- | ------ |
-| `1`–`5` (`1`–`6` GHL) | Place or remove a note on that lane at the cursor; in record mode, play a note |
-| `0` | Open note, or drum kick |
-| `Shift`+`0` | 2× kick (Expert drums) |
+| `1`–`5` (`1`–`6` GHL) | Place or remove a note on that lane at the cursor; in record mode, play a note. While the song plays with record mode off, nothing |
+| `0` | Open note, or drum kick (as `1`–`5`, while the song plays) |
+| `Shift`+`0` | 2× kick (Expert drums; as `1`–`5`, while the song plays) |
 | `Space` | Play or pause from the cursor |
 | `Shift`+`Space` | Play the selection |
 | `↑` / `↓` (Highway), `→` / `←` (Timeline) | Move the cursor one grid step later or earlier |
 | `Alt`+arrows | Move the selection one grid step in time, or one lane across |
+| `Alt`+`Shift`+arrows across | Shift the selected notes a lane, each stopping at the edge |
+| `Alt`+`→` / `←`, `Alt`+`↑` / `↓` (vocal lane) | Move the selected vocal notes one grid step, or one semitone |
+| `Alt`+`Shift`+`↑` / `↓` (vocal lane) | Move the selected vocal notes an octave |
+| `Alt`+drag (Select tool, not on a selected note) | Select a time range across the lanes shown |
 | `PgUp` / `PgDn` | Move the cursor one measure |
-| `Ctrl`+`↑` / `Ctrl`+`↓` | Previous or next section |
+| `Ctrl`+`↑` / `Ctrl`+`↓` | Next or previous section |
+| `Ctrl`+`Shift`+`↑` / `Ctrl`+`Shift`+`↓` | Next or previous tempo or time signature change |
 | `[` / `]` | Coarser or finer snap |
 | `O` | Snap to onset on or off |
+| `Shift`+`O` | Nudge the selected notes to their onsets |
 | `B` | Tap tempo |
 | `Ctrl`+wheel, `+` / `−` | Zoom |
+| `Shift`+wheel | Move the cursor four grid steps later or earlier |
 | `Ctrl`+`1`–`4` | Easy to Expert |
 | `V` | Switch between Highway and Timeline |
 | `H` / `G` / `T` | Toggle force HOPO, force strum, tap on the selected chords |
@@ -1675,13 +2612,37 @@ These are the defaults. Rebinding is future work.
 | `A` / `Shift`+`A` | Toggle accent or ghost (drums) |
 | `S` | Star power phrase over the selection |
 | `L` | Set the loop region to the selection |
-| `R` | Start or stop record mode |
-| `W` | Switch between waveform and spectrogram |
-| `Ctrl`+`A` | Select all in the current difficulty |
+| `R` | Record mode on or off, and playtest off: on, playing the song records a pass. Space ends a pass, and Esc cancels it |
+| `P` | Playtest on or off, and record mode off: on, playing the song playtests the lane ([C19](#c19-playtest-and-instrument-input)) |
+| `N` / `Shift`+`N` | Move the cursor to the playtest's next or previous problem |
+| `W` | Switch the lane between waveform and spectrogram |
+| `Ctrl`+`A` | Select all in the current difficulty, or a vocal lane's part |
+| `Ctrl`+`Shift`+`A` | Select the section the cursor is in, across the lanes shown |
 | `Ctrl`+`Z`; `Ctrl`+`Y` or `Ctrl`+`Shift`+`Z` | Undo; redo |
-| `Ctrl`+`X` / `C` / `V` | Cut, copy, paste |
+| `Ctrl`+`X` / `C` / `V` | Cut, copy, paste over the span the passage covers |
+| `Ctrl`+`Shift`+`V` | Paste, merged with what's there |
 | `Delete` | Delete the selection |
+| `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills, adding nothing; else clear the selection |
+| `F11` | In the preview's window, full screen on or off; Esc leaves it |
 | `Ctrl`+`S` | Save |
+
+Mouse gestures on a highway's lane (a vocal lane keeps its own, [C3](#c3-editor-layout) item 7).
+Switching tools keeps the selection; placing notes, by mouse or key, leaves nothing selected.
+
+| Gesture | Action |
+| ------- | ------ |
+| Place: click | Place a note |
+| Place: drag | Place a run of notes, one on every grid step to the pointer, leaving out places taken |
+| Place: `Ctrl`+drag | Place a note with a sustain to the pointer (not on drums) |
+| Place: `Alt` with any of these | An open note, or the kick, instead |
+| `Shift`+click or drag, any tool | Select, as the Select tool does; the first press while Shift is held selects afresh |
+| `Ctrl`+drag on a selected note | Lengthen or shorten each selected sustain by the same grid steps |
+| `Alt`+drag on a selected note | Lay a run of each selected note, as many grid steps as dragged |
+| Right-drag | Lengthen or shorten each selected sustain by the same grid steps |
+| `Ctrl`+right-drag | End every selected sustain at the pointer |
+| `Alt`+right-drag | Lay a run of each selected note up to the pointer |
+| Right-click | The note menu |
+| Middle-drag | Erase, whatever the tool |
 
 ## 10. Settings
 
@@ -1695,8 +2656,9 @@ save writes its own temp file and renames it into place.
 | File | Owner | Holds |
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
-| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height) and the recent songs |
+| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
 | `audio-latency.json` | Chart Builder's calibration tool | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when its window is activated ([§4.8](#48-launching-and-coordination)). |
+| `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
 and the Core `SettingDefinition` catalog that Chart Packer's uses. The catalog can express Toggle,
@@ -1712,25 +2674,33 @@ opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
 | Default editor view | Highway |
 | Editor highway speed | The inspector's default `HighwayNoteSpeed` |
 | Notes keep ticks or times when the tempo changes | Keep ticks |
-| Waveform or spectrogram behind the lanes | Waveform |
-| Spectrogram memory budget | 256 MB |
-| Metronome volume / hit-sound volume | 50% / 50% |
+| Waveform or spectrogram behind the lanes (**Lanes show**, under Audio assist) | Waveform |
+| Spectrogram memory budget (under Audio assist) | 256 MB (64 to 4096) |
+| Metronome volume / hit-sound volume | 50% / 50%. At 50%, each sound plays at the level `Synth` makes it. A change applies from the next time playback starts. |
 | Audio/visual latency | Per output device, plus a global fallback of 0 ms ([C11](#c11-calibration-tool)) |
 | Prompt for calibration on first editor use | On |
-| Autosave interval | 2 minutes |
+| Autosave interval | 2 minutes (1 to 60) |
 | Default charter name | Empty. Prefills `charter` for a new chart, and fills an empty `charter` on save |
 | Default difficulty reduction rules | As in [C9](#c9-difficulty-authoring). The Reduce dialog starts from them, and its changes apply to one run only. |
+| Playtest hit window, early / late (under Input) | 70 ms / 70 ms (20 to 200) |
+| Cymbals must match, judge the 2× kick, overhits break the combo (under Input) | On, on, on |
+| Judge accents and ghosts (under Input) | Off |
+| Guitar record style (under Input) | Strum: a strum places the frets held |
+| Dynamics from velocity, when recording drums (under Input) | Off |
 
 There is no existing playback-offset setting in `AppSettings` to extend. The latency is new. It is
-stored in `audio-latency.json` as two maps, from device ID and from device name to milliseconds,
-plus the fallback, and is looked up in that order ([C11](#c11-calibration-tool)). The file is
+stored in `audio-latency.json` as two maps, from device ID and from device name to whole
+milliseconds, plus the fallback (`{ "byId": { … }, "byName": { … }, "fallback": 0 }`). It is
+looked up in that order ([C11](#c11-calibration-tool)). Values are kept within ±500 ms, and a save
+changes only the device saved, keeping the rest of the file (`AudioLatencyFile`). The file is
 written to a temp file and renamed into place, as `settings.json` is, so a reader never sees half
 of it.
 
 The new-chart settings (default charter name and default resolution) moved from `AppSettings` to
 `BuilderSettings` when new charts moved to Chart Builder, before any release included them, so
-nothing is migrated. The wizard's last parent folder was dropped along with the wizard
-([C1](#c1-new-chart-from-scratch)).
+nothing is migrated. The last parent folder used for a new chart, which a new chart's first save starts
+from ([C1](#c1-new-chart-and-chart-settings)), is kept in `builder-settings.json` beside the window
+layout. It isn't a row in Settings.
 
 ## 11. Non-functional requirements
 
@@ -1761,6 +2731,7 @@ nothing is migrated. The wizard's last parent folder was dropped along with the 
 | Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the beep's position in the mixed output for a given latency (AC C11.1) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
+| Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |
 | Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two `FileStream`s in one test process standing in for two processes, and released when the holder is disposed (AC C2.5); `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
 
 **Test isolation** is as in [project-spec §10](project-spec-v1.md#10-testing-strategy). Tests use
@@ -1772,25 +2743,29 @@ fails the run if anything there changes anyway.
 
 | Milestone | Contents | Exit criteria |
 | --------- | -------- | ------------- |
-| **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartPacker.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and the C1 wizard moved from Chart Packer as it is. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; the wizard opens from Chart Builder's home screen and from dropped audio files |
+| **CM0: Split** | `Directory.Build.props` (the version) and `Directory.Packages.props` (central package management). The `ChartPacker.UI` library, with the theme, dialogs, pickers and settings window. The `ChartBuilder` app: home screen, `BuilderArgs`, `BuilderSettings`, and **New chart**, which opens the Editor. `JsonSettingsFile<T>`, shared by both apps' settings. Chart Packer's **New chart** is removed, and its **Edit chart** button (one selected song, no job running) is added, disabled until CM2. `publish.ps1` publishes both apps into one folder, the installer installs both, and the release workflow reads the version from `Directory.Build.props`. | Both apps build and publish with zero AOT warnings, into one folder with one copy of each native library; the installer upgrades an existing install and adds both Start menu entries; New chart opens the Editor from Chart Builder's home screen and from dropped audio files |
 | **CM1: Model, writer and lint engine** | `EditableChart` and friends, `MidiChartLoader`, `MidiChartWriter`, passthrough and re-ticking, the game-view projection and extended read-back check, `MidiChartReader` reading dynamics, commands and undo. The lint engine: rule scopes, `Finding`'s chart location, and chart quick fixes. The `SongFolderFiles` order change. And the tests. | Every round-trip and writer-vs-reader test passes, and AC C2.4; zero AOT warnings |
-| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart (without **Detect from audio**), C2 open and import, with **Edit chart** turned on (`ChartBuilderLauncher.CanOpenSongs`), `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), and the player and highway view models moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
+| **CM2: Calibration, new chart, 5-fret editing** | The playback changes ([§4.4.1](#441-playback-changes)) and `Synth`, C11 calibration and the shared latency file, C1 new chart and Chart settings (without **Detect from audio**), C2 open and import, with **Edit chart** turned on, `SongLock` and Chart Packer's refresh ([§4.8](#48-launching-and-coordination)), the highway's drawing moved to `ChartPacker.UI`, C3 both views, C4 tempo map and grid, C5 5-fret, C10 playback, C15 autosave and recovery, C17 save, and the timing, 5-fret and song lint rules. Calibration comes first because every timing judgement after it depends on it. | AC C1, C2, C3, C4, C5, C10, C11, C15.2 and C17 pass |
 | **CM3: Drums and GHL** | C6 all three drum variants and conversion, C7 GHL, C8 phrases and events, and the drums and phrase lint rules | AC C6, C7 and C8 pass |
 | **CM4: Audio assist** | C12 waveform, C13 spectrogram, C14 onsets and tempo estimation, and new chart's **Detect from audio** | AC C12, C13 and C14 pass |
 | **CM5: Authoring tools** | C9 reduction, C15 record mode, clipboard and transforms, C16 lint in the library, C18 preview and suggested difficulty | AC C9, C15, C16 and C18 pass |
+| **CM6: Playtest and instrument input** | C19: the input model and judge, keyboard playtest in the editor, game controllers and the Input devices window, recording from devices, then MIDI devices on Windows | AC C19 pass; zero AOT warnings |
 
 ## 14. Future (after v1)
 
-- Vocals and harmonies editing (lyrics, pitches, phrases), building on `VocalChart` and
-  `VocalsEditor`.
+- Vocal percussion and overdrive, lyric and range shifts, and pitch detection from the vocals stem,
+  building on the vocal lanes' editing ([C3](#c3-editor-layout) item 7).
 - Keys, pro keys, pro guitar/bass and Elite drums.
 - Venue, lighting and camera events.
 - `.chart` export.
 - Auto-charting drafts from audio. This would build on C14, and the result would always be
   labelled as a draft.
-- Playtesting with a guitar or drum controller, with hit windows and scoring.
-- A MIDI drum kit or controller as the input for record mode.
-- Rebindable shortcuts.
+- Playtesting 6-fret, extended sustains, and recording cymbals and toms from a kit
+  ([C19](#c19-playtest-and-instrument-input)).
+- MIDI devices on macOS and Linux.
+- Keeping and replaying a playtest performance, judged again against the chart as it changes.
+- Measuring a device's input offset by tapping along, as the tap test does.
+- Rebindable editor shortcuts (instrument bindings are in C19).
 - Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
   library and inspector as well as Chart Builder.
 
@@ -1807,10 +2782,17 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   opening it in Chart Builder ([§4.6](#46-saving)).
 - **Settings:** each app writes only its own file. The latency is a shared file that only Chart
   Builder writes ([§10](#10-settings)).
-- **New chart:** part of Chart Builder only. The wizard that moved from Chart Packer has been
-  removed. New chart opens an empty Editor window, and the song is set up from **Chart settings**,
-  whose design is still to be specified ([C1](#c1-new-chart-from-scratch)). Chart Packer has no
-  **New chart**. Its only way into Chart Builder is **Edit chart**, for exactly one selected song.
+- **New chart:** part of Chart Builder only, with no wizard. New chart opens a new chart in the
+  Editor straight away, and its first save asks where the song folder goes
+  ([C1](#c1-new-chart-and-chart-settings)). Chart Packer has no **New chart**. Its only way into
+  Chart Builder is **Edit chart**, for exactly one selected song.
+- **Chart settings and Art:** Chart settings, the first tab in the Editor's left panel, holds the
+  chart's timing and `delay`, its parts and their ratings, the song's metadata and its tracks; the
+  Art tab holds the album art and backgrounds. Each change is applied as it is made, as an undo
+  step. (*Revised after CM5:* these were in a Chart Inspector tab, as pending changes, not undo
+  steps.)
+- **Changing the resolution:** allowed at any time. It re-ticks the chart keeping times, and warns
+  first when anything would move in time or be left out ([C1](#c1-new-chart-and-chart-settings)).
 - **Windows:** the launcher and the Editor are separate windows, and only one is open at a time
   ([§4.5](#45-app-chartbuilder)).
 - **Views:** Highway and Timeline, both in v1.

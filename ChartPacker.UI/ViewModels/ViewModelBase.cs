@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace ChartPacker.ViewModels
+namespace ChartPacker.UI.ViewModels
 {
     public abstract class ViewModelBase : ObservableObject
     {

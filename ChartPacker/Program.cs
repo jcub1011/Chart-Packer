@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using ChartPacker.Core;
 using ChartPacker.Services;
+using ChartPacker.UI;
 using System;
 
 namespace ChartPacker
@@ -22,6 +23,9 @@ namespace ChartPacker
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
+                // Room on the GPU for the lanes' waveform pictures beside the window itself: within Avalonia's own
+                // ~28 MB they were dropped and uploaded again every frame. A ceiling Skia keeps under, not an allocation.
+                .With(new SkiaOptions { MaxGpuResourceSizeBytes = 256 * 1024 * 1024 })
 #if DEBUG
                 .WithDeveloperTools()
 #endif

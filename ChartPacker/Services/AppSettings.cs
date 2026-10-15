@@ -5,6 +5,7 @@ using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Library;
+using ChartPacker.UI;
 
 namespace ChartPacker.Services
 {

@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Trash;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
 
@@ -19,7 +21,8 @@ namespace ChartPacker.Services
         SettingsService settings,
         PlayerViewModel mainPlayer,
         Func<Func<Window?>, IMergeWindowService> mergeWindowFor,
-        string logPath) : IDedupWindowService
+        string logPath,
+        Func<string, bool>? isOpenInChartBuilder = null) : IDedupWindowService
     {
         public async Task<DedupWindowResult> ShowAsync(DedupRequest request)
         {
@@ -42,7 +45,8 @@ namespace ChartPacker.Services
                 new AvaloniaConfirmationService(() => dialog),
                 mergeWindowFor(() => dialog),
                 SystemTrash.ForCurrentOS(() => handle),
-                new DeletionLog(logPath));
+                new DeletionLog(logPath),
+                isOpenInChartBuilder);
             dialog.DataContext = viewModel;
 
             _ = viewModel.AnalyzeAsync();

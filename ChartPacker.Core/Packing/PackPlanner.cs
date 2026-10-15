@@ -1,4 +1,5 @@
 using System.Globalization;
+using ChartPacker.Core.Charts;
 using ChartPacker.Core.Ini;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Resources;
@@ -10,7 +11,9 @@ namespace ChartPacker.Core.Packing;
 
 /// <summary>Choices that change what goes into a <c>.sng</c>.</summary>
 /// <param name="IncludeSubfolders">Whether files in subfolders are packed (A13: off by default).</param>
-public sealed record PackOptions(bool IncludeSubfolders = false)
+/// <param name="TranscodeToOpus">Whether non-Opus audio stems are transcoded to Opus before packing. Needs an <see cref="IPackTranscoder"/> where it's used.</param>
+/// <param name="OpusBitrateKbps">The transcoded Opus bitrate in kbps per stereo stem (mono stems use half), when <paramref name="TranscodeToOpus"/>.</param>
+public sealed record PackOptions(bool IncludeSubfolders = false, bool TranscodeToOpus = false, int OpusBitrateKbps = 128)
 {
     /// <summary>The defaults from project spec §8.</summary>
     public static PackOptions Default { get; } = new();
@@ -20,7 +23,7 @@ public sealed record PackOptions(bool IncludeSubfolders = false)
 /// <param name="SourceFolder">The song folder.</param>
 /// <param name="Included">Files to store, with their final names, in order.</param>
 /// <param name="Excluded">Relative paths of files left out, including <c>song.ini</c>.</param>
-/// <param name="Metadata">Metadata pairs to store, in order, with empty values already dropped.</param>
+/// <param name="Metadata">Metadata pairs to store, in order, with empty values and the keys of parts the chart has no notes in already dropped.</param>
 /// <param name="Findings">Problems found. Any error blocks packing.</param>
 public sealed record PackPlan(
     string SourceFolder,
@@ -149,7 +152,25 @@ public static class PackPlanner
             findings.Add(new Finding(SngRules.Sng052, Severity.Warning, FindingMessages.NoAudioStem));
 
         var metadata = await ReadMetadataAsync(folder, songIni, findings, cancellationToken).ConfigureAwait(false);
+        metadata = await PruneForChartAsync(included, metadata, findings, cancellationToken).ConfigureAwait(false);
         return new PackPlan(folder, included, excluded, metadata, findings);
+    }
+
+    /// <summary><paramref name="metadata"/> without the keys of parts the chart has no notes in (SNG062), as <see cref="ExportCleanup.PruneMetadata"/> leaves it.</summary>
+    private static async Task<IReadOnlyList<KeyValuePair<string, string>>> PruneForChartAsync(
+        IReadOnlyList<SngSourceFile> included,
+        IReadOnlyList<KeyValuePair<string, string>> metadata,
+        List<Finding> findings,
+        CancellationToken cancellationToken)
+    {
+        if (ChartReader.Pick(included.Select(f => f.StoredName)) is not { } name)
+            return metadata;
+        var chart = included.First(f => f.StoredName == name);
+        if (chart.Length > ChartReader.MaxBytes)
+            return metadata;
+
+        byte[] bytes = await File.ReadAllBytesAsync(chart.SourcePath, cancellationToken).ConfigureAwait(false);
+        return ExportCleanup.PruneMetadata(metadata, ExportCleanup.PartsOf(bytes, name, metadata), ChartReader.IsMidi(name), findings);
     }
 
     private static async Task<IReadOnlyList<KeyValuePair<string, string>>> ReadMetadataAsync(

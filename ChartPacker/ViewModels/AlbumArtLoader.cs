@@ -84,7 +84,7 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>The list let go of <paramref name="item"/>'s row. Its thumbnail, if any, is kept.</summary>
-        public void Unrealized(LibraryItemViewModel item) => item.IsRealized = false;
+        public static void Unrealized(LibraryItemViewModel item) => item.IsRealized = false;
 
         /// <summary>
         /// <paramref name="item"/>'s draft may have changed, or been saved or discarded. Its art is

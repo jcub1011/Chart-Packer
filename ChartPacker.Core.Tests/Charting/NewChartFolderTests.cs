@@ -55,4 +55,21 @@ public sealed class NewChartFolderTests
         Assert.AreEqual(NewChartFolderProblemKind.InvalidName, problem?.Kind);
         Assert.IsFalse(string.IsNullOrWhiteSpace(problem!.Reason));
     }
+
+    [TestMethod]
+    [DataRow("Artist", "Song", "Artist - Song")]
+    [DataRow(" Artist ", "", "Artist")]
+    [DataRow("", "Song", "Song")]
+    [DataRow("", "", "")]
+    [DataRow("AC/DC", "What?", "AC_DC - What_")]
+    [DataRow("Band", "Song...", "Band - Song")]
+    [DataRow("Band", "A..B", "Band - A.B")]
+    public void TheFolderNameFollowsTheArtistAndNameWithWhatAPathCanNotHoldReplaced(string artist, string name, string expected)
+    {
+        string folder = NewChartFolder.NameFor(artist, name);
+
+        Assert.AreEqual(expected, folder);
+        if (folder.Length > 0)
+            Assert.IsNull(NewChartFolder.ProblemOf(_root.FullName, folder));
+    }
 }

@@ -110,6 +110,41 @@ public sealed class RemovePart(ChartInstrument instrument) : ChartCommand
     }
 }
 
+/// <summary>
+/// Changes how the song's drums are charted (charter-spec C1, Parts; C6 item 9). Switching between 4-lane and Pro is a
+/// song setting, and keeps the notes and tom markers as they are; drums with notes are converted to or from 5-lane
+/// instead (<see cref="ConvertDrums"/>). Undoing puts back the variant it had.
+/// </summary>
+public sealed class SetDrumsVariant : ChartCommand
+{
+    private DrumsVariant? _previous;
+
+    public SetDrumsVariant(DrumsVariant variant)
+    {
+        if (!Enum.IsDefined(variant))
+            throw new ArgumentException("Drums are 4-lane, Pro or 5-lane.", nameof(variant));
+        Variant = variant;
+    }
+
+    public DrumsVariant Variant { get; }
+
+    private protected override ChartChange Do(EditableChart chart)
+    {
+        var drums = chart.PartOf(ChartInstrument.Drums);
+        if (drums is not null && drums.HasNotes && chart.DrumsVariant != Variant && (chart.DrumsVariant == DrumsVariant.FiveLane || Variant == DrumsVariant.FiveLane))
+            throw new InvalidOperationException("Drums with notes are converted to or from 5-lane, not switched.");
+        _previous = chart.DrumsVariant;
+        if (_previous == Variant)
+            return ChartChange.None;
+        chart.DrumsVariant = Variant;
+        return drums is null
+            ? ChartChange.Of(SongChanges.DrumsVariant)
+            : ChartChange.Of([PartEdits.Whole(ChartInstrument.Drums)], SongChanges.DrumsVariant);
+    }
+
+    private protected override void Undo(EditableChart chart) => chart.DrumsVariant = _previous;
+}
+
 /// <summary>What the part commands share.</summary>
 internal static class PartEdits
 {

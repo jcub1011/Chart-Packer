@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartPacker.Services;
+using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 
 namespace ChartPacker.Views

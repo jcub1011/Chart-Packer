@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using ChartPacker.Audio.Decoding;
 using ChartPacker.Ffmpeg;
 
@@ -206,5 +207,28 @@ internal static class TestAudio
         public void SeekToFrame(long frame) => _position = Math.Min(frame, _frames);
 
         public void Dispose() => IsDisposed = true;
+    }
+
+    /// <summary>Has the device play <paramref name="frames"/> frames, as the player keeps queuing them.</summary>
+    public static void PlayFor(FakeOutput output, int frames)
+    {
+        while (frames > 0)
+        {
+            WaitUntil(() => output.QueuedFrames > 0);
+            int count = Math.Min(frames, output.QueuedFrames);
+            output.Drain(count);
+            frames -= count;
+        }
+    }
+
+    public static void WaitUntil(Func<bool> condition)
+    {
+        var clock = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (clock.Elapsed > TimeSpan.FromSeconds(10))
+                Assert.Fail("Timed out waiting for the player.");
+            Thread.Sleep(2);
+        }
     }
 }

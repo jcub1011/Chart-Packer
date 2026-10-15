@@ -13,14 +13,23 @@ namespace ChartPacker.Audio.Playback;
 /// when that changes, e.g. when headphones are unplugged. Opened by <see cref="SdlAudio.Open"/>,
 /// which keeps SDL's audio subsystem running; opening and closing a device stream is safe from
 /// any thread.
+/// <para>
+/// SDL moves the stream without saying so, and only reports device events to an event loop this
+/// app doesn't run, so <see cref="Device"/> is checked when playback starts and once a second.
+/// </para>
 /// </remarks>
 public sealed unsafe class SdlAudioOutput : IAudioOutput
 {
     private const int Channels = 2;
     private const int BytesPerFrame = Channels * sizeof(float);
+    private static readonly TimeSpan DeviceCheckInterval = TimeSpan.FromSeconds(1);
 
     private readonly Lock _lock = new();
+    private readonly Lock _deviceLock = new();
+    private readonly Lock _checkGate = new();
+    private readonly Timer _deviceCheck;
     private SDL_AudioStream* _stream;
+    private AudioDevice _device;
 
     /// <exception cref="AudioDeviceException">No output device could be opened.</exception>
     internal SdlAudioOutput(int sampleRate)
@@ -32,9 +41,23 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
         _stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, null, IntPtr.Zero);
         if (_stream is null)
             throw new AudioDeviceException(SDL_GetError() ?? "No audio output device could be opened.");
+
+        _device = ReadDevice() ?? AudioDevice.Unknown;
+        _deviceCheck = new Timer(_ => CheckDevice(), null, DeviceCheckInterval, DeviceCheckInterval);
     }
 
     public int SampleRate { get; }
+
+    public AudioDevice Device
+    {
+        get
+        {
+            lock (_deviceLock)
+                return _device;
+        }
+    }
+
+    public event Action<AudioDevice>? DeviceChanged;
 
     public int QueuedFrames
     {
@@ -120,10 +143,14 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
             if (_stream is not null)
                 SDL_ResumeAudioStreamDevice(_stream);
         }
+
+        // Off the caller's thread: reading the endpoint is a COM call.
+        ThreadPool.QueueUserWorkItem(_ => CheckDevice());
     }
 
     public void Dispose()
     {
+        _deviceCheck.Dispose();
         lock (_lock)
         {
             if (_stream is null)
@@ -133,5 +160,46 @@ public sealed unsafe class SdlAudioOutput : IAudioOutput
             SDL_DestroyAudioStream(_stream);
             _stream = null;
         }
+    }
+
+    /// <summary>Raises <see cref="DeviceChanged"/> when the stream is on another device than it was.</summary>
+    private void CheckDevice()
+    {
+        // One check at a time, so the changes are raised in order; a check that finds one running skips.
+        if (!_checkGate.TryEnter())
+            return;
+        try
+        {
+            if (ReadDevice() is not { } device)
+                return;
+
+            lock (_deviceLock)
+            {
+                if (device == _device)
+                    return;
+                _device = device;
+            }
+            DeviceChanged?.Invoke(device);
+        }
+        finally
+        {
+            _checkGate.Exit();
+        }
+    }
+
+    /// <summary>The device the stream is on now, or null once it's closed.</summary>
+    private AudioDevice? ReadDevice()
+    {
+        string? name;
+        lock (_lock)
+        {
+            if (_stream is null)
+                return null;
+
+            // The stream's device is the default device, which SDL resolves to the physical one it's on.
+            name = SDL_GetAudioDeviceName(SDL_GetAudioStreamDevice(_stream));
+        }
+        var id = OperatingSystem.IsWindows() ? WindowsAudioEndpoint.DefaultRenderId() : null;
+        return new AudioDevice(name ?? "", id);
     }
 }

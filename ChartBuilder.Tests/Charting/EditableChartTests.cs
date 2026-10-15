@@ -32,7 +32,7 @@ public sealed class EditableChartTests
             }
         }
 
-        Assert.AreSequenceEqual(expected.ToList(), track.Notes.Select(n => (n.Tick, n.Lane, n.DoubleKick)).ToList());
+        Assert.AreSequenceEqual(expected.ToList(), [.. track.Notes.Select(n => (n.Tick, n.Lane, n.DoubleKick))]);
     }
 
     [TestMethod]
@@ -69,7 +69,7 @@ public sealed class EditableChartTests
             track.Notes.Add(new EditableNote(tick, 1, lane));
 
         Assert.AreSequenceEqual([240L, 480, 480, 720], track.Notes.Between(240, 720).ToArray().Select(n => n.Tick).ToList());
-        Assert.AreEqual(2, track.Notes.At(480).Length);
+        Assert.HasCount(2, track.Notes.At(480));
         Assert.IsTrue(track.Notes.Between(721, 959).IsEmpty);
         Assert.AreEqual(2, track.Notes.FirstAtOrAfter(480));
         Assert.AreEqual(4, track.Notes.FirstAfter(480));
@@ -254,7 +254,7 @@ public sealed class EditableChartTests
             [ChartInstrument.Bass, ChartInstrument.Drums, ChartInstrument.GhlGuitar], chart.Parts.Select(p => p.Instrument).ToList());
         Assert.IsTrue(chart.Parts.All(p => p.Tracks.All(t => t.Notes.Count == 0) && p.Phrases.Count == 0));
         Assert.AreEqual(DrumsVariant.FiveLane, chart.DrumsVariant);
-        Assert.AreSequenceEqual([TextEvent.Of(0, "[music_start]"), TextEvent.Of(0, "[end]")], chart.Events.ToList());
+        Assert.IsEmpty(chart.Events, "The song events are placed as it's saved.");
         Assert.IsEmpty(chart.EventsRaw);
         Assert.IsEmpty(chart.TempoTrackRaw);
         Assert.IsEmpty(chart.Passthrough);

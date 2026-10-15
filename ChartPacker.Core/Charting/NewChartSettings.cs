@@ -32,7 +32,7 @@ public sealed record NewChartSettings(
     public const double MaxBpm = 1000;
 
     /// <summary>The most beats a measure can have.</summary>
-    public const int MaxNumerator = 32;
+    public const int MaxNumerator = Commands.AddTimeSignature.MaxNumerator;
 
     /// <summary>The resolutions at which every common snap lands on a whole tick.</summary>
     public static IReadOnlyList<int> Resolutions { get; } = [192, 480, 960];

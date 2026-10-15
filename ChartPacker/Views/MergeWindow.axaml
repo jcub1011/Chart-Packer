@@ -6,6 +6,8 @@
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartPacker.Controls"
         xmlns:conv="using:ChartPacker.Converters"
+        xmlns:ui="using:ChartPacker.UI.Controls"
+        xmlns:uiconv="using:ChartPacker.UI.Converters"
         xmlns:views="using:ChartPacker.Views"
         mc:Ignorable="d" d:DesignWidth="1560" d:DesignHeight="900"
         x:Class="ChartPacker.Views.MergeWindow"
@@ -20,14 +22,14 @@
 
     <Window.Resources>
         <!-- A chart difficulty's letter and its note counts, in the games' colours, as the inspector shows them. -->
-        <conv:DifficultyBrushConverter x:Key="DifficultyLetterBrush"
+        <uiconv:DifficultyBrushConverter x:Key="DifficultyLetterBrush"
                                        Level0="{StaticResource DifficultyEasyBrush}"
                                        Level1="{StaticResource DifficultyMediumBrush}"
                                        Level2="{StaticResource DifficultyHardBrush}"
                                        Level3="{StaticResource DifficultyExpertBrush}"
                                        Fallback="{StaticResource SystemControlForegroundBaseMediumBrush}" />
         <!-- A part row's instrument, as the inspector's icon shows it. -->
-        <conv:DifficultyGlyphConverter x:Key="DifficultyGlyph"
+        <uiconv:DifficultyGlyphConverter x:Key="DifficultyGlyph"
                                        Guitar="{StaticResource InstrumentGuitarGeometry}"
                                        Bass="{StaticResource InstrumentBassGeometry}"
                                        Rhythm="{StaticResource InstrumentRhythmGeometry}"
@@ -303,7 +305,7 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
                                             <!-- A value can carry rich-text tags (colours, bold…), which are drawn as the inspector draws them. -->
-                                            <TextBlock ctl:RichTextMarkup.Text="{Binding Text}"
+                                            <TextBlock ui:RichTextMarkup.Text="{Binding Text}"
                                                        IsVisible="{Binding ShowText}"
                                                        TextTrimming="CharacterEllipsis" />
                                             <!-- Compact text, e.g. a stem count; the full text stays in the tooltip. -->
@@ -446,7 +448,7 @@
                                                     <StackPanel Spacing="4" IsVisible="{Binding CanMove}">
                                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
                                                             <NumericUpDown Grid.Column="0"
-                                                                           ctl:DragScrub.IsEnabled="True"
+                                                                           ui:DragScrub.IsEnabled="True"
                                                                            MinWidth="0"
                                                                            HorizontalAlignment="Stretch"
                                                                            ShowButtonSpinner="False"
@@ -465,7 +467,7 @@
                                                                                    Text="{Binding LinkNote}"
                                                                                    IsVisible="{Binding HasLinkNote}" />
                                                                         <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
-                                                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
                                                                     </StackPanel>
                                                                 </ToolTip.Tip>
                                                             </NumericUpDown>
@@ -535,7 +537,7 @@
                                                          Margin="13,8,12,8"
                                                          VerticalAlignment="Center"
                                                          TextWrapping="Wrap"
-                                                         ctl:RichTextMarkup.Text="{Binding CharterPreview}" />
+                                                         ui:RichTextMarkup.Text="{Binding CharterPreview}" />
                                 </Grid>
                             </Border>
                             <Border Classes="merge-row">

@@ -80,7 +80,7 @@ public sealed class CommandSequenceTests
     /// <returns>The kinds of command executed.</returns>
     private static HashSet<string> Run(ChartUndoStack stack, Random random)
     {
-        var generator = new RandomCommands(random);
+        var generator = new RandomCommands(random, authoring: true);
         var kinds = new HashSet<string>();
         int executed = 0;
         for (int attempt = 0; executed < Steps && attempt < Steps * 20; attempt++)
@@ -114,15 +114,38 @@ public sealed class CommandSequenceTests
 
     /// <summary>
     /// Makes random commands of every kind from what a chart holds, keeping to what saves and reads back as it is (no
-    /// fifth pad on drums that aren't 5-lane, no drum fills or big rock endings moved about <c>[coda]</c>).
+    /// fifth pad on drums that aren't 5-lane, and drum fills and big rock endings as <c>[coda]</c> makes them).
     /// </summary>
-    internal sealed class RandomCommands(Random random)
+    /// <param name="authoring">
+    /// Whether to make the authoring tools' commands too (charter-spec C9, C15): Copy difficulty, the replacements a paste or
+    /// Reduce makes, and stretching. Off, the commands are drawn exactly as before they were added, so other tests' seeded
+    /// runs are unchanged.
+    /// </param>
+    internal sealed class RandomCommands(Random random, bool authoring = false)
     {
         private const int Snap = 60;
         private const int Snaps = 256;
         private int _texts;
 
-        public IChartCommand? Next(EditableChart chart) => random.Next(100) switch
+        public IChartCommand? Next(EditableChart chart) => !authoring ? Next(chart, random.Next(110)) : random.Next(118) switch
+        {
+            < 2 => CopyDifficulty(chart),
+            < 4 => ReplaceNotes(chart),
+            < 6 => ReplaceTrack(chart),
+            < 8 => Stretch(chart),
+            var n => Next(chart, n - 8),
+        };
+
+        // The timing between two points stretched or squeezed, everything keeping its time (charter-spec C15 item 4).
+        private IChartCommand? Stretch(EditableChart chart)
+        {
+            long from = Tick();
+            long to = from + (random.Next(1, 16) * Snap);
+            long newTo = from + (random.Next(1, 16) * Snap);
+            return ChartPacker.Core.Charting.Editing.TempoMapEdits.Stretch(chart, from, to, newTo).Command;
+        }
+
+        private IChartCommand? Next(EditableChart chart, int roll) => roll switch
         {
             < 16 => AddNotes(chart),
             < 23 => RemoveNotes(chart),
@@ -146,6 +169,11 @@ public sealed class CommandSequenceTests
             < 84 => ChangeTempoMap(chart),
             < 86 => AddPart(chart),
             < 87 => chart.Parts.Count > 1 ? new RemovePart(Any(chart.Parts).Instrument) : null,
+            < 90 => SetToms(chart),
+            < 92 => SetDoubleKick(chart),
+            < 95 => DiscoFlip(chart),
+            < 97 => Coda(chart),
+            < 98 => chart.PartOf(ChartInstrument.Drums) is not null && chart.DrumsVariant is not null ? DrumVariantChange.For(chart, (DrumsVariant)random.Next(3)) : null,
             _ => Gesture(chart),
         };
 
@@ -163,6 +191,42 @@ public sealed class CommandSequenceTests
             }
 
             return notes.Count > 0 ? new AddNotes(part.Instrument, track.Difficulty, notes) : null;
+        }
+
+        private IChartCommand? CopyDifficulty(EditableChart chart)
+        {
+            if (TrackWithNotes(chart) is not var (part, track))
+                return null;
+            var to = (ChartDifficulty)random.Next(4);
+            return to == track.Difficulty ? null : new CopyDifficulty(part, track.Difficulty, to);
+        }
+
+        // Some notes taken out and others put in, the way a paste or a recorded pass does.
+        private IChartCommand? ReplaceNotes(EditableChart chart)
+        {
+            if (TrackWithNotes(chart) is not var (part, track))
+                return null;
+            var remove = SomeNotes(track);
+            var add = new List<EditableNote>();
+            for (int i = random.Next(0, 3); i > 0; i--)
+            {
+                var note = NoteFor(chart, track);
+                if (!add.Any(n => n.Tick == note.Tick && n.Lane == note.Lane && n.DoubleKick == note.DoubleKick))
+                    add.Add(note);
+            }
+
+            return new ReplaceNotes(part, track.Difficulty, remove, add);
+        }
+
+        // A track's notes put back thinned, as Reduce does, keeping its marking where a chord stays.
+        private IChartCommand? ReplaceTrack(EditableChart chart)
+        {
+            if (TrackWithNotes(chart) is not var (part, track))
+                return null;
+            var notes = track.Notes.Where((_, i) => i % 2 == 0).ToList();
+            var ticks = notes.Select(n => n.Tick).ToHashSet();
+            var flags = track.FlaggedChords.Where(f => ticks.Contains(f.Tick)).ToList();
+            return new ReplaceTrack(part, track.Difficulty, notes, flags, track.Kind == ChartInstrumentKind.Drums ? [] : null);
         }
 
         private IChartCommand? RemoveNotes(EditableChart chart) =>
@@ -203,11 +267,14 @@ public sealed class CommandSequenceTests
             if (Part(chart.Parts) is not { } part)
                 return null;
             PhraseKind[] kinds = part.Kind == ChartInstrumentKind.Drums
-                ? [PhraseKind.StarPower, PhraseKind.Solo, PhraseKind.Roll, PhraseKind.Trill]
+                ? [PhraseKind.StarPower, PhraseKind.Solo, PhraseKind.DrumFill, PhraseKind.Roll, PhraseKind.Trill]
                 : [PhraseKind.StarPower, PhraseKind.Solo, PhraseKind.BigRockEnding];
             var kind = kinds[random.Next(kinds.Length)];
+            long tick = Tick();
+            if (kind == PhraseKind.DrumFill)
+                kind = DrumFills.KindAt(chart, tick);
             ChartDifficulty? lowest = Phrase.HasLowestDifficulty(kind) ? (ChartDifficulty)random.Next(4) : null;
-            return new AddPhrase(part.Instrument, new Phrase(kind, Tick(), random.Next(1, 32) * Snap, lowest));
+            return new AddPhrase(part.Instrument, new Phrase(kind, tick, random.Next(1, 32) * Snap, lowest));
         }
 
         private IChartCommand? RemovePhrase(EditableChart chart) =>
@@ -215,19 +282,72 @@ public sealed class CommandSequenceTests
 
         private IChartCommand? ChangePhrase(EditableChart chart)
         {
-            if (Part(chart.Parts.Where(p => p.Phrases.Any(x => Movable(p, x)))) is not { } part)
+            if (Part(chart.Parts.Where(p => p.Phrases.Count > 0)) is not { } part)
                 return null;
-            var phrase = Any(part.Phrases.Where(x => Movable(part, x)).ToList());
+            var phrase = Any(part.Phrases);
             var changed = phrase with
             {
                 Tick = Math.Max(0, phrase.Tick + (random.Next(-4, 5) * Snap)),
                 Length = random.Next(1, 32) * Snap,
                 LowestDifficulty = phrase.LowestDifficulty is null ? null : (ChartDifficulty)random.Next(4),
             };
-            return new ChangePhrase(part.Instrument, phrase, changed);
 
-            // Drums' fills and big rock endings are told apart by [coda], so they stay where they are.
-            static bool Movable(EditablePart part, Phrase p) => part.Kind != ChartInstrumentKind.Drums || p.Kind is not (PhraseKind.DrumFill or PhraseKind.BigRockEnding);
+            // Drums' fills and big rock endings are told apart by [coda], so one moved past it becomes the other.
+            if (part.Kind == ChartInstrumentKind.Drums && phrase.Kind is PhraseKind.DrumFill or PhraseKind.BigRockEnding)
+                changed = changed with { Kind = DrumFills.KindAt(chart, changed.Tick) };
+            return new ChangePhrase(part.Instrument, phrase, changed);
+        }
+
+        // Pro drum notes made toms or cymbals.
+        private IChartCommand? SetToms(EditableChart chart)
+        {
+            if (chart.DrumsVariant != DrumsVariant.Pro || chart.PartOf(ChartInstrument.Drums) is not { } drums)
+                return null;
+            var pads = drums.Tracks.SelectMany(t => t.Notes).Where(n => n.Lane is >= TomMarker.FirstPad and <= TomMarker.LastPad).ToList();
+            if (pads.Count == 0)
+                return null;
+            var places = new HashSet<(int, long)>();
+            for (int i = random.Next(1, 4); i > 0; i--)
+            {
+                var note = Any(pads);
+                places.Add((note.Lane, note.Tick));
+            }
+
+            return new SetToms(places, random.Next(2) == 0);
+        }
+
+        private IChartCommand? SetDoubleKick(EditableChart chart)
+        {
+            if (chart.PartOf(ChartInstrument.Drums)?[ChartDifficulty.Expert] is not { } track)
+                return null;
+            bool on = random.Next(2) == 0;
+            var kicks = track.Notes.Where(n => n.Lane == 0 && n.DoubleKick != on).ToList();
+            return kicks.Count > 0 ? new SetDoubleKick([Any(kicks)], on) : null;
+        }
+
+        // A disco flip section added, removed, moved or resized.
+        private IChartCommand? DiscoFlip(EditableChart chart)
+        {
+            if (chart.PartOf(ChartInstrument.Drums) is not { } drums)
+                return null;
+            var difficulty = (ChartDifficulty)random.Next(4);
+            var ranges = DiscoFlips.RangesOf(drums[difficulty]);
+            long tick = Tick();
+            long end = tick + (random.Next(1, 16) * Snap);
+            return random.Next(3) switch
+            {
+                0 => new AddDiscoFlip(difficulty, tick, end),
+                1 => ranges.Count > 0 ? new RemoveDiscoFlip(difficulty, Any(ranges)) : null,
+                _ => ranges.Count > 0 ? new ChangeDiscoFlip(difficulty, Any(ranges), tick, end) : null,
+            };
+        }
+
+        // A [coda] added or removed, which makes the drums' fills and big rock endings what it then decides.
+        private IChartCommand? Coda(EditableChart chart)
+        {
+            if (random.Next(2) == 0)
+                return new AddTextEvent(null, TextEvent.Of(Tick(), "[coda]"));
+            return Maybe(chart.Events.Where(DrumFills.IsCoda)) is { } coda ? new RemoveTextEvent(null, coda) : null;
         }
 
         private IChartCommand? AddText(EditableChart chart)

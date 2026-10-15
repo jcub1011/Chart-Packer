@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:views="using:ChartBuilder.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="720"
+        x:Class="ChartBuilder.Views.PreviewWindow"
+        x:DataType="vm:PreviewViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="{x:Static res:Strings.PreviewWindowTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        Width="480"
+        Height="720">
+
+    <!-- The highway preview in a window of its own (charter-spec C18 item 1): F11 for full screen, Esc to leave it, Space
+         to play or pause. -->
+    <views:PreviewView />
+</Window>

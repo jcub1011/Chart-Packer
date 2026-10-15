@@ -5,6 +5,7 @@
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:ctl="using:ChartPacker.Controls"
+        xmlns:ui="using:ChartPacker.UI.Controls"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="640"
         x:Class="ChartPacker.Views.MergeCompareWindow"
         x:DataType="vm:MergeCompareViewModel"
@@ -69,7 +70,7 @@
             <StackPanel Grid.Column="2" Spacing="2">
                 <TextBlock Classes="muted" FontSize="11" Text="{x:Static res:Strings.MergeAlignmentLabel}" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <NumericUpDown ctl:DragScrub.IsEnabled="True"
+                    <NumericUpDown ui:DragScrub.IsEnabled="True"
                                    Width="84"
                                    ShowButtonSpinner="False"
                                    VerticalAlignment="Center"
@@ -82,7 +83,7 @@
                         <ToolTip.Tip>
                             <StackPanel Spacing="6">
                                 <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MergeAlignmentOffsetToolTip}" />
-                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:Strings.OffsetControlsHelp}" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
                             </StackPanel>
                         </ToolTip.Tip>
                     </NumericUpDown>

@@ -402,7 +402,7 @@ public sealed class MidiChartLoaderTests
 
             Assert.AreEqual(conversion.Offset, import.Offset);
             Assert.AreEqual(conversion.Options, import.Options);
-            Assert.AreSequenceEqual(conversion.Warnings.Select(Describe).ToList(), import.Warnings.Select(Describe).ToList());
+            Assert.AreSequenceEqual(conversion.Warnings.Select(Describe).ToList(), [.. import.Warnings.Select(Describe)]);
             Assert.IsEmpty(import.Load.Issues);
             AssertNotesMatchReader(import.Load.Chart, MidiChartReader.Read(conversion.Midi, conversion.Options));
         }
@@ -444,7 +444,7 @@ public sealed class MidiChartLoaderTests
         var chart = MidiChartLoader.Load(midi, ChartReadOptions.Default).Chart;
 
         AssertNotesMatchReader(chart, MidiChartReader.Read(midi, ChartReadOptions.Default));
-        Assert.AreEqual(4, chart.Parts.Count);
+        Assert.HasCount(4, chart.Parts);
         Assert.HasCount(6, chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert].Notes);
     }
 

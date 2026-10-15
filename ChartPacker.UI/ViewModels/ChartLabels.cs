@@ -6,7 +6,7 @@ using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Resources;
 
-namespace ChartPacker.ViewModels
+namespace ChartPacker.UI.ViewModels
 {
     /// <summary>The names instruments, parts and difficulties are shown by.</summary>
     public static class ChartLabels

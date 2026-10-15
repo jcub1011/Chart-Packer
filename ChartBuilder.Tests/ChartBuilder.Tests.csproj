@@ -11,6 +11,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ChartPacker.Core\ChartPacker.Core.csproj" />
+    <!-- For the highway preview's scene (charter-spec C18), whose timing is checked against the editor's. -->
+    <ProjectReference Include="..\ChartPacker.UI\ChartPacker.UI.csproj" />
+    <!-- For the editor canvas's Ctrl+wheel zoom stepping. -->
+    <ProjectReference Include="..\ChartBuilder\ChartBuilder.csproj" />
   </ItemGroup>
 
   <!-- Shared with ChartPacker.Core.Tests rather than copied: the MIDI fixture builder, and the guard that fails the
@@ -22,7 +26,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageVersion Update="Microsoft.Testing.Extensions.TrxReport" Version="2.5.0" />
+    <PackageVersion Update="Microsoft.Testing.Extensions.TrxReport" Version="2.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageVersion Update="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageVersion Update="MSTest.TestAdapter" Version="4.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageVersion Update="MSTest.TestFramework" Version="4.5.1" />
   </ItemGroup>
 
 </Project>

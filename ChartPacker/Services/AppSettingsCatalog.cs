@@ -6,6 +6,7 @@ using ChartPacker.Core.Dedup;
 using ChartPacker.Core.Jobs;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
+using ChartPacker.UI;
 using ChartPacker.ViewModels;
 
 namespace ChartPacker.Services
@@ -21,7 +22,14 @@ namespace ChartPacker.Services
     /// </remarks>
     public static class AppSettingsCatalog
     {
-        public static SettingsCatalog Create(LibraryViewModel library, PlayerViewModel player, HighwayViewModel highway, DownloadService downloads, SettingsService settings)
+        /// <param name="calibrate">Runs Chart Builder's calibration tool, which measures the audio latency (charter-spec C11).</param>
+        public static SettingsCatalog Create(
+            LibraryViewModel library,
+            PlayerViewModel player,
+            HighwayViewModel highway,
+            DownloadService downloads,
+            SettingsService settings,
+            Action calibrate)
         {
             var libraryCategory = new SettingCategory("library", Strings.SettingsCategoryLibrary);
             var scanning = new SettingCategory("library.scanning", Strings.SettingsCategoryScanning, libraryCategory);
@@ -166,6 +174,16 @@ namespace ChartPacker.Services
                         DefaultValue = AppSettings.DefaultPitchCorrection,
                         Get = () => player.PitchCorrection,
                         Set = correct => player.PitchCorrection = correct,
+                    },
+                    // Measured, per device, by Chart Builder's calibration tool, which owns the file (charter-spec §10).
+                    new ActionSetting
+                    {
+                        Id = "playback.latency",
+                        Category = audio,
+                        Label = Strings.AudioLatencyLabel,
+                        Description = Strings.AudioLatencyDescription,
+                        Keywords = SettingKeywords.Split(Strings.AudioLatencyKeywords),
+                        Actions = [new SettingAction(Strings.CalibrateButton, calibrate)],
                     },
                     new ToggleSetting
                     {

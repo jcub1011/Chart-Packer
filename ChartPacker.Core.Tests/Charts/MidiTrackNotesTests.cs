@@ -24,7 +24,7 @@ public sealed class MidiTrackNotesTests
             .Raw(100, 0x90, 62, 1));                     // 12: never let go; 13 is the end of the track
         var track = MidiTrackNotes.Of(bytes, events, enhancedOpens: true);
 
-        Assert.AreSequenceEqual([1, 3, 5, 6, 7], track.Consumed.Order().ToArray());
+        Assert.AreSequenceEqual([1, 3, 5, 6, 7], [.. track.Consumed.Order()]);
         Assert.AreSequenceEqual([new MidiNote(60, 0, 100, 0, 20, false, 1, 3)], track.Notes);
         Assert.AreSequenceEqual([new MidiSysexSpan(3, MidiLayout.SysexOpen, 40, 50, 5, 6)], track.Sysex);
         Assert.AreSequenceEqual([new MidiText(60, 0x01, "mix 3 drums0d", 7)], track.Texts);
@@ -72,9 +72,9 @@ public sealed class MidiTrackNotesTests
         var fiveFret = MidiTrackNotes.Of(bytes, events, enhancedOpens: true);
         var other = MidiTrackNotes.Of(bytes, events, enhancedOpens: false);
 
-        Assert.AreSequenceEqual([false, true], fiveFret.Notes.Select(n => n.EnhancedOpens).ToArray());
-        Assert.AreSequenceEqual([false, false], other.Notes.Select(n => n.EnhancedOpens).ToArray());
-        Assert.AreSequenceEqual(["ENHANCED_OPENS"], fiveFret.Texts.Select(t => t.Text).ToArray());
+        Assert.AreSequenceEqual([false, true], [.. fiveFret.Notes.Select(n => n.EnhancedOpens)]);
+        Assert.AreSequenceEqual([false, false], [.. other.Notes.Select(n => n.EnhancedOpens)]);
+        Assert.AreSequenceEqual(["ENHANCED_OPENS"], [.. fiveFret.Texts.Select(t => t.Text)]);
         Assert.Contains(fiveFret.Texts[0].Index, fiveFret.Consumed);
     }
 

@@ -9,7 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
-using ChartPacker.Services;
+using ChartPacker.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -112,9 +112,18 @@ namespace ChartPacker.ViewModels.Settings
             RangeSetting range => new RangeSettingViewModel((SettingEdit<double>)edit, range),
             FolderSetting folder => new FolderSettingViewModel((SettingEdit<string?>)edit, folder, folderPicker),
             TextSetting text => new TextSettingViewModel((SettingEdit<string>)edit, text),
+            ActionSetting => new ActionSettingViewModel(edit),
             _ when edit is IChoiceEdit choice => new ChoiceSettingViewModel(edit, choice),
             _ => throw new NotSupportedException($"No editor for setting '{edit.Definition.Id}' ({edit.Definition.GetType().Name})."),
         };
+    }
+
+    /// <summary>A row with only its buttons (<see cref="ActionSetting"/>), and no editor.</summary>
+    public sealed class ActionSettingViewModel(SettingEdit edit) : SettingViewModel(edit)
+    {
+        protected override void OnValueChanged()
+        {
+        }
     }
 
     /// <summary>An on/off setting, shown as a toggle switch.</summary>

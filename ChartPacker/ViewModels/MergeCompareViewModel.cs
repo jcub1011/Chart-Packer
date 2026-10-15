@@ -11,6 +11,8 @@ using ChartPacker.Core.Charts;
 using ChartPacker.Core.Merging;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
+using ChartPacker.UI.Controls.Highway;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

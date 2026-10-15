@@ -130,6 +130,76 @@ public sealed class TimeStretcherTests
     }
 
     [TestMethod]
+    [DataRow(0.5)]
+    [DataRow(0.75)]
+    [DataRow(1.5)]
+    public void ThePlayedPositionIsWhereAClickIsHeard(double ratio)
+    {
+        // Music on the left, which the grains are chosen by and nudged up to 12 ms from where the ratio says; on the
+        // right, clicks too quiet to sway the choice, which go wherever the grains take them.
+        int[] clicks = [.. Enumerable.Range(0, 12).Select(i => (Rate * 3 / 10) + (i * Rate / 7))];
+        var input = new Input(Rate * 2, (n, channel) => channel == 0
+            ? (float)(Sine(n, 440) + (0.6 * Sine(n, 97)) + (0.4 * Sine(n, 313.7)))
+            : clicks.Contains((int)n) ? 1e-3f : 0f);
+        var stretcher = Stretcher(input, ratio);
+
+        var right = new List<double>();
+        var played = new List<double>();
+        var nominal = new List<double>();
+        var frame = new float[2];
+        while (true)
+        {
+            double playedAt = stretcher.PlayedPosition, nominalAt = stretcher.SourcePosition;
+            if (stretcher.Read(frame) == 0)
+                break;
+            right.Add(frame[1]);
+            played.Add(playedAt);
+            nominal.Add(nominalAt);
+        }
+
+        // Each grain that takes a click in carries a copy of it, as loud as the grain is in the frame it lands on; it's
+        // heard where its loudest copy is. Two grains nearly as loud as each other there make two copies a few
+        // milliseconds apart, and the output stands for somewhere between, so the test is how far off it is on average.
+        double playedOff = 0, nominalOff = 0;
+        foreach (int click in clicks)
+        {
+            int around = (int)(click / ratio);
+            int loudest = Enumerable.Range(around - (4 * Hop), 8 * Hop).MaxBy(n => right[n]);
+            playedOff += Math.Abs(played[loudest] - click) / clicks.Length;
+            nominalOff += Math.Abs(nominal[loudest] - click) / clicks.Length;
+        }
+
+        Assert.IsLessThanOrEqualTo(1.5 * Rate / 1000, playedOff, $"The played position is {playedOff * 1000 / Rate:F2} ms from a click on average.");
+        Assert.IsLessThan(nominalOff / 2, playedOff, $"The played position is {playedOff * 1000 / Rate:F2} ms off, the nominal {nominalOff * 1000 / Rate:F2} ms.");
+    }
+
+    [TestMethod]
+    public void ThePlayedPositionStartsWhereTheInputDoesAndCarriesOnBetweenGrains()
+    {
+        var input = new Input(Rate * 2, (n, _) => Sine(n, 440) + (0.5f * Sine(n, 97)));
+        var stretcher = Stretcher(input, 0.75);
+        input.Position = 1000;
+        stretcher.Reset(1000);
+
+        Assert.AreEqual(1000, stretcher.PlayedPosition);
+        Assert.AreEqual(0, stretcher.FramesToNextGrain);
+
+        // Each grain's frames carry on from the last's, a frame at a time but for the fade between grains.
+        var frame = new float[2];
+        double last = stretcher.PlayedPosition;
+        for (int n = 0; n < 10 * Hop; n++)
+        {
+            stretcher.Read(frame);
+            double step = stretcher.PlayedPosition - last;
+            Assert.AreEqual(1, step, 2.0, $"Frame {n} moved the played position {step} frames.");
+            last = stretcher.PlayedPosition;
+        }
+
+        Assert.AreEqual(Hop, stretcher.GrainStep);
+        Assert.AreEqual(0, stretcher.FramesToNextGrain);
+    }
+
+    [TestMethod]
     public void ARatioChangeTakesEffectAtTheNextGrain()
     {
         var input = new Input(Rate * 2, (n, _) => Sine(n, 440));
@@ -157,7 +227,7 @@ public sealed class TimeStretcherTests
         input.Position = stretcher.ForgetInput();
         float[] rest = ReadAll(stretcher);
 
-        CollectionAssert.AreEqual(whole, first.Concat(rest).ToArray());
+        Assert.AreSequenceEqual(whole, [.. first, .. rest]);
     }
 
     [TestMethod]

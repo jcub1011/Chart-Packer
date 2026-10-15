@@ -137,6 +137,24 @@ public class SettingEdit<T> : SettingEdit
     }
 }
 
+/// <summary>An <see cref="ActionSetting"/>'s edit: there's nothing to stage, so it's never modified.</summary>
+public sealed class ActionSettingEdit(ActionSetting definition) : SettingEdit(definition)
+{
+    public override bool IsModified => false;
+
+    public override bool IsDefault => true;
+
+    public override bool Apply() => false;
+
+    public override void Revert()
+    {
+    }
+
+    public override void ResetToDefault()
+    {
+    }
+}
+
 /// <summary>A <see cref="ChoiceSetting{T}"/>'s edit, seen by index so a view can bind to it without knowing <c>T</c>.</summary>
 public interface IChoiceEdit
 {

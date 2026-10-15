@@ -29,7 +29,7 @@ public sealed class GameViewTests
 
             var differences = ChartReadBack.Compare(view, read, GameView.Instruments);
             Assert.IsEmpty(differences, $"At a HOPO threshold of {threshold}: {Describe(differences)}");
-            Assert.AreSequenceEqual(read.Instruments.Where(i => i != ChartInstrument.Keys).ToList(), view.Instruments.ToList());
+            Assert.AreSequenceEqual(read.Instruments.Where(i => i != ChartInstrument.Keys).ToList(), [.. view.Instruments]);
         }
 
         Assert.HasCount(2, thresholds);
@@ -169,10 +169,11 @@ public sealed class GameViewTests
             view.Tracks[new ChartTrackKey(ChartInstrument.Drums, Expert)].Notes.ToList());
         Assert.IsEmpty(ChartReadBack.Compare(view, MidiChartReader.Read(midi, ChartReadOptions.Default), GameView.Instruments));
 
-        // Without [ENABLE_CHART_DYNAMICS] they aren't written, so none are read.
+        // A model without [ENABLE_CHART_DYNAMICS] yet (one edited since it was loaded) is saved with it, as it has
+        // accents and ghosts, so they're read all the same.
         drums.ChartDynamics = false;
-        var plain = GameView.Project(chart, ChartReadOptions.Default).Tracks[new ChartTrackKey(ChartInstrument.Drums, Expert)].Notes;
-        Assert.IsTrue(plain.All(n => (n.Flags & (NoteFlags.Accent | NoteFlags.Ghost)) == 0));
+        var edited = GameView.Project(chart, ChartReadOptions.Default).Tracks[new ChartTrackKey(ChartInstrument.Drums, Expert)].Notes;
+        Assert.AreSequenceEqual(view.Tracks[new ChartTrackKey(ChartInstrument.Drums, Expert)].Notes.ToList(), [.. edited]);
     }
 
     [TestMethod]

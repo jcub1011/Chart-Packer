@@ -67,19 +67,10 @@ public sealed record ChartWriteResult(
 /// </remarks>
 public static class MidiChartWriter
 {
-    // The furthest tick a track can reach: a MIDI delta is at most four bytes of seven bits.
-    private const long MaxTick = 0x0FFF_FFFF;
-
-    // A track's name comes before everything else at tick 0.
-    private const int NamePhase = -1;
-
     // Within PartEventOrder.Text: the part's settings, then its text events, then its raw events.
     private const int SettingKey = 0;
     private const int TextKey = 1;
     private const int RawKey = 2;
-
-    // A Phase Shift sysex event's key in its phase: after every note event's.
-    private const int SysexKey = 1 << 10;
 
     private const int DownbeatPitch = 12;
     private const int BeatPitch = 13;
@@ -108,7 +99,8 @@ public static class MidiChartWriter
     /// 124, taking the first's kind. A roll or trill merged reaches down to the easiest difficulty any of them reached,
     /// so no difficulty loses a lane it had. Two that start on one tick overlap, however long they are; one that
     /// starts where another ends doesn't.</item>
-    /// <item>Overlapping tom markers on one pad merge the same way.</item>
+    /// <item>Overlapping tom markers on one pad merge the same way. 4-lane drums' tom markers are left out, as the games
+    /// would read any as Pro drums (charter-spec C6 item 9).</item>
     /// <item>A chord marking on a tick without a note of its difficulty, which marks nothing, is left out.</item>
     /// <item><c>[ENABLE_CHART_DYNAMICS]</c> is on while a drum note is an accent or a ghost, and off when none is
     /// (charter-spec C6). <c>[ENHANCED_OPENS]</c> is on for five-fret parts that had it or have an open note, which needs
@@ -127,8 +119,7 @@ public static class MidiChartWriter
     /// or chord marking on an instrument with no place for it; a drum fill at or after <c>EVENTS</c>' first
     /// <c>[coda]</c>, or a drums big rock ending before it, which read back as each other; an anchor at a tick without a
     /// tempo marker; a raw event that would read back as something else (a text event, a note the model reads); a time
-    /// signature the games can't read; 4-lane drums with tom markers, which read back as pro drums; drums without a
-    /// variant; and a passthrough track the reader takes for a part the chart doesn't have.
+    /// signature the games can't read; drums without a variant; and a passthrough track the reader takes for a part the chart doesn't have.
     /// </para>
     /// </remarks>
     public static EditableChart Normalize(EditableChart chart)
@@ -141,7 +132,7 @@ public static class MidiChartWriter
             saved.DrumsVariant = null;
         changes.Texts += RawTexts(saved.Events, saved.EventsRaw);
         foreach (var part in saved.Parts)
-            NormalizePart(part, changes);
+            NormalizePart(part, saved.DrumsVariant, changes);
         changes.Passthrough = OrderPassthrough(saved);
 
         if (changes.Any)
@@ -506,7 +497,7 @@ public static class MidiChartWriter
 
     // Normalizing.
 
-    private static void NormalizePart(EditablePart part, Changes changes)
+    private static void NormalizePart(EditablePart part, DrumsVariant? variant, Changes changes)
     {
         var kind = part.Kind;
         bool drums = kind == ChartInstrumentKind.Drums;
@@ -534,6 +525,13 @@ public static class MidiChartWriter
         }
 
         changes.Phrases += MergePhrases(part);
+        if (drums && variant == DrumsVariant.FourLane)
+        {
+            // The games would read any tom marker as Pro drums (charter-spec C6 item 9).
+            changes.TomMarkers += part.TomMarkers.Count;
+            part.TomMarkers.Clear();
+        }
+
         changes.TomMarkers += MergeTomMarkers(part);
         part.ChartDynamics = drums && dynamics;
         part.EnhancedOpens = fiveFret && (part.EnhancedOpens || opens);
@@ -719,60 +717,6 @@ public static class MidiChartWriter
         .. result.GameDifferences.Select(d => string.Create(CultureInfo.InvariantCulture, $"{d.Kind} {d.Instrument} {d.Difficulty} at {d.Ticks.FirstOrDefault()}")),
         .. result.ReloadIssues.Select(i => string.Create(CultureInfo.InvariantCulture, $"{i.Kind} {i.Part} {i.Difficulty} at {i.Tick}")),
     ];
-
-    /// <summary>A track's events, put in order when it's written.</summary>
-    private sealed class TrackEvents
-    {
-        private readonly List<Placed> _events = [];
-
-        /// <summary>A track whose first event, at tick 0, is its name.</summary>
-        public TrackEvents(string name) => Add(0, NamePhase, 0, Text(0, 0x03, name));
-
-        /// <summary>The tick of the last event.</summary>
-        public long LastTick { get; private set; }
-
-        /// <summary>An event at <paramref name="tick"/>, in <paramref name="phase"/> of it, ordered by <paramref name="key"/> there, then as added.</summary>
-        public void Add(long tick, int phase, int key, byte[] bytes)
-        {
-            _events.Add(new Placed(tick, phase, key, _events.Count, bytes));
-            LastTick = Math.Max(LastTick, tick);
-        }
-
-        /// <summary>
-        /// A note from <paramref name="tick"/> held for <paramref name="length"/>: its note-on among the note-ons by
-        /// pitch, and its note-off among the note-offs where it ends, or straight after its note-on when it's held for no
-        /// ticks.
-        /// </summary>
-        public void Note(long tick, long length, int pitch, int velocity = MidiLayout.NormalVelocity)
-        {
-            Add(tick, PartEventOrder.NoteOn, pitch * 2, MidiMessage.NoteOn(tick, pitch, velocity).Bytes);
-            if (length == 0)
-                Add(tick, PartEventOrder.NoteOn, (pitch * 2) + 1, MidiMessage.NoteOff(tick, pitch).Bytes);
-            else
-                Add(tick + length, PartEventOrder.NoteOff, pitch, MidiMessage.NoteOff(tick + length, pitch).Bytes);
-        }
-
-        /// <summary>A Phase Shift phrase on the tick at <paramref name="tick"/>: on there, after the note-ons, and off a tick later, after the note-offs.</summary>
-        public void PhaseShift(long tick, int difficulty, int code)
-        {
-            Add(tick, PartEventOrder.NoteOn, SysexKey + difficulty, MidiMessage.PhaseShift(tick, difficulty, code, on: true).Bytes);
-            Add(tick + 1, PartEventOrder.NoteOff, SysexKey + difficulty, MidiMessage.PhaseShift(tick + 1, difficulty, code, on: false).Bytes);
-        }
-
-        /// <summary>The track's chunk, its events in order and ended.</summary>
-        /// <exception cref="ChartFormatException">An event is later than a MIDI file can say.</exception>
-        public byte[] Chunk()
-        {
-            if (LastTick > MaxTick)
-                throw new ChartFormatException("An event of the chart is too late for a MIDI file.");
-            _events.Sort(static (a, b) => (a.Tick, a.Phase, a.Key, a.Sequence).CompareTo((b.Tick, b.Phase, b.Key, b.Sequence)));
-
-            // The writer keeps events at a tick in the order they're given.
-            return MidiWriter.Track(_events.Select(static e => new MidiMessage(e.Tick, e.Bytes)));
-        }
-
-        private readonly record struct Placed(long Tick, int Phase, int Key, int Sequence, byte[] Bytes);
-    }
 
     /// <summary>How much normalizing a chart changed, for the log.</summary>
     private sealed class Changes

@@ -12,6 +12,7 @@ using ChartPacker.Core.Merging;
 using ChartPacker.Core.Metadata;
 using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -82,7 +83,7 @@ namespace ChartPacker.ViewModels
         public LyricsViewModel(PlayerViewModel player)
         {
             _player = player;
-            Clock = () => player.CurrentPosition;
+            Clock = () => player.DrawnPosition;
             WaveformPicker = new LaneWaveformPickerViewModel(OnWaveformPicked);
             player.TrackWaveformsChanged += (_, e) =>
             {

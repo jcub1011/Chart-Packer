@@ -4,7 +4,8 @@ using System.Globalization;
 using System.Linq;
 using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
-using ChartPacker.Services;
+using ChartPacker.UI.Services;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

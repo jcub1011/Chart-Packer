@@ -10,6 +10,8 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartPacker.Audio.Waveforms;
 using ChartPacker.Core.Charts;
+using ChartPacker.UI.Controls;
+using ChartPacker.UI.Controls.Highway;
 
 namespace ChartPacker.Controls
 {
@@ -59,8 +61,8 @@ namespace ChartPacker.Controls
             for (int i = 0; i < lane.Notes.Length; i++)
             {
                 var note = lane.Notes[i];
-                int row = note.Lane == ChartNote.OpenLane ? -1 : NoteHighwayView.Column(lane, note.Lane);
-                notes.Add((lane.Starts[i], lane.Ends[i], row, NoteHighwayView.NoteColor(lane, note)));
+                int row = note.Lane == ChartNote.OpenLane ? -1 : HighwayPalette.Column(lane.Kind, lane.LaneCount, note.Lane);
+                notes.Add((lane.Starts[i], lane.Ends[i], row, HighwayPalette.NoteColor(lane.Kind, lane.LaneCount, note)));
             }
 
             return new TimelineNotes(lane.Label, rows, notes);

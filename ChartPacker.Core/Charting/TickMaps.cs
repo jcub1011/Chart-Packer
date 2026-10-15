@@ -25,4 +25,26 @@ public static class TickMaps
         ArgumentNullException.ThrowIfNull(to);
         return MidiMerger.MapOf(from, TimeSpan.Zero, to, TimeSpan.Zero);
     }
+
+    /// <summary>
+    /// The ticks of a stretch or squeeze of the ticks from <paramref name="from"/> to <paramref name="to"/> onto those from
+    /// <paramref name="from"/> to <paramref name="newTo"/> (charter-spec C15 item 4): ticks before it stay, ticks inside it
+    /// are scaled, to the nearest tick, and ticks after it move by the change in its length. It never decreases.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The span, or the one it becomes, has no length.</exception>
+    public static Func<long, long> Stretch(long from, long to, long newTo)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(from);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(to, from);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(newTo, from);
+        long length = to - from, newLength = newTo - from;
+        return tick =>
+        {
+            if (tick <= from)
+                return tick;
+            if (tick >= to)
+                return tick + (newTo - to);
+            return from + (long)Math.Round((double)(tick - from) * newLength / length, MidpointRounding.AwayFromZero);
+        };
+    }
 }

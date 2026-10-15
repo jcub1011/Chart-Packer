@@ -120,6 +120,14 @@ public sealed record ChartContents(LibraryInstruments Instruments, LibraryDiffic
         TryTally(bytes, storedName, options, int.MaxValue) is { } parts ? ToParts(parts) : null;
 
     /// <summary>
+    /// The ids of the known parts <paramref name="bytes"/>, a chart stored as <paramref name="storedName"/>, has a note
+    /// in, as for <see cref="Read"/>; <see langword="null"/> when the chart is malformed.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="storedName"/> isn't a chart's name.</exception>
+    internal static IReadOnlySet<string>? PartIdsOf(byte[] bytes, string storedName, ChartReadOptions? options = null) =>
+        TryTally(bytes, storedName, options, noteLimit: 1)?.Keys.ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
     /// The known parts <paramref name="document"/> has, as for <see cref="ReadParts"/>, with those the note
     /// reader skips read from <paramref name="midi"/>, the MIDI file it was read from (<see langword="null"/> for a <c>.chart</c>).
     /// </summary>

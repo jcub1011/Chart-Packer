@@ -7,8 +7,8 @@ using ChartPacker.Core.Validation;
 namespace ChartBuilder.Tests.Charting.Lint;
 
 /// <summary>
-/// Lint rules that exist only for the engine's tests, one of each scope, as the CHR rules come later (CM2, CM3). Their
-/// IDs are <c>TST</c>, which no real rule uses.
+/// Lint rules that exist only for the engine's tests, one of each scope, so the engine is tested apart from the CHR
+/// rules. Their IDs are <c>TST</c>, which no real rule uses.
 /// </summary>
 internal static class TestLintRules
 {

@@ -7,7 +7,7 @@ using ChartBuilder.Resources;
 using ChartPacker.Core.Charting;
 using ChartPacker.Core.Charting.Layout;
 using ChartPacker.Core.Charts;
-using ChartPacker.ViewModels;
+using ChartPacker.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
@@ -59,9 +59,29 @@ namespace ChartBuilder.ViewModels
             return groups;
         }
 
-        /// <summary>What a lane showing <paramref name="part"/> is headed, e.g. "Guitar · Expert" or "Harmony 2".</summary>
+        /// <summary>An item that runs <paramref name="run"/>, checked when <paramref name="isChecked"/>.</summary>
+        public static LaneMenuItem Choice(string header, bool isChecked, Action run) =>
+            new(header, null, new RelayCommand(run), isEnabled: true, isChecked);
+
+        /// <summary>An item that runs <paramref name="run"/>, greyed out unless <paramref name="isEnabled"/>.</summary>
+        public static LaneMenuItem Action(string header, bool isEnabled, Action run) =>
+            new(header, null, new RelayCommand(run), isEnabled, isChecked: false);
+
+        /// <summary>A submenu of <paramref name="items"/>, greyed out when none of them can be picked.</summary>
+        public static LaneMenuItem Submenu(string header, IReadOnlyList<LaneMenuItem> items) =>
+            new(header, items, null, items.Any(static i => i.IsEnabled), isChecked: false);
+
+        /// <summary>A line between groups of items.</summary>
+        public static LaneMenuItem Separator { get; } = new(string.Empty, null, null, isEnabled: false, isChecked: false);
+
+        public bool IsSeparator => ReferenceEquals(this, Separator);
+
+        /// <summary>
+        /// What a lane showing <paramref name="part"/> is headed, e.g. "Guitar" or "Harmony 2": a highway's difficulty is
+        /// shown beside it, by its letters.
+        /// </summary>
         public static string TitleOf(LanePart part) => part.Track is { } track
-            ? string.Format(CultureInfo.CurrentCulture, Strings.LaneTitleFormat, ChartLabels.InstrumentName(track.Instrument), ChartLabels.DifficultyName(track.Difficulty))
+            ? ChartLabels.InstrumentName(track.Instrument)
             : VocalName(part.Vocal!.Value);
 
         private static string VocalName(VocalTrack vocal) => vocal switch

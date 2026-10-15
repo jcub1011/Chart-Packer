@@ -17,12 +17,6 @@ namespace ChartPacker.Services
     /// </remarks>
     public sealed class ChartBuilderLauncher : IChartBuilderLauncher
     {
-        /// <summary>
-        /// Whether Chart Builder can open a song yet. Edit chart stays disabled until it can: it's turned on in
-        /// milestone CM2, when Chart Builder gets its editor (charter-spec §13).
-        /// </summary>
-        public const bool CanOpenSongs = false;
-
         private static readonly string ExecutableName = OperatingSystem.IsWindows() ? "ChartBuilder.exe" : "ChartBuilder";
 
         /// <summary>Chart Builder's executable, next to this process's, whether or not it's there.</summary>

@@ -77,6 +77,9 @@ public sealed class EditablePart
     /// <summary>Pro drums' tom markers, which every difficulty shares, in order of tick, then pad, then length.</summary>
     public TickList<TomMarker> TomMarkers { get; }
 
+    /// <summary>Whether any difficulty has a note.</summary>
+    public bool HasNotes => _tracks.Any(static t => t.Notes.Count > 0);
+
     /// <summary>Whether the track has <c>[ENHANCED_OPENS]</c>, which makes the notes below green opens.</summary>
     public bool EnhancedOpens { get; internal set; }
 
