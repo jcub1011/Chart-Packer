@@ -147,6 +147,17 @@
             <Setter Property="Padding" Value="20,8" />
             <Setter Property="TextElement.FontSize" Value="12" />
         </Style>
+        <!-- While the save bar shows, over the bottom of the panel, the tip strip sits on it, and the details end above
+             it, so the last of them can still be scrolled into view. The bar is 45 high. -->
+        <Style Selector="ctl|ToolTipStrip.save-bar">
+            <Setter Property="Margin" Value="0,0,0,45" />
+        </Style>
+        <Style Selector="StackPanel.details">
+            <Setter Property="Margin" Value="20,16" />
+        </Style>
+        <Style Selector="StackPanel.details.save-bar">
+            <Setter Property="Margin" Value="20,16,20,61" />
+        </Style>
 
         <!-- The background's Image | Video switch: radio buttons, so one is always picked, drawn as
              compact icon toggles with the one shown in the accent. -->
@@ -212,7 +223,9 @@
         </Style>
     </UserControl.Styles>
 
-    <Panel>
+    <!-- Everything is layered, as in a Panel; the save bar last, over the bottom of the rest, so showing it moves
+         nothing. -->
+    <Grid>
         <!-- Behind everything, along the bottom of the panel: what's heard as a spectrum, whichever song is
              playing, up to 128px tall. It stays put while the details scroll over it. Hidden, it stops drawing. -->
         <ctl:SpectrumView VerticalAlignment="Bottom"
@@ -255,7 +268,8 @@
                    IsVisible="{Binding HasError}" />
 
         <DockPanel IsVisible="{Binding ShowDetails}">
-            <!-- Save and Discard are on the toolbar; a failed save is reported here, above the rows it concerns. -->
+            <!-- Save and Discard are in the save bar along the bottom; a failed save is reported here, above the rows it
+                 concerns. -->
             <Border DockPanel.Dock="Top"
                     Classes="banner error"
                     Margin="20,12,20,0"
@@ -264,7 +278,7 @@
             </Border>
 
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="20,16">
+                <StackPanel Classes="details" Classes.save-bar="{Binding ShowSaveBar}">
                     <!-- "Name - Artist", with the charter at the right; the path below, with the song's size at the right.
                          Right-clicking either line shows the songs in the file manager. -->
                     <StackPanel Background="Transparent">
@@ -1140,6 +1154,57 @@
         </DockPanel>
 
         <!-- In front of everything, along the bottom: the tip of whatever's under the pointer, as tall as it needs. -->
-        <ctl:ToolTipStrip x:Name="TipStrip" VerticalAlignment="Bottom" />
-    </Panel>
+        <ctl:ToolTipStrip x:Name="TipStrip" VerticalAlignment="Bottom" Classes.save-bar="{Binding ShowSaveBar}" />
+
+        <!-- The save bar: over the bottom of everything, while the selection has unsaved changes and through their save.
+             It covers the bottom of the spectrum; the details and the tip strip end above it (save-bar, above). Its
+             buttons' tips show in the strip. 45 high, as those styles allow for. -->
+        <Border VerticalAlignment="Bottom"
+                Height="45"
+                IsVisible="{Binding ShowSaveBar}"
+                Background="{DynamicResource ToolbarBrush}"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="20,8">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0"
+                           Classes="muted"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding SaveBarLabel}" />
+                <Arc Grid.Column="1"
+                     Classes="spinner"
+                     Classes.active="{Binding IsSavingShown}"
+                     IsVisible="{Binding IsSavingShown}"
+                     Width="14" Height="14" StrokeThickness="2"
+                     VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Classes="labelled"
+                        Command="{Binding DiscardCommand}"
+                        ToolTip.ShowOnDisabled="True"
+                        AutomationProperties.Name="{x:Static res:Strings.DiscardButton}">
+                    <ToolTip.Tip>
+                        <ui:TitledToolTip Title="{x:Static res:Strings.DiscardButton}" Description="{x:Static res:Strings.DiscardToolTip}" />
+                    </ToolTip.Tip>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:LineIcon Data="{StaticResource UndoStroke}" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DiscardButton}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3"
+                        Classes="labelled accent"
+                        Command="{Binding SaveCommand}"
+                        ToolTip.ShowOnDisabled="True"
+                        AutomationProperties.Name="{x:Static res:Strings.SaveButton}">
+                    <ToolTip.Tip>
+                        <ui:TitledToolTip Title="{x:Static res:Strings.SaveButton}" Description="{x:Static res:Strings.SaveToolTip}" />
+                    </ToolTip.Tip>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:LineIcon Data="{StaticResource SaveStroke}" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SaveButton}" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

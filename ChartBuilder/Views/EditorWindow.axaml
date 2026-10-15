@@ -51,42 +51,6 @@
     </Window.Resources>
 
     <Window.Styles>
-        <!-- The title bar the window draws for itself: its menus flat on the frame's colour, like the caption buttons. -->
-        <!-- 30 high, as Fluent's caption buttons are. -->
-        <Style Selector="Border.title-bar">
-            <Setter Property="Height" Value="30" />
-            <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
-        </Style>
-        <Style Selector="Border.title-bar Menu">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <!-- The song's title: flat, lit on hover like the menus, and plain text while disabled (a new chart). -->
-        <Style Selector="Button.title-link">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="6,3" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
-        <Style Selector="Button.title-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
-        </Style>
-        <Style Selector="Button.title-link:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
-        </Style>
-        <Style Selector="Button.title-link:disabled">
-            <Setter Property="Cursor" Value="Arrow" />
-        </Style>
-        <Style Selector="Button.title-link:disabled /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-        </Style>
-        <Style Selector="Border.title-bar Menu > MenuItem">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Padding" Value="10,5" />
-            <Setter Property="CornerRadius" Value="4" />
-        </Style>
         <!-- Centred messages standing in for content that isn't built yet. -->
         <Style Selector="StackPanel.placeholder">
             <Setter Property="HorizontalAlignment" Value="Center" />
@@ -136,20 +100,11 @@
         <!-- The title bar and the toolbar. The code-behind refits the panels as they change height, the toolbar wrapping as
              the window narrows. -->
         <StackPanel x:Name="TopBand" Grid.Row="0">
-            <!-- The window draws its own title bar (ExtendClientAreaToDecorationsHint): the icon, the File and Edit menus,
-                 and the window's title and the program version. The caption buttons are drawn over its right end, which the
-                 last column keeps clear: minimize, maximize and close, 45 wide with 2 between, inside the 1px frame.
-                 Dragging anywhere but the menus moves the window. -->
-            <Border Classes="title-bar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
-                <Grid ColumnDefinitions="Auto,Auto,*,140">
-                    <Image Grid.Column="0"
-                           Width="16"
-                           Height="16"
-                           Margin="12,0,6,0"
-                           VerticalAlignment="Center"
-                           Source="/Assets/avalonia-logo.ico"
-                           AutomationProperties.Name="{x:Static res:Strings.AppName}" />
-                    <Menu Grid.Column="1" chrome:WindowDecorationProperties.ElementRole="User">
+            <!-- The window draws its own title bar (TitleBar): the icon, the File and Edit menus, and the window's title and
+                 the program version. Dragging anywhere but the menus, the title and the version moves the window. -->
+            <ctl:TitleBar Icon="/Assets/avalonia-logo.ico" AppName="{x:Static res:Strings.AppName}">
+                <ctl:TitleBar.Menu>
+                    <Menu chrome:WindowDecorationProperties.ElementRole="User">
                         <MenuItem Header="{x:Static res:Strings.MenuFile}">
                             <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N" />
                             <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O" />
@@ -192,26 +147,26 @@
                             <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
                         </MenuItem>
                     </Menu>
-                    <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
-                         is a button that shows the song in the file manager; a new chart's, with nowhere to show, is plain text. -->
-                    <Grid Grid.Column="2"
-                          ColumnDefinitions="*,Auto"
-                          ColumnSpacing="8"
-                          Margin="6,0,0,0"
-                          HorizontalAlignment="Left"
-                          VerticalAlignment="Center">
-                        <Button Grid.Column="0"
-                                Classes="title-link"
-                                chrome:WindowDecorationProperties.ElementRole="User"
-                                Command="{Binding ShowSongCommand}"
-                                ToolTip.Tip="{Binding ShowSongToolTip}"
-                                AutomationProperties.Name="{Binding ShowSongToolTip}">
-                            <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
-                        </Button>
-                        <TextBlock Grid.Column="1" Classes="muted" FontSize="12" VerticalAlignment="Center" Text="{Binding VersionText}" />
-                    </Grid>
+                </ctl:TitleBar.Menu>
+                <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
+                     is a button (title-link, in Theme.axaml) that shows the song in the file manager; a new chart's, with
+                     nowhere to show, is plain text. The version opens the releases page. -->
+                <Grid ColumnDefinitions="*,Auto"
+                      ColumnSpacing="8"
+                      Margin="6,0,0,0"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center">
+                    <Button Grid.Column="0"
+                            Classes="title-link"
+                            chrome:WindowDecorationProperties.ElementRole="User"
+                            Command="{Binding ShowSongCommand}"
+                            ToolTip.Tip="{Binding ShowSongToolTip}"
+                            AutomationProperties.Name="{Binding ShowSongToolTip}">
+                        <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                    </Button>
+                    <ctl:VersionLink Grid.Column="1" chrome:WindowDecorationProperties.ElementRole="User" />
                 </Grid>
-            </Border>
+            </ctl:TitleBar>
 
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
