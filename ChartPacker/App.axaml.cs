@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using ChartPacker.Resources;
 using ChartPacker.Services;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
@@ -88,7 +89,10 @@ namespace ChartPacker
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
                     settingsPicker => new SettingsWindowViewModel(
-                        AppSettingsCatalog.Create(library, player, highway, downloads, settings, Calibrate), settingsPicker, settings.Save));
+                        AppSettingsCatalog.Create(library, player, highway, downloads, settings, Calibrate), settingsPicker, settings.Save),
+                    settings.Settings,
+                    settings.Save,
+                    Strings.AppName);
 
                 window.DataContext = new MainWindowViewModel(
                     library,

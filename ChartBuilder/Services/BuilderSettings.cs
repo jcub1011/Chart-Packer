@@ -6,6 +6,7 @@ using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Jobs;
 using ChartShared.Core.Launching;
+using ChartShared.UI.Services;
 
 namespace ChartBuilder.Services
 {
@@ -31,7 +32,7 @@ namespace ChartBuilder.Services
 
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
     /// <remarks>Chart Packer's are in its own file, so neither app overwrites the other's.</remarks>
-    public sealed class BuilderSettings
+    public sealed class BuilderSettings : ISettingsWindowSize
     {
         public const double DefaultEditorLeftPanelWidth = 300;
         public const double DefaultEditorRightPanelWidth = 280;
@@ -129,6 +130,11 @@ namespace ChartBuilder.Services
         public double? EditorWidth { get; set; }
 
         public double? EditorHeight { get; set; }
+
+        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
+        public double? SettingsWindowWidth { get; set; }
+
+        public double? SettingsWindowHeight { get; set; }
 
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;

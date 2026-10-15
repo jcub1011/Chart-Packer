@@ -6,6 +6,7 @@ using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Services;
 using ChartShared.UI.Views;
 
 namespace ChartBuilder.Services
@@ -91,6 +92,7 @@ namespace ChartBuilder.Services
             if (settings.EditorFullscreen)
                 settings.EditorMaximized = true;
             SanitizeEditorBounds(settings);
+            SettingsWindowSize.Sanitize(settings);
         }
 
         /// <summary>

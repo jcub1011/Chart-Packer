@@ -6,11 +6,12 @@ using ChartShared.Core.Dedup;
 using ChartShared.Core.Jobs;
 using ChartShared.Core.Library;
 using ChartShared.UI;
+using ChartShared.UI.Services;
 
 namespace ChartPacker.Services
 {
     /// <summary>User settings persisted to <c>settings.json</c>. See spec §8.</summary>
-    public sealed class AppSettings
+    public sealed class AppSettings : ISettingsWindowSize
     {
         public const double DefaultLibraryPaneWidth = 320;
         public const double MinLibraryPaneWidth = 200;
@@ -56,6 +57,11 @@ namespace ChartPacker.Services
         public double? MainWindowWidth { get; set; }
 
         public double? MainWindowHeight { get; set; }
+
+        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
+        public double? SettingsWindowWidth { get; set; }
+
+        public double? SettingsWindowHeight { get; set; }
 
         /// <summary>Whether the merge songs editor was maximized when it was last closed.</summary>
         public bool MergeWindowMaximized { get; set; }

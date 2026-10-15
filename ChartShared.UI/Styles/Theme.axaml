@@ -87,6 +87,21 @@
         <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#4A4D66" />
         <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#1C1D27" />
         <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#34364A" />
+
+        <!-- The caption buttons of a window that draws its own title bar (ctl:TitleBar): with the client area extended,
+             Avalonia draws them itself (Fluent's WindowDrawnDecorations), not Windows. Its own title text is hidden, as
+             the title bar has the icon and title, and its full screen button, as full screen hides the caption buttons,
+             leaving no way to restore, resize or close the window. The window's Title still names it in the taskbar.
+             Set as the window's WindowDecorationsTheme. -->
+        <ControlTheme x:Key="TitleBarDecorations" TargetType="WindowDrawnDecorations" BasedOn="{StaticResource {x:Type WindowDrawnDecorations}}">
+            <!-- The text, not its panel: the panel's IsVisible is template-bound, which a style can't override. -->
+            <Style Selector="^ /template/ Panel#PART_TitleTextPanel > TextBlock">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="^ /template/ Button#PART_FullScreenButton">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+        </ControlTheme>
     </Styles.Resources>
 
     <!-- Toolbar -->

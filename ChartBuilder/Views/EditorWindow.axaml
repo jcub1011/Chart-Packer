@@ -19,6 +19,7 @@
         MinWidth="720" MinHeight="480"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterScreen">
 
     <Window.KeyBindings>
@@ -30,21 +31,6 @@
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
     </Window.KeyBindings>
-
-    <!-- With the client area extended, Avalonia draws the caption buttons itself (Fluent's WindowDrawnDecorations), not
-         Windows. Its own title text is hidden, as the title bar below shows the title, and its full screen button, as full
-         screen hides the caption buttons, leaving no way to restore, resize or close the window. -->
-    <Window.WindowDecorationsTheme>
-        <ControlTheme TargetType="WindowDrawnDecorations" BasedOn="{StaticResource {x:Type WindowDrawnDecorations}}">
-            <!-- The text, not its panel: the panel's IsVisible is template-bound, which a style can't override. -->
-            <Style Selector="^ /template/ Panel#PART_TitleTextPanel > TextBlock">
-                <Setter Property="IsVisible" Value="False" />
-            </Style>
-            <Style Selector="^ /template/ Button#PART_FullScreenButton">
-                <Setter Property="IsVisible" Value="False" />
-            </Style>
-        </ControlTheme>
-    </Window.WindowDecorationsTheme>
 
     <Window.Resources>
         <bctl:LaneMenuConverter x:Key="LaneMenu" Check="{StaticResource CheckStroke}" />
@@ -137,14 +123,14 @@
                                       Command="{Binding ExportCopyCommand}"
                                       ToolTip.Tip="{Binding ExportCopyToolTip}"
                                       ToolTip.ShowOnDisabled="True" />
+                            <Separator />
+                            <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
+                                 left panel. Its Ctrl+, isn't shown, as Avalonia would print it as Ctrl+OemComma. -->
+                            <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
                         </MenuItem>
-                        <!-- Settings is the program's; the chart's are a tab in the left panel. Its Ctrl+, isn't shown, as
-                             Avalonia would print it as Ctrl+OemComma. -->
                         <MenuItem Header="{x:Static res:Strings.MenuEdit}">
                             <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
                             <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
-                            <Separator />
-                            <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
                         </MenuItem>
                     </Menu>
                 </ctl:TitleBar.Menu>

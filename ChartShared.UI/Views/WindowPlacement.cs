@@ -51,7 +51,8 @@ namespace ChartShared.UI.Views
 
         /// <summary>
         /// Centers <paramref name="window"/>, not yet shown, on <paramref name="center"/>, within the working area of the
-        /// screen that point is on.
+        /// screen that point is on, its size made to fit that area but no smaller than the window's own minimum where it
+        /// allows.
         /// </summary>
         /// <returns>False, leaving the window where it would have gone, when the point is on none of the screens.</returns>
         public static bool CenterOn(Window window, PixelPoint center)
@@ -60,9 +61,15 @@ namespace ChartShared.UI.Views
                 return false;
 
             // The window isn't on a screen yet, so its size is scaled as the one it's going to.
+            var area = screen.WorkingArea;
             var size = PixelSize.FromSize(new Size(window.Width, window.Height), screen.Scaling);
+            var minPixels = PixelSize.FromSize(new Size(window.MinWidth, window.MinHeight), screen.Scaling);
+            size = FitSize(size, minPixels, area);
+
+            window.Width = size.Width / screen.Scaling;
+            window.Height = size.Height / screen.Scaling;
             window.WindowStartupLocation = WindowStartupLocation.Manual;
-            window.Position = Centered(center, size, screen.WorkingArea);
+            window.Position = Centered(center, size, area);
             return true;
         }
 
