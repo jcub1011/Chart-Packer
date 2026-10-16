@@ -62,6 +62,9 @@ namespace ChartPacker.ViewModels
         // Set while a whole tab is marked, so the tab's count is taken once rather than for every copy.
         private bool _isMarking;
 
+        // Set while the groups are first added, so the listed groups are found once rather than for every group.
+        private bool _populating;
+
         /// <param name="request">How to get the songs to compare, and where a merge writes.</param>
         /// <param name="hasDrafts">Whether the song at a path has unsaved metadata edits; those are never deleted. UI thread only.</param>
         /// <param name="settings">Holds the keep preference.</param>
@@ -91,13 +94,13 @@ namespace ChartPacker.ViewModels
 
             KeepOptions =
             [
-                new(DedupKindPreference.PreferSng, Strings.DedupKeepSng),
-                new(DedupKindPreference.PreferFolder, Strings.DedupKeepFolder),
+                new(DedupKindPreference.PreferSng, Strings.KindSng),
+                new(DedupKindPreference.PreferFolder, Strings.KindFolder),
             ];
             SelectedKeepOption = KeepOptions.First(o => o.Value == settings.Settings.DedupKeepPreference);
-            ExactGroups.CollectionChanged += (_, _) => RefreshHeaders();
-            SameChartGroups.CollectionChanged += (_, _) => RefreshHeaders();
-            MergeGroups.CollectionChanged += (_, _) => RefreshHeaders();
+            ExactGroups.CollectionChanged += (_, _) => OnGroupsChanged();
+            SameChartGroups.CollectionChanged += (_, _) => OnGroupsChanged();
+            MergeGroups.CollectionChanged += (_, _) => OnGroupsChanged();
         }
 
         /// <summary>Asks the window to close.</summary>
@@ -122,11 +125,62 @@ namespace ChartPacker.ViewModels
 
         public string MergeHeader => string.Format(CultureInfo.CurrentCulture, Strings.DedupTabMergeFormat, MergeGroups.Count);
 
-        public bool HasNoExact => IsLoaded && ExactGroups.Count == 0;
+        /// <summary>Which tab's groups are listed.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsExactShown))]
+        [NotifyPropertyChangedFor(nameof(IsSameChartShown))]
+        [NotifyPropertyChangedFor(nameof(IsMergeShown))]
+        [NotifyPropertyChangedFor(nameof(MarkShownLabel))]
+        public partial DedupTier ShownTier { get; set; }
 
-        public bool HasNoSameChart => IsLoaded && SameChartGroups.Count == 0;
+        // For the category chips, which are radio buttons: one is always on, so only turning one on changes the tab.
+        public bool IsExactShown
+        {
+            get => ShownTier == DedupTier.Exact;
+            set { if (value) ShownTier = DedupTier.Exact; }
+        }
 
-        public bool HasNoMerge => IsLoaded && MergeGroups.Count == 0;
+        public bool IsSameChartShown
+        {
+            get => ShownTier == DedupTier.SameChart;
+            set { if (value) ShownTier = DedupTier.SameChart; }
+        }
+
+        public bool IsMergeShown
+        {
+            get => ShownTier == DedupTier.MergeCandidate;
+            set { if (value) ShownTier = DedupTier.MergeCandidate; }
+        }
+
+        /// <summary>Narrows the listed groups to those whose title or a copy's path contains it.</summary>
+        [ObservableProperty]
+        public partial string SearchText { get; set; } = "";
+
+        /// <summary>The shown tab's groups that match the search.</summary>
+        public AvaloniaList<DedupGroupViewModel> ShownGroups { get; } = [];
+
+        /// <summary>The group whose copies the inspector shows.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSelection))]
+        [NotifyPropertyChangedFor(nameof(ShowNoSelection))]
+        public partial DedupGroupViewModel? SelectedGroup { get; set; }
+
+        public bool HasSelection => SelectedGroup is not null;
+
+        public bool ShowNoSelection => SelectedGroup is null && ShownGroups.Count > 0;
+
+        /// <summary>Nothing is listed: the tab has no groups, or none match the search.</summary>
+        public bool HasNoShown => IsLoaded && ShownGroups.Count == 0;
+
+        /// <summary>Why nothing is listed.</summary>
+        public string ShownEmptyText => GroupsOf(ShownTier).Count > 0
+            ? string.Format(CultureInfo.CurrentCulture, Strings.DedupNoMatchesFormat, SearchText.Trim())
+            : ShownTier switch
+            {
+                DedupTier.Exact => Strings.DedupNoExact,
+                DedupTier.SameChart => Strings.DedupNoSameChart,
+                _ => Strings.DedupNoMerge,
+            };
 
         /// <summary>Songs that couldn't be compared, one line each.</summary>
         public AvaloniaList<string> Skipped { get; } = [];
@@ -139,9 +193,7 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(IsReady))]
         [NotifyPropertyChangedFor(nameof(IsLoaded))]
         [NotifyPropertyChangedFor(nameof(CloseLabel))]
-        [NotifyPropertyChangedFor(nameof(HasNoExact))]
-        [NotifyPropertyChangedFor(nameof(HasNoSameChart))]
-        [NotifyPropertyChangedFor(nameof(HasNoMerge))]
+        [NotifyPropertyChangedFor(nameof(HasNoShown))]
         public partial bool IsAnalyzing { get; set; } = true;
 
         [ObservableProperty]
@@ -178,26 +230,22 @@ namespace ChartPacker.ViewModels
         /// <summary>What the trash is called here, e.g. "Recycle Bin".</summary>
         public string TrashName => _trash?.Kind == TrashKind.RecycleBin ? Strings.DedupTrashRecycleBin : Strings.DedupTrashTrash;
 
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(DeleteMarkedLabel))]
-        [NotifyCanExecuteChangedFor(nameof(DeleteExactCommand))]
-        public partial int ExactMarkedCount { get; set; }
+        /// <summary>How many copies are marked on the shown tab.</summary>
+        public int ShownMarkedCount => GroupsOf(ShownTier).Sum(g => g.MarkedCount);
 
-        public string DeleteMarkedLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteMarkedFormat, ExactMarkedCount);
+        public bool HasShownMarked => ShownMarkedCount > 0;
 
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(SameChartDeleteMarkedLabel))]
-        [NotifyCanExecuteChangedFor(nameof(DeleteSameChartCommand))]
-        public partial int SameChartMarkedCount { get; set; }
+        /// <summary>How many copies are marked on the shown tab, and their size.</summary>
+        public string MarkedSummaryText => string.Format(
+            CultureInfo.CurrentCulture,
+            Strings.DedupMarkedSummaryFormat,
+            ShownMarkedCount,
+            ByteSizeFormatter.Format((ulong)GroupsOf(ShownTier).Sum(g => g.MarkedBytes)));
 
-        public string SameChartDeleteMarkedLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteMarkedFilesFormat, SameChartMarkedCount);
+        /// <summary>Marks every duplicate on the Exact tab; on the others, every copy a merge has replaced.</summary>
+        public string MarkShownLabel => ShownTier == DedupTier.Exact ? Strings.DedupMarkAll : Strings.DedupMarkMerged;
 
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(MergeDeleteMarkedLabel))]
-        [NotifyCanExecuteChangedFor(nameof(DeleteMergeCommand))]
-        public partial int MergeMarkedCount { get; set; }
-
-        public string MergeDeleteMarkedLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteMarkedFilesFormat, MergeMarkedCount);
+        public string DeleteShownLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteMarkedFormat, ShownMarkedCount);
 
         public AvaloniaList<DedupResultRow> Results { get; } = [];
 
@@ -255,12 +303,22 @@ namespace ChartPacker.ViewModels
                 IsAnalyzing = false;
             }
 
-            foreach (var variant in _analysis.Exact)
-                ExactGroups.Add(new DedupGroupViewModel(this, DedupTier.Exact, variant.Entries.Select(e => new[] { new DedupVariant([e]) })));
-            foreach (var chart in _analysis.SameChart)
-                SameChartGroups.Add(new DedupGroupViewModel(this, DedupTier.SameChart, chart.Variants.Select(v => new[] { v })));
-            foreach (var song in _analysis.MergeCandidates)
-                MergeGroups.Add(new DedupGroupViewModel(this, DedupTier.MergeCandidate, song.Charts.Select(c => c.Variants)));
+            // The list is filled once, after, rather than for every group added.
+            _populating = true;
+            try
+            {
+                foreach (var variant in _analysis.Exact)
+                    ExactGroups.Add(new DedupGroupViewModel(this, DedupTier.Exact, variant.Entries.Select(e => new[] { new DedupVariant([e]) })));
+                foreach (var chart in _analysis.SameChart)
+                    SameChartGroups.Add(new DedupGroupViewModel(this, DedupTier.SameChart, chart.Variants.Select(v => new[] { v })));
+                foreach (var song in _analysis.MergeCandidates)
+                    MergeGroups.Add(new DedupGroupViewModel(this, DedupTier.MergeCandidate, song.Charts.Select(c => c.Variants)));
+            }
+            finally
+            {
+                _populating = false;
+            }
+
             foreach (var skipped in _analysis.Skipped)
                 Skipped.Add(string.Format(CultureInfo.CurrentCulture, Strings.DedupSkippedLineFormat, skipped.Entry.RelativePath, Describe(skipped)));
 
@@ -269,6 +327,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(HasSkipped));
             OnPropertyChanged(nameof(SkippedHeader));
             RefreshHeaders();
+            RefreshShown();
             RefreshCommands();
 
             foreach (var group in SameChartGroups)
@@ -306,41 +365,46 @@ namespace ChartPacker.ViewModels
 
         partial void OnIsDeletingChanged(bool value) => RefreshCommands();
 
-        /// <summary>Marks every copy on the Exact tab that isn't being kept.</summary>
-        [RelayCommand(CanExecute = nameof(CanMarkAll))]
-        private void MarkAll() => Mark(DedupTier.Exact, ExactGroups);
+        partial void OnShownTierChanged(DedupTier value)
+        {
+            RefreshShown();
+            RefreshShownMarks();
+        }
 
-        private bool CanMarkAll() => IsReady && CanDelete && ExactGroups.Count > 0;
+        partial void OnSearchTextChanged(string value) => RefreshShown();
 
-        /// <summary>Deletes every marked copy on the Exact tab.</summary>
-        [RelayCommand(CanExecute = nameof(CanDeleteExact))]
-        private Task DeleteExactAsync() => DeleteMarkedAsync(ExactGroups);
+        [RelayCommand]
+        private void ClearSearch() => SearchText = "";
 
-        private bool CanDeleteExact() => CanDeleteMarked(ExactMarkedCount);
+        /// <summary>
+        /// On the Exact tab, marks every copy that isn't being kept; on the others, every copy of a group a merge has
+        /// replaced.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanMarkShown))]
+        private void MarkShown()
+        {
+            if (ShownTier == DedupTier.Exact)
+                Mark(DedupTier.Exact, ExactGroups);
+            else
+                Mark(ShownTier, GroupsOf(ShownTier).Where(g => g.HasMerged));
+        }
 
-        /// <summary>Marks every copy of a merged group on the Same chart tab.</summary>
-        [RelayCommand(CanExecute = nameof(CanMarkMergedSameChart))]
-        private void MarkMergedSameChart() => Mark(DedupTier.SameChart, SameChartGroups.Where(g => g.HasMerged));
+        private bool CanMarkShown() => ShownTier == DedupTier.Exact
+            ? IsReady && CanDelete && ExactGroups.Count > 0
+            : CanMarkMerged(GroupsOf(ShownTier));
 
-        private bool CanMarkMergedSameChart() => CanMarkMerged(SameChartGroups);
+        /// <summary>Deletes every marked copy on the shown tab.</summary>
+        [RelayCommand(CanExecute = nameof(CanDeleteShown))]
+        private Task DeleteShownAsync() => DeleteMarkedAsync(GroupsOf(ShownTier));
 
-        /// <summary>Deletes every marked copy on the Same chart tab.</summary>
-        [RelayCommand(CanExecute = nameof(CanDeleteSameChart))]
-        private Task DeleteSameChartAsync() => DeleteMarkedAsync(SameChartGroups);
+        private bool CanDeleteShown() => CanDeleteMarked(ShownMarkedCount);
 
-        private bool CanDeleteSameChart() => CanDeleteMarked(SameChartMarkedCount);
-
-        /// <summary>Marks every source of a merged group on the Merge tab.</summary>
-        [RelayCommand(CanExecute = nameof(CanMarkMergedMerge))]
-        private void MarkMergedMerge() => Mark(DedupTier.MergeCandidate, MergeGroups.Where(g => g.HasMerged));
-
-        private bool CanMarkMergedMerge() => CanMarkMerged(MergeGroups);
-
-        /// <summary>Deletes every marked source on the Merge tab.</summary>
-        [RelayCommand(CanExecute = nameof(CanDeleteMerge))]
-        private Task DeleteMergeAsync() => DeleteMarkedAsync(MergeGroups);
-
-        private bool CanDeleteMerge() => CanDeleteMarked(MergeMarkedCount);
+        private AvaloniaList<DedupGroupViewModel> GroupsOf(DedupTier tier) => tier switch
+        {
+            DedupTier.Exact => ExactGroups,
+            DedupTier.SameChart => SameChartGroups,
+            _ => MergeGroups,
+        };
 
         /// <summary>Marks every copy in <paramref name="groups"/>, all on <paramref name="tier"/>'s tab, that can be; the tab's count follows once, after.</summary>
         private void Mark(DedupTier tier, IEnumerable<DedupGroupViewModel> groups)
@@ -528,22 +592,52 @@ namespace ChartPacker.ViewModels
         /// </summary>
         internal void OnMarksChanged(DedupTier tier)
         {
-            if (_isMarking)
-                return;
-
-            switch (tier)
-            {
-                case DedupTier.Exact:
-                    ExactMarkedCount = ExactGroups.Sum(g => g.MarkedCount);
-                    break;
-                case DedupTier.SameChart:
-                    SameChartMarkedCount = SameChartGroups.Sum(g => g.MarkedCount);
-                    break;
-                case DedupTier.MergeCandidate:
-                    MergeMarkedCount = MergeGroups.Sum(g => g.MarkedCount);
-                    break;
-            }
+            if (!_isMarking && tier == ShownTier)
+                RefreshShownMarks();
         }
+
+        private void RefreshShownMarks()
+        {
+            OnPropertyChanged(nameof(ShownMarkedCount));
+            OnPropertyChanged(nameof(HasShownMarked));
+            OnPropertyChanged(nameof(MarkedSummaryText));
+            OnPropertyChanged(nameof(DeleteShownLabel));
+            DeleteShownCommand.NotifyCanExecuteChanged();
+            MarkShownCommand.NotifyCanExecuteChanged();
+        }
+
+        private void OnGroupsChanged()
+        {
+            RefreshHeaders();
+            if (!_populating)
+                RefreshShown();
+        }
+
+        /// <summary>
+        /// Lists the shown tab's groups that match the search. The selected group stays selected while it's listed;
+        /// otherwise the one now where it was is, so deleting a group's copies moves on to the next.
+        /// </summary>
+        private void RefreshShown()
+        {
+            string search = SearchText.Trim();
+            var shown = GroupsOf(ShownTier).Where(g => search.Length == 0 || Matches(g, search)).ToList();
+            var selected = SelectedGroup;
+            int index = selected is null ? 0 : ShownGroups.IndexOf(selected);
+
+            ShownGroups.Clear();
+            ShownGroups.AddRange(shown);
+
+            SelectedGroup = selected is not null && shown.Contains(selected)
+                ? selected
+                : shown.Count == 0 ? null : shown[Math.Clamp(index, 0, shown.Count - 1)];
+            OnPropertyChanged(nameof(HasNoShown));
+            OnPropertyChanged(nameof(ShownEmptyText));
+            OnPropertyChanged(nameof(ShowNoSelection));
+        }
+
+        private static bool Matches(DedupGroupViewModel group, string search) =>
+            group.Title.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+            || group.Members.Any(m => m.Path.Contains(search, StringComparison.CurrentCultureIgnoreCase));
 
         /// <summary>Stops a deletion after the copy it's on; otherwise closes the window.</summary>
         [RelayCommand]
@@ -580,22 +674,13 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ExactHeader));
             OnPropertyChanged(nameof(SameChartHeader));
             OnPropertyChanged(nameof(MergeHeader));
-            OnPropertyChanged(nameof(HasNoExact));
-            OnPropertyChanged(nameof(HasNoSameChart));
-            OnPropertyChanged(nameof(HasNoMerge));
-            MarkAllCommand.NotifyCanExecuteChanged();
-            MarkMergedSameChartCommand.NotifyCanExecuteChanged();
-            MarkMergedMergeCommand.NotifyCanExecuteChanged();
+            MarkShownCommand.NotifyCanExecuteChanged();
         }
 
         private void RefreshCommands()
         {
-            MarkAllCommand.NotifyCanExecuteChanged();
-            DeleteExactCommand.NotifyCanExecuteChanged();
-            MarkMergedSameChartCommand.NotifyCanExecuteChanged();
-            DeleteSameChartCommand.NotifyCanExecuteChanged();
-            MarkMergedMergeCommand.NotifyCanExecuteChanged();
-            DeleteMergeCommand.NotifyCanExecuteChanged();
+            MarkShownCommand.NotifyCanExecuteChanged();
+            DeleteShownCommand.NotifyCanExecuteChanged();
             foreach (var group in ExactGroups.Concat(SameChartGroups).Concat(MergeGroups))
                 group.RefreshCommands();
         }

@@ -1612,13 +1612,17 @@
     <value>Find duplicate copies of songs across the whole library, and different charts of the same song, and move the copies you don't need to the trash. Rescans the library first, so it compares what's on disk now.</value>
   </data>
   <data name="DedupWindowTitle" xml:space="preserve">
-    <value>Deduplicate library</value>
+    <value>Deduplicate Library</value>
   </data>
   <data name="SettingsCategoryDuplicates" xml:space="preserve">
     <value>Duplicates</value>
   </data>
   <data name="DedupKeepLabel" xml:space="preserve">
     <value>Keep by default</value>
+  </data>
+  <data name="DedupKeepByDefaultLabel" xml:space="preserve">
+    <value>Keep by Default</value>
+    <comment>In the Deduplicate window's footer, before the SNG / FOLDER choice. The setting itself is DedupKeepLabel.</comment>
   </data>
   <data name="DedupKeepSng" xml:space="preserve">
     <value>The .sng</value>
@@ -1661,15 +1665,15 @@
     <comment>{0} is the error.</comment>
   </data>
   <data name="DedupTabExactFormat" xml:space="preserve">
-    <value>Exact duplicates ({0:N0})</value>
+    <value>Exact Duplicates ({0:N0})</value>
     <comment>{0} is the number of groups.</comment>
   </data>
   <data name="DedupTabSameChartFormat" xml:space="preserve">
-    <value>Same chart ({0:N0})</value>
+    <value>Same Chart ({0:N0})</value>
     <comment>{0} is the number of groups.</comment>
   </data>
   <data name="DedupTabMergeFormat" xml:space="preserve">
-    <value>Merge candidates ({0:N0})</value>
+    <value>Merge Candidates ({0:N0})</value>
     <comment>{0} is the number of groups.</comment>
   </data>
   <data name="DedupExactDescription" xml:space="preserve">
@@ -1689,6 +1693,35 @@
   </data>
   <data name="DedupNoMerge" xml:space="preserve">
     <value>No songs with more than one chart were found.</value>
+  </data>
+  <data name="DedupNoMatchesFormat" xml:space="preserve">
+    <value>No groups match “{0}”.</value>
+    <comment>{0} is the search text.</comment>
+  </data>
+  <data name="DedupNoSelection" xml:space="preserve">
+    <value>Select a group to see its copies.</value>
+  </data>
+  <data name="DedupSearchWatermark" xml:space="preserve">
+    <value>Search songs or paths</value>
+  </data>
+  <data name="DedupGroupCopiesFormat" xml:space="preserve">
+    <value>{0:N0} copies</value>
+    <comment>{0} is the number of copies in a group of duplicates.</comment>
+  </data>
+  <data name="DedupGroupChartsFormat" xml:space="preserve">
+    <value>{0:N0} charts</value>
+    <comment>{0} is the number of different charts of one song.</comment>
+  </data>
+  <data name="DedupGroupMarkedFormat" xml:space="preserve">
+    <value>{0:N0} marked</value>
+    <comment>{0} is the number of copies in a group marked for deletion.</comment>
+  </data>
+  <data name="DedupTagMerged" xml:space="preserve">
+    <value>Merged</value>
+  </data>
+  <data name="DedupMarkedSummaryFormat" xml:space="preserve">
+    <value>{0:N0} Marked · {1}</value>
+    <comment>{0} is the number of copies marked for deletion, {1} their size, such as "1.2 GB".</comment>
   </data>
   <data name="DedupSkippedFormat" xml:space="preserve">
     <value>{0:N0} songs couldn't be compared</value>
@@ -1718,10 +1751,10 @@
     <value>Delete</value>
   </data>
   <data name="DedupMarkAll" xml:space="preserve">
-    <value>Mark all duplicates</value>
+    <value>Mark All Duplicates</value>
   </data>
   <data name="DedupDeleteMarkedFormat" xml:space="preserve">
-    <value>Delete marked ({0:N0})…</value>
+    <value>Delete Marked ({0:N0})…</value>
     <comment>{0} is the number of marked rows.</comment>
   </data>
   <data name="DedupDeleteSourcesFormat" xml:space="preserve">
@@ -1729,11 +1762,7 @@
     <comment>{0} is the number of marked rows.</comment>
   </data>
   <data name="DedupMarkMerged" xml:space="preserve">
-    <value>Mark merged for deletion</value>
-  </data>
-  <data name="DedupDeleteMarkedFilesFormat" xml:space="preserve">
-    <value>Delete files marked for deletion ({0:N0})…</value>
-    <comment>{0} is the number of marked rows.</comment>
+    <value>Mark Merged for Deletion</value>
   </data>
   <data name="DedupOpenInMerge" xml:space="preserve">
     <value>Open in Merge…</value>
@@ -1750,18 +1779,8 @@
     <value>{0} – {1}</value>
     <comment>{0} is the artist, {1} the title.</comment>
   </data>
-  <data name="DedupKindSng" xml:space="preserve">
-    <value>.sng</value>
-  </data>
-  <data name="DedupKindFolder" xml:space="preserve">
-    <value>Folder</value>
-  </data>
-  <data name="DedupMemberDetailFormat" xml:space="preserve">
-    <value>{0} · {1} · modified {2}</value>
-    <comment>{0} is ".sng" or "Folder", {1} a size, {2} a date.</comment>
-  </data>
   <data name="DedupCharterFormat" xml:space="preserve">
-    <value>charted by {0}</value>
+    <value>Charted by {0}</value>
     <comment>{0} is the charter.</comment>
   </data>
   <data name="DedupCopiesFormat" xml:space="preserve">
@@ -1771,6 +1790,10 @@
   <data name="DedupOtherVersionsFormat" xml:space="preserve">
     <value>{0:N0} other copies of this chart differ and aren't deleted with it</value>
     <comment>{0} is the number of copies whose metadata or other files differ from the one shown.</comment>
+  </data>
+  <data name="DedupModifiedFormat" xml:space="preserve">
+    <value>Modified {0}</value>
+    <comment>{0} is a date.</comment>
   </data>
   <data name="DedupTagSuffix" xml:space="preserve">
     <value>Download copy</value>
@@ -1838,7 +1861,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>{0} is "Recycle Bin" or "Trash".</comment>
   </data>
   <data name="DedupDeleting" xml:space="preserve">
-    <value>Moving copies to the trash…</value>
+    <value>Moving Copies to the Trash…</value>
   </data>
   <data name="DedupStop" xml:space="preserve">
     <value>Stop</value>
@@ -1881,7 +1904,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Kept: you chose not to delete it permanently</value>
   </data>
   <data name="DedupResultSummaryFormat" xml:space="preserve">
-    <value>{0:N0} moved to the {1}, {2:N0} deleted permanently, {3:N0} skipped or failed</value>
+    <value>{0:N0} Moved to the {1}, {2:N0} Deleted Permanently, {3:N0} Skipped or Failed</value>
     <comment>{0}, {2} and {3} are counts, {1} is "Recycle Bin" or "Trash".</comment>
   </data>
   <data name="MenuDownloadAllFiles" xml:space="preserve">
