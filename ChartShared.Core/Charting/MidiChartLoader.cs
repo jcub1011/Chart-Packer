@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Globalization;
 using ChartShared.Core.Charts;
 using Serilog;
@@ -44,9 +45,30 @@ public static class MidiChartLoader
 
         // As the reader reads the file, so it fails where the reader does.
         var (resolution, chunks) = MidiChartReader.ChunksOf(midi);
-        var tempoEvents = MidiFile.ReadEvents(midi, chunks[0]);
-        var parts = MidiChartReader.PartTracksOf(midi, chunks);
+        var tempoEvents = MidiFile.RentEvents(midi, chunks[0]);
+        Dictionary<ChartInstrument, MidiPartTrack>? parts = null;
+        try
+        {
+            parts = MidiChartReader.PartTracksOf(midi, chunks);
+            return Load(midi, options, resolution, chunks, tempoEvents, parts);
+        }
+        finally
+        {
+            // The events were read into rented lists; the model holds what it takes from them.
+            ListPool<MidiEvent>.Return(tempoEvents);
+            if (parts is not null)
+                MidiChartReader.Return(parts);
+        }
+    }
 
+    private static ChartLoadResult Load(
+        byte[] midi,
+        ChartReadOptions options,
+        int resolution,
+        List<MidiChunk> chunks,
+        List<MidiEvent> tempoEvents,
+        Dictionary<ChartInstrument, MidiPartTrack> parts)
+    {
         var chart = new EditableChart(resolution);
         var issues = new List<ChartLoadIssue>();
         LoadTempoTrack(midi, tempoEvents, chart, issues);
@@ -77,9 +99,26 @@ public static class MidiChartLoader
             chart.AddPassthrough(new PassthroughTrack(midi[chunk.Start..chunk.End], MidiFile.NameOf(midi, chunk)));
         }
 
-        long? coda = events is { } at ? LoadEvents(midi, MidiFile.ReadEvents(midi, chunks[at]), chart) : null;
+        long? coda = null;
+        if (events is { } at)
+        {
+            var eventsTrack = MidiFile.RentEvents(midi, chunks[at]);
+            coda = LoadEvents(midi, eventsTrack, chart);
+            ListPool<MidiEvent>.Return(eventsTrack);
+        }
+
         foreach (var (instrument, part) in parts.Where(p => p.Key != ChartInstrument.Keys).OrderBy(p => p.Key))
-            new PartLoader(midi, part.Events, chart.AddPart(instrument), options, issues).Load(part.Name, coda);
+        {
+            var loader = new PartLoader(midi, part.Events, chart.AddPart(instrument), options, issues);
+            try
+            {
+                loader.Load(part.Name, coda);
+            }
+            finally
+            {
+                loader.Return();
+            }
+        }
 
         if (parts.TryGetValue(ChartInstrument.Drums, out var drums))
         {
@@ -105,8 +144,10 @@ public static class MidiChartLoader
     {
         ArgumentNullException.ThrowIfNull(chartBytes);
         ArgumentNullException.ThrowIfNull(options);
-        var conversion = ChartToMidi.Convert(chartBytes, options);
-        return new ChartImportResult(Load(conversion.Midi, conversion.Options), conversion.Offset, conversion.Options, conversion.Warnings, ChartSongSection.Read(chartBytes));
+        // Decoded and split into sections once, for the conversion and the [Song] section both.
+        var sections = ChartTextReader.Sections(ChartTextReader.Decode(chartBytes));
+        var conversion = ChartToMidi.Convert(sections, options);
+        return new ChartImportResult(Load(conversion.Midi, conversion.Options), conversion.Offset, conversion.Options, conversion.Warnings, ChartSongSection.Read(sections));
     }
 
     /// <summary>
@@ -270,14 +311,26 @@ public static class MidiChartLoader
         private readonly EditablePart _part = part;
         private readonly ChartReadOptions _options = options;
         private readonly List<ChartLoadIssue> _issues = issues;
-        private readonly MidiTrackNotes _track = MidiTrackNotes.Of(bytes, events, part.Kind == ChartInstrumentKind.FiveFret);
+        private readonly MidiTrackNotes _track = MidiTrackNotes.Of(bytes, events, part.Kind == ChartInstrumentKind.FiveFret, rent: true);
 
         // The events the model has taken, or left out: the rest are kept as text and raw events.
         private readonly bool[] _taken = new bool[events.Count];
 
+        // A difficulty's candidates, and KeepFirst's copy of them, used again for each difficulty rather than made anew.
+        private readonly List<Candidate> _candidates = ListPool<Candidate>.Rent();
+        private readonly List<Candidate> _sorted = ListPool<Candidate>.Rent();
+
         private ChartInstrumentKind Kind => _part.Kind;
 
         private bool IsDrums => Kind == ChartInstrumentKind.Drums;
+
+        /// <summary>Gives back the lists it rented, once it's loaded the part. Nothing may use it after.</summary>
+        public void Return()
+        {
+            _track.Return();
+            ListPool<Candidate>.Return(_candidates);
+            ListPool<Candidate>.Return(_sorted);
+        }
 
         /// <param name="name">The track's name, as the reader took it.</param>
         /// <param name="coda">The tick of <c>EVENTS</c>' first <c>[coda]</c>, after which drum fills are big rock endings.</param>
@@ -326,10 +379,11 @@ public static class MidiChartLoader
             var sysex = PhaseShiftMarkers();
             var taps = MarkersOn(MidiLayout.TapPitch);
             var tapIndex = Index(taps);
-            foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+            foreach (var difficulty in MidiLayout.Difficulties)
             {
                 int b = MidiLayout.BaseOf(Kind, difficulty);
-                var gems = new List<Candidate>();
+                var gems = _candidates;
+                gems.Clear();
                 foreach (var note in _track.Notes)
                 {
                     if (MidiLayout.DifficultyOf(Kind, note.Pitch) != difficulty)
@@ -393,10 +447,11 @@ public static class MidiChartLoader
         /// <summary>Each difficulty's drum notes, with their pads' accents and ghosts once the track has <c>[ENABLE_CHART_DYNAMICS]</c>.</summary>
         private void Drums()
         {
-            foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+            foreach (var difficulty in MidiLayout.Difficulties)
             {
                 int b = MidiLayout.BaseOf(ChartInstrumentKind.Drums, difficulty);
-                var hits = new List<Candidate>();
+                var hits = _candidates;
+                hits.Clear();
                 foreach (var note in _track.Notes)
                 {
                     // As the reader has them: the pitch below an easier difficulty's kick reads as its double kick too,
@@ -519,10 +574,24 @@ public static class MidiChartLoader
         /// </summary>
         private void Unpaired()
         {
-            var consumed = _track.Consumed;
+            bool[] consumed = ArrayPool<bool>.Shared.Rent(_events.Count);
+            try
+            {
+                Array.Clear(consumed, 0, _events.Count);
+                _track.MarkConsumed(consumed.AsSpan(0, _events.Count));
+                Unpaired(consumed);
+            }
+            finally
+            {
+                ArrayPool<bool>.Shared.Return(consumed);
+            }
+        }
+
+        private void Unpaired(bool[] consumed)
+        {
             for (int i = 1; i < _events.Count; i++)
             {
-                if (_taken[i] || consumed.Contains(i))
+                if (_taken[i] || consumed[i])
                     continue;
                 var e = _events[i];
                 if (e.Kind is 0x80 or 0x90 && IsRead(_bytes[e.DataStart]))
@@ -570,7 +639,9 @@ public static class MidiChartLoader
         private List<Candidate> KeepFirst(List<Candidate> candidates, ChartDifficulty difficulty, Func<Candidate, int> keyOf, Func<Candidate, bool>? kept = null)
         {
             TickOrder.Sort(candidates, static c => c.Note.Start);
-            var sorted = candidates.ToList();
+            var sorted = _sorted;
+            sorted.Clear();
+            sorted.AddRange(candidates);
             TickOrder.KeepFirstOfEach(candidates, static c => c.Note.Start, keyOf);
 
             // Those kept are in the order sorted, so the rest are found walking both.

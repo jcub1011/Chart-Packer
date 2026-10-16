@@ -75,13 +75,22 @@ public static class ChartToMidi
     public static ChartConversion Convert(byte[] chartBytes, ChartReadOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(chartBytes);
+        return Convert(ChartTextReader.Sections(ChartTextReader.Decode(chartBytes)), options);
+    }
+
+    /// <summary>
+    /// As <see cref="Convert(byte[], ChartReadOptions?)"/>, from the <c>.chart</c>'s sections as
+    /// <see cref="ChartTextReader.Sections"/> finds them, so a caller reading them for more decodes the file once.
+    /// </summary>
+    /// <exception cref="ChartFormatException">The chart is malformed, or can't be written as MIDI.</exception>
+    internal static ChartConversion Convert(List<(string Name, List<string> Lines)> sections, ChartReadOptions? options)
+    {
         options ??= ChartReadOptions.Default;
 
-        var before = ChartReader.Read(chartBytes, ChartFiles.ChartName, options);
+        var before = ChartTextReader.Read(sections, options);
         if (before.Tempo.Resolution > short.MaxValue)
             throw new ChartFormatException("The chart's resolution is too fine for a MIDI file.");
 
-        var sections = ChartTextReader.Sections(ChartTextReader.Decode(chartBytes));
         var byInstrument = new Dictionary<ChartInstrument, Dictionary<ChartDifficulty, List<ChartTextReader.TrackEvent>>>();
         foreach (var (name, lines) in sections.Skip(2))
         {

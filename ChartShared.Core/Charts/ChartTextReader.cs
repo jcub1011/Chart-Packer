@@ -68,10 +68,13 @@ internal static class ChartTextReader
         length <= 0 || (options.SustainCutoff is { } cutoff && length < cutoff) ? 0 : length;
 
     /// <exception cref="ChartFormatException">The file isn't a <c>.chart</c> YARG can read.</exception>
-    public static ChartDocument Read(byte[] bytes, ChartReadOptions? options = null)
+    public static ChartDocument Read(byte[] bytes, ChartReadOptions? options = null) => Read(Sections(Decode(bytes)), options);
+
+    /// <summary>As <see cref="Read(byte[], ChartReadOptions?)"/>, from the file's <see cref="Sections"/>, for a caller that reads them for more.</summary>
+    /// <exception cref="ChartFormatException">The file isn't a <c>.chart</c> YARG can read.</exception>
+    internal static ChartDocument Read(List<(string Name, List<string> Lines)> sections, ChartReadOptions? options)
     {
         options ??= ChartReadOptions.Default;
-        var sections = Sections(Decode(bytes));
         if (sections.Count < 1 || sections[0].Name != "Song")
             throw new ChartFormatException("The chart doesn't start with a [Song] section.");
         if (sections.Count < 2 || sections[1].Name != "SyncTrack")

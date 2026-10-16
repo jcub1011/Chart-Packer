@@ -53,19 +53,51 @@ public static class SongMetadataCheck
     /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
     public static async Task<SongMetadataReport> ReadAsync(SongEntry entry, CancellationToken cancellationToken = default)
     {
+        var (report, files) = await OpenAsync(entry, cancellationToken).ConfigureAwait(false);
+        files?.Dispose();
+        return report;
+    }
+
+    /// <summary>
+    /// Opens <paramref name="entry"/> and reads its metadata, leaving it open so its other files can be read without
+    /// opening it again, as its chart is linted (<see cref="SongChartLint"/>). A song that can't be read is reported, not
+    /// thrown, and has no files open.
+    /// </summary>
+    /// <returns>The metadata, and the song open, which the caller disposes; null when it couldn't be read.</returns>
+    /// <exception cref="OperationCanceledException">The read was cancelled.</exception>
+    public static async Task<(SongMetadataReport Report, SongFileReader? Files)> OpenAsync(SongEntry entry, CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(entry);
 
+        SongFileReader? files = null;
         try
         {
-            return entry.Kind == SongEntryKind.SngFile
-                ? FromSng(entry, await SngReader.ReadAsync(entry.FullPath, cancellationToken).ConfigureAwait(false))
-                : await ReadFolderAsync(entry, SongIni.FindIn(entry.FullPath), cancellationToken).ConfigureAwait(false);
+            // A .sng's index is read on the thread pool, as the caller may be the UI thread.
+            files = entry.Kind == SongEntryKind.SngFile
+                ? await Task.Run(() => SongFileReader.Open(entry, cancellationToken), cancellationToken).ConfigureAwait(false)
+                : SongFileReader.Open(entry, cancellationToken);
+            var report = files.Sng is { } sng
+                ? FromSng(entry, sng)
+                : await ReadFolderAsync(entry, SongIniIn(files), cancellationToken).ConfigureAwait(false);
+            return (report, files);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new SongMetadataReport(entry, [], [], SongMetadataStatus.Unreadable, ex.Message);
+            files?.Dispose();
+            return (new SongMetadataReport(entry, [], [], SongMetadataStatus.Unreadable, ex.Message), null);
+        }
+        catch
+        {
+            files?.Dispose();
+            throw;
         }
     }
+
+    // The folder's song.ini, found in its listing as SongIni.FindIn finds it.
+    private static string? SongIniIn(SongFileReader files) =>
+        files.TopLevel.FirstOrDefault(f => f.Name.Equals(SongIni.FileName, StringComparison.OrdinalIgnoreCase)) is { } ini
+            ? Path.Combine(files.Entry.FullPath, ini.Name)
+            : null;
 
     /// <summary>The metadata of the <c>.sng</c> <paramref name="entry"/>, read as <paramref name="result"/>.</summary>
     public static SongMetadataReport FromSng(SongEntry entry, SngReadResult result)

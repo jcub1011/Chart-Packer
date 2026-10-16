@@ -5,33 +5,61 @@
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
         xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:ui="using:ChartShared.UI.Controls"
         mc:Ignorable="d"
         x:Class="ChartPacker.Views.ValidatorProgressDialog"
         x:DataType="vm:ValidatorWindowViewModel"
         Title="{x:Static res:Strings.ValidatorWindowTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
         SizeToContent="Height"
         Width="400"
         CanResize="False"
+        CanMinimize="False"
         ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterOwner">
-    <StackPanel Margin="20" Spacing="14">
-        <StackPanel Orientation="Horizontal" Spacing="8">
+    <DockPanel>
+        <!-- The title bar, as the Validator window's is, over the check's progress. -->
+        <Panel DockPanel.Dock="Top" Height="31">
+            <ProgressBar Classes="fill"
+                         Margin="0,0,0,1"
+                         Minimum="0"
+                         Maximum="{Binding Total}"
+                         Value="{Binding Checked}"
+                         IsHitTestVisible="False"
+                         AutomationProperties.Name="{Binding StatusText}" />
+
+            <ui:TitleBar x:Name="WindowTitleBar"
+                         Background="Transparent"
+                         BorderThickness="0,0,0,1"
+                         BorderBrush="{DynamicResource SubtleBorderBrush}"
+                         AppName="{x:Static res:Strings.AppName}">
+                <TextBlock Margin="8,0,12,0"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{x:Static res:Strings.ValidatorWindowTitle}" />
+            </ui:TitleBar>
+        </Panel>
+
+        <!-- What it's doing; Cancel stops the check, and nothing opens. -->
+        <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Button HorizontalAlignment="Right"
+                    MinWidth="80"
+                    HorizontalContentAlignment="Center"
+                    Content="{x:Static sres:SharedStrings.CancelButton}"
+                    IsCancel="True"
+                    Click="OnCancel"
+                    AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+        </Border>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="16,18">
             <Arc Classes="spinner active"
-                 Width="12" Height="12" StrokeThickness="2"
+                 Width="14" Height="14" StrokeThickness="2"
                  VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding StatusText}" />
         </StackPanel>
-        <ProgressBar Minimum="0"
-                     Maximum="{Binding Total}"
-                     Value="{Binding Checked}"
-                     AutomationProperties.Name="{Binding StatusText}" />
-        <!-- Cancel stops the check; nothing opens. -->
-        <Button HorizontalAlignment="Right"
-                MinWidth="80"
-                HorizontalContentAlignment="Center"
-                Content="{x:Static sres:SharedStrings.CancelButton}"
-                IsCancel="True"
-                Click="OnCancel"
-                AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
-    </StackPanel>
+    </DockPanel>
 </Window>

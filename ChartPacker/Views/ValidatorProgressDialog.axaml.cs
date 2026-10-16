@@ -13,6 +13,7 @@ namespace ChartPacker.Views
         public ValidatorProgressDialog()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
 

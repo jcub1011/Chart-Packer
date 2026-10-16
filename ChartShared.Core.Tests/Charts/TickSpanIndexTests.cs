@@ -39,8 +39,8 @@ public sealed class TickSpanIndexTests
             _ => new TickSpan(60, 70),
         });
 
-        Assert.AreSequenceEqual(["b", "a"], index.Covering(40).ToList());
-        Assert.IsEmpty(index.Covering(55));
+        Assert.AreSequenceEqual(["b", "a"], Covering(index, 40));
+        Assert.IsEmpty(Covering(index, 55));
     }
 
     [TestMethod]
@@ -62,5 +62,13 @@ public sealed class TickSpanIndexTests
                 Assert.AreEqual(expected > 0, index.Covers(tick), $"round {round}, tick {tick}");
             }
         }
+    }
+
+    private static List<string> Covering(TickSpanIndex<string> index, long tick)
+    {
+        var items = new List<string>();
+        foreach (string item in index.Covering(tick))
+            items.Add(item);
+        return items;
     }
 }

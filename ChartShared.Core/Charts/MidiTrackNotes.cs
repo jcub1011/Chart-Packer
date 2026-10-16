@@ -37,7 +37,14 @@ internal sealed class MidiTrackNotes
 {
     private HashSet<int>? _consumed;
 
-    private MidiTrackNotes(int capacity) => Notes = new List<MidiNote>(capacity);
+    // Whether Notes was rented from ListPool, to be given back by Return.
+    private readonly bool _rented;
+
+    private MidiTrackNotes(int capacity, bool rent)
+    {
+        _rented = rent;
+        Notes = rent ? ListPool<MidiNote>.Rent(capacity) : new List<MidiNote>(capacity);
+    }
 
     /// <summary>The notes, in the order they're let go.</summary>
     public List<MidiNote> Notes { get; }
@@ -66,6 +73,27 @@ internal sealed class MidiTrackNotes
     /// text events. The rest (the first event, notes ignored or never let go, any other event) weren't.
     /// </summary>
     public IReadOnlySet<int> Consumed => _consumed ??= ConsumedOf();
+
+    /// <summary>Gives back <see cref="Notes"/>, if it was rented. Nothing may use the track after.</summary>
+    public void Return()
+    {
+        if (_rented)
+            ListPool<MidiNote>.Return(Notes);
+    }
+
+    /// <summary>
+    /// Marks the events <see cref="Consumed"/> holds, by their indexes in <paramref name="marks"/>, without making the
+    /// set: a track's worth of hashed ints for each part loaded.
+    /// </summary>
+    public void MarkConsumed(Span<bool> marks)
+    {
+        foreach (var note in Notes)
+            marks[note.OnIndex] = marks[note.OffIndex] = true;
+        foreach (var sysex in Sysex)
+            marks[sysex.OnIndex] = marks[sysex.OffIndex] = true;
+        foreach (var text in Texts)
+            marks[text.Index] = true;
+    }
 
     /// <summary>The notes on <paramref name="pitch"/>, of any channel, in the order they're let go.</summary>
     public List<TickSpan> Spans(int pitch)
@@ -100,10 +128,14 @@ internal sealed class MidiTrackNotes
     }
 
     /// <param name="enhancedOpens">Whether an <c>ENHANCED_OPENS</c> event can turn on open notes: five-fret only.</param>
-    public static MidiTrackNotes Of(byte[] bytes, List<MidiEvent> events, bool enhancedOpens)
+    /// <param name="rent">
+    /// Whether <see cref="Notes"/> is rented from <see cref="ListPool{T}"/>, for a track read only while a chart is: the
+    /// caller then gives it back with <see cref="Return"/>.
+    /// </param>
+    public static MidiTrackNotes Of(byte[] bytes, List<MidiEvent> events, bool enhancedOpens, bool rent = false)
     {
         // A note takes a note-on and a note-off.
-        var track = new MidiTrackNotes(events.Count / 2);
+        var track = new MidiTrackNotes(events.Count / 2, rent);
         var held = new List<(int Pitch, int Channel, int Velocity, long Start, int Index)>();
         var heldSysex = new List<(int Difficulty, int Code, long Start, int Index)>();
         bool opensOn = false;

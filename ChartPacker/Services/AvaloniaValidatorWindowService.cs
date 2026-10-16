@@ -74,7 +74,8 @@ namespace ChartPacker.Services
                 isOpenInChartBuilder,
                 new AvaloniaChartIssuesWindowService(() => dialog));
 
-            // Songs are read as many at once as a library scan reads.
+            // Songs are read as many at once as a library scan reads; the window lints and checks them on one core fewer
+            // than there are, leaving one to the UI thread.
             int parallelism = Math.Max(settings.Settings.ScanParallelism, AppSettings.MinScanParallelism);
             var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, settings, confirmation, isOpenInChartBuilder);
             dialog.DataContext = viewModel;

@@ -27,6 +27,7 @@ namespace ChartPacker.Views
         public ValidatorWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             // The splitter position is view state, so it's applied and captured here rather than bound.
             Opened += (_, _) =>
             {
@@ -68,6 +69,8 @@ namespace ChartPacker.Views
             ValidatorWindowViewModel.ToggleExpanded(song);
             e.Handled = true;
         }
+
+        private void OnClose(object? sender, RoutedEventArgs e) => Close();
 
         private static ValidatorSongViewModel? SongAt(object? source) =>
             (source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true)?.DataContext as ValidatorSongViewModel;

@@ -20,16 +20,20 @@ public static class SongFile
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (entry.Kind != SongEntryKind.SngFile)
-        {
-            return [.. new DirectoryInfo(entry.FullPath).EnumerateFiles().Select(f => new StoredFile(f.Name, f.Length))];
-        }
+        return entry.Kind != SongEntryKind.SngFile
+            ? ListFolder(entry.FullPath)
+            : TopLevelOf(SngReader.Read(entry.FullPath, cancellationToken));
+    }
 
-        var read = SngReader.Read(entry.FullPath, cancellationToken);
-        return read.Header is null
+    /// <summary>The files directly in <paramref name="folder"/>.</summary>
+    internal static IReadOnlyList<StoredFile> ListFolder(string folder) =>
+        [.. new DirectoryInfo(folder).EnumerateFiles().Select(f => new StoredFile(f.Name, f.Length))];
+
+    /// <summary>The stored files of the <c>.sng</c> read as <paramref name="read"/> whose names have no folder; none when it can't be parsed.</summary>
+    internal static IReadOnlyList<StoredFile> TopLevelOf(SngReadResult read) =>
+        read.Header is null
             ? []
             : read.Files.Where(f => !f.Name.Contains('/')).Select(f => new StoredFile(f.Name, (long)f.Length)).ToList();
-    }
 
     /// <summary>
     /// Reads the file <paramref name="storedName"/> of <paramref name="entry"/>, matched ignoring case.
@@ -189,7 +193,7 @@ public static class SongFile
     /// directly in it, or, for a <c>/</c>-separated name as a <c>.sng</c> stores one, in its subfolders.
     /// A name that leads outside the folder finds nothing.
     /// </summary>
-    private static string? FindInFolder(string folder, string name)
+    internal static string? FindInFolder(string folder, string name)
     {
         string[] segments = name.Split('/');
         if (segments.Any(s => s is "" or "." or ".." || s.Contains('\\')))

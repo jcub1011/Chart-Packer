@@ -179,20 +179,36 @@ namespace ChartPacker.ViewModels
 
         private string Query => SearchText?.Trim() ?? "";
 
-        internal void Add(JobItemRow row)
+        /// <summary>
+        /// Adds <paramref name="rows"/>, in the order they finished. Each outcome's go into the list together, so the
+        /// view hears of them at most once per outcome rather than once per row.
+        /// </summary>
+        internal void AddRange(IReadOnlyList<JobItemRow> rows)
         {
-            int outcome = (int)row.Outcome;
-            _all[outcome].Add(row);
-            _chips[outcome].Count++;
-            if (IsShown(row))
+            if (rows.Count == 0)
+                return;
+
+            for (int outcome = 0; outcome < _all.Length; outcome++)
             {
+                var ofOutcome = rows.Where(r => (int)r.Outcome == outcome).ToList();
+                if (ofOutcome.Count == 0)
+                    continue;
+
+                _all[outcome].AddRange(ofOutcome);
+                _chips[outcome].Count += ofOutcome.Count;
+
+                var shown = ofOutcome.Where(IsShown).ToList();
+                if (shown.Count == 0)
+                    continue;
+
                 // After the shown rows of its own outcome and those listed before it.
                 int index = 0;
                 for (int i = 0; i <= outcome; i++)
                     index += _shown[i];
-                Rows.Insert(index, row);
-                _shown[outcome]++;
+                Rows.InsertRange(index, shown);
+                _shown[outcome] += shown.Count;
             }
+
             Refresh();
         }
 
@@ -266,6 +282,10 @@ namespace ChartPacker.ViewModels
         // A job has run (or is running) this session, so there's a summary to show.
         private bool _hasRun;
 
+        // How often the results a job reports are taken in while it runs: often enough to look live, seldom enough that
+        // the windows lay themselves out and draw a few times a second rather than once per item.
+        private static readonly TimeSpan TakeReportedInterval = TimeSpan.FromMilliseconds(100);
+
         /// <summary>A row per item the job has finished, or a cancelled job never finished.</summary>
         public JobResultList Results { get; } = new();
 
@@ -323,24 +343,41 @@ namespace ChartPacker.ViewModels
             IsRunning = true;
             RefreshState();
 
-            // Progress<T> posts to the UI thread in order, ahead of this method's continuation.
-            var progress = new Progress<JobItemResult>(result => Add(kind, result));
-
+            // The job reports each item from its own threads, into a queue the UI thread takes in a batch at a time,
+            // below input and drawing. Posting each one instead (Progress<T>) runs them above both, so a fast run of
+            // items, such as songs already packed, held up the whole UI until the last was in.
+            var reported = new UiBatchQueue<JobItemResult>(TakeReportedInterval, results => TakeReported(kind, results));
+            reported.Start();
             try
             {
-                await Task.Run(() => SongJob.RunAsync(kind, entries, scanRoot, destination, policy, progress, layout, cancellationToken: cts.Token), cts.Token);
+                await Task.Run(() => SongJob.RunAsync(kind, entries, scanRoot, destination, policy, reported, layout, cancellationToken: cts.Token), cts.Token);
             }
             catch (OperationCanceledException)
             {
                 _cancelled = true;
+                // The items finished before it stopped come first, so the rest are the ones never finished.
+                reported.TakeAll();
                 AddCanceled(kind, entries);
             }
             finally
             {
+                reported.Stop();
+                reported.TakeAll();
                 _cts = null;
                 IsRunning = false;
                 RefreshState();
             }
+        }
+
+        /// <summary>Takes in the results reported since the last time, as rows, with one change for the list and the summary.</summary>
+        private void TakeReported(JobKind kind, IEnumerable<JobItemResult> results)
+        {
+            var rows = results.Select(result => RowFor(kind, result)).ToList();
+            if (rows.Count == 0)
+                return;
+
+            Results.AddRange(rows);
+            RefreshState();
         }
 
         [RelayCommand(CanExecute = nameof(IsRunning))]
@@ -355,7 +392,8 @@ namespace ChartPacker.ViewModels
         /// <summary>Selects <paramref name="row"/>'s song in the library, as double-clicking the row does.</summary>
         public void ShowInLibrary(JobItemRow row) => ShowInLibraryRequested?.Invoke(this, row.Entry);
 
-        private void Add(JobKind kind, JobItemResult result)
+        /// <summary>Counts <paramref name="result"/> towards the summary and makes its row.</summary>
+        private JobItemRow RowFor(JobKind kind, JobItemResult result)
         {
             switch (result.Status)
             {
@@ -375,8 +413,7 @@ namespace ChartPacker.ViewModels
                 .Select(f => new JobMessageRow(f.RuleId, f.Message, f.Severity == Severity.Error))
                 .ToList();
 
-            Results.Add(new JobItemRow(result.Entry, Describe(kind, result), result.Status, messages));
-            RefreshState();
+            return new JobItemRow(result.Entry, Describe(kind, result), result.Status, messages);
         }
 
         /// <summary>
@@ -386,8 +423,7 @@ namespace ChartPacker.ViewModels
         private void AddCanceled(JobKind kind, IReadOnlyList<SongEntry> entries)
         {
             string detail = kind == JobKind.Pack ? Strings.JobCanceledPack : Strings.JobCanceledUnpack;
-            foreach (SongEntry entry in entries.Skip(Done))
-                Results.Add(new JobItemRow(entry, detail, JobItemStatus.Failed, [], IsCanceled: true));
+            Results.AddRange([.. entries.Skip(Done).Select(entry => new JobItemRow(entry, detail, JobItemStatus.Failed, [], IsCanceled: true))]);
         }
 
         private static string Describe(JobKind kind, JobItemResult result) => result.Status switch

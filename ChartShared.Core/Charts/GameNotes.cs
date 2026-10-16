@@ -64,13 +64,38 @@ internal sealed class TickSpanIndex<T>
         return count;
     }
 
-    /// <summary>The items whose spans cover <paramref name="tick"/>, the latest starting first.</summary>
-    public IEnumerable<T> Covering(long tick)
+    /// <summary>
+    /// The items whose spans cover <paramref name="tick"/>, the latest starting first. Enumerated without allocating,
+    /// as it's asked of every note.
+    /// </summary>
+    public CoveringItems Covering(long tick) => new(this, tick);
+
+    /// <summary>The items whose spans cover a tick, for <see langword="foreach"/>.</summary>
+    public readonly struct CoveringItems(TickSpanIndex<T> index, long tick)
     {
-        for (int i = LastStartingBy(tick); i >= 0 && CanCover(i, tick); i--)
+        public Enumerator GetEnumerator() => new(index, tick);
+
+        public struct Enumerator(TickSpanIndex<T> index, long tick)
         {
-            if (_spans[i].Covers(tick))
-                yield return _items[i];
+            private int _next = index.LastStartingBy(tick);
+
+            public T Current { get; private set; } = default!;
+
+            public bool MoveNext()
+            {
+                while (_next >= 0 && index.CanCover(_next, tick))
+                {
+                    int i = _next--;
+                    if (index._spans[i].Covers(tick))
+                    {
+                        Current = index._items[i];
+                        return true;
+                    }
+                }
+
+                _next = -1;
+                return false;
+            }
         }
     }
 

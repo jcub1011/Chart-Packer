@@ -78,7 +78,7 @@ internal static class FindingOrder
         if (c == 0)
             c = string.CompareOrdinal(a.RuleId, b.RuleId);
         if (c == 0)
-            c = a.Severity.CompareTo(b.Severity);
+            c = ((int)a.Severity).CompareTo((int)b.Severity); // As ints: an enum's CompareTo boxes both.
         if (c == 0)
             c = string.CompareOrdinal(a.Message, b.Message);
         if (c == 0)
@@ -104,7 +104,7 @@ internal static class FindingOrder
     {
         if (a is null || b is null)
             return a is null ? (b is null ? 0 : -1) : 1;
-        int c = a.Part.CompareTo(b.Part);
+        int c = ((int)a.Part).CompareTo((int)b.Part);
         if (c == 0)
             c = Nullable.Compare(a.Difficulty, b.Difficulty);
         if (c == 0)

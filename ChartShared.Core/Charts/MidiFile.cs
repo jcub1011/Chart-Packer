@@ -84,10 +84,22 @@ internal static class MidiFile
 
     /// <summary>The events of the track <paramref name="chunk"/>, with their ticks from the start of the track.</summary>
     /// <exception cref="ChartFormatException">The track is malformed.</exception>
-    public static List<MidiEvent> ReadEvents(byte[] bytes, MidiChunk chunk)
+    public static List<MidiEvent> ReadEvents(byte[] bytes, MidiChunk chunk) =>
+        ReadEvents(bytes, chunk, new List<MidiEvent>(CapacityFor(chunk)));
+
+    /// <summary>
+    /// As <see cref="ReadEvents(byte[], MidiChunk)"/>, into a list rented from <see cref="ListPool{T}"/>, which the
+    /// caller gives back once it's done with the events.
+    /// </summary>
+    /// <exception cref="ChartFormatException">The track is malformed.</exception>
+    public static List<MidiEvent> RentEvents(byte[] bytes, MidiChunk chunk) =>
+        ReadEvents(bytes, chunk, ListPool<MidiEvent>.Rent(CapacityFor(chunk)));
+
+    // Note events take 3 or 4 bytes with running status, so this is about enough, and seldom grows.
+    private static int CapacityFor(MidiChunk chunk) => chunk.Length / 3;
+
+    private static List<MidiEvent> ReadEvents(byte[] bytes, MidiChunk chunk, List<MidiEvent> events)
     {
-        // Note events take 3 or 4 bytes with running status, so this is about enough, and seldom grows.
-        var events = new List<MidiEvent>(chunk.Length / 3);
         var reader = new EventReader(chunk);
         while (reader.Next(bytes) is { } e)
             events.Add(e);

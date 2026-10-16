@@ -17,6 +17,9 @@ internal static class MidiLayout
     /// <summary>The velocity a note is written with when nothing rides on it.</summary>
     public const int NormalVelocity = 100;
 
+    /// <summary>Every difficulty, easiest first: <see cref="Enum.GetValues{TEnum}()"/> once, as it makes an array each call.</summary>
+    public static readonly ChartDifficulty[] Difficulties = Enum.GetValues<ChartDifficulty>();
+
     /// <summary>The pro-drums tom markers for yellow, blue and green.</summary>
     public const int FirstTomPitch = 110;
 
@@ -70,7 +73,7 @@ internal static class MidiLayout
     /// <summary>The difficulty whose notes (and forcing markers) use <paramref name="pitch"/>, if one does.</summary>
     public static ChartDifficulty? DifficultyOf(ChartInstrumentKind kind, int pitch)
     {
-        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+        foreach (var difficulty in Difficulties)
         {
             int b = BaseOf(kind, difficulty);
             var (low, high) = kind switch
@@ -179,35 +182,67 @@ internal readonly record struct MidiPartTrack(int Chunk, string Name, List<MidiE
 internal static class MidiChartReader
 {
     /// <exception cref="ChartFormatException">The file isn't a MIDI file YARG can read, or is malformed.</exception>
-    public static ChartDocument Read(byte[] bytes, ChartReadOptions options)
-    {
-        var (resolution, chunks) = ChunksOf(bytes);
-        var tempo = TempoOf(bytes, resolution, [MidiFile.ReadEvents(bytes, chunks[0])]);
-        var parts = PartTracksOf(bytes, chunks);
+    public static ChartDocument Read(byte[] bytes, ChartReadOptions options) => ReadEachWay(bytes, [options])[0];
 
-        var read = new List<(ChartInstrument, IReadOnlyDictionary<ChartDifficulty, List<ChartNote>>, IReadOnlyList<StarPowerPhrase>)>(parts.Count);
-        DrumsLayout? drumsLayout = null;
-        foreach (var (instrument, part) in parts)
+    /// <summary>
+    /// The chart read with each of <paramref name="ways"/>, which differ only in their natural-HOPO threshold
+    /// (<see cref="ChartReadOptions.MidiHopoTicks"/>), as <see cref="NoteCheck.ReadEveryWay"/> reads one: as many reads
+    /// as <see cref="Read"/> would give, but the tracks are read and their notes paired once, and only the fret notes,
+    /// which the threshold shapes, are worked out for each. The drum notes, which it doesn't, are the same lists in each.
+    /// </summary>
+    /// <exception cref="ChartFormatException">The file isn't a MIDI file YARG can read, or is malformed.</exception>
+    internal static IReadOnlyList<ChartDocument> ReadEachWay(byte[] bytes, IReadOnlyList<ChartReadOptions> ways)
+    {
+        var options = ways[0];
+        var (resolution, chunks) = ChunksOf(bytes);
+        var sync = MidiFile.RentEvents(bytes, chunks[0]);
+        var tempo = TempoOf(bytes, resolution, [sync]);
+        ListPool<MidiEvent>.Return(sync);
+
+        // The events and notes are read into rented lists, given back once the notes are worked out from them.
+        var parts = PartTracksOf(bytes, chunks);
+        try
         {
-            var events = part.Events;
-            var kind = ChartInstruments.KindOf(instrument);
-            var track = MidiTrackNotes.Of(bytes, events, kind == ChartInstrumentKind.FiveFret);
-            var starPower = GameNotes.StarPower(track.Spans(options.MidiStarPowerPitch));
-            if (kind == ChartInstrumentKind.Drums)
+            var reads = ways.Select(_ => new List<(ChartInstrument, IReadOnlyDictionary<ChartDifficulty, List<ChartNote>>, IReadOnlyList<StarPowerPhrase>)>(parts.Count)).ToList();
+            DrumsLayout? drumsLayout = null;
+            foreach (var (instrument, part) in parts)
             {
-                var layout = DrumsLayoutOf(bytes, events, options);
-                drumsLayout = layout;
-                read.Add((instrument, Drums(track, layout, starPower), starPower));
-                continue;
+                var events = part.Events;
+                var kind = ChartInstruments.KindOf(instrument);
+                var track = MidiTrackNotes.Of(bytes, events, kind == ChartInstrumentKind.FiveFret, rent: true);
+                try
+                {
+                    var starPower = GameNotes.StarPower(track.Spans(options.MidiStarPowerPitch));
+                    if (kind == ChartInstrumentKind.Drums)
+                    {
+                        var layout = DrumsLayoutOf(bytes, events, options);
+                        drumsLayout = layout;
+                        var drums = Drums(track, layout, starPower);
+                        foreach (var read in reads)
+                            read.Add((instrument, drums, starPower));
+                        continue;
+                    }
+
+                    for (int way = 0; way < ways.Count; way++)
+                    {
+                        var notes = new Dictionary<ChartDifficulty, List<ChartNote>>();
+                        foreach (var difficulty in MidiLayout.Difficulties)
+                            notes[difficulty] = Frets(track, kind, difficulty, resolution, ways[way], starPower);
+                        reads[way].Add((instrument, notes, starPower));
+                    }
+                }
+                finally
+                {
+                    track.Return();
+                }
             }
 
-            var notes = new Dictionary<ChartDifficulty, List<ChartNote>>();
-            foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
-                notes[difficulty] = Frets(track, kind, difficulty, resolution, options, starPower);
-            read.Add((instrument, notes, starPower));
+            return [.. reads.Select(read => GameNotes.Document(tempo, read, drumsLayout))];
         }
-
-        return GameNotes.Document(tempo, read, drumsLayout);
+        finally
+        {
+            Return(parts);
+        }
     }
 
     /// <summary>The file's division, and its chunks after the header, the sync track first, as YARG takes them.</summary>
@@ -228,7 +263,8 @@ internal static class MidiChartReader
     /// </summary>
     /// <remarks>
     /// Every track is read, so a malformed one fails the file, but only the events of the tracks taken are kept:
-    /// vocals, venue and the like are often most of a file.
+    /// vocals, venue and the like are often most of a file. Their lists are rented from <see cref="ListPool{T}"/>, and
+    /// given back with <see cref="Return(Dictionary{ChartInstrument, MidiPartTrack})"/>.
     /// </remarks>
     /// <param name="chunks">The file's chunks after its header, the sync track first, as <see cref="ChunksOf"/> gives them.</param>
     /// <exception cref="ChartFormatException">A track is malformed.</exception>
@@ -244,7 +280,9 @@ internal static class MidiChartReader
                 && MidiLayout.TrackNames.TryGetValue(name, out var instrument)
                 && (!parts.ContainsKey(instrument) || MidiLayout.OverridingTrackNames.Contains(name)))
             {
-                parts[instrument] = new MidiPartTrack(i, name, MidiFile.ReadEvents(bytes, chunk));
+                if (parts.TryGetValue(instrument, out var replaced))
+                    ListPool<MidiEvent>.Return(replaced.Events);
+                parts[instrument] = new MidiPartTrack(i, name, MidiFile.RentEvents(bytes, chunk));
             }
             else
             {
@@ -253,6 +291,13 @@ internal static class MidiChartReader
         }
 
         return parts;
+    }
+
+    /// <summary>Gives back the lists of events <see cref="PartTracksOf"/> rented. Nothing may use them after.</summary>
+    internal static void Return(Dictionary<ChartInstrument, MidiPartTrack> parts)
+    {
+        foreach (var part in parts.Values)
+            ListPool<MidiEvent>.Return(part.Events);
     }
 
     /// <summary>
@@ -406,7 +451,7 @@ internal static class MidiChartReader
     private static Dictionary<ChartDifficulty, List<ChartNote>> Drums(MidiTrackNotes track, DrumsLayout layout, IReadOnlyList<StarPowerPhrase> starPower)
     {
         var hits = new Dictionary<ChartDifficulty, List<DrumHit>>();
-        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+        foreach (var difficulty in MidiLayout.Difficulties)
         {
             int b = MidiLayout.BaseOf(ChartInstrumentKind.Drums, difficulty);
             var list = new List<DrumHit>();
