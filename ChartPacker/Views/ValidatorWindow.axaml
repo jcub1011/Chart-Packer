@@ -4,7 +4,6 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
-        xmlns:ctl="using:ChartPacker.Controls"
         xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:views="using:ChartPacker.Views"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="880"
@@ -15,7 +14,14 @@
         Width="1400" Height="880"
         MinWidth="900" MinHeight="520"
         ShowInTaskbar="False"
+        CanMinimize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterOwner">
+
+    <!-- It can't be minimized: a modal window with no taskbar entry would have nothing to restore it from, leaving its
+         owner disabled. -->
 
     <Window.Resources>
         <!-- A filter chip: clicking it turns it on or off. -->
@@ -53,9 +59,13 @@
             <Setter Property="Padding" Value="0" />
         </Style>
 
-        <!-- Rows: hover and selection as in the library list (tint and a violet bar on the left). -->
+        <!-- Rows: hover and selection as in the library list (tint and a violet bar on the left). The separator is on
+             the row inside the padding, so it's inset from the bar. -->
+        <Style Selector="ListBox.validator-songs">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
         <Style Selector="ListBox.validator-songs ListBoxItem">
-            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="BorderThickness" Value="3,0,0,0" />
             <Setter Property="BorderBrush" Value="Transparent" />
         </Style>
@@ -64,13 +74,15 @@
         </Style>
         <Style Selector="ListBox.validator-songs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="BorderBrush">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </Style>
         <Style Selector="ListBox.validator-songs ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#558B5CF6" />
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+        </Style>
+        <Style Selector="Border.song-row">
+            <Setter Property="Padding" Value="0,9" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
         </Style>
 
         <!-- A song fixed since it was listed stays, dimmed, so the list doesn't move under the pointer. -->
@@ -78,53 +90,48 @@
             <Setter Property="Opacity" Value="0.55" />
         </Style>
 
-        <!-- The counts at the end of a song's lines: violet for quick fixes, orange for the rest, green once it passes.
-             A zero is dimmed, not hidden, so the columns stay put. -->
-        <Style Selector="Border.count">
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="6,1" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="VerticalAlignment" Value="Center" />
+        <!-- The counts at the end of a song's lines, as chips: violet for quick fixes, orange for the rest, green once it
+             passes. Both fill their column, so they're the same width. A zero is dimmed, not hidden, so the columns
+             stay put. -->
+        <Style Selector="Border.chip.count">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
         </Style>
-        <Style Selector="Border.count > TextBlock">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+        <Style Selector="Border.chip.count > TextBlock">
             <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="1" />
         </Style>
-        <Style Selector="Border.count.fixable">
-            <Setter Property="Background" Value="#2E8B5CF6" />
-            <Setter Property="BorderBrush" Value="#668B5CF6" />
+        <Style Selector="Border.chip.fixable">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
         </Style>
-        <Style Selector="Border.count.fixable > TextBlock">
+        <Style Selector="Border.chip.fixable > TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
         </Style>
-        <Style Selector="Border.count.manual">
-            <Setter Property="Background" Value="#2EFB923C" />
-            <Setter Property="BorderBrush" Value="#66FB923C" />
+        <Style Selector="Border.chip.manual">
+            <Setter Property="Background" Value="#40FB923C" />
         </Style>
-        <Style Selector="Border.count.manual > TextBlock">
+        <Style Selector="Border.chip.manual > TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
         </Style>
-        <Style Selector="Border.count.passes">
+        <Style Selector="Border.chip.passes">
             <Setter Property="Background" Value="#2E4ADE80" />
-            <Setter Property="BorderBrush" Value="#664ADE80" />
         </Style>
-        <Style Selector="Border.count.passes > TextBlock">
+        <Style Selector="Border.chip.passes > TextBlock">
             <Setter Property="Foreground" Value="#4ADE80" />
         </Style>
-        <Style Selector="Border.count.zero">
+        <Style Selector="Border.chip.zero">
             <Setter Property="Opacity" Value="0.35" />
         </Style>
 
-        <!-- A song's list of issues, opened under it. -->
+        <!-- A song's list of issues, opened under it, indented to its title. -->
         <Style Selector="Border.issues">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10,8" />
-            <Setter Property="Margin" Value="30,8,0,2" />
+            <Setter Property="Margin" Value="30,8,0,0" />
         </Style>
         <Style Selector="TextBlock.issue">
             <Setter Property="FontSize" Value="12" />
@@ -156,296 +163,309 @@
             <Setter Property="FontFamily" Value="Consolas, Menlo, monospace" />
             <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
         </Style>
+
+        <!-- The footer's status: amber while songs still fail, the accent once they all pass. -->
+        <Style Selector="ui|LineIcon.warn">
+            <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
+        </Style>
+        <Style Selector="ui|LineIcon.done">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
     </Window.Styles>
 
-    <!-- Columns (0) songs, (1) splitter, (2) inspector. ValidatorWindow.axaml.cs indexes these. -->
-    <Grid x:Name="ValidatorRoot">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="2*" MinWidth="360" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="3*" MinWidth="420" />
-        </Grid.ColumnDefinitions>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- The title bar, as the main window's is, over the check's progress: the icon (the owner's, set in code) and
+             the title. Layered: the progress, then the title bar, see-through so the progress shows. -->
+        <Panel Grid.Row="0" Height="31">
+            <ProgressBar Classes="fill"
+                         Margin="0,0,0,1"
+                         Minimum="0"
+                         Maximum="{Binding Total}"
+                         Value="{Binding Checked}"
+                         IsVisible="{Binding IsChecking}"
+                         IsHitTestVisible="False"
+                         AutomationProperties.Name="{Binding StatusText}" />
 
-        <!-- The songs that fail, as they're found. -->
-        <DockPanel Grid.Column="0">
-            <!-- How far the check has got, or what it found, with the filter beside it, and a box over the songs' boxes
-                 that ticks every quick fix shown. -->
-            <Border DockPanel.Dock="Top" Classes="toolbar" Padding="13,10,12,8">
-                <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Arc Classes="spinner"
-                                     Classes.active="{Binding IsChecking}"
-                                     IsVisible="{Binding IsChecking}"
-                                     Width="12" Height="12" StrokeThickness="2"
-                                     VerticalAlignment="Center" />
-                                <TextBlock VerticalAlignment="Center"
-                                           FontWeight="SemiBold"
-                                           TextWrapping="Wrap"
-                                           Text="{Binding StatusText}" />
-                            </StackPanel>
-                            <TextBlock Classes="muted"
-                                       FontSize="11"
-                                       TextWrapping="Wrap"
-                                       IsVisible="{Binding HasActiveFilters}"
-                                       Text="{Binding ShownSummaryText}" />
-                        </StackPanel>
-
-                        <!-- On/off chips: with none on in a group, it lets every issue through. -->
-                        <Button Grid.Column="1"
-                                Classes="tool"
-                                Classes.active="{Binding HasActiveFilters}"
-                                VerticalAlignment="Center"
-                                ToolTip.Tip="{x:Static res:Strings.ValidatorFilterToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.ValidatorFilterToolTip}">
-                            <Panel Width="32" Height="32">
-                                <ui:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
-                                <Border Classes="badge" IsVisible="{Binding HasActiveFilters}">
-                                    <TextBlock Text="{Binding ActiveFilterCount}" />
-                                </Border>
-                            </Panel>
-                            <Button.Flyout>
-                                <Flyout Placement="BottomEdgeAlignedRight">
-                                    <ScrollViewer MaxHeight="560" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Width="340" Spacing="14" Margin="2">
-                                            <StackPanel Classes="filter-section">
-                                                <TextBlock Classes="caption" Text="{x:Static res:Strings.ValidatorFilterFixLabel}" />
-                                                <ItemsControl ItemsSource="{Binding FixChips}" ItemTemplate="{StaticResource ValidatorFilterChipTemplate}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel ItemSpacing="4" LineSpacing="4" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                </ItemsControl>
-                                            </StackPanel>
-
-                                            <!-- Only the types the listed songs have. -->
-                                            <StackPanel Classes="filter-section">
-                                                <TextBlock Classes="caption" Text="{x:Static res:Strings.ValidatorFilterTypeLabel}" />
-                                                <ItemsControl ItemsSource="{Binding TypeChips}"
-                                                              ItemTemplate="{StaticResource ValidatorFilterChipTemplate}"
-                                                              IsVisible="{Binding HasTypeChips}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel ItemSpacing="4" LineSpacing="4" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                </ItemsControl>
-                                                <TextBlock Classes="muted"
-                                                           FontSize="12"
-                                                           IsVisible="{Binding !HasTypeChips}"
-                                                           Text="{x:Static res:Strings.ValidatorFilterNoTypes}" />
-                                            </StackPanel>
-
-                                            <!-- Only the metadata keys that fail in the listed songs, not every key. -->
-                                            <StackPanel Classes="filter-section">
-                                                <TextBlock Classes="caption" Text="{x:Static res:Strings.ValidatorFilterKeyLabel}" />
-                                                <ItemsControl ItemsSource="{Binding KeyChips}"
-                                                              ItemTemplate="{StaticResource ValidatorKeyChipTemplate}"
-                                                              IsVisible="{Binding HasKeyChips}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel ItemSpacing="4" LineSpacing="4" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                </ItemsControl>
-                                                <TextBlock Classes="muted"
-                                                           FontSize="12"
-                                                           IsVisible="{Binding !HasKeyChips}"
-                                                           Text="{x:Static res:Strings.ValidatorFilterNoTypes}" />
-                                            </StackPanel>
-
-                                            <Button HorizontalAlignment="Right"
-                                                    Content="{x:Static res:Strings.ResetFilters}"
-                                                    Command="{Binding ClearFiltersCommand}" />
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </Flyout>
-                            </Button.Flyout>
-                        </Button>
-                    </Grid>
-                    <ProgressBar IsVisible="{Binding IsChecking}"
-                                 Minimum="0"
-                                 Maximum="{Binding Total}"
-                                 Value="{Binding Checked}"
-                                 MinWidth="0"
-                                 MinHeight="3"
-                                 Height="3"
-                                 AutomationProperties.Name="{Binding StatusText}" />
-                    <CheckBox VerticalAlignment="Center"
-                              IsThreeState="False"
-                              IsEnabled="{Binding HasFixes}"
-                              IsChecked="{Binding AllFixesSelected}"
-                              Content="{x:Static res:Strings.ValidatorSelectAllFixes}" />
-                </StackPanel>
-            </Border>
-
-            <!-- Quick fixes go into the drafts; Save all changes writes every listed song's. -->
-            <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0" Padding="12,8">
-                <StackPanel Spacing="8">
-                    <Border Classes="banner error" IsVisible="{Binding HasSaveError}">
-                        <SelectableTextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding SaveError}" />
-                    </Border>
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Panel Width="14" VerticalAlignment="Center">
-                            <Arc Classes="spinner"
-                                 Classes.active="{Binding IsSaving}"
-                                 IsVisible="{Binding IsSaving}"
-                                 Width="14" Height="14" StrokeThickness="2" />
-                        </Panel>
-                        <Button Classes="labelled"
-                                Command="{Binding FixSelectedCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.ValidatorFixSelectedToolTip}">
-                            <TextBlock VerticalAlignment="Center" Text="{Binding FixSelectedText}" />
-                        </Button>
-                        <Button Classes="labelled accent"
-                                Command="{Binding SaveAllCommand}"
-                                ToolTip.Tip="{x:Static res:Strings.ValidatorSaveAllToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.ValidatorSaveAll}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ui:LineIcon Data="{StaticResource SaveStroke}" />
-                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ValidatorSaveAll}" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <Panel>
-                <ListBox x:Name="SongList"
-                         Classes="validator-songs"
-                         ItemsSource="{Binding ShownSongs}"
-                         SelectedItem="{Binding SelectedSong}"
-                         SelectionMode="Single"
+            <ui:TitleBar x:Name="WindowTitleBar"
                          Background="Transparent"
-                         AutomationProperties.Name="{x:Static res:Strings.ValidatorSongsListName}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ValidatorSongViewModel">
-                            <StackPanel Classes="validator-song" Classes.fixed="{Binding IsFixed}">
-                                <!-- The box ticks every quick fix of the song. Clicking anywhere else on these lines picks
-                                     the song, or opens and closes its issues once it's picked (ValidatorWindow.axaml.cs). -->
-                                <Grid Classes="song-header"
-                                      Background="Transparent"
-                                      ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto"
-                                      ColumnSpacing="10" RowSpacing="3"
-                                      ToolTip.Tip="{Binding Path}">
-                                    <CheckBox Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                              Classes="bare"
-                                              VerticalAlignment="Center"
-                                              IsThreeState="False"
-                                              IsEnabled="{Binding HasShownFixes}"
-                                              IsChecked="{Binding AllSelected}"
-                                              AutomationProperties.Name="{Binding SelectFixesName}" />
+                         BorderThickness="0,0,0,1"
+                         BorderBrush="{DynamicResource SubtleBorderBrush}"
+                         AppName="{x:Static res:Strings.AppName}">
+                <TextBlock Margin="8,0,12,0"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{x:Static res:Strings.ValidatorWindowTitle}" />
+            </ui:TitleBar>
+        </Panel>
 
-                                    <TextBlock Grid.Row="0" Grid.Column="1"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"
-                                               Text="{Binding Title}" />
-                                    <!-- Artist · charter, or where the song is when it has neither. The charter can carry
-                                         rich-text tags (colours, bold…), which are drawn rather than shown. -->
-                                    <TextBlock Grid.Row="1" Grid.Column="1"
-                                               Classes="muted"
-                                               FontSize="11"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"
-                                               Text="{Binding Details}"
-                                               IsVisible="{Binding ShowDetails}" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1"
-                                               Classes="muted"
-                                               FontSize="11"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"
-                                               ui:RichTextMarkup.Prefix="{Binding BylinePrefix}"
-                                               ui:RichTextMarkup.Text="{Binding Charter}"
-                                               IsVisible="{Binding ShowByline}" />
+        <!-- Columns (0) songs, (1) splitter, (2) inspector. ValidatorWindow.axaml.cs indexes these. -->
+        <Grid x:Name="ValidatorRoot" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" MinWidth="360" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="3*" MinWidth="420" />
+            </Grid.ColumnDefinitions>
 
-                                    <Border Grid.Row="0" Grid.Column="2"
-                                            Classes="count fixable"
-                                            Classes.zero="{Binding !HasFixes}"
-                                            IsVisible="{Binding !IsFixed}"
-                                            ToolTip.Tip="{x:Static res:Strings.ValidatorFixableCountToolTip}">
-                                        <TextBlock Text="{Binding FixableCountText}" />
+            <!-- The songs that fail, as they're found, on the surface the library's list is on. -->
+            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}">
+                <DockPanel>
+                    <!-- Search, and the filter flyout, as the library's search strip is. -->
+                    <Border DockPanel.Dock="Top"
+                            Padding="6"
+                            BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <TextBox Grid.Column="0"
+                                     Classes="clearButton"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding SearchText}"
+                                     PlaceholderText="{x:Static res:Strings.ValidatorSearchWatermark}"
+                                     AutomationProperties.Name="{x:Static res:Strings.ValidatorSearchWatermark}">
+                                <TextBox.InnerLeftContent>
+                                    <ui:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                                </TextBox.InnerLeftContent>
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+
+                            <!-- On/off chips: with none on in a group, it lets every issue through. -->
+                            <Button Grid.Column="1"
+                                    Classes="tool"
+                                    Classes.active="{Binding HasActiveFilters}"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="{x:Static res:Strings.ValidatorFilterToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.ValidatorFilterToolTip}">
+                                <Panel Width="32" Height="32">
+                                    <ui:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
+                                    <Border Classes="badge" IsVisible="{Binding HasActiveFilters}">
+                                        <TextBlock Text="{Binding ActiveFilterCount}" />
                                     </Border>
-                                    <Border Grid.Row="1" Grid.Column="2"
-                                            Classes="count manual"
-                                            Classes.zero="{Binding !HasManual}"
-                                            IsVisible="{Binding !IsFixed}"
-                                            ToolTip.Tip="{x:Static res:Strings.ValidatorManualCountToolTip}">
-                                        <TextBlock Text="{Binding ManualCountText}" />
+                                </Panel>
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedRight">
+                                        <ScrollViewer MaxHeight="560" HorizontalScrollBarVisibility="Disabled">
+                                            <StackPanel Width="340" Spacing="14" Margin="2">
+                                                <StackPanel Classes="filter-section">
+                                                    <TextBlock Classes="caption" Text="{x:Static res:Strings.ValidatorFilterFixLabel}" />
+                                                    <ItemsControl ItemsSource="{Binding FixChips}" ItemTemplate="{StaticResource ValidatorFilterChipTemplate}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                </StackPanel>
+
+                                                <!-- Only the types the listed songs have. -->
+                                                <StackPanel Classes="filter-section">
+                                                    <TextBlock Classes="caption" Text="{x:Static res:Strings.ValidatorFilterTypeLabel}" />
+                                                    <ItemsControl ItemsSource="{Binding TypeChips}"
+                                                                  ItemTemplate="{StaticResource ValidatorFilterChipTemplate}"
+                                                                  IsVisible="{Binding HasTypeChips}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                    <TextBlock Classes="muted"
+                                                               FontSize="12"
+                                                               IsVisible="{Binding !HasTypeChips}"
+                                                               Text="{x:Static res:Strings.ValidatorFilterNoTypes}" />
+                                                </StackPanel>
+
+                                                <!-- Only the metadata keys that fail in the listed songs, not every key. -->
+                                                <StackPanel Classes="filter-section">
+                                                    <TextBlock Classes="caption" Text="{x:Static res:Strings.ValidatorFilterKeyLabel}" />
+                                                    <ItemsControl ItemsSource="{Binding KeyChips}"
+                                                                  ItemTemplate="{StaticResource ValidatorKeyChipTemplate}"
+                                                                  IsVisible="{Binding HasKeyChips}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                    <TextBlock Classes="muted"
+                                                               FontSize="12"
+                                                               IsVisible="{Binding !HasKeyChips}"
+                                                               Text="{x:Static res:Strings.ValidatorFilterNoTypes}" />
+                                                </StackPanel>
+
+                                                <Button HorizontalAlignment="Right"
+                                                        Content="{x:Static res:Strings.ResetFilters}"
+                                                        Command="{Binding ClearFiltersCommand}" />
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- A box over the songs' boxes, lined up with them, that ticks every quick fix shown; then how many of
+                         the listed songs the search and filter show. -->
+                    <Border DockPanel.Dock="Top"
+                            Padding="15,6,12,6"
+                            BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <CheckBox Grid.Column="0"
+                                      MinHeight="0"
+                                      FontSize="12"
+                                      VerticalAlignment="Center"
+                                      IsThreeState="False"
+                                      IsEnabled="{Binding HasFixes}"
+                                      IsChecked="{Binding AllFixesSelected}"
+                                      Content="{x:Static res:Strings.ValidatorSelectAllFixes}" />
+                            <TextBlock Grid.Column="1"
+                                       Classes="muted"
+                                       FontSize="12"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       IsVisible="{Binding IsNarrowed}"
+                                       Text="{Binding ShownSummaryText}" />
+                        </Grid>
+                    </Border>
+
+                    <Panel>
+                        <ListBox x:Name="SongList"
+                                 Classes="validator-songs"
+                                 ItemsSource="{Binding ShownSongs}"
+                                 SelectedItem="{Binding SelectedSong}"
+                                 SelectionMode="Single"
+                                 AutomationProperties.Name="{x:Static res:Strings.ValidatorSongsListName}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ValidatorSongViewModel">
+                                    <Border Classes="song-row">
+                                        <StackPanel Classes="validator-song" Classes.fixed="{Binding IsFixed}">
+                                            <!-- The box ticks every quick fix of the song. Clicking anywhere else on these
+                                                 lines picks the song, or opens and closes its issues once it's picked
+                                                 (ValidatorWindow.axaml.cs). -->
+                                            <Grid Classes="song-header"
+                                                  Background="Transparent"
+                                                  ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto"
+                                                  ColumnSpacing="10" RowSpacing="3"
+                                                  ToolTip.Tip="{Binding Path}">
+                                                <CheckBox Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
+                                                          Classes="bare"
+                                                          VerticalAlignment="Center"
+                                                          IsThreeState="False"
+                                                          IsEnabled="{Binding HasShownFixes}"
+                                                          IsChecked="{Binding AllSelected}"
+                                                          AutomationProperties.Name="{Binding SelectFixesName}" />
+
+                                                <TextBlock Grid.Row="0" Grid.Column="1"
+                                                           FontWeight="SemiBold"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Text="{Binding Title}" />
+                                                <!-- Artist · charter, or where the song is when it has neither. The charter can
+                                                     carry rich-text tags (colours, bold…), which are drawn rather than shown. -->
+                                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                                           Classes="muted"
+                                                           FontSize="12"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Text="{Binding Details}"
+                                                           IsVisible="{Binding ShowDetails}" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                                           Classes="muted"
+                                                           FontSize="12"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ui:RichTextMarkup.Prefix="{Binding BylinePrefix}"
+                                                           ui:RichTextMarkup.Text="{Binding Charter}"
+                                                           IsVisible="{Binding ShowByline}" />
+
+                                                <Border Grid.Row="0" Grid.Column="2"
+                                                        Classes="chip large count fixable"
+                                                        Classes.zero="{Binding !HasFixes}"
+                                                        IsVisible="{Binding !IsFixed}"
+                                                        ToolTip.Tip="{x:Static res:Strings.ValidatorFixableCountToolTip}">
+                                                    <TextBlock Text="{Binding FixableCountText}" />
+                                                </Border>
+                                                <Border Grid.Row="1" Grid.Column="2"
+                                                        Classes="chip large count manual"
+                                                        Classes.zero="{Binding !HasManual}"
+                                                        IsVisible="{Binding !IsFixed}"
+                                                        ToolTip.Tip="{x:Static res:Strings.ValidatorManualCountToolTip}">
+                                                    <TextBlock Text="{Binding ManualCountText}" />
+                                                </Border>
+                                                <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
+                                                        Classes="chip large count passes"
+                                                        IsVisible="{Binding IsFixed}">
+                                                    <TextBlock Text="{x:Static res:Strings.ValidatorFixed}" />
+                                                </Border>
+                                            </Grid>
+
+                                            <!-- Each failing key the filter shows, with why; one with a quick fix can be
+                                                 ticked, with what the fix does under it. -->
+                                            <Border Classes="issues" IsVisible="{Binding ShowIssues}">
+                                                <ItemsControl ItemsSource="{Binding ShownIssues}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Spacing="8" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:ValidatorIssueViewModel">
+                                                            <Grid ColumnDefinitions="28,*">
+                                                                <CheckBox Grid.Column="0"
+                                                                          Classes="bare"
+                                                                          VerticalAlignment="Top"
+                                                                          IsVisible="{Binding IsFixable}"
+                                                                          IsChecked="{Binding IsSelected}"
+                                                                          AutomationProperties.Name="{Binding Text}" />
+                                                                <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                                        <Border Grid.Column="0" Classes="key" IsVisible="{Binding HasKey}">
+                                                                            <TextBlock Text="{Binding Key}" />
+                                                                        </Border>
+                                                                        <TextBlock Grid.Column="1"
+                                                                                   Classes="issue"
+                                                                                   Classes.chartWarning="{Binding IsChartWarning}"
+                                                                                   Classes.chartError="{Binding IsChartError}"
+                                                                                   Text="{Binding Message}" />
+                                                                    </Grid>
+                                                                    <TextBlock Classes="fix" IsVisible="{Binding IsFixable}" Text="{Binding FixText}" />
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Border>
+                                        </StackPanel>
                                     </Border>
-                                    <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
-                                            Classes="count passes"
-                                            IsVisible="{Binding IsFixed}">
-                                        <TextBlock Text="{x:Static res:Strings.ValidatorFixed}" />
-                                    </Border>
-                                </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
 
-                                <!-- Each failing key the filter shows, with why; one with a quick fix can be ticked, with what
-                                     the fix does under it. -->
-                                <Border Classes="issues" IsVisible="{Binding ShowIssues}">
-                                    <ItemsControl ItemsSource="{Binding ShownIssues}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="8" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:ValidatorIssueViewModel">
-                                                <Grid ColumnDefinitions="28,*">
-                                                    <CheckBox Grid.Column="0"
-                                                              Classes="bare"
-                                                              VerticalAlignment="Top"
-                                                              IsVisible="{Binding IsFixable}"
-                                                              IsChecked="{Binding IsSelected}"
-                                                              AutomationProperties.Name="{Binding Text}" />
-                                                    <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
-                                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                                            <Border Grid.Column="0" Classes="key" IsVisible="{Binding HasKey}">
-                                                                <TextBlock Text="{Binding Key}" />
-                                                            </Border>
-                                                            <TextBlock Grid.Column="1"
-                                                                       Classes="issue"
-                                                                       Classes.chartWarning="{Binding IsChartWarning}"
-                                                                       Classes.chartError="{Binding IsChartError}"
-                                                                       Text="{Binding Message}" />
-                                                        </Grid>
-                                                        <TextBlock Classes="fix" IsVisible="{Binding IsFixable}" Text="{Binding FixText}" />
-                                                    </StackPanel>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Border>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                        <StackPanel VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Margin="16"
+                                    Spacing="10"
+                                    IsVisible="{Binding ShowNoMatches}">
+                            <TextBlock Classes="muted centered" Text="{x:Static res:Strings.ValidatorNoMatches}" TextWrapping="Wrap" />
+                            <Button HorizontalAlignment="Center"
+                                    Content="{x:Static res:Strings.ClearFilters}"
+                                    Command="{Binding ClearFiltersCommand}" />
+                        </StackPanel>
+                    </Panel>
+                </DockPanel>
+            </Border>
 
-                <StackPanel VerticalAlignment="Center"
-                            HorizontalAlignment="Center"
-                            Margin="16"
-                            Spacing="10"
-                            IsVisible="{Binding ShowNoMatches}">
-                    <TextBlock Classes="muted centered" Text="{x:Static res:Strings.ValidatorNoMatches}" TextWrapping="Wrap" />
-                    <Button HorizontalAlignment="Center"
-                            Content="{x:Static res:Strings.ClearFilters}"
-                            Command="{Binding ClearFiltersCommand}" />
-                </StackPanel>
-            </Panel>
-        </DockPanel>
+            <GridSplitter Grid.Column="1"
+                          Width="1"
+                          Background="{DynamicResource SubtleBorderBrush}"
+                          ResizeDirection="Columns" />
 
-        <GridSplitter Grid.Column="1"
-                      Width="4"
-                      ResizeDirection="Columns"
-                      Background="{DynamicResource SubtleBorderBrush}" />
-
-        <!-- The picked song in the full inspector, with Save and Discard along its bottom while it has unsaved changes,
-             as in the main window. -->
-        <Border Grid.Column="2" Background="{DynamicResource SurfaceBrush}">
-            <Panel>
-                <!-- Nothing is edited while Save all changes writes the drafts. -->
+            <!-- The picked song in the full inspector, as in the main window, with Save and Discard along its bottom
+                 while it has unsaved changes. Nothing is edited while Save all changes writes the drafts. -->
+            <Panel Grid.Column="2">
                 <Panel IsVisible="{Binding ShowInspector}" IsEnabled="{Binding !IsSaving}">
                     <views:SongDetailView DataContext="{Binding Inspector}" />
                 </Panel>
@@ -456,6 +476,64 @@
                            IsVisible="{Binding ShowPickPrompt}"
                            Text="{x:Static res:Strings.ValidatorPickSong}" />
             </Panel>
+        </Grid>
+
+        <!-- Why the last save failed; then one line, how far the check has got or what it found, and the actions: Fix
+             selected puts the ticked quick fixes into the drafts, Save all changes writes every listed song's, Close
+             keeps the drafts. -->
+        <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
+            <StackPanel Spacing="8">
+                <Border Classes="banner error" IsVisible="{Binding HasSaveError}">
+                    <SelectableTextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding SaveError}" />
+                </Border>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <Grid Grid.Column="0" ColumnDefinitions="16,*" ColumnSpacing="8" VerticalAlignment="Center" Margin="4,0,0,0">
+                        <Panel Grid.Column="0" VerticalAlignment="Center">
+                            <Arc Classes="spinner"
+                                 Classes.active="{Binding IsChecking}"
+                                 IsVisible="{Binding IsChecking}"
+                                 Width="14" Height="14" StrokeThickness="2" />
+                            <ui:LineIcon Classes="warn" Data="{StaticResource WarningStroke}" IsVisible="{Binding HasFailing}" />
+                            <ui:LineIcon Classes="done" Data="{StaticResource CheckStroke}" IsVisible="{Binding AllPass}" />
+                        </Panel>
+                        <TextBlock Grid.Column="1"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding StatusText}"
+                                   Text="{Binding StatusText}" />
+                    </Grid>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Panel Width="14" VerticalAlignment="Center">
+                            <Arc Classes="spinner"
+                                 Classes.active="{Binding IsSaving}"
+                                 IsVisible="{Binding IsSaving}"
+                                 Width="14" Height="14" StrokeThickness="2" />
+                        </Panel>
+                        <Button Command="{Binding FixSelectedCommand}"
+                                Content="{Binding FixSelectedText}"
+                                ToolTip.Tip="{x:Static res:Strings.ValidatorFixSelectedToolTip}"
+                                AutomationProperties.Name="{Binding FixSelectedText}" />
+                        <Button Classes="accent"
+                                Command="{Binding SaveAllCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.ValidatorSaveAllToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.ValidatorSaveAll}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ui:LineIcon Data="{StaticResource SaveStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ValidatorSaveAll}" />
+                            </StackPanel>
+                        </Button>
+                        <!-- Not IsCancel: Escape belongs to the inspector's boxes, and a stray one mustn't close the
+                             window over the song being edited. -->
+                        <Button MinWidth="80"
+                                HorizontalContentAlignment="Center"
+                                Content="{x:Static res:Strings.CloseButton}"
+                                Click="OnClose"
+                                AutomationProperties.Name="{x:Static res:Strings.CloseButton}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

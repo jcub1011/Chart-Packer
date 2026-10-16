@@ -106,11 +106,9 @@ internal static class NoteCheck
     public static IReadOnlyList<ChartDocument> ReadEveryWay(byte[] midi, ChartReadOptions options)
     {
         var (_, resolution, _) = MidiFile.ReadChunks(midi);
-        return
-        [
-            ChartReader.Read(midi, ChartFiles.MidiName, options),
-            .. options.MidiHopoThresholds(resolution).Skip(1).Select(t => ChartReader.Read(midi, ChartFiles.MidiName, options with { MidiHopoTicks = t })),
-        ];
+
+        // Read once, with the notes worked out for each threshold, rather than read again for each.
+        return MidiChartReader.ReadEachWay(midi, [options, .. options.MidiHopoThresholds(resolution).Skip(1).Select(t => options with { MidiHopoTicks = t })]);
     }
 
     /// <summary>

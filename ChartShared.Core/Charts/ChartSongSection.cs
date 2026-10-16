@@ -31,7 +31,12 @@ public static class ChartSongSection
     public static IReadOnlyList<KeyValuePair<string, string>> Read(byte[] chartBytes)
     {
         ArgumentNullException.ThrowIfNull(chartBytes);
-        var sections = ChartTextReader.Sections(ChartTextReader.Decode(chartBytes));
+        return Read(ChartTextReader.Sections(ChartTextReader.Decode(chartBytes)));
+    }
+
+    /// <summary>As <see cref="Read(byte[])"/>, from the file's sections as <see cref="ChartTextReader.Sections"/> finds them.</summary>
+    internal static IReadOnlyList<KeyValuePair<string, string>> Read(List<(string Name, List<string> Lines)> sections)
+    {
         if (sections.Count < 1 || sections[0].Name != "Song")
             return [];
 

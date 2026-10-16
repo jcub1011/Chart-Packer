@@ -68,8 +68,9 @@ namespace ChartShared.UI.ViewModels
             return [.. SongTracks.FilesOfStem(storedNames, stem).Where(stored => !stored.Equals(storedName, StringComparison.Ordinal))];
         }
 
-        /// <summary>The title of the file picker for <paramref name="stem"/>'s track.</summary>
-        public static string PickTitleFor(string stem) => string.Format(CultureInfo.CurrentCulture, SharedStrings.PickTrackTitleFormat, stem);
+        /// <summary>The title of the file picker for <paramref name="stem"/>'s track, with the stem in title case as the rest is.</summary>
+        public static string PickTitleFor(string stem) =>
+            string.Format(CultureInfo.CurrentCulture, SharedStrings.PickTrackTitleFormat, CultureInfo.CurrentCulture.TextInfo.ToTitleCase(stem));
 
         /// <summary>
         /// The Add track menu's entries: every stem, labelled to replace it where <paramref name="present"/> has it, each

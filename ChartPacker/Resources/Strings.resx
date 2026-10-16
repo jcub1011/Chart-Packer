@@ -42,7 +42,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="BrowseDialogTitle" xml:space="preserve">
-    <value>Choose a folder of songs</value>
+    <value>Choose a Folder of Songs</value>
   </data>
   <data name="BrowseToolTip" xml:space="preserve">
     <value>Choose the folder to search for songs</value>
@@ -114,7 +114,7 @@
     <comment>{0} is the system error message.</comment>
   </data>
   <data name="DetailPlaceholderTitle" xml:space="preserve">
-    <value>Select a song</value>
+    <value>Select a Song</value>
   </data>
   <data name="DetailPlaceholderBody" xml:space="preserve">
     <value>Choose a song in the list to see its metadata and files</value>
@@ -146,7 +146,7 @@
     <value>Other files</value>
   </data>
   <data name="OtherFilesHeaderFormat" xml:space="preserve">
-    <value>Other files ({0:N0})</value>
+    <value>Other Files ({0:N0})</value>
     <comment>{0} is the number of files that aren't the album art, a background, a track, the chart or song.ini.</comment>
   </data>
   <data name="NoOtherFiles" xml:space="preserve">
@@ -159,7 +159,7 @@
     <value>Choose where Pack and Unpack write. Each item keeps its place relative to the scanned folder.</value>
   </data>
   <data name="BrowseOutputDialogTitle" xml:space="preserve">
-    <value>Choose the output folder</value>
+    <value>Choose the Output Folder</value>
   </data>
   <data name="BrowseOutputToolTip" xml:space="preserve">
     <value>Choose where Pack and Unpack write</value>
@@ -341,7 +341,7 @@
     <value>_Deduplicate…</value>
   </data>
   <data name="JobProgressWindowTitle" xml:space="preserve">
-    <value>Job progress</value>
+    <value>Job Progress</value>
   </data>
   <data name="JobGroupPackedFormat" xml:space="preserve">
     <value>Packed ({0:N0})</value>
@@ -356,7 +356,7 @@
     <comment>{0} is the number of items.</comment>
   </data>
   <data name="JobGroupFailedFormat" xml:space="preserve">
-    <value>Failed or canceled ({0:N0})</value>
+    <value>Failed or Canceled ({0:N0})</value>
     <comment>{0} is the number of items.</comment>
   </data>
   <data name="JobGroupEmpty" xml:space="preserve">
@@ -467,7 +467,7 @@
     <comment>{0} is the item's display name; {1} why it couldn't be saved.</comment>
   </data>
   <data name="CloseUnsavedTitle" xml:space="preserve">
-    <value>Unsaved changes</value>
+    <value>Unsaved Changes</value>
   </data>
   <data name="CloseUnsavedOne" xml:space="preserve">
     <value>1 item has unsaved changes. Close and discard them?</value>
@@ -507,7 +507,7 @@
     <value>Undo the change to the album art</value>
   </data>
   <data name="PickArtTitle" xml:space="preserve">
-    <value>Choose album art</value>
+    <value>Choose Album Art</value>
   </data>
   <data name="BackgroundName" xml:space="preserve">
     <value>Background</value>
@@ -557,7 +557,7 @@
     <value>Undo the changes to the background</value>
   </data>
   <data name="PickBackgroundTitle" xml:space="preserve">
-    <value>Choose a background image or video</value>
+    <value>Choose a Background Image or Video</value>
   </data>
   <data name="BackgroundNotSupported" xml:space="preserve">
     <value>That file isn't a png, jpg or jpeg image, or an mp4, avi, webm, vp8, ogv or mpeg video.</value>
@@ -578,7 +578,7 @@
     <value>Add files</value>
   </data>
   <data name="PickFilesTitle" xml:space="preserve">
-    <value>Choose files to add</value>
+    <value>Choose Files to Add</value>
   </data>
   <data name="RemoveFileToolTip" xml:space="preserve">
     <value>Remove this file</value>
@@ -698,7 +698,7 @@
     <value>Undo the change to the chart</value>
   </data>
   <data name="PickChartTitle" xml:space="preserve">
-    <value>Choose a chart</value>
+    <value>Choose a Chart</value>
   </data>
   <data name="ChartNotSupportedFormat" xml:space="preserve">
     <value>{0} isn't a .chart, .mid or .midi file.</value>
@@ -757,7 +757,7 @@
     <comment>{0} is a number of milliseconds: how much later the lyrics must move to start with the song.</comment>
   </data>
   <data name="PickLyricsTitle" xml:space="preserve">
-    <value>Choose a chart or .sng to take the lyrics from</value>
+    <value>Choose a Chart or .sng to Take the Lyrics From</value>
   </data>
   <data name="LyricsSourceUnreadableFormat" xml:space="preserve">
     <value>{0} can't be read: {1}</value>
@@ -906,7 +906,7 @@
     <comment>Button in the sort and filter flyout; the search and sort are kept.</comment>
   </data>
   <data name="SortByLabel" xml:space="preserve">
-    <value>Sort by</value>
+    <value>Sort By</value>
   </data>
   <data name="SortDescendingToolTip" xml:space="preserve">
     <value>Reverse the order</value>
@@ -957,11 +957,11 @@
     <comment>Heading of the difficulty filter chips: the difficulties any part of the chart has notes for.</comment>
   </data>
   <data name="FilterStemsLabel" xml:space="preserve">
-    <value>Audio stems</value>
+    <value>Audio Stems</value>
     <comment>Heading of the audio stem filter chips.</comment>
   </data>
   <data name="FilterAssetsLabel" xml:space="preserve">
-    <value>Backgrounds and art</value>
+    <value>Backgrounds and Art</value>
     <comment>Heading of the video, background image and album art filter chips.</comment>
   </data>
   <data name="FilterMatchAll" xml:space="preserve">
@@ -1102,7 +1102,7 @@
     <value>Reset the audio offset</value>
   </data>
   <data name="VideoOffsetName" xml:space="preserve">
-    <value>Video offset</value>
+    <value>Video Offset</value>
   </data>
   <data name="VideoOffsetToolTip" xml:space="preserve">
     <value>Moves the background video later (positive) or earlier (negative) against the audio. Saved as song.ini's video_start_time.</value>
@@ -1869,7 +1869,7 @@
     <value>Deleting is turned off: this system has no trash the app can move files to.</value>
   </data>
   <data name="DedupConfirmTitle" xml:space="preserve">
-    <value>Delete duplicates</value>
+    <value>Delete Duplicates</value>
   </data>
   <data name="DedupConfirmFormat" xml:space="preserve">
     <value>Move {0:N0} songs ({1}) to the {2}?
@@ -1978,10 +1978,10 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>the .sng can't be read</value>
   </data>
   <data name="DownloadPickerTitle" xml:space="preserve">
-    <value>Save file</value>
+    <value>Save File</value>
   </data>
   <data name="DownloadFolderPickerTitle" xml:space="preserve">
-    <value>Choose where to save the songs</value>
+    <value>Choose Where to Save the Songs</value>
   </data>
   <data name="NoticeDismissToolTip" xml:space="preserve">
     <value>Dismiss</value>
@@ -2004,7 +2004,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="BrowseDownloadDialogTitle" xml:space="preserve">
-    <value>Choose the download folder</value>
+    <value>Choose the Download Folder</value>
   </data>
   <data name="AskDownloadLocationLabel" xml:space="preserve">
     <value>Ask where to save each download</value>
@@ -2127,7 +2127,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>The Ctrl+drag speed setting's value: {0} is milliseconds of the song for each pixel dragged.</comment>
   </data>
   <data name="SaveInvalidTitle" xml:space="preserve">
-    <value>Save metadata that fails validation?</value>
+    <value>Save Invalid Metadata</value>
   </data>
   <data name="SaveInvalidMessageFormat" xml:space="preserve">
     <value>Some of the metadata fails validation: {0} marked in orange. Games may misread or ignore these values. Save it anyway?</value>
@@ -2140,7 +2140,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Check the selected songs' metadata for values games may misread, such as a word where a number belongs, and fix them in place. Unsaved changes are checked as drafted.</value>
   </data>
   <data name="ValidatorWindowTitle" xml:space="preserve">
-    <value>Validate metadata</value>
+    <value>Validate Metadata</value>
   </data>
   <data name="ValidatorCheckingFormat" xml:space="preserve">
     <value>Checking {0} of {1} songs…</value>
@@ -2225,6 +2225,9 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorFilterToolTip" xml:space="preserve">
     <value>Filter issues</value>
   </data>
+  <data name="ValidatorSearchWatermark" xml:space="preserve">
+    <value>Search title, artist, charter or path</value>
+  </data>
   <data name="ValidatorFilterFixLabel" xml:space="preserve">
     <value>Fix</value>
     <comment>Heading of the Validator filter's Quick fix and Manual fix chips.</comment>
@@ -2242,7 +2245,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Heading of the Validator filter's chips for each kind of issue found.</comment>
   </data>
   <data name="ValidatorFilterKeyLabel" xml:space="preserve">
-    <value>Metadata key</value>
+    <value>Metadata Key</value>
     <comment>Heading of the Validator filter's chips for each metadata key that fails in a listed song.</comment>
   </data>
   <data name="ValidatorFilterNoTypes" xml:space="preserve">
@@ -2261,7 +2264,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Under the Validator's status while a filter is on. {0} is how many songs are shown, {1} how many are listed.</comment>
   </data>
   <data name="ValidatorNoMatches" xml:space="preserve">
-    <value>No songs have issues that match the filters.</value>
+    <value>No songs match the search and filters.</value>
   </data>
   <data name="ValidatorTypeDuplicateKey" xml:space="preserve">
     <value>Duplicate key</value>
@@ -2305,7 +2308,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Open the selected song's chart in Chart Builder. Select one song to edit it.</value>
   </data>
   <data name="EditChartUnsavedTitle" xml:space="preserve">
-    <value>Unsaved changes</value>
+    <value>Unsaved Changes</value>
   </data>
   <data name="EditChartUnsavedMessageFormat" xml:space="preserve">
     <value>{0} has metadata changes that aren't saved. Chart Builder opens the song as it is on disk, so save or discard them first.</value>

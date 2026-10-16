@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 
 namespace ChartShared.Core.Charts;
@@ -65,19 +66,71 @@ internal static class MidiWriter
     /// </summary>
     public static void WriteTrack(Stream output, IEnumerable<MidiMessage> messages, long endAtLeast = 0)
     {
-        var placed = messages.Where(m => !m.IsEndOfTrack).OrderBy(m => m.Tick).ToList();
-        long end = Math.Max(endAtLeast, Math.Max(0, placed.Count > 0 ? placed[^1].Tick : 0));
-
-        using var track = new MemoryStream();
-        long tick = 0;
-        foreach (var m in placed.Append(new MidiMessage(end, [0xFF, MidiFile.EndOfTrack, 0])))
+        // Sorted in rented buffers rather than by OrderBy, whose buffers for a long track were each a large object.
+        var buffer = ArrayPool<MidiMessage>.Shared.Rent(messages.TryGetNonEnumeratedCount(out int known) ? Math.Max(known, 1) : 256);
+        try
         {
-            MidiFile.WriteVlq(track, m.Tick - tick);
-            tick = m.Tick;
-            track.Write(m.Bytes);
-        }
+            int count = 0;
+            foreach (var m in messages)
+            {
+                if (m.IsEndOfTrack)
+                    continue;
+                if (count == buffer.Length)
+                {
+                    var larger = ArrayPool<MidiMessage>.Shared.Rent(count * 2);
+                    buffer.AsSpan(0, count).CopyTo(larger);
+                    ArrayPool<MidiMessage>.Shared.Return(buffer, clearArray: true);
+                    buffer = larger;
+                }
 
-        WriteChunk(output, track);
+                buffer[count++] = m;
+            }
+
+            var placed = buffer.AsSpan(0, count);
+            SortByTick(placed);
+            long end = Math.Max(endAtLeast, Math.Max(0, count > 0 ? placed[^1].Tick : 0));
+
+            using var track = new MemoryStream();
+            long tick = 0;
+            foreach (var m in placed)
+            {
+                MidiFile.WriteVlq(track, m.Tick - tick);
+                tick = m.Tick;
+                track.Write(m.Bytes);
+            }
+
+            MidiFile.WriteVlq(track, end - tick);
+            track.Write([0xFF, MidiFile.EndOfTrack, 0]);
+            WriteChunk(output, track);
+        }
+        finally
+        {
+            ArrayPool<MidiMessage>.Shared.Return(buffer, clearArray: true);
+        }
+    }
+
+    /// <summary>Sorts <paramref name="messages"/> by tick, those at a tick kept in the order given, as OrderBy does.</summary>
+    private static void SortByTick(Span<MidiMessage> messages)
+    {
+        int i = 1;
+        while (i < messages.Length && messages[i].Tick >= messages[i - 1].Tick)
+            i++;
+        if (i >= messages.Length)
+            return;
+
+        // Each keyed by its tick and then its place, so the sort, which isn't stable, keeps ties in order.
+        var keys = ArrayPool<(long Tick, int Index)>.Shared.Rent(messages.Length);
+        try
+        {
+            var span = keys.AsSpan(0, messages.Length);
+            for (int k = 0; k < span.Length; k++)
+                span[k] = (messages[k].Tick, k);
+            span.Sort(messages);
+        }
+        finally
+        {
+            ArrayPool<(long Tick, int Index)>.Shared.Return(keys);
+        }
     }
 
     /// <summary>A format-1 file of <paramref name="division"/> ticks per beat, with the given <c>MTrk</c> chunks, headers included.</summary>

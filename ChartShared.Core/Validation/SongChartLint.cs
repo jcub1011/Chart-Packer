@@ -80,7 +80,7 @@ public static class SongChartLint
     /// <param name="draft">The song's draft, whose staged audio is measured in place of the song's; null for none.</param>
     /// <param name="cache">Where results are kept for the session; null to lint every time.</param>
     /// <exception cref="OperationCanceledException">Linting was cancelled.</exception>
-    public static async Task<SongChartLintReport> LintAsync(
+    public static Task<SongChartLintReport> LintAsync(
         SongEntry entry,
         IReadOnlyList<KeyValuePair<string, string>> pairs,
         MetadataDraft? draft,
@@ -89,31 +89,70 @@ public static class SongChartLint
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(pairs);
+        return OrUnreadableAsync(async () =>
+        {
+            using var files = SongFileReader.Open(entry, cancellationToken);
+            return await LintOpenAsync(files, pairs, draft, cache, cancellationToken).ConfigureAwait(false);
+        });
+    }
+
+    /// <summary>
+    /// As <see cref="LintAsync(SongEntry, IReadOnlyList{KeyValuePair{string, string}}, MetadataDraft?, SongChartLintCache?, CancellationToken)"/>,
+    /// reading the song through <paramref name="files"/>, already open, so a <c>.sng</c> read for its metadata isn't
+    /// opened and its index read again for its chart and each of its audio files.
+    /// </summary>
+    /// <exception cref="OperationCanceledException">Linting was cancelled.</exception>
+    public static Task<SongChartLintReport> LintAsync(
+        SongFileReader files,
+        IReadOnlyList<KeyValuePair<string, string>> pairs,
+        MetadataDraft? draft,
+        SongChartLintCache? cache,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(pairs);
+        return OrUnreadableAsync(() => LintOpenAsync(files, pairs, draft, cache, cancellationToken));
+    }
+
+    // A song or chart that can't be read is reported as unreadable, not thrown. A malformed chart is a
+    // ChartFormatException, which is an IOException, so it's reported so too.
+    private static async Task<SongChartLintReport> OrUnreadableAsync(Func<Task<SongChartLintReport>> lint)
+    {
         try
         {
-            IReadOnlyList<string> stored = [.. SongFile.ListTopLevel(entry, cancellationToken).Select(static f => f.Name)];
-            if (ChartReader.Pick(stored) is not { } chartName)
-                return new SongChartLintReport(SongChartLintStatus.NoChart, []);
-
-            var tracks = SongTracks.Resolve(stored, draft);
-            var audio = AudioStamps(entry, tracks);
-            var key = new SongChartLintKey(entry.FullPath, ChartFileStamp.Of(entry, chartName), pairs, audio, CultureInfo.CurrentUICulture.Name);
-            if (cache?.TryGet(key) is { } known)
-                return known;
-
-            var report = await LintStoredAsync(entry, chartName, pairs, tracks, audio, cache, cancellationToken).ConfigureAwait(false);
-            cache?.Add(key, report);
-            return report;
+            return await lint().ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            // A malformed chart is a ChartFormatException, which is an IOException.
             return new SongChartLintReport(SongChartLintStatus.Unreadable, [], ex.Message);
         }
     }
 
+    private static async Task<SongChartLintReport> LintOpenAsync(
+        SongFileReader files,
+        IReadOnlyList<KeyValuePair<string, string>> pairs,
+        MetadataDraft? draft,
+        SongChartLintCache? cache,
+        CancellationToken cancellationToken)
+    {
+        var entry = files.Entry;
+        IReadOnlyList<string> stored = [.. files.TopLevel.Select(static f => f.Name)];
+        if (ChartReader.Pick(stored) is not { } chartName)
+            return new SongChartLintReport(SongChartLintStatus.NoChart, []);
+
+        var tracks = SongTracks.Resolve(stored, draft);
+        var audio = AudioStamps(entry, tracks);
+        var key = new SongChartLintKey(entry.FullPath, ChartFileStamp.Of(entry, chartName), pairs, audio, CultureInfo.CurrentUICulture.Name);
+        if (cache?.TryGet(key) is { } known)
+            return known;
+
+        var report = await LintStoredAsync(files, chartName, pairs, tracks, audio, cache, cancellationToken).ConfigureAwait(false);
+        cache?.Add(key, report);
+        return report;
+    }
+
     private static async Task<SongChartLintReport> LintStoredAsync(
-        SongEntry entry,
+        SongFileReader files,
         string chartName,
         IReadOnlyList<KeyValuePair<string, string>> pairs,
         IReadOnlyList<SongTrack> tracks,
@@ -121,13 +160,14 @@ public static class SongChartLint
         SongChartLintCache? cache,
         CancellationToken cancellationToken)
     {
-        byte[]? bytes = await SongFile.ReadAsync(entry, chartName, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false);
+        var entry = files.Entry;
+        byte[]? bytes = await files.ReadAsync(chartName, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false);
         if (bytes is null)
             return new SongChartLintReport(SongChartLintStatus.ChartTooLarge, []);
         var chart = SongOpener.LoadChart(chartName, bytes, pairs);
         long? audioMs = cache is not null && cache.TryGetAudioLength(entry.FullPath, audio, out long? measured)
             ? measured
-            : SongAudioLength.LongestMs(entry, tracks, cancellationToken);
+            : SongAudioLength.LongestMs(files, tracks, cancellationToken);
         cache?.AddAudioLength(entry.FullPath, audio, audioMs);
 
         try

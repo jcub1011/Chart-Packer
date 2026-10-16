@@ -428,11 +428,11 @@
     <value>Values can't contain ; or line breaks.</value>
   </data>
   <data name="ChartIssuesWindowTitle" xml:space="preserve">
-    <value>Chart issues</value>
+    <value>Chart Issues</value>
     <comment>The chart issues window's title before a song is named.</comment>
   </data>
   <data name="ChartIssuesWindowTitleFormat" xml:space="preserve">
-    <value>Chart issues · {0}</value>
+    <value>Chart Issues · {0}</value>
     <comment>{0} is the song.</comment>
   </data>
   <data name="ChartIssuesSummaryFormat" xml:space="preserve">
@@ -471,11 +471,11 @@
     <comment>{0} is the headline; {1} the count of info findings.</comment>
   </data>
   <data name="ChartIssuesParsingGroup" xml:space="preserve">
-    <value>Reading the chart file</value>
+    <value>Reading the Chart File</value>
     <comment>The group of what reading the chart file left out.</comment>
   </data>
   <data name="ChartIssuesGeneralGroup" xml:space="preserve">
-    <value>Whole chart</value>
+    <value>Whole Chart</value>
     <comment>The group of findings about the chart as a whole, not one part.</comment>
   </data>
   <data name="ChartIssuesTrackGroupFormat" xml:space="preserve">
@@ -569,7 +569,7 @@
     <comment>{0} is the file name; {1} is the reason.</comment>
   </data>
   <data name="PickTrackTitleFormat" xml:space="preserve">
-    <value>Choose the {0} track</value>
+    <value>Choose the {0} Track</value>
     <comment>{0} is the stem, e.g. "guitar".</comment>
   </data>
   <data name="TrackRowMenuToolTip" xml:space="preserve">
