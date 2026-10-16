@@ -188,7 +188,8 @@ internal static class MidiChartReader
     /// The chart read with each of <paramref name="ways"/>, which differ only in their natural-HOPO threshold
     /// (<see cref="ChartReadOptions.MidiHopoTicks"/>), as <see cref="NoteCheck.ReadEveryWay"/> reads one: as many reads
     /// as <see cref="Read"/> would give, but the tracks are read and their notes paired once, and only the fret notes,
-    /// which the threshold shapes, are worked out for each. The drum notes, which it doesn't, are the same lists in each.
+    /// which the threshold shapes, are worked out for each. The drum notes, which it doesn't, are worked out once and
+    /// copied for each read after the first, so no two reads share a list.
     /// </summary>
     /// <exception cref="ChartFormatException">The file isn't a MIDI file YARG can read, or is malformed.</exception>
     internal static IReadOnlyList<ChartDocument> ReadEachWay(byte[] bytes, IReadOnlyList<ChartReadOptions> ways)
@@ -218,17 +219,19 @@ internal static class MidiChartReader
                         var layout = DrumsLayoutOf(bytes, events, options);
                         drumsLayout = layout;
                         var drums = Drums(track, layout, starPower);
-                        foreach (var read in reads)
-                            read.Add((instrument, drums, starPower));
+                        for (int way = 0; way < ways.Count; way++)
+                            reads[way].Add(way == 0 ? (instrument, drums, starPower) : (instrument, CopyOf(drums), [.. starPower]));
                         continue;
                     }
 
                     for (int way = 0; way < ways.Count; way++)
                     {
+                        // Each read has its own star power, as it has its own notes.
+                        IReadOnlyList<StarPowerPhrase> wayStarPower = way == 0 ? starPower : [.. starPower];
                         var notes = new Dictionary<ChartDifficulty, List<ChartNote>>();
                         foreach (var difficulty in MidiLayout.Difficulties)
-                            notes[difficulty] = Frets(track, kind, difficulty, resolution, ways[way], starPower);
-                        reads[way].Add((instrument, notes, starPower));
+                            notes[difficulty] = Frets(track, kind, difficulty, resolution, ways[way], wayStarPower);
+                        reads[way].Add((instrument, notes, wayStarPower));
                     }
                 }
                 finally
@@ -447,6 +450,10 @@ internal static class MidiChartReader
             hopoThreshold: options.MidiHopoTicks ?? options.MidiHopoThresholds(resolution)[0],
             starPower);
     }
+
+    // A read's notes by difficulty, in lists of their own.
+    private static Dictionary<ChartDifficulty, List<ChartNote>> CopyOf(Dictionary<ChartDifficulty, List<ChartNote>> notes) =>
+        notes.ToDictionary(n => n.Key, n => new List<ChartNote>(n.Value));
 
     private static Dictionary<ChartDifficulty, List<ChartNote>> Drums(MidiTrackNotes track, DrumsLayout layout, IReadOnlyList<StarPowerPhrase> starPower)
     {

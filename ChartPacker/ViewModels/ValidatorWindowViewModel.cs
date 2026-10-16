@@ -112,6 +112,15 @@ namespace ChartPacker.ViewModels
         // How long one batch may hold the UI thread; what's left goes in the next, after input and drawing.
         private static readonly TimeSpan TakeReadBudget = TimeSpan.FromMilliseconds(30);
 
+        // How many songs read may wait to be taken in before the workers wait for the UI thread to catch up.
+        private const int ReadQueueCapacity = 1024;
+
+        // How long the search waits for typing to stop before the list is filtered.
+        private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
+
+        // Filters the list once typing in the search stops.
+        private readonly DispatcherTimer _searchTimer;
+
         // How many workers lint and check at once, however many read: one core is left to the UI thread, as with
         // every core busy linting the window stutters. Reading isn't held to it, so a slow drive is read as widely as
         // the library scan reads it.
@@ -163,7 +172,9 @@ namespace ChartPacker.ViewModels
             _settings = settings;
             _confirmation = confirmation;
             _parallelism = parallelism;
-            _read = new UiBatchQueue<ReadSong>(TakeReadInterval, TakeRead, TakeReadBudget);
+            _read = new UiBatchQueue<ReadSong>(TakeReadInterval, TakeRead, TakeReadBudget, ReadQueueCapacity);
+            _searchTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = SearchDelay };
+            _searchTimer.Tick += (_, _) => ApplySearch();
             Inspector = inspector;
             QuickFixChip = new ValidatorFilterChipViewModel("quick", Strings.ValidatorFilterQuickFix, OnFilterChanged);
             ManualChip = new ValidatorFilterChipViewModel("manual", Strings.ValidatorFilterManual, OnFilterChanged);
@@ -345,21 +356,37 @@ namespace ChartPacker.ViewModels
                     ValidatorSongCheck? check = null;
                     try
                     {
-                        await _checkGate.WaitAsync(token).ConfigureAwait(false);
-                        try
+                        // A drafted song is linted and checked once it's listed, against its draft: nothing to do here.
+                        if (!drafted)
                         {
-                            // The chart is linted on this worker, with the song.ini as read; a drafted one once it's listed.
-                            if (files is not null && report.ReadError is null && !drafted)
-                                lint = await SongChartLint.LintAsync(files, report.Pairs, null, LibraryChartLint.Cache, token).ConfigureAwait(false);
+                            // The song stays open for its chart only when a worker is free to lint it now. One kept open
+                            // while it waits would hold the file against a job or a save writing it meanwhile, so it's
+                            // let go of, and opened again once it's its turn.
+                            if (!_checkGate.Wait(0))
+                            {
+                                files?.Dispose();
+                                files = null;
+                                await _checkGate.WaitAsync(token).ConfigureAwait(false);
+                            }
 
-                            // A song without a draft is checked here too. Drafts live on the UI thread, so the check of a
-                            // song with one is made there, against it.
-                            if (!drafted)
+                            try
+                            {
+                                // The chart is linted on this worker, with the song.ini as read.
+                                if (report.ReadError is null)
+                                {
+                                    lint = files is not null
+                                        ? await SongChartLint.LintAsync(files, report.Pairs, null, LibraryChartLint.Cache, token).ConfigureAwait(false)
+                                        : await SongChartLint.LintAsync(report.Entry, report.Pairs, null, LibraryChartLint.Cache, token).ConfigureAwait(false);
+                                }
+
+                                // A song without a draft is checked here too. Drafts live on the UI thread, so the check
+                                // of a song with one is made there, against it.
                                 check = ValidatorSongViewModel.Evaluate(report, lint, null);
-                        }
-                        finally
-                        {
-                            _checkGate.Release();
+                            }
+                            finally
+                            {
+                                _checkGate.Release();
+                            }
                         }
                     }
                     finally
@@ -367,7 +394,8 @@ namespace ChartPacker.ViewModels
                         files?.Dispose();
                     }
 
-                    _read.Report(new ReadSong(i, report, lint, check));
+                    // Waits while the UI thread is behind taking in the songs read, so they don't pile up unheld.
+                    await _read.ReportAsync(new ReadSong(i, report, lint, check), token).ConfigureAwait(false);
                 });
 
                 // The songs read last are still to be taken in before the counts are final.
@@ -402,6 +430,7 @@ namespace ChartPacker.ViewModels
         public async Task ShutdownAsync()
         {
             _closing.Cancel();
+            _searchTimer.Stop();
             _drafts.DraftsChanged -= OnDraftsChanged;
             _job.PropertyChanged -= OnJobPropertyChanged;
             Inspector.PropertyChanged -= OnInspectorPropertyChanged;
@@ -673,11 +702,33 @@ namespace ChartPacker.ViewModels
 
         partial void OnSearchTextChanged(string? value)
         {
-            _query = value?.Trim() ?? "";
+            _searchTimer.Stop();
 
             // Clear filters shows every song once, when it's done.
-            if (!_clearingFilters)
-                RefreshShown();
+            if (_clearingFilters)
+            {
+                _query = value?.Trim() ?? "";
+                return;
+            }
+
+            // A search cleared shows every song at once; one typed waits for the typing to stop, so the list is
+            // filtered once rather than on every key.
+            if (string.IsNullOrWhiteSpace(value))
+                ApplySearch();
+            else
+                _searchTimer.Start();
+        }
+
+        /// <summary>Filters the list by the search as it is now, unless that's what it's filtered by already.</summary>
+        private void ApplySearch()
+        {
+            _searchTimer.Stop();
+            string query = SearchText?.Trim() ?? "";
+            if (query == _query)
+                return;
+
+            _query = query;
+            RefreshShown();
         }
 
         [RelayCommand]

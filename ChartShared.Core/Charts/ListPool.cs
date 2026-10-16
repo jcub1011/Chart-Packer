@@ -9,9 +9,8 @@ namespace ChartShared.Core.Charts;
 /// <remarks>
 /// <para>A list rented must be given back once nothing uses it, and not used after; one never given back is only
 /// collected, as any list is. Lists of types holding references aren't kept, as clearing one would walk its array.</para>
-/// <para>What's kept is capped, and after each full collection a list unused for a while is let go, as
-/// <see cref="System.Buffers.ArrayPool{T}.Shared"/> lets its arrays go, so a burst of reading doesn't hold its memory
-/// for the rest of the session.</para>
+/// <para>What's kept is capped, and a list unused for a while is let go, so a burst of reading doesn't hold its memory
+/// for the rest of the session, however quiet the app is after.</para>
 /// </remarks>
 internal static class ListPool<T>
 {
@@ -19,15 +18,17 @@ internal static class ListPool<T>
     private const int MaxKept = 128;
     private const int MaxCapacity = 1 << 20;
 
-    // How long a list kept may go unused before a full collection lets it go.
-    private const long IdleMilliseconds = 10_000;
+    // How long a list kept may go unused before it's let go.
+    internal const long IdleMilliseconds = 10_000;
 
     private static readonly Lock Gate = new();
     // In the order given back, the last at the end.
     private static readonly List<(List<T> List, long ReturnedAt)> Kept = [];
     private static readonly bool CanKeep = !System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
-    static ListPool() => _ = new TrimAfterFullCollections();
+    // Lets go of the lists gone unused, while any are kept; armed under Gate.
+    private static readonly Timer TrimTimer = new(_ => Trim(Environment.TickCount64), null, Timeout.Infinite, Timeout.Infinite);
+    private static bool _trimArmed;
 
     /// <summary>
     /// A list, empty, with room for <paramref name="capacity"/> items: the smallest given back that has the room, so a
@@ -77,31 +78,36 @@ internal static class ListPool<T>
         lock (Gate)
         {
             if (Kept.Count < MaxKept)
+            {
                 Kept.Add((list, Environment.TickCount64));
+                if (!_trimArmed)
+                {
+                    _trimArmed = true;
+                    TrimTimer.Change(IdleMilliseconds, Timeout.Infinite);
+                }
+            }
         }
     }
 
-    // Lets go of the lists unused for a while.
-    private static void Trim()
-    {
-        long now = Environment.TickCount64;
-        lock (Gate)
-            Kept.RemoveAll(k => now - k.ReturnedAt >= IdleMilliseconds);
-    }
-
     /// <summary>
-    /// Trims the pool each time it's finalized, and lives on to be finalized again: once it's reached the oldest
-    /// generation, that's after each full collection.
+    /// Lets go of the lists unused for <see cref="IdleMilliseconds"/> as of <paramref name="now"/>, a
+    /// <see cref="Environment.TickCount64"/>; while any are still kept, it runs again once the oldest of them has gone unused as long.
     /// </summary>
-    private sealed class TrimAfterFullCollections
+    internal static void Trim(long now)
     {
-        ~TrimAfterFullCollections()
+        lock (Gate)
         {
-            if (Environment.HasShutdownStarted)
+            Kept.RemoveAll(k => now - k.ReturnedAt >= IdleMilliseconds);
+            if (Kept.Count == 0)
+            {
+                _trimArmed = false;
+                TrimTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 return;
+            }
 
-            Trim();
-            GC.ReRegisterForFinalize(this);
+            long oldest = Kept.Min(k => k.ReturnedAt);
+            _trimArmed = true;
+            TrimTimer.Change(Math.Max(oldest + IdleMilliseconds - now, 1), Timeout.Infinite);
         }
     }
 }

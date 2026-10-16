@@ -80,7 +80,7 @@ public static class SongChartLint
     /// <param name="draft">The song's draft, whose staged audio is measured in place of the song's; null for none.</param>
     /// <param name="cache">Where results are kept for the session; null to lint every time.</param>
     /// <exception cref="OperationCanceledException">Linting was cancelled.</exception>
-    public static async Task<SongChartLintReport> LintAsync(
+    public static Task<SongChartLintReport> LintAsync(
         SongEntry entry,
         IReadOnlyList<KeyValuePair<string, string>> pairs,
         MetadataDraft? draft,
@@ -89,15 +89,11 @@ public static class SongChartLint
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(pairs);
-        try
+        return OrUnreadableAsync(async () =>
         {
             using var files = SongFileReader.Open(entry, cancellationToken);
             return await LintOpenAsync(files, pairs, draft, cache, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-        {
-            return new SongChartLintReport(SongChartLintStatus.Unreadable, [], ex.Message);
-        }
+        });
     }
 
     /// <summary>
@@ -106,7 +102,7 @@ public static class SongChartLint
     /// opened and its index read again for its chart and each of its audio files.
     /// </summary>
     /// <exception cref="OperationCanceledException">Linting was cancelled.</exception>
-    public static async Task<SongChartLintReport> LintAsync(
+    public static Task<SongChartLintReport> LintAsync(
         SongFileReader files,
         IReadOnlyList<KeyValuePair<string, string>> pairs,
         MetadataDraft? draft,
@@ -115,9 +111,16 @@ public static class SongChartLint
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(pairs);
+        return OrUnreadableAsync(() => LintOpenAsync(files, pairs, draft, cache, cancellationToken));
+    }
+
+    // A song or chart that can't be read is reported as unreadable, not thrown. A malformed chart is a
+    // ChartFormatException, which is an IOException, so it's reported so too.
+    private static async Task<SongChartLintReport> OrUnreadableAsync(Func<Task<SongChartLintReport>> lint)
+    {
         try
         {
-            return await LintOpenAsync(files, pairs, draft, cache, cancellationToken).ConfigureAwait(false);
+            return await lint().ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
@@ -125,7 +128,6 @@ public static class SongChartLint
         }
     }
 
-    // A malformed chart is a ChartFormatException, which is an IOException: the callers report it as unreadable.
     private static async Task<SongChartLintReport> LintOpenAsync(
         SongFileReader files,
         IReadOnlyList<KeyValuePair<string, string>> pairs,

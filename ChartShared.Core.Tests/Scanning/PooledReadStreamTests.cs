@@ -43,6 +43,18 @@ public sealed class PooledReadStreamTests
     }
 
     [TestMethod]
+    public void SeekingBeforeTheStartThrowsAsAFileStreamDoes()
+    {
+        using var stream = new PooledReadStream(new MemoryStream(new byte[100]), 16);
+        stream.Position = 10;
+
+        Assert.Throws<IOException>(() => stream.Seek(-1, SeekOrigin.Begin));
+        Assert.Throws<IOException>(() => stream.Seek(-11, SeekOrigin.Current));
+        Assert.Throws<IOException>(() => stream.Seek(-101, SeekOrigin.End));
+        Assert.AreEqual(10, stream.Position);
+    }
+
+    [TestMethod]
     public void DisposingItDisposesTheStreamUnderIt()
     {
         var inner = new MemoryStream([1, 2, 3]);

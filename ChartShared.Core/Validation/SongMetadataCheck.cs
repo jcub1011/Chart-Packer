@@ -72,10 +72,8 @@ public static class SongMetadataCheck
         SongFileReader? files = null;
         try
         {
-            // A .sng's index is read on the thread pool, as the caller may be the UI thread.
-            files = entry.Kind == SongEntryKind.SngFile
-                ? await Task.Run(() => SongFileReader.Open(entry, cancellationToken), cancellationToken).ConfigureAwait(false)
-                : SongFileReader.Open(entry, cancellationToken);
+            // A .sng's index, or a folder's listing, is read on the thread pool, as the caller may be the UI thread.
+            files = await Task.Run(() => SongFileReader.Open(entry, cancellationToken), cancellationToken).ConfigureAwait(false);
             var report = files.Sng is { } sng
                 ? FromSng(entry, sng)
                 : await ReadFolderAsync(entry, SongIniIn(files), cancellationToken).ConfigureAwait(false);

@@ -92,6 +92,10 @@ internal sealed class PooledReadStream : Stream
             SeekOrigin.End => Length + offset,
             _ => throw new ArgumentOutOfRangeException(nameof(origin)),
         };
+
+        // As FileStream throws, which the readers of the streams this one stands in for may be ready for.
+        if (position < 0)
+            throw new IOException("An attempt was made to move the position before the beginning of the stream.");
         Position = position;
         return position;
     }

@@ -36,6 +36,28 @@ public sealed class GameViewTests
     }
 
     [TestMethod]
+    public void EachReadAtEveryHopoThresholdHasListsOfItsOwn()
+    {
+        // The drum notes are worked out once for every threshold, but no two reads may share a list.
+        var fixture = MidiFixtures.Named(nameof(MidiFixtures.ProDrums));
+        var key = new ChartTrackKey(ChartInstrument.Drums, Expert);
+
+        var reads = NoteCheck.ReadEveryWay(fixture.Midi, fixture.Options);
+
+        Assert.IsGreaterThan(1, reads.Count);
+        var first = reads[0].Tracks[key];
+        foreach (var read in reads.Skip(1))
+        {
+            var track = read.Tracks[key];
+            Assert.AreNotSame(first.Notes, track.Notes);
+            Assert.AreSequenceEqual(first.Notes.ToList(), track.Notes.ToList());
+            if (first.StarPower.Count > 0)
+                Assert.AreNotSame(first.StarPower, track.StarPower);
+            Assert.AreSequenceEqual(first.StarPower.ToList(), track.StarPower.ToList());
+        }
+    }
+
+    [TestMethod]
     public void TheHopoThresholdsTheFixturesAreReadWithGiveDifferentHopos()
     {
         // The note 165 ticks after the one before is a HOPO only at Rock Band's threshold of 170.
