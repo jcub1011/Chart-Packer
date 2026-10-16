@@ -439,20 +439,20 @@
     <value>{0} errors · {1} warnings · {2} info</value>
   </data>
   <data name="ChartIssuesErrorsFormat" xml:space="preserve">
-    <value>{0} errors</value>
-    <comment>A group's count of errors.</comment>
+    <value>{0} Errors</value>
+    <comment>The footer's count of errors, for any number but 1.</comment>
   </data>
   <data name="ChartIssuesWarningsFormat" xml:space="preserve">
-    <value>{0} warnings</value>
-    <comment>A group's count of warnings.</comment>
+    <value>{0} Warnings</value>
+    <comment>The footer's count of warnings, for any number but 1.</comment>
   </data>
   <data name="ChartIssuesInfosFormat" xml:space="preserve">
-    <value>{0} info</value>
-    <comment>A group's count of info findings.</comment>
+    <value>{0} Informational</value>
+    <comment>The footer's count of info findings.</comment>
   </data>
   <data name="ChartIssuesCountsSeparator" xml:space="preserve">
-    <value> · </value>
-    <comment>Between a group's counts.</comment>
+    <value> - </value>
+    <comment>Between the footer's counts.</comment>
   </data>
   <data name="ChartIssuesTheChart" xml:space="preserve">
     <value>the chart</value>
@@ -470,23 +470,11 @@
     <value>{0} · {1} info</value>
     <comment>{0} is the headline; {1} the count of info findings.</comment>
   </data>
-  <data name="ChartIssuesParsingGroup" xml:space="preserve">
-    <value>Reading the Chart File</value>
-    <comment>The group of what reading the chart file left out.</comment>
-  </data>
-  <data name="ChartIssuesGeneralGroup" xml:space="preserve">
-    <value>Whole Chart</value>
-    <comment>The group of findings about the chart as a whole, not one part.</comment>
-  </data>
-  <data name="ChartIssuesTrackGroupFormat" xml:space="preserve">
-    <value>{0} · {1}</value>
-    <comment>A part and difficulty's group: {0} the part, {1} the difficulty.</comment>
-  </data>
   <data name="ChartIssuesViewButton" xml:space="preserve">
     <value>View issues…</value>
   </data>
   <data name="ChartIssuesViewToolTip" xml:space="preserve">
-    <value>List every finding, by part and difficulty, in a window of its own</value>
+    <value>List every finding in a window of its own, to search and filter</value>
   </data>
   <data name="ChartIssuesNone" xml:space="preserve">
     <value>No findings: nothing the rules check for.</value>
@@ -494,6 +482,128 @@
   <data name="ChartIssuesListName" xml:space="preserve">
     <value>Chart issues</value>
     <comment>The issues list's name, for screen readers.</comment>
+  </data>
+  <data name="FilterChipFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+    <comment>A filter chip. {0} is what it shows, e.g. "Empty value"; {1} is how many listed things it matches.</comment>
+  </data>
+  <data name="ChartIssuesErrorOne" xml:space="preserve">
+    <value>1 Error</value>
+    <comment>The footer's count of errors when there's one.</comment>
+  </data>
+  <data name="ChartIssuesWarningOne" xml:space="preserve">
+    <value>1 Warning</value>
+    <comment>The footer's count of warnings when there's one.</comment>
+  </data>
+  <data name="ChartIssuesErrorsSection" xml:space="preserve">
+    <value>Errors</value>
+    <comment>The heading over the errors in the issues list.</comment>
+  </data>
+  <data name="ChartIssuesWarningsSection" xml:space="preserve">
+    <value>Warnings</value>
+    <comment>The heading over the warnings in the issues list.</comment>
+  </data>
+  <data name="ChartIssuesInfosSection" xml:space="preserve">
+    <value>Informational</value>
+    <comment>The heading over the info findings in the issues list.</comment>
+  </data>
+  <data name="ChartIssuesWholeChart" xml:space="preserve">
+    <value>Whole chart</value>
+    <comment>A finding's place when it's about the chart as a whole, not one part.</comment>
+  </data>
+  <data name="ChartIssuesChartFile" xml:space="preserve">
+    <value>Chart file</value>
+    <comment>A finding's place when it's about what reading the chart file left out.</comment>
+  </data>
+  <data name="ChartIssuesTrackFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment>A finding's part and difficulty: {0} the part, {1} the difficulty.</comment>
+  </data>
+  <data name="ChartIssuesSearchWatermark" xml:space="preserve">
+    <value>Search descriptions, codes and places</value>
+  </data>
+  <data name="ChartIssuesFilterToolTip" xml:space="preserve">
+    <value>Filter the findings</value>
+  </data>
+  <data name="ChartIssuesFilterSeverityLabel" xml:space="preserve">
+    <value>Severity</value>
+  </data>
+  <data name="ChartIssuesFilterInstrumentLabel" xml:space="preserve">
+    <value>Instrument</value>
+  </data>
+  <data name="ChartIssuesFilterDifficultyLabel" xml:space="preserve">
+    <value>Difficulty</value>
+  </data>
+  <data name="ChartIssuesFilterTypeLabel" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="ChartIssuesFilterNone" xml:space="preserve">
+    <value>None in this chart.</value>
+    <comment>In place of a filter group's chips when no finding has one.</comment>
+  </data>
+  <data name="ChartIssuesFilterChipToolTipFormat" xml:space="preserve">
+    <value>{0}: {1} findings. Turn on chips to show only the findings that match them.</value>
+    <comment>{0} is what the chip shows, e.g. "Guitar"; {1} is how many findings it matches.</comment>
+  </data>
+  <data name="ChartIssuesResetFilters" xml:space="preserve">
+    <value>Reset filters</value>
+  </data>
+  <data name="ChartIssuesClearFilters" xml:space="preserve">
+    <value>Clear filters</value>
+  </data>
+  <data name="ChartIssuesShownSummaryFormat" xml:space="preserve">
+    <value>Showing {0} of {1} findings</value>
+  </data>
+  <data name="ChartIssuesNoMatches" xml:space="preserve">
+    <value>No findings match the search and filters.</value>
+  </data>
+  <data name="ChartIssuesTypeTiming" xml:space="preserve">
+    <value>Timing</value>
+    <comment>A type of chart finding: the tempo map and the grid.</comment>
+  </data>
+  <data name="ChartIssuesTypeFrets" xml:space="preserve">
+    <value>Frets</value>
+    <comment>A type of chart finding: 5-fret and GHL parts.</comment>
+  </data>
+  <data name="ChartIssuesTypeDrums" xml:space="preserve">
+    <value>Drums</value>
+    <comment>A type of chart finding.</comment>
+  </data>
+  <data name="ChartIssuesTypePhrases" xml:space="preserve">
+    <value>Phrases and events</value>
+    <comment>A type of chart finding.</comment>
+  </data>
+  <data name="ChartIssuesTypeSong" xml:space="preserve">
+    <value>Song</value>
+    <comment>A type of chart finding: about the song as a whole.</comment>
+  </data>
+  <data name="ChartIssuesTypeVocals" xml:space="preserve">
+    <value>Vocals</value>
+    <comment>A type of chart finding.</comment>
+  </data>
+  <data name="ChartIssuesTypeLoad" xml:space="preserve">
+    <value>Loading</value>
+    <comment>A type of chart finding: what reading the chart file found.</comment>
+  </data>
+  <data name="ChartIssuesTypeOther" xml:space="preserve">
+    <value>Other</value>
+    <comment>A type of chart finding: any outside the chart catalogue.</comment>
+  </data>
+  <data name="FindingPlaceFormat" xml:space="preserve">
+    <value>m{0} · beat {1:0.##}</value>
+    <comment>Where a finding is: its measure and beat, e.g. "m41 · beat 3".</comment>
+  </data>
+  <data name="VocalTrackVocals" xml:space="preserve">
+    <value>Vocals</value>
+    <comment>The lead vocal part, PART VOCALS.</comment>
+  </data>
+  <data name="VocalTrackHarmonyFormat" xml:space="preserve">
+    <value>Harmony {0}</value>
+    <comment>A harmony vocal part, e.g. "Harmony 2".</comment>
+  </data>
+  <data name="FindingPlaceRangeFormat" xml:space="preserve">
+    <value>{0} – {1}</value>
+    <comment>A finding's place when it covers a stretch of the chart: {0} where it starts, {1} where it ends, e.g. "m40 · beat 1".</comment>
   </data>
   <data name="ChartIssuesCloseButton" xml:space="preserve">
     <value>Close</value>

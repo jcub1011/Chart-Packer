@@ -176,8 +176,8 @@ namespace ChartPacker.ViewModels
             _searchTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = SearchDelay };
             _searchTimer.Tick += (_, _) => ApplySearch();
             Inspector = inspector;
-            QuickFixChip = new ValidatorFilterChipViewModel("quick", Strings.ValidatorFilterQuickFix, OnFilterChanged);
-            ManualChip = new ValidatorFilterChipViewModel("manual", Strings.ValidatorFilterManual, OnFilterChanged);
+            QuickFixChip = new CountedFilterChipViewModel("quick", Strings.ValidatorFilterQuickFix, Strings.ValidatorFilterChipToolTipFormat, OnFilterChanged);
+            ManualChip = new CountedFilterChipViewModel("manual", Strings.ValidatorFilterManual, Strings.ValidatorFilterChipToolTipFormat, OnFilterChanged);
             FixChips = [QuickFixChip, ManualChip];
             _drafts.DraftsChanged += OnDraftsChanged;
             _job.PropertyChanged += OnJobPropertyChanged;
@@ -208,21 +208,21 @@ namespace ChartPacker.ViewModels
         public AvaloniaList<ValidatorSongViewModel> ShownSongs { get; } = [];
 
         /// <summary>Shows only issues with a quick fix (with <see cref="ManualChip"/>, every issue).</summary>
-        public ValidatorFilterChipViewModel QuickFixChip { get; }
+        public CountedFilterChipViewModel QuickFixChip { get; }
 
         /// <summary>Shows only issues without a quick fix (with <see cref="QuickFixChip"/>, every issue).</summary>
-        public ValidatorFilterChipViewModel ManualChip { get; }
+        public CountedFilterChipViewModel ManualChip { get; }
 
         /// <summary>The Quick fix and Manual fix chips.</summary>
-        public IReadOnlyList<ValidatorFilterChipViewModel> FixChips { get; }
+        public IReadOnlyList<CountedFilterChipViewModel> FixChips { get; }
 
         /// <summary>A chip for each type of issue the listed songs have, and any turned on since they stopped having it.</summary>
-        public AvaloniaList<ValidatorFilterChipViewModel> TypeChips { get; } = [];
+        public AvaloniaList<CountedFilterChipViewModel> TypeChips { get; } = [];
 
         public bool HasTypeChips => TypeChips.Count > 0;
 
         /// <summary>A chip for each metadata key that fails in a listed song, and any turned on since it stopped failing.</summary>
-        public AvaloniaList<ValidatorFilterChipViewModel> KeyChips { get; } = [];
+        public AvaloniaList<CountedFilterChipViewModel> KeyChips { get; } = [];
 
         public bool HasKeyChips => KeyChips.Count > 0;
 
@@ -234,7 +234,7 @@ namespace ChartPacker.ViewModels
         /// <summary>Narrows the list to the songs whose title, artist, charter or path contains it.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasSearch), nameof(IsNarrowed))]
-        [NotifyCanExecuteChangedFor(nameof(ClearFiltersCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ClearSearchCommand), nameof(ClearFiltersCommand))]
         public partial string? SearchText { get; set; }
 
         public bool HasSearch => !string.IsNullOrWhiteSpace(SearchText);
@@ -731,7 +731,8 @@ namespace ChartPacker.ViewModels
             RefreshShown();
         }
 
-        [RelayCommand]
+        // Only with something to clear, so Escape in an empty search is left to the window.
+        [RelayCommand(CanExecute = nameof(HasSearch))]
         private void ClearSearch() => SearchText = null;
 
         /// <summary>
@@ -917,7 +918,7 @@ namespace ChartPacker.ViewModels
         /// should: a chip per ID, sorted by <paramref name="order"/>, and none for an ID no song has unless it's on.
         /// </summary>
         private void SyncChips(
-            AvaloniaList<ValidatorFilterChipViewModel> chips,
+            AvaloniaList<CountedFilterChipViewModel> chips,
             Dictionary<string, int> counts,
             Func<string, string> nameOf,
             IComparer<string> order)
@@ -941,7 +942,7 @@ namespace ChartPacker.ViewModels
                 int at = 0;
                 while (at < chips.Count && order.Compare(chips[at].Id, id) < 0)
                     at++;
-                chips.Insert(at, new ValidatorFilterChipViewModel(id, nameOf(id), OnFilterChanged) { Count = count });
+                chips.Insert(at, new CountedFilterChipViewModel(id, nameOf(id), Strings.ValidatorFilterChipToolTipFormat, OnFilterChanged) { Count = count });
             }
         }
 

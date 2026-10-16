@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charting.Lint;
 using ChartShared.Core.Charts;
@@ -227,31 +228,22 @@ namespace ChartBuilder.ViewModels
 
             // What the load left out of the chart file is listed too, until a save writes the file without it.
             var findings = ChartLoadFindings.Merge(result.Findings, ChartLoadFindings.Of(_song.Opened?.Load.Issues ?? []));
-            Issues.Show(findings, static f => f, f => new FindingItem(f, finding => WhereOf(finding, map), GoTo, FixesOf), reuse);
+            Issues.Show(findings, static f => f, f => new FindingItem(f, finding => PlaceOf(finding, map), GoTo, FixesOf), reuse);
             OnPropertyChanged(nameof(ErrorCount));
             RefreshMarks();
             Changed?.Invoke(this, EventArgs.Empty);
         }
 
-        private static string WhereOf(Finding finding, TempoMap map)
+        // Where the finding is in measures and beats, from where it starts to where it ends when it covers a stretch.
+        private static string? PlaceOf(Finding finding, TempoMap map)
         {
             if (finding.Location is { } location)
             {
-                string part = location.Difficulty is { } difficulty
-                    ? string.Format(CultureInfo.CurrentCulture, Strings.FindingPartDifficultyFormat, ChartLabels.InstrumentName(location.Part), ChartLabels.DifficultyName(difficulty))
-                    : ChartLabels.InstrumentName(location.Part);
-                return string.Format(CultureInfo.CurrentCulture, Strings.FindingWhereFormat, part, PropertiesViewModel.MeasureBeat(map, location.Tick));
+                var end = location.EndTick > location.Tick ? MeasureBeat.At(map, location.EndTick) : (MeasureBeat?)null;
+                return ChartLabels.PlaceText(MeasureBeat.At(map, location.Tick), end);
             }
 
-            if (VocalTracks.Of(finding.Track) is { } vocal)
-            {
-                string part = LaneMenuItem.TitleOf(LanePart.Vocals(vocal));
-                return finding.Tick is { } at ? string.Format(CultureInfo.CurrentCulture, Strings.FindingWhereFormat, part, PropertiesViewModel.MeasureBeat(map, at)) : part;
-            }
-
-            if (finding.Tick is { } tick)
-                return PropertiesViewModel.MeasureBeat(map, tick);
-            return finding.Key ?? Strings.FindingWhereSong;
+            return finding.Tick is { } tick ? ChartLabels.PlaceText(MeasureBeat.At(map, tick)) : null;
         }
 
         /// <summary>Goes to where <paramref name="finding"/> is: its lane in focus, the cursor on it, and its notes selected.</summary>

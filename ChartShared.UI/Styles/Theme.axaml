@@ -322,8 +322,9 @@
         <Setter Property="MinWidth" Value="0" />
     </Style>
 
-    <!-- Filter chips: plain while off, the accent while on. The library's three-state chips add their own
-         Includes and Excludes looks in LibraryView.axaml. -->
+    <!-- Filter chips: plain while off, the accent's fill, border and text while on, so turning one on or off changes
+         only its colours, never its size. The library's three-state chips add their own Includes and Excludes looks in
+         LibraryView.axaml. -->
     <Style Selector=":is(Button).filterChip">
         <Setter Property="MinHeight" Value="0" />
         <Setter Property="Padding" Value="8,2" />
@@ -342,10 +343,12 @@
     </Style>
     <Style Selector="ToggleButton.filterChip:checked /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
     <Style Selector="ToggleButton.filterChip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
 </Styles>
