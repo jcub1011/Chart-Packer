@@ -101,7 +101,9 @@ namespace ChartPacker
                     drafts,
                     confirmation,
                     settingsWindow,
-                    notice);
+                    notice,
+                    downloads,
+                    folderPicker);
 
                 // Opens where it was when it last closed.
                 MainWindowPlacement.Restore(window, settings.Settings);

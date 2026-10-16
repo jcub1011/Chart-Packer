@@ -95,7 +95,7 @@
     <comment>Right-click menu item on macOS.</comment>
   </data>
   <data name="RevealInFolder" xml:space="preserve">
-    <value>Show in folder</value>
+    <value>Show in Folder</value>
     <comment>Right-click menu item on Linux, and the download notice's button.</comment>
   </data>
   <data name="AudioFileTypeName" xml:space="preserve">
