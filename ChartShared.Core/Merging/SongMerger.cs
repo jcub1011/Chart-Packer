@@ -65,6 +65,21 @@ public sealed record SongMergePlan(
 {
     /// <summary>How far <see cref="SourceOffsets"/> moves what source <paramref name="source"/> gives, in milliseconds.</summary>
     public int SourceOffsetOf(int source) => SourceOffsets?.GetValueOrDefault(source) ?? 0;
+
+    /// <summary>
+    /// Whether source <paramref name="source"/>'s charting is in the merge: its base chart (the tempo map, sections and
+    /// events) or one of its parts. Only those sources' charters are credited; audio, art or metadata taken from a song
+    /// isn't charting.
+    /// </summary>
+    public bool Credits(int source) => Credits(source, BaseSource, Parts.Values);
+
+    /// <summary>
+    /// Whether source <paramref name="source"/> is credited when the base chart is taken from <paramref name="baseSource"/>
+    /// and the parts from <paramref name="partSources"/>: <see cref="Credits(int)"/> of a plan, or of choices that aren't one
+    /// yet.
+    /// </summary>
+    public static bool Credits(int source, int? baseSource, IEnumerable<int> partSources) =>
+        baseSource == source || partSources.Contains(source);
 }
 
 /// <summary>A merged song.</summary>
@@ -87,6 +102,25 @@ public static class SongMerger
     /// <summary>The merged song's metadata, <c>song_length</c> aside, in the base source's order with other keys after.</summary>
     /// <exception cref="ArgumentException">The plan names a source or part that doesn't exist.</exception>
     public static IReadOnlyList<KeyValuePair<string, string>> BuildMetadata(SongMergePlan plan) => WithSourceOffsets(MetadataOf(plan), plan);
+
+    /// <summary>
+    /// The merged song's <c>charter</c>: the charters of the sources whose base chart or parts it takes
+    /// (<see cref="SongMergePlan.Credits"/>), in source order, combined by <see cref="CharterList"/>; empty when none of
+    /// them sets one.
+    /// </summary>
+    public static string ChartersOf(SongMergePlan plan) => ChartersOf(plan.Analysis, plan.BaseSource, [.. plan.Parts.Values]);
+
+    /// <summary>
+    /// The <c>charter</c> credited when the base chart is taken from <paramref name="baseSource"/> and the parts from
+    /// <paramref name="partSources"/>, as <see cref="ChartersOf(SongMergePlan)"/>; for choices that aren't a plan yet, as
+    /// chosen so far.
+    /// </summary>
+    public static string ChartersOf(SongMergeAnalysis analysis, int? baseSource, IReadOnlyCollection<int> partSources)
+    {
+        ArgumentNullException.ThrowIfNull(analysis);
+        ArgumentNullException.ThrowIfNull(partSources);
+        return CharterList.Merge(analysis.Sources.Where((_, i) => SongMergePlan.Credits(i, baseSource, partSources)).Select(s => s.Value("charter")));
+    }
 
     /// <summary>The merged song's metadata as <see cref="BuildMetadata"/> builds it, without the plan's <see cref="SongMergePlan.SourceOffsets"/>.</summary>
     /// <inheritdoc cref="BuildMetadata"/>
@@ -121,7 +155,7 @@ public static class SongMerger
             switch (SongMergeAnalysis.RuleOf(key))
             {
                 case MergeKeyRule.Charter:
-                    string charters = CharterList.Merge(sources.Select(s => s.Value("charter")));
+                    string charters = ChartersOf(plan);
                     return charters.Length > 0 ? charters : null;
 
                 case MergeKeyRule.Part:

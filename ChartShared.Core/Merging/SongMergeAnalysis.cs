@@ -26,7 +26,7 @@ public enum MergeKeyRule
     /// <summary>The value the sources share, or the one chosen when they differ.</summary>
     Chosen,
 
-    /// <summary>Every source's charters, combined by <see cref="CharterList"/>.</summary>
+    /// <summary>The charters of every source whose base chart or parts the merge takes, combined by <see cref="CharterList"/>; see <see cref="SongMerger.ChartersOf"/>.</summary>
     Charter,
 
     /// <summary>The source of the part the key describes, e.g. <c>diff_drums</c> from the drums' source.</summary>

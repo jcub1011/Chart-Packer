@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -17,23 +16,12 @@ namespace ChartPacker.Views
         public JobProgressWindow()
         {
             InitializeComponent();
-            WindowTitleBar.Icon = WindowChrome.ImageOf(Icon);
+            WindowChrome.ShowIcon(this, WindowTitleBar);
 
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
 
             // Handled ones too: a row's detail is selectable text, which takes the clicks to select a word.
             ResultList.AddHandler(DoubleTappedEvent, OnResultDoubleTapped, handledEventsToo: true);
-        }
-
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            // The icon is the owner's (WindowChrome.UseOwnerIcon), so the title bar shows it as the window gets it.
-            // Null-checked, as a style can set the icon before InitializeComponent has made the title bar; the
-            // constructor copies that one over.
-            if (change.Property == IconProperty && WindowTitleBar is not null)
-                WindowTitleBar.Icon = WindowChrome.ImageOf(Icon);
         }
 
         /// <summary>Selects the row's song in the main window's library, and brings that window forward.</summary>

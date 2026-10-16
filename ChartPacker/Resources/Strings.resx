@@ -1253,7 +1253,7 @@
     <value>Combine the selected songs into one new .sng, choosing which song each part, the audio and the metadata come from</value>
   </data>
   <data name="MergeWindowTitle" xml:space="preserve">
-    <value>Merge songs</value>
+    <value>Merge Songs</value>
   </data>
   <data name="MergeLoading" xml:space="preserve">
     <value>Reading the songs…</value>
@@ -1268,13 +1268,13 @@
     <value>Unsaved edits aren't included</value>
   </data>
   <data name="MergeSectionChart" xml:space="preserve">
-    <value>Base chart</value>
+    <value>Base Chart</value>
   </data>
   <data name="MergeBaseDescription" xml:space="preserve">
     <value>Its tempo map, sections, events and delay are kept. Parts from the other songs are placed by song time; fine-tune them afterwards with the note highway's offsets.</value>
   </data>
   <data name="MergeBaseLabel" xml:space="preserve">
-    <value>Tempo map and events</value>
+    <value>Tempo Map and Events</value>
   </data>
   <data name="MergeSectionParts" xml:space="preserve">
     <value>Parts</value>
@@ -1286,19 +1286,19 @@
     <value>Audio</value>
   </data>
   <data name="MergeAudioLabel" xml:space="preserve">
-    <value>Audio tracks</value>
+    <value>Audio Tracks</value>
   </data>
   <data name="MergeSectionAssets" xml:space="preserve">
-    <value>Album art and backgrounds</value>
+    <value>Album Art and Backgrounds</value>
   </data>
   <data name="MergeAlbumArtLabel" xml:space="preserve">
-    <value>Album art</value>
+    <value>Album Art</value>
   </data>
   <data name="MergeBackgroundLabel" xml:space="preserve">
-    <value>Background image</value>
+    <value>Background Image</value>
   </data>
   <data name="MergeVideoLabel" xml:space="preserve">
-    <value>Background video</value>
+    <value>Background Video</value>
   </data>
   <data name="MergeSectionAlignment" xml:space="preserve">
     <value>Alignment</value>
@@ -1310,7 +1310,7 @@
     <value>Offset</value>
   </data>
   <data name="MergeAutoAlignButton" xml:space="preserve">
-    <value>Auto-align</value>
+    <value>Auto-Align</value>
   </data>
   <data name="MergeAutoAlignToolTip" xml:space="preserve">
     <value>Works out how far each song is from the kept audio, by the parts the songs share or else by their audio, and lines them all up. Offsets typed by hand are replaced. The first time, each song's audio is read, which can take a few seconds.</value>
@@ -1331,7 +1331,7 @@
     <value>Kept audio: the others line up with it</value>
   </data>
   <data name="MergeReferenceShort" xml:space="preserve">
-    <value>Kept audio</value>
+    <value>Kept Audio</value>
     <comment>Chip in a merge alignment cell for the song with the kept audio. The full explanation, in its tooltip, is MergeAlignmentReference.</comment>
   </data>
   <data name="MergeAlignmentNoChart" xml:space="preserve">
@@ -1419,11 +1419,11 @@
     <value>Line this song up by eye: its waveform and notes against the kept audio's song's.</value>
   </data>
   <data name="MergeCompareTitleFormat" xml:space="preserve">
-    <value>Line up {0}</value>
+    <value>Line Up {0}</value>
     <comment>The window's title. {0} is the song being lined up.</comment>
   </data>
   <data name="MergeCompareHeadingFormat" xml:space="preserve">
-    <value>Line up {0} with {1}</value>
+    <value>Line Up {0} with {1}</value>
     <comment>{0} is the song being lined up, {1} the kept audio's song.</comment>
   </data>
   <data name="MergeCompareDescriptionFormat" xml:space="preserve">
@@ -1449,17 +1449,17 @@
     <value>Back to the offset the song had when this opened.</value>
   </data>
   <data name="MergeCompareZoomIn" xml:space="preserve">
-    <value>Zoom in</value>
+    <value>Zoom In</value>
   </data>
   <data name="MergeCompareZoomOut" xml:space="preserve">
-    <value>Zoom out</value>
+    <value>Zoom Out</value>
   </data>
   <data name="MergeCompareShowStart" xml:space="preserve">
-    <value>First notes</value>
+    <value>First Notes</value>
     <comment>Moves the view to just before the first notes.</comment>
   </data>
   <data name="MergeCompareShowAll" xml:space="preserve">
-    <value>Whole song</value>
+    <value>Whole Song</value>
     <comment>Zooms the view out to show both songs from end to end.</comment>
   </data>
   <data name="MergeCompareTimelineName" xml:space="preserve">
@@ -1468,12 +1468,16 @@
   <data name="MergeCompareJumpTo" xml:space="preserve">
     <value>Jump to where a link puts it</value>
   </data>
+  <data name="MergeCompareJumpButton" xml:space="preserve">
+    <value>Jump to Link</value>
+    <comment>Opens a menu of where each of the song's links would put it, in the Compare window.</comment>
+  </data>
   <data name="MergeCompareEstimateFormat" xml:space="preserve">
     <value>{0}: {1:+0;-0;0} ms</value>
     <comment>{0} is a link choice, as the alignment cell lists it; {1} where it puts the song.</comment>
   </data>
   <data name="MergeCompareApplyButton" xml:space="preserve">
-    <value>Use this offset</value>
+    <value>Use This Offset</value>
   </data>
   <data name="MergeAlignmentBeforeStartFormat" xml:space="preserve">
     <value>Lining up moves {0} before the song starts. Move its song later, or choose another base chart.</value>
@@ -1495,7 +1499,7 @@
     <value>Output</value>
   </data>
   <data name="MergeLeaveOut" xml:space="preserve">
-    <value>Leave out</value>
+    <value>Leave Out</value>
   </data>
   <data name="MergeIncludeToolTip" xml:space="preserve">
     <value>Include this in the merge — uncheck to leave it out</value>
@@ -1537,10 +1541,15 @@
     <comment>Compact merge audio cell. {0} is the number of audio files. The file names stay in the tooltip.</comment>
   </data>
   <data name="MergeDifficultyFormat" xml:space="preserve">
-    <value>diff {0}</value>
+    <value>Difficulty: {0}</value>
+    <comment>A part cell's tooltip line in the Merge window; {0} is its song.ini difficulty.</comment>
+  </data>
+  <data name="MergeDifficultyUnset" xml:space="preserve">
+    <value>Difficulty: not set</value>
+    <comment>A part cell's tooltip line in the Merge window, for a song that sets no difficulty for the part.</comment>
   </data>
   <data name="MergePartPresent" xml:space="preserve">
-    <value>Yes</value>
+    <value>Exists</value>
   </data>
   <data name="MergeNoParts" xml:space="preserve">
     <value>None of the songs has a chart that can be read.</value>
@@ -1568,6 +1577,18 @@
   </data>
   <data name="MergeWarningsHeading" xml:space="preserve">
     <value>Check these on the note highway:</value>
+  </data>
+  <data name="MergeWarningsOne" xml:space="preserve">
+    <value>1 Warning</value>
+    <comment>A button in the Merge window's footer and preview header that lists what to check.</comment>
+  </data>
+  <data name="MergeWarningsFormat" xml:space="preserve">
+    <value>{0:N0} Warnings</value>
+    <comment>{0} is how many; more than one.</comment>
+  </data>
+  <data name="MergedButton" xml:space="preserve">
+    <value>Merged</value>
+    <comment>The Merge button once the song is merged, disabled.</comment>
   </data>
   <data name="MergeFailedFormat" xml:space="preserve">
     <value>The merge failed: {0}</value>

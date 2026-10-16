@@ -15,6 +15,7 @@ namespace ChartPacker.Views
         public MergeCompareWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += OnOpened;
         }
 
