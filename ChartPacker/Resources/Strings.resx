@@ -361,18 +361,34 @@
   </data>
   <data name="JobGroupEmpty" xml:space="preserve">
     <value>Nothing here.</value>
-    <comment>Shown in a progress window tab with no items.</comment>
+    <comment>Shown in the progress window's list while it has no items.</comment>
   </data>
   <data name="JobSearchWatermark" xml:space="preserve">
     <value>Search name, path or message</value>
+  </data>
+  <data name="SongNotInLibraryFormat" xml:space="preserve">
+    <value>"{0}" isn't in the library anymore. Rescan to see what's there now.</value>
+    <comment>Shown when a job result is double-clicked but the scan no longer has its song. {0} is the song's name.</comment>
+  </data>
+  <data name="SongHiddenByFilterFormat" xml:space="preserve">
+    <value>"{0}" is hidden by the library's search or filters. Clear them to show it.</value>
+    <comment>Shown when a job result is double-clicked but the library's search or filters hide its song. {0} is the song's name.</comment>
+  </data>
+  <data name="JobFilterNoMatches" xml:space="preserve">
+    <value>No results have the chosen outcomes.</value>
+    <comment>Shown in the progress window when the outcome chips that are on match no items.</comment>
+  </data>
+  <data name="JobResultCountFormat" xml:space="preserve">
+    <value>{0:N0} songs</value>
+    <comment>{0} is the number of items in the progress window.</comment>
   </data>
   <data name="JobSearchNoMatchesFormat" xml:space="preserve">
     <value>No results match "{0}".</value>
     <comment>{0} is the search text.</comment>
   </data>
   <data name="JobSearchCountFormat" xml:space="preserve">
-    <value>{0:N0} of {1:N0}</value>
-    <comment>{0} is the number of items matching the search; {1} the number in the tab.</comment>
+    <value>{0:N0} of {1:N0} songs</value>
+    <comment>{0} is the number of items the search and outcome chips let through; {1} the number in the progress window.</comment>
   </data>
   <data name="JobCanceledPack" xml:space="preserve">
     <value>Canceled before it was packed.</value>

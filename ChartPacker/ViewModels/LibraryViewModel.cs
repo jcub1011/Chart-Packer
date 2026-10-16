@@ -219,6 +219,7 @@ namespace ChartPacker.ViewModels
                     OnPropertyChanged(nameof(OutputFolderToolTip));
                 }
             };
+            Job.ShowInLibraryRequested += (_, entry) => ShowInList(entry);
         }
 
         public JobViewModel Job { get; }
@@ -478,6 +479,29 @@ namespace ChartPacker.ViewModels
             int index = Entries.IndexOf(item);
             if (index >= 0)
                 Selection.SelectedIndex = index;
+        }
+
+        /// <summary>
+        /// Selects <paramref name="entry"/>'s song on its own, which scrolls the list to it, as double-clicking its row in
+        /// the job's progress window does. A song the scan no longer has, or the search or filters hide, isn't
+        /// selected; the notice says why.
+        /// </summary>
+        private void ShowInList(SongEntry entry)
+        {
+            if (!_itemsByPath.TryGetValue(entry.FullPath, out var item))
+            {
+                _notice.ShowError(string.Format(CultureInfo.CurrentCulture, Strings.SongNotInLibraryFormat, entry.DisplayName));
+                return;
+            }
+
+            int index = Entries.IndexOf(item);
+            if (index < 0)
+            {
+                _notice.ShowError(string.Format(CultureInfo.CurrentCulture, Strings.SongHiddenByFilterFormat, entry.DisplayName));
+                return;
+            }
+
+            Selection.SelectedIndex = index;
         }
 
         /// <summary>Marks the item whose song is playing, and clears the one that was.</summary>
