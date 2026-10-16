@@ -26,11 +26,15 @@ using CommunityToolkit.Mvvm.Input;
 namespace ChartPacker.ViewModels
 {
     /// <summary>An overwrite policy as offered in the Pack menu's "If the output exists".</summary>
-    public sealed partial class OverwriteOption(OverwritePolicy value, string label) : ObservableObject
+    public sealed partial class OverwriteOption(OverwritePolicy value, string label, string menuLabel) : ObservableObject
     {
         public OverwritePolicy Value { get; } = value;
 
+        /// <summary>Its name in Settings, in sentence case.</summary>
         public string Label { get; } = label;
+
+        /// <summary>Its name in the Pack menu, in Title Case as menu items are.</summary>
+        public string MenuLabel { get; } = menuLabel;
 
         /// <summary>It's the policy in use (<see cref="LibraryViewModel.SelectedOverwriteOption"/>): checked in the menu.</summary>
         [ObservableProperty]
@@ -169,9 +173,9 @@ namespace ChartPacker.ViewModels
 
             OverwriteOptions =
             [
-                new(OverwritePolicy.Skip, Strings.OverwriteSkip),
-                new(OverwritePolicy.Overwrite, Strings.OverwriteOverwrite),
-                new(OverwritePolicy.Rename, Strings.OverwriteRename),
+                new(OverwritePolicy.Skip, Strings.OverwriteSkip, Strings.MenuOverwriteSkip),
+                new(OverwritePolicy.Overwrite, Strings.OverwriteOverwrite, Strings.MenuOverwriteOverwrite),
+                new(OverwritePolicy.Rename, Strings.OverwriteRename, Strings.MenuOverwriteRename),
             ];
             SelectedOverwriteOption = OverwriteOptions.First(o => o.Value == settings.Settings.OverwritePolicy);
             FlatPackOutput = settings.Settings.FlatPackOutput;

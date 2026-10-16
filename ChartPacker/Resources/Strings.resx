@@ -277,16 +277,23 @@
     <comment>The title bar's menus. An underscore marks the access key, unique among a menu's items.</comment>
   </data>
   <data name="MenuChooseSongsFolder" xml:space="preserve">
-    <value>_Choose songs folder…</value>
+    <value>_Choose Songs Folder…</value>
   </data>
   <data name="MenuRescan" xml:space="preserve">
     <value>_Rescan</value>
   </data>
   <data name="MenuChooseOutputFolder" xml:space="preserve">
-    <value>Choose _output folder…</value>
+    <value>Choose _Output Folder…</value>
   </data>
   <data name="MenuResetOutputFolder" xml:space="preserve">
-    <value>R_eset output folder</value>
+    <value>R_eset Output Folder</value>
+  </data>
+  <data name="MenuChooseDownloadFolder" xml:space="preserve">
+    <value>Choose _Download Location…</value>
+    <comment>Picks the download folder; its tooltip is the folder downloads go to.</comment>
+  </data>
+  <data name="MenuOpenLogsFolder" xml:space="preserve">
+    <value>Open _Logs Folder</value>
   </data>
   <data name="MenuSettings" xml:space="preserve">
     <value>_Settings…</value>
@@ -302,17 +309,27 @@
     <value>_Unpack</value>
   </data>
   <data name="MenuOverwrite" xml:space="preserve">
-    <value>If the output _exists</value>
+    <value>If the Output _Exists</value>
     <comment>A submenu of the overwrite policies, the one in use checked.</comment>
   </data>
+  <data name="MenuOverwriteSkip" xml:space="preserve">
+    <value>Skip Existing</value>
+    <comment>The If the Output Exists submenu's items, in Title Case; Settings uses OverwriteSkip etc.</comment>
+  </data>
+  <data name="MenuOverwriteOverwrite" xml:space="preserve">
+    <value>Overwrite</value>
+  </data>
+  <data name="MenuOverwriteRename" xml:space="preserve">
+    <value>Keep Both</value>
+  </data>
   <data name="MenuFlatPack" xml:space="preserve">
-    <value>Pack into one _folder (flat)</value>
+    <value>Pack Into One _Folder (Flat)</value>
   </data>
   <data name="MenuTools" xml:space="preserve">
     <value>_Tools</value>
   </data>
   <data name="MenuEditChart" xml:space="preserve">
-    <value>_Edit chart</value>
+    <value>_Edit Chart</value>
   </data>
   <data name="MenuMerge" xml:space="preserve">
     <value>_Merge…</value>
@@ -1852,7 +1869,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>{0}, {2} and {3} are counts, {1} is "Recycle Bin" or "Trash".</comment>
   </data>
   <data name="MenuDownloadAllFiles" xml:space="preserve">
-    <value>Download all files</value>
+    <value>Download All Files</value>
     <comment>Library right-click menu: saves each selected song as a song folder.</comment>
   </data>
   <data name="MenuDownloadFileFormat" xml:space="preserve">
@@ -1860,19 +1877,19 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Right-click menu item on a track or file. {0} is the file's name, e.g. guitar.ogg.</comment>
   </data>
   <data name="MenuDownloadArt" xml:space="preserve">
-    <value>Download album art</value>
+    <value>Download Album Art</value>
     <comment>Right-click menu item on the album art while there's none to download.</comment>
   </data>
   <data name="MenuDownloadBackgroundImage" xml:space="preserve">
-    <value>Download background image</value>
+    <value>Download Background Image</value>
     <comment>Right-click menu item on the background while there's none to download.</comment>
   </data>
   <data name="MenuDownloadBackgroundVideo" xml:space="preserve">
-    <value>Download background video</value>
+    <value>Download Background Video</value>
     <comment>Right-click menu item on the background while there's none to download.</comment>
   </data>
   <data name="MenuExportLyrics" xml:space="preserve">
-    <value>Export lyrics as "notes.mid"</value>
+    <value>Export Lyrics as "notes.mid"</value>
   </data>
   <data name="DownloadSavingFormat" xml:space="preserve">
     <value>Saving {0}…</value>
@@ -2222,7 +2239,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>{0} is the error message.</comment>
   </data>
   <data name="EditChartButton" xml:space="preserve">
-    <value>Edit chart</value>
+    <value>Edit Chart</value>
   </data>
   <data name="EditChartToolTip" xml:space="preserve">
     <value>Open the selected song's chart in Chart Builder. Select one song to edit it.</value>

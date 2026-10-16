@@ -60,7 +60,8 @@
                       AppName="{x:Static res:Strings.AppName}">
             <ctl:TitleBar.Menu>
                 <Menu chrome:WindowDecorationProperties.ElementRole="User">
-                    <!-- Where songs are found and where Pack and Unpack write. Settings' Ctrl+, isn't shown, as Avalonia
+                    <!-- Where songs are found, where Pack and Unpack write and where downloads go; then the logs and
+                         Settings. Settings' Ctrl+, isn't shown, as Avalonia
                          would print it as Ctrl+OemComma. -->
                     <MenuItem Header="{x:Static res:Strings.MenuFile}">
                         <MenuItem Header="{x:Static res:Strings.MenuChooseSongsFolder}"
@@ -87,7 +88,18 @@
                                   ToolTip.ShowOnDisabled="True">
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
                         </MenuItem>
+                        <!-- Where right-click downloads go; its tooltip is that folder. -->
+                        <MenuItem Header="{x:Static res:Strings.MenuChooseDownloadFolder}"
+                                  Command="{Binding ChooseDownloadFolderCommand}"
+                                  ToolTip.Tip="{Binding DownloadFolderToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
+                        </MenuItem>
                         <Separator />
+                        <MenuItem Header="{x:Static res:Strings.MenuOpenLogsFolder}"
+                                  Command="{Binding OpenLogsFolderCommand}"
+                                  ToolTip.Tip="{x:Static vm:MainWindowViewModel.LogFolder}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
+                        </MenuItem>
                         <MenuItem Header="{x:Static res:Strings.MenuSettings}"
                                   Command="{Binding OpenSettingsCommand}"
                                   ToolTip.Tip="{x:Static res:Strings.SettingsToolTip}">
@@ -119,7 +131,7 @@
                                   ToolTip.Tip="{x:Static res:Strings.OverwriteToolTip}">
                             <MenuItem.ItemContainerTheme>
                                 <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:OverwriteOption">
-                                    <Setter Property="Header" Value="{Binding Label}" />
+                                    <Setter Property="Header" Value="{Binding MenuLabel}" />
                                     <Setter Property="ToggleType" Value="Radio" />
                                     <Setter Property="GroupName" Value="OverwritePolicy" />
                                     <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=TwoWay}" />

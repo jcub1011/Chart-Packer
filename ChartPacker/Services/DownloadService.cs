@@ -28,8 +28,19 @@ namespace ChartPacker.Services
         public string? Folder
         {
             get => settings.Settings.DownloadFolder;
-            set => settings.Settings.DownloadFolder = string.IsNullOrWhiteSpace(value) ? null : value;
+            set
+            {
+                string? folder = string.IsNullOrWhiteSpace(value) ? null : value;
+                if (folder == settings.Settings.DownloadFolder)
+                    return;
+
+                settings.Settings.DownloadFolder = folder;
+                FolderChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
+
+        /// <summary>Raised when <see cref="Folder"/> changes, from the menu or from Settings.</summary>
+        public event EventHandler? FolderChanged;
 
         /// <summary>Whether each download asks where to save, starting in <see cref="Folder"/>.</summary>
         public bool AskEveryTime
@@ -48,7 +59,7 @@ namespace ChartPacker.Services
             bool ask = AskEveryTime;
             try
             {
-                string folder = await DefaultFolderAsync();
+                string folder = await ResolveFolderAsync();
                 path = ask ? await PickFileAsync(folder, name) : DownloadNames.UniquePath(CreateFolder(folder), name);
                 if (path is null)
                     return;
@@ -80,7 +91,7 @@ namespace ChartPacker.Services
             NoticeViewModel.BusyNotice? busy = null;
             try
             {
-                string folder = await DefaultFolderAsync();
+                string folder = await ResolveFolderAsync();
                 string? parent = AskEveryTime ? await PickFolderAsync(folder) : CreateFolder(folder);
                 if (parent is null)
                     return;
@@ -145,8 +156,8 @@ namespace ChartPacker.Services
             }
         }
 
-        /// <summary>The folder set in the settings, or the system's Downloads folder.</summary>
-        private async Task<string> DefaultFolderAsync()
+        /// <summary>The folder downloads go to: the one set in the settings, or the system's Downloads folder.</summary>
+        public async Task<string> ResolveFolderAsync()
         {
             if (Folder is { } folder)
                 return folder;
