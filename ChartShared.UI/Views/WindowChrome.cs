@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using ChartShared.UI.Controls;
 
 namespace ChartShared.UI.Views
 {
@@ -45,6 +46,14 @@ namespace ChartShared.UI.Views
         /// long as the icon does.
         /// </remarks>
         public static IImage? ImageOf(WindowIcon? icon) => icon is null ? null : IconImages.GetValue(icon, Decode);
+
+        /// <summary>
+        /// Shows <paramref name="window"/>'s icon in its <paramref name="titleBar"/>, as it has it now and as it gets it later:
+        /// a window with its owner's icon (<see cref="UseOwnerIcon"/>) gets it only once shown. Call after InitializeComponent.
+        /// </summary>
+        /// <remarks>The title bar is the window's, so the binding lasts as long as both and needn't be undone.</remarks>
+        public static void ShowIcon(Window window, TitleBar titleBar) =>
+            titleBar.Bind(TitleBar.IconProperty, window.GetObservable(Window.IconProperty, ImageOf));
 
         private static readonly ConditionalWeakTable<WindowIcon, IImage> IconImages = new();
 

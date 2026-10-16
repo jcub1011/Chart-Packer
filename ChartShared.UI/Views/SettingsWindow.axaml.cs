@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -16,7 +15,7 @@ namespace ChartShared.UI.Views
         public SettingsWindow()
         {
             InitializeComponent();
-            WindowTitleBar.Icon = WindowChrome.ImageOf(Icon);
+            WindowChrome.ShowIcon(this, WindowTitleBar);
 
             Opened += (_, _) =>
             {
@@ -33,17 +32,6 @@ namespace ChartShared.UI.Views
         {
             get => WindowTitleBar.AppName;
             set => WindowTitleBar.AppName = value;
-        }
-
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            // The icon is the owner's (WindowChrome.UseOwnerIcon), so the title bar shows it as the window gets it.
-            // Null-checked, as a style can set the icon before InitializeComponent has made the title bar; the
-            // constructor copies that one over.
-            if (change.Property == IconProperty && WindowTitleBar is not null)
-                WindowTitleBar.Icon = WindowChrome.ImageOf(Icon);
         }
 
         private void OnPreviewKeyDown(object? sender, KeyEventArgs e)

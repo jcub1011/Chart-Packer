@@ -605,6 +605,76 @@ public sealed class SongMergerTests
     }
 
     [TestMethod]
+    public async Task SongNothingIsTakenFromIsntCredited()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 0 });
+
+        var metadata = SongMerger.BuildMetadata(plan).ToDictionary(p => p.Key, p => p.Value);
+
+        Assert.IsFalse(plan.Credits(1));
+        Assert.AreEqual("Alice", metadata["charter"]);
+        Assert.AreEqual("Alice", SongMerger.ChartersOf(plan));
+    }
+
+    [TestMethod]
+    public async Task SongOnlyAPartIsTakenFromIsCredited()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["guitar"] = 1 });
+
+        Assert.IsTrue(plan.Credits(1));
+        Assert.AreEqual("Alice, <color=red>Bob</color>", SongMerger.ChartersOf(plan));
+    }
+
+    [TestMethod]
+    public async Task SongOnlyTheBaseChartIsTakenFromIsCredited()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 0 }) with { BaseSource = 1 };
+
+        Assert.IsTrue(plan.Credits(1));
+        Assert.AreEqual("Alice, <color=red>Bob</color>", SongMerger.ChartersOf(plan));
+    }
+
+    [TestMethod]
+    public async Task SongOnlyAudioArtOrMetadataIsTakenFromIsntCredited()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["drums"] = 0 }) with
+        {
+            AudioSource = 1,
+            AlbumArtSource = 1,
+            Metadata = new Dictionary<string, int?> { ["genre"] = 1 },
+        };
+
+        Assert.IsFalse(plan.Credits(1));
+        Assert.AreEqual("Alice", SongMerger.ChartersOf(plan));
+    }
+
+    [TestMethod]
+    public async Task ChoicesSoFarCreditOnlyTheBaseChartAndPartsSources()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+
+        Assert.AreEqual("Alice", SongMerger.ChartersOf(analysis, 0, []));
+        Assert.AreEqual("<color=red>Bob</color>", SongMerger.ChartersOf(analysis, null, [1]));
+        Assert.AreEqual("Alice, <color=red>Bob</color>", SongMerger.ChartersOf(analysis, 0, [1]));
+        Assert.AreEqual("", SongMerger.ChartersOf(analysis, null, []));
+        Assert.IsFalse(SongMergePlan.Credits(1, 0, [0]));
+        Assert.IsTrue(SongMergePlan.Credits(1, null, [0, 1]));
+    }
+
+    [TestMethod]
+    public async Task ChoicesSoFarCreditAsTheirPlanDoes()
+    {
+        var analysis = await SongMergeAnalysis.LoadAsync([DrumsAndBass(), await DrumsAndGuitarSngAsync()], TestContext.CancellationToken);
+        var plan = Plan(analysis, new Dictionary<string, int> { ["bass"] = 0, ["guitar"] = 1 });
+
+        Assert.AreEqual(SongMerger.ChartersOf(plan), SongMerger.ChartersOf(analysis, plan.BaseSource, [.. plan.Parts.Values]));
+    }
+
+    [TestMethod]
     public void FileNameHasNoTagsOrCharactersFilesCantHave()
     {
         Assert.AreEqual("AC_DC - Back _In_ Black", SongMerger.FileNameFor([P("artist", "AC/DC"), P("name", "<color=red>Back \"In\" Black</color>")], "fallback"));

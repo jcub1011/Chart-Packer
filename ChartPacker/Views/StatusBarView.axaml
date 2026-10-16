@@ -10,17 +10,6 @@
              x:DataType="vm:StatusBarViewModel">
 
     <UserControl.Styles>
-        <!-- The progress fills the bar from the left, behind the text, in the accent's tint. -->
-        <Style Selector="ProgressBar.fill">
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="CornerRadius" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTintBrush}" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
-        </Style>
-
         <!-- The whole bar is one flat button that opens the progress window. Its hover is a translucent overlay, so the
              progress shows through it. While busy, the text clears the spinner at the left. While a scan runs it's
              disabled, as the window is the job's, but stays plain text rather than greying out. -->

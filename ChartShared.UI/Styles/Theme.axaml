@@ -192,6 +192,18 @@
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
+    <!-- Work under way, filling a bar from the left behind its text in the accent's tint: a window's title bar while it
+         works (Deduplicate, the job's progress, Merge, lining a song up), or the main window's status bar. -->
+    <Style Selector="ProgressBar.fill">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTintBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+    </Style>
+
     <!-- The title bar a window draws for itself (TitleBar), as Chart Packer's main window and Chart Builder's editor do:
          its menus flat on the frame's colour, like the caption buttons. 30 high, as Fluent's caption buttons are. -->
     <Style Selector="Border.title-bar">

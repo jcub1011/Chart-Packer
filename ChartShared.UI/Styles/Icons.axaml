@@ -73,6 +73,9 @@
     <StreamGeometry x:Key="OutputFolderStroke">M1.5,4 A1,1 0 0 1 2.5,3 H6 L7.5,4.5 H13.5 A1,1 0 0 1 14.5,5.5 V12.5 A1,1 0 0 1 13.5,13.5 H2.5 A1,1 0 0 1 1.5,12.5 Z M5.5,9 H10.5 M8.5,7 L10.5,9 L8.5,11</StreamGeometry>
     <StreamGeometry x:Key="ClearStroke">M4.5,4.5 L11.5,11.5 M11.5,4.5 L4.5,11.5</StreamGeometry>
     <StreamGeometry x:Key="CheckStroke">M3.5,8.5 L6.5,11.5 L12.5,4.5</StreamGeometry>
+    <!-- A triangle with an exclamation mark: something to check. The dot is a line too short to see as one, which the
+         round caps draw as a dot. -->
+    <StreamGeometry x:Key="WarningStroke">M8,2 L14.5,13.5 H1.5 Z M8,6.25 V9.25 M8,11.4 V11.5</StreamGeometry>
     <StreamGeometry x:Key="PackStroke">M1.5,9.5 V13.5 H14.5 V9.5 M8,1.5 V9 M5,6 L8,9 L11,6</StreamGeometry>
     <StreamGeometry x:Key="UnpackStroke">M1.5,9.5 V13.5 H14.5 V9.5 M8,9.5 V2 M5,5 L8,2 L11,5</StreamGeometry>
     <!-- Two lines joining into one: songs merged. -->
@@ -92,6 +95,8 @@
     <!-- A small chevron pointing down, beside a button's text: it opens a menu. -->
     <StreamGeometry x:Key="ChevronDownStroke">M4.5,6.5 L8,10 L11.5,6.5</StreamGeometry>
     <StreamGeometry x:Key="AddStroke">M8,3.5 V12.5 M3.5,8 H12.5</StreamGeometry>
+    <!-- AddStroke's bar alone: less, e.g. zooming out. -->
+    <StreamGeometry x:Key="SubtractStroke">M3.5,8 H12.5</StreamGeometry>
     <!-- Three dots in a row: more tools, in a menu. -->
     <StreamGeometry x:Key="MoreStroke">M3.25,8 A0.75,0.75 0 1 1 1.75,8 A0.75,0.75 0 1 1 3.25,8 Z M8.75,8 A0.75,0.75 0 1 1 7.25,8 A0.75,0.75 0 1 1 8.75,8 Z M14.25,8 A0.75,0.75 0 1 1 12.75,8 A0.75,0.75 0 1 1 14.25,8 Z</StreamGeometry>
     <!-- A magnifying glass. -->

@@ -24,18 +24,6 @@
     <!-- It can't be minimized: with no taskbar entry, a minimized window would have nothing to restore it from. -->
 
     <Window.Styles>
-        <!-- The title bar is the job's progress: it fills from the left, behind the text, in the accent's tint, as the
-             main window's status bar does (StatusBarView.axaml). -->
-        <Style Selector="ProgressBar.fill">
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="CornerRadius" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTintBrush}" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
-        </Style>
-
         <!-- While a job runs, the spinner takes the icon's place. The icon is see-through rather than hidden, so its
              column keeps its width and the summary doesn't move. -->
         <Style Selector="Border.title-bar.busy > Grid > Image">
