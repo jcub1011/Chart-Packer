@@ -260,14 +260,6 @@
     <value>{0} · {1}</value>
     <comment>A part's name: its instrument and difficulty, e.g. "Guitar · Expert".</comment>
   </data>
-  <data name="LaneVocals" xml:space="preserve">
-    <value>Vocals</value>
-    <comment>The lead vocals lane, PART VOCALS.</comment>
-  </data>
-  <data name="LaneHarmonyFormat" xml:space="preserve">
-    <value>Harmony {0}</value>
-    <comment>A harmony vocals lane, e.g. "Harmony 2".</comment>
-  </data>
   <data name="LaneVocalsGroup" xml:space="preserve">
     <value>Vocals</value>
     <comment>The vocal parts' group in a lane's part menu.</comment>
@@ -1737,18 +1729,6 @@ Saving also makes these changes to song.ini:
   <data name="FindingsFixedEverywhereFormat" xml:space="preserve">
     <value>Fixed {0} {1} findings.</value>
     <comment>After Fix All. {0} is how many were fixed, {1} the rule ID (CHR023).</comment>
-  </data>
-  <data name="FindingPartDifficultyFormat" xml:space="preserve">
-    <value>{0} {1}</value>
-    <comment>A finding's part and difficulty, e.g. "Lead Guitar Expert". {0} is the part; {1} the difficulty.</comment>
-  </data>
-  <data name="FindingWhereFormat" xml:space="preserve">
-    <value>{0} · {1}</value>
-    <comment>Where a finding is: {0} is its part and difficulty; {1} its measure and beat.</comment>
-  </data>
-  <data name="FindingWhereSong" xml:space="preserve">
-    <value>Song</value>
-    <comment>Where a finding about the song as a whole is.</comment>
   </data>
   <data name="SaveAndPackErrorsToolTipFormat" xml:space="preserve">
     <value>The chart has {0} errors, things the games read differently from what's written. Fix them before packing; Save still works.</value>

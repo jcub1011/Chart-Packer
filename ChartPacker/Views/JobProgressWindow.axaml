@@ -268,14 +268,11 @@
                             <ToggleButton Classes="filterChip"
                                           IsChecked="{Binding IsOn}"
                                           AutomationProperties.Name="{Binding Label}">
-                                <StackPanel Orientation="Horizontal" Spacing="3">
-                                    <ctl:LineIcon Data="{StaticResource CheckStroke}" IsVisible="{Binding IsOn}" />
-                                    <TextBlock Classes="outcome"
-                                               Classes.attention="{Binding IsAttention}"
-                                               Classes.failed="{Binding IsFailed}"
-                                               VerticalAlignment="Center"
-                                               Text="{Binding Label}" />
-                                </StackPanel>
+                                <TextBlock Classes="outcome"
+                                           Classes.attention="{Binding IsAttention}"
+                                           Classes.failed="{Binding IsFailed}"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding Label}" />
                             </ToggleButton>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

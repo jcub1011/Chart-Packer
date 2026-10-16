@@ -31,7 +31,8 @@ public enum SongChartLintStatus
 
 /// <summary>A chart lint finding, with where it is in measures and beats for showing it.</summary>
 /// <param name="Place">Where its tick is in the song, or null for a finding about the song as a whole.</param>
-public sealed record SongChartFinding(Finding Finding, MeasureBeat? Place);
+/// <param name="EndPlace">Where its last tick is, for a finding about a stretch of the chart rather than a point; null otherwise.</param>
+public sealed record SongChartFinding(Finding Finding, MeasureBeat? Place, MeasureBeat? EndPlace = null);
 
 /// <summary>What linting a song's chart found (<see cref="SongChartLint"/>).</summary>
 /// <param name="Detail">For <see cref="SongChartLintStatus.Unreadable"/>, what went wrong.</param>
@@ -70,7 +71,10 @@ public static class SongChartLint
         var map = load.Chart.TempoMap.ToTempoMap();
         return new SongChartLintReport(
             SongChartLintStatus.Linted,
-            [.. findings.Select(f => new SongChartFinding(f, (f.Location?.Tick ?? f.Tick) is { } tick ? MeasureBeat.At(map, tick) : null))]);
+            [.. findings.Select(f => new SongChartFinding(
+                f,
+                (f.Location?.Tick ?? f.Tick) is { } tick ? MeasureBeat.At(map, tick) : null,
+                f.Location is { } location && location.EndTick > location.Tick ? MeasureBeat.At(map, location.EndTick) : null))]);
     }
 
     /// <summary>

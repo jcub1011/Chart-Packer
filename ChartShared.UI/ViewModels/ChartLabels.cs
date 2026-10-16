@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Linq;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Library;
 using ChartShared.Core.Merging;
@@ -32,6 +34,36 @@ namespace ChartShared.UI.ViewModels
             ChartDifficulty.Hard => SharedStrings.DifficultyHard,
             _ => SharedStrings.DifficultyExpert,
         };
+
+        /// <summary>The name of a vocal part: Vocals, or Harmony 1 to Harmony 3.</summary>
+        public static string VocalTrackName(VocalTrack track) => track switch
+        {
+            VocalTrack.Vocals => SharedStrings.VocalTrackVocals,
+            _ => string.Format(CultureInfo.CurrentCulture, SharedStrings.VocalTrackHarmonyFormat, (int)track),
+        };
+
+        /// <summary>
+        /// The name of a MIDI track a finding is in: a vocal part's name for <c>PART VOCALS</c> or <c>HARM1</c> to
+        /// <c>HARM3</c>, any other track's own name, or null for none.
+        /// </summary>
+        public static string? TrackName(string? midiTrack) =>
+            VocalTracks.Of(midiTrack) is { } vocal ? VocalTrackName(vocal)
+            : string.IsNullOrWhiteSpace(midiTrack) ? null
+            : midiTrack.Trim();
+
+        /// <summary>
+        /// Where a finding is in the song, as "m12 · beat 3", or from where it starts to where it ends, as
+        /// "m12 · beat 3 – m14 · beat 1", when <paramref name="end"/> is somewhere else.
+        /// </summary>
+        public static string PlaceText(MeasureBeat start, MeasureBeat? end = null)
+        {
+            string place = Place(start);
+            return end is { } last && Place(last) is var to && to != place
+                ? string.Format(CultureInfo.CurrentCulture, SharedStrings.FindingPlaceRangeFormat, place, to)
+                : place;
+
+            static string Place(MeasureBeat at) => string.Format(CultureInfo.CurrentCulture, SharedStrings.FindingPlaceFormat, at.Measure, at.Beat);
+        }
 
         /// <summary>The one-letter name of <paramref name="difficulty"/>: E, M, H or X.</summary>
         public static string DifficultyLetter(ChartDifficulty difficulty) => difficulty switch

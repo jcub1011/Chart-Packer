@@ -2251,10 +2251,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorFilterNoTypes" xml:space="preserve">
     <value>No issues found yet.</value>
   </data>
-  <data name="ValidatorFilterChipFormat" xml:space="preserve">
-    <value>{0} ({1})</value>
-    <comment>A Validator filter chip. {0} is what it shows, e.g. "Empty value"; {1} is how many listed songs have it.</comment>
-  </data>
   <data name="ValidatorFilterChipToolTipFormat" xml:space="preserve">
     <value>{0}: {1} songs. Turn on chips to show only the issues that match them.</value>
     <comment>{0} is what the chip shows, e.g. "Empty value"; {1} is how many listed songs have it.</comment>

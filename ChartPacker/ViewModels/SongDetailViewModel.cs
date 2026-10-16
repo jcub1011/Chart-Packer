@@ -1769,7 +1769,7 @@ namespace ChartPacker.ViewModels
 
                 ChartIssues.FileName = chartName ?? "";
                 ChartIssues.Title = string.Format(CultureInfo.CurrentCulture, SharedStrings.ChartIssuesWindowTitleFormat, Title);
-                ChartIssues.Show(report.Findings, static f => f.Finding, static f => new FindingItem(f.Finding, _ => LibraryChartLint.Where(f)));
+                ChartIssues.Show(report.Findings, static f => f.Finding, static f => new FindingItem(f.Finding, _ => LibraryChartLint.PlaceOf(f)));
                 HasChartIssues = report.Status == SongChartLintStatus.Linted;
             }
             catch (OperationCanceledException)
