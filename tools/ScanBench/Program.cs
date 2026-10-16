@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Scanning;
 using ScanBench;
 
 // Times the library scan on a real library (see README.md):
@@ -22,6 +22,7 @@ int depth = 2;
 bool phases = false;
 bool warm = false;
 bool charts = false;
+bool validate = false;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -42,6 +43,9 @@ for (int i = 0; i < args.Length; i++)
         case "--charts":
             charts = true;
             break;
+        case "--validate":
+            validate = true;
+            break;
         default:
             root = args[i];
             break;
@@ -57,6 +61,12 @@ if (root is null)
 if (phases)
 {
     Phases.Run(root, depth, warm);
+    return 0;
+}
+
+if (validate)
+{
+    await Validate.RunAsync(root, depth);
     return 0;
 }
 

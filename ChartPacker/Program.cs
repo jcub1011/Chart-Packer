@@ -1,7 +1,7 @@
 ﻿using Avalonia;
-using ChartPacker.Core;
+using ChartShared.Core;
 using ChartPacker.Services;
-using ChartPacker.UI;
+using ChartShared.UI;
 using System;
 
 namespace ChartPacker
@@ -30,6 +30,7 @@ namespace ChartPacker
                 .WithDeveloperTools()
 #endif
                 .WithInterFont()
-                .LogToTrace();
+                .LogToTrace()
+                .LogToAppLog();
     }
 }

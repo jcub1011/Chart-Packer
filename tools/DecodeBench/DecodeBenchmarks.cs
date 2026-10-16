@@ -1,6 +1,6 @@
 using BenchmarkDotNet.Attributes;
-using ChartPacker.Audio.Decoding;
-using ChartPacker.Audio.Waveforms;
+using ChartShared.Audio.Decoding;
+using ChartShared.Audio.Waveforms;
 
 namespace DecodeBench;
 

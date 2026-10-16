@@ -1,16 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Library;
-using ChartPacker.UI;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Library;
+using ChartShared.UI;
+using ChartShared.UI.Services;
 
 namespace ChartPacker.Services
 {
     /// <summary>User settings persisted to <c>settings.json</c>. See spec §8.</summary>
-    public sealed class AppSettings
+    public sealed class AppSettings : ISettingsWindowSize
     {
         public const double DefaultLibraryPaneWidth = 320;
         public const double MinLibraryPaneWidth = 200;
@@ -44,6 +45,23 @@ namespace ChartPacker.Services
 
         /// <summary>Width of the library (left) panel, in device-independent pixels.</summary>
         public double LibraryPaneWidth { get; set; } = DefaultLibraryPaneWidth;
+
+        /// <summary>Whether the main window was maximized when it last closed, so it opens that way.</summary>
+        public bool MainWindowMaximized { get; set; }
+
+        /// <summary>The main window's normal bounds when it last closed, in screen pixels (position) and device-independent pixels (size). Null for none yet.</summary>
+        public int? MainWindowX { get; set; }
+
+        public int? MainWindowY { get; set; }
+
+        public double? MainWindowWidth { get; set; }
+
+        public double? MainWindowHeight { get; set; }
+
+        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
+        public double? SettingsWindowWidth { get; set; }
+
+        public double? SettingsWindowHeight { get; set; }
 
         /// <summary>Whether the merge songs editor was maximized when it was last closed.</summary>
         public bool MergeWindowMaximized { get; set; }
@@ -111,6 +129,9 @@ namespace ChartPacker.Services
 
         /// <summary>Whether the spectrum is drawn behind the details panel. Off, it isn't worked out at all.</summary>
         public bool ShowSpectrum { get; set; } = true;
+
+        /// <summary>Whether the main window takes its colours from the selected song's album art. Off, it keeps the app's own.</summary>
+        public bool AlbumArtTheming { get; set; } = true;
 
         /// <summary>Whether the chart's notes are drawn.</summary>
         public bool ShowNoteHighway { get; set; } = true;

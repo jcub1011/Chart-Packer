@@ -5,7 +5,7 @@
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:conv="using:ChartPacker.Converters"
              xmlns:ctl="using:ChartPacker.Controls"
-             xmlns:ui="using:ChartPacker.UI.Controls"
+             xmlns:ui="using:ChartShared.UI.Controls"
              xmlns:res="using:ChartPacker.Resources"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="600"
              x:Class="ChartPacker.Views.LibraryView"
@@ -35,16 +35,11 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <Style Selector="TextBlock.path">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="TextTrimming" Value="PathSegmentEllipsis" />
-        </Style>
-
         <!-- Selected rows are tinted, not filled, and get a violet bar on the left. The bar is always
-             there (transparent), so selecting doesn't shift the row. -->
+             there (transparent), so selecting doesn't shift the row. The sides are padded by the gap between the
+             search box and the filter button. -->
         <Style Selector="ListBox#EntryList ListBoxItem">
-            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Padding" Value="6,5" />
             <Setter Property="BorderThickness" Value="3,0,0,0" />
             <Setter Property="BorderBrush" Value="Transparent" />
         </Style>
@@ -54,12 +49,10 @@
         <Style Selector="ListBox#EntryList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
             <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="BorderBrush">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </Style>
         <Style Selector="ListBox#EntryList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#558B5CF6" />
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
         </Style>
 
         <Style Selector="Border.art-tile">
@@ -93,9 +86,7 @@
             <Setter Property="Foreground" Value="White" />
         </Style>
         <Style Selector="Button.tilePlay:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
         <Style Selector="Button.tilePlay PathIcon">
@@ -150,266 +141,221 @@
     </UserControl.Styles>
 
     <DockPanel>
-        <!-- Where songs are read from and where Pack/Unpack write; both are chosen from the toolbar. -->
+        <!-- Search, and the sort and filter flyout, always there. The songs and output folders are in the title bar
+             (MainWindow.axaml). Padded all round by the gap between the two. -->
         <Border DockPanel.Dock="Top"
-                Padding="12,10"
+                Padding="6"
                 BorderThickness="0,0,0,1"
                 BorderBrush="{DynamicResource SubtleBorderBrush}">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
-                    <TextBlock Grid.Row="0" Grid.Column="0"
-                               Classes="caption"
-                               VerticalAlignment="Center"
-                               Text="{x:Static res:Strings.InputLabel}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1"
-                               Classes="path"
-                               Classes.muted="{Binding ShowPrompt}"
-                               Text="{Binding FolderPath, TargetNullValue={x:Static res:Strings.FolderPathWatermark}}"
-                               ToolTip.Tip="{Binding FolderPath}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBox x:Name="SearchBox"
+                         Grid.Column="0"
+                         Classes="clearButton"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding Filter.SearchText}"
+                         PlaceholderText="{x:Static res:Strings.SearchWatermark}"
+                         AutomationProperties.Name="{x:Static res:Strings.SearchName}">
+                    <TextBox.InnerLeftContent>
+                        <ui:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                    </TextBox.InnerLeftContent>
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Escape" Command="{Binding Filter.ClearSearchCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0"
-                               Classes="caption"
-                               VerticalAlignment="Center"
-                               Text="{x:Static res:Strings.OutputLabel}" />
-                    <!-- Muted while it's the default (next to the scanned songs) rather than a chosen folder. -->
-                    <TextBlock Grid.Row="1" Grid.Column="1"
-                               Classes="path"
-                               Classes.muted="{Binding !HasCustomOutputFolder}"
-                               Text="{Binding EffectiveOutputFolder, TargetNullValue={x:Static res:Strings.OutputWatermark}}">
-                        <ToolTip.Tip>
-                            <StackPanel MaxWidth="360" Spacing="2">
-                                <TextBlock FontWeight="SemiBold" TextWrapping="Wrap"
-                                           Text="{Binding EffectiveOutputFolder, TargetNullValue={x:Static res:Strings.OutputWatermark}}" />
-                                <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.OutputToolTip}" />
-                            </StackPanel>
-                        </ToolTip.Tip>
-                    </TextBlock>
-                </Grid>
+                <Button Grid.Column="1"
+                        Classes="tool"
+                        Classes.active="{Binding Filter.HasActiveFilters}"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{x:Static res:Strings.FilterToolTip}"
+                        AutomationProperties.Name="{x:Static res:Strings.FilterToolTip}">
+                    <Panel Width="32" Height="32">
+                        <ui:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
+                        <Border Classes="badge" IsVisible="{Binding Filter.HasActiveFilters}">
+                            <TextBlock Text="{Binding Filter.ActiveFilterCount}" />
+                        </Border>
+                    </Panel>
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                            <ScrollViewer MaxHeight="560" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Width="340" Spacing="14" Margin="2">
+                                    <StackPanel Classes="filter-section">
+                                        <TextBlock Classes="caption" Text="{x:Static res:Strings.SortByLabel}" />
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                            <ComboBox Grid.Column="0"
+                                                      HorizontalAlignment="Stretch"
+                                                      ItemsSource="{Binding Filter.SortOptions}"
+                                                      SelectedItem="{Binding Filter.SelectedSortOption}"
+                                                      AutomationProperties.Name="{x:Static res:Strings.SortByLabel}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:LibrarySortOption">
+                                                        <TextBlock Text="{Binding Label}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                            <ToggleButton Grid.Column="1"
+                                                          Classes="tool"
+                                                          IsChecked="{Binding Filter.SortDescending}"
+                                                          ToolTip.Tip="{x:Static res:Strings.SortDescendingToolTip}"
+                                                          AutomationProperties.Name="{x:Static res:Strings.SortDescendingToolTip}">
+                                                <Panel>
+                                                    <ui:LineIcon Data="{StaticResource SortAscendingStroke}" IsVisible="{Binding !Filter.SortDescending}" />
+                                                    <ui:LineIcon Data="{StaticResource SortDescendingStroke}" IsVisible="{Binding Filter.SortDescending}" />
+                                                </Panel>
+                                            </ToggleButton>
+                                        </Grid>
+                                    </StackPanel>
 
-                <Border Classes="banner" IsVisible="{Binding IsStale}">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                        <PathIcon Grid.Column="0"
-                                  Width="12" Height="12"
-                                  VerticalAlignment="Center"
-                                  Data="{StaticResource InfoIconGeometry}" />
-                        <TextBlock Grid.Column="1"
-                                   FontSize="12"
-                                   Text="{x:Static res:Strings.StaleHint}"
-                                   TextWrapping="Wrap"
-                                   VerticalAlignment="Center" />
-                    </Grid>
-                </Border>
-
-                <!-- Search, and the sort and filter flyout. -->
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding ShowFilterBar}">
-                    <TextBox x:Name="SearchBox"
-                             Grid.Column="0"
-                             Classes="clearButton"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding Filter.SearchText}"
-                             PlaceholderText="{x:Static res:Strings.SearchWatermark}"
-                             AutomationProperties.Name="{x:Static res:Strings.SearchName}">
-                        <TextBox.InnerLeftContent>
-                            <ui:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
-                        </TextBox.InnerLeftContent>
-                        <TextBox.KeyBindings>
-                            <KeyBinding Gesture="Escape" Command="{Binding Filter.ClearSearchCommand}" />
-                        </TextBox.KeyBindings>
-                    </TextBox>
-
-                    <Button Grid.Column="1"
-                            Classes="tool"
-                            Classes.active="{Binding Filter.HasActiveFilters}"
-                            VerticalAlignment="Center"
-                            ToolTip.Tip="{x:Static res:Strings.FilterToolTip}"
-                            AutomationProperties.Name="{x:Static res:Strings.FilterToolTip}">
-                        <Panel Width="32" Height="32">
-                            <ui:LineIcon Data="{StaticResource FilterStroke}" HorizontalAlignment="Center" />
-                            <Border Classes="badge" IsVisible="{Binding Filter.HasActiveFilters}">
-                                <TextBlock Text="{Binding Filter.ActiveFilterCount}" />
-                            </Border>
-                        </Panel>
-                        <Button.Flyout>
-                            <Flyout Placement="BottomEdgeAlignedRight">
-                                <ScrollViewer MaxHeight="560" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel Width="340" Spacing="14" Margin="2">
-                                        <StackPanel Classes="filter-section">
-                                            <TextBlock Classes="caption" Text="{x:Static res:Strings.SortByLabel}" />
-                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                                <ComboBox Grid.Column="0"
-                                                          HorizontalAlignment="Stretch"
-                                                          ItemsSource="{Binding Filter.SortOptions}"
-                                                          SelectedItem="{Binding Filter.SelectedSortOption}"
-                                                          AutomationProperties.Name="{x:Static res:Strings.SortByLabel}">
-                                                    <ComboBox.ItemTemplate>
-                                                        <DataTemplate x:DataType="vm:LibrarySortOption">
-                                                            <TextBlock Text="{Binding Label}" />
-                                                        </DataTemplate>
-                                                    </ComboBox.ItemTemplate>
-                                                </ComboBox>
-                                                <ToggleButton Grid.Column="1"
-                                                              Classes="tool"
-                                                              IsChecked="{Binding Filter.SortDescending}"
-                                                              ToolTip.Tip="{x:Static res:Strings.SortDescendingToolTip}"
-                                                              AutomationProperties.Name="{x:Static res:Strings.SortDescendingToolTip}">
-                                                    <Panel>
-                                                        <ui:LineIcon Data="{StaticResource SortAscendingStroke}" IsVisible="{Binding !Filter.SortDescending}" />
-                                                        <ui:LineIcon Data="{StaticResource SortDescendingStroke}" IsVisible="{Binding Filter.SortDescending}" />
-                                                    </Panel>
-                                                </ToggleButton>
-                                            </Grid>
+                                    <StackPanel Classes="filter-section">
+                                        <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterTypeLabel}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="16">
+                                            <CheckBox Content="{x:Static res:Strings.FilterKindSng}" IsChecked="{Binding Filter.ShowSng}" />
+                                            <CheckBox Content="{x:Static res:Strings.FilterKindFolder}" IsChecked="{Binding Filter.ShowFolders}" />
                                         </StackPanel>
+                                    </StackPanel>
 
-                                        <StackPanel Classes="filter-section">
-                                            <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterTypeLabel}" />
-                                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                                <CheckBox Content="{x:Static res:Strings.FilterKindSng}" IsChecked="{Binding Filter.ShowSng}" />
-                                                <CheckBox Content="{x:Static res:Strings.FilterKindFolder}" IsChecked="{Binding Filter.ShowFolders}" />
-                                            </StackPanel>
-                                        </StackPanel>
+                                    <StackPanel Classes="filter-section">
+                                        <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterTextLabel}" />
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
+                                            <TextBlock Grid.Row="0" Classes="label" Text="{x:Static res:Strings.FieldTitle}" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.TitleContains}"
+                                                     AutomationProperties.Name="{x:Static res:Strings.FieldTitle}" />
+                                            <TextBlock Grid.Row="1" Classes="label" Text="{x:Static res:Strings.FieldArtist}" />
+                                            <TextBox Grid.Row="1" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.ArtistContains}"
+                                                     AutomationProperties.Name="{x:Static res:Strings.FieldArtist}" />
+                                            <TextBlock Grid.Row="2" Classes="label" Text="{x:Static res:Strings.FieldAlbum}" />
+                                            <TextBox Grid.Row="2" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.AlbumContains}"
+                                                     AutomationProperties.Name="{x:Static res:Strings.FieldAlbum}" />
+                                            <TextBlock Grid.Row="3" Classes="label" Text="{x:Static res:Strings.FieldGenre}" />
+                                            <TextBox Grid.Row="3" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.GenreContains}"
+                                                     AutomationProperties.Name="{x:Static res:Strings.FieldGenre}" />
+                                            <TextBlock Grid.Row="4" Classes="label" Text="{x:Static res:Strings.FieldCharter}" />
+                                            <TextBox Grid.Row="4" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.CharterContains}"
+                                                     AutomationProperties.Name="{x:Static res:Strings.FieldCharter}" />
+                                        </Grid>
+                                    </StackPanel>
 
-                                        <StackPanel Classes="filter-section">
-                                            <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterTextLabel}" />
-                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
-                                                <TextBlock Grid.Row="0" Classes="label" Text="{x:Static res:Strings.FieldTitle}" />
-                                                <TextBox Grid.Row="0" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.TitleContains}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.FieldTitle}" />
-                                                <TextBlock Grid.Row="1" Classes="label" Text="{x:Static res:Strings.FieldArtist}" />
-                                                <TextBox Grid.Row="1" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.ArtistContains}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.FieldArtist}" />
-                                                <TextBlock Grid.Row="2" Classes="label" Text="{x:Static res:Strings.FieldAlbum}" />
-                                                <TextBox Grid.Row="2" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.AlbumContains}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.FieldAlbum}" />
-                                                <TextBlock Grid.Row="3" Classes="label" Text="{x:Static res:Strings.FieldGenre}" />
-                                                <TextBox Grid.Row="3" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.GenreContains}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.FieldGenre}" />
-                                                <TextBlock Grid.Row="4" Classes="label" Text="{x:Static res:Strings.FieldCharter}" />
-                                                <TextBox Grid.Row="4" Grid.Column="1" Classes="clearButton" Text="{Binding Filter.CharterContains}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.FieldCharter}" />
-                                            </Grid>
-                                        </StackPanel>
+                                    <!-- Min and max, both optional. Empty means no limit. -->
+                                    <StackPanel Classes="filter-section">
+                                        <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterRangeLabel}" />
+                                        <Grid ColumnDefinitions="Auto,*,Auto,*,28" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6" RowSpacing="4">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Margin="0,0,4,0" Text="{x:Static res:Strings.FieldYear}" />
+                                            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding Filter.YearMin}" Maximum="9999" FormatString="0"
+                                                           PlaceholderText="{x:Static res:Strings.FilterMinWatermark}" />
+                                            <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.FilterRangeSeparator}" />
+                                            <NumericUpDown Grid.Row="0" Grid.Column="3" Value="{Binding Filter.YearMax}" Maximum="9999" FormatString="0"
+                                                           PlaceholderText="{x:Static res:Strings.FilterMaxWatermark}" />
 
-                                        <!-- Min and max, both optional. Empty means no limit. -->
-                                        <StackPanel Classes="filter-section">
-                                            <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterRangeLabel}" />
-                                            <Grid ColumnDefinitions="Auto,*,Auto,*,28" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6" RowSpacing="4">
-                                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Margin="0,0,4,0" Text="{x:Static res:Strings.FieldYear}" />
-                                                <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding Filter.YearMin}" Maximum="9999" FormatString="0"
-                                                               PlaceholderText="{x:Static res:Strings.FilterMinWatermark}" />
-                                                <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.FilterRangeSeparator}" />
-                                                <NumericUpDown Grid.Row="0" Grid.Column="3" Value="{Binding Filter.YearMax}" Maximum="9999" FormatString="0"
-                                                               PlaceholderText="{x:Static res:Strings.FilterMaxWatermark}" />
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Margin="0,0,4,0" Text="{x:Static res:Strings.FieldLength}" />
+                                            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Filter.LengthMin}" Increment="0.5" FormatString="0.#"
+                                                           PlaceholderText="{x:Static res:Strings.FilterMinWatermark}" />
+                                            <TextBlock Grid.Row="1" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.FilterRangeSeparator}" />
+                                            <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding Filter.LengthMax}" Increment="0.5" FormatString="0.#"
+                                                           PlaceholderText="{x:Static res:Strings.FilterMaxWatermark}" />
+                                            <TextBlock Grid.Row="1" Grid.Column="4" Classes="label muted" Text="{x:Static res:Strings.FilterLengthUnit}" />
 
-                                                <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Margin="0,0,4,0" Text="{x:Static res:Strings.FieldLength}" />
-                                                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Filter.LengthMin}" Increment="0.5" FormatString="0.#"
-                                                               PlaceholderText="{x:Static res:Strings.FilterMinWatermark}" />
-                                                <TextBlock Grid.Row="1" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.FilterRangeSeparator}" />
-                                                <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding Filter.LengthMax}" Increment="0.5" FormatString="0.#"
-                                                               PlaceholderText="{x:Static res:Strings.FilterMaxWatermark}" />
-                                                <TextBlock Grid.Row="1" Grid.Column="4" Classes="label muted" Text="{x:Static res:Strings.FilterLengthUnit}" />
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Margin="0,0,4,0" Text="{x:Static res:Strings.FieldSize}" />
+                                            <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Filter.SizeMin}" FormatString="0.#"
+                                                           PlaceholderText="{x:Static res:Strings.FilterMinWatermark}" />
+                                            <TextBlock Grid.Row="2" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.FilterRangeSeparator}" />
+                                            <NumericUpDown Grid.Row="2" Grid.Column="3" Value="{Binding Filter.SizeMax}" FormatString="0.#"
+                                                           PlaceholderText="{x:Static res:Strings.FilterMaxWatermark}" />
+                                            <TextBlock Grid.Row="2" Grid.Column="4" Classes="label muted" Text="{x:Static res:Strings.FilterSizeUnit}" />
+                                        </Grid>
+                                    </StackPanel>
 
-                                                <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Margin="0,0,4,0" Text="{x:Static res:Strings.FieldSize}" />
-                                                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Filter.SizeMin}" FormatString="0.#"
-                                                               PlaceholderText="{x:Static res:Strings.FilterMinWatermark}" />
-                                                <TextBlock Grid.Row="2" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.FilterRangeSeparator}" />
-                                                <NumericUpDown Grid.Row="2" Grid.Column="3" Value="{Binding Filter.SizeMax}" FormatString="0.#"
-                                                               PlaceholderText="{x:Static res:Strings.FilterMaxWatermark}" />
-                                                <TextBlock Grid.Row="2" Grid.Column="4" Classes="label muted" Text="{x:Static res:Strings.FilterSizeUnit}" />
-                                            </Grid>
-                                        </StackPanel>
+                                    <!-- What the chart and files have. A group's included chips must all be there, or
+                                         just one with Any; an excluded chip must never be. -->
+                                    <ItemsControl ItemsSource="{Binding Filter.ChipGroups}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Spacing="14" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:FilterChipGroupViewModel">
+                                                <StackPanel Classes="filter-section">
+                                                    <DockPanel>
+                                                        <StackPanel DockPanel.Dock="Right"
+                                                                    Orientation="Horizontal"
+                                                                    Spacing="2"
+                                                                    AutomationProperties.Name="{Binding MatchName}">
+                                                            <RadioButton Classes="match"
+                                                                         Content="{x:Static res:Strings.FilterMatchAll}"
+                                                                         IsChecked="{Binding MatchAll}"
+                                                                         ToolTip.Tip="{x:Static res:Strings.FilterMatchAllToolTip}"
+                                                                         AutomationProperties.Name="{x:Static res:Strings.FilterMatchAllToolTip}" />
+                                                            <RadioButton Classes="match"
+                                                                         Content="{x:Static res:Strings.FilterMatchAny}"
+                                                                         IsChecked="{Binding MatchAny}"
+                                                                         ToolTip.Tip="{x:Static res:Strings.FilterMatchAnyToolTip}"
+                                                                         AutomationProperties.Name="{x:Static res:Strings.FilterMatchAnyToolTip}" />
+                                                        </StackPanel>
+                                                        <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding Label}" />
+                                                    </DockPanel>
+                                                    <ItemsControl ItemsSource="{Binding Chips}" ItemTemplate="{StaticResource FilterChipTemplate}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
 
-                                        <!-- What the chart and files have. A group's included chips must all be there, or
-                                             just one with Any; an excluded chip must never be. -->
-                                        <ItemsControl ItemsSource="{Binding Filter.ChipGroups}">
+                                    <StackPanel Classes="filter-section">
+                                        <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterAssetsLabel}" />
+                                        <ItemsControl ItemsSource="{Binding Filter.AssetChips}" ItemTemplate="{StaticResource FilterChipTemplate}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
-                                                    <StackPanel Spacing="14" />
+                                                    <WrapPanel ItemSpacing="4" LineSpacing="4" />
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:FilterChipGroupViewModel">
-                                                    <StackPanel Classes="filter-section">
-                                                        <DockPanel>
-                                                            <StackPanel DockPanel.Dock="Right"
-                                                                        Orientation="Horizontal"
-                                                                        Spacing="2"
-                                                                        AutomationProperties.Name="{Binding MatchName}">
-                                                                <RadioButton Classes="match"
-                                                                             Content="{x:Static res:Strings.FilterMatchAll}"
-                                                                             IsChecked="{Binding MatchAll}"
-                                                                             ToolTip.Tip="{x:Static res:Strings.FilterMatchAllToolTip}"
-                                                                             AutomationProperties.Name="{x:Static res:Strings.FilterMatchAllToolTip}" />
-                                                                <RadioButton Classes="match"
-                                                                             Content="{x:Static res:Strings.FilterMatchAny}"
-                                                                             IsChecked="{Binding MatchAny}"
-                                                                             ToolTip.Tip="{x:Static res:Strings.FilterMatchAnyToolTip}"
-                                                                             AutomationProperties.Name="{x:Static res:Strings.FilterMatchAnyToolTip}" />
-                                                            </StackPanel>
-                                                            <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding Label}" />
-                                                        </DockPanel>
-                                                        <ItemsControl ItemsSource="{Binding Chips}" ItemTemplate="{StaticResource FilterChipTemplate}">
-                                                            <ItemsControl.ItemsPanel>
-                                                                <ItemsPanelTemplate>
-                                                                    <WrapPanel ItemSpacing="4" LineSpacing="4" />
-                                                                </ItemsPanelTemplate>
-                                                            </ItemsControl.ItemsPanel>
-                                                        </ItemsControl>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
                                         </ItemsControl>
-
-                                        <StackPanel Classes="filter-section">
-                                            <TextBlock Classes="caption" Text="{x:Static res:Strings.FilterAssetsLabel}" />
-                                            <ItemsControl ItemsSource="{Binding Filter.AssetChips}" ItemTemplate="{StaticResource FilterChipTemplate}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel ItemSpacing="4" LineSpacing="4" />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                            </ItemsControl>
-                                        </StackPanel>
-
-                                        <CheckBox Content="{x:Static res:Strings.FilterOnlyUnsaved}" IsChecked="{Binding Filter.OnlyUnsaved}" />
-
-                                        <Button HorizontalAlignment="Right"
-                                                Content="{x:Static res:Strings.ResetFilters}"
-                                                Command="{Binding Filter.ClearFiltersCommand}"
-                                                IsEnabled="{Binding Filter.HasActiveFilters}" />
                                     </StackPanel>
-                                </ScrollViewer>
-                            </Flyout>
-                        </Button.Flyout>
-                    </Button>
-                </Grid>
-            </StackPanel>
+
+                                    <CheckBox Content="{x:Static res:Strings.FilterOnlyUnsaved}" IsChecked="{Binding Filter.OnlyUnsaved}" />
+
+                                    <Button HorizontalAlignment="Right"
+                                            Content="{x:Static res:Strings.ResetFilters}"
+                                            Command="{Binding Filter.ClearFiltersCommand}"
+                                            IsEnabled="{Binding Filter.HasActiveFilters}" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
         </Border>
 
+        <!-- How many songs are listed, or shown of them, once there are any; a centered state says it otherwise. A
+             scan's progress is in the status bar along the bottom of the window (StatusBarView.axaml). -->
         <Border DockPanel.Dock="Bottom"
                 Padding="12,5"
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource SubtleBorderBrush}"
-                IsVisible="{Binding ShowStatus}">
-            <StackPanel Spacing="5">
-                <!-- How many of the songs found so far have been read. The spinner shows while folders are still being searched. -->
-                <ProgressBar IsVisible="{Binding IsScanning}"
-                             IsIndeterminate="{Binding IsScanProgressIndeterminate}"
-                             Minimum="0"
-                             Maximum="{Binding ScanFound}"
-                             Value="{Binding ScanRead}"
-                             MinWidth="0"
-                             MinHeight="3"
-                             Height="3"
-                             AutomationProperties.Name="{Binding StatusText}" />
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Arc Classes="spinner"
-                         Classes.active="{Binding IsSearching}"
-                         IsVisible="{Binding IsSearching}"
-                         Width="10" Height="10" StrokeThickness="2"
-                         VerticalAlignment="Center" />
-                    <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center" />
-                </StackPanel>
-            </StackPanel>
+                IsVisible="{Binding ShowSongCount}">
+            <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center" />
+        </Border>
+
+        <!-- The stale-scan banner, just above the song count. -->
+        <Border DockPanel.Dock="Bottom"
+                Classes="banner"
+                Margin="6"
+                IsVisible="{Binding IsStale}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <PathIcon Grid.Column="0"
+                          Width="12" Height="12"
+                          VerticalAlignment="Center"
+                          Data="{StaticResource InfoIconGeometry}" />
+                <TextBlock Grid.Column="1"
+                           FontSize="12"
+                           Text="{x:Static res:Strings.StaleHint}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </Grid>
         </Border>
 
         <Panel>
@@ -419,9 +365,14 @@
                      Selection="{Binding Selection}"
                      SelectionMode="Multiple"
                      AutomationProperties.Name="{x:Static res:Strings.LibraryListName}">
-                <!-- Right-clicking a row selects it, or keeps the selection it's part of, so the menu acts on the selection. -->
+                <!-- Right-clicking a row selects it, or keeps the selection it's part of, so the menu acts on the selection.
+                     Edit Chart is there only with one song selected, the one it opens in Chart Builder. -->
                 <ListBox.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Header="{x:Static res:Strings.EditChartButton}"
+                                  Command="{Binding EditChartCommand}"
+                                  IsVisible="{Binding IsSingleSelection}" />
+                        <Separator IsVisible="{Binding IsSingleSelection}" />
                         <MenuItem Header="{x:Static vm:LibraryViewModel.RevealLabel}" Command="{Binding RevealCommand}" />
                         <MenuItem Header="{x:Static res:Strings.MenuDownloadAllFiles}" Command="{Binding DownloadAllCommand}" />
                     </ContextMenu>
@@ -458,7 +409,7 @@
                                     </Button>
                                 </Panel>
                             </Border>
-                            <!-- Text on the left, chips on the right: the kind on the title line, the length and size on the detail line. -->
+                            <!-- Text on the left, chips on the right: the length and kind on the title line, the size on the detail line. -->
                             <Grid Grid.Column="1"
                                   ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                                   ColumnSpacing="8" RowSpacing="2"
@@ -467,12 +418,18 @@
                                            Text="{Binding Title}"
                                            FontWeight="SemiBold"
                                            TextTrimming="CharacterEllipsis" />
-                                <Border Grid.Row="0" Grid.Column="1"
-                                        Classes="chip"
-                                        Classes.sng="{Binding IsSng}"
-                                        Classes.folder="{Binding !IsSng}">
-                                    <TextBlock Text="{Binding KindLabel}" />
-                                </Border>
+                                <StackPanel Grid.Row="0" Grid.Column="1"
+                                            Orientation="Horizontal" Spacing="4"
+                                            HorizontalAlignment="Right">
+                                    <Border Classes="chip" IsVisible="{Binding HasLength}">
+                                        <TextBlock Text="{Binding LengthText}" />
+                                    </Border>
+                                    <Border Classes="chip"
+                                            Classes.sng="{Binding IsSng}"
+                                            Classes.folder="{Binding !IsSng}">
+                                        <TextBlock Text="{Binding KindLabel}" />
+                                    </Border>
+                                </StackPanel>
 
                                 <!-- Artist · charter, or a loading note until the metadata is read. The charter can carry
                                      rich-text tags (colours, bold…), which are drawn rather than shown. -->
@@ -491,27 +448,20 @@
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis"
                                            IsVisible="{Binding ShowByline}" />
-                                <StackPanel Grid.Row="1" Grid.Column="1"
-                                            Orientation="Horizontal" Spacing="4"
-                                            HorizontalAlignment="Right">
-                                    <Border Classes="chip" IsVisible="{Binding HasLength}">
-                                        <TextBlock Text="{Binding LengthText}" />
-                                    </Border>
-                                    <Border Classes="chip" IsVisible="{Binding HasSize}">
-                                        <TextBlock Text="{Binding SizeText}" />
-                                    </Border>
-                                </StackPanel>
+                                <Border Grid.Row="1" Grid.Column="1"
+                                        Classes="chip"
+                                        HorizontalAlignment="Right"
+                                        IsVisible="{Binding HasSize}">
+                                    <TextBlock Text="{Binding SizeText}" />
+                                </Border>
                             </Grid>
                             <!-- Unsaved metadata changes. -->
                             <Ellipse Grid.Column="2"
                                      Width="8" Height="8"
                                      VerticalAlignment="Center"
                                      IsVisible="{Binding HasDrafts}"
-                                     ToolTip.Tip="{x:Static res:Strings.UnsavedToolTip}">
-                                <Ellipse.Fill>
-                                    <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-                                </Ellipse.Fill>
-                            </Ellipse>
+                                     Fill="{DynamicResource AccentBrush}"
+                                     ToolTip.Tip="{x:Static res:Strings.UnsavedToolTip}" />
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>

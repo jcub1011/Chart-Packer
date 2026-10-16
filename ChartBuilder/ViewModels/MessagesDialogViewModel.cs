@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using ChartPacker.UI.ViewModels;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartBuilder.ViewModels

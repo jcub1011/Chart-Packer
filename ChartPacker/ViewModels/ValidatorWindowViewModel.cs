@@ -7,14 +7,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Threading;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Validation;
-using ChartPacker.Core.Validation.QuickFixes;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Text;
+using ChartShared.Core.Validation;
+using ChartShared.Core.Validation.QuickFixes;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -80,17 +81,63 @@ namespace ChartPacker.ViewModels
         // The keys of the key chips that are on; keys are compared ignoring case, as song.ini does.
         private readonly HashSet<string> _keysOn = new(StringComparer.OrdinalIgnoreCase);
 
-        // Set while every chip is turned off at once, so the list is filtered once at the end.
+        // Set while the search is cleared and every chip is turned off at once, so the list is filtered once at the end.
         private bool _clearingFilters;
 
         // Set while many issues are ticked at once, so the counts are worked out once at the end.
         private bool _selectingAll;
 
-        // A refresh of the counts is posted and not yet run, so a burst of songs read or fixed counts them once.
+        // A refresh of the counts is posted and not yet run, so a burst of songs changed or fixed counts them once.
         private bool _refreshPending;
+
+        // A refresh of the counts after songs the check read is waiting out CheckingCountsDelay.
+        private bool _checkRefreshPending;
+
+        // The search, trimmed, as songs are matched against it; empty for none.
+        private string _query = "";
+
+        // The song the inspector shows, which a song let go of and given back while the shown list is replaced leaves alone.
+        private ValidatorSongViewModel? _inspected;
 
         // How long after a song's draft changes its chart is linted again, so a burst of edits lints once.
         private static readonly TimeSpan RelintDelay = TimeSpan.FromMilliseconds(300);
+
+        // Songs read and checked by the workers, waiting to be taken in on the UI thread a batch at a time.
+        private readonly UiBatchQueue<ReadSong> _read;
+
+        // How often they're taken in while checking: often enough to look live, seldom enough that the window lays
+        // itself out and draws a few times a second rather than every frame.
+        private static readonly TimeSpan TakeReadInterval = TimeSpan.FromMilliseconds(100);
+
+        // How long one batch may hold the UI thread; what's left goes in the next, after input and drawing.
+        private static readonly TimeSpan TakeReadBudget = TimeSpan.FromMilliseconds(30);
+
+        // How many songs read may wait to be taken in before the workers wait for the UI thread to catch up.
+        private const int ReadQueueCapacity = 1024;
+
+        // How long the search waits for typing to stop before the list is filtered.
+        private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
+
+        // Filters the list once typing in the search stops.
+        private readonly DispatcherTimer _searchTimer;
+
+        // How many workers lint and check at once, however many read: one core is left to the UI thread, as with
+        // every core busy linting the window stutters. Reading isn't held to it, so a slow drive is read as widely as
+        // the library scan reads it.
+        private readonly SemaphoreSlim _checkGate = new(Math.Max(Environment.ProcessorCount - 1, 1));
+
+        // While checking, the counts walk a list still growing, so after songs read they're worked out this often at most.
+        private static readonly TimeSpan CheckingCountsDelay = TimeSpan.FromMilliseconds(250);
+
+        // More runs of songs shown or hidden at once than this, and the list is replaced in one go rather than run by
+        // run: each run is a change the view hears of.
+        private const int ReplaceShownThreshold = 64;
+
+        // Set while the shown list is replaced, when the view lets go of the picked song and is given it back.
+        private bool _replacingShown;
+
+        /// <summary>A song a worker read, with its chart's findings and, when it had no draft, what checking it found.</summary>
+        private sealed record ReadSong(int Index, SongMetadataReport Report, SongChartLintReport? Lint, ValidatorSongCheck? Check);
 
         // The counts, as last worked out: the listed songs that still fail, their issues with a quick fix, and how many of those are ticked.
         private int _failingCount;
@@ -125,9 +172,12 @@ namespace ChartPacker.ViewModels
             _settings = settings;
             _confirmation = confirmation;
             _parallelism = parallelism;
+            _read = new UiBatchQueue<ReadSong>(TakeReadInterval, TakeRead, TakeReadBudget, ReadQueueCapacity);
+            _searchTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = SearchDelay };
+            _searchTimer.Tick += (_, _) => ApplySearch();
             Inspector = inspector;
-            QuickFixChip = new ValidatorFilterChipViewModel("quick", Strings.ValidatorFilterQuickFix, OnFilterChanged);
-            ManualChip = new ValidatorFilterChipViewModel("manual", Strings.ValidatorFilterManual, OnFilterChanged);
+            QuickFixChip = new CountedFilterChipViewModel("quick", Strings.ValidatorFilterQuickFix, Strings.ValidatorFilterChipToolTipFormat, OnFilterChanged);
+            ManualChip = new CountedFilterChipViewModel("manual", Strings.ValidatorFilterManual, Strings.ValidatorFilterChipToolTipFormat, OnFilterChanged);
             FixChips = [QuickFixChip, ManualChip];
             _drafts.DraftsChanged += OnDraftsChanged;
             _job.PropertyChanged += OnJobPropertyChanged;
@@ -158,21 +208,21 @@ namespace ChartPacker.ViewModels
         public AvaloniaList<ValidatorSongViewModel> ShownSongs { get; } = [];
 
         /// <summary>Shows only issues with a quick fix (with <see cref="ManualChip"/>, every issue).</summary>
-        public ValidatorFilterChipViewModel QuickFixChip { get; }
+        public CountedFilterChipViewModel QuickFixChip { get; }
 
         /// <summary>Shows only issues without a quick fix (with <see cref="QuickFixChip"/>, every issue).</summary>
-        public ValidatorFilterChipViewModel ManualChip { get; }
+        public CountedFilterChipViewModel ManualChip { get; }
 
         /// <summary>The Quick fix and Manual fix chips.</summary>
-        public IReadOnlyList<ValidatorFilterChipViewModel> FixChips { get; }
+        public IReadOnlyList<CountedFilterChipViewModel> FixChips { get; }
 
         /// <summary>A chip for each type of issue the listed songs have, and any turned on since they stopped having it.</summary>
-        public AvaloniaList<ValidatorFilterChipViewModel> TypeChips { get; } = [];
+        public AvaloniaList<CountedFilterChipViewModel> TypeChips { get; } = [];
 
         public bool HasTypeChips => TypeChips.Count > 0;
 
         /// <summary>A chip for each metadata key that fails in a listed song, and any turned on since it stopped failing.</summary>
-        public AvaloniaList<ValidatorFilterChipViewModel> KeyChips { get; } = [];
+        public AvaloniaList<CountedFilterChipViewModel> KeyChips { get; } = [];
 
         public bool HasKeyChips => KeyChips.Count > 0;
 
@@ -181,18 +231,29 @@ namespace ChartPacker.ViewModels
 
         public bool HasActiveFilters => ActiveFilterCount > 0;
 
-        /// <summary>How many of the listed songs the filter shows.</summary>
+        /// <summary>Narrows the list to the songs whose title, artist, charter or path contains it.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSearch), nameof(IsNarrowed))]
+        [NotifyCanExecuteChangedFor(nameof(ClearSearchCommand), nameof(ClearFiltersCommand))]
+        public partial string? SearchText { get; set; }
+
+        public bool HasSearch => !string.IsNullOrWhiteSpace(SearchText);
+
+        /// <summary>The search or a chip leaves some listed songs out.</summary>
+        public bool IsNarrowed => HasActiveFilters || HasSearch;
+
+        /// <summary>How many of the listed songs the search and filter show.</summary>
         public string ShownSummaryText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorShownSummaryFormat, ShownSongs.Count, Songs.Count);
 
-        /// <summary>Songs are listed but the filter shows none of them.</summary>
-        public bool ShowNoMatches => HasActiveFilters && ShownSongs.Count == 0 && Songs.Count > 0;
+        /// <summary>Songs are listed but the search and filter show none of them.</summary>
+        public bool ShowNoMatches => IsNarrowed && ShownSongs.Count == 0 && Songs.Count > 0;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ShowPickPrompt), nameof(ShowInspector))]
         public partial ValidatorSongViewModel? SelectedSong { get; set; }
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(StatusText))]
+        [NotifyPropertyChangedFor(nameof(StatusText), nameof(AllPass), nameof(HasFailing))]
         public partial bool IsChecking { get; set; }
 
         /// <summary>How many songs have been read.</summary>
@@ -217,14 +278,20 @@ namespace ChartPacker.ViewModels
         /// <summary>How many listed songs still fail.</summary>
         public int FailingCount => _failingCount;
 
+        /// <summary>The check is done and every listed song passes now.</summary>
+        public bool AllPass => !IsChecking && FailingCount == 0;
+
+        /// <summary>The check is done and some listed songs still fail.</summary>
+        public bool HasFailing => !IsChecking && FailingCount > 0;
+
         public string StatusText =>
             IsChecking ? string.Format(CultureInfo.CurrentCulture, Strings.ValidatorCheckingFormat, Checked, Total)
             : FailingCount == 0 ? string.Format(CultureInfo.CurrentCulture, Strings.ValidatorAllPassFormat, Total)
             : string.Format(CultureInfo.CurrentCulture, Strings.ValidatorSummaryFormat, FailingCount, Total);
 
-        public bool ShowInspector => SelectedSong is not null;
+        public bool ShowInspector => _inspected is not null;
 
-        public bool ShowPickPrompt => SelectedSong is null;
+        public bool ShowPickPrompt => _inspected is null;
 
         /// <summary>Some issue shown has a quick fix.</summary>
         public bool HasFixes => _fixableCount > 0;
@@ -276,20 +343,63 @@ namespace ChartPacker.ViewModels
             }
 
             var options = new ParallelOptions { MaxDegreeOfParallelism = _parallelism, CancellationToken = _closing.Token };
+            _read.Start();
             try
             {
                 await Parallel.ForEachAsync(Enumerable.Range(0, _entries.Count), options, async (i, token) =>
                 {
-                    var report = await SongMetadataCheck.ReadAsync(_entries[i], token).ConfigureAwait(false);
+                    // The song is opened once, for its metadata and then its chart and audio.
+                    var (report, files) = await SongMetadataCheck.OpenAsync(_entries[i], token).ConfigureAwait(false);
+                    bool drafted = _draftedAtStart.Contains(report.Entry.FullPath);
 
-                    // The chart is linted on this worker, with the song.ini as read; a drafted one once it's listed.
-                    SongChartLintReport? lint = report.ReadError is null && !_draftedAtStart.Contains(report.Entry.FullPath)
-                        ? await SongChartLint.LintAsync(report.Entry, report.Pairs, null, LibraryChartLint.Cache, token).ConfigureAwait(false)
-                        : null;
+                    SongChartLintReport? lint = null;
+                    ValidatorSongCheck? check = null;
+                    try
+                    {
+                        // A drafted song is linted and checked once it's listed, against its draft: nothing to do here.
+                        if (!drafted)
+                        {
+                            // The song stays open for its chart only when a worker is free to lint it now. One kept open
+                            // while it waits would hold the file against a job or a save writing it meanwhile, so it's
+                            // let go of, and opened again once it's its turn.
+                            if (!_checkGate.Wait(0))
+                            {
+                                files?.Dispose();
+                                files = null;
+                                await _checkGate.WaitAsync(token).ConfigureAwait(false);
+                            }
 
-                    // Drafts live on the UI thread, so the check against them is made there.
-                    await Dispatcher.UIThread.InvokeAsync(() => Add(i, report, lint));
+                            try
+                            {
+                                // The chart is linted on this worker, with the song.ini as read.
+                                if (report.ReadError is null)
+                                {
+                                    lint = files is not null
+                                        ? await SongChartLint.LintAsync(files, report.Pairs, null, LibraryChartLint.Cache, token).ConfigureAwait(false)
+                                        : await SongChartLint.LintAsync(report.Entry, report.Pairs, null, LibraryChartLint.Cache, token).ConfigureAwait(false);
+                                }
+
+                                // A song without a draft is checked here too. Drafts live on the UI thread, so the check
+                                // of a song with one is made there, against it.
+                                check = ValidatorSongViewModel.Evaluate(report, lint, null);
+                            }
+                            finally
+                            {
+                                _checkGate.Release();
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        files?.Dispose();
+                    }
+
+                    // Waits while the UI thread is behind taking in the songs read, so they don't pile up unheld.
+                    await _read.ReportAsync(new ReadSong(i, report, lint, check), token).ConfigureAwait(false);
                 });
+
+                // The songs read last are still to be taken in before the counts are final.
+                await _read.TakeRestAsync();
 
                 RefreshCounts();
                 IsChecking = false;
@@ -299,11 +409,16 @@ namespace ChartPacker.ViewModels
             }
             catch (Exception ex)
             {
-                // Once a song is listed the window is open, and keeps what was found.
+                // Once a song is listed the window is open, and keeps what was found, all of it read so far, done
+                // checking as far as it got.
+                _read.TakeAll();
+                RefreshCounts();
+                IsChecking = false;
                 _firstFailure.TrySetException(ex);
             }
             finally
             {
+                _read.Stop();
                 _firstFailure.TrySetResult(Songs.Count > 0);
             }
         }
@@ -315,6 +430,7 @@ namespace ChartPacker.ViewModels
         public async Task ShutdownAsync()
         {
             _closing.Cancel();
+            _searchTimer.Stop();
             _drafts.DraftsChanged -= OnDraftsChanged;
             _job.PropertyChanged -= OnJobPropertyChanged;
             Inspector.PropertyChanged -= OnInspectorPropertyChanged;
@@ -326,6 +442,12 @@ namespace ChartPacker.ViewModels
 
         partial void OnSelectedSongChanged(ValidatorSongViewModel? value)
         {
+            // The same song, let go of and given back while the shown list was replaced: nothing to show again.
+            if (_replacingShown)
+                return;
+
+            _inspected = value;
+
             // A song picked opens its list of issues, which stays open once another is picked.
             if (value is not null)
                 value.IsExpanded = true;
@@ -424,48 +546,130 @@ namespace ChartPacker.ViewModels
                 SaveError = string.Format(CultureInfo.CurrentCulture, Strings.SaveFailedFormat, string.Join(Environment.NewLine, failures));
         }
 
-        private void Add(int index, SongMetadataReport report, SongChartLintReport? lint)
+        /// <summary>
+        /// Takes in a batch of the songs read, and lists the ones that fail together. Below input and drawing, so the
+        /// window keeps drawing and answering while a long check runs.
+        /// </summary>
+        private void TakeRead(IEnumerable<ReadSong> reads)
         {
             if (_closing.IsCancellationRequested)
+            {
+                _read.Clear();
+                return;
+            }
+
+            var failing = new List<ValidatorSongViewModel>();
+            int taken = 0;
+            foreach (var read in reads)
+            {
+                taken++;
+                if (Add(read) is { } song)
+                    failing.Add(song);
+            }
+
+            if (taken == 0)
                 return;
 
-            Checked++;
-            var song = new ValidatorSongViewModel(index, report, OnIssueSelectionChanged, IsIssueShown);
-            song.SetChartLint(lint);
+            Checked += taken;
+            List(failing);
+            ScheduleCheckRefreshCounts();
+        }
+
+        /// <summary>
+        /// Checks a song read against its draft, if it has one now; returns it if it fails, to be listed. A song with a
+        /// draft has its chart linted again, with the draft: it was linted with the song.ini as read, if at all.
+        /// </summary>
+        private ValidatorSongViewModel? Add(ReadSong read)
+        {
+            var report = read.Report;
+            // Checked by its worker, and still without a draft: one that passes is done with.
+            if (read.Check is { } check && !_drafts.HasDrafts(report.Entry.FullPath))
+            {
+                if (check.IsFixed)
+                    return null;
+
+                var checkedSong = new ValidatorSongViewModel(read.Index, report, OnIssueSelectionChanged, IsIssueShown);
+                checkedSong.SetChartLint(read.Lint);
+                checkedSong.Apply(check);
+                return checkedSong;
+            }
+
+            var song = new ValidatorSongViewModel(read.Index, report, OnIssueSelectionChanged, IsIssueShown);
+            song.SetChartLint(read.Lint);
             song.Check(DraftOf(report.Entry));
-            if (lint is null && report.ReadError is null)
+            if (report.ReadError is null)
                 _ = RelintAsync(song, delay: false);
-            if (!song.IsFixed)
-                List(song);
+            return song.IsFixed ? null : song;
         }
 
         /// <summary>Lists <paramref name="song"/>, which fails, in its place.</summary>
-        private void List(ValidatorSongViewModel song)
+        private void List(ValidatorSongViewModel song) => List([song]);
+
+        /// <summary>Lists <paramref name="songs"/>, which fail, in their places, those not listed already. The caller counts them.</summary>
+        private void List(IReadOnlyList<ValidatorSongViewModel> songs)
         {
-            if (_byPath.ContainsKey(song.Path))
+            var added = new List<ValidatorSongViewModel>(songs.Count);
+            foreach (var song in songs)
+            {
+                if (_byPath.TryAdd(song.Path, song))
+                    added.Add(song);
+            }
+
+            if (added.Count == 0)
                 return;
-            _byPath[song.Path] = song;
-            ShowIfMatching(song);
+
+            added.Sort((a, b) => a.Index.CompareTo(b.Index));
+            InsertSorted(Songs, added);
+
+            var shown = added.Where(IsSongShown).ToList();
+            InsertSorted(ShownSongs, shown);
+            _shown.UnionWith(shown);
+
             OnPropertyChanged(nameof(ShownSummaryText));
             OnPropertyChanged(nameof(ShowNoMatches));
-            ScheduleRefreshCounts();
             _firstFailure.TrySetResult(true);
         }
 
         /// <summary>Reads finish in any order; the lists keep the selection's, which they're sorted by.</summary>
-        private static void InsertSorted(AvaloniaList<ValidatorSongViewModel> list, ValidatorSongViewModel song)
+        private static void InsertSorted(AvaloniaList<ValidatorSongViewModel> list, ValidatorSongViewModel song) =>
+            list.Insert(PlaceOf(list, song.Index), song);
+
+        /// <summary>
+        /// Puts <paramref name="songs"/>, in selection order, in their places. Songs that go between the same two are
+        /// put in together, so the list (and the view over it) hears of each run of them once rather than of every song.
+        /// </summary>
+        private static void InsertSorted(AvaloniaList<ValidatorSongViewModel> list, IReadOnlyList<ValidatorSongViewModel> songs)
+        {
+            for (int start = 0; start < songs.Count;)
+            {
+                int at = PlaceOf(list, songs[start].Index);
+                int next = at < list.Count ? list[at].Index : int.MaxValue;
+                int end = start + 1;
+                while (end < songs.Count && songs[end].Index < next)
+                    end++;
+
+                if (end - start == 1)
+                    list.Insert(at, songs[start]);
+                else
+                    list.InsertRange(at, songs.Skip(start).Take(end - start));
+                start = end;
+            }
+        }
+
+        // Where a song at selection index `index` goes in a list sorted by it.
+        private static int PlaceOf(AvaloniaList<ValidatorSongViewModel> list, int index)
         {
             int low = 0, high = list.Count;
             while (low < high)
             {
                 int mid = (low + high) / 2;
-                if (list[mid].Index < song.Index)
+                if (list[mid].Index < index)
                     low = mid + 1;
                 else
                     high = mid;
             }
 
-            list.Insert(low, song);
+            return low;
         }
 
         /// <summary>
@@ -483,7 +687,53 @@ namespace ChartPacker.ViewModels
             return _typesOn.Count == 0 || issue.Types.Any(_typesOn.Contains);
         }
 
-        private bool IsSongShown(ValidatorSongViewModel song) => !HasActiveFilters || song.HasShownIssue;
+        private bool IsSongShown(ValidatorSongViewModel song) => MatchesSearch(song) && (!HasActiveFilters || song.HasShownIssue);
+
+        /// <summary>Whether the song's title, artist, charter (as shown) or path contains the search, ignoring case.</summary>
+        private bool MatchesSearch(ValidatorSongViewModel song)
+        {
+            if (_query.Length == 0)
+                return true;
+
+            return Contains(song.Title) || Contains(song.Artist) || Contains(song.CharterText) || Contains(song.Details);
+
+            bool Contains(string? text) => text?.Contains(_query, StringComparison.CurrentCultureIgnoreCase) == true;
+        }
+
+        partial void OnSearchTextChanged(string? value)
+        {
+            _searchTimer.Stop();
+
+            // Clear filters shows every song once, when it's done.
+            if (_clearingFilters)
+            {
+                _query = value?.Trim() ?? "";
+                return;
+            }
+
+            // A search cleared shows every song at once; one typed waits for the typing to stop, so the list is
+            // filtered once rather than on every key.
+            if (string.IsNullOrWhiteSpace(value))
+                ApplySearch();
+            else
+                _searchTimer.Start();
+        }
+
+        /// <summary>Filters the list by the search as it is now, unless that's what it's filtered by already.</summary>
+        private void ApplySearch()
+        {
+            _searchTimer.Stop();
+            string query = SearchText?.Trim() ?? "";
+            if (query == _query)
+                return;
+
+            _query = query;
+            RefreshShown();
+        }
+
+        // Only with something to clear, so Escape in an empty search is left to the window.
+        [RelayCommand(CanExecute = nameof(HasSearch))]
+        private void ClearSearch() => SearchText = null;
 
         /// <summary>
         /// Shows a song the filter now matches, as when it's listed or checked again. A song already shown is left
@@ -514,48 +764,114 @@ namespace ChartPacker.ViewModels
             foreach (var song in Songs)
                 song.ApplyFilter();
 
-            var shown = Songs.Where(IsSongShown).ToHashSet();
+            OnPropertyChanged(nameof(ActiveFilterCount));
+            OnPropertyChanged(nameof(HasActiveFilters));
+            OnPropertyChanged(nameof(IsNarrowed));
+            ClearFiltersCommand.NotifyCanExecuteChanged();
+            RefreshShown();
+
+            // A chip turned off once its songs no longer have its type or key goes.
+            RefreshFilterChips();
+        }
+
+        /// <summary>The search or a chip changed: the list shows the songs that now match.</summary>
+        private void RefreshShown()
+        {
+            // In selection order, as Songs is.
+            var target = Songs.Where(IsSongShown).ToList();
+            var shown = target.ToHashSet();
 
             // The picked song is let go of before it leaves the list, rather than by the list as it goes.
             if (SelectedSong is { } picked && !shown.Contains(picked))
                 SelectedSong = null;
 
-            // Songs still shown stay where they are, so the picked one stays picked.
-            for (int i = ShownSongs.Count - 1; i >= 0; i--)
+            // Each run of songs hidden, or of songs shown between the same two, is one change for the view.
+            var added = target.Where(s => !_shown.Contains(s)).ToList();
+            int runs = CountRuns(ShownSongs, s => !shown.Contains(s)) + CountRuns(target, s => !_shown.Contains(s));
+            if (runs > ReplaceShownThreshold)
             {
-                if (!shown.Contains(ShownSongs[i]))
-                    ShownSongs.RemoveAt(i);
+                // Scattered changes over a long list: one change for the view rather than one per run.
+                ReplaceShown(target);
             }
-
-            foreach (var song in Songs)
+            else
             {
-                if (shown.Contains(song) && !_shown.Contains(song))
-                    InsertSorted(ShownSongs, song);
+                // A few runs: songs still shown stay where they are, so the picked one stays picked.
+                for (int end = ShownSongs.Count; end > 0;)
+                {
+                    if (shown.Contains(ShownSongs[end - 1]))
+                    {
+                        end--;
+                        continue;
+                    }
+
+                    int start = end - 1;
+                    while (start > 0 && !shown.Contains(ShownSongs[start - 1]))
+                        start--;
+                    ShownSongs.RemoveRange(start, end - start);
+                    end = start;
+                }
+
+                InsertSorted(ShownSongs, added);
             }
 
             _shown.Clear();
             _shown.UnionWith(shown);
 
-            OnPropertyChanged(nameof(ActiveFilterCount));
-            OnPropertyChanged(nameof(HasActiveFilters));
             OnPropertyChanged(nameof(ShownSummaryText));
             OnPropertyChanged(nameof(ShowNoMatches));
-            ClearFiltersCommand.NotifyCanExecuteChanged();
-
-            // A chip turned off once its songs no longer have its type or key goes.
-            RefreshFilterChips();
             RefreshSelection();
         }
 
-        private bool CanClearFilters() => HasActiveFilters;
+        /// <summary>How many runs of consecutive songs in <paramref name="songs"/> match <paramref name="match"/>.</summary>
+        private static int CountRuns(IEnumerable<ValidatorSongViewModel> songs, Func<ValidatorSongViewModel, bool> match)
+        {
+            int runs = 0;
+            bool inRun = false;
+            foreach (var song in songs)
+            {
+                bool matches = match(song);
+                if (matches && !inRun)
+                    runs++;
+                inRun = matches;
+            }
 
-        /// <summary>Turns every chip off, so every listed song and issue shows.</summary>
+            return runs;
+        }
+
+        /// <summary>
+        /// Replaces the shown songs with <paramref name="songs"/> in two changes, a reset and an add, however many there
+        /// are. The view lets go of the picked song as the list is cleared, so it's given it back, without the inspector
+        /// showing it again or hiding meanwhile.
+        /// </summary>
+        private void ReplaceShown(List<ValidatorSongViewModel> songs)
+        {
+            var picked = SelectedSong;
+            _replacingShown = true;
+            try
+            {
+                ShownSongs.Clear();
+                ShownSongs.AddRange(songs);
+                if (!ReferenceEquals(SelectedSong, picked))
+                    SelectedSong = picked;
+                else
+                    OnPropertyChanged(nameof(SelectedSong));
+            }
+            finally
+            {
+                _replacingShown = false;
+            }
+        }
+
+        private bool CanClearFilters() => IsNarrowed;
+
+        /// <summary>Clears the search and turns every chip off, so every listed song and issue shows.</summary>
         [RelayCommand(CanExecute = nameof(CanClearFilters))]
         private void ClearFilters()
         {
             _clearingFilters = true;
             try
             {
+                SearchText = null;
                 foreach (var chip in FixChips.Concat(TypeChips).Concat(KeyChips))
                     chip.IsOn = false;
             }
@@ -602,7 +918,7 @@ namespace ChartPacker.ViewModels
         /// should: a chip per ID, sorted by <paramref name="order"/>, and none for an ID no song has unless it's on.
         /// </summary>
         private void SyncChips(
-            AvaloniaList<ValidatorFilterChipViewModel> chips,
+            AvaloniaList<CountedFilterChipViewModel> chips,
             Dictionary<string, int> counts,
             Func<string, string> nameOf,
             IComparer<string> order)
@@ -626,7 +942,7 @@ namespace ChartPacker.ViewModels
                 int at = 0;
                 while (at < chips.Count && order.Compare(chips[at].Id, id) < 0)
                     at++;
-                chips.Insert(at, new ValidatorFilterChipViewModel(id, nameOf(id), OnFilterChanged) { Count = count });
+                chips.Insert(at, new CountedFilterChipViewModel(id, nameOf(id), Strings.ValidatorFilterChipToolTipFormat, OnFilterChanged) { Count = count });
             }
         }
 
@@ -725,8 +1041,8 @@ namespace ChartPacker.ViewModels
         private MetadataDraft? DraftOf(SongEntry entry) => _drafts.HasDrafts(entry.FullPath) ? _drafts.Get(entry.FullPath) : null;
 
         /// <summary>
-        /// Counts the songs and issues again once the songs read or changed so far are in: each walks the whole list,
-        /// so a burst of them, such as checking or fixing many songs, counts once rather than once per song.
+        /// Counts the songs and issues again once the songs changed so far are in: each walks the whole list, so a
+        /// burst of them, such as fixing many songs, counts once rather than once per song.
         /// </summary>
         private void ScheduleRefreshCounts()
         {
@@ -737,12 +1053,38 @@ namespace ChartPacker.ViewModels
             Dispatcher.UIThread.Post(RefreshCounts, DispatcherPriority.Background);
         }
 
+        /// <summary>
+        /// Counts the songs and issues again after a batch of songs the check read: while it runs, a moment later at
+        /// most, as batch after batch comes in. What the user does meanwhile counts at once, by
+        /// <see cref="ScheduleRefreshCounts"/>.
+        /// </summary>
+        private void ScheduleCheckRefreshCounts()
+        {
+            if (!IsChecking)
+            {
+                ScheduleRefreshCounts();
+                return;
+            }
+
+            if (_checkRefreshPending)
+                return;
+
+            _checkRefreshPending = true;
+            DispatcherTimer.RunOnce(() =>
+            {
+                _checkRefreshPending = false;
+                RefreshCounts();
+            }, CheckingCountsDelay, DispatcherPriority.Background);
+        }
+
         private void RefreshCounts()
         {
             _refreshPending = false;
             _failingCount = Songs.Count(s => !s.IsFixed);
             OnPropertyChanged(nameof(FailingCount));
             OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(AllPass));
+            OnPropertyChanged(nameof(HasFailing));
             SaveAllCommand.NotifyCanExecuteChanged();
             RefreshFilterChips();
             RefreshSelection();
@@ -808,6 +1150,11 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(BylinePrefix), nameof(ShowByline), nameof(ShowDetails))]
         public partial string? Charter { get; set; }
+
+        /// <summary>The charter as shown, without its rich-text tags, which the search matches.</summary>
+        internal string? CharterText { get; private set; }
+
+        partial void OnCharterChanged(string? value) => CharterText = value is null ? null : RichText.ToPlainText(value);
 
         /// <summary>
         /// The plain text before the charter on the byline: the artist, with the separator when a charter
@@ -958,23 +1305,48 @@ namespace ChartPacker.ViewModels
         /// Checks the metadata as <paramref name="draft"/> would save it. Issues ticked before stay ticked while they're
         /// still fixable. A song that can't be edited, such as a <c>.sng</c> with structural errors, has no fixes.
         /// </summary>
-        public void Check(MetadataDraft? draft)
+        public void Check(MetadataDraft? draft) => Apply(Evaluate(_report, _chartLint, draft));
+
+        /// <summary>
+        /// Takes in what checking the song found: its headline and issues. Issues ticked before stay ticked while
+        /// they're still fixable.
+        /// </summary>
+        public void Apply(ValidatorSongCheck check)
         {
-            var item = new MetadataItem(_report.Pairs, draft ?? new MetadataDraft(), _report.DuplicateKeys);
-            var pairs = item.Draft.ApplyTo(item.Original);
-            var headline = SongHeadline.From(pairs);
-            Title = headline.Name ?? _report.Entry.DisplayName;
-            Artist = headline.Artist;
-            Charter = SongHeadline.CharterMarkup(pairs);
+            Title = check.Title;
+            Artist = check.Artist;
+            Charter = check.Charter;
 
             var selected = Issues.Where(i => i.IsSelected).Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var issues = check.Lines
+                .Select(line => new ValidatorIssueViewModel(line.Key, line.Message, line.Types, line.Fix, line.Fix is not null && selected.Contains(line.Key), OnIssueSelectionChanged)
+                {
+                    ChartSeverity = line.ChartSeverity,
+                })
+                .ToList();
 
-            if (_report.ReadError is { } error)
+            FailsMetadata = check.FailsMetadata;
+            IsFixed = check.IsFixed;
+            SetIssues(issues, check.Fixable, check.Manual);
+        }
+
+        /// <summary>
+        /// Checks <paramref name="report"/>'s metadata as <paramref name="draft"/> would save it, with
+        /// <paramref name="lint"/>'s chart findings. It touches nothing of the window's, so a song read without a draft
+        /// is checked on the worker that read it.
+        /// </summary>
+        public static ValidatorSongCheck Evaluate(SongMetadataReport report, SongChartLintReport? lint, MetadataDraft? draft)
+        {
+            var item = new MetadataItem(report.Pairs, draft ?? new MetadataDraft(), report.DuplicateKeys);
+            var pairs = item.Draft.ApplyTo(item.Original);
+            var headline = SongHeadline.From(pairs);
+            string title = headline.Name ?? report.Entry.DisplayName;
+            string? charter = SongHeadline.CharterMarkup(pairs);
+
+            if (report.ReadError is { } error)
             {
                 string unreadable = string.Format(CultureInfo.CurrentCulture, Strings.ValidatorUnreadableFormat, error);
-                SetIssues([new ValidatorIssueViewModel("", unreadable, [ValidatorIssueTypes.Unreadable], null, false, OnIssueSelectionChanged)], 0, 1);
-                IsFixed = false;
-                return;
+                return new ValidatorSongCheck(title, headline.Artist, charter, [new ValidatorIssueLine("", unreadable, [ValidatorIssueTypes.Unreadable], null)], 0, 1, FailsMetadata: false, IsFixed: false);
             }
 
             // One line per failing key, its messages joined, with what its quick fixes do.
@@ -983,19 +1355,19 @@ namespace ChartPacker.ViewModels
                 .GroupBy(f => f.Key ?? "", StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            var issues = new List<ValidatorIssueViewModel>();
+            var lines = new List<ValidatorIssueLine>();
             // Only a .sng with structural errors is read but can't be edited; the rest that can't couldn't be read.
             // The note says why its keys have no fixes, and isn't counted as one of them.
-            if (!_report.CanEdit && byKey.Count > 0)
+            if (!report.CanEdit && byKey.Count > 0)
             {
-                string reason = string.Format(CultureInfo.CurrentCulture, Strings.SngHasErrorsFormat, _report.Entry.DisplayName);
-                issues.Add(new ValidatorIssueViewModel("", reason, [], null, false, OnIssueSelectionChanged));
+                string reason = string.Format(CultureInfo.CurrentCulture, Strings.SngHasErrorsFormat, report.Entry.DisplayName);
+                lines.Add(new ValidatorIssueLine("", reason, [], null));
             }
 
             int fixable = 0;
             foreach (var group in byKey)
             {
-                List<string> fixes = !_report.CanEdit ? [] : [.. group
+                List<string> fixes = !report.CanEdit ? [] : [.. group
                     .Select(f => QuickFixRegistry.Propose(f, pairs)?.Description)
                     .OfType<string>()
                     .Distinct(StringComparer.Ordinal)];
@@ -1005,31 +1377,35 @@ namespace ChartPacker.ViewModels
 
                 string message = string.Join(" ", group.Select(f => f.Message).Distinct(StringComparer.Ordinal));
                 List<string> types = [.. group.Select(f => f.RuleId).Distinct(StringComparer.Ordinal)];
-                issues.Add(new ValidatorIssueViewModel(group.Key, message, types, fix, fix is not null && selected.Contains(group.Key), OnIssueSelectionChanged));
+                lines.Add(new ValidatorIssueLine(group.Key, message, types, fix));
             }
 
             // The chart's findings, after the metadata's, one line per rule and key: never fixable here.
             int chartProblems = 0;
-            foreach (var group in (_chartLint?.Findings ?? []).GroupBy(f => (f.Finding.RuleId, Key: f.Finding.Key ?? "")))
+            foreach (var group in (lint?.Findings ?? []).GroupBy(f => (f.Finding.RuleId, Key: f.Finding.Key ?? "")))
             {
                 var first = group.First();
                 bool problem = group.Any(f => f.Finding.Severity != Severity.Info);
                 if (problem)
                     chartProblems++;
-                issues.Add(new ValidatorIssueViewModel(group.Key.Key, LibraryChartLint.Describe(first, group.Count()), [LibraryChartLint.TypeOf(group.Key.RuleId)], null, false, OnIssueSelectionChanged)
+                var severity = group.Max(f => f.Finding.Severity == Severity.Error ? 2 : f.Finding.Severity == Severity.Warning ? 1 : 0) switch
                 {
-                    ChartSeverity = group.Max(f => f.Finding.Severity == Severity.Error ? 2 : f.Finding.Severity == Severity.Warning ? 1 : 0) switch
-                    {
-                        2 => Severity.Error,
-                        1 => Severity.Warning,
-                        _ => Severity.Info,
-                    },
-                });
+                    2 => Severity.Error,
+                    1 => Severity.Warning,
+                    _ => Severity.Info,
+                };
+                lines.Add(new ValidatorIssueLine(group.Key.Key, LibraryChartLint.Describe(first, group.Count()), [LibraryChartLint.TypeOf(group.Key.RuleId)], null, severity));
             }
 
-            FailsMetadata = byKey.Count > 0;
-            IsFixed = byKey.Count == 0 && chartProblems == 0;
-            SetIssues(issues, fixable, byKey.Count - fixable + chartProblems);
+            return new ValidatorSongCheck(
+                title,
+                headline.Artist,
+                charter,
+                lines,
+                fixable,
+                byKey.Count - fixable + chartProblems,
+                FailsMetadata: byKey.Count > 0,
+                IsFixed: byKey.Count == 0 && chartProblems == 0);
         }
 
         private void SetIssues(IReadOnlyList<ValidatorIssueViewModel> issues, int fixable, int manual)
@@ -1060,6 +1436,28 @@ namespace ChartPacker.ViewModels
             _selectionChanged();
         }
     }
+
+    /// <summary>What checking a song found, before it's shown: its headline and a line per issue.</summary>
+    /// <param name="Fixable">How many failing keys have a quick fix.</param>
+    /// <param name="Manual">How many issues, metadata or chart, don't.</param>
+    /// <param name="FailsMetadata">Some of its metadata fails, which saving asks about.</param>
+    /// <param name="IsFixed">Nothing fails, so it isn't listed.</param>
+    public sealed record ValidatorSongCheck(
+        string Title,
+        string? Artist,
+        string? Charter,
+        IReadOnlyList<ValidatorIssueLine> Lines,
+        int Fixable,
+        int Manual,
+        bool FailsMetadata,
+        bool IsFixed);
+
+    /// <summary>One of a song's issues as found, before it's shown and can be ticked.</summary>
+    /// <param name="Key">The failing key, or empty for a note about the song as a whole.</param>
+    /// <param name="Types">The rules it breaks, as <see cref="ValidatorIssueTypes"/> knows them; none for a note.</param>
+    /// <param name="Fix">What the key's quick fix does, or <see langword="null"/> without one.</param>
+    /// <param name="ChartSeverity">How bad a chart finding is; <see langword="null"/> for the metadata's.</param>
+    public sealed record ValidatorIssueLine(string Key, string Message, IReadOnlyList<string> Types, string? Fix, Severity? ChartSeverity = null);
 
     /// <summary>A failing key of a song in the Validator's list, which can be ticked for Fix selected when it has a quick fix.</summary>
     /// <param name="key">The failing key, or empty for a note about the song as a whole.</param>

@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using ChartPacker.UI.Views;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
 {
@@ -13,6 +13,7 @@ namespace ChartPacker.Views
         public ValidatorProgressDialog()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
 

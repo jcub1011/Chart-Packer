@@ -3,7 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using ChartPacker.Audio.Synthesis;
+using ChartShared.Audio.Synthesis;
 
 namespace ChartBuilder.Controls
 {

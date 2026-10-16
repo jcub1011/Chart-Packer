@@ -1,8 +1,8 @@
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
-using ChartPacker.Audio.Encoding;
-using ChartPacker.Core.Jobs;
-using ChartPacker.UI.Services;
+using ChartShared.Audio.Encoding;
+using ChartShared.Core.Jobs;
+using ChartShared.UI.Services;
 
 namespace ChartBuilder.Tests.Charting.Export;
 

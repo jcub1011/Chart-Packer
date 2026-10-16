@@ -1,18 +1,28 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartPacker.ViewModels"
-        xmlns:views="using:ChartPacker.Views"
         xmlns:res="using:ChartPacker.Resources"
+        xmlns:ctl="using:ChartShared.UI.Controls"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
+        xmlns:theme="using:ChartShared.UI.Theming"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1080" d:DesignHeight="800"
         x:Class="ChartPacker.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartPacker.ico"
         Title="{Binding Title}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1080" Height="800"
-        MinWidth="640" MinHeight="360">
+        MinWidth="640" MinHeight="360"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
+        theme:DynamicTheme.Seed="{Binding Detail.ThemeSeed}">
+
+    <!-- The whole window, and the menus and flyouts it opens, take their colours from the selected song's album art
+         (DynamicTheme), fading from song to song; see SongDetailViewModel.ThemeSeed. -->
 
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding Library.RescanCommand}" />
@@ -21,7 +31,7 @@
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <!-- Toolbar (0), panels (1), download notice (2), job summary line (3). -->
+            <!-- Title bar (0), panels (1), download notice (2), job summary line (3). -->
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="160" />
             <RowDefinition Height="Auto" />
@@ -34,7 +44,194 @@
             <ColumnDefinition Width="*" MinWidth="240" />
         </Grid.ColumnDefinitions>
 
-        <views:ToolbarView Grid.Row="0" Grid.ColumnSpan="3" />
+        <!-- The window draws its own title bar (TitleBar, as Chart Builder's editor does): the icon, the File, Pack and
+             Tools menus, the songs and output folders, and the program version, which opens the releases page. A line
+             under it, between it and the panels. Dragging anywhere but the menus, the folders and the version moves
+             the window.
+             Each item has the icon its button had on the old toolbar. Save and Discard are at the bottom of the details
+             panel (SongDetailView.axaml), while there are edits to save. Each item's tooltip says what it does, and while
+             it's disabled, what it needs. -->
+        <ctl:TitleBar Grid.Row="0"
+                      Grid.ColumnSpan="3"
+                      Height="31"
+                      BorderThickness="0,0,0,1"
+                      BorderBrush="{DynamicResource SubtleBorderBrush}"
+                      Icon="/Assets/ChartPacker.ico"
+                      AppName="{x:Static res:Strings.AppName}">
+            <ctl:TitleBar.Menu>
+                <Menu chrome:WindowDecorationProperties.ElementRole="User">
+                    <!-- Where songs are found, where Pack and Unpack write and where downloads go; then the logs and
+                         Settings. Settings' Ctrl+, isn't shown, as Avalonia
+                         would print it as Ctrl+OemComma. -->
+                    <MenuItem Header="{x:Static res:Strings.MenuFile}">
+                        <MenuItem Header="{x:Static res:Strings.MenuChooseSongsFolder}"
+                                  Command="{Binding Library.BrowseCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.BrowseToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuRescan}"
+                                  Command="{Binding Library.RescanCommand}"
+                                  InputGesture="F5"
+                                  ToolTip.Tip="{x:Static res:Strings.RescanToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ScanStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="{x:Static res:Strings.MenuChooseOutputFolder}"
+                                  Command="{Binding Library.BrowseOutputCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.BrowseOutputToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuResetOutputFolder}"
+                                  Command="{Binding Library.ResetOutputCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.ResetOutputToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <!-- Where right-click downloads go; its tooltip is that folder. -->
+                        <MenuItem Header="{x:Static res:Strings.MenuChooseDownloadFolder}"
+                                  Command="{Binding ChooseDownloadFolderCommand}"
+                                  ToolTip.Tip="{Binding DownloadFolderToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="{x:Static res:Strings.MenuOpenLogsFolder}"
+                                  Command="{Binding OpenLogsFolderCommand}"
+                                  ToolTip.Tip="{x:Static vm:MainWindowViewModel.LogFolder}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuSettings}"
+                                  Command="{Binding OpenSettingsCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.SettingsToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                    </MenuItem>
+                    <!-- Packing the selection, and how: what to do when the output exists (the policy in use checked), and
+                         whether every .sng goes straight into the output folder. -->
+                    <MenuItem Header="{x:Static res:Strings.MenuPack}">
+                        <MenuItem Header="{x:Static res:Strings.MenuPackSelection}"
+                                  Command="{Binding Library.PackCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.PackToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PackStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuUnpack}"
+                                  Command="{Binding Library.UnpackCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.UnpackToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UnpackStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <!-- Each policy picks itself with the Library's SelectOverwriteOptionCommand, found up the logical
+                             tree ($parent), as the submenu's popup isn't under the menu in the visual tree. Its check is
+                             bound both ways: a click checks it (and the group unchecks the others) itself, which would
+                             otherwise replace a one-way binding, and stop it following a policy picked in Settings. -->
+                        <MenuItem Header="{x:Static res:Strings.MenuOverwrite}"
+                                  ItemsSource="{Binding Library.OverwriteOptions}"
+                                  ToolTip.Tip="{x:Static res:Strings.OverwriteToolTip}">
+                            <MenuItem.ItemContainerTheme>
+                                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:OverwriteOption">
+                                    <Setter Property="Header" Value="{Binding MenuLabel}" />
+                                    <Setter Property="ToggleType" Value="Radio" />
+                                    <Setter Property="GroupName" Value="OverwritePolicy" />
+                                    <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                    <Setter Property="Command" Value="{Binding $parent[Menu].((vm:MainWindowViewModel)DataContext).Library.SelectOverwriteOptionCommand}" />
+                                    <Setter Property="CommandParameter" Value="{Binding}" />
+                                </ControlTheme>
+                            </MenuItem.ItemContainerTheme>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuFlatPack}"
+                                  Classes="check-end"
+                                  ToggleType="CheckBox"
+                                  IsChecked="{Binding Library.FlatPackOutput, Mode=TwoWay}"
+                                  ToolTip.Tip="{x:Static res:Strings.FlatPackToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource FlatStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                    </MenuItem>
+                    <!-- Edit Chart opens the selected song in Chart Builder; the rest open their own windows. -->
+                    <MenuItem Header="{x:Static res:Strings.MenuTools}">
+                        <MenuItem Header="{x:Static res:Strings.MenuEditChart}"
+                                  Command="{Binding Library.EditChartCommand}"
+                                  ToolTip.Tip="{Binding Library.EditChartToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource EditChartStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="{x:Static res:Strings.MenuMerge}"
+                                  Command="{Binding Library.MergeCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.MergeToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource MergeStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuValidate}"
+                                  Command="{Binding Library.ValidateCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.ValidateToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource CheckStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuDeduplicate}"
+                                  Command="{Binding Library.DeduplicateCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.DedupToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource DedupStroke}" /></MenuItem.Icon>
+                        </MenuItem>
+                    </MenuItem>
+                </Menu>
+            </ctl:TitleBar.Menu>
+            <!-- The songs folder, an arrow, then the output folder: each a button (title-link, in Theme.axaml) that
+                 opens its folder picker, its path trimmed in the middle when they don't fit, and dimmed while it's
+                 unset (or the output is the default, next to the scanned songs). Left-aligned, so the version follows
+                 them; when they don't fit, the longer path gives up its width first (ShrinkPanel). Each path is in a
+                 grid's star column, not a StackPanel, which would let it grow past the button rather than trim. The
+                 arrow isn't clickable, so dragging it moves the window. -->
+            <ctl:ShrinkPanel Spacing="4"
+                             Margin="6,0,0,0"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center">
+                <Button ctl:ShrinkPanel.CanShrink="True"
+                        Classes="title-link"
+                        chrome:WindowDecorationProperties.ElementRole="User"
+                        Command="{Binding Library.BrowseCommand}"
+                        ToolTip.ShowOnDisabled="True"
+                        AutomationProperties.Name="{x:Static res:Strings.BrowseToolTip}"
+                        AutomationProperties.HelpText="{Binding Library.FolderPath}">
+                    <ToolTip.Tip>
+                        <ctl:TitledToolTip Title="{Binding Library.FolderPath, TargetNullValue={x:Static res:Strings.FolderPathWatermark}}"
+                                           Description="{Binding Library.SongsFolderToolTip}" />
+                    </ToolTip.Tip>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                        <ctl:LineIcon Data="{StaticResource InputFolderStroke}" />
+                        <TextBlock Grid.Column="1"
+                                   Classes="path"
+                                   Classes.muted="{Binding Library.ShowPrompt}"
+                                   Text="{Binding Library.FolderPath, TargetNullValue={x:Static res:Strings.FolderPathWatermark}}" />
+                    </Grid>
+                </Button>
+                <ctl:LineIcon Opacity="0.55"
+                              VerticalAlignment="Center"
+                              Data="{StaticResource ArrowRightStroke}" />
+                <Button ctl:ShrinkPanel.CanShrink="True"
+                        Classes="title-link"
+                        chrome:WindowDecorationProperties.ElementRole="User"
+                        Command="{Binding Library.BrowseOutputCommand}"
+                        ToolTip.ShowOnDisabled="True"
+                        AutomationProperties.Name="{x:Static res:Strings.BrowseOutputToolTip}"
+                        AutomationProperties.HelpText="{Binding Library.EffectiveOutputFolder}">
+                    <ToolTip.Tip>
+                        <ctl:TitledToolTip Title="{Binding Library.EffectiveOutputFolder, TargetNullValue={x:Static res:Strings.OutputWatermark}}"
+                                           Description="{Binding Library.OutputFolderToolTip}" />
+                    </ToolTip.Tip>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                        <ctl:LineIcon Data="{StaticResource OutputFolderStroke}" />
+                        <TextBlock Grid.Column="1"
+                                   Classes="path"
+                                   Classes.muted="{Binding !Library.HasCustomOutputFolder}"
+                                   Text="{Binding Library.EffectiveOutputFolder, TargetNullValue={x:Static res:Strings.OutputWatermark}}" />
+                    </Grid>
+                </Button>
+                <ctl:VersionLink chrome:WindowDecorationProperties.ElementRole="User" />
+            </ctl:ShrinkPanel>
+        </ctl:TitleBar>
 
         <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource SurfaceBrush}">
             <ContentControl Content="{Binding Library}" />
@@ -92,11 +289,12 @@
             </Grid>
         </Border>
 
-        <!-- Pack/unpack summary, always under both panels. Clicking it opens the progress window. -->
+        <!-- The status bar, always under both panels: the pack/unpack job, or the library's scan. Clicking it opens
+             the progress window. -->
         <ContentControl Grid.Row="3"
                         Grid.Column="0"
                         Grid.ColumnSpan="3"
-                        Content="{Binding Job}" />
+                        Content="{Binding StatusBar}" />
     </Grid>
 
 </Window>

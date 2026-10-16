@@ -1,11 +1,12 @@
 using System.Collections.Generic;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Authoring;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charting.Playtest;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Launching;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charting.Playtest;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Launching;
+using ChartShared.UI.Services;
 
 namespace ChartBuilder.Services
 {
@@ -31,7 +32,7 @@ namespace ChartBuilder.Services
 
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
     /// <remarks>Chart Packer's are in its own file, so neither app overwrites the other's.</remarks>
-    public sealed class BuilderSettings
+    public sealed class BuilderSettings : ISettingsWindowSize
     {
         public const double DefaultEditorLeftPanelWidth = 300;
         public const double DefaultEditorRightPanelWidth = 280;
@@ -46,7 +47,7 @@ namespace ChartBuilder.Services
         /// <summary>The most a saved panel width or timeline height is restored as: wider than an 8K screen.</summary>
         public const double MaxEditorPanelSize = 8192;
 
-        /// <summary>Whether Chart Builder writes log files (<see cref="ChartPacker.UI.AppLog"/>).</summary>
+        /// <summary>Whether Chart Builder writes log files (<see cref="ChartShared.UI.AppLog"/>).</summary>
         public bool LoggingEnabled { get; set; } = true;
 
         /// <summary>The name a new chart's <c>charter</c> is filled in with. Empty for none.</summary>
@@ -130,20 +131,15 @@ namespace ChartBuilder.Services
 
         public double? EditorHeight { get; set; }
 
-        /// <summary>The narrowest and shortest the editor's normal size is restored as.</summary>
-        public const double MinEditorWidth = 720;
+        /// <summary>The Settings window's normal size when it last closed, in device-independent pixels. Null for none yet.</summary>
+        public double? SettingsWindowWidth { get; set; }
 
-        public const double MinEditorHeight = 480;
-
-        /// <summary>The widest and tallest the editor's normal size is restored as: bigger than an 8K screen.</summary>
-        public const double MaxEditorWidth = 7680;
-
-        public const double MaxEditorHeight = 4320;
+        public double? SettingsWindowHeight { get; set; }
 
         /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
         public StartupAction StartupAction { get; set; } = StartupAction.BlankChart;
 
-        /// <summary>The songs opened lately, the latest first, as the File menu's Open recent lists them (<see cref="ChartPacker.Core.Launching.RecentSongs"/>).</summary>
+        /// <summary>The songs opened lately, the latest first, as the File menu's Open recent lists them (<see cref="ChartShared.Core.Launching.RecentSongs"/>).</summary>
         public List<RecentSong> RecentSongs { get; set; } = [];
 
         /// <summary>The fewest minutes between autosaves.</summary>

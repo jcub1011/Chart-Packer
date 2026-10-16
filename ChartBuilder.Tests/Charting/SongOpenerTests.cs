@@ -1,8 +1,8 @@
 using System.Text;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Sng;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Sng;
 
 namespace ChartBuilder.Tests.Charting;
 

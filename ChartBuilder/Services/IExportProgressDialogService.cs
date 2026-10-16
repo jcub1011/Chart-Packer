@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
-using ChartPacker.Core.Jobs;
-using ChartPacker.UI.Views;
+using ChartShared.Core.Jobs;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder.Services
 {

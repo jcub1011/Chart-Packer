@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="460"
         x:Class="ChartBuilder.Views.MessagesWindow"
         x:DataType="vm:MessagesDialogViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartBuilder.ico"
         Title="{x:Static res:Strings.MessagesTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="640" Height="460"

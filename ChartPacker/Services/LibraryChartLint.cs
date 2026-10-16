@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Globalization;
-using ChartPacker.Core.Validation;
 using ChartPacker.Resources;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Validation;
+using ChartShared.UI.ViewModels;
 
 namespace ChartPacker.Services
 {
@@ -40,6 +40,13 @@ namespace ChartPacker.Services
                 : ChartLabels.InstrumentName(location.Part);
             return string.Format(CultureInfo.CurrentCulture, Strings.ChartFindingPartPlaceFormat, part, at);
         }
+
+        /// <summary>
+        /// Where the finding is, as the chart issues list's place pill shows it: in measures and beats, from where it
+        /// starts to where it ends when it covers more than one place; null for nowhere in particular.
+        /// </summary>
+        public static string? PlaceOf(SongChartFinding finding) =>
+            finding.Place is { } start ? ChartLabels.PlaceText(start, finding.EndPlace) : null;
 
         /// <summary>The Validator's type for a chart finding, by the catalogue's group (<see cref="ChrRules.CategoryOf"/>).</summary>
         public static string TypeOf(string ruleId) => ChrRules.CategoryOf(ruleId) switch

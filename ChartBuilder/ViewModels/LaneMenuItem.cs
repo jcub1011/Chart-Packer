@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Windows.Input;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charts;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
@@ -54,7 +53,7 @@ namespace ChartBuilder.ViewModels
                 groups.Add(Group(ChartLabels.InstrumentName(instrument), parts, canPick, isCurrent, pick));
             }
 
-            var vocals = Enum.GetValues<VocalTrack>().Select(v => (LanePart.Vocals(v), VocalName(v)));
+            var vocals = Enum.GetValues<VocalTrack>().Select(v => (LanePart.Vocals(v), ChartLabels.VocalTrackName(v)));
             groups.Add(Group(Strings.LaneVocalsGroup, vocals, canPick, isCurrent, pick));
             return groups;
         }
@@ -82,13 +81,7 @@ namespace ChartBuilder.ViewModels
         /// </summary>
         public static string TitleOf(LanePart part) => part.Track is { } track
             ? ChartLabels.InstrumentName(track.Instrument)
-            : VocalName(part.Vocal!.Value);
-
-        private static string VocalName(VocalTrack vocal) => vocal switch
-        {
-            VocalTrack.Vocals => Strings.LaneVocals,
-            _ => string.Format(CultureInfo.CurrentCulture, Strings.LaneHarmonyFormat, (int)vocal),
-        };
+            : ChartLabels.VocalTrackName(part.Vocal!.Value);
 
         private static LaneMenuItem Group(
             string header,

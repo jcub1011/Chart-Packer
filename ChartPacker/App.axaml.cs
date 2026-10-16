@@ -5,17 +5,18 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core;
-using ChartPacker.Core.Launching;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
-using ChartPacker.Ffmpeg;
+using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.Services;
 using ChartPacker.ViewModels;
-using ChartPacker.ViewModels.Settings;
 using ChartPacker.Views;
+using ChartShared.Audio.Playback;
+using ChartShared.Core;
+using ChartShared.Core.Launching;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.Ffmpeg;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels.Settings;
 
 namespace ChartPacker
 {
@@ -88,7 +89,10 @@ namespace ChartPacker
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,
                     settingsPicker => new SettingsWindowViewModel(
-                        AppSettingsCatalog.Create(library, player, highway, downloads, settings, Calibrate), settingsPicker, settings.Save));
+                        AppSettingsCatalog.Create(library, player, highway, downloads, settings, Calibrate), settingsPicker, settings.Save),
+                    settings.Settings,
+                    settings.Save,
+                    Strings.AppName);
 
                 window.DataContext = new MainWindowViewModel(
                     library,
@@ -97,11 +101,22 @@ namespace ChartPacker
                     drafts,
                     confirmation,
                     settingsWindow,
-                    notice);
+                    notice,
+                    downloads,
+                    folderPicker);
+
+                // Opens where it was when it last closed.
+                MainWindowPlacement.Restore(window, settings.Settings);
 
                 // Subscribed after MainWindow's own Closing handler, which captures the splitter positions first.
-                // It also runs when that handler cancels the close to ask about unsaved changes, which is harmless.
-                window.Closing += (_, _) => settings.Save();
+                // It also runs when that handler cancels the close to ask about unsaved changes. The placement is saved
+                // then too, so it isn't lost if the OS shuts down without waiting for the answer; a close the user
+                // cancels leaves the window as it was, and the next close saves it again.
+                window.Closing += (_, _) =>
+                {
+                    MainWindowPlacement.Capture(window, settings.Settings);
+                    settings.Save();
+                };
 
                 // Stops playback and closes the audio device and the song's files.
                 desktop.Exit += (_, _) =>

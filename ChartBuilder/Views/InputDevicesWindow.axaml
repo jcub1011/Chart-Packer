@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="640"
         x:Class="ChartBuilder.Views.InputDevicesWindow"
         x:DataType="vm:InputDevicesViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartBuilder.ico"
         Title="{x:Static res:Strings.InputDevicesWindowTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
         WindowStartupLocation="CenterOwner"

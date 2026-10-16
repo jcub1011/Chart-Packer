@@ -1,6 +1,6 @@
 using System;
 using Avalonia;
-using ChartPacker.Core.Charting.Editing;
+using ChartShared.Core.Charting.Editing;
 
 namespace ChartBuilder.Controls.Editing
 {

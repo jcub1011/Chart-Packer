@@ -4,12 +4,14 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core;
+using ChartShared.Core.Scanning;
+using ChartShared.UI;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
@@ -20,6 +22,8 @@ namespace ChartPacker.ViewModels
         private readonly MetadataDraftStore _drafts;
         private readonly IConfirmationService _confirmation;
         private readonly ISettingsWindowService _settingsWindow;
+        private readonly DownloadService _downloads;
+        private readonly IFolderPickerService _folderPicker;
 
         public MainWindowViewModel(
             LibraryViewModel library,
@@ -28,7 +32,9 @@ namespace ChartPacker.ViewModels
             MetadataDraftStore drafts,
             IConfirmationService confirmation,
             ISettingsWindowService settingsWindow,
-            NoticeViewModel notice)
+            NoticeViewModel notice,
+            DownloadService downloads,
+            IFolderPickerService folderPicker)
         {
             Library = library;
             Detail = detail;
@@ -36,7 +42,15 @@ namespace ChartPacker.ViewModels
             _drafts = drafts;
             _confirmation = confirmation;
             _settingsWindow = settingsWindow;
+            _downloads = downloads;
+            _folderPicker = folderPicker;
             Notice = notice;
+            StatusBar = new StatusBarViewModel(library);
+
+            // Shown as soon as there is one; the system's Downloads folder is looked up after.
+            DownloadFolderToolTip = downloads.Folder ?? string.Empty;
+            downloads.FolderChanged += (_, _) => _ = RefreshDownloadFolderAsync();
+            _ = RefreshDownloadFolderAsync();
 
             Library.PropertyChanged += (_, e) =>
             {
@@ -142,8 +156,8 @@ namespace ChartPacker.ViewModels
         /// <summary>What the latest download did, shown along the bottom for a few seconds.</summary>
         public NoticeViewModel Notice { get; }
 
-        /// <summary>The pack/unpack results panel, always shown under both panels.</summary>
-        public JobViewModel Job => Library.Job;
+        /// <summary>The status bar, always shown under both panels: the pack/unpack job, or the library's scan.</summary>
+        public StatusBarViewModel StatusBar { get; }
 
         /// <summary>Persisted width of the library panel. The view applies it on open and writes it back on close.</summary>
         public double LibraryPaneWidth
@@ -154,6 +168,41 @@ namespace ChartPacker.ViewModels
 
         [RelayCommand]
         private Task OpenSettingsAsync() => _settingsWindow.ShowAsync();
+
+        /// <summary>The File menu's Choose Download Location tooltip: the folder downloads go to.</summary>
+        [ObservableProperty]
+        public partial string DownloadFolderToolTip { get; private set; }
+
+        /// <summary>The File menu's Open Logs Folder tooltip: the folder the log files are written to.</summary>
+        public static string LogFolder => UserConfigPaths.LogFolder;
+
+        /// <summary>Picks the folder downloads go to, as Settings' download folder does.</summary>
+        [RelayCommand]
+        private async Task ChooseDownloadFolderAsync()
+        {
+            var path = await _folderPicker.PickFolderAsync(Strings.BrowseDownloadDialogTitle, await _downloads.ResolveFolderAsync());
+            if (path is null)
+                return;
+
+            _downloads.Folder = path;
+        }
+
+        [RelayCommand]
+        private void OpenLogsFolder() => AppLog.OpenFolder();
+
+        /// <summary>Shows the folder downloads now go to in <see cref="DownloadFolderToolTip"/>. Never throws.</summary>
+        private async Task RefreshDownloadFolderAsync()
+        {
+            try
+            {
+                DownloadFolderToolTip = await _downloads.ResolveFolderAsync();
+            }
+            catch (Exception ex)
+            {
+                // Nothing awaits this, so anything not caught here would be lost.
+                Trace.TraceError($"Looking up the download folder failed: {ex}");
+            }
+        }
 
         /// <summary>Some song has metadata changes that closing would lose.</summary>
         public bool HasUnsavedDrafts => _drafts.DirtyCount > 0;

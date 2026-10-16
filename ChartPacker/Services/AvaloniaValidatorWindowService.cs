@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.UI.Services;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Services
 {
@@ -23,7 +23,7 @@ namespace ChartPacker.Services
     /// The main window's panel. It lets go of its songs' files while the Validator is open, as the Validator may save
     /// them, and shows them again afterwards; its player and highway then take up the settings the Validator's changed.
     /// </param>
-    /// <param name="notice">Where downloads report, under the main window's toolbar.</param>
+    /// <param name="notice">Where downloads report, along the bottom of the main window.</param>
     /// <param name="songFiles">Keeps saving a song apart from copies of it being downloaded, in either window.</param>
     /// <param name="latency">The calibrated audio latency, which the inspector's highway allows for.</param>
     public sealed class AvaloniaValidatorWindowService(
@@ -74,7 +74,8 @@ namespace ChartPacker.Services
                 isOpenInChartBuilder,
                 new AvaloniaChartIssuesWindowService(() => dialog));
 
-            // Songs are read as many at once as a library scan reads.
+            // Songs are read as many at once as a library scan reads; the window lints and checks them on one core fewer
+            // than there are, leaving one to the UI thread.
             int parallelism = Math.Max(settings.Settings.ScanParallelism, AppSettings.MinScanParallelism);
             var viewModel = new ValidatorWindowViewModel(entries, drafts, inspector, parallelism, job, saver, settings, confirmation, isOpenInChartBuilder);
             dialog.DataContext = viewModel;

@@ -1,8 +1,8 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Lint;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Validation;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Lint;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
 using static ChartBuilder.Tests.Editing.EditorSessions;
 
 namespace ChartBuilder.Tests.Charting;

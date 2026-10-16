@@ -45,7 +45,7 @@
     <value>Charter</value>
   </data>
   <data name="SettingsCategoryNewCharts" xml:space="preserve">
-    <value>New charts</value>
+    <value>New Charts</value>
   </data>
   <data name="DefaultCharterNameLabel" xml:space="preserve">
     <value>Default charter name</value>
@@ -149,10 +149,6 @@
   <data name="EditorWindowTitleFormat" xml:space="preserve">
     <value>{0} - Chart Builder</value>
     <comment>The editor window's title. {0} is the chart's name.</comment>
-  </data>
-  <data name="VersionFormat" xml:space="preserve">
-    <value>v{0}</value>
-    <comment>The program version in the editor's title bar, e.g. "v0.3.0".</comment>
   </data>
   <data name="ComingSoonToolTip" xml:space="preserve">
     <value>Coming soon.</value>
@@ -264,14 +260,6 @@
     <value>{0} · {1}</value>
     <comment>A part's name: its instrument and difficulty, e.g. "Guitar · Expert".</comment>
   </data>
-  <data name="LaneVocals" xml:space="preserve">
-    <value>Vocals</value>
-    <comment>The lead vocals lane, PART VOCALS.</comment>
-  </data>
-  <data name="LaneHarmonyFormat" xml:space="preserve">
-    <value>Harmony {0}</value>
-    <comment>A harmony vocals lane, e.g. "Harmony 2".</comment>
-  </data>
   <data name="LaneVocalsGroup" xml:space="preserve">
     <value>Vocals</value>
     <comment>The vocal parts' group in a lane's part menu.</comment>
@@ -297,19 +285,19 @@
     <comment>The button in a vocal lane whose part the chart hasn't, which adds it empty, with the lane's title, e.g. "Add Harmony 2".</comment>
   </data>
   <data name="PropertiesVocalNoteHeadingFormat" xml:space="preserve">
-    <value>Vocal note · {0}</value>
+    <value>Vocal Note · {0}</value>
     <comment>Properties' heading for one selected vocal note, with its part, e.g. "Vocal note · Harmony 1".</comment>
   </data>
   <data name="PropertiesVocalNotesHeadingFormat" xml:space="preserve">
-    <value>{0} vocal notes · {1}</value>
+    <value>{0} Vocal Notes · {1}</value>
     <comment>Properties' heading for several selected vocal notes: {0} is how many; {1} their part.</comment>
   </data>
   <data name="PropertiesVocalPhraseHeadingFormat" xml:space="preserve">
-    <value>Vocal phrase · {0}</value>
+    <value>Vocal Phrase · {0}</value>
     <comment>Properties' heading for one selected vocal phrase, with its part.</comment>
   </data>
   <data name="PropertiesVocalPhrasesHeadingFormat" xml:space="preserve">
-    <value>{0} vocal phrases · {1}</value>
+    <value>{0} Vocal Phrases · {1}</value>
     <comment>Properties' heading for several selected vocal phrases: {0} is how many; {1} their part.</comment>
   </data>
   <data name="PropertiesPitchLabel" xml:space="preserve">
@@ -410,7 +398,7 @@
     <value>Open a song folder or .sng in the editor (Ctrl+O).</value>
   </data>
   <data name="OpenSongPickerTitle" xml:space="preserve">
-    <value>Open a song: its .sng, or the song.ini or chart in its folder</value>
+    <value>Open a Song</value>
   </data>
   <data name="RecentToday" xml:space="preserve">
     <value>today</value>
@@ -440,7 +428,7 @@
     <value>The most recently opened song</value>
   </data>
   <data name="UnsavedRecoverTitle" xml:space="preserve">
-    <value>Recover unsaved chart</value>
+    <value>Recover Unsaved Chart</value>
     <comment>Offered on startup for a new chart that was autosaved but never saved.</comment>
   </data>
   <data name="UnsavedRecoverMessageFormat" xml:space="preserve">
@@ -460,7 +448,7 @@
     <comment>{0} is the song's path.</comment>
   </data>
   <data name="OpenSongNoChartFormat" xml:space="preserve">
-    <value>{0} has no chart to open. Starting a chart in a song comes with Chart settings.</value>
+    <value>{0} has no chart to open. Starting a chart in a song comes with Chart Settings.</value>
     <comment>{0} is the song's path.</comment>
   </data>
   <data name="OpenSongTooLargeFormat" xml:space="preserve">
@@ -556,7 +544,7 @@ Open it anyway?</value>
     <comment>{0} is the audio file, {1} the error.</comment>
   </data>
   <data name="CalibrationWindowTitle" xml:space="preserve">
-    <value>Calibrate audio latency</value>
+    <value>Calibrate Audio Latency</value>
   </data>
   <data name="CalibrationDeviceFormat" xml:space="preserve">
     <value>Calibrating: {0}</value>
@@ -622,7 +610,7 @@ Open it anyway?</value>
     <value>The latency couldn't be saved.</value>
   </data>
   <data name="CalibrationPromptTitle" xml:space="preserve">
-    <value>Calibrate audio latency?</value>
+    <value>Calibrate Audio Latency</value>
   </data>
   <data name="CalibrationPromptFormat" xml:space="preserve">
     <value>{0} hasn't been calibrated. Calibrating lines up what you see with what you hear, which timing notes depends on. It takes about a minute.</value>
@@ -778,7 +766,7 @@ Open it anyway?</value>
     <value>A time signature has 1 to {0} beats.</value>
   </data>
   <data name="RemovePartTitle" xml:space="preserve">
-    <value>Remove part</value>
+    <value>Remove Part</value>
   </data>
   <data name="RemovePartMessageFormat" xml:space="preserve">
     <value>{0} has notes. Remove it, with its notes, phrases and events? It can be undone.</value>
@@ -787,7 +775,7 @@ Open it anyway?</value>
     <value>Remove</value>
   </data>
   <data name="ResolutionWarningTitle" xml:space="preserve">
-    <value>Change the resolution?</value>
+    <value>Change Resolution</value>
   </data>
   <data name="ResolutionWarningMovesFormat" xml:space="preserve">
     <value>Changing the resolution from {0} to {1} would move {2} items in time, as their ticks don't scale to whole ticks, by up to {3:0.###} ms:</value>
@@ -814,10 +802,10 @@ Open it anyway?</value>
     <value>The resolution can't be changed: {0}</value>
   </data>
   <data name="ChartSettingsNotAppliedFormat" xml:space="preserve">
-    <value>Chart settings couldn't be applied, so nothing was changed: {0}</value>
+    <value>Chart Settings couldn't be applied, so nothing was changed: {0}</value>
   </data>
   <data name="PendingChangesHeading" xml:space="preserve">
-    <value>Pending song.ini changes</value>
+    <value>Pending song.ini Changes</value>
   </data>
   <data name="PendingChangesNone" xml:space="preserve">
     <value>None.</value>
@@ -833,7 +821,7 @@ Open it anyway?</value>
     <comment>The title bar's song title's tooltip. {0} is "Show in Explorer" or the platform's like, {1} the song's folder or .sng.</comment>
   </data>
   <data name="EditorUntitledChart" xml:space="preserve">
-    <value>Untitled chart</value>
+    <value>Untitled Chart</value>
   </data>
   <data name="NewChartFilesNotAddedFormat" xml:space="preserve">
     <value>Some audio files weren't added: {0}.</value>
@@ -953,7 +941,7 @@ Open it anyway?</value>
     <comment>Said when tap tempo's result can't be stored.</comment>
   </data>
   <data name="AnchorBlockedTitle" xml:space="preserve">
-    <value>Keep the anchor?</value>
+    <value>Keep Anchor</value>
     <comment>The title of the prompt when a tempo edit can't keep an anchored marker where it is.</comment>
   </data>
   <data name="AnchorBlockedMessageFormat" xml:space="preserve">
@@ -977,7 +965,7 @@ Open it anyway?</value>
     <comment>A lane's button tooltip: switch the lane to the horizontal timeline view.</comment>
   </data>
   <data name="LaneNoPartFormat" xml:space="preserve">
-    <value>The chart has no {0} part. Add it in Chart settings.</value>
+    <value>The chart has no {0} part. Add it in Chart Settings.</value>
     <comment>A lane's placeholder when the chart hasn't the part it shows, with the part's name.</comment>
   </data>
   <data name="LaneDifficultyShownFormat" xml:space="preserve">
@@ -1009,15 +997,15 @@ Open it anyway?</value>
     <comment>Properties' heading for one selected note.</comment>
   </data>
   <data name="PropertiesNotesHeadingFormat" xml:space="preserve">
-    <value>{0} notes</value>
+    <value>{0} Notes</value>
     <comment>Properties' heading for several selected notes, with how many.</comment>
   </data>
   <data name="PropertiesTempoHeading" xml:space="preserve">
-    <value>Tempo marker</value>
+    <value>Tempo Marker</value>
     <comment>Properties' heading for one selected tempo marker.</comment>
   </data>
   <data name="PropertiesTemposHeadingFormat" xml:space="preserve">
-    <value>{0} tempo markers</value>
+    <value>{0} Tempo Markers</value>
     <comment>Properties' heading for several selected tempo markers, with how many.</comment>
   </data>
   <data name="PropertiesSpanHeading" xml:space="preserve">
@@ -1217,11 +1205,11 @@ Open it anyway?</value>
     <comment>What the Phrase tool can draw on Pro drums besides phrases: a section where the games swap red and yellow.</comment>
   </data>
   <data name="PropertiesDiscoFlipHeading" xml:space="preserve">
-    <value>Disco flip</value>
+    <value>Disco Flip</value>
     <comment>Properties' heading for one selected disco flip section.</comment>
   </data>
   <data name="PropertiesDiscoFlipsHeadingFormat" xml:space="preserve">
-    <value>{0} disco flip sections</value>
+    <value>{0} Disco Flip Sections</value>
     <comment>Properties' heading for several selected disco flip sections, with how many.</comment>
   </data>
   <data name="PropertiesDifficultyLabel" xml:space="preserve">
@@ -1237,7 +1225,7 @@ Open it anyway?</value>
     <comment>Properties' heading for one selected phrase.</comment>
   </data>
   <data name="PropertiesPhrasesHeadingFormat" xml:space="preserve">
-    <value>{0} phrases</value>
+    <value>{0} Phrases</value>
     <comment>Properties' heading for several selected phrases, with how many.</comment>
   </data>
   <data name="PropertiesKindLabel" xml:space="preserve">
@@ -1323,7 +1311,7 @@ Open it anyway?</value>
     <comment>Export copy's tooltip, disabled, for a new chart that hasn't been saved yet.</comment>
   </data>
   <data name="ExportCopyPickerTitle" xml:space="preserve">
-    <value>Export a copy into</value>
+    <value>Export a Copy Into</value>
     <comment>The folder picker's title for Export copy; the copy is made in a new folder inside the one picked.</comment>
   </data>
   <data name="ExportedFormat" xml:space="preserve">
@@ -1348,7 +1336,7 @@ Open it anyway?</value>
     <value>Saved, but packing didn't say what it did.</value>
   </data>
   <data name="CloseUnsavedTitle" xml:space="preserve">
-    <value>Unsaved changes</value>
+    <value>Unsaved Changes</value>
   </data>
   <data name="CloseUnsavedMessageFormat" xml:space="preserve">
     <value>"{0}" has changes that aren't saved. Save them before closing?</value>
@@ -1400,23 +1388,23 @@ Saving also makes these changes to song.ini:
     <comment>{0} is the new song folder.</comment>
   </data>
   <data name="FirstSaveTitle" xml:space="preserve">
-    <value>Save new chart</value>
+    <value>Save New Chart</value>
   </data>
   <data name="FirstSaveIntro" xml:space="preserve">
     <value>A new chart is saved as a song folder, holding notes.mid, song.ini and its audio. Its folder can't be one that's already there.</value>
   </data>
   <data name="FirstSaveParentLabel" xml:space="preserve">
-    <value>Save in</value>
+    <value>Save In</value>
     <comment>The label of the folder the new song folder is made in.</comment>
   </data>
   <data name="FirstSaveFolderLabel" xml:space="preserve">
-    <value>Folder name</value>
+    <value>Folder Name</value>
   </data>
   <data name="FirstSaveBrowseButton" xml:space="preserve">
     <value>Browse…</value>
   </data>
   <data name="FirstSaveBrowseTitle" xml:space="preserve">
-    <value>Save the new chart in</value>
+    <value>Save the New Chart In</value>
   </data>
   <data name="FirstSaveNoParent" xml:space="preserve">
     <value>Choose a folder to save it in.</value>
@@ -1440,7 +1428,7 @@ Saving also makes these changes to song.ini:
     <value>Song</value>
   </data>
   <data name="NewChartInSongTitle" xml:space="preserve">
-    <value>New chart in this song</value>
+    <value>New Chart in This Song</value>
   </data>
   <data name="NewChartInSongMessageFormat" xml:space="preserve">
     <value>"{0}" has neither notes.mid nor notes.chart. Start a new chart in it? Its first save adds notes.mid and the song.ini keys.</value>
@@ -1450,7 +1438,7 @@ Saving also makes these changes to song.ini:
     <value>New chart</value>
   </data>
   <data name="PendingChangesTab" xml:space="preserve">
-    <value>Pending changes</value>
+    <value>Pending Changes</value>
     <comment>The right panel's tab listing the song.ini changes a save makes.</comment>
   </data>
   <data name="PendingChangeRemovedFormat" xml:space="preserve">
@@ -1464,7 +1452,7 @@ Saving also makes these changes to song.ini:
     <value>Restore</value>
   </data>
   <data name="PendingChangeNotRevertableToolTip" xml:space="preserve">
-    <value>The chart is read by this setting, so leaving it out would save a chart that plays differently. Change the drums in Chart settings instead.</value>
+    <value>The chart is read by this setting, so leaving it out would save a chart that plays differently. Change the drums in Chart Settings instead.</value>
   </data>
   <data name="PendingReasonImportedValue" xml:space="preserve">
     <value>From the imported chart or the new chart's details, as song.ini has no value for it.</value>
@@ -1513,7 +1501,7 @@ Saving also makes these changes to song.ini:
     <value>Ask every time</value>
   </data>
   <data name="SaveAndPackPickerTitle" xml:space="preserve">
-    <value>Pack the .sng into</value>
+    <value>Pack the .sng Into</value>
     <comment>The folder picker's title for Save and pack; the .sng is written inside the one picked.</comment>
   </data>
   <data name="ExportSngTitle" xml:space="preserve">
@@ -1664,7 +1652,7 @@ Saving also makes these changes to song.ini:
     <value>Location</value>
   </data>
   <data name="ExportSngOtherHeading" xml:space="preserve">
-    <value>Other metadata</value>
+    <value>Other Metadata</value>
   </data>
   <data name="ExportSngNameLabel" xml:space="preserve">
     <value>Name</value>
@@ -1692,7 +1680,7 @@ Saving also makes these changes to song.ini:
     <comment>The Editor's notice when it opens a chart recovered from an autosave.</comment>
   </data>
   <data name="RecoverTitle" xml:space="preserve">
-    <value>Recover unsaved changes</value>
+    <value>Recover Unsaved Changes</value>
   </data>
   <data name="RecoverMessageFormat" xml:space="preserve">
     <value>"{0}" has changes that weren't saved, autosaved at {1}. Recover them, or discard them and open the song as it is on disk?</value>
@@ -1741,18 +1729,6 @@ Saving also makes these changes to song.ini:
   <data name="FindingsFixedEverywhereFormat" xml:space="preserve">
     <value>Fixed {0} {1} findings.</value>
     <comment>After Fix All. {0} is how many were fixed, {1} the rule ID (CHR023).</comment>
-  </data>
-  <data name="FindingPartDifficultyFormat" xml:space="preserve">
-    <value>{0} {1}</value>
-    <comment>A finding's part and difficulty, e.g. "Lead Guitar Expert". {0} is the part; {1} the difficulty.</comment>
-  </data>
-  <data name="FindingWhereFormat" xml:space="preserve">
-    <value>{0} · {1}</value>
-    <comment>Where a finding is: {0} is its part and difficulty; {1} its measure and beat.</comment>
-  </data>
-  <data name="FindingWhereSong" xml:space="preserve">
-    <value>Song</value>
-    <comment>Where a finding about the song as a whole is.</comment>
   </data>
   <data name="SaveAndPackErrorsToolTipFormat" xml:space="preserve">
     <value>The chart has {0} errors, things the games read differently from what's written. Fix them before packing; Save still works.</value>
@@ -1809,11 +1785,11 @@ Saving also makes these changes to song.ini:
     <comment>Insert event's entry for a free text event on the focused part's track. {0} is the part.</comment>
   </data>
   <data name="SectionsEventsHeading" xml:space="preserve">
-    <value>Sections and events</value>
+    <value>Sections and Events</value>
     <comment>The heading over EVENTS' text events: sections, song events and free text.</comment>
   </data>
   <data name="SectionsPartHeadingFormat" xml:space="preserve">
-    <value>Text events on {0}</value>
+    <value>Text Events on {0}</value>
     <comment>The heading over the focused part's own text events. {0} is the part.</comment>
   </data>
   <data name="SectionsNone" xml:space="preserve">
@@ -1866,7 +1842,7 @@ Saving also makes these changes to song.ini:
     <comment>The left panel's tab listing the chart's tempo and time signature changes.</comment>
   </data>
   <data name="TempoMapFromAudioHeading" xml:space="preserve">
-    <value>From the audio</value>
+    <value>From the Audio</value>
     <comment>The heading over the Tempo map tab's Propose tempo map and Find first downbeat.</comment>
   </data>
   <data name="TempoMapAddTempoButton" xml:space="preserve">
@@ -1886,7 +1862,7 @@ Saving also makes these changes to song.ini:
     <comment>Add time signature's entry that adds the signature in force, to be typed over.</comment>
   </data>
   <data name="TempoMapHeading" xml:space="preserve">
-    <value>Tempo and time signature changes</value>
+    <value>Tempo and Time Signature Changes</value>
     <comment>The heading over the Tempo map tab's list.</comment>
   </data>
   <data name="TempoMapAtCursorFormat" xml:space="preserve">
@@ -1940,7 +1916,7 @@ Saving also makes these changes to song.ini:
     <comment>The Generate fills button's tooltip.</comment>
   </data>
   <data name="GenerateFillsHeading" xml:space="preserve">
-    <value>Generate fills</value>
+    <value>Generate Fills</value>
   </data>
   <data name="GenerateFillsSpacingLabel" xml:space="preserve">
     <value>Spacing (measures)</value>
@@ -2007,7 +1983,7 @@ Saving also makes these changes to song.ini:
     <comment>Ends Generate fills, adding nothing.</comment>
   </data>
   <data name="SettingsCategoryAudioAssist" xml:space="preserve">
-    <value>Audio assist</value>
+    <value>Audio Assist</value>
   </data>
   <data name="LaneBackdropLabel" xml:space="preserve">
     <value>Lanes show</value>
@@ -2178,7 +2154,7 @@ Saving also makes these changes to song.ini:
     <value>Propose a tempo map from the audio, to review over the real one</value>
   </data>
   <data name="ProposeTempoMapHeading" xml:space="preserve">
-    <value>Propose a tempo map</value>
+    <value>Propose a Tempo Map</value>
   </data>
   <data name="ProposalListenLabel" xml:space="preserve">
     <value>Listen to</value>
@@ -2289,7 +2265,7 @@ Saving also makes these changes to song.ini:
     <value>Downbeat?</value>
   </data>
   <data name="DownbeatDelaySetFormat" xml:space="preserve">
-    <value>The delay is set to {0} ms, so the chart starts on the downbeat. Revert it in Pending changes to take it back.</value>
+    <value>The delay is set to {0} ms, so the chart starts on the downbeat. Revert it in Pending Changes to take it back.</value>
   </data>
   <data name="DetectFromAudioButton" xml:space="preserve">
     <value>Detect from audio</value>
@@ -2329,7 +2305,7 @@ Saving also makes these changes to song.ini:
     <value>Copy {0} to</value>
   </data>
   <data name="CopyDifficultyTitle" xml:space="preserve">
-    <value>Copy difficulty</value>
+    <value>Copy Difficulty</value>
   </data>
   <data name="CopyDifficultyConfirmFormat" xml:space="preserve">
     <value>{0} has {1} notes, which {2} will replace. Undo puts them back.</value>
@@ -2350,7 +2326,7 @@ Saving also makes these changes to song.ini:
     <value>Reduce {0}</value>
   </data>
   <data name="ReduceDefaultsTitle" xml:space="preserve">
-    <value>Default reduction rules</value>
+    <value>Default Reduction Rules</value>
   </data>
   <data name="ReduceIntro" xml:space="preserve">
     <value>Makes a draft of a lower difficulty from a higher one, drawn over the target as you change the rules. The changes here are for this run only.</value>
@@ -2473,7 +2449,7 @@ Saving also makes these changes to song.ini:
     <value>Pasted, leaving out {0} 2× kicks, which only Expert has.</value>
   </data>
   <data name="LaneMappingTitle" xml:space="preserve">
-    <value>Lane mapping</value>
+    <value>Lane Mapping</value>
   </data>
   <data name="LaneMappingIntroFormat" xml:space="preserve">
     <value>Where each {0} lane goes in {1}. Open notes stay open.</value>
@@ -2657,7 +2633,7 @@ Saving also makes these changes to song.ini:
     <value>Use as {0}</value>
   </data>
   <data name="SuggestedRatingUseToolTip" xml:space="preserve">
-    <value>Write the suggested rating to song.ini on the next save; Pending changes can take it back</value>
+    <value>Write the suggested rating to song.ini on the next save; Pending Changes can take it back</value>
   </data>
   <data name="SuggestedRatingUsedFormat" xml:space="preserve">
     <value>Rating {0} will be saved as {1}.</value>
@@ -2666,22 +2642,22 @@ Saving also makes these changes to song.ini:
     <value>Art</value>
   </data>
   <data name="ArtAlbumArtTitle" xml:space="preserve">
-    <value>Album art</value>
+    <value>Album Art</value>
   </data>
   <data name="ArtBackgroundImageTitle" xml:space="preserve">
-    <value>Background image</value>
+    <value>Background Image</value>
   </data>
   <data name="ArtBackgroundVideoTitle" xml:space="preserve">
-    <value>Background video</value>
+    <value>Background Video</value>
   </data>
   <data name="ArtPickAlbumArtTitle" xml:space="preserve">
-    <value>Choose the album art</value>
+    <value>Choose the Album Art</value>
   </data>
   <data name="ArtPickBackgroundImageTitle" xml:space="preserve">
-    <value>Choose the background image</value>
+    <value>Choose the Background Image</value>
   </data>
   <data name="ArtPickBackgroundVideoTitle" xml:space="preserve">
-    <value>Choose the background video</value>
+    <value>Choose the Background Video</value>
   </data>
   <data name="ArtChooseButton" xml:space="preserve">
     <value>Choose…</value>
@@ -2835,7 +2811,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: the row that opens the Input devices window.</comment>
   </data>
   <data name="InputDevicesDescription" xml:space="preserve">
-    <value>Play the keyboard, game controllers (guitars, drums, gamepads) and MIDI devices (drum kits, on Windows) as instruments, to playtest a chart and to record into it. Their controls are bound to each instrument's frets, strum and pads in the Input devices window.</value>
+    <value>Play the keyboard, game controllers (guitars, drums, gamepads) and MIDI devices (drum kits, on Windows) as instruments, to playtest a chart and to record into it. Their controls are bound to each instrument's frets, strum and pads in the Input Devices window.</value>
     <comment>Settings: what the Instrument devices row does.</comment>
   </data>
   <data name="InputDevicesKeywords" xml:space="preserve">
@@ -2947,7 +2923,7 @@ Saving also makes these changes to song.ini:
     <comment>Settings: whether a MIDI kit records accents and ghosts by how hard it is hit.</comment>
   </data>
   <data name="RecordDynamicsDescription" xml:space="preserve">
-    <value>When recording drums from a MIDI kit, a hard hit is an accent and a soft one a ghost, by the velocities set for the kit in the Input devices window.</value>
+    <value>When recording drums from a MIDI kit, a hard hit is an accent and a soft one a ghost, by the velocities set for the kit in the Input Devices window.</value>
     <comment>Settings: what Dynamics from velocity does.</comment>
   </data>
   <data name="RecordDynamicsKeywords" xml:space="preserve">
@@ -2999,7 +2975,7 @@ Saving also makes these changes to song.ini:
     <comment>The status when N or Shift+N finds no problem past the cursor.</comment>
   </data>
   <data name="InputDevicesWindowTitle" xml:space="preserve">
-    <value>Input devices</value>
+    <value>Input Devices</value>
     <comment>The Input devices window's title.</comment>
   </data>
   <data name="InputDevicesHeading" xml:space="preserve">
@@ -3063,7 +3039,7 @@ Saving also makes these changes to song.ini:
     <comment>The input offset's tooltip.</comment>
   </data>
   <data name="InputMidiSettings" xml:space="preserve">
-    <value>MIDI settings</value>
+    <value>MIDI Settings</value>
     <comment>The Input devices window: the expander with a MIDI device's velocities.</comment>
   </data>
   <data name="InputMinVelocityLabel" xml:space="preserve">

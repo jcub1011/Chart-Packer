@@ -2,9 +2,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ChartBuilder.ViewModels"
              xmlns:res="using:ChartBuilder.Resources"
-             xmlns:ui="using:ChartPacker.UI.Controls"
-             xmlns:uiviews="using:ChartPacker.UI.Views"
-             xmlns:conv="using:ChartPacker.UI.Converters"
+             xmlns:ui="using:ChartShared.UI.Controls"
+             xmlns:uiviews="using:ChartShared.UI.Views"
+             xmlns:conv="using:ChartShared.UI.Converters"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="900"
@@ -19,7 +19,7 @@
          mix. The timing (the resolution, the delay and the tempo map) is in the Tempo map tab. Each field's label is above it, as the panel can be narrow. Focusable so a click on
          empty space can take focus from an edit box, which commits it. -->
     <UserControl.Styles>
-        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <StyleInclude Source="avares://ChartShared.UI/Styles/Inspector.axaml" />
         <Style Selector="StackPanel.field">
             <Setter Property="Spacing" Value="4" />
         </Style>

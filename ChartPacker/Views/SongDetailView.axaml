@@ -4,10 +4,11 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:ChartPacker.ViewModels"
              xmlns:res="using:ChartPacker.Resources"
+             xmlns:sres="using:ChartShared.UI.Resources"
              xmlns:ctl="using:ChartPacker.Controls"
-             xmlns:hw="using:ChartPacker.UI.Controls.Highway"
-             xmlns:ui="using:ChartPacker.UI.Controls"
-             xmlns:uiviews="using:ChartPacker.UI.Views"
+             xmlns:hw="using:ChartShared.UI.Controls.Highway"
+             xmlns:ui="using:ChartShared.UI.Controls"
+             xmlns:uiviews="using:ChartShared.UI.Views"
              mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
              x:Class="ChartPacker.Views.SongDetailView"
              x:DataType="vm:SongDetailViewModel"
@@ -78,7 +79,7 @@
                                     <ToolTip.Tip>
                                         <StackPanel MaxWidth="320" Spacing="6">
                                             <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.HighwayOffsetToolTip}" />
-                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                         </StackPanel>
                                     </ToolTip.Tip>
                                 </NumericUpDown>
@@ -133,7 +134,7 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <StyleInclude Source="avares://ChartShared.UI/Styles/Inspector.axaml" />
         <!-- A flyout floats over the panel, and can cover the tip strip, so its tips pop up as usual. -->
         <Style Selector="FlyoutPresenter">
             <Setter Property="ToolTip.ServiceEnabled" Value="True" />
@@ -144,8 +145,19 @@
             <Setter Property="Background" Value="{DynamicResource ToolTipStripBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
             <Setter Property="BorderThickness" Value="0,1,0,0" />
-            <Setter Property="Padding" Value="20,8" />
+            <Setter Property="Padding" Value="12,8" />
             <Setter Property="TextElement.FontSize" Value="12" />
+        </Style>
+        <!-- While the save bar shows, over the bottom of the panel, the tip strip sits on it, and the details end above
+             it, so the last of them can still be scrolled into view. The bar is 45 high. -->
+        <Style Selector="ctl|ToolTipStrip.save-bar">
+            <Setter Property="Margin" Value="0,0,0,45" />
+        </Style>
+        <Style Selector="StackPanel.details">
+            <Setter Property="Margin" Value="12,10" />
+        </Style>
+        <Style Selector="StackPanel.details.save-bar">
+            <Setter Property="Margin" Value="12,10,12,55" />
         </Style>
 
         <!-- The background's Image | Video switch: radio buttons, so one is always picked, drawn as
@@ -212,7 +224,9 @@
         </Style>
     </UserControl.Styles>
 
-    <Panel>
+    <!-- Everything is layered, as in a Panel; the save bar last, over the bottom of the rest, so showing it moves
+         nothing. -->
+    <Grid>
         <!-- Behind everything, along the bottom of the panel: what's heard as a spectrum, whichever song is
              playing, up to 128px tall. It stays put while the details scroll over it. Hidden, it stops drawing. -->
         <ctl:SpectrumView VerticalAlignment="Bottom"
@@ -222,7 +236,16 @@
                           Source="{Binding Player}"
                           LowColor="{DynamicResource SpectrumLowColor}"
                           MiddleColor="{DynamicResource SpectrumMiddleColor}"
-                          HighColor="{DynamicResource SpectrumHighColor}" />
+                          HighColor="{DynamicResource SpectrumHighColor}">
+            <!-- The album art's colours change the shades at once; these fade them, with the rest of the panel. -->
+            <ctl:SpectrumView.Transitions>
+                <Transitions>
+                    <ColorTransition Property="LowColor" Duration="0:0:0.4" Easing="CubicEaseInOut" />
+                    <ColorTransition Property="MiddleColor" Duration="0:0:0.4" Easing="CubicEaseInOut" />
+                    <ColorTransition Property="HighColor" Duration="0:0:0.4" Easing="CubicEaseInOut" />
+                </Transitions>
+            </ctl:SpectrumView.Transitions>
+        </ctl:SpectrumView>
 
         <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Center"
@@ -255,16 +278,17 @@
                    IsVisible="{Binding HasError}" />
 
         <DockPanel IsVisible="{Binding ShowDetails}">
-            <!-- Save and Discard are on the toolbar; a failed save is reported here, above the rows it concerns. -->
+            <!-- Save and Discard are in the save bar along the bottom; a failed save is reported here, above the rows it
+                 concerns. -->
             <Border DockPanel.Dock="Top"
                     Classes="banner error"
-                    Margin="20,12,20,0"
+                    Margin="12,10,12,0"
                     IsVisible="{Binding HasSaveError}">
                 <SelectableTextBlock TextWrapping="Wrap" Text="{Binding SaveError}" />
             </Border>
 
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="20,16">
+                <StackPanel Classes="details" Classes.save-bar="{Binding ShowSaveBar}">
                     <!-- "Name - Artist", with the charter at the right; the path below, with the song's size at the right.
                          Right-clicking either line shows the songs in the file manager. -->
                     <StackPanel Background="Transparent">
@@ -306,8 +330,9 @@
 
                     <!-- Album art on the left and the background beside it, each in its own shape, as tall as
                          lets both fit the panel's width, with a caption below each. The row, captions included,
-                         is at most 512px or 40% of the window's height, whichever is smaller. -->
-                    <ctl:MediaRow Margin="0,16,0,0" MaxRowHeight="512" MaxViewportFraction="0.4" FooterHeight="32" ClipToBounds="True">
+                         is at most 512px or 40% of the window's height, whichever is smaller. The rows here are spaced
+                         as the panel is padded: 12 between tiles side by side, 10 between rows. -->
+                    <ctl:MediaRow Margin="0,10,0,0" Spacing="12" MaxRowHeight="512" MaxViewportFraction="0.4" FooterHeight="32" ClipToBounds="True">
                         <!-- The file's name, with its actions beside it, and its size in a chip, under the tile; a - for
                              each when there's none. -->
                         <DockPanel ctl:MediaRow.AspectRatio="{Binding ArtAspect}">
@@ -470,7 +495,7 @@
                                                             <ToolTip.Tip>
                                                                 <StackPanel MaxWidth="320" Spacing="6">
                                                                     <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.VideoOffsetToolTip}" />
-                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                                                 </StackPanel>
                                                             </ToolTip.Tip>
                                                         </NumericUpDown>
@@ -556,7 +581,7 @@
                     <!-- The one selected song's vocals as a karaoke lane, in step with the audio, shown while it has
                          a vocals track or vocals in its chart. Captioned and edited like the art. While Shift is held
                          over the lane it shows the whole part, to scrub through. -->
-                    <DockPanel Margin="0,16,0,0" IsVisible="{Binding Lyrics.IsVisible}">
+                    <DockPanel Margin="0,10,0,0" IsVisible="{Binding Lyrics.IsVisible}">
                         <!-- The name, which gives way on a narrow panel, with its actions beside it, then the offset at the
                              right, as the highway's instruments have in their flyout. -->
                         <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
@@ -648,7 +673,7 @@
                                         <ToolTip.Tip>
                                             <StackPanel Spacing="6">
                                                 <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.LyricsOffsetToolTip}" />
-                                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                             </StackPanel>
                                         </ToolTip.Tip>
                                     </NumericUpDown>
@@ -677,6 +702,9 @@
                                                    Clock="{Binding Lyrics.Clock}"
                                                    LengthSeconds="{Binding Player.TimelineSeconds}"
                                                    FineScrubFactor="{Binding Player.LaneFineScrubFactor}"
+                                                   NoteBrush="{DynamicResource AccentMarkBrush}"
+                                                   SingingBrush="{DynamicResource AccentHighlightBrush}"
+                                                   SungBrush="{DynamicResource AccentTextBrush}"
                                                    ToolTip.Tip="{Binding Player.LyricsScrubToolTip}"
                                                    IsVisible="{Binding Lyrics.HasLyrics}" />
                                 <TextBlock Classes="muted centered"
@@ -695,7 +723,7 @@
                          settings put them here rather than over the background. Captioned like the lyrics: the button at the
                          right shows or hides the highways, and its arrow opens their options. -->
                     <Panel IsVisible="{Binding ShowSongFiles}">
-                        <DockPanel Margin="0,16,0,0" IsVisible="{Binding Highway.IsInRow}">
+                        <DockPanel Margin="0,10,0,0" IsVisible="{Binding Highway.IsInRow}">
                             <Border DockPanel.Dock="Bottom" Classes="mediaCaption" MinHeight="32">
                                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6">
                                     <TextBlock Grid.Column="0"
@@ -777,7 +805,7 @@
                                     <ToolTip.Tip>
                                         <StackPanel Spacing="6">
                                             <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.AudioOffsetToolTip}" />
-                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static sres:SharedStrings.OffsetControlsHelp}" />
                                         </StackPanel>
                                     </ToolTip.Tip>
                                 </NumericUpDown>
@@ -1121,10 +1149,10 @@
                         <Button Grid.Column="1"
                                 Classes="labelled"
                                 VerticalAlignment="Center"
-                                Content="{x:Static res:SharedStrings.ChartIssuesViewButton}"
+                                Content="{x:Static sres:SharedStrings.ChartIssuesViewButton}"
                                 Command="{Binding ViewChartIssuesCommand}"
                                 IsVisible="{Binding CanViewChartIssues}"
-                                ToolTip.Tip="{x:Static res:SharedStrings.ChartIssuesViewToolTip}" />
+                                ToolTip.Tip="{x:Static sres:SharedStrings.ChartIssuesViewToolTip}" />
                     </Grid>
 
                     <TextBlock Classes="section" Text="{Binding MetadataEditor.MetadataHeader}" />
@@ -1140,6 +1168,57 @@
         </DockPanel>
 
         <!-- In front of everything, along the bottom: the tip of whatever's under the pointer, as tall as it needs. -->
-        <ctl:ToolTipStrip x:Name="TipStrip" VerticalAlignment="Bottom" />
-    </Panel>
+        <ctl:ToolTipStrip x:Name="TipStrip" VerticalAlignment="Bottom" Classes.save-bar="{Binding ShowSaveBar}" />
+
+        <!-- The save bar: over the bottom of everything, while the selection has unsaved changes and through their save.
+             It covers the bottom of the spectrum; the details and the tip strip end above it (save-bar, above). Its
+             buttons' tips show in the strip. 45 high, as those styles allow for. -->
+        <Border VerticalAlignment="Bottom"
+                Height="45"
+                IsVisible="{Binding ShowSaveBar}"
+                Background="{DynamicResource ToolbarBrush}"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,8">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0"
+                           Classes="muted"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding SaveBarLabel}" />
+                <Arc Grid.Column="1"
+                     Classes="spinner"
+                     Classes.active="{Binding IsSavingShown}"
+                     IsVisible="{Binding IsSavingShown}"
+                     Width="14" Height="14" StrokeThickness="2"
+                     VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Classes="labelled"
+                        Command="{Binding DiscardCommand}"
+                        ToolTip.ShowOnDisabled="True"
+                        AutomationProperties.Name="{x:Static res:Strings.DiscardButton}">
+                    <ToolTip.Tip>
+                        <ui:TitledToolTip Title="{x:Static res:Strings.DiscardButton}" Description="{x:Static res:Strings.DiscardToolTip}" />
+                    </ToolTip.Tip>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:LineIcon Data="{StaticResource UndoStroke}" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DiscardButton}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3"
+                        Classes="labelled accent"
+                        Command="{Binding SaveCommand}"
+                        ToolTip.ShowOnDisabled="True"
+                        AutomationProperties.Name="{x:Static res:Strings.SaveButton}">
+                    <ToolTip.Tip>
+                        <ui:TitledToolTip Title="{x:Static res:Strings.SaveButton}" Description="{x:Static res:Strings.SaveToolTip}" />
+                    </ToolTip.Tip>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:LineIcon Data="{StaticResource SaveStroke}" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SaveButton}" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

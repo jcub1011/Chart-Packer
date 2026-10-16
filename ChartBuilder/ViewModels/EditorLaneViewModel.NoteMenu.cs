@@ -3,10 +3,10 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charts;
 
 namespace ChartBuilder.ViewModels
 {

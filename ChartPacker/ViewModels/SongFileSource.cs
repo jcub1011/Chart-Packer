@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.IO;
-using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
+using ChartShared.Core.Scanning;
 
 namespace ChartPacker.ViewModels
 {

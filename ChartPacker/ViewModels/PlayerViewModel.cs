@@ -7,19 +7,19 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Threading;
-using ChartPacker.Audio.Mixing;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Audio.Spectrum;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Audio.Mixing;
+using ChartShared.Audio.Playback;
+using ChartShared.Audio.Spectrum;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PreviewStartTime = ChartPacker.Core.Metadata.PreviewStart;
+using PreviewStartTime = ChartShared.Core.Metadata.PreviewStart;
 
 namespace ChartPacker.ViewModels
 {
@@ -130,6 +130,7 @@ namespace ChartPacker.ViewModels
             ShowWaveforms = settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = settings.Settings.ShowSpectrum;
+            AlbumArtTheming = settings.Settings.AlbumArtTheming;
             WaveformFidelity = settings.Settings.WaveformFidelity;
             ScrubStep = settings.Settings.ScrubStep;
             FineScrubMilliseconds = settings.Settings.FineScrubMilliseconds;
@@ -264,6 +265,10 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial bool ShowSpectrum { get; set; }
 
+        /// <summary>Whether the window showing a song takes its colours from its album art. Kept in the settings.</summary>
+        [ObservableProperty]
+        public partial bool AlbumArtTheming { get; set; }
+
         /// <summary>How finely the tracks' waveforms are read; changed, they're read again. Kept in the settings.</summary>
         [ObservableProperty]
         public partial WaveformFidelity WaveformFidelity { get; set; }
@@ -391,6 +396,7 @@ namespace ChartPacker.ViewModels
             ShowWaveforms = _settings.Settings.ShowWaveforms;
             ShowLaneWaveforms = _settings.Settings.ShowLaneWaveforms;
             ShowSpectrum = _settings.Settings.ShowSpectrum;
+            AlbumArtTheming = _settings.Settings.AlbumArtTheming;
             WaveformFidelity = _settings.Settings.WaveformFidelity;
             ScrubStep = _settings.Settings.ScrubStep;
             FineScrubMilliseconds = _settings.Settings.FineScrubMilliseconds;
@@ -1066,6 +1072,8 @@ namespace ChartPacker.ViewModels
             RaiseTracksChanged();
             StartPeaks(entry, [.. Tracks.Select(t => t.Track)]);
         }
+
+        partial void OnAlbumArtThemingChanged(bool value) => _settings.Settings.AlbumArtTheming = value;
 
         partial void OnShowSpectrumChanged(bool value)
         {

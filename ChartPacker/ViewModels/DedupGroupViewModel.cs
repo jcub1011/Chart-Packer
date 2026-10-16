@@ -6,11 +6,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
-using ChartPacker.UI.Formatting;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Scanning;
+using ChartShared.UI.Formatting;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -59,24 +59,24 @@ namespace ChartPacker.ViewModels
 
         public string FullPath => Representative.Entry.FullPath;
 
-        /// <summary>Kind, size and date, and the charter on the Merge tab.</summary>
-        public string DetailText
-        {
-            get
-            {
-                var song = Representative;
-                string kind = song.Entry.Kind == SongEntryKind.SngFile ? Strings.DedupKindSng : Strings.DedupKindFolder;
-                string text = string.Format(
-                    CultureInfo.CurrentCulture,
-                    Strings.DedupMemberDetailFormat,
-                    kind,
-                    ByteSizeFormatter.Format((ulong)song.Stamp.TotalBytes),
-                    song.Stamp.LastWriteTimeUtc.ToLocalTime().ToString("d", CultureInfo.CurrentCulture));
-                if (_group.Tier == DedupTier.MergeCandidate && song.Headline.Charter is { } charter)
-                    text += " · " + string.Format(CultureInfo.CurrentCulture, Strings.DedupCharterFormat, charter);
-                return text;
-            }
-        }
+        public bool IsSng => Representative.Entry.Kind == SongEntryKind.SngFile;
+
+        /// <summary>SNG or FOLDER, as the library's chip says.</summary>
+        public string KindText => IsSng ? Strings.KindSng : Strings.KindFolder;
+
+        public string SizeText => ByteSizeFormatter.Format((ulong)Representative.Stamp.TotalBytes);
+
+        public string ModifiedText => string.Format(
+            CultureInfo.CurrentCulture,
+            Strings.DedupModifiedFormat,
+            Representative.Stamp.LastWriteTimeUtc.ToLocalTime().ToString("d", CultureInfo.CurrentCulture));
+
+        /// <summary>Who charted it, on the Merge tab, where the charts differ.</summary>
+        public string? CharterText => _group.Tier == DedupTier.MergeCandidate && Representative.Headline.Charter is { } charter
+            ? string.Format(CultureInfo.CurrentCulture, Strings.DedupCharterFormat, charter)
+            : null;
+
+        public bool HasCharter => CharterText is not null;
 
         /// <summary>The other copies deleted or kept along with this one.</summary>
         public string CopiesText => string.Format(CultureInfo.CurrentCulture, Strings.DedupCopiesFormat, Identical.Count - 1);
@@ -101,6 +101,12 @@ namespace ChartPacker.ViewModels
 
         /// <summary>Once a group is merged, the merged song is what's kept, so there's no keep button.</summary>
         public bool ShowKeeper => _group.HasKeeperChoice;
+
+        /// <summary>It has a delete button: everywhere but the Merge tab before a merge.</summary>
+        public bool ShowDelete => _group.ShowDeleteChoice;
+
+        /// <summary>It has a keep or a delete button; before a merge, a Merge tab chart has neither.</summary>
+        public bool ShowChoice => ShowKeeper || ShowDelete;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(CanMark))]
@@ -155,6 +161,8 @@ namespace ChartPacker.ViewModels
         internal void RefreshCanMark()
         {
             OnPropertyChanged(nameof(ShowKeeper));
+            OnPropertyChanged(nameof(ShowDelete));
+            OnPropertyChanged(nameof(ShowChoice));
             OnPropertyChanged(nameof(CanMark));
             if (IsMarked && !CanMark)
                 IsMarked = false;
@@ -240,6 +248,26 @@ namespace ChartPacker.ViewModels
             }
         }
 
+        /// <summary>The song's title, or the name of the first copy when it's missing.</summary>
+        public string SongName => Members.Count > 0 && Members[0].Representative is { } song
+            ? song.Headline.Name ?? song.Entry.DisplayName
+            : "";
+
+        public string? Artist => Members.Count > 0 ? Members[0].Representative.Headline.Artist : null;
+
+        /// <summary>What the group's tab holds, shown over its copies.</summary>
+        public string Description => Tier switch
+        {
+            DedupTier.Exact => Strings.DedupExactDescription,
+            DedupTier.SameChart => Strings.DedupSameChartDescription,
+            _ => Strings.DedupMergeDescription,
+        };
+
+        /// <summary>How many copies it has, or on the Merge tab how many charts.</summary>
+        public string SummaryText => Tier == DedupTier.MergeCandidate
+            ? string.Format(CultureInfo.CurrentCulture, Strings.DedupGroupChartsFormat, Members.Count)
+            : string.Format(CultureInfo.CurrentCulture, Strings.DedupGroupCopiesFormat, Members.Sum(m => m.Entries.Count));
+
         public AvaloniaList<DedupMemberViewModel> Members { get; } = [];
 
         public DedupMemberViewModel? Keeper { get; private set; }
@@ -265,18 +293,27 @@ namespace ChartPacker.ViewModels
         /// <summary>Copies can be marked: always, except on the Merge tab before a merge.</summary>
         public bool CanMarkMembers => _owner.CanDelete && (Tier != DedupTier.MergeCandidate || MergedOutput is not null);
 
+        /// <summary>Its copies have delete buttons: everywhere but the Merge tab before a merge.</summary>
+        public bool ShowDeleteChoice => Tier != DedupTier.MergeCandidate || MergedOutput is not null;
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(DeleteLabel))]
+        [NotifyPropertyChangedFor(nameof(HasMarked))]
+        [NotifyPropertyChangedFor(nameof(MarkedText))]
         [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
         public partial int MarkedCount { get; set; }
 
-        /// <summary>The group's own delete button: on the Same chart tab, and on the Merge tab once merged.</summary>
-        public bool ShowGroupDelete => Tier == DedupTier.SameChart || (Tier == DedupTier.MergeCandidate && MergedOutput is not null);
+        public bool HasMarked => MarkedCount > 0;
 
-        public string DeleteLabel => string.Format(
-            CultureInfo.CurrentCulture,
-            MergedOutput is not null ? Strings.DedupDeleteSourcesFormat : Strings.DedupDeleteMarkedFormat,
-            MarkedCount);
+        public string MarkedText => string.Format(CultureInfo.CurrentCulture, Strings.DedupGroupMarkedFormat, MarkedCount);
+
+        /// <summary>The size of the copies marked for deletion.</summary>
+        public long MarkedBytes => Members.Where(m => m.IsMarked).SelectMany(m => m.DeletableEntries).Sum(e => e.Stamp.TotalBytes);
+
+        /// <summary>The group's own delete button, once it's merged: it deletes the sources the merge came from.</summary>
+        public bool ShowGroupDelete => MergedOutput is not null;
+
+        public string DeleteLabel => string.Format(CultureInfo.CurrentCulture, Strings.DedupDeleteSourcesFormat, MarkedCount);
 
         [RelayCommand(CanExecute = nameof(CanDelete))]
         private Task DeleteAsync() => _owner.DeleteGroupAsync(this);
@@ -310,6 +347,8 @@ namespace ChartPacker.ViewModels
             foreach (var member in Members)
                 member.ChooseRepresentative();
             OnPropertyChanged(nameof(Title));
+            OnPropertyChanged(nameof(SongName));
+            OnPropertyChanged(nameof(Artist));
 
             if (!HasKeeperChoice || Members.Count == 0 || (IsKeeperOverridden && Keeper is not null && Members.Contains(Keeper)))
                 return;
@@ -343,6 +382,8 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(MergedText));
             OnPropertyChanged(nameof(CanMarkMembers));
             OnPropertyChanged(nameof(ShowGroupDelete));
+            OnPropertyChanged(nameof(ShowDeleteChoice));
+            OnPropertyChanged(nameof(SummaryText));
             foreach (var member in Members)
                 member.RefreshCanMark();
             RefreshCommands();
@@ -387,6 +428,7 @@ namespace ChartPacker.ViewModels
             {
                 ApplyDefaultKeeper();
                 OnMarksChanged();
+                OnPropertyChanged(nameof(SummaryText));
                 RefreshCommands();
             }
 
@@ -397,6 +439,7 @@ namespace ChartPacker.ViewModels
         internal void OnMarksChanged()
         {
             MarkedCount = Members.Count(m => m.IsMarked);
+            OnPropertyChanged(nameof(MarkedBytes));
             _owner.OnMarksChanged(Tier);
         }
 

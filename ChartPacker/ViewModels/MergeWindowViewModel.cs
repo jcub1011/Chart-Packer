@@ -7,17 +7,18 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Library;
-using ChartPacker.Core.Merging;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Text;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Library;
+using ChartShared.Core.Merging;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Text;
+using ChartShared.UI.Resources;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -29,14 +30,37 @@ namespace ChartPacker.ViewModels
     /// <summary>A part's note count in a merge cell, colored by its difficulty like the inspector's.</summary>
     public sealed record MergeNoteCountItem(ChartDifficulty? Difficulty, string Text);
 
+    /// <summary>
+    /// A part's song.ini difficulty in a merge cell, as a badge in its tier's colour like the inspector's instrument
+    /// badges: the tier, a value set that isn't one as it is, or <c>?</c> when the source doesn't set one.
+    /// </summary>
+    /// <param name="Tier">The tier, 0 and up; <see langword="null"/> when it's missing, unset (negative) or not a whole number.</param>
+    /// <param name="Value">
+    /// A value set that isn't a tier, e.g. <c>4.5</c>, which the merge carries as it is; <see langword="null"/> when there's a
+    /// <paramref name="Tier"/>, or nothing is set.
+    /// </param>
+    public sealed record MergeRating(int? Tier, string? Value = null)
+    {
+        /// <summary>Without a tier's colour: grey, for a difficulty that isn't set or isn't a tier.</summary>
+        public bool IsPlain => Tier is null;
+
+        public string Text => Tier?.ToString(CultureInfo.CurrentCulture) ?? Value ?? SharedStrings.DifficultyUnsetBadge;
+
+        /// <summary>The cell tooltip's line for it, e.g. <c>Difficulty: 4</c>.</summary>
+        public string ToolTipLine => IsPlain && Value is null
+            ? Strings.MergeDifficultyUnset
+            : string.Format(CultureInfo.CurrentCulture, Strings.MergeDifficultyFormat, Text);
+    }
+
     /// <summary>One cell of a merge choice: a source, or leaving the thing out.</summary>
     /// <param name="toolTip">The tooltip, when there's more to it than <see cref="PlainText"/>.</param>
     /// <param name="summary">Compact text shown instead of <paramref name="text"/>, e.g. <c>3 tracks</c> for audio; the full text stays in the tooltip.</param>
     /// <param name="difficultyItems">The cell's difficulty letters, colored like the inspector's; empty outside part rows.</param>
     /// <param name="noteCountItems">The cell's note counts, colored by difficulty like the inspector's; empty outside part rows.</param>
-    /// <param name="warning">What to know about the source, shown under the cell and in its tooltip, e.g. that its chart can't be read.</param>
-    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, string? detail, bool isAvailable, bool isShown = true, string? toolTip = null, string? summary = null,
-        IReadOnlyList<MergeDifficultyItem>? difficultyItems = null, IReadOnlyList<MergeNoteCountItem>? noteCountItems = null, string? warning = null) : ObservableObject
+    /// <param name="warning">What to know about the source, shown as a glyph in the cell and in its tooltip, e.g. that its chart can't be read.</param>
+    /// <param name="rating">A part's song.ini difficulty, as a badge at the end of the cell's top line; <see langword="null"/> outside part rows.</param>
+    public sealed partial class MergeOptionViewModel(MergeChoiceViewModel owner, int? source, string text, bool isAvailable, bool isShown = true, string? toolTip = null, string? summary = null,
+        IReadOnlyList<MergeDifficultyItem>? difficultyItems = null, IReadOnlyList<MergeNoteCountItem>? noteCountItems = null, string? warning = null, MergeRating? rating = null) : ObservableObject
     {
 
         /// <summary>The source it takes from; <see langword="null"/> to leave the thing out.</summary>
@@ -67,9 +91,9 @@ namespace ChartPacker.ViewModels
         /// <summary><see cref="Text"/> without its tags, for the tooltip and screen readers.</summary>
         public string PlainText => RichText.ToPlainText(Text);
 
-        public string? Detail { get; } = detail;
+        public MergeRating? Rating { get; } = rating;
 
-        public bool HasDetail => !string.IsNullOrEmpty(Detail);
+        public bool HasRating => Rating is not null;
 
         public string? Warning { get; } = warning;
 
@@ -154,6 +178,12 @@ namespace ChartPacker.ViewModels
         /// <remarks>Not when no source has the thing: with nothing to include, it's left out without asking.</remarks>
         public bool CanExclude => LeaveOutOption is { IsAvailable: true, IsShown: true } && Options.Any(o => o.Source is not null && o.IsAvailable);
 
+        /// <summary>
+        /// Whether the gutter keeps room for the Include checkbox: on every row with an icon, so the icons line up whether
+        /// or not the row can be left out, and on any row that can be, e.g. a part the catalog doesn't know, which has no icon.
+        /// </summary>
+        public bool HasIncludeSlot => HasRowIcon || CanExclude;
+
         /// <summary>Whether the thing is taken from one of the sources; false leaves it out. Defaults to included.</summary>
         [ObservableProperty]
         public partial bool IsIncluded { get; set; } = true;
@@ -171,6 +201,12 @@ namespace ChartPacker.ViewModels
 
         /// <summary>Nothing is chosen yet, and the row is included, so it still has to be made.</summary>
         public bool ShowNeedsChoice => IsIncluded && NeedsChoice;
+
+        /// <summary>
+        /// The label's tooltip, and the icon's while the label is hidden: the label, and that the row still needs a choice
+        /// while it does, which otherwise only its amber bar and label say, taking no line of their own.
+        /// </summary>
+        public string LabelToolTip => ShowNeedsChoice ? Label + Environment.NewLine + Strings.MergeNeedsChoice : Label;
 
         /// <summary>The user chose, so defaults no longer follow other choices.</summary>
         public bool IsTouched { get; private set; }
@@ -269,6 +305,7 @@ namespace ChartPacker.ViewModels
 
             OnPropertyChanged(nameof(IsExcluded));
             OnPropertyChanged(nameof(ShowNeedsChoice));
+            OnPropertyChanged(nameof(LabelToolTip));
         }
 
         /// <summary>Keeps the Include checkbox with the selection, without feeding back into it.</summary>
@@ -293,6 +330,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(Selected));
             OnPropertyChanged(nameof(NeedsChoice));
             OnPropertyChanged(nameof(ShowNeedsChoice));
+            OnPropertyChanged(nameof(LabelToolTip));
             OnPropertyChanged(nameof(IsExcluded));
             Changed?.Invoke(this);
         }
@@ -300,8 +338,35 @@ namespace ChartPacker.ViewModels
 
     /// <summary>One of the songs being merged: a column of every row.</summary>
     /// <param name="Title">What the song is called where it's named, e.g. in an alignment link.</param>
-    /// <param name="Problem">What to know about the song, shown in its Base chart cell, e.g. that its unsaved edits aren't included.</param>
-    public sealed record MergeSourceViewModel(string Title, string? Problem);
+    /// <param name="Problem">What to know about the song, shown in its header and its Base chart cell, e.g. that its unsaved edits aren't included.</param>
+    /// <param name="IsSng">The song is a <c>.sng</c>, not a folder; its header's chip says which, as the library's does.</param>
+    /// <param name="Charter">Who charted it, as plain text, under its title in the header; <see langword="null"/> when unset.</param>
+    /// <param name="FullPath">Where it is, in its header's tooltip.</param>
+    public sealed record MergeSourceViewModel(string Title, string? Problem, bool IsSng = false, string? Charter = null, string FullPath = "")
+    {
+        public bool HasProblem => !string.IsNullOrEmpty(Problem);
+
+        public string KindText => IsSng ? Strings.KindSng : Strings.KindFolder;
+    }
+
+    /// <summary>A song's column header: what the song is, and how far it moves to line up with the kept audio.</summary>
+    public sealed record MergeSongHeaderViewModel(MergeSourceViewModel Source, MergeAlignmentCellViewModel Alignment);
+
+    /// <summary>What the Merge window's footer says, which sets how it's drawn.</summary>
+    public enum MergeStatusKind
+    {
+        None,
+
+        /// <summary>What still needs choosing before the merge can run.</summary>
+        Hint,
+
+        /// <summary>Why the merge can't run as chosen, e.g. the output exists.</summary>
+        Problem,
+
+        Busy,
+        Done,
+        Error,
+    }
 
     /// <summary>
     /// The merge window: reads the selected songs, offers a choice wherever they differ, and merges
@@ -389,9 +454,13 @@ namespace ChartPacker.ViewModels
         /// <summary>Parts of the preview that didn't come out exactly as their source has them.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasPreviewWarnings))]
+        [NotifyPropertyChangedFor(nameof(PreviewWarningsText))]
         public partial IReadOnlyList<string> PreviewWarnings { get; set; } = [];
 
         public bool HasPreviewWarnings => PreviewWarnings.Count > 0;
+
+        /// <summary>The preview header's warnings button, e.g. <c>2 Warnings</c>.</summary>
+        public string PreviewWarningsText => WarningsCount(PreviewWarnings.Count);
 
         /// <summary>Asks the window to close; true when a song was merged.</summary>
         public event Action<bool>? CloseRequested;
@@ -400,6 +469,9 @@ namespace ChartPacker.ViewModels
         public int ColumnCount => Sources.Count;
 
         public AvaloniaList<MergeSourceViewModel> Sources { get; } = [];
+
+        /// <summary>One header per source, over its column: the song, and its alignment.</summary>
+        public AvaloniaList<MergeSongHeaderViewModel> Headers { get; } = [];
 
         public MergeChoiceViewModel? BaseChoice { get; private set; }
 
@@ -421,12 +493,15 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsReady))]
         [NotifyPropertyChangedFor(nameof(CloseLabel))]
+        [NotifyPropertyChangedFor(nameof(StatusKind))]
+        [NotifyPropertyChangedFor(nameof(StatusText))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         public partial bool IsMerging { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsReady))]
         [NotifyPropertyChangedFor(nameof(CloseLabel))]
+        [NotifyPropertyChangedFor(nameof(MergeLabel))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         public partial bool IsDone { get; set; }
 
@@ -435,6 +510,8 @@ namespace ChartPacker.ViewModels
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasError))]
+        [NotifyPropertyChangedFor(nameof(StatusKind))]
+        [NotifyPropertyChangedFor(nameof(StatusText))]
         public partial string? ErrorMessage { get; set; }
 
         public bool HasError => ErrorMessage is not null;
@@ -442,32 +519,75 @@ namespace ChartPacker.ViewModels
         [ObservableProperty]
         public partial string CharterPreview { get; set; } = "";
 
+        /// <summary>Where the merge will write; a dash while something still needs choosing.</summary>
         [ObservableProperty]
-        public partial string TargetText { get; set; } = "";
+        public partial string TargetText { get; set; } = Strings.MergeUnavailable;
+
+        /// <summary>What still needs choosing before the merge can run, e.g. a part's song.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(StatusKind))]
+        [NotifyPropertyChangedFor(nameof(StatusText))]
+        public partial string? ChoiceHint { get; set; }
 
         /// <summary>Why the merge can't run as chosen, e.g. the output exists and is to be skipped.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasTargetProblem))]
+        [NotifyPropertyChangedFor(nameof(StatusKind))]
+        [NotifyPropertyChangedFor(nameof(StatusText))]
         public partial string? TargetProblem { get; set; }
 
         public bool HasTargetProblem => TargetProblem is not null;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasResult))]
+        [NotifyPropertyChangedFor(nameof(StatusKind))]
+        [NotifyPropertyChangedFor(nameof(StatusText))]
         public partial string? ResultText { get; set; }
 
         public bool HasResult => ResultText is not null;
+
+        /// <summary>
+        /// What the footer's one line says, most pressing first: the merge failed, it's running, it's done, it can't run as
+        /// chosen, or what's still to choose. One line whatever it says, so nothing above it moves.
+        /// </summary>
+        public MergeStatusKind StatusKind =>
+            HasError ? MergeStatusKind.Error
+            : IsMerging ? MergeStatusKind.Busy
+            : HasResult ? MergeStatusKind.Done
+            : HasTargetProblem ? MergeStatusKind.Problem
+            : ChoiceHint is not null ? MergeStatusKind.Hint
+            : MergeStatusKind.None;
+
+        public string? StatusText => StatusKind switch
+        {
+            MergeStatusKind.Error => ErrorMessage,
+            MergeStatusKind.Busy => Strings.MergeMerging,
+            MergeStatusKind.Done => ResultText,
+            MergeStatusKind.Problem => TargetProblem,
+            MergeStatusKind.Hint => ChoiceHint,
+            _ => null,
+        };
 
         /// <summary>The merged <c>.sng</c>, once a song is merged.</summary>
         public string? MergedPath { get; private set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasWarnings))]
+        [NotifyPropertyChangedFor(nameof(WarningsText))]
         public partial IReadOnlyList<string> Warnings { get; set; } = [];
 
         public bool HasWarnings => Warnings.Count > 0;
 
+        /// <summary>The footer's warnings button, e.g. <c>3 Warnings</c>.</summary>
+        public string WarningsText => WarningsCount(Warnings.Count);
+
         public string CloseLabel => IsDone ? Strings.CloseButton : SharedStrings.CancelButton;
+
+        /// <summary>Merge, until it's done; then the button stays where it was, disabled, as Merged.</summary>
+        public string MergeLabel => IsDone ? Strings.MergedButton : Strings.MergeButton;
+
+        private static string WarningsCount(int count) =>
+            count == 1 ? Strings.MergeWarningsOne : string.Format(CultureInfo.CurrentCulture, Strings.MergeWarningsFormat, count);
 
         /// <summary>Reads the songs and builds the choices.</summary>
         public async Task LoadAsync()
@@ -502,16 +622,19 @@ namespace ChartPacker.ViewModels
                 string? problem = s.ChartError is { } error ? string.Format(CultureInfo.CurrentCulture, Strings.MergeChartErrorFormat, error)
                     : i < hasDrafts.Count && hasDrafts[i] ? Strings.MergeUnsavedEdits
                     : null;
-                Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, problem));
+                string? charter = s.Value("charter") is { Length: > 0 } c ? RichText.ToPlainText(c) : null;
+                Sources.Add(new MergeSourceViewModel(s.Headline.Name ?? s.Entry.DisplayName, problem,
+                    s.Entry.Kind == SongEntryKind.SngFile, charter, s.Entry.FullPath));
             }
 
-            BaseChoice = Choice(Strings.MergeBaseLabel, null, i => sources[i].Chart is not null, i => FormatOf(sources[i].Format), null, leaveOut: null,
+            BaseChoice = Choice(Strings.MergeBaseLabel, null, i => sources[i].Chart is not null, i => FormatOf(sources[i].Format), leaveOut: null,
                 icon: MergeRowIcon.Midi, warning: i => Sources[i].Problem);
 
             foreach (var part in analysis.Parts)
             {
-                var row = Choice(ChartLabels.PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), i => RatingOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut,
+                var row = Choice(ChartLabels.PartName(part), part.Id, i => sources[i].HasPart(part.Id), i => DifficultiesOf(sources[i], part.Id), leaveOut: Strings.MergeLeaveOut,
                     counts: i => sources[i].Parts.First(p => p.Part.Id == part.Id).NoteCounts,
+                    rating: i => RatingOf(sources[i], part.Id),
                     difficulties: i => sources[i].Parts.First(p => p.Part.Id == part.Id).Difficulties,
                     glyph: PartGlyphOf(part.Id));
                 var with = analysis.SourcesWith(part.Id);
@@ -520,20 +643,22 @@ namespace ChartPacker.ViewModels
                 Parts.Add(row);
             }
 
-            AudioChoice = Choice(Strings.MergeAudioLabel, null, i => true, i => StemsOf(sources[i]), null, leaveOut: null,
+            AudioChoice = Choice(Strings.MergeAudioLabel, null, i => true, i => StemsOf(sources[i]), leaveOut: null,
                 summary: i => StemsSummaryOf(sources[i]),
                 icon: MergeRowIcon.Waveform);
-            Assets.Add(Choice(Strings.MergeAlbumArtLabel, "album", i => sources[i].AlbumArt is not null, i => sources[i].AlbumArt ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+            Assets.Add(Choice(Strings.MergeAlbumArtLabel, "album", i => sources[i].AlbumArt is not null, i => sources[i].AlbumArt ?? Strings.MergeUnavailable, leaveOut: Strings.MergeNone,
                 icon: MergeRowIcon.AlbumArt));
-            Assets.Add(Choice(Strings.MergeBackgroundLabel, "background", i => sources[i].BackgroundImage is not null, i => sources[i].BackgroundImage ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+            Assets.Add(Choice(Strings.MergeBackgroundLabel, "background", i => sources[i].BackgroundImage is not null, i => sources[i].BackgroundImage ?? Strings.MergeUnavailable, leaveOut: Strings.MergeNone,
                 icon: MergeRowIcon.Background));
-            Assets.Add(Choice(Strings.MergeVideoLabel, "video", i => sources[i].Video is not null, i => sources[i].Video ?? Strings.MergeUnavailable, null, leaveOut: Strings.MergeNone,
+            Assets.Add(Choice(Strings.MergeVideoLabel, "video", i => sources[i].Video is not null, i => sources[i].Video ?? Strings.MergeUnavailable, leaveOut: Strings.MergeNone,
                 icon: MergeRowIcon.Video));
 
             foreach (var conflict in analysis.Conflicts)
-                Metadata.Add(Choice(conflict.Key, conflict.Key, i => true, i => conflict.Values[i] ?? Strings.MergeNotSet, null, leaveOut: null));
+                Metadata.Add(Choice(conflict.Key, conflict.Key, i => true, i => conflict.Values[i] ?? Strings.MergeNotSet, leaveOut: null));
 
             BuildAlignment(analysis);
+            for (int i = 0; i < Sources.Count; i++)
+                Headers.Add(new MergeSongHeaderViewModel(Sources[i], Alignment[i]));
 
             // The audio with the most tracks; the rest follow it until chosen.
             int audio = Enumerable.Range(0, sources.Count)
@@ -553,10 +678,11 @@ namespace ChartPacker.ViewModels
         /// <param name="difficulties">An available cell's charted difficulties, for a part's colored letters.</param>
         /// <param name="glyph">The row's instrument icon, drawn like the inspector's.</param>
         /// <param name="icon">The row's fixed icon: the audio waveform, an art placeholder, or MIDI.</param>
-        /// <param name="warning">What to know about a source, under its cell whether it's available or not.</param>
-        private MergeChoiceViewModel Choice(string label, string? key, Func<int, bool> available, Func<int, string> text, Func<int, string?>? detail, string? leaveOut,
+        /// <param name="warning">What to know about a source, in its cell whether it's available or not.</param>
+        /// <param name="rating">An available cell's song.ini difficulty, for a part's badge.</param>
+        private MergeChoiceViewModel Choice(string label, string? key, Func<int, bool> available, Func<int, string> text, string? leaveOut,
             Func<int, IReadOnlyList<NoteCount>>? counts = null, Func<int, string?>? summary = null, Func<int, IReadOnlyList<ChartDifficulty>>? difficulties = null,
-            DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None, Func<int, string?>? warning = null)
+            DifficultyGlyph? glyph = null, MergeRowIcon icon = MergeRowIcon.None, Func<int, string?>? warning = null, Func<int, MergeRating?>? rating = null)
         {
             var row = new MergeChoiceViewModel(label, key, glyph, icon);
             for (int i = 0; i < Sources.Count; i++)
@@ -564,20 +690,24 @@ namespace ChartPacker.ViewModels
                 bool has = available(i);
                 string shown = has ? text(i) : Strings.MergeUnavailable;
                 var noteCounts = has && counts is not null ? counts(i) : [];
+                var rated = has ? rating?.Invoke(i) : null;
                 bool counted = noteCounts.Count > 0;
-                row.Options.Add(new MergeOptionViewModel(row, i, shown, detail?.Invoke(i), has,
-                    toolTip: counted ? string.Join(Environment.NewLine, [RichText.ToPlainText(shown), .. noteCounts.Select(NoteCountLine)]) : null,
+                row.Options.Add(new MergeOptionViewModel(row, i, shown, has,
+                    toolTip: counted || rated is not null
+                        ? string.Join(Environment.NewLine, [RichText.ToPlainText(shown), .. rated is null ? [] : (string[])[rated.ToolTipLine], .. noteCounts.Select(NoteCountLine)])
+                        : null,
                     summary: has ? summary?.Invoke(i) : null,
                     difficultyItems: has && difficulties is not null
                         ? difficulties(i).Select(d => new MergeDifficultyItem(d, ChartLabels.DifficultyLetter(d))).ToList()
                         : [],
                     noteCountItems: [.. noteCounts.Select(c => new MergeNoteCountItem(c.Difficulty, c.Count.ToString("N0", CultureInfo.CurrentCulture)))],
-                    warning: warning?.Invoke(i)));
+                    warning: warning?.Invoke(i),
+                    rating: rated));
             }
 
             row.Options.Add(leaveOut is null
-                ? new MergeOptionViewModel(row, null, "", null, isAvailable: false, isShown: false)
-                : new MergeOptionViewModel(row, null, leaveOut, null, isAvailable: true));
+                ? new MergeOptionViewModel(row, null, "", isAvailable: false, isShown: false)
+                : new MergeOptionViewModel(row, null, leaveOut, isAvailable: true));
             row.Changed += OnChoiceChanged;
             return row;
         }
@@ -601,6 +731,16 @@ namespace ChartPacker.ViewModels
                 AlignTo(audio);
             }
 
+            OnChoicesChanged();
+        }
+
+        /// <summary>
+        /// The user changed what's merged. A merge that failed did so as it was chosen before, so what it said gives way to
+        /// what there is to know now: what's still to choose, or why it can't run.
+        /// </summary>
+        private void OnChoicesChanged()
+        {
+            ErrorMessage = null;
             Refresh();
         }
 
@@ -755,7 +895,9 @@ namespace ChartPacker.ViewModels
         {
             if (_analysis is { } analysis)
             {
-                CharterPreview = CharterList.Merge(analysis.Sources.Select(s => s.Value("charter")));
+                // The songs whose base chart or parts are taken, as the merge credits them; while something still needs
+                // choosing, as chosen so far.
+                CharterPreview = SongMerger.ChartersOf(analysis, BaseChoice?.Selected?.Source, [.. Parts.Select(row => row.Selected?.Source).OfType<int>()]);
                 if (string.IsNullOrEmpty(CharterPreview))
                     CharterPreview = Strings.MergeNotSet;
             }
@@ -767,18 +909,23 @@ namespace ChartPacker.ViewModels
                 return;
             }
 
+            // Built once for all that follows, as dragging an offset refreshes at every step.
+            var plan = Plan();
+
             // Lining the songs up moves the preview right away, the way dragging a highway offset does; the staging that
             // follows changes nothing shown.
-            PreviewLiveAlignment();
+            PreviewLiveAlignment(plan);
             SchedulePreview();
-            RefreshTarget();
+            RefreshTarget(plan);
         }
 
-        /// <summary>Where the merge will write, and why it can't run as chosen, if it can't.</summary>
-        private void RefreshTarget()
+        /// <summary>Where the merge will write as <paramref name="plan"/>, the plan as chosen, and why it can't run, if it can't.</summary>
+        private void RefreshTarget(SongMergePlan? plan)
         {
             TargetProblem = null;
-            if (Plan() is { } plan)
+            ChoiceHint = null;
+            _hasPlan = plan is not null;
+            if (plan is not null)
             {
                 string preferred = Path.Combine(outputFolder, SongMerger.FileNameFor(SongMerger.BuildMetadata(plan), plan.Analysis.Sources[plan.BaseSource].Entry.DisplayName) + ".sng");
                 string? target = SongMerger.TargetFor(plan, outputFolder, policy);
@@ -796,7 +943,8 @@ namespace ChartPacker.ViewModels
             }
             else
             {
-                TargetText = !Parts.Any() ? Strings.MergeNoParts : Parts.Any(p => p.NeedsChoice) ? Strings.MergeChooseParts : Strings.MergeChooseSomething;
+                TargetText = Strings.MergeUnavailable;
+                ChoiceHint = !Parts.Any() ? Strings.MergeNoParts : Parts.Any(p => p.NeedsChoice) ? Strings.MergeChooseParts : Strings.MergeChooseSomething;
             }
 
             MergeCommand.NotifyCanExecuteChanged();
@@ -808,11 +956,19 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void OnPreviewLyricsChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(LyricsViewModel.HasProblem) && !IsDone && !_closed)
-                RefreshTarget();
+            if (e.PropertyName != nameof(LyricsViewModel.HasProblem) || IsDone || _closed || _analysis is null)
+                return;
+
+            // The offset is the user's change to what's merged, as a choice is; see OnChoicesChanged.
+            ErrorMessage = null;
+            RefreshTarget(Plan());
         }
 
-        private bool CanMerge() => IsReady && TargetProblem is null && Plan() is not null;
+        // Whether there was a plan when RefreshTarget last looked: every change to the choices refreshes it, so CanMerge
+        // needn't build the plan again.
+        private bool _hasPlan;
+
+        private bool CanMerge() => IsReady && TargetProblem is null && _hasPlan;
 
         [RelayCommand(CanExecute = nameof(CanMerge))]
         private async Task MergeAsync()
@@ -1128,11 +1284,22 @@ namespace ChartPacker.ViewModels
         private static string NoteCountLine(NoteCount count) =>
             string.Format(CultureInfo.CurrentCulture, Strings.NoteCountLineFormat, ChartLabels.NoteCountLabel(count), ChartLabels.NoteCountText(count.Count));
 
-        /// <summary>The source's song.ini rating for the part, which comes along with it.</summary>
-        private static string? RatingOf(MergeSource source, string partId) =>
-            source.Parts.FirstOrDefault(p => p.Part.Id == partId) is { Difficulty: { } rating } part && MetadataDifficulty.IsDifficultyKey(part.Part.Keys[0])
-                ? string.Format(CultureInfo.CurrentCulture, Strings.MergeDifficultyFormat, rating)
-                : null;
+        /// <summary>
+        /// The source's song.ini difficulty for the part, which comes along with it; unset when the source doesn't set one.
+        /// A value that isn't a tier, e.g. <c>4.5</c>, is set, as <see cref="MetadataDifficulty.IsUnsetIn"/> has it, and shown
+        /// as it is. <see langword="null"/>, and no badge, for a part whose key isn't a difficulty.
+        /// </summary>
+        /// <remarks>A track the catalog doesn't know, e.g. <c>PART DJ</c>, is a part with no keys, so it has no badge.</remarks>
+        private static MergeRating? RatingOf(MergeSource source, string partId)
+        {
+            if (source.Parts.FirstOrDefault(p => p.Part.Id == partId) is not { Part.Keys: [var key, ..] } part || !MetadataDifficulty.IsDifficultyKey(key))
+                return null;
+
+            string? value = part.Difficulty;
+            int? tier = MetadataDifficulty.TierOf(value);
+            bool other = tier is null && !string.IsNullOrWhiteSpace(value) && !MetadataDifficulty.IsUnset(key, value);
+            return new MergeRating(tier, other ? value : null);
+        }
 
         private static string StemsOf(MergeSource source) =>
             source.AudioFiles.Count == 0 ? Strings.MergeStemsNone : string.Join(", ", source.AudioFiles);

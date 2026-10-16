@@ -1,5 +1,5 @@
-using ChartPacker.Audio.Decoding;
-using ChartPacker.Core.Sng;
+using ChartShared.Audio.Decoding;
+using ChartShared.Core.Sng;
 using Microsoft.Win32.SafeHandles;
 
 namespace DecodeBench;

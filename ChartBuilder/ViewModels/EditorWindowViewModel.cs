@@ -8,16 +8,15 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.Core.Charting.Saving;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.UI;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -169,8 +168,6 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The song's audio as the lanes draw and analyse it (charter-spec C12–C14).</summary>
         public EditorAudio Audio { get; }
-
-        public string VersionText { get; } = string.Format(CultureInfo.CurrentCulture, Strings.VersionFormat, AppVersion.Semantic);
 
         /// <summary>What the Editor has had to say, the latest on the message bar along the bottom of the window.</summary>
         public EditorMessages Messages { get; } = new();

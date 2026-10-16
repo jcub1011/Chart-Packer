@@ -1,6 +1,6 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Input;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Input;
 
 namespace ChartBuilder.Tests.InstrumentInput;
 

@@ -5,19 +5,43 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
-using ChartPacker.Audio.Alignment;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Merging;
 using ChartPacker.Resources;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Audio.Alignment;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Merging;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
-    /// <summary>A link a song can be lined up by, as its cell offers it; or none, for an offset set by hand.</summary>
-    public sealed record MergeAlignmentOptionViewModel(AlignmentChoice? Choice, string Label);
+    /// <summary>
+    /// A link a song can be lined up by, as its header's link menu offers it; or none, for an offset set by hand. The
+    /// menu's items are radio items, checked by <see cref="IsSelected"/>; checking one picks it for the song.
+    /// </summary>
+    /// <param name="groupName">The menu's radio group: its song's, so each song's menu has one item checked.</param>
+    /// <param name="picked">The song's cell, told when the user checks this one.</param>
+    public sealed partial class MergeAlignmentOptionViewModel(AlignmentChoice? choice, string label, string groupName, Action<MergeAlignmentOptionViewModel> picked)
+        : ObservableObject
+    {
+        public AlignmentChoice? Choice { get; } = choice;
+
+        public string Label { get; } = label;
+
+        /// <summary>The menu's radio group: its song's, so each song's menu has one item checked.</summary>
+        public string GroupName { get; } = groupName;
+
+        /// <summary>Checked in the menu: the link the song is lined up by.</summary>
+        [ObservableProperty]
+        public partial bool IsSelected { get; set; }
+
+        partial void OnIsSelectedChanged(bool value)
+        {
+            if (value)
+                picked(this);
+        }
+    }
 
     /// <summary>One song's cell of the alignment row: how far it moves, and what it's lined up by.</summary>
     /// <param name="compare">Opens the window that lines the song up by eye.</param>
@@ -30,6 +54,9 @@ namespace ChartPacker.ViewModels
     {
         // Set while the window shows what it worked out, so that isn't taken for the user's choice.
         private bool _updating;
+
+        // Set while the link menu's checks follow SelectedOption, so that isn't taken for the user checking one.
+        private bool _checking;
 
         public int Source { get; } = source;
 
@@ -77,7 +104,12 @@ namespace ChartPacker.ViewModels
 
         public bool HasWarning => Warning is not null;
 
+        /// <summary>An item for the song's link menu, in its radio group, that picks <paramref name="choice"/> for it when checked.</summary>
+        internal MergeAlignmentOptionViewModel NewOption(AlignmentChoice? choice, string label) =>
+            new(choice, label, "merge-link-" + Source.ToString(CultureInfo.InvariantCulture), OnPicked);
+
         /// <summary>Shows what the window worked out: the links it can be lined up by, the one it is, and how far it moves.</summary>
+        /// <param name="options">The links it can be lined up by, made by <see cref="NewOption"/>.</param>
         internal void Show(IReadOnlyList<MergeAlignmentOptionViewModel> options, AlignmentChoice? choice, int offset, string? linkNote, string? note, string? warning)
         {
             _updating = true;
@@ -106,8 +138,27 @@ namespace ChartPacker.ViewModels
         [RelayCommand]
         private void Compare() => compare(this);
 
+        /// <summary>The user checked <paramref name="option"/> in the link menu.</summary>
+        private void OnPicked(MergeAlignmentOptionViewModel option)
+        {
+            if (!_checking)
+                SelectedOption = option;
+        }
+
         partial void OnSelectedOptionChanged(MergeAlignmentOptionViewModel? value)
         {
+            // The menu checks the link the song is lined up by, whoever chose it.
+            _checking = true;
+            try
+            {
+                foreach (var option in Options)
+                    option.IsSelected = ReferenceEquals(option, value);
+            }
+            finally
+            {
+                _checking = false;
+            }
+
             if (!_updating && value is not null)
                 chosen(this, value.Choice);
         }
@@ -230,9 +281,10 @@ namespace ChartPacker.ViewModels
         /// follows changes nothing shown. Only when lining up is all that's changed since the chart was read; anything else
         /// is staged and read again in place.
         /// </summary>
-        private void PreviewLiveAlignment()
+        /// <param name="plan">The plan as chosen; <see langword="null"/> while something still needs choosing.</param>
+        private void PreviewLiveAlignment(SongMergePlan? plan)
         {
-            if (Plan() is not { } plan || LiveShiftsOf(plan) is not { } shifts)
+            if (plan is null || LiveShiftsOf(plan) is not { } shifts)
                 return;
 
             // The preview's audio and video offsets are its keys' values against what it shows, which this now is.
@@ -312,7 +364,7 @@ namespace ChartPacker.ViewModels
                 return;
 
             ShowAlignment();
-            Refresh();
+            OnChoicesChanged();
         }
 
         /// <summary>
@@ -345,7 +397,7 @@ namespace ChartPacker.ViewModels
             _byHand.Clear();
             AlignmentMessage = null;
             ShowAlignment();
-            Refresh();
+            OnChoicesChanged();
         }
 
         // A chart that can't be read for lining up just isn't lined up by.
@@ -386,7 +438,7 @@ namespace ChartPacker.ViewModels
             }
 
             ShowAlignment();
-            Refresh();
+            OnChoicesChanged();
         }
 
         /// <summary>Asks the window to open the window that lines a song up by eye.</summary>
@@ -470,7 +522,7 @@ namespace ChartPacker.ViewModels
                 _byHand.Add(cell.Source);
 
             ShowAlignment();
-            Refresh();
+            OnChoicesChanged();
         }
 
         /// <summary>Shows each song's offset and link as chosen, and the links each could be lined up by.</summary>
@@ -494,12 +546,12 @@ namespace ChartPacker.ViewModels
                     continue;
                 }
 
-                var options = new List<MergeAlignmentOptionViewModel> { new(null, Strings.MergeAlignmentByHand) };
+                var options = new List<MergeAlignmentOptionViewModel> { cell.NewOption(null, Strings.MergeAlignmentByHand) };
                 foreach (var link in (_links ?? []).Where(l => l.To == cell.Source && SourceAligner.IsLinked(l.From, reference, _choices, new HashSet<int> { cell.Source }, _byHand)))
                 {
                     // A note pattern nothing lines up by isn't worth offering.
                     foreach (var method in link.Methods.Where(m => m != AlignmentMethod.NotePattern || link.Estimate(m).Matched > 0))
-                        options.Add(Option(new AlignmentChoice(link, method)));
+                        options.Add(Option(cell, new AlignmentChoice(link, method)));
                 }
 
                 var choice = _choices.GetValueOrDefault(cell.Source);
@@ -508,7 +560,7 @@ namespace ChartPacker.ViewModels
             }
         }
 
-        private MergeAlignmentOptionViewModel Option(AlignmentChoice choice)
+        private MergeAlignmentOptionViewModel Option(MergeAlignmentCellViewModel cell, AlignmentChoice choice)
         {
             var estimate = choice.Link.Estimate(choice.Method);
             string how = choice.Method switch
@@ -518,7 +570,7 @@ namespace ChartPacker.ViewModels
                 _ => Strings.MergeAlignmentFirstNotes,
             };
             string by = choice.Link.PartId is { } partId ? PartNameOf(partId) : Strings.MergeAlignmentAudioPart;
-            return new MergeAlignmentOptionViewModel(choice, string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentOptionFormat, Sources[choice.Link.From].Title, by, how));
+            return cell.NewOption(choice, string.Format(CultureInfo.CurrentCulture, Strings.MergeAlignmentOptionFormat, Sources[choice.Link.From].Title, by, how));
         }
 
         /// <summary>How far <paramref name="choice"/> moves the song from the one it's lined up with; <see langword="null"/> without a link.</summary>

@@ -1,13 +1,14 @@
 using System;
 using System.Globalization;
 using System.Linq;
-using ChartPacker.Audio.Waveforms;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Settings;
 using ChartPacker.Resources;
-using ChartPacker.UI;
 using ChartPacker.ViewModels;
+using ChartShared.Audio.Waveforms;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Settings;
+using ChartShared.UI;
+using ChartShared.UI.Resources;
 
 namespace ChartPacker.Services
 {
@@ -18,7 +19,7 @@ namespace ChartPacker.Services
     /// <remarks>
     /// Settings are read and written through the view models that own the live values rather than through
     /// <see cref="AppSettings"/> directly. The view models already persist a change and refresh what depends
-    /// on it, so the toolbar and player stay in step with the window. Window layout (pane sizes) isn't listed.
+    /// on it, so the menus and player stay in step with the window. Window layout (pane sizes) isn't listed.
     /// </remarks>
     public static class AppSettingsCatalog
     {
@@ -42,10 +43,11 @@ namespace ChartPacker.Services
             var visualizers = new SettingCategory("playback.visualizers", Strings.SettingsCategoryVisualizers, playback);
             var scrubbing = new SettingCategory("playback.scrubbing", Strings.SettingsCategoryScrubbing, playback);
             var general = new SettingCategory("general", SharedStrings.SettingsCategoryGeneral);
+            var appearance = new SettingCategory("general.appearance", Strings.SettingsCategoryAppearance, general);
             var logging = new SettingCategory("general.logging", SharedStrings.SettingsCategoryLogging, general);
 
             return new SettingsCatalog(
-                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, logging],
+                [libraryCategory, scanning, duplicates, output, packing, downloadsCategory, playback, audio, visualizers, scrubbing, general, appearance, logging],
                 [
                     new IntegerSetting
                     {
@@ -322,6 +324,17 @@ namespace ChartPacker.Services
                         Format = factor => string.Format(CultureInfo.CurrentCulture, Strings.LaneFineScrubFormat, factor),
                         Get = () => player.LaneFineScrubFactor,
                         Set = factor => player.LaneFineScrubFactor = factor,
+                    },
+                    new ToggleSetting
+                    {
+                        Id = "general.albumArtTheme",
+                        Category = appearance,
+                        Label = Strings.AlbumArtThemeLabel,
+                        Description = Strings.AlbumArtThemeDescription,
+                        Keywords = SettingKeywords.Split(Strings.AlbumArtThemeKeywords),
+                        DefaultValue = true,
+                        Get = () => player.AlbumArtTheming,
+                        Set = theme => player.AlbumArtTheming = theme,
                     },
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
                 ]);

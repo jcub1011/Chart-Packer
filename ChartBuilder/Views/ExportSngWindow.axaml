@@ -2,13 +2,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
-        xmlns:sres="using:ChartPacker.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="720"
         x:Class="ChartBuilder.Views.ExportSngWindow"
         x:DataType="vm:ExportSngViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/ChartBuilder.ico"
         Title="{x:Static res:Strings.ExportSngTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
         WindowStartupLocation="CenterOwner"
@@ -20,7 +20,7 @@
     <!-- Export to .sng: a read-only preview of what will be packed, the export location, and what to do
          when the .sng already exists. Nothing is written until Export is chosen. -->
     <Window.Styles>
-        <StyleInclude Source="avares://ChartPacker.UI/Styles/Inspector.axaml" />
+        <StyleInclude Source="avares://ChartShared.UI/Styles/Inspector.axaml" />
         <Style Selector="TextBlock.section-heading">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />

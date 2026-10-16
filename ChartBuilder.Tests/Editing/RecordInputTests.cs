@@ -1,10 +1,10 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Input;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Input;
 using static ChartBuilder.Tests.Editing.EditorSessions;
 using static ChartBuilder.Tests.Playtest.Plays;
-using static ChartPacker.Core.Input.InstrumentAction;
+using static ChartShared.Core.Input.InstrumentAction;
 
 namespace ChartBuilder.Tests.Editing;
 

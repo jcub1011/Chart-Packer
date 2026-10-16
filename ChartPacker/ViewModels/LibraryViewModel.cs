@@ -11,22 +11,35 @@ using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Controls.Selection;
 using Avalonia.Threading;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Jobs;
-using ChartPacker.Core.Launching;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
 using ChartPacker.Resources;
 using ChartPacker.Services;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Jobs;
+using ChartShared.Core.Launching;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ChartPacker.ViewModels
 {
-    /// <summary>An overwrite policy as offered in the policy picker.</summary>
-    public sealed record OverwriteOption(OverwritePolicy Value, string Label);
+    /// <summary>An overwrite policy as offered in the Pack menu's "If the output exists".</summary>
+    public sealed partial class OverwriteOption(OverwritePolicy value, string label, string menuLabel) : ObservableObject
+    {
+        public OverwritePolicy Value { get; } = value;
+
+        /// <summary>Its name in Settings, in sentence case.</summary>
+        public string Label { get; } = label;
+
+        /// <summary>Its name in the Pack menu, in Title Case as menu items are.</summary>
+        public string MenuLabel { get; } = menuLabel;
+
+        /// <summary>It's the policy in use (<see cref="LibraryViewModel.SelectedOverwriteOption"/>): checked in the menu.</summary>
+        [ObservableProperty]
+        public partial bool IsSelected { get; set; }
+    }
 
     /// <summary>The left panel: a picked folder, the song sources found under it, and Pack/Unpack/Merge/Validate/Deduplicate.</summary>
     /// <remarks>
@@ -109,6 +122,9 @@ namespace ChartPacker.ViewModels
         // A job has written to disk since the last scan.
         private bool _outputsChanged;
 
+        // The last scan was stopped before it listed every song it would have found.
+        private bool _scanStoppedShort;
+
         // The item whose art shows a stop button, because it's the song being played.
         private LibraryItemViewModel? _previewingItem;
 
@@ -157,9 +173,9 @@ namespace ChartPacker.ViewModels
 
             OverwriteOptions =
             [
-                new(OverwritePolicy.Skip, Strings.OverwriteSkip),
-                new(OverwritePolicy.Overwrite, Strings.OverwriteOverwrite),
-                new(OverwritePolicy.Rename, Strings.OverwriteRename),
+                new(OverwritePolicy.Skip, Strings.OverwriteSkip, Strings.MenuOverwriteSkip),
+                new(OverwritePolicy.Overwrite, Strings.OverwriteOverwrite, Strings.MenuOverwriteOverwrite),
+                new(OverwritePolicy.Rename, Strings.OverwriteRename, Strings.MenuOverwriteRename),
             ];
             SelectedOverwriteOption = OverwriteOptions.First(o => o.Value == settings.Settings.OverwritePolicy);
             FlatPackOutput = settings.Settings.FlatPackOutput;
@@ -197,8 +213,13 @@ namespace ChartPacker.ViewModels
             Job.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(JobViewModel.IsRunning))
+                {
                     RefreshCommands();
+                    OnPropertyChanged(nameof(SongsFolderToolTip));
+                    OnPropertyChanged(nameof(OutputFolderToolTip));
+                }
             };
+            Job.ShowInLibraryRequested += (_, entry) => ShowInList(entry);
         }
 
         public JobViewModel Job { get; }
@@ -232,23 +253,39 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(UnpackCommand))]
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CancelScanCommand))]
         public partial bool IsScanning { get; set; }
 
         /// <summary>How many songs the scan has found so far.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsScanProgressIndeterminate))]
+        [NotifyPropertyChangedFor(nameof(ScanProgress))]
+        [NotifyPropertyChangedFor(nameof(ScanProgressText))]
         public partial int ScanFound { get; set; }
 
         /// <summary>How many of the songs found have been read and listed.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ScanProgress))]
+        [NotifyPropertyChangedFor(nameof(ScanProgressText))]
         public partial int ScanRead { get; set; }
 
         /// <summary>The scan is still searching folders, so <see cref="ScanFound"/> may grow.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ScanProgressText))]
         public partial bool IsSearching { get; set; }
 
         /// <summary>Nothing has been found yet, so the progress bar can't show how far along the scan is.</summary>
         public bool IsScanProgressIndeterminate => ScanFound == 0;
+
+        /// <summary>How many of the songs found have been read, as a percentage.</summary>
+        public double ScanProgress => ScanFound == 0 ? 0 : 100.0 * ScanRead / ScanFound;
+
+        /// <summary>While scanning, how many of the songs found have been read, and whether folders are still being searched.</summary>
+        public string ScanProgressText => string.Format(
+            CultureInfo.CurrentCulture,
+            IsSearching ? Strings.ScanSearchingProgressFormat : Strings.ScanReadingProgressFormat,
+            ScanRead,
+            ScanFound);
 
         [ObservableProperty]
         public partial string? ErrorMessage { get; set; }
@@ -268,7 +305,11 @@ namespace ChartPacker.ViewModels
         [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
         [NotifyCanExecuteChangedFor(nameof(ValidateCommand))]
         [NotifyCanExecuteChangedFor(nameof(EditChartCommand))]
+        [NotifyPropertyChangedFor(nameof(IsSingleSelection))]
         public partial int SelectedCount { get; set; }
+
+        /// <summary>One song is selected: the right-click menu offers Edit Chart.</summary>
+        public bool IsSingleSelection => SelectedCount == 1;
 
         /// <summary>Max scan depth, set from the Settings window.</summary>
         [ObservableProperty]
@@ -283,49 +324,41 @@ namespace ChartPacker.ViewModels
         /// <summary>A folder is chosen (e.g. restored at launch) but hasn't been scanned yet.</summary>
         public bool ShowNotScanned => FolderPath is not null && !HasScanned && !IsScanning;
 
-        /// <summary>The list was scanned with a different folder or depth than is now selected, or a job has changed the disk since.</summary>
+        /// <summary>
+        /// The list was scanned with a different folder or depth than is now selected, the scan was stopped before it
+        /// listed every song, or a job has changed the disk since.
+        /// </summary>
         public bool IsStale => HasScanned && !IsScanning &&
-            (_outputsChanged || !ScannedFolderIsSelected || _settings.Settings.ScanMaxDepth != _scannedDepth);
+            (_outputsChanged || _scanStoppedShort || !ScannedFolderIsSelected || _settings.Settings.ScanMaxDepth != _scannedDepth);
 
         public bool HasError => ErrorMessage is not null;
 
-        /// <summary>Only when the empty result is for the folder shown; after switching folders the stale banner speaks instead.</summary>
-        public bool ShowEmpty => HasScanned && ScannedFolderIsSelected && !IsScanning && !HasError && _allItems.Count == 0;
+        /// <summary>
+        /// Only when the empty result is for the folder shown, and the scan wasn't stopped before it listed anything;
+        /// otherwise the stale banner speaks instead.
+        /// </summary>
+        public bool ShowEmpty => HasScanned && ScannedFolderIsSelected && !IsScanning && !HasError && !_scanStoppedShort &&
+            _allItems.Count == 0;
 
         public bool ShowCenteredSpinner => IsScanning && _allItems.Count == 0;
 
         /// <summary>Songs were found, but the search or filters hide every one.</summary>
         public bool ShowNoMatches => HasScanned && !HasError && _allItems.Count > 0 && Entries.Count == 0;
 
-        /// <summary>The search box and filter button, once there's a list to narrow down.</summary>
-        public bool ShowFilterBar => HasScanned;
-
         /// <summary>
-        /// The bottom status line, with the progress bar while scanning; hidden while a centered state
-        /// (empty, error) says it instead.
+        /// The song count under the list, once songs are listed; hidden while a centered state (the prompt, not
+        /// scanned, empty, an error, the spinner) says it instead.
         /// </summary>
-        public bool ShowStatus => HasScanned && !HasError && (IsScanning || _allItems.Count > 0);
+        public bool ShowSongCount => HasScanned && !HasError && _allItems.Count > 0;
 
         /// <summary>
-        /// While scanning, how many of the songs found have been read, and how many show while the search or a filter
-        /// may hide some; then the song count, or "shown/total".
+        /// The song count under the list, or "shown/total" while the search or a filter may hide some. It counts the
+        /// songs listed so far while a scan runs; the scan's own progress is <see cref="ScanProgressText"/>.
         /// </summary>
         public string StatusText
         {
             get
             {
-                if (IsScanning)
-                {
-                    string format = (IsSearching, Filter.Query.IsFiltering) switch
-                    {
-                        (true, true) => Strings.ScanSearchingFilteredProgressFormat,
-                        (true, false) => Strings.ScanSearchingProgressFormat,
-                        (false, true) => Strings.ScanReadingFilteredProgressFormat,
-                        (false, false) => Strings.ScanReadingProgressFormat,
-                    };
-                    return string.Format(CultureInfo.CurrentCulture, format, ScanRead, ScanFound, Entries.Count);
-                }
-
                 if (Filter.Query.IsFiltering)
                     return string.Format(CultureInfo.CurrentCulture, Strings.FilteredSongCountFormat, Entries.Count, _allItems.Count);
 
@@ -370,6 +403,12 @@ namespace ChartPacker.ViewModels
 
         private bool CanBrowse() => !Job.IsRunning;
 
+        /// <summary>The title bar's songs folder tooltip: what it does, or while a job runs, why it can't.</summary>
+        public string SongsFolderToolTip => Job.IsRunning ? Strings.BrowseBusyToolTip : Strings.BrowseToolTip;
+
+        /// <summary>The title bar's output folder tooltip: what it does, or while a job runs, why it can't.</summary>
+        public string OutputFolderToolTip => Job.IsRunning ? Strings.BrowseBusyToolTip : Strings.OutputToolTip;
+
         [RelayCommand(CanExecute = nameof(CanBrowse))]
         private async Task BrowseAsync()
         {
@@ -386,6 +425,23 @@ namespace ChartPacker.ViewModels
         /// <summary>Scans the chosen folder. Re-running it mid-scan cancels and restarts.</summary>
         [RelayCommand(CanExecute = nameof(CanRescan))]
         private void Rescan() => _ = StartScan(FolderPath!, _settings.Settings.ScanMaxDepth);
+
+        /// <summary>
+        /// Stops the running scan. The songs read so far are listed, and unless every song had been read, the list
+        /// shows as out of date.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(IsScanning))]
+        private void CancelScan()
+        {
+            _scanCts?.Cancel();
+            if (_scanSink is not { } sink)
+                return;
+
+            ListQueued(sink, Timeout.InfiniteTimeSpan);
+            _scanStoppedShort = !sink.IsLoaded;
+            EndScan(sink, completed: sink.IsLoaded);
+            RefreshState();
+        }
 
         [RelayCommand(CanExecute = nameof(CanBrowse))]
         private async Task BrowseOutputAsync()
@@ -423,6 +479,29 @@ namespace ChartPacker.ViewModels
             int index = Entries.IndexOf(item);
             if (index >= 0)
                 Selection.SelectedIndex = index;
+        }
+
+        /// <summary>
+        /// Selects <paramref name="entry"/>'s song on its own, which scrolls the list to it, as double-clicking its row in
+        /// the job's progress window does. A song the scan no longer has, or the search or filters hide, isn't
+        /// selected; the notice says why.
+        /// </summary>
+        private void ShowInList(SongEntry entry)
+        {
+            if (!_itemsByPath.TryGetValue(entry.FullPath, out var item))
+            {
+                _notice.ShowError(string.Format(CultureInfo.CurrentCulture, Strings.SongNotInLibraryFormat, entry.DisplayName));
+                return;
+            }
+
+            int index = Entries.IndexOf(item);
+            if (index < 0)
+            {
+                _notice.ShowError(string.Format(CultureInfo.CurrentCulture, Strings.SongHiddenByFilterFormat, entry.DisplayName));
+                return;
+            }
+
+            Selection.SelectedIndex = index;
         }
 
         /// <summary>Marks the item whose song is playing, and clears the one that was.</summary>
@@ -688,7 +767,16 @@ namespace ChartPacker.ViewModels
             SyncSelection();
         }
 
-        partial void OnSelectedOverwriteOptionChanged(OverwriteOption value) => _settings.Settings.OverwritePolicy = value.Value;
+        partial void OnSelectedOverwriteOptionChanged(OverwriteOption value)
+        {
+            _settings.Settings.OverwritePolicy = value.Value;
+            foreach (var option in OverwriteOptions)
+                option.IsSelected = option == value;
+        }
+
+        /// <summary>Picks a policy from the Pack menu.</summary>
+        [RelayCommand]
+        private void SelectOverwriteOption(OverwriteOption option) => SelectedOverwriteOption = option;
 
         partial void OnFlatPackOutputChanged(bool value) => _settings.Settings.FlatPackOutput = value;
 
@@ -734,6 +822,7 @@ namespace ChartPacker.ViewModels
             _scannedFolder = folder;
             _scannedDepth = depth;
             _outputsChanged = false;
+            _scanStoppedShort = false;
             Selection.Clear();
             Entries.Clear();
             _allItems.Clear();
@@ -791,17 +880,7 @@ namespace ChartPacker.ViewModels
             if (sink != _scanSink)
                 return;
 
-            var watch = Stopwatch.StartNew();
-            var chunk = new List<LibraryItemViewModel>(ListChunkSize);
-            do
-            {
-                chunk.Clear();
-                while (chunk.Count < ListChunkSize && sink.Songs.TryDequeue(out var song))
-                    chunk.Add(CreateItem(song));
-                if (chunk.Count > 0)
-                    AddItems(chunk);
-            }
-            while (chunk.Count == ListChunkSize && watch.Elapsed < ListBudget);
+            ListQueued(sink, ListBudget);
 
             ScanFound = sink.Found;
             ScanRead = _allItems.Count;
@@ -813,6 +892,22 @@ namespace ChartPacker.ViewModels
                 EndScan(sink, completed: true);
 
             RefreshState();
+        }
+
+        /// <summary>Lists the songs <paramref name="sink"/> has queued, a chunk at a time, until none are left or <paramref name="budget"/> runs out.</summary>
+        private void ListQueued(ScanSink sink, TimeSpan budget)
+        {
+            var watch = Stopwatch.StartNew();
+            var chunk = new List<LibraryItemViewModel>(ListChunkSize);
+            do
+            {
+                chunk.Clear();
+                while (chunk.Count < ListChunkSize && sink.Songs.TryDequeue(out var song))
+                    chunk.Add(CreateItem(song));
+                if (chunk.Count > 0)
+                    AddItems(chunk);
+            }
+            while (chunk.Count == ListChunkSize && (budget == Timeout.InfiniteTimeSpan || watch.Elapsed < budget));
         }
 
         private void EndScan(ScanSink sink, bool completed)
@@ -1062,8 +1157,7 @@ namespace ChartPacker.ViewModels
             OnPropertyChanged(nameof(ShowEmpty));
             OnPropertyChanged(nameof(ShowCenteredSpinner));
             OnPropertyChanged(nameof(ShowNoMatches));
-            OnPropertyChanged(nameof(ShowFilterBar));
-            OnPropertyChanged(nameof(ShowStatus));
+            OnPropertyChanged(nameof(ShowSongCount));
             OnPropertyChanged(nameof(StatusText));
             RefreshOutput();
             RefreshCommands();

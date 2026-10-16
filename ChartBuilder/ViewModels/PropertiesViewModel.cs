@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charts;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -553,11 +553,11 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// Where <paramref name="tick"/> is in the song's measures, e.g. "m41 · beat 3", counting both from 1. It costs no
-        /// more far into the song than near its start (<see cref="ChartPacker.Core.Charting.Editing.MeasureBeat"/>).
+        /// more far into the song than near its start (<see cref="ChartShared.Core.Charting.Editing.MeasureBeat"/>).
         /// </summary>
         internal static string MeasureBeat(TempoMap map, long tick)
         {
-            var at = ChartPacker.Core.Charting.Editing.MeasureBeat.At(map, tick);
+            var at = ChartShared.Core.Charting.Editing.MeasureBeat.At(map, tick);
             return string.Format(CultureInfo.CurrentCulture, Strings.PropertiesMeasureBeatFormat, at.Measure, at.Beat.ToString("0.##", CultureInfo.CurrentCulture));
         }
 

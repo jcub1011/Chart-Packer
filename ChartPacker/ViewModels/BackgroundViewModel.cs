@@ -8,13 +8,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Ffmpeg;
 using ChartPacker.Resources;
-using ChartPacker.UI.Formatting;
-using ChartPacker.UI.ViewModels;
-using ChartPacker.Video;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
+using ChartShared.Ffmpeg;
+using ChartShared.UI.Formatting;
+using ChartShared.UI.Resources;
+using ChartShared.UI.ViewModels;
+using ChartShared.Video;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ChartPacker.ViewModels
@@ -421,7 +422,7 @@ namespace ChartPacker.ViewModels
         private void StartVideo(VideoSource source)
         {
             StopVideo();
-            var playback = new VideoPlayback(source.Open, VideoDecodeWidth);
+            var playback = new VideoPlayback(source.Open, VideoDecodeWidth, source.DisplayName);
             playback.Changed += OnVideoChanged;
             _videoSource = source;
             Video = playback;

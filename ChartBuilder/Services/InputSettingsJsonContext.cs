@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using ChartPacker.Core.Input;
+using ChartShared.Core.Input;
 
 namespace ChartBuilder.Services
 {

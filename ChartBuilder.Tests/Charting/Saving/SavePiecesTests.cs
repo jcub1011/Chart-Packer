@@ -1,7 +1,7 @@
 using System.Text;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Charting.ChartSettingsCommandTests;
 
 namespace ChartBuilder.Tests.Charting.Saving;
@@ -148,7 +148,7 @@ public sealed class SavePiecesTests
     public void RevertingAnImportsDelayMovesTheChartBackAgainstTheAudio()
     {
         var opened = new OpenedSong(
-            new ChartPacker.Core.Scanning.SongEntry(ChartPacker.Core.Scanning.SongEntryKind.SongFolder, @"C:\Song", ".", "Song"),
+            new ChartShared.Core.Scanning.SongEntry(ChartShared.Core.Scanning.SongEntryKind.SongFolder, @"C:\Song", ".", "Song"),
             [],
             ["notes.chart"],
             "notes.chart",

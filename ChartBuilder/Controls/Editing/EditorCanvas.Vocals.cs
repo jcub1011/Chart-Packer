@@ -6,10 +6,10 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Layout;
-using ChartPacker.UI.Controls.Highway;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Layout;
+using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls.Editing
 {

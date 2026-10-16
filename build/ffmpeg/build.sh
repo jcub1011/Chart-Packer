@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the minimal LGPL FFmpeg that ChartPacker.Ffmpeg binds (for video and audio), and copies its
-# shared libraries into ChartPacker.Ffmpeg/runtimes/<rid>/native/, from where they ship beside the executable.
+# Builds the minimal LGPL FFmpeg that ChartShared.Ffmpeg binds (for video and audio), and copies its
+# shared libraries into ChartShared.Ffmpeg/runtimes/<rid>/native/, from where they ship beside the executable.
 #
 # Usage: build/ffmpeg/build.sh [--yes] <rid>
 #   --yes: install missing prerequisites without asking.
@@ -24,7 +24,7 @@ rid="${1:?usage: build.sh [--yes] <rid>}"
 tag="n9.0.2"
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-out="$root/ChartPacker.Ffmpeg/runtimes/$rid/native"
+out="$root/ChartShared.Ffmpeg/runtimes/$rid/native"
 
 # FFmpeg's configure refuses to build out of tree from a path with whitespace in it, so a repo
 # under such a path (C:\Users\First Last\...) builds in /tmp instead; only the result is copied back.

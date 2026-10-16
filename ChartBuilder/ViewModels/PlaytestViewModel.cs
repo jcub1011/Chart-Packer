@@ -5,12 +5,12 @@ using System.Linq;
 using Avalonia.Input;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Playtest;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Input;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Playtest;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Input;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

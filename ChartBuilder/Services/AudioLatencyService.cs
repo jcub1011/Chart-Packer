@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Threading;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Settings;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Settings;
 
 namespace ChartBuilder.Services
 {

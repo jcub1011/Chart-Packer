@@ -4,12 +4,12 @@ using System.Globalization;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.Services;
-using ChartPacker.Audio.Mixing;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Audio.Synthesis;
-using ChartPacker.Core.Calibration;
-using ChartPacker.Core.Settings;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Audio.Mixing;
+using ChartShared.Audio.Playback;
+using ChartShared.Audio.Synthesis;
+using ChartShared.Core.Calibration;
+using ChartShared.Core.Settings;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

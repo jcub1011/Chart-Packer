@@ -1,10 +1,10 @@
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.Core.Charting.Saving;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Scanning;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Recovery;
+using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
 using ChartBuilder.Tests.Charting.Saving;
 using static ChartBuilder.Tests.Charting.ChartSettingsCommandTests;
 using static ChartBuilder.Tests.Charting.Saving.SaveFolders;

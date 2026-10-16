@@ -2,10 +2,11 @@ using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using ChartPacker.Services;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
 {
@@ -13,6 +14,10 @@ namespace ChartPacker.Views
     /// The Merge window. Cancel, Escape or closing the window stops a merge that's running; once a
     /// song is merged the button closes it.
     /// </summary>
+    /// <remarks>
+    /// The song headers are outside the rows' scroll, so they stay as the rows scroll down; they're given the rows'
+    /// width and scrolled sideways with them, so each stays over its column.
+    /// </remarks>
     public partial class MergeWindow : Window
     {
         private ColumnDefinition ChoicesColumn => MergeRoot.ColumnDefinitions[0];
@@ -20,13 +25,14 @@ namespace ChartPacker.Views
         private ColumnDefinition PreviewColumn => MergeRoot.ColumnDefinitions[2];
 
         // The rows' gutter with its labels and with only its icons (the view's "gutter" widths plus their
-        // 8px margins), and the chrome either side of the cells (the table's 1px edges, the rows' 3px bar
-        // and the cells' 4px right margin), in pixels; with one narrowest cell per source this is how
-        // wide the rows have to be to stay readable.
+        // 8px margins), and the chrome either side of the cells (the rows' 3px bar and the cells' 4px right
+        // margin), in pixels; with one narrowest cell per source this is how wide the rows have to be to
+        // stay readable.
         private const double FullGutterWidth = 168;
         private const double CompactGutterWidth = 72;
-        private const double RowChrome = 9;
-        private const double MinCellWidth = 140;
+        private const double RowChrome = 7;
+        // Room in a song's header for its offset box beside the unit, the link menu and Compare.
+        private const double MinCellWidth = 176;
 
         // The labels are hidden once the cells would be narrower than this with them shown, and shown
         // again only some way past it, so a scroll bar coming and going can't flip them back and forth.
@@ -40,6 +46,7 @@ namespace ChartPacker.Views
         public MergeWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             // The splitter position and maximized state are view state, so they're applied and captured here rather than bound.
             Opened += (_, _) =>
             {
@@ -49,7 +56,25 @@ namespace ChartPacker.Views
             };
 
             // Raised when the viewport changes size too, e.g. the splitter moves or the vertical bar appears.
-            LeftScroll.ScrollChanged += (_, _) => FitColumns();
+            LeftScroll.ScrollChanged += (_, _) =>
+            {
+                FitColumns();
+                FollowRows();
+            };
+
+            // Shift+wheel over the headers scrolls them; the rows follow, so they stay lined up. While the headers are still
+            // laid out to an old width, though, an offset of the rows' they couldn't take yet was cut short to fit it: that's
+            // theirs to catch up on, not the rows' to go back to.
+            HeaderScroll.ScrollChanged += (_, e) =>
+            {
+                if (HeaderScroll.Offset.X.Equals(LeftScroll.Offset.X))
+                    return;
+
+                if (!e.ExtentDelta.X.Equals(0) || !HeaderScroll.Extent.Width.Equals(LeftScroll.Extent.Width))
+                    FollowRows();
+                else
+                    LeftScroll.Offset = new Vector(HeaderScroll.Offset.X, LeftScroll.Offset.Y);
+            };
             DataContextChanged += (_, _) =>
             {
                 AttachSources();
@@ -92,8 +117,22 @@ namespace ChartPacker.Views
             if (!width.Equals(_lastWidth))
             {
                 ColumnsPanel.Width = width;
+                HeaderPanel.Width = width;
                 _lastWidth = width;
             }
+
+            // The headers' viewport ends where the rows' does, so both scroll as far. The rows' bars collapse over them, so
+            // this is nothing unless the bars stop doing that and take a strip of their own.
+            double bar = Math.Max(0, LeftScroll.Bounds.Width - viewport);
+            if (!HeaderScroll.Margin.Right.Equals(bar))
+                HeaderScroll.Margin = new Thickness(0, 0, bar, 0);
+        }
+
+        /// <summary>Scrolls the headers sideways with the rows, so each stays over its column.</summary>
+        private void FollowRows()
+        {
+            if (!HeaderScroll.Offset.X.Equals(LeftScroll.Offset.X))
+                HeaderScroll.Offset = new Vector(LeftScroll.Offset.X, 0);
         }
 
         private void AttachSources()
@@ -138,6 +177,7 @@ namespace ChartPacker.Views
         private async Task ShowCompareAsync(MergeCompareViewModel compare)
         {
             var dialog = new MergeCompareWindow { DataContext = compare };
+            WindowChrome.UseOwnerIcon(dialog, this);
             await dialog.ShowDialog(this);
         }
 

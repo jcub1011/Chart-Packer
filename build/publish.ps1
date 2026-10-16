@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Publishes Chart Packer and Chart Builder as Native AOT builds, without debug symbols, to <repo>/publish/<rid>/.
+    Publishes Chart Packer and Chart Builder as Native AOT builds, without debug symbols, to <repo>/publish/<rid>/,
+    with, on Windows, the .sng thumbnail handler (ChartPacker.Thumbnails.dll) the installer registers.
 
 .DESCRIPTION
     The two apps are installed together, so they're published into one folder. Each is published on its
@@ -8,7 +9,8 @@
     Directory.Packages.props ensures for the native libraries, and the script stops if one isn't.
 
     The output holds the executables and every native library they load: SDL3, Avalonia's Skia,
-    HarfBuzz and ANGLE libraries, and FFmpeg. FFmpeg isn't in the repo. If it's missing, or is a
+    HarfBuzz and ANGLE libraries, and FFmpeg. The thumbnail handler is a Native AOT library of its own, which
+    Explorer loads; only its DLL is kept. FFmpeg isn't in the repo. If it's missing, or is a
     build from before the audio decoders were added, the script offers to build it with
     build/ffmpeg/build.sh (see build/ffmpeg/README.md). If you decline, it stops rather than publish
     a build without video preview or with the slower managed audio decoders.
@@ -38,11 +40,14 @@ Set-StrictMode -Version Latest
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 # Each app's project is <repo>/<name>/<name>.csproj, and its executable is named after it.
 $apps = 'ChartPacker', 'ChartBuilder'
+# Explorer's thumbnail handler for .sng files; Windows only. Its project is <repo>/<name>/<name>.csproj too.
+$thumbnails = 'ChartPacker.Thumbnails'
+$isWindowsRuntime = $Runtime -like 'win-*'
 $outputDir = Join-Path $repoRoot "publish/$Runtime"
 $stagingDir = Join-Path $repoRoot "publish/$Runtime.staging"
 
-# ChartPacker.Ffmpeg copies these beside the executables, but only if they're there to copy.
-$ffmpegDir = Join-Path $repoRoot "ChartPacker.Ffmpeg/runtimes/$Runtime/native"
+# ChartShared.Ffmpeg copies these beside the executables, but only if they're there to copy.
+$ffmpegDir = Join-Path $repoRoot "ChartShared.Ffmpeg/runtimes/$Runtime/native"
 
 # Why the FFmpeg in $ffmpegDir can't be published, or $null when it can. Only builds with the audio
 # decoders have swresample, which the Opus decoder needs; without it, audio would play on the managed decoders.
@@ -133,10 +138,29 @@ foreach ($app in $apps) {
     Get-ChildItem $appDir -Recurse -Include '*.pdb', '*.dbg' | Remove-Item -Force
 }
 
-# Merges the apps into one folder. A file both have is copied once, and must be byte-for-byte the same in each:
-# two different copies of a native library can't share a folder.
+$parts = $apps
+if ($isWindowsRuntime) {
+    $thumbnailsDir = Join-Path $stagingDir $thumbnails
+    dotnet publish (Join-Path $repoRoot "$thumbnails/$thumbnails.csproj") `
+        --configuration $Configuration `
+        --runtime $Runtime `
+        --output $thumbnailsDir `
+        -p:DebugType=none `
+        -p:DebugSymbols=false `
+        -p:CopyOutputSymbolsToPublishDirectory=false
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish of $thumbnails failed with exit code $LASTEXITCODE."
+    }
+
+    # A native library's publish also leaves its import library and the like; only the DLL is loaded.
+    Get-ChildItem $thumbnailsDir -Recurse -File | Where-Object Name -ne "$thumbnails.dll" | Remove-Item -Force
+    $parts += $thumbnails
+}
+
+# Merges the apps, and the thumbnail handler, into one folder. A file two have is copied once, and must be
+# byte-for-byte the same in each: two different copies of a native library can't share a folder.
 New-Item -ItemType Directory $outputDir | Out-Null
-foreach ($app in $apps) {
+foreach ($app in $parts) {
     $appDir = Join-Path $stagingDir $app
     foreach ($file in Get-ChildItem $appDir -Recurse -File) {
         $relative = [IO.Path]::GetRelativePath($appDir, $file.FullName)

@@ -1,8 +1,8 @@
 using System;
 using Avalonia.Controls;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
 using ChartPacker.Views;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Services
 {

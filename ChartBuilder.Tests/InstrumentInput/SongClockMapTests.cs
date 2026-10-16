@@ -1,5 +1,5 @@
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Input;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Input;
 
 namespace ChartBuilder.Tests.InstrumentInput;
 

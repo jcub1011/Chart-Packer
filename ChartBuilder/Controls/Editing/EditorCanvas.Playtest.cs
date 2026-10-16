@@ -2,10 +2,10 @@ using System;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using ChartPacker.Core.Charting.Editing;
-using ChartPacker.Core.Charting.Playtest;
-using ChartPacker.Core.Charts;
-using ChartPacker.UI.Controls.Highway;
+using ChartShared.Core.Charting.Editing;
+using ChartShared.Core.Charting.Playtest;
+using ChartShared.Core.Charts;
+using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls.Editing
 {

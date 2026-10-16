@@ -6,10 +6,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using ChartBuilder.Resources;
-using ChartPacker.Audio.Encoding;
-using ChartPacker.Core.Jobs;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.ViewModels;
+using ChartShared.Audio.Encoding;
+using ChartShared.Core.Jobs;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 

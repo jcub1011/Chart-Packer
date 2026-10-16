@@ -1,16 +1,16 @@
 using System.Text;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charting.Saving;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Dedup;
-using ChartPacker.Core.Ini;
-using ChartPacker.Core.Metadata;
-using ChartPacker.Core.Packing;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Sng;
-using ChartPacker.Core.Tests.Isolation;
-using ChartPacker.Core.Validation;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Saving;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Dedup;
+using ChartShared.Core.Ini;
+using ChartShared.Core.Metadata;
+using ChartShared.Core.Packing;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Sng;
+using ChartShared.Core.Tests.Isolation;
+using ChartShared.Core.Validation;
 using static ChartBuilder.Tests.Charting.Saving.SaveFolders;
 
 namespace ChartBuilder.Tests.Charting.Saving;
@@ -259,7 +259,7 @@ public sealed class ChartSaveTests
         Assert.AreNotEqual(stamp, EntryStamps.Capture(path, kind, Token));
         var summary = await SongSummaryReader.ReadAsync(SongOpener.EntryOf(path)!, Token);
         Assert.AreEqual("-1", SongIniValuesOf(summary.Pairs, "diff_bass"));
-        Assert.IsTrue(summary.Chart!.Instruments.HasFlag(ChartPacker.Core.Library.LibraryInstruments.Bass));
+        Assert.IsTrue(summary.Chart!.Instruments.HasFlag(ChartShared.Core.Library.LibraryInstruments.Bass));
     }
 
     // AC C17.1–C17.4.

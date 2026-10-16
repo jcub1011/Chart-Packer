@@ -1,0 +1,229 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ChartShared.UI.ViewModels"
+             xmlns:res="using:ChartShared.UI.Resources"
+             mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="480"
+             x:Class="ChartShared.UI.Views.ChartIssuesView"
+             x:DataType="vm:ChartIssuesViewModel">
+    <!-- A chart's findings (GitHub issue #53), Chart Builder's Findings tab and the chart issues window alike: errors, then
+         warnings, then info, each section under its heading. One virtualizing list, headings among the rows, so only the
+         rows on screen are made, however many findings there are. -->
+
+    <UserControl.Styles>
+        <Style Selector="ListBox.issues">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="6,0,6,8" />
+        </Style>
+        <!-- Rows aren't picked, only acted on: no highlight. -->
+        <Style Selector="ListBox.issues ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <Style Selector="ListBox.issues ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.issues ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.issues ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <!-- A section's heading: its name in its severity's colour, how many it shows, and a hairline to the edge. -->
+        <Style Selector="Border.section">
+            <Setter Property="Padding" Value="10,16,10,6" />
+        </Style>
+        <Style Selector="Border.section TextBlock.title">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="Border.section.warning TextBlock.title">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="Border.section.error TextBlock.title">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+
+        <!-- A finding's row. It's hovered as rows with a right-click menu are. -->
+        <Style Selector="Border.finding">
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.finding:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="TextBlock.message">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="LineHeight" Value="19" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <!-- Pills: the rule's, in its severity's colour, the one loud thing on the row; the track's and the place's quiet. -->
+        <Style Selector="Border.pill">
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="7,1" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Border.pill TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Opacity" Value="0.85" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.pill.place TextBlock">
+            <Setter Property="FontFamily" Value="Consolas, Menlo, monospace" />
+        </Style>
+        <Style Selector="Border.pill.code">
+            <Setter Property="Margin" Value="0,1,0,0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
+        </Style>
+        <Style Selector="Border.pill.code TextBlock">
+            <Setter Property="FontFamily" Value="Consolas, Menlo, monospace" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="Border.pill.code.warning">
+            <Setter Property="BorderBrush" Value="#59FBBF24" />
+            <Setter Property="Background" Value="#1FFBBF24" />
+        </Style>
+        <Style Selector="Border.pill.code.warning TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="Border.pill.code.error">
+            <Setter Property="BorderBrush" Value="#66F87171" />
+            <Setter Property="Background" Value="#24F87171" />
+        </Style>
+        <Style Selector="Border.pill.code.error TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+        </Style>
+
+        <!-- The track pill's dot: the difficulty's colour, as the difficulty badges use. -->
+        <Style Selector="Ellipse.difficulty">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="Height" Value="6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Ellipse.difficulty.easy">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyEasyBrush}" />
+        </Style>
+        <Style Selector="Ellipse.difficulty.medium">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyMediumBrush}" />
+        </Style>
+        <Style Selector="Ellipse.difficulty.hard">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyHardBrush}" />
+        </Style>
+        <Style Selector="Ellipse.difficulty.expert">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyExpertBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <TextBlock Classes="muted"
+                   FontSize="12"
+                   Margin="12"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Text="{x:Static res:SharedStrings.ChartIssuesNone}"
+                   IsVisible="{Binding !HasFindings}" />
+
+        <ListBox Classes="issues"
+                 ItemsSource="{Binding Rows}"
+                 IsVisible="{Binding HasFindings}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 AutomationProperties.Name="{x:Static res:SharedStrings.ChartIssuesListName}">
+            <ListBox.DataTemplates>
+                <DataTemplate DataType="vm:FindingGroup">
+                    <Border Classes="section"
+                            Classes.error="{Binding IsError}"
+                            Classes.warning="{Binding IsWarning}">
+                        <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0" Classes="title" VerticalAlignment="Center" Text="{Binding Title}" />
+                            <TextBlock Grid.Column="1" Classes="muted" FontSize="12" VerticalAlignment="Center" Text="{Binding Count}" />
+                            <Rectangle Grid.Column="2"
+                                       Height="1"
+                                       Margin="4,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Fill="{DynamicResource SubtleBorderBrush}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+                <DataTemplate DataType="vm:FindingItem">
+                    <!-- The rule's pill in a column of its own, so the rules line up down the list; the description beside
+                         it, then the track's and the place's pills under that. Its fixes are on its right-click menu,
+                         filled as the row asks for it (ChartIssuesView.axaml.cs), so they're of the chart as it is then. It
+                         isn't shown where the list can't fix anything. -->
+                    <Border Classes="finding">
+                        <Border.ContextMenu>
+                            <ContextMenu Opening="OnFindingMenuOpening" />
+                        </Border.ContextMenu>
+                        <Grid ColumnDefinitions="76,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+                            <Border Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="0"
+                                    Classes="pill code"
+                                    Classes.error="{Binding IsError}"
+                                    Classes.warning="{Binding IsWarning}">
+                                <TextBlock Text="{Binding RuleId}" />
+                            </Border>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Classes="message" Text="{Binding Message}" />
+                            <WrapPanel Grid.Row="1" Grid.Column="1" ItemSpacing="4" LineSpacing="4">
+                                <Border Classes="pill">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Ellipse Classes="difficulty"
+                                                 Classes.easy="{Binding IsEasy}"
+                                                 Classes.medium="{Binding IsMedium}"
+                                                 Classes.hard="{Binding IsHard}"
+                                                 Classes.expert="{Binding IsExpert}"
+                                                 IsVisible="{Binding HasDifficulty}" />
+                                        <TextBlock Text="{Binding TrackText}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="pill place" IsVisible="{Binding HasPlace}">
+                                    <TextBlock Text="{Binding PlaceText}" />
+                                </Border>
+                            </WrapPanel>
+                            <Button Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="2"
+                                    Classes="labelled"
+                                    FontSize="12"
+                                    VerticalAlignment="Center"
+                                    Content="{x:Static res:SharedStrings.FindingGoToButton}"
+                                    Command="{Binding GoToCommand}"
+                                    IsVisible="{Binding CanGoTo}"
+                                    ToolTip.Tip="{x:Static res:SharedStrings.FindingGoToToolTip}"
+                                    AutomationProperties.Name="{x:Static res:SharedStrings.FindingGoToToolTip}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.DataTemplates>
+        </ListBox>
+
+        <!-- Findings there are, but the search and filter show none of them. Over the list, so its button can be clicked. -->
+        <StackPanel Margin="12"
+                    Spacing="10"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding ShowNoMatches}">
+            <TextBlock Classes="muted"
+                       FontSize="12"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Text="{x:Static res:SharedStrings.ChartIssuesNoMatches}" />
+            <Button HorizontalAlignment="Center"
+                    Content="{x:Static res:SharedStrings.ChartIssuesClearFilters}"
+                    Command="{Binding ClearFiltersCommand}" />
+        </StackPanel>
+    </Panel>
+</UserControl>

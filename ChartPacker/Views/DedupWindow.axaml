@@ -4,143 +4,481 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
+        xmlns:ctl="using:ChartShared.UI.Controls"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="760"
         x:Class="ChartPacker.Views.DedupWindow"
         x:DataType="vm:DedupWindowViewModel"
         Title="{x:Static res:Strings.DedupWindowTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="1100" Height="760"
-        MinWidth="720" MinHeight="460"
+        MinWidth="760" MinHeight="460"
         ShowInTaskbar="False"
+        CanMinimize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterOwner">
 
+    <!-- It can't be minimized: a modal window with no taskbar entry would have nothing to restore it from, leaving its
+         owner disabled. -->
+
+    <Window.Resources>
+        <!-- Behind a copy marked for deletion: the rose of ExcludeTintBrush, fainter, as AccentTintFaintBrush is to the
+             accent. -->
+        <SolidColorBrush x:Key="ExcludeTintFaintBrush" Color="#1FF2587A" />
+    </Window.Resources>
+
     <Window.Styles>
-        <Style Selector="TextBlock.heading">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-        </Style>
-        <Style Selector="TextBlock.description">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Opacity" Value="0.6" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
         <Style Selector="TextBlock.warning">
             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
-        <Style Selector="TextBlock.error">
-            <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
-            <Setter Property="TextWrapping" Value="Wrap" />
+
+        <!-- The category chips: radio buttons, so one is always on, drawn as filter chips (Theme.axaml). Its checked
+             look is for ToggleButton only, so it's repeated here. -->
+        <Style Selector="RadioButton.filterChip">
+            <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
         </Style>
-        <Style Selector="Border.group-card">
+        <Style Selector="RadioButton.filterChip:checked">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="RadioButton.filterChip:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="RadioButton.filterChip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+
+        <!-- Groups: hover and selection as in the library list (tint and a violet bar on the left). The separator is on
+             the row inside the padding, so it's inset from the bar. -->
+        <Style Selector="ListBox.groups">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.groups ListBoxItem">
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.groups ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox.groups ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="ListBox.groups ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+        </Style>
+        <Style Selector="Border.group-row">
+            <Setter Property="Padding" Value="0,9" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+
+        <!-- How many of a group's copies are marked: a chip in the rose of a copy marked for deletion. -->
+        <Style Selector="Border.chip.marked">
+            <Setter Property="Background" Value="{DynamicResource ExcludeTintBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.chip.marked > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ExcludeTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- A copy's details as chips, in a row that wraps. Its kind is in the accent for a .sng, or manila for a
+             folder, as in the library list (LibraryView.axaml). -->
+        <Style Selector="Border.chip.detail">
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="0,2,6,2" />
+        </Style>
+        <Style Selector="Border.chip.sng">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.chip.sng > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Border.chip.folder">
+            <Setter Property="Background" Value="{DynamicResource FolderTintBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.chip.folder > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource FolderTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- One copy in the inspector: a bar on the left, violet for the copy kept, rose for one marked for deletion,
+             with the row faintly tinted to match. The separator is on the outer border, under the whole row. -->
+        <Style Selector="Border.member">
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+        <Style Selector="Border.member-row">
+            <Setter Property="Padding" Value="13,10,16,10" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.member-row.keeper">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
+        </Style>
+        <Style Selector="Border.member-row.marked">
+            <Setter Property="BorderBrush" Value="{DynamicResource ExcludeTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ExcludeTintFaintBrush}" />
+        </Style>
+
+        <!-- A copy's Keep | Delete switch: two flat segments in one outlined group, as the toolbar groups are. Keep is a
+             radio button across the group's copies, so clicking the kept copy's Keep leaves it kept. -->
+        <Style Selector="Border.segments">
             <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="VerticalAlignment" Value="Top" />
         </Style>
-        <Style Selector="Border.member-row.keeper">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Style Selector="RadioButton.segment">
+            <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
         </Style>
-        <Style Selector="Border.member-row">
+        <Style Selector=":is(ToggleButton).segment">
+            <Setter Property="MinWidth" Value="56" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="10,3" />
             <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
         </Style>
-        <Style Selector="Expander">
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Style Selector=":is(ToggleButton).segment:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector=":is(ToggleButton).segment:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="RadioButton.segment:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.segment:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ExcludeTintBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ExcludeTextBrush}" />
         </Style>
     </Window.Styles>
 
     <Window.DataTemplates>
-        <!-- One copy (or variant, or chart): keep it, or mark it for deletion. -->
+        <!-- One copy (or variant, or chart): its Keep | Delete switch, then where it is, what it is, and how it differs
+             from the copy kept. -->
         <DataTemplate DataType="vm:DedupMemberViewModel">
-            <Border Classes="member-row" Classes.keeper="{Binding IsKeeper}">
-                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-                    <RadioButton Grid.Column="0"
-                                 VerticalAlignment="Top"
-                                 GroupName="{Binding GroupName}"
-                                 IsChecked="{Binding IsKeeper}"
-                                 IsVisible="{Binding ShowKeeper}"
-                                 Content="{x:Static res:Strings.DedupKeep}"
-                                 AutomationProperties.Name="{x:Static res:Strings.DedupKeep}" />
-                    <CheckBox Grid.Column="1"
-                              VerticalAlignment="Top"
-                              IsChecked="{Binding IsMarked}"
-                              IsEnabled="{Binding CanMark}"
-                              Content="{x:Static res:Strings.DedupDelete}"
-                              AutomationProperties.Name="{x:Static res:Strings.DedupDelete}" />
-                    <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                        <SelectableTextBlock Text="{Binding Path}" FontWeight="SemiBold" TextWrapping="Wrap" ToolTip.Tip="{Binding FullPath}" />
-                        <WrapPanel Orientation="Horizontal">
-                            <TextBlock Classes="muted" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Text="{Binding DetailText}" />
-                            <TextBlock Classes="muted" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Text="{Binding CopiesText}" IsVisible="{Binding HasCopies}" />
-                            <TextBlock Classes="muted" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Text="{Binding OtherVersionsText}" IsVisible="{Binding HasOtherVersions}" />
-                            <Border Classes="chip" Margin="0,0,6,0" IsVisible="{Binding HasSuffix}">
-                                <TextBlock Text="{x:Static res:Strings.DedupTagSuffix}" />
-                            </Border>
-                            <Border Classes="chip" Margin="0,0,6,0" IsVisible="{Binding HasDrafts}">
-                                <TextBlock Text="{x:Static res:Strings.DedupTagUnsaved}" />
-                            </Border>
-                            <Border Classes="chip" Margin="0,0,6,0" IsVisible="{Binding HasExtras}">
-                                <TextBlock Text="{Binding ExtrasText}" />
-                            </Border>
-                        </WrapPanel>
-                        <TextBlock FontSize="12" TextWrapping="Wrap" Opacity="0.85" Text="{Binding DifferenceText}" IsVisible="{Binding HasDifference}" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-        </DataTemplate>
-
-        <!-- A group: its title, its own buttons, and its copies. -->
-        <DataTemplate DataType="vm:DedupGroupViewModel">
-            <Border Classes="group-card">
-                <StackPanel Spacing="6">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <TextBlock Grid.Column="0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                            <Button Content="{x:Static res:Strings.DedupOpenInMerge}"
-                                    Command="{Binding OpenInMergeCommand}"
-                                    IsVisible="{Binding ShowOpenInMerge}"
-                                    AutomationProperties.Name="{x:Static res:Strings.DedupOpenInMerge}" />
-                            <Button Content="{Binding DeleteLabel}"
-                                    Command="{Binding DeleteCommand}"
-                                    IsVisible="{Binding ShowGroupDelete}"
-                                    AutomationProperties.Name="{Binding DeleteLabel}" />
+            <Border Classes="member">
+                <Border Classes="member-row" Classes.keeper="{Binding IsKeeper}" Classes.marked="{Binding IsMarked}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                        <Border Grid.Column="0" Classes="segments" IsVisible="{Binding ShowChoice}">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <RadioButton Classes="segment"
+                                             GroupName="{Binding GroupName}"
+                                             IsChecked="{Binding IsKeeper}"
+                                             IsVisible="{Binding ShowKeeper}"
+                                             Content="{x:Static res:Strings.DedupKeep}"
+                                             AutomationProperties.Name="{x:Static res:Strings.DedupKeep}" />
+                                <ToggleButton Classes="segment"
+                                              IsChecked="{Binding IsMarked}"
+                                              IsEnabled="{Binding CanMark}"
+                                              IsVisible="{Binding ShowDelete}"
+                                              Content="{x:Static res:Strings.DedupDelete}"
+                                              AutomationProperties.Name="{x:Static res:Strings.DedupDelete}" />
+                            </StackPanel>
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                            <SelectableTextBlock Text="{Binding Path}" FontWeight="SemiBold" TextWrapping="Wrap" ToolTip.Tip="{Binding FullPath}" />
+                            <!-- What it is as chips: its kind (coloured as in the library), size, charter on the Merge tab,
+                                 date, then any tags; then the copies that go with it. -->
+                            <WrapPanel Orientation="Horizontal">
+                                <Border Classes="chip large detail" Classes.sng="{Binding IsSng}" Classes.folder="{Binding !IsSng}">
+                                    <TextBlock Text="{Binding KindText}" />
+                                </Border>
+                                <Border Classes="chip large detail">
+                                    <TextBlock Text="{Binding SizeText}" />
+                                </Border>
+                                <Border Classes="chip large detail" IsVisible="{Binding HasCharter}">
+                                    <TextBlock Text="{Binding CharterText}" />
+                                </Border>
+                                <Border Classes="chip large detail">
+                                    <TextBlock Text="{Binding ModifiedText}" />
+                                </Border>
+                                <Border Classes="chip large detail" IsVisible="{Binding HasSuffix}">
+                                    <TextBlock Text="{x:Static res:Strings.DedupTagSuffix}" />
+                                </Border>
+                                <Border Classes="chip large detail" IsVisible="{Binding HasDrafts}">
+                                    <TextBlock Text="{x:Static res:Strings.DedupTagUnsaved}" />
+                                </Border>
+                                <Border Classes="chip large detail" IsVisible="{Binding HasExtras}">
+                                    <TextBlock Text="{Binding ExtrasText}" />
+                                </Border>
+                            </WrapPanel>
+                            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding CopiesText}" IsVisible="{Binding HasCopies}" />
+                            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding OtherVersionsText}" IsVisible="{Binding HasOtherVersions}" />
+                            <TextBlock FontSize="12" TextWrapping="Wrap" Opacity="0.85" Text="{Binding DifferenceText}" IsVisible="{Binding HasDifference}" />
                         </StackPanel>
                     </Grid>
-                    <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding MergedText}" IsVisible="{Binding HasMerged}" />
-                    <ItemsControl ItemsSource="{Binding Members}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Spacing="2" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                </StackPanel>
+                </Border>
             </Border>
-        </DataTemplate>
-
-        <DataTemplate DataType="vm:DedupResultRow">
-            <Grid ColumnDefinitions="*,2*" ColumnSpacing="10" Margin="0,2">
-                <TextBlock Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" />
-                <TextBlock Grid.Column="1" TextWrapping="Wrap" Classes.warning="{Binding IsProblem}" Text="{Binding Status}" />
-            </Grid>
         </DataTemplate>
     </Window.DataTemplates>
 
-    <Grid RowDefinitions="Auto,*,Auto">
-        <!-- What's kept by default, and anything stopping deletes. -->
-        <Border Grid.Row="0" Classes="toolbar" BorderThickness="0,0,0,1">
-            <StackPanel Spacing="6">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DedupKeepLabel}" />
-                    <ComboBox MinWidth="140"
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <!-- The title bar, as the main window's is, over the comparison's progress: the icon (the owner's, set in code)
+             and the title. Layered: the progress, then the title bar, see-through so the progress shows. -->
+        <Panel Grid.Row="0" Height="31">
+            <ProgressBar Classes="fill"
+                         Margin="0,0,0,1"
+                         Minimum="0" Maximum="100"
+                         Value="{Binding ProgressValue}"
+                         IsIndeterminate="{Binding IsProgressIndeterminate}"
+                         IsVisible="{Binding IsAnalyzing}"
+                         IsHitTestVisible="False"
+                         AutomationProperties.Name="{Binding ProgressText}" />
+
+            <ctl:TitleBar x:Name="WindowTitleBar"
+                          Background="Transparent"
+                          BorderThickness="0,0,0,1"
+                          BorderBrush="{DynamicResource SubtleBorderBrush}"
+                          AppName="{x:Static res:Strings.AppName}">
+                <TextBlock Margin="8,0,12,0"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{x:Static res:Strings.DedupWindowTitle}" />
+            </ctl:TitleBar>
+        </Panel>
+
+        <!-- Search, then a chip per category, as the library's search strip is. The chips pick which category's groups
+             are listed; each one's tooltip says what it holds. -->
+        <Border Grid.Row="1"
+                Padding="6"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                IsEnabled="{Binding IsLoaded}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Grid.Column="0"
+                         Classes="clearButton"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding SearchText}"
+                         PlaceholderText="{x:Static res:Strings.DedupSearchWatermark}"
+                         AutomationProperties.Name="{x:Static res:Strings.DedupSearchWatermark}">
+                    <TextBox.InnerLeftContent>
+                        <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                    </TextBox.InnerLeftContent>
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <RadioButton Classes="filterChip"
+                                 GroupName="dedup-category"
+                                 IsChecked="{Binding IsExactShown}"
+                                 Content="{Binding ExactHeader}"
+                                 ToolTip.Tip="{x:Static res:Strings.DedupExactDescription}"
+                                 AutomationProperties.Name="{Binding ExactHeader}" />
+                    <RadioButton Classes="filterChip"
+                                 GroupName="dedup-category"
+                                 IsChecked="{Binding IsSameChartShown}"
+                                 Content="{Binding SameChartHeader}"
+                                 ToolTip.Tip="{x:Static res:Strings.DedupSameChartDescription}"
+                                 AutomationProperties.Name="{Binding SameChartHeader}" />
+                    <RadioButton Classes="filterChip"
+                                 GroupName="dedup-category"
+                                 IsChecked="{Binding IsMergeShown}"
+                                 Content="{Binding MergeHeader}"
+                                 ToolTip.Tip="{x:Static res:Strings.DedupMergeDescription}"
+                                 AutomationProperties.Name="{Binding MergeHeader}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Anything stopping deletes. -->
+        <StackPanel Grid.Row="2" Margin="6,6,6,0" Spacing="6">
+            <StackPanel.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="TrashUnavailable" />
+                    <Binding Path="HasError" />
+                </MultiBinding>
+            </StackPanel.IsVisible>
+            <Border Classes="banner" IsVisible="{Binding TrashUnavailable}">
+                <TextBlock Classes="warning" FontSize="12" Text="{x:Static res:Strings.DedupTrashUnsupported}" />
+            </Border>
+            <Border Classes="banner error" IsVisible="{Binding HasError}">
+                <SelectableTextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding ErrorMessage}" />
+            </Border>
+        </StackPanel>
+
+        <!-- While the library is compared: what it's doing. The title bar shows how far it's got. -->
+        <StackPanel Grid.Row="3"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MaxWidth="460"
+                    Margin="16"
+                    Spacing="10"
+                    IsVisible="{Binding IsAnalyzing}">
+            <Arc Classes="spinner active" Width="20" Height="20" StrokeThickness="2" HorizontalAlignment="Center" />
+            <TextBlock Classes="muted centered" TextWrapping="Wrap" Text="{Binding ProgressText}" />
+        </StackPanel>
+
+        <!-- The shown category's groups on the left, the selected group's copies on the right. -->
+        <Grid Grid.Row="3" IsVisible="{Binding IsLoaded}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340" MinWidth="260" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="380" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}">
+                <DockPanel>
+                    <!-- Songs that couldn't be compared, listed in a flyout. -->
+                    <Border DockPanel.Dock="Bottom"
+                            Padding="6,4"
+                            BorderThickness="0,1,0,0"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}"
+                            IsVisible="{Binding HasSkipped}">
+                        <Button Classes="title-link" HorizontalAlignment="Left">
+                            <TextBlock Classes="warning" FontSize="12" Text="{Binding SkippedHeader}" />
+                            <Button.Flyout>
+                                <Flyout Placement="TopEdgeAlignedLeft">
+                                    <ScrollViewer Width="520" MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding Skipped}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <TextBlock FontSize="12" Margin="0,2" TextWrapping="Wrap" Text="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </Border>
+
+                    <Panel>
+                        <ListBox Classes="groups"
+                                 ItemsSource="{Binding ShownGroups}"
+                                 SelectedItem="{Binding SelectedGroup}"
+                                 AutomationProperties.Name="{x:Static res:Strings.DedupWindowTitle}">
+                            <ListBox.ItemTemplate>
+                                <!-- A group, as a library row: the title, with what's marked or merged on the right; then
+                                     the artist, with how many copies on the right. -->
+                                <DataTemplate x:DataType="vm:DedupGroupViewModel">
+                                    <Border Classes="group-row">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+                                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip.Tip="{Binding Title}"
+                                                       Text="{Binding SongName}" />
+                                            <!-- Small chips, as on the library's title line, so they fit inside the title's
+                                                 line and showing one doesn't make the row taller. -->
+                                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                                <Border Classes="chip" IsVisible="{Binding HasMerged}">
+                                                    <TextBlock Text="{x:Static res:Strings.DedupTagMerged}" />
+                                                </Border>
+                                                <Border Classes="chip marked" IsVisible="{Binding HasMarked}">
+                                                    <TextBlock Text="{Binding MarkedText}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                                       Classes="muted"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding Artist}" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                                       Classes="muted"
+                                                       FontSize="12"
+                                                       HorizontalAlignment="Right"
+                                                       Text="{Binding SummaryText}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Classes="muted centered"
+                                   VerticalAlignment="Center"
+                                   Margin="16"
+                                   TextWrapping="Wrap"
+                                   IsHitTestVisible="False"
+                                   Text="{Binding ShownEmptyText}"
+                                   IsVisible="{Binding HasNoShown}" />
+                    </Panel>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter Grid.Column="1"
+                          Width="1"
+                          Background="{DynamicResource SubtleBorderBrush}"
+                          ResizeDirection="Columns" />
+
+            <!-- The selected group: its song and what its category holds, its actions, then its copies. -->
+            <Panel Grid.Column="2">
+                <TextBlock Classes="muted centered"
+                           VerticalAlignment="Center"
+                           Margin="16"
+                           Text="{x:Static res:Strings.DedupNoSelection}"
+                           IsVisible="{Binding ShowNoSelection}" />
+
+                <Panel IsVisible="{Binding HasSelection}">
+                    <DockPanel DataContext="{Binding SelectedGroup}" x:DataType="vm:DedupGroupViewModel">
+                        <Border DockPanel.Dock="Top"
+                                Padding="16,12"
+                                BorderThickness="0,0,0,1"
+                                BorderBrush="{DynamicResource SubtleBorderBrush}">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <SelectableTextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Title}" />
+                                        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding Description}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                        <Button Classes="labelled"
+                                                Content="{x:Static res:Strings.DedupOpenInMerge}"
+                                                Command="{Binding OpenInMergeCommand}"
+                                                IsVisible="{Binding ShowOpenInMerge}"
+                                                AutomationProperties.Name="{x:Static res:Strings.DedupOpenInMerge}" />
+                                        <Button Classes="labelled accent"
+                                                Content="{Binding DeleteLabel}"
+                                                Command="{Binding DeleteCommand}"
+                                                IsVisible="{Binding ShowGroupDelete}"
+                                                AutomationProperties.Name="{Binding DeleteLabel}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Border Classes="banner" IsVisible="{Binding HasMerged}">
+                                    <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding MergedText}" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Members}" />
+                        </ScrollViewer>
+                    </DockPanel>
+                </Panel>
+            </Panel>
+        </Grid>
+
+        <!-- Which copy is kept by default; what's marked on the shown category, or the deletion and what it did; then
+             the shown category's actions and Close (Cancel while comparing, Stop while deleting). -->
+        <Border Grid.Row="4" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="caption" VerticalAlignment="Center" Text="{x:Static res:Strings.DedupKeepByDefaultLabel}" />
+                    <ComboBox MinWidth="120"
+                              VerticalAlignment="Center"
                               ItemsSource="{Binding KeepOptions}"
                               SelectedItem="{Binding SelectedKeepOption}"
                               IsEnabled="{Binding IsReady}"
                               ToolTip.Tip="{x:Static res:Strings.DedupKeepDescription}"
-                              AutomationProperties.Name="{x:Static res:Strings.DedupKeepLabel}">
+                              AutomationProperties.Name="{x:Static res:Strings.DedupKeepByDefaultLabel}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:DedupKeepOption">
                                 <TextBlock Text="{Binding Label}" />
@@ -148,141 +486,55 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
                 </StackPanel>
-                <TextBlock Classes="warning" Text="{x:Static res:Strings.DedupTrashUnsupported}" IsVisible="{Binding TrashUnavailable}" />
-                <TextBlock Classes="error" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" />
-            </StackPanel>
-        </Border>
 
-        <Panel Grid.Row="1">
-            <StackPanel HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Width="420"
-                        Spacing="8"
-                        IsVisible="{Binding IsAnalyzing}">
-                <TextBlock HorizontalAlignment="Center" Text="{Binding ProgressText}" />
-                <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressValue}" IsIndeterminate="{Binding IsProgressIndeterminate}" />
-            </StackPanel>
-
-            <DockPanel IsVisible="{Binding IsLoaded}">
-                <Expander DockPanel.Dock="Bottom" Margin="16,0,16,8" IsVisible="{Binding HasSkipped}">
-                    <Expander.Header>
-                        <TextBlock Classes="warning" Text="{Binding SkippedHeader}" />
-                    </Expander.Header>
-                    <ScrollViewer MaxHeight="140" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl ItemsSource="{Binding Skipped}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="x:String">
-                                    <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding}" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Expander>
-
-                <TabControl Margin="8,4,8,0">
-                    <TabItem Header="{Binding ExactHeader}">
-                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="8,8,8,16" Spacing="10">
-                                <TextBlock Classes="description" Text="{x:Static res:Strings.DedupExactDescription}" />
-                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoExact}">
-                                    <Button Content="{x:Static res:Strings.DedupMarkAll}"
-                                            Command="{Binding MarkAllCommand}"
-                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkAll}" />
-                                    <Button Classes="accent"
-                                            Content="{Binding DeleteMarkedLabel}"
-                                            Command="{Binding DeleteExactCommand}"
-                                            AutomationProperties.Name="{Binding DeleteMarkedLabel}" />
-                                </StackPanel>
-                                <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoExact}" IsVisible="{Binding HasNoExact}" />
-                                <ItemsControl ItemsSource="{Binding ExactGroups}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Spacing="8" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <TabItem Header="{Binding SameChartHeader}">
-                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="8,8,8,16" Spacing="10">
-                                <TextBlock Classes="description" Text="{x:Static res:Strings.DedupSameChartDescription}" />
-                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoSameChart}">
-                                    <Button Content="{x:Static res:Strings.DedupMarkMerged}"
-                                            Command="{Binding MarkMergedSameChartCommand}"
-                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkMerged}" />
-                                    <Button Classes="accent"
-                                            Content="{Binding SameChartDeleteMarkedLabel}"
-                                            Command="{Binding DeleteSameChartCommand}"
-                                            AutomationProperties.Name="{Binding SameChartDeleteMarkedLabel}" />
-                                </StackPanel>
-                                <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoSameChart}" IsVisible="{Binding HasNoSameChart}" />
-                                <ItemsControl ItemsSource="{Binding SameChartGroups}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Spacing="8" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <TabItem Header="{Binding MergeHeader}">
-                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="8,8,8,16" Spacing="10">
-                                <TextBlock Classes="description" Text="{x:Static res:Strings.DedupMergeDescription}" />
-                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasNoMerge}">
-                                    <Button Content="{x:Static res:Strings.DedupMarkMerged}"
-                                            Command="{Binding MarkMergedMergeCommand}"
-                                            AutomationProperties.Name="{x:Static res:Strings.DedupMarkMerged}" />
-                                    <Button Classes="accent"
-                                            Content="{Binding MergeDeleteMarkedLabel}"
-                                            Command="{Binding DeleteMergeCommand}"
-                                            AutomationProperties.Name="{Binding MergeDeleteMarkedLabel}" />
-                                </StackPanel>
-                                <TextBlock Classes="muted" Text="{x:Static res:Strings.DedupNoMerge}" IsVisible="{Binding HasNoMerge}" />
-                                <ItemsControl ItemsSource="{Binding MergeGroups}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Spacing="8" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-                </TabControl>
-            </DockPanel>
-        </Panel>
-
-        <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsDeleting}">
                         <Arc Classes="spinner active" Width="14" Height="14" StrokeThickness="2" />
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.DedupDeleting}" />
+                        <TextBlock FontSize="12" VerticalAlignment="Center" Text="{x:Static res:Strings.DedupDeleting}" />
                     </StackPanel>
-                    <Expander IsVisible="{Binding HasResults}">
-                        <Expander.Header>
-                            <TextBlock FontWeight="SemiBold" Text="{Binding ResultSummary}" />
-                        </Expander.Header>
-                        <ScrollViewer MaxHeight="160" HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding Results}" />
-                        </ScrollViewer>
-                    </Expander>
+                    <TextBlock Classes="muted"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Text="{Binding MarkedSummaryText}"
+                               IsVisible="{Binding HasShownMarked}" />
+                    <Button Classes="title-link" IsVisible="{Binding HasResults}">
+                        <TextBlock FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding ResultSummary}" />
+                        <Button.Flyout>
+                            <Flyout Placement="TopEdgeAlignedLeft">
+                                <ScrollViewer Width="560" MaxHeight="360" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding Results}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:DedupResultRow">
+                                                <Grid ColumnDefinitions="*,2*" ColumnSpacing="10" Margin="0,2">
+                                                    <TextBlock Grid.Column="0" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" />
+                                                    <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap" Classes.warning="{Binding IsProblem}" Text="{Binding Status}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
 
-                <Button Grid.Column="1"
-                        MinWidth="80"
-                        VerticalAlignment="Bottom"
-                        HorizontalContentAlignment="Center"
-                        Content="{Binding CloseLabel}"
-                        Command="{Binding CloseCommand}"
-                        IsCancel="True"
-                        AutomationProperties.Name="{Binding CloseLabel}" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding MarkShownLabel}"
+                            Command="{Binding MarkShownCommand}"
+                            IsVisible="{Binding IsLoaded}"
+                            AutomationProperties.Name="{Binding MarkShownLabel}" />
+                    <Button Classes="accent"
+                            Content="{Binding DeleteShownLabel}"
+                            Command="{Binding DeleteShownCommand}"
+                            IsVisible="{Binding IsLoaded}"
+                            AutomationProperties.Name="{Binding DeleteShownLabel}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{Binding CloseLabel}"
+                            Command="{Binding CloseCommand}"
+                            IsCancel="True"
+                            AutomationProperties.Name="{Binding CloseLabel}" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

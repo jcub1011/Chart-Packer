@@ -41,23 +41,14 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="InputLabel" xml:space="preserve">
-    <value>Input</value>
-  </data>
   <data name="BrowseDialogTitle" xml:space="preserve">
-    <value>Choose a folder of songs</value>
-  </data>
-  <data name="BrowseButton" xml:space="preserve">
-    <value>Songs folder</value>
+    <value>Choose a Folder of Songs</value>
   </data>
   <data name="BrowseToolTip" xml:space="preserve">
     <value>Choose the folder to search for songs</value>
   </data>
   <data name="FolderPathWatermark" xml:space="preserve">
     <value>No folder selected</value>
-  </data>
-  <data name="RescanButton" xml:space="preserve">
-    <value>Scan</value>
   </data>
   <data name="RescanToolTip" xml:space="preserve">
     <value>Search the chosen folder for songs (F5)</value>
@@ -104,13 +95,9 @@
     <value>Read {0:N0} of {1:N0}…</value>
     <comment>{0} is the number of songs whose details have been read, {1} the number found. Shown once every folder has been searched.</comment>
   </data>
-  <data name="ScanSearchingFilteredProgressFormat" xml:space="preserve">
-    <value>{2:N0} shown · read {0:N0} of {1:N0} found · still searching…</value>
-    <comment>{0} is the number of songs whose details have been read, {1} the number found so far, {2} the number the search and filters show. Shown while folders are still being searched.</comment>
-  </data>
-  <data name="ScanReadingFilteredProgressFormat" xml:space="preserve">
-    <value>{2:N0} shown · read {0:N0} of {1:N0}…</value>
-    <comment>{0} is the number of songs whose details have been read, {1} the number found, {2} the number the search and filters show. Shown once every folder has been searched.</comment>
+  <data name="CancelScanToolTip" xml:space="preserve">
+    <value>Stop scanning</value>
+    <comment>The status bar's spinner, under the pointer while a scan runs. The songs listed so far stay.</comment>
   </data>
   <data name="SongCountOne" xml:space="preserve">
     <value>1 song</value>
@@ -127,7 +114,7 @@
     <comment>{0} is the system error message.</comment>
   </data>
   <data name="DetailPlaceholderTitle" xml:space="preserve">
-    <value>Select a song</value>
+    <value>Select a Song</value>
   </data>
   <data name="DetailPlaceholderBody" xml:space="preserve">
     <value>Choose a song in the list to see its metadata and files</value>
@@ -159,35 +146,29 @@
     <value>Other files</value>
   </data>
   <data name="OtherFilesHeaderFormat" xml:space="preserve">
-    <value>Other files ({0:N0})</value>
+    <value>Other Files ({0:N0})</value>
     <comment>{0} is the number of files that aren't the album art, a background, a track, the chart or song.ini.</comment>
   </data>
   <data name="NoOtherFiles" xml:space="preserve">
     <value>No other files</value>
   </data>
-  <data name="OutputLabel" xml:space="preserve">
-    <value>Output</value>
-  </data>
   <data name="OutputWatermark" xml:space="preserve">
     <value>Next to the scanned songs</value>
   </data>
   <data name="OutputToolTip" xml:space="preserve">
-    <value>Where Pack and Unpack write. Each item keeps its place relative to the scanned folder.</value>
+    <value>Choose where Pack and Unpack write. Each item keeps its place relative to the scanned folder.</value>
   </data>
   <data name="BrowseOutputDialogTitle" xml:space="preserve">
-    <value>Choose the output folder</value>
-  </data>
-  <data name="BrowseOutputButton" xml:space="preserve">
-    <value>Output folder</value>
+    <value>Choose the Output Folder</value>
   </data>
   <data name="BrowseOutputToolTip" xml:space="preserve">
     <value>Choose where Pack and Unpack write</value>
   </data>
+  <data name="BrowseBusyToolTip" xml:space="preserve">
+    <value>Wait for Pack or Unpack to finish before choosing another folder</value>
+  </data>
   <data name="ResetOutputToolTip" xml:space="preserve">
     <value>Write next to the scanned songs again</value>
-  </data>
-  <data name="ResetOutputButton" xml:space="preserve">
-    <value>Reset output folder</value>
   </data>
   <data name="OverwriteLabel" xml:space="preserve">
     <value>If the output exists</value>
@@ -204,14 +185,8 @@
   <data name="OverwriteRename" xml:space="preserve">
     <value>Keep both</value>
   </data>
-  <data name="PackButton" xml:space="preserve">
-    <value>Pack</value>
-  </data>
   <data name="PackToolTip" xml:space="preserve">
     <value>Pack the selected song folders into .sng files</value>
-  </data>
-  <data name="UnpackButton" xml:space="preserve">
-    <value>Unpack</value>
   </data>
   <data name="UnpackToolTip" xml:space="preserve">
     <value>Unpack the selected .sng files into song folders</value>
@@ -282,8 +257,9 @@
     <value>Waiting for job…</value>
     <comment>The results panel before any pack or unpack has run.</comment>
   </data>
-  <data name="JobDetailsButton" xml:space="preserve">
-    <value>Details</value>
+  <data name="CancelJobToolTip" xml:space="preserve">
+    <value>Cancel the job</value>
+    <comment>The status bar's spinner, under the pointer while a pack or unpack runs.</comment>
   </data>
   <data name="JobDetailsToolTip" xml:space="preserve">
     <value>Show details</value>
@@ -292,8 +268,80 @@
     <value>Chart Packer - v{0}</value>
     <comment>{0} is the program's semantic version, e.g. 1.2.0.</comment>
   </data>
+  <data name="AppName" xml:space="preserve">
+    <value>Chart Packer</value>
+    <comment>The app's name, for its icon in the main window's title bar.</comment>
+  </data>
+  <data name="MenuFile" xml:space="preserve">
+    <value>_File</value>
+    <comment>The title bar's menus. An underscore marks the access key, unique among a menu's items.</comment>
+  </data>
+  <data name="MenuChooseSongsFolder" xml:space="preserve">
+    <value>_Choose Songs Folder…</value>
+  </data>
+  <data name="MenuRescan" xml:space="preserve">
+    <value>_Rescan</value>
+  </data>
+  <data name="MenuChooseOutputFolder" xml:space="preserve">
+    <value>Choose _Output Folder…</value>
+  </data>
+  <data name="MenuResetOutputFolder" xml:space="preserve">
+    <value>R_eset Output Folder</value>
+  </data>
+  <data name="MenuChooseDownloadFolder" xml:space="preserve">
+    <value>Choose _Download Location…</value>
+    <comment>Picks the download folder; its tooltip is the folder downloads go to.</comment>
+  </data>
+  <data name="MenuOpenLogsFolder" xml:space="preserve">
+    <value>Open _Logs Folder</value>
+  </data>
+  <data name="MenuSettings" xml:space="preserve">
+    <value>_Settings…</value>
+  </data>
+  <data name="MenuPack" xml:space="preserve">
+    <value>_Pack</value>
+  </data>
+  <data name="MenuPackSelection" xml:space="preserve">
+    <value>_Pack</value>
+    <comment>The Pack menu's item that packs the selection.</comment>
+  </data>
+  <data name="MenuUnpack" xml:space="preserve">
+    <value>_Unpack</value>
+  </data>
+  <data name="MenuOverwrite" xml:space="preserve">
+    <value>If the Output _Exists</value>
+    <comment>A submenu of the overwrite policies, the one in use checked.</comment>
+  </data>
+  <data name="MenuOverwriteSkip" xml:space="preserve">
+    <value>Skip Existing</value>
+    <comment>The If the Output Exists submenu's items, in Title Case; Settings uses OverwriteSkip etc.</comment>
+  </data>
+  <data name="MenuOverwriteOverwrite" xml:space="preserve">
+    <value>Overwrite</value>
+  </data>
+  <data name="MenuOverwriteRename" xml:space="preserve">
+    <value>Keep Both</value>
+  </data>
+  <data name="MenuFlatPack" xml:space="preserve">
+    <value>Pack Into One _Folder (Flat)</value>
+  </data>
+  <data name="MenuTools" xml:space="preserve">
+    <value>_Tools</value>
+  </data>
+  <data name="MenuEditChart" xml:space="preserve">
+    <value>_Edit Chart</value>
+  </data>
+  <data name="MenuMerge" xml:space="preserve">
+    <value>_Merge…</value>
+  </data>
+  <data name="MenuValidate" xml:space="preserve">
+    <value>_Validate…</value>
+  </data>
+  <data name="MenuDeduplicate" xml:space="preserve">
+    <value>_Deduplicate…</value>
+  </data>
   <data name="JobProgressWindowTitle" xml:space="preserve">
-    <value>Job progress</value>
+    <value>Job Progress</value>
   </data>
   <data name="JobGroupPackedFormat" xml:space="preserve">
     <value>Packed ({0:N0})</value>
@@ -308,23 +356,39 @@
     <comment>{0} is the number of items.</comment>
   </data>
   <data name="JobGroupFailedFormat" xml:space="preserve">
-    <value>Failed or canceled ({0:N0})</value>
+    <value>Failed or Canceled ({0:N0})</value>
     <comment>{0} is the number of items.</comment>
   </data>
   <data name="JobGroupEmpty" xml:space="preserve">
     <value>Nothing here.</value>
-    <comment>Shown in a progress window tab with no items.</comment>
+    <comment>Shown in the progress window's list while it has no items.</comment>
   </data>
   <data name="JobSearchWatermark" xml:space="preserve">
     <value>Search name, path or message</value>
+  </data>
+  <data name="SongNotInLibraryFormat" xml:space="preserve">
+    <value>"{0}" isn't in the library anymore. Rescan to see what's there now.</value>
+    <comment>Shown when a job result is double-clicked but the scan no longer has its song. {0} is the song's name.</comment>
+  </data>
+  <data name="SongHiddenByFilterFormat" xml:space="preserve">
+    <value>"{0}" is hidden by the library's search or filters. Clear them to show it.</value>
+    <comment>Shown when a job result is double-clicked but the library's search or filters hide its song. {0} is the song's name.</comment>
+  </data>
+  <data name="JobFilterNoMatches" xml:space="preserve">
+    <value>No results have the chosen outcomes.</value>
+    <comment>Shown in the progress window when the outcome chips that are on match no items.</comment>
+  </data>
+  <data name="JobResultCountFormat" xml:space="preserve">
+    <value>{0:N0} songs</value>
+    <comment>{0} is the number of items in the progress window.</comment>
   </data>
   <data name="JobSearchNoMatchesFormat" xml:space="preserve">
     <value>No results match "{0}".</value>
     <comment>{0} is the search text.</comment>
   </data>
   <data name="JobSearchCountFormat" xml:space="preserve">
-    <value>{0:N0} of {1:N0}</value>
-    <comment>{0} is the number of items matching the search; {1} the number in the tab.</comment>
+    <value>{0:N0} of {1:N0} songs</value>
+    <comment>{0} is the number of items the search and outcome chips let through; {1} the number in the progress window.</comment>
   </data>
   <data name="JobCanceledPack" xml:space="preserve">
     <value>Canceled before it was packed.</value>
@@ -367,6 +431,14 @@
   <data name="UnsavedToolTip" xml:space="preserve">
     <value>This item has unsaved changes</value>
   </data>
+  <data name="UnsavedChangesLabel" xml:space="preserve">
+    <value>Unsaved changes</value>
+    <comment>Beside Save and Discard, at the bottom of the details panel while the selection has unsaved changes.</comment>
+  </data>
+  <data name="SavingChangesLabel" xml:space="preserve">
+    <value>Saving changes…</value>
+    <comment>In place of "Unsaved changes", beside Save and Discard, while the selection's changes are being saved.</comment>
+  </data>
   <data name="EditValueToolTip" xml:space="preserve">
     <value>Click to edit</value>
   </data>
@@ -395,7 +467,7 @@
     <comment>{0} is the item's display name; {1} why it couldn't be saved.</comment>
   </data>
   <data name="CloseUnsavedTitle" xml:space="preserve">
-    <value>Unsaved changes</value>
+    <value>Unsaved Changes</value>
   </data>
   <data name="CloseUnsavedOne" xml:space="preserve">
     <value>1 item has unsaved changes. Close and discard them?</value>
@@ -435,7 +507,7 @@
     <value>Undo the change to the album art</value>
   </data>
   <data name="PickArtTitle" xml:space="preserve">
-    <value>Choose album art</value>
+    <value>Choose Album Art</value>
   </data>
   <data name="BackgroundName" xml:space="preserve">
     <value>Background</value>
@@ -485,7 +557,7 @@
     <value>Undo the changes to the background</value>
   </data>
   <data name="PickBackgroundTitle" xml:space="preserve">
-    <value>Choose a background image or video</value>
+    <value>Choose a Background Image or Video</value>
   </data>
   <data name="BackgroundNotSupported" xml:space="preserve">
     <value>That file isn't a png, jpg or jpeg image, or an mp4, avi, webm, vp8, ogv or mpeg video.</value>
@@ -506,7 +578,7 @@
     <value>Add files</value>
   </data>
   <data name="PickFilesTitle" xml:space="preserve">
-    <value>Choose files to add</value>
+    <value>Choose Files to Add</value>
   </data>
   <data name="RemoveFileToolTip" xml:space="preserve">
     <value>Remove this file</value>
@@ -626,7 +698,7 @@
     <value>Undo the change to the chart</value>
   </data>
   <data name="PickChartTitle" xml:space="preserve">
-    <value>Choose a chart</value>
+    <value>Choose a Chart</value>
   </data>
   <data name="ChartNotSupportedFormat" xml:space="preserve">
     <value>{0} isn't a .chart, .mid or .midi file.</value>
@@ -685,7 +757,7 @@
     <comment>{0} is a number of milliseconds: how much later the lyrics must move to start with the song.</comment>
   </data>
   <data name="PickLyricsTitle" xml:space="preserve">
-    <value>Choose a chart or .sng to take the lyrics from</value>
+    <value>Choose a Chart or .sng to Take the Lyrics From</value>
   </data>
   <data name="LyricsSourceUnreadableFormat" xml:space="preserve">
     <value>{0} can't be read: {1}</value>
@@ -694,9 +766,6 @@
   <data name="LyricsSourceHasNoneFormat" xml:space="preserve">
     <value>{0} has no lyrics or vocal notes.</value>
     <comment>{0} is the file name.</comment>
-  </data>
-  <data name="SettingsButton" xml:space="preserve">
-    <value>Settings</value>
   </data>
   <data name="SettingsToolTip" xml:space="preserve">
     <value>Change how songs are scanned, packed and played (Ctrl+,)</value>
@@ -798,6 +867,19 @@
     <value>spectrum analyzer analyser bars visualizer visualiser performance slow</value>
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
+  <data name="SettingsCategoryAppearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="AlbumArtThemeLabel" xml:space="preserve">
+    <value>Take colours from album art</value>
+  </data>
+  <data name="AlbumArtThemeDescription" xml:space="preserve">
+    <value>Tint the main window, its accent colour and the spectrum to match the selected song's album art, fading as you move between songs. When off, the app keeps its own colours.</value>
+  </data>
+  <data name="AlbumArtThemeKeywords" xml:space="preserve">
+    <value>colour color theme dynamic accent tint cover art album artwork palette</value>
+    <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
+  </data>
   <data name="FilteredSongCountFormat" xml:space="preserve">
     <value>{0:N0}/{1:N0} songs</value>
     <comment>{0} is the number of songs shown, {1} the number found. Shown while a search or filter hides some.</comment>
@@ -824,7 +906,7 @@
     <comment>Button in the sort and filter flyout; the search and sort are kept.</comment>
   </data>
   <data name="SortByLabel" xml:space="preserve">
-    <value>Sort by</value>
+    <value>Sort By</value>
   </data>
   <data name="SortDescendingToolTip" xml:space="preserve">
     <value>Reverse the order</value>
@@ -875,11 +957,11 @@
     <comment>Heading of the difficulty filter chips: the difficulties any part of the chart has notes for.</comment>
   </data>
   <data name="FilterStemsLabel" xml:space="preserve">
-    <value>Audio stems</value>
+    <value>Audio Stems</value>
     <comment>Heading of the audio stem filter chips.</comment>
   </data>
   <data name="FilterAssetsLabel" xml:space="preserve">
-    <value>Backgrounds and art</value>
+    <value>Backgrounds and Art</value>
     <comment>Heading of the video, background image and album art filter chips.</comment>
   </data>
   <data name="FilterMatchAll" xml:space="preserve">
@@ -1020,7 +1102,7 @@
     <value>Reset the audio offset</value>
   </data>
   <data name="VideoOffsetName" xml:space="preserve">
-    <value>Video offset</value>
+    <value>Video Offset</value>
   </data>
   <data name="VideoOffsetToolTip" xml:space="preserve">
     <value>Moves the background video later (positive) or earlier (negative) against the audio. Saved as song.ini's video_start_time.</value>
@@ -1171,7 +1253,7 @@
     <value>Combine the selected songs into one new .sng, choosing which song each part, the audio and the metadata come from</value>
   </data>
   <data name="MergeWindowTitle" xml:space="preserve">
-    <value>Merge songs</value>
+    <value>Merge Songs</value>
   </data>
   <data name="MergeLoading" xml:space="preserve">
     <value>Reading the songs…</value>
@@ -1186,13 +1268,13 @@
     <value>Unsaved edits aren't included</value>
   </data>
   <data name="MergeSectionChart" xml:space="preserve">
-    <value>Base chart</value>
+    <value>Base Chart</value>
   </data>
   <data name="MergeBaseDescription" xml:space="preserve">
     <value>Its tempo map, sections, events and delay are kept. Parts from the other songs are placed by song time; fine-tune them afterwards with the note highway's offsets.</value>
   </data>
   <data name="MergeBaseLabel" xml:space="preserve">
-    <value>Tempo map and events</value>
+    <value>Tempo Map and Events</value>
   </data>
   <data name="MergeSectionParts" xml:space="preserve">
     <value>Parts</value>
@@ -1204,19 +1286,19 @@
     <value>Audio</value>
   </data>
   <data name="MergeAudioLabel" xml:space="preserve">
-    <value>Audio tracks</value>
+    <value>Audio Tracks</value>
   </data>
   <data name="MergeSectionAssets" xml:space="preserve">
-    <value>Album art and backgrounds</value>
+    <value>Album Art and Backgrounds</value>
   </data>
   <data name="MergeAlbumArtLabel" xml:space="preserve">
-    <value>Album art</value>
+    <value>Album Art</value>
   </data>
   <data name="MergeBackgroundLabel" xml:space="preserve">
-    <value>Background image</value>
+    <value>Background Image</value>
   </data>
   <data name="MergeVideoLabel" xml:space="preserve">
-    <value>Background video</value>
+    <value>Background Video</value>
   </data>
   <data name="MergeSectionAlignment" xml:space="preserve">
     <value>Alignment</value>
@@ -1228,7 +1310,7 @@
     <value>Offset</value>
   </data>
   <data name="MergeAutoAlignButton" xml:space="preserve">
-    <value>Auto-align</value>
+    <value>Auto-Align</value>
   </data>
   <data name="MergeAutoAlignToolTip" xml:space="preserve">
     <value>Works out how far each song is from the kept audio, by the parts the songs share or else by their audio, and lines them all up. Offsets typed by hand are replaced. The first time, each song's audio is read, which can take a few seconds.</value>
@@ -1249,7 +1331,7 @@
     <value>Kept audio: the others line up with it</value>
   </data>
   <data name="MergeReferenceShort" xml:space="preserve">
-    <value>Kept audio</value>
+    <value>Kept Audio</value>
     <comment>Chip in a merge alignment cell for the song with the kept audio. The full explanation, in its tooltip, is MergeAlignmentReference.</comment>
   </data>
   <data name="MergeAlignmentNoChart" xml:space="preserve">
@@ -1337,11 +1419,11 @@
     <value>Line this song up by eye: its waveform and notes against the kept audio's song's.</value>
   </data>
   <data name="MergeCompareTitleFormat" xml:space="preserve">
-    <value>Line up {0}</value>
+    <value>Line Up {0}</value>
     <comment>The window's title. {0} is the song being lined up.</comment>
   </data>
   <data name="MergeCompareHeadingFormat" xml:space="preserve">
-    <value>Line up {0} with {1}</value>
+    <value>Line Up {0} with {1}</value>
     <comment>{0} is the song being lined up, {1} the kept audio's song.</comment>
   </data>
   <data name="MergeCompareDescriptionFormat" xml:space="preserve">
@@ -1367,17 +1449,17 @@
     <value>Back to the offset the song had when this opened.</value>
   </data>
   <data name="MergeCompareZoomIn" xml:space="preserve">
-    <value>Zoom in</value>
+    <value>Zoom In</value>
   </data>
   <data name="MergeCompareZoomOut" xml:space="preserve">
-    <value>Zoom out</value>
+    <value>Zoom Out</value>
   </data>
   <data name="MergeCompareShowStart" xml:space="preserve">
-    <value>First notes</value>
+    <value>First Notes</value>
     <comment>Moves the view to just before the first notes.</comment>
   </data>
   <data name="MergeCompareShowAll" xml:space="preserve">
-    <value>Whole song</value>
+    <value>Whole Song</value>
     <comment>Zooms the view out to show both songs from end to end.</comment>
   </data>
   <data name="MergeCompareTimelineName" xml:space="preserve">
@@ -1386,12 +1468,16 @@
   <data name="MergeCompareJumpTo" xml:space="preserve">
     <value>Jump to where a link puts it</value>
   </data>
+  <data name="MergeCompareJumpButton" xml:space="preserve">
+    <value>Jump to Link</value>
+    <comment>Opens a menu of where each of the song's links would put it, in the Compare window.</comment>
+  </data>
   <data name="MergeCompareEstimateFormat" xml:space="preserve">
     <value>{0}: {1:+0;-0;0} ms</value>
     <comment>{0} is a link choice, as the alignment cell lists it; {1} where it puts the song.</comment>
   </data>
   <data name="MergeCompareApplyButton" xml:space="preserve">
-    <value>Use this offset</value>
+    <value>Use This Offset</value>
   </data>
   <data name="MergeAlignmentBeforeStartFormat" xml:space="preserve">
     <value>Lining up moves {0} before the song starts. Move its song later, or choose another base chart.</value>
@@ -1413,7 +1499,7 @@
     <value>Output</value>
   </data>
   <data name="MergeLeaveOut" xml:space="preserve">
-    <value>Leave out</value>
+    <value>Leave Out</value>
   </data>
   <data name="MergeIncludeToolTip" xml:space="preserve">
     <value>Include this in the merge — uncheck to leave it out</value>
@@ -1455,10 +1541,15 @@
     <comment>Compact merge audio cell. {0} is the number of audio files. The file names stay in the tooltip.</comment>
   </data>
   <data name="MergeDifficultyFormat" xml:space="preserve">
-    <value>diff {0}</value>
+    <value>Difficulty: {0}</value>
+    <comment>A part cell's tooltip line in the Merge window; {0} is its song.ini difficulty.</comment>
+  </data>
+  <data name="MergeDifficultyUnset" xml:space="preserve">
+    <value>Difficulty: not set</value>
+    <comment>A part cell's tooltip line in the Merge window, for a song that sets no difficulty for the part.</comment>
   </data>
   <data name="MergePartPresent" xml:space="preserve">
-    <value>Yes</value>
+    <value>Exists</value>
   </data>
   <data name="MergeNoParts" xml:space="preserve">
     <value>None of the songs has a chart that can be read.</value>
@@ -1470,7 +1561,7 @@
     <value>Keep at least one part.</value>
   </data>
   <data name="MergeTargetExistsFormat" xml:space="preserve">
-    <value>{0} already exists. Choose Overwrite or Rename in the toolbar to merge anyway.</value>
+    <value>{0} already exists. Choose Overwrite or Rename under Pack, If the output exists, to merge anyway.</value>
   </data>
   <data name="MergeTargetIsSourceFormat" xml:space="preserve">
     <value>{0} is one of the songs being merged, so it can't be written over.</value>
@@ -1486,6 +1577,18 @@
   </data>
   <data name="MergeWarningsHeading" xml:space="preserve">
     <value>Check these on the note highway:</value>
+  </data>
+  <data name="MergeWarningsOne" xml:space="preserve">
+    <value>1 Warning</value>
+    <comment>A button in the Merge window's footer and preview header that lists what to check.</comment>
+  </data>
+  <data name="MergeWarningsFormat" xml:space="preserve">
+    <value>{0:N0} Warnings</value>
+    <comment>{0} is how many; more than one.</comment>
+  </data>
+  <data name="MergedButton" xml:space="preserve">
+    <value>Merged</value>
+    <comment>The Merge button once the song is merged, disabled.</comment>
   </data>
   <data name="MergeFailedFormat" xml:space="preserve">
     <value>The merge failed: {0}</value>
@@ -1526,20 +1629,21 @@
   <data name="MergePreviewNote" xml:space="preserve">
     <value>This is a preview of the merged song. Offsets set on its note highway are applied when it's merged; everything else can be edited once it's merged.</value>
   </data>
-  <data name="DedupButton" xml:space="preserve">
-    <value>Deduplicate</value>
-  </data>
   <data name="DedupToolTip" xml:space="preserve">
     <value>Find duplicate copies of songs across the whole library, and different charts of the same song, and move the copies you don't need to the trash. Rescans the library first, so it compares what's on disk now.</value>
   </data>
   <data name="DedupWindowTitle" xml:space="preserve">
-    <value>Deduplicate library</value>
+    <value>Deduplicate Library</value>
   </data>
   <data name="SettingsCategoryDuplicates" xml:space="preserve">
     <value>Duplicates</value>
   </data>
   <data name="DedupKeepLabel" xml:space="preserve">
     <value>Keep by default</value>
+  </data>
+  <data name="DedupKeepByDefaultLabel" xml:space="preserve">
+    <value>Keep by Default</value>
+    <comment>In the Deduplicate window's footer, before the SNG / FOLDER choice. The setting itself is DedupKeepLabel.</comment>
   </data>
   <data name="DedupKeepSng" xml:space="preserve">
     <value>The .sng</value>
@@ -1582,15 +1686,15 @@
     <comment>{0} is the error.</comment>
   </data>
   <data name="DedupTabExactFormat" xml:space="preserve">
-    <value>Exact duplicates ({0:N0})</value>
+    <value>Exact Duplicates ({0:N0})</value>
     <comment>{0} is the number of groups.</comment>
   </data>
   <data name="DedupTabSameChartFormat" xml:space="preserve">
-    <value>Same chart ({0:N0})</value>
+    <value>Same Chart ({0:N0})</value>
     <comment>{0} is the number of groups.</comment>
   </data>
   <data name="DedupTabMergeFormat" xml:space="preserve">
-    <value>Merge candidates ({0:N0})</value>
+    <value>Merge Candidates ({0:N0})</value>
     <comment>{0} is the number of groups.</comment>
   </data>
   <data name="DedupExactDescription" xml:space="preserve">
@@ -1610,6 +1714,35 @@
   </data>
   <data name="DedupNoMerge" xml:space="preserve">
     <value>No songs with more than one chart were found.</value>
+  </data>
+  <data name="DedupNoMatchesFormat" xml:space="preserve">
+    <value>No groups match “{0}”.</value>
+    <comment>{0} is the search text.</comment>
+  </data>
+  <data name="DedupNoSelection" xml:space="preserve">
+    <value>Select a group to see its copies.</value>
+  </data>
+  <data name="DedupSearchWatermark" xml:space="preserve">
+    <value>Search songs or paths</value>
+  </data>
+  <data name="DedupGroupCopiesFormat" xml:space="preserve">
+    <value>{0:N0} copies</value>
+    <comment>{0} is the number of copies in a group of duplicates.</comment>
+  </data>
+  <data name="DedupGroupChartsFormat" xml:space="preserve">
+    <value>{0:N0} charts</value>
+    <comment>{0} is the number of different charts of one song.</comment>
+  </data>
+  <data name="DedupGroupMarkedFormat" xml:space="preserve">
+    <value>{0:N0} marked</value>
+    <comment>{0} is the number of copies in a group marked for deletion.</comment>
+  </data>
+  <data name="DedupTagMerged" xml:space="preserve">
+    <value>Merged</value>
+  </data>
+  <data name="DedupMarkedSummaryFormat" xml:space="preserve">
+    <value>{0:N0} Marked · {1}</value>
+    <comment>{0} is the number of copies marked for deletion, {1} their size, such as "1.2 GB".</comment>
   </data>
   <data name="DedupSkippedFormat" xml:space="preserve">
     <value>{0:N0} songs couldn't be compared</value>
@@ -1639,10 +1772,10 @@
     <value>Delete</value>
   </data>
   <data name="DedupMarkAll" xml:space="preserve">
-    <value>Mark all duplicates</value>
+    <value>Mark All Duplicates</value>
   </data>
   <data name="DedupDeleteMarkedFormat" xml:space="preserve">
-    <value>Delete marked ({0:N0})…</value>
+    <value>Delete Marked ({0:N0})…</value>
     <comment>{0} is the number of marked rows.</comment>
   </data>
   <data name="DedupDeleteSourcesFormat" xml:space="preserve">
@@ -1650,11 +1783,7 @@
     <comment>{0} is the number of marked rows.</comment>
   </data>
   <data name="DedupMarkMerged" xml:space="preserve">
-    <value>Mark merged for deletion</value>
-  </data>
-  <data name="DedupDeleteMarkedFilesFormat" xml:space="preserve">
-    <value>Delete files marked for deletion ({0:N0})…</value>
-    <comment>{0} is the number of marked rows.</comment>
+    <value>Mark Merged for Deletion</value>
   </data>
   <data name="DedupOpenInMerge" xml:space="preserve">
     <value>Open in Merge…</value>
@@ -1671,18 +1800,8 @@
     <value>{0} – {1}</value>
     <comment>{0} is the artist, {1} the title.</comment>
   </data>
-  <data name="DedupKindSng" xml:space="preserve">
-    <value>.sng</value>
-  </data>
-  <data name="DedupKindFolder" xml:space="preserve">
-    <value>Folder</value>
-  </data>
-  <data name="DedupMemberDetailFormat" xml:space="preserve">
-    <value>{0} · {1} · modified {2}</value>
-    <comment>{0} is ".sng" or "Folder", {1} a size, {2} a date.</comment>
-  </data>
   <data name="DedupCharterFormat" xml:space="preserve">
-    <value>charted by {0}</value>
+    <value>Charted by {0}</value>
     <comment>{0} is the charter.</comment>
   </data>
   <data name="DedupCopiesFormat" xml:space="preserve">
@@ -1692,6 +1811,10 @@
   <data name="DedupOtherVersionsFormat" xml:space="preserve">
     <value>{0:N0} other copies of this chart differ and aren't deleted with it</value>
     <comment>{0} is the number of copies whose metadata or other files differ from the one shown.</comment>
+  </data>
+  <data name="DedupModifiedFormat" xml:space="preserve">
+    <value>Modified {0}</value>
+    <comment>{0} is a date.</comment>
   </data>
   <data name="DedupTagSuffix" xml:space="preserve">
     <value>Download copy</value>
@@ -1746,7 +1869,7 @@
     <value>Deleting is turned off: this system has no trash the app can move files to.</value>
   </data>
   <data name="DedupConfirmTitle" xml:space="preserve">
-    <value>Delete duplicates</value>
+    <value>Delete Duplicates</value>
   </data>
   <data name="DedupConfirmFormat" xml:space="preserve">
     <value>Move {0:N0} songs ({1}) to the {2}?
@@ -1759,7 +1882,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>{0} is "Recycle Bin" or "Trash".</comment>
   </data>
   <data name="DedupDeleting" xml:space="preserve">
-    <value>Moving copies to the trash…</value>
+    <value>Moving Copies to the Trash…</value>
   </data>
   <data name="DedupStop" xml:space="preserve">
     <value>Stop</value>
@@ -1802,11 +1925,11 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Kept: you chose not to delete it permanently</value>
   </data>
   <data name="DedupResultSummaryFormat" xml:space="preserve">
-    <value>{0:N0} moved to the {1}, {2:N0} deleted permanently, {3:N0} skipped or failed</value>
+    <value>{0:N0} Moved to the {1}, {2:N0} Deleted Permanently, {3:N0} Skipped or Failed</value>
     <comment>{0}, {2} and {3} are counts, {1} is "Recycle Bin" or "Trash".</comment>
   </data>
   <data name="MenuDownloadAllFiles" xml:space="preserve">
-    <value>Download all files</value>
+    <value>Download All Files</value>
     <comment>Library right-click menu: saves each selected song as a song folder.</comment>
   </data>
   <data name="MenuDownloadFileFormat" xml:space="preserve">
@@ -1814,19 +1937,19 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Right-click menu item on a track or file. {0} is the file's name, e.g. guitar.ogg.</comment>
   </data>
   <data name="MenuDownloadArt" xml:space="preserve">
-    <value>Download album art</value>
+    <value>Download Album Art</value>
     <comment>Right-click menu item on the album art while there's none to download.</comment>
   </data>
   <data name="MenuDownloadBackgroundImage" xml:space="preserve">
-    <value>Download background image</value>
+    <value>Download Background Image</value>
     <comment>Right-click menu item on the background while there's none to download.</comment>
   </data>
   <data name="MenuDownloadBackgroundVideo" xml:space="preserve">
-    <value>Download background video</value>
+    <value>Download Background Video</value>
     <comment>Right-click menu item on the background while there's none to download.</comment>
   </data>
   <data name="MenuExportLyrics" xml:space="preserve">
-    <value>Export lyrics as "notes.mid"</value>
+    <value>Export Lyrics as "notes.mid"</value>
   </data>
   <data name="DownloadSavingFormat" xml:space="preserve">
     <value>Saving {0}…</value>
@@ -1855,10 +1978,10 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>the .sng can't be read</value>
   </data>
   <data name="DownloadPickerTitle" xml:space="preserve">
-    <value>Save file</value>
+    <value>Save File</value>
   </data>
   <data name="DownloadFolderPickerTitle" xml:space="preserve">
-    <value>Choose where to save the songs</value>
+    <value>Choose Where to Save the Songs</value>
   </data>
   <data name="NoticeDismissToolTip" xml:space="preserve">
     <value>Dismiss</value>
@@ -1881,7 +2004,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Extra search words for the setting, separated by spaces. Not shown.</comment>
   </data>
   <data name="BrowseDownloadDialogTitle" xml:space="preserve">
-    <value>Choose the download folder</value>
+    <value>Choose the Download Folder</value>
   </data>
   <data name="AskDownloadLocationLabel" xml:space="preserve">
     <value>Ask where to save each download</value>
@@ -2004,7 +2127,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>The Ctrl+drag speed setting's value: {0} is milliseconds of the song for each pixel dragged.</comment>
   </data>
   <data name="SaveInvalidTitle" xml:space="preserve">
-    <value>Save metadata that fails validation?</value>
+    <value>Save Invalid Metadata</value>
   </data>
   <data name="SaveInvalidMessageFormat" xml:space="preserve">
     <value>Some of the metadata fails validation: {0} marked in orange. Games may misread or ignore these values. Save it anyway?</value>
@@ -2013,14 +2136,11 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="SaveAnywayButton" xml:space="preserve">
     <value>Save anyway</value>
   </data>
-  <data name="ValidateButton" xml:space="preserve">
-    <value>Validate</value>
-  </data>
   <data name="ValidateToolTip" xml:space="preserve">
     <value>Check the selected songs' metadata for values games may misread, such as a word where a number belongs, and fix them in place. Unsaved changes are checked as drafted.</value>
   </data>
   <data name="ValidatorWindowTitle" xml:space="preserve">
-    <value>Validate metadata</value>
+    <value>Validate Metadata</value>
   </data>
   <data name="ValidatorCheckingFormat" xml:space="preserve">
     <value>Checking {0} of {1} songs…</value>
@@ -2105,6 +2225,9 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorFilterToolTip" xml:space="preserve">
     <value>Filter issues</value>
   </data>
+  <data name="ValidatorSearchWatermark" xml:space="preserve">
+    <value>Search title, artist, charter or path</value>
+  </data>
   <data name="ValidatorFilterFixLabel" xml:space="preserve">
     <value>Fix</value>
     <comment>Heading of the Validator filter's Quick fix and Manual fix chips.</comment>
@@ -2122,15 +2245,11 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Heading of the Validator filter's chips for each kind of issue found.</comment>
   </data>
   <data name="ValidatorFilterKeyLabel" xml:space="preserve">
-    <value>Metadata key</value>
+    <value>Metadata Key</value>
     <comment>Heading of the Validator filter's chips for each metadata key that fails in a listed song.</comment>
   </data>
   <data name="ValidatorFilterNoTypes" xml:space="preserve">
     <value>No issues found yet.</value>
-  </data>
-  <data name="ValidatorFilterChipFormat" xml:space="preserve">
-    <value>{0} ({1})</value>
-    <comment>A Validator filter chip. {0} is what it shows, e.g. "Empty value"; {1} is how many listed songs have it.</comment>
   </data>
   <data name="ValidatorFilterChipToolTipFormat" xml:space="preserve">
     <value>{0}: {1} songs. Turn on chips to show only the issues that match them.</value>
@@ -2141,7 +2260,7 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>Under the Validator's status while a filter is on. {0} is how many songs are shown, {1} how many are listed.</comment>
   </data>
   <data name="ValidatorNoMatches" xml:space="preserve">
-    <value>No songs have issues that match the filters.</value>
+    <value>No songs match the search and filters.</value>
   </data>
   <data name="ValidatorTypeDuplicateKey" xml:space="preserve">
     <value>Duplicate key</value>
@@ -2179,13 +2298,13 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <comment>{0} is the error message.</comment>
   </data>
   <data name="EditChartButton" xml:space="preserve">
-    <value>Edit chart</value>
+    <value>Edit Chart</value>
   </data>
   <data name="EditChartToolTip" xml:space="preserve">
     <value>Open the selected song's chart in Chart Builder. Select one song to edit it.</value>
   </data>
   <data name="EditChartUnsavedTitle" xml:space="preserve">
-    <value>Unsaved changes</value>
+    <value>Unsaved Changes</value>
   </data>
   <data name="EditChartUnsavedMessageFormat" xml:space="preserve">
     <value>{0} has metadata changes that aren't saved. Chart Builder opens the song as it is on disk, so save or discard them first.</value>

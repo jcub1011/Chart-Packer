@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Controls;
-using ChartPacker.UI.Views;
 using ChartPacker.ViewModels;
+using ChartShared.UI.Views;
 
 namespace ChartPacker.Views
 {
@@ -14,6 +14,7 @@ namespace ChartPacker.Views
         public DedupWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
         }
 

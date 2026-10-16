@@ -16,7 +16,7 @@ libraries that are built into a release of the app, with their licenses.
   confirm behaviour such as field order, which checks the reader makes and how `song.ini` is
   parsed. Source files whose behaviour follows the reference name the upstream file in their
   documentation comments. The known-keys table in `SngCli/KnownKeys.cs` was one of the sources
-  for the key names and types in `ChartPacker.Core/Metadata/KnownKeys.cs`.
+  for the key names and types in `ChartShared.Core/Metadata/KnownKeys.cs`.
 
 ```
 Copyright (c) 2023 Matthew Sitton
@@ -44,25 +44,25 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - **Project:** [TheNathannator/GuitarGame_ChartFormats](https://github.com/TheNathannator/GuitarGame_ChartFormats)
 - **License:** [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain dedication)
 - **Used for:** the `song.ini` tag lists that sng-spec §6.3 names as the metadata key registry.
-  `ChartPacker.Core/Metadata/KnownKeys.cs` takes its key names and value types from the Standard
+  `ChartShared.Core/Metadata/KnownKeys.cs` takes its key names and value types from the Standard
   Tags and the Clone Hero, Phase Shift, Frets on Fire X and Editor on Fire tag lists. No text is
   copied; the key descriptions are Chart-Packer's own. It is also the reference for the
   `notes.mid` layout in [docs/charter-spec-v1.md](docs/charter-spec-v1.md) §7, which `MidiLayout`
-  (`ChartPacker.Core/Charts/MidiChartReader.cs`), `MidiChartLoader` and `MidiChartWriter`
-  (`ChartPacker.Core/Charting/`) follow. No text is copied there either.
+  (`ChartShared.Core/Charts/MidiChartReader.cs`), `MidiChartLoader` and `MidiChartWriter`
+  (`ChartShared.Core/Charting/`) follow. No text is copied there either.
 
 ### YARG.Core
 
 - **Project:** [YARC-Official/YARG.Core](https://github.com/YARC-Official/YARG.Core)
 - **Used for:** how the games read a chart. The `.chart` and MIDI readers, the drum and note
-  conversion, and Chart Builder's loader and game view (`ChartPacker.Core/Charts/` and
+  conversion, and Chart Builder's loader and game view (`ChartShared.Core/Charts/` and
   `Charting/`) follow YARG's reading behaviour, observed from its source. No code is copied.
   Source files whose behaviour follows YARG name the upstream type in their documentation
   comments.
 
 ### Audio formats
 
-The containers and headers that `ChartPacker.Audio` reads itself are written from their
+The containers and headers that `ChartShared.Audio` reads itself are written from their
 specifications; no code from any implementation of them is used.
 
 - **Ogg:** [RFC 3533](https://www.rfc-editor.org/rfc/rfc3533), The Ogg Encapsulation Format
@@ -109,6 +109,20 @@ specifications; no code from any implementation of them is used.
 | [Tune pitch](https://game-icons.net/1x1/lorc/tune-pitch.html) | [Lorc](https://lorcblog.blogspot.com) | Pitch correction |
 | [Gamepad](https://game-icons.net/1x1/delapouite/gamepad.html) | [Delapouite](https://delapouite.com) | Playtest |
 
+### Bootstrap Icons
+
+- **Project:** [Bootstrap Icons](https://icons.getbootstrap.com) ([twbs/icons](https://github.com/twbs/icons))
+- **License:** [MIT](#mit-license) © The Bootstrap Authors
+- **Used for:** the program icons of Chart Packer and Chart Builder, and the icon of `.sng` files
+  without album art. The SVGs are kept unchanged in `tools/IconGen/Sources`. `tools/IconGen` fills
+  each one in a single colour, and saves them as the `.ico` files below.
+
+| Icon | Used as |
+|---|---|
+| [box-seam-fill](https://icons.getbootstrap.com/icons/box-seam-fill/) | Chart Packer (`ChartPacker/Assets/ChartPacker.ico`) |
+| [bar-chart-line-fill](https://icons.getbootstrap.com/icons/bar-chart-line-fill/) | Chart Builder (`ChartBuilder/Assets/ChartBuilder.ico`) |
+| [disc-fill](https://icons.getbootstrap.com/icons/disc-fill/) | `.sng` files (`installer/SngFile.ico`) |
+
 ## Bundled libraries
 
 A release is a single native executable (.NET Native AOT) plus the native libraries below it
@@ -138,19 +152,19 @@ builds only) aren't part of a release and aren't listed.
 | [SDL](https://github.com/libsdl-org/SDL), the native library in `ppy.SDL3-CS` | 3.5.0 | zlib | © 1997-2026 Sam Lantinga |
 | [FFmpeg](https://ffmpeg.org): `libavformat`, `libavcodec`, `libavutil`, `libswscale`, `libswresample` | 9.0 | LGPL 2.1 or later | © 2000-2026 the FFmpeg developers |
 
-ATL.NET reads audio durations in `ChartPacker.Core/Scanning/AudioLength.cs`, the library list's
+ATL.NET reads audio durations in `ChartShared.Core/Scanning/AudioLength.cs`, the library list's
 fallback when a song has no `song_length`.
 
 Serilog writes both apps' logs, and Serilog.Sinks.File writes them to daily files in the per-user
-log folder (`ChartPacker.UI/AppLog.cs`).
+log folder (`ChartShared.UI/AppLog.cs`).
 
-For audio playback (`ChartPacker.Audio`), FFmpeg's decoders decode Vorbis, Opus and MPEG audio
+For audio playback (`ChartShared.Audio`), FFmpeg's decoders decode Vorbis, Opus and MPEG audio
 packets when its libraries are present. Otherwise NVorbis decodes Vorbis, NLayer decodes MPEG audio
 frames, and Concentus decodes Opus packets, all in managed code. SDL plays the mixed result; only
 its audio subsystem is used. Its native library (`SDL3.dll`, `libSDL3.so` or `libSDL3.dylib`)
 ships beside the executable.
 
-For background video (`ChartPacker.Video`), FFmpeg's shared libraries decode the video and
+For background video (`ChartShared.Video`), FFmpeg's shared libraries decode the video and
 scale its frames. They ship beside the executable, unmodified, as separate files; see
 [FFmpeg](#ffmpeg) below.
 
@@ -588,7 +602,7 @@ no GPL or non-free parts of FFmpeg are enabled. They're built, unmodified, from 
 the [FFmpeg source](https://git.ffmpeg.org/ffmpeg.git) by
 [build/ffmpeg/build.sh](build/ffmpeg/build.sh), which gives the full configure line. They can be
 replaced with any other build of the same major versions. Chart-Packer's bindings to them
-(`ChartPacker.Ffmpeg/Interop/Native.cs`) are written from FFmpeg's public headers; no FFmpeg code
+(`ChartShared.Ffmpeg/Interop/Native.cs`) are written from FFmpeg's public headers; no FFmpeg code
 is copied.
 
 ```

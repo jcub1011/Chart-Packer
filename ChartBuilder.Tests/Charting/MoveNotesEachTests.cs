@@ -1,7 +1,7 @@
 using ChartBuilder.Tests.Editing;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Commands;
-using ChartPacker.Core.Charts;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charts;
 using static ChartBuilder.Tests.Charting.CommandChecks;
 
 namespace ChartBuilder.Tests.Charting;

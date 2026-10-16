@@ -3,25 +3,23 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Platform;
 using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
-using ChartPacker.Audio.Playback;
-using ChartPacker.Core.Charting;
-using ChartPacker.Core.Charting.Recovery;
-using ChartPacker.Core.Charts;
-using ChartPacker.Core.Input;
-using ChartPacker.Core.Launching;
-using ChartPacker.Core.Scanning;
-using ChartPacker.Core.Settings;
-using ChartPacker.UI.Services;
-using ChartPacker.UI.Views;
-using ChartPacker.ViewModels.Settings;
+using ChartShared.Audio.Playback;
+using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Recovery;
+using ChartShared.Core.Charts;
+using ChartShared.Core.Input;
+using ChartShared.Core.Launching;
+using ChartShared.Core.Scanning;
+using ChartShared.Core.Settings;
+using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels.Settings;
+using ChartShared.UI.Views;
 
 namespace ChartBuilder.Services
 {
@@ -308,30 +306,18 @@ namespace ChartBuilder.Services
                 if (e.Cancel)
                     return;
 
-                if (editor.WindowState == WindowState.Minimized)
+                if (WindowPlacement.TryCapture(editor, out var state, out var bounds))
                 {
-                    settings.Save();
-                    return;
-                }
+                    if (bounds is { } normal)
+                    {
+                        settings.Settings.EditorX = normal.Position.X;
+                        settings.Settings.EditorY = normal.Position.Y;
+                        settings.Settings.EditorWidth = normal.Size.Width;
+                        settings.Settings.EditorHeight = normal.Size.Height;
+                    }
 
-                if (editor.WindowState == WindowState.Normal)
-                {
-                    settings.Settings.EditorX = editor.Position.X;
-                    settings.Settings.EditorY = editor.Position.Y;
-                    settings.Settings.EditorWidth = editor.Width;
-                    settings.Settings.EditorHeight = editor.Height;
-                    settings.Settings.EditorMaximized = false;
-                    settings.Settings.EditorFullscreen = false;
-                }
-                else if (editor.WindowState == WindowState.FullScreen)
-                {
-                    settings.Settings.EditorMaximized = true;
-                    settings.Settings.EditorFullscreen = true;
-                }
-                else
-                {
-                    settings.Settings.EditorMaximized = true;
-                    settings.Settings.EditorFullscreen = false;
+                    settings.Settings.EditorMaximized = state != WindowState.Normal;
+                    settings.Settings.EditorFullscreen = state == WindowState.FullScreen;
                 }
 
                 settings.Save();
@@ -365,39 +351,9 @@ namespace ChartBuilder.Services
         /// </summary>
         private void RestorePlacement(EditorWindow editor)
         {
-            if (settings.Settings.EditorX is not { } x
-                || settings.Settings.EditorY is not { } y
-                || settings.Settings.EditorWidth is not { } width
-                || settings.Settings.EditorHeight is not { } height)
-            {
-                ApplySavedState(editor);
-                return;
-            }
-
-            width = Math.Clamp(width, BuilderSettings.MinEditorWidth, BuilderSettings.MaxEditorWidth);
-            height = Math.Clamp(height, BuilderSettings.MinEditorHeight, BuilderSettings.MaxEditorHeight);
-            var desired = new PixelPoint(x, y);
-
-            var screens = editor.Screens.All;
-            if (screens.Count == 0)
-            {
-                ApplySavedState(editor);
-                return;
-            }
-
-            Screen? target = editor.Screens.ScreenFromPoint(desired);
-            target ??= editor.Screens.ScreenFromPoint(new PixelPoint(desired.X + (int)(width / 2), desired.Y + (int)(height / 2)));
-            target ??= screens[0];
-            var area = target.WorkingArea;
-
-            var pixelSize = PixelSize.FromSize(new Size(width, height), target.Scaling);
-            var minPixels = PixelSize.FromSize(new Size(BuilderSettings.MinEditorWidth, BuilderSettings.MinEditorHeight), target.Scaling);
-            pixelSize = WindowPlacement.FitSize(pixelSize, minPixels, area);
-
-            editor.Width = pixelSize.Width / target.Scaling;
-            editor.Height = pixelSize.Height / target.Scaling;
-            editor.WindowStartupLocation = WindowStartupLocation.Manual;
-            editor.Position = WindowPlacement.PlaceAt(desired, pixelSize, area);
+            var saved = settings.Settings;
+            if (WindowBounds.FromSaved(saved.EditorX, saved.EditorY, saved.EditorWidth, saved.EditorHeight) is { } bounds)
+                WindowPlacement.Restore(editor, bounds);
             ApplySavedState(editor);
         }
 
@@ -419,7 +375,10 @@ namespace ChartBuilder.Services
         private AvaloniaSettingsWindowService SettingsWindowFor(Window owner) => new(
             () => owner,
             settingsPicker => new SettingsWindowViewModel(
-                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings), settingsPicker, settings.Save));
+                BuilderSettingsCatalog.Create(settings, () => _ = ShowCalibrationAsync(), () => _ = ShowReductionDefaultsAsync(), ShowInputDevices, ResetBindings), settingsPicker, settings.Save),
+            settings.Settings,
+            settings.Save,
+            Strings.AppName);
 
         /// <summary>Puts every profile's bindings back to the keyboard's defaults, keeping each device's settings.</summary>
         private void ResetBindings()

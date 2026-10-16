@@ -4,39 +4,70 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:ChartPacker.ViewModels"
         xmlns:res="using:ChartPacker.Resources"
-        xmlns:ctl="using:ChartPacker.UI.Controls"
+        xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:ctl="using:ChartShared.UI.Controls"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="560"
         x:Class="ChartPacker.Views.JobProgressWindow"
         x:DataType="vm:JobViewModel"
         Title="{x:Static res:Strings.JobProgressWindowTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
         Width="760" Height="560"
-        MinWidth="460" MinHeight="320"
+        MinWidth="560" MinHeight="320"
         ShowInTaskbar="False"
+        CanMinimize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
         WindowStartupLocation="CenterOwner">
 
+    <!-- It can't be minimized: with no taskbar entry, a minimized window would have nothing to restore it from. -->
+
     <Window.Styles>
-        <!-- Tabs: smaller than Fluent's default headers. Skipped and Failed are only coloured once they
-             have something in them. -->
-        <Style Selector="TabItem">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="MinHeight" Value="40" />
+        <!-- While a job runs, the spinner takes the icon's place. The icon is see-through rather than hidden, so its
+             column keeps its width and the summary doesn't move. -->
+        <Style Selector="Border.title-bar.busy > Grid > Image">
+            <Setter Property="Opacity" Value="0" />
         </Style>
-        <Style Selector="TextBlock.tab-header.attention">
+
+        <!-- The spinner, over the icon: under the pointer (or focused) it turns into an X that cancels. It fills the
+             icon's column (12 + 16 + 6), padded so the spinner centres where the icon does, and the bar's height inside
+             the bottom line. -->
+        <Style Selector="Button.cancel">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Padding" Value="6,0,0,0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.cancel ctl|LineIcon">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.cancel:pointerover Arc, Button.cancel:focus-visible Arc">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.cancel:pointerover ctl|LineIcon, Button.cancel:focus-visible ctl|LineIcon">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.cancel:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="Button.cancel:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+
+        <!-- An outcome chip's label is coloured once it has something in it: amber for skipped, red for failed. -->
+        <Style Selector="TextBlock.outcome.attention">
             <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
         </Style>
-        <Style Selector="TextBlock.tab-header.failed">
+        <Style Selector="TextBlock.outcome.failed">
             <Setter Property="Foreground" Value="{DynamicResource SystemControlErrorTextForegroundBrush}" />
         </Style>
 
-        <!-- The list sits in a framed panel, like the settings and library lists. -->
-        <Style Selector="Border.results-frame">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="ClipToBounds" Value="True" />
-        </Style>
         <Style Selector="ListBox.results">
             <Setter Property="Background" Value="Transparent" />
         </Style>
@@ -53,12 +84,10 @@
         </Style>
         <Style Selector="ListBox.results ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
-            <Setter Property="BorderBrush">
-                <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-            </Setter>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </Style>
         <Style Selector="ListBox.results ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#558B5CF6" />
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
         </Style>
         <Style Selector="Border.result-row">
             <Setter Property="Padding" Value="0,9" />
@@ -110,52 +139,6 @@
     </Window.Styles>
 
     <Window.DataTemplates>
-        <!-- A tab: its search, then its rows, or why there are none. -->
-        <DataTemplate DataType="vm:JobResultGroup">
-            <DockPanel Margin="8,10,8,8">
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,8">
-                    <TextBox Grid.Column="0"
-                             Classes="clearButton"
-                             VerticalContentAlignment="Center"
-                             Text="{Binding SearchText}"
-                             PlaceholderText="{x:Static res:Strings.JobSearchWatermark}"
-                             AutomationProperties.Name="{x:Static res:Strings.JobSearchWatermark}">
-                        <TextBox.InnerLeftContent>
-                            <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
-                        </TextBox.InnerLeftContent>
-                        <TextBox.KeyBindings>
-                            <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
-                        </TextBox.KeyBindings>
-                    </TextBox>
-                    <TextBlock Grid.Column="1"
-                               Classes="muted"
-                               VerticalAlignment="Center"
-                               Text="{Binding MatchCountText}"
-                               IsVisible="{Binding IsSearching}" />
-                </Grid>
-
-                <Border Classes="results-frame">
-                    <Panel>
-                        <ListBox Classes="results"
-                                 ItemsSource="{Binding Rows}"
-                                 AutomationProperties.Name="{Binding Title}" />
-                        <TextBlock Classes="muted centered"
-                                   VerticalAlignment="Center"
-                                   Margin="16"
-                                   IsHitTestVisible="False"
-                                   Text="{x:Static res:Strings.JobGroupEmpty}"
-                                   IsVisible="{Binding !HasRows}" />
-                        <TextBlock Classes="muted centered"
-                                   VerticalAlignment="Center"
-                                   Margin="16"
-                                   IsHitTestVisible="False"
-                                   Text="{Binding NoMatchesText}"
-                                   IsVisible="{Binding HasNoMatches}" />
-                    </Panel>
-                </Border>
-            </DockPanel>
-        </DataTemplate>
-
         <!-- One item: its status mark, its name, what happened, and any warnings or errors. -->
         <DataTemplate DataType="vm:JobItemRow">
             <Border Classes="result-row">
@@ -207,56 +190,146 @@
         </DataTemplate>
     </Window.DataTemplates>
 
-    <Grid RowDefinitions="Auto,*,Auto">
-        <Border Grid.Row="0" Classes="toolbar">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SummaryText}"
-                               FontWeight="SemiBold"
-                               Classes.muted="{Binding IsWaiting}"
-                               TextWrapping="Wrap" />
-                    <ProgressBar Value="{Binding Progress}"
-                                 Minimum="0" Maximum="100"
-                                 IsVisible="{Binding IsRunning}" />
-                </StackPanel>
-                <Button Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Content="{x:Static res:SharedStrings.CancelButton}"
-                        Command="{Binding CancelCommand}"
-                        IsVisible="{Binding IsRunning}"
-                        AutomationProperties.Name="{x:Static res:SharedStrings.CancelButton}" />
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <!-- The title bar, as the main window's is, over the job's progress: the icon (the owner's, set in code), or
+             while a job runs the spinner that cancels it, then the summary. Dragging anywhere but the spinner moves the
+             window. Layered: the progress, then the title bar, see-through so the progress shows, then the spinner. -->
+        <Panel Grid.Row="0" Height="31">
+            <ProgressBar Classes="fill"
+                         Margin="0,0,0,1"
+                         Minimum="0" Maximum="100"
+                         Value="{Binding Progress}"
+                         IsVisible="{Binding IsRunning}"
+                         IsHitTestVisible="False"
+                         AutomationProperties.Name="{Binding SummaryText}" />
+
+            <ctl:TitleBar x:Name="WindowTitleBar"
+                          Background="Transparent"
+                          BorderThickness="0,0,0,1"
+                          BorderBrush="{DynamicResource SubtleBorderBrush}"
+                          Classes.busy="{Binding IsRunning}"
+                          AppName="{x:Static res:Strings.AppName}">
+                <TextBlock Margin="8,0,12,0"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Classes.muted="{Binding IsWaiting}"
+                           Text="{Binding SummaryText}" />
+            </ctl:TitleBar>
+
+            <Button Classes="cancel"
+                    Margin="0,0,0,1"
+                    chrome:WindowDecorationProperties.ElementRole="User"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsRunning}"
+                    ToolTip.Tip="{x:Static res:Strings.CancelJobToolTip}"
+                    AutomationProperties.Name="{x:Static res:Strings.CancelJobToolTip}">
+                <Panel>
+                    <Arc Classes="spinner"
+                         Classes.active="{Binding IsRunning}"
+                         Width="14" Height="14" StrokeThickness="2" />
+                    <ctl:LineIcon Data="{StaticResource ClearStroke}" />
+                </Panel>
+            </Button>
+        </Panel>
+
+        <!-- Search, and a chip per outcome, as the library's search strip is. With no chip on, every outcome is shown;
+             with some on, only theirs. -->
+        <Border Grid.Row="1"
+                Padding="6"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Grid.Column="0"
+                         Classes="clearButton"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding Results.SearchText}"
+                         PlaceholderText="{x:Static res:Strings.JobSearchWatermark}"
+                         AutomationProperties.Name="{x:Static res:Strings.JobSearchWatermark}">
+                    <TextBox.InnerLeftContent>
+                        <ctl:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                    </TextBox.InnerLeftContent>
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Escape" Command="{Binding Results.ClearSearchCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <ItemsControl Grid.Column="1"
+                              VerticalAlignment="Center"
+                              ItemsSource="{Binding Results.Chips}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:JobOutcomeChip">
+                            <ToggleButton Classes="filterChip"
+                                          IsChecked="{Binding IsOn}"
+                                          AutomationProperties.Name="{Binding Label}">
+                                <TextBlock Classes="outcome"
+                                           Classes.attention="{Binding IsAttention}"
+                                           Classes.failed="{Binding IsFailed}"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding Label}" />
+                            </ToggleButton>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </Grid>
         </Border>
 
-        <!-- One tab per outcome, so each kind is easy to find. -->
-        <TabControl Grid.Row="1"
-                    Margin="8,4,8,0"
-                    AutomationProperties.Name="{x:Static res:Strings.JobResultsListName}">
-            <TabItem Content="{Binding Completed}">
-                <TabItem.Header>
-                    <TextBlock Classes="tab-header" Text="{Binding Completed.Title}" />
-                </TabItem.Header>
-            </TabItem>
-            <TabItem Content="{Binding Skipped}">
-                <TabItem.Header>
-                    <TextBlock Classes="tab-header" Classes.attention="{Binding Skipped.HasRows}" Text="{Binding Skipped.Title}" />
-                </TabItem.Header>
-            </TabItem>
-            <TabItem Content="{Binding Failed}">
-                <TabItem.Header>
-                    <TextBlock Classes="tab-header" Classes.failed="{Binding Failed.HasRows}" Text="{Binding Failed.Title}" />
-                </TabItem.Header>
-            </TabItem>
-        </TabControl>
+        <!-- Every item in one list, problems first, or why there are none. Double-clicking a row selects its song in
+             the main window's library (JobProgressWindow.axaml.cs). -->
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}">
+            <Panel>
+                <ListBox x:Name="ResultList"
+                         Classes="results"
+                         ItemsSource="{Binding Results.Rows}"
+                         AutomationProperties.Name="{x:Static res:Strings.JobResultsListName}" />
+                <TextBlock Classes="muted centered"
+                           VerticalAlignment="Center"
+                           Margin="16"
+                           IsHitTestVisible="False"
+                           Text="{x:Static res:Strings.JobGroupEmpty}"
+                           IsVisible="{Binding !Results.HasRows}" />
+                <TextBlock Classes="muted centered"
+                           VerticalAlignment="Center"
+                           Margin="16"
+                           IsHitTestVisible="False"
+                           Text="{Binding Results.NoMatchesText}"
+                           IsVisible="{Binding Results.HasNoMatches}" />
+            </Panel>
+        </Border>
 
-        <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
-            <Button HorizontalAlignment="Right"
-                    MinWidth="80"
-                    HorizontalContentAlignment="Center"
-                    Content="{x:Static res:Strings.CloseButton}"
-                    IsCancel="True"
-                    Click="OnClose"
-                    AutomationProperties.Name="{x:Static res:Strings.CloseButton}" />
+        <!-- How many items are listed, or shown of them; then Cancel, while a job runs, and Close. -->
+        <Border Grid.Row="3" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <TextBlock Grid.Column="0"
+                           Classes="muted"
+                           Margin="4,0,0,0"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding Results.CountText}"
+                           IsVisible="{Binding Results.HasRows}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static sres:SharedStrings.CancelButton}"
+                            Command="{Binding CancelCommand}"
+                            IsVisible="{Binding IsRunning}"
+                            ToolTip.Tip="{x:Static res:Strings.CancelJobToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.CancelJobToolTip}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:Strings.CloseButton}"
+                            IsCancel="True"
+                            Click="OnClose"
+                            AutomationProperties.Name="{x:Static res:Strings.CloseButton}" />
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>
