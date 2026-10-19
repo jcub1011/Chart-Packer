@@ -184,6 +184,16 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <!-- A search box in a title bar: shorter than a TextBox's usual 32, to fit the 30 high bar. -->
+    <Style Selector="TextBox.title-search">
+        <Setter Property="Width" Value="300" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="6,2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
     <!-- Buttons with an icon and a label, such as the details panel's Save and Discard. -->
     <Style Selector="Button.labelled">
         <Setter Property="Height" Value="28" />
