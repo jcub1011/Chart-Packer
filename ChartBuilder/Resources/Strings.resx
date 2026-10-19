@@ -389,7 +389,7 @@
     <comment>The playhead's time and the song's length, e.g. "0:42.0 / 3:00.0".</comment>
   </data>
   <data name="TimelineToolTip" xml:space="preserve">
-    <value>Click or drag to move the playhead.</value>
+    <value>Click or drag to move the playhead. Scroll to move it a bar, Shift+scroll four.</value>
   </data>
   <data name="InspectorMetadataHeading" xml:space="preserve">
     <value>Metadata</value>

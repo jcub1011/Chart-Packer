@@ -20,7 +20,7 @@ namespace ChartBuilder.Controls
 
     /// <summary>
     /// The editor's timeline: second marks, the whole mix's waveform, the chart's beat and measure lines, and a playhead
-    /// that clicking or dragging moves (scrubbing). It's also the overview strip (charter-spec C3 item 2): the sections,
+    /// that clicking or dragging moves (scrubbing), and the wheel moves a bar at a time. It's also the overview strip (charter-spec C3 item 2): the sections,
     /// the note density, star power and solos of the lane in focus, and a box round the span the lanes show.
     /// </summary>
     /// <remarks>
@@ -65,6 +65,12 @@ namespace ChartBuilder.Controls
         private Pen? _measurePen;
         private Pen? _waveformPen;
         private bool _frameRequested;
+
+        // The wheel turn not yet taken as a notch.
+        private double _wheel;
+
+        // How near a bar line the playhead counts as on it, so one put there by the wheel doesn't stick to it.
+        private const double BarTolerance = 1e-3;
 
         // The picture of everything but the playhead, the size and scaling it was drawn at, and whether what it shows has
         // changed since.
@@ -573,6 +579,57 @@ namespace ChartBuilder.Controls
         {
             if (Bounds.Width > 0)
                 Position = Math.Clamp(TimeOf(e.GetPosition(this).X, Bounds.Width), 0, Length);
+        }
+
+        protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+        {
+            base.OnPointerWheelChanged(e);
+
+            // A bar a notch, later with the wheel turned down, as along the lanes' timeline; four with Shift held, which
+            // some platforms report as a sideways scroll. At most one notch per wheel event.
+            bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
+            double raw = e.Delta.Y != 0 ? e.Delta.Y : (fast ? e.Delta.X : 0);
+            int bars = Editing.EditorCanvas.TakeScrollStep(ref _wheel, -raw, fast);
+            if (bars != 0 && Beats is { } beats && StepBars(beats, Position, bars) is { } seconds)
+                Position = Math.Clamp(seconds, 0, Length);
+
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// The bar line <paramref name="bars"/> bars from <paramref name="position"/>, later for more than none: from
+        /// partway through a bar, the first back is the bar's own start. As far as there are bar lines, or null for none
+        /// that way.
+        /// </summary>
+        internal static double? StepBars(IReadOnlyList<TimelineBeat> beats, double position, int bars)
+        {
+            double? found = null;
+            int left = Math.Abs(bars);
+            if (bars > 0)
+            {
+                foreach (var beat in beats)
+                {
+                    if (!beat.IsMeasure || beat.Seconds <= position + BarTolerance)
+                        continue;
+                    found = beat.Seconds;
+                    if (--left == 0)
+                        break;
+                }
+            }
+            else if (bars < 0)
+            {
+                for (int i = beats.Count - 1; i >= 0; i--)
+                {
+                    var beat = beats[i];
+                    if (!beat.IsMeasure || beat.Seconds >= position - BarTolerance)
+                        continue;
+                    found = beat.Seconds;
+                    if (--left == 0)
+                        break;
+                }
+            }
+
+            return found;
         }
 
         /// <summary>Where the playhead is drawn: at the clock while playing, otherwise at <see cref="Position"/>.</summary>
