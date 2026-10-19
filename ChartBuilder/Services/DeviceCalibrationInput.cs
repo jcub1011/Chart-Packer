@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Avalonia.Input;
+using ChartShared.Core;
 using ChartShared.Core.Input;
 using ChartShared.UI.Services;
 
@@ -37,7 +38,7 @@ namespace ChartBuilder.Services
             }
 
             input.Hub.Received += OnReceived;
-            return new Listening(() =>
+            return new DisposeAction(() =>
             {
                 input.Hub.Received -= OnReceived;
                 lease.Dispose();
@@ -46,25 +47,15 @@ namespace ChartBuilder.Services
 
         public void Key(PhysicalKey key, bool down) => input.PostKey(key, down);
 
-        /// <summary>Stores the offset in the device's settings, keeping the rest, and has the playtest take it up.</summary>
+        /// <summary>
+        /// Stores the offset in the device's settings, keeping the rest, and has the playtest take it up; when the file can't
+        /// be written, the device keeps the offset it had.
+        /// </summary>
         public bool Save(int offsetMs)
         {
             var tuning = input.Settings.Settings.TuningOf(device.Id).Sanitized();
             tuning.OffsetMs = offsetMs;
-            input.Settings.Settings.SetTuning(tuning);
-            input.SaveBindings();
-            return true;
-        }
-
-        private sealed class Listening(Action stop) : IDisposable
-        {
-            private Action? _stop = stop;
-
-            public void Dispose()
-            {
-                _stop?.Invoke();
-                _stop = null;
-            }
+            return input.SaveTuning(tuning);
         }
     }
 }

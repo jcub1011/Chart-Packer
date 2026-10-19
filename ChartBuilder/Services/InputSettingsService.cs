@@ -29,6 +29,7 @@ namespace ChartBuilder.Services
         }
 
         /// <summary>Writes the profiles and devices changed in this run, keeping other processes' changes to the rest.</summary>
-        public void Save() => _file.Save(Settings);
+        /// <returns>Whether the file was written.</returns>
+        public bool Save() => _file.Save(Settings);
     }
 }

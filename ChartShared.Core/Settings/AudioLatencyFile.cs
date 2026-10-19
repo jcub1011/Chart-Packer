@@ -15,7 +15,7 @@ public readonly record struct LatencyLookup(int Milliseconds, LatencySource Sour
 
 /// <summary>
 /// <c>audio-latency.json</c>: the audio/visual latency measured by Chart Builder's calibration tool, per
-/// output device (charter-spec C11, §10). Chart Builder writes it; Chart Packer only reads it.
+/// output device (charter-spec C11, §10). The calibration tool writes it, in whichever app opens it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,7 +26,8 @@ public readonly record struct LatencyLookup(int Milliseconds, LatencySource Sour
 /// <para>
 /// Several processes may share the file, so a save re-reads it and changes only the device saved,
 /// keeping every other entry and any keys it doesn't know. It writes a temp file and renames it into
-/// place, as <see cref="JsonSettingsFile{T}"/> does. The path is always passed in; tests pass a temp file.
+/// place, holding <c>{file}.lock</c> from its read to the rename, as <see cref="JsonSettingsFile{T}"/> does.
+/// The path is always passed in; tests pass a temp file.
 /// </para>
 /// </remarks>
 public sealed class AudioLatencyFile
@@ -58,8 +59,8 @@ public sealed class AudioLatencyFile
     }
 
     /// <summary>
-    /// <see cref="Find"/>, and when the value was found by name, <see cref="RememberUnderId"/>. For Chart Builder,
-    /// which owns the file; Chart Packer only finds.
+    /// <see cref="Find"/>, and when the value was found by name, <see cref="RememberUnderId"/>. For the calibration
+    /// tool and Chart Builder's playback; Chart Packer's playback only finds.
     /// </summary>
     public LatencyLookup FindAndRemember(string name, string? id)
     {
@@ -79,12 +80,15 @@ public sealed class AudioLatencyFile
             return false;
 
         milliseconds = Math.Clamp(milliseconds, -MaxMilliseconds, MaxMilliseconds);
-        var file = JsonFiles.ReadObject(_path, warn: false) ?? [];
-        if (!string.IsNullOrEmpty(name))
-            MapIn(file, ByName)[name] = milliseconds;
-        if (!string.IsNullOrEmpty(id))
-            MapIn(file, ById)[id] = milliseconds;
-        return JsonFiles.WriteAtomically(_path, file);
+        return JsonFiles.Update(_path, file =>
+        {
+            file ??= [];
+            if (!string.IsNullOrEmpty(name))
+                MapIn(file, ByName)[name] = milliseconds;
+            if (!string.IsNullOrEmpty(id))
+                MapIn(file, ById)[id] = milliseconds;
+            return file;
+        });
     }
 
     /// <summary>
@@ -96,12 +100,19 @@ public sealed class AudioLatencyFile
         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name))
             return;
 
-        var file = JsonFiles.ReadObject(_path, warn: false);
-        if (ValueIn(file, ById, id) is not null || ValueIn(file, ByName, name) is not { } byName)
+        // Looked for first without the lock, as it's nearly always there already, then again under it.
+        var found = JsonFiles.ReadObject(_path, warn: false);
+        if (ValueIn(found, ById, id) is not null || ValueIn(found, ByName, name) is null)
             return;
 
-        MapIn(file!, ById)[id] = byName;
-        JsonFiles.WriteAtomically(_path, file!);
+        JsonFiles.Update(_path, file =>
+        {
+            if (ValueIn(file, ById, id) is not null || ValueIn(file, ByName, name) is not { } byName)
+                return null;
+
+            MapIn(file!, ById)[id] = byName;
+            return file;
+        });
     }
 
     private static int? ValueIn(JsonObject? file, string map, string key) =>

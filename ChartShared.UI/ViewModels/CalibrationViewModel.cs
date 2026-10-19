@@ -5,7 +5,6 @@ using ChartShared.Audio.Mixing;
 using ChartShared.Audio.Playback;
 using ChartShared.Audio.Synthesis;
 using ChartShared.Core.Calibration;
-using ChartShared.Core.Charts;
 using ChartShared.Core.Settings;
 using ChartShared.UI.Controls.Highway;
 using ChartShared.UI.Resources;
@@ -70,13 +69,7 @@ namespace ChartShared.UI.ViewModels
             _calibration = new LatencyCalibration(latency.File, device.Name, device.Id);
             Value = _calibration.Value;
             DeviceName = DeviceNameOf(device.Name);
-
-            var tempo = CalibrationChart.Tempo;
-            var notes = CalibrationChart.Notes(CalibrationChart.BeatsIn(MixLength - Lead));
-            Scene = new HighwayScene(
-                [new HighwayLane(ChartInstrumentKind.FiveFret, HighwayLane.LaneCountOf(ChartInstrumentKind.FiveFret, false), "", notes, tempo, Lead)],
-                tempo,
-                Lead);
+            Scene = SceneOf(CalibrationChart.Notes(CalibrationChart.BeatsIn(MixLength - Lead)), Lead);
         }
 
         public static int MinLatency => -AudioLatencyFile.MaxMilliseconds;

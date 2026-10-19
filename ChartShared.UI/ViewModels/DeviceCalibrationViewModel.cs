@@ -4,7 +4,6 @@ using System.Globalization;
 using Avalonia.Input;
 using Avalonia.Threading;
 using ChartShared.Core.Calibration;
-using ChartShared.Core.Charts;
 using ChartShared.Core.Input;
 using ChartShared.UI.Controls.Highway;
 using ChartShared.UI.Resources;
@@ -64,13 +63,7 @@ namespace ChartShared.UI.ViewModels
             _clock = clock ?? (() => InputClock.Now);
             DeviceName = input.DeviceName;
             SavedOffset = input.OffsetMs;
-
-            var tempo = CalibrationChart.Tempo;
-            var notes = CalibrationChart.Notes(CalibrationChart.DeviceNoteCount, CalibrationChart.DeviceLeadBeats);
-            Scene = new HighwayScene(
-                [new HighwayLane(ChartInstrumentKind.FiveFret, HighwayLane.LaneCountOf(ChartInstrumentKind.FiveFret, false), "", notes, tempo, TimeSpan.Zero)],
-                tempo,
-                TimeSpan.Zero);
+            Scene = SceneOf(CalibrationChart.Notes(CalibrationChart.DeviceNoteCount, CalibrationChart.DeviceLeadBeats), TimeSpan.Zero);
 
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TickInterval };
             _timer.Tick += (_, _) => Tick();

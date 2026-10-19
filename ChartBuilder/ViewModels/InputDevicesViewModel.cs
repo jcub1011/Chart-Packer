@@ -170,15 +170,18 @@ namespace ChartBuilder.ViewModels
         private const double MeterFall = 0.4;
 
         private readonly InputService _input;
-        private readonly Func<InputDeviceInfo, Task>? _calibrate;
+        private readonly Func<InputDeviceInfo, Task<bool>>? _calibrate;
         private readonly IDisposable _lease;
         private readonly DispatcherTimer _meters;
         private BindingDetector? _detector;
         private InputActionRow? _listening;
         private bool _disposed;
 
-        /// <param name="calibrate">Opens the calibration tool to measure a device's offset, and waits for it to close.</param>
-        public InputDevicesViewModel(InputService input, Func<InputDeviceInfo, Task>? calibrate = null)
+        /// <param name="calibrate">
+        /// Opens the calibration tool to measure a device's offset, and waits for it to close; gives false when the tool was
+        /// open already, so the device wasn't measured.
+        /// </param>
+        public InputDevicesViewModel(InputService input, Func<InputDeviceInfo, Task<bool>>? calibrate = null)
         {
             _input = input;
             _calibrate = calibrate;
@@ -261,15 +264,26 @@ namespace ChartBuilder.ViewModels
             _input.SaveBindings();
         }
 
-        /// <summary>Measures a device's offset with the calibration tool, then shows what it saved, if anything.</summary>
+        /// <summary>
+        /// Measures a device's offset with the calibration tool, then shows what it saved, if anything. Bind stops waiting
+        /// first, so the test's taps aren't taken for a control to bind.
+        /// </summary>
         internal async Task CalibrateAsync(InputDeviceRow row)
         {
             if (_calibrate is null)
                 return;
 
-            await _calibrate(row.Info);
-            if (!_disposed)
+            StopListening();
+            PendingMove = null;
+            Status = null;
+            bool ran = await _calibrate(row.Info);
+            if (_disposed)
+                return;
+
+            if (ran)
                 row.ShowOffset(_input.Settings.Settings.TuningOf(row.Info.Id).OffsetMs);
+            else
+                Status = Strings.InputCalibrationAlreadyOpen;
         }
 
         /// <summary>The General MIDI drum map on a MIDI device, in place of the drums bindings it had.</summary>

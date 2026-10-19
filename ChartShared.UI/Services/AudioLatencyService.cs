@@ -1,6 +1,7 @@
 using System;
 using Avalonia.Threading;
 using ChartShared.Audio.Playback;
+using ChartShared.Core;
 using ChartShared.Core.Settings;
 
 namespace ChartShared.UI.Services
@@ -36,7 +37,7 @@ namespace ChartShared.UI.Services
             void OnDeviceChanged(AudioDevice device) => Dispatcher.UIThread.Post(() => SetDevice(device));
             output.DeviceChanged += OnDeviceChanged;
             SetDevice(output.Device);
-            return new Unsubscriber(() => output.DeviceChanged -= OnDeviceChanged);
+            return new DisposeAction(() => output.DeviceChanged -= OnDeviceChanged);
         }
 
         /// <summary>Loads <paramref name="device"/>'s latency.</summary>
@@ -57,17 +58,6 @@ namespace ChartShared.UI.Services
             Milliseconds = found.Milliseconds;
             Source = found.Source;
             Changed?.Invoke(this, EventArgs.Empty);
-        }
-
-        private sealed class Unsubscriber(Action unsubscribe) : IDisposable
-        {
-            private Action? _unsubscribe = unsubscribe;
-
-            public void Dispose()
-            {
-                _unsubscribe?.Invoke();
-                _unsubscribe = null;
-            }
         }
     }
 }

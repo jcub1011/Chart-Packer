@@ -62,6 +62,29 @@ namespace ChartBuilder.Services
             BindingsChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// Saves <paramref name="tuning"/> as its device's settings and has everything that plays take it up; when the file
+        /// can't be written, puts back what the device had, so nothing changes.
+        /// </summary>
+        /// <returns>Whether it was saved.</returns>
+        public bool SaveTuning(DeviceTuning tuning)
+        {
+            ArgumentNullException.ThrowIfNull(tuning);
+            var settings = Settings.Settings;
+
+            // SetTuning makes a new list, so this one is the devices' settings as they were.
+            var before = settings.Devices;
+            settings.SetTuning(tuning);
+            if (!Settings.Save())
+            {
+                settings.Devices = before;
+                return false;
+            }
+
+            BindingsChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
         public void Dispose() => Hub.Dispose();
     }
 }

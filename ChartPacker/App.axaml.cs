@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -83,14 +84,30 @@ namespace ChartPacker
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice);
 
                 // Settings' Calibrate… opens the calibration tool (charter-spec C11) over the window in front, pausing the
-                // song; the latency it saves is read again once it closes.
-                var calibration = new CalibrationWindowService(audio.Open, new AudioLatencyService(latency));
+                // song; the latency it saves is read again once it closes. The tool starts on the device the song plays on,
+                // so it names it and shows its latency even when its own output can't be opened.
+                var calibrationLatency = new AudioLatencyService(latency);
+                var calibration = new CalibrationWindowService(audio.Open, calibrationLatency, () =>
+                {
+                    player.Pause();
+                    if (player.OutputDevice is { } device)
+                        calibrationLatency.SetDevice(device);
+                });
                 async Task CalibrateAsync()
                 {
-                    if (!calibration.IsOpen)
-                        player.Pause();
-                    await calibration.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? window);
-                    player.RefreshLatency();
+                    try
+                    {
+                        await calibration.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? window);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Nothing awaits this, so anything not caught here would be lost.
+                        Trace.TraceError($"The calibration tool failed: {ex}");
+                    }
+                    finally
+                    {
+                        player.RefreshLatency();
+                    }
                 }
 
                 void Calibrate() => _ = CalibrateAsync();

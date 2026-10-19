@@ -1,4 +1,6 @@
 using System;
+using ChartShared.Core.Calibration;
+using ChartShared.Core.Charts;
 using ChartShared.UI.Controls.Highway;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -63,5 +65,15 @@ namespace ChartShared.UI.ViewModels
 
         /// <summary>Whether there's anything to save yet.</summary>
         protected virtual bool CanSave() => true;
+
+        /// <summary>The tool's highway: one 5-fret lane of <paramref name="notes"/> on <see cref="CalibrationChart.Tempo"/>, from <paramref name="lead"/>.</summary>
+        protected static HighwayScene SceneOf(ChartNote[] notes, TimeSpan lead)
+        {
+            var tempo = CalibrationChart.Tempo;
+            return new HighwayScene(
+                [new HighwayLane(ChartInstrumentKind.FiveFret, HighwayLane.LaneCountOf(ChartInstrumentKind.FiveFret, false), "", notes, tempo, lead)],
+                tempo,
+                lead);
+        }
     }
 }

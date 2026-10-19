@@ -1450,13 +1450,19 @@ both read and write the one shared latency file ([§10](#10-settings)). It opens
 - from Chart Builder's **Settings**;
 - from Chart Builder's transport bar;
 - from **Calibrate…** in Chart Packer's Settings, which pauses the song and reads the latency again
-  when the tool closes;
+  when the tool closes. The tool starts on the device the song plays on, so it names that device and
+  shows its latency even when the tool's own output can't be opened;
 - **automatically, once**, the first time Chart Builder opens on a device that has no calibration.
   This can be skipped.
 
 Its input-device test opens from **Calibrate…** beside a device's offset in Chart Builder's Input
-devices window, over that window, pausing the Editor. Chart Packer has no instrument input, so it
-has only the audio/visual test.
+devices window, over that window, pausing the Editor. A **Bind** still waiting for a control stops
+waiting first, so the test's taps never bind one. Chart Packer has no instrument input, so it has
+only the audio/visual test.
+
+Only one test is open at a time. Opening the tool again, for either test, brings the one open to
+the front; when that's from the Input devices window, it says the tool is already open, and the
+device isn't measured.
 
 **Behaviour:**
 
@@ -1524,7 +1530,8 @@ has only the audio/visual test.
      input offset can be is saved as the nearest it can.
    - **Try again** runs the test anew. **Save** stores the offset in the device's settings
      (`input-bindings.json`), keeping the rest, and the playtest takes it up at once; the Input
-     devices window shows it. **Cancel** stores nothing.
+     devices window shows it. When the file can't be written, the tool says so and stays open, and
+     the device keeps the offset it had. **Cancel** stores nothing.
    - **The keyboard** has an offset too. The window hands its keys on to the keyboard device, all
      but Escape, which cancels, before any button has them, so Space or Enter never presses one.
      Key events carry no timestamp, so a key is timed when it's handled, and its spread is wider.
@@ -2703,7 +2710,10 @@ Each app owns its settings file, and every file is in the per-user config folder
 `JsonSettingsFile<T>`. Several processes can share a file (several Chart Builders, say), so a save
 re-reads the file and replaces only the settings this process changed since it last loaded or saved.
 Other processes' changes to the other settings, and keys this version doesn't know, are kept. Each
-save writes its own temp file and renames it into place.
+save writes its own temp file and renames it into place. It holds `{file}.lock` from its read to the
+rename, so two processes' saves can't interleave and lose one's changes. The lock is the open handle,
+which the OS lets go of if a process dies. A save that can't get the lock within about a second
+isn't written.
 
 | File | Owner | Holds |
 | ---- | ----- | ----- |
@@ -2745,8 +2755,8 @@ stored in `audio-latency.json` as two maps, from device ID and from device name 
 milliseconds, plus the fallback (`{ "byId": { … }, "byName": { … }, "fallback": 0 }`). It is
 looked up in that order ([C11](#c11-calibration-tool)). Values are kept within ±500 ms, and a save
 changes only the device saved, keeping the rest of the file (`AudioLatencyFile`). The file is
-written to a temp file and renamed into place, as `settings.json` is, so a reader never sees half
-of it.
+written to a temp file and renamed into place, under the same lock as `settings.json`, so a reader
+never sees half of it and the two apps' saves don't overwrite each other.
 
 The new-chart settings (default charter name and default resolution) moved from `AppSettings` to
 `BuilderSettings` when new charts moved to Chart Builder, before any release included them, so

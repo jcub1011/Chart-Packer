@@ -3118,6 +3118,10 @@ Saving also makes these changes to song.ini:
     <value>Space, Esc, P and N are the editor's, and can't be bound.</value>
     <comment>The Input devices window: a reserved key was pressed while binding.</comment>
   </data>
+  <data name="InputCalibrationAlreadyOpen" xml:space="preserve">
+    <value>The calibration tool is already open. Close it, then calibrate the device.</value>
+    <comment>The Input devices window: Calibrate… was pressed while the calibration tool was open, which is brought to the front instead.</comment>
+  </data>
   <data name="InputRemoveBindingToolTip" xml:space="preserve">
     <value>Remove this binding</value>
     <comment>The Input devices window: the ✕ on a binding's chip.</comment>

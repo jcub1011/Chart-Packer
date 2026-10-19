@@ -42,8 +42,13 @@ namespace ChartBuilder.Services
         RecoveryStore recovery,
         InputService input) : IEditorWindowService
     {
-        // The calibration tool, shared with Chart Packer.
-        private readonly CalibrationWindowService _calibration = new(openOutput, latency);
+        // The calibration tool, shared with Chart Packer, which pauses the Editor's playback as it opens, so its notes are
+        // the only ones moving.
+        private readonly CalibrationWindowService _calibration = new(openOutput, latency, () =>
+        {
+            if (desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
+                editor.Playback.Pause();
+        });
 
         // The Input devices window, while it's open.
         private InputDevicesWindow? _inputDevices;
@@ -165,25 +170,16 @@ namespace ChartBuilder.Services
         /// Opens the calibration tool (charter-spec C11) over the window in front, pausing the Editor's playback. Only
         /// one is open at a time; opening it again brings that one to the front.
         /// </summary>
-        public async Task ShowCalibrationAsync()
-        {
-            if (!_calibration.IsOpen && desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
-                editor.Playback.Pause();
-
+        public async Task ShowCalibrationAsync() =>
             await _calibration.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow);
-        }
 
         /// <summary>
         /// Opens the calibration tool's input-device test (charter-spec C11 item 2) for <paramref name="device"/> over the
         /// Input devices window, pausing the Editor's playback, so its notes are the only ones moving.
         /// </summary>
-        private async Task ShowDeviceCalibrationAsync(InputDevicesWindow owner, InputDeviceInfo device)
-        {
-            if (!_calibration.IsOpen && desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
-                editor.Playback.Pause();
-
-            await _calibration.ShowDeviceAsync(owner, new DeviceCalibrationInput(input, device));
-        }
+        /// <returns>Whether it ran: false when the tool was open already, which is brought to the front instead.</returns>
+        private Task<bool> ShowDeviceCalibrationAsync(InputDevicesWindow owner, InputDeviceInfo device) =>
+            _calibration.ShowDeviceAsync(owner, new DeviceCalibrationInput(input, device));
 
         /// <summary>
         /// Opens the Input devices window (charter-spec C19 item 2), where devices are bound to the instruments. Only one is

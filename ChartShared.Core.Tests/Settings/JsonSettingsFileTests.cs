@@ -108,7 +108,38 @@ public sealed class JsonSettingsFileTests
 
         file.Save(settings);
 
-        Assert.AreSequenceEqual(new[] { "settings.json" }, [.. _root.GetFiles().Select(f => f.Name)]);
+        // The lock file is deleted as it's let go on Windows only.
+        Assert.AreSequenceEqual(new[] { "settings.json" }, [.. _root.GetFiles().Select(f => f.Name).Where(n => !n.EndsWith(".lock", StringComparison.Ordinal))]);
+    }
+
+    [TestMethod]
+    public void ASaveSaysWhetherItWasWritten()
+    {
+        var file = Open();
+        var settings = file.Load();
+        settings.Count = 2;
+        Assert.IsTrue(file.Save(settings));
+
+        // A folder where the file goes can't be renamed over.
+        File.Delete(_path);
+        Directory.CreateDirectory(_path);
+        settings.Count = 3;
+
+        Assert.IsFalse(file.Save(settings));
+    }
+
+    [TestMethod]
+    public void ASettingNotWrittenIsWrittenByTheNextSave()
+    {
+        var file = Open();
+        var settings = file.Load();
+        settings.Count = 3;
+        using (new FileStream(_path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            Assert.IsFalse(file.Save(settings));
+
+        Assert.IsTrue(file.Save(settings));
+
+        Assert.AreEqual(3, Open().Load().Count);
     }
 
     private JsonSettingsFile<TestSettings> Open() => new(_path, TestSettingsJsonContext.Default.TestSettings);

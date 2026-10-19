@@ -75,6 +75,23 @@ public sealed class DeviceCalibrationInputTests
         Assert.IsTrue(rebound);
     }
 
+    [TestMethod]
+    public void AnOffsetThatCantBeWrittenIsNotSavedAndTheDeviceKeepsItsOwn()
+    {
+        using var input = new InputService(InputSettingsService.Load(_path), [new FakeSource()]);
+        input.Settings.Settings.SetTuning(new DeviceTuning { Kind = Guitar.Id.Kind, Key = Guitar.Id.Key, OffsetMs = 12 });
+        bool rebound = false;
+        input.BindingsChanged += (_, _) => rebound = true;
+
+        // A folder where the file goes can't be renamed over.
+        Directory.CreateDirectory(_path);
+        var calibration = new DeviceCalibrationInput(input, Guitar);
+
+        Assert.IsFalse(calibration.Save(-18));
+        Assert.AreEqual(12, calibration.OffsetMs);
+        Assert.IsFalse(rebound);
+    }
+
     private static RawInputEvent Button(InputDeviceId device, float value, double time) =>
         new(device, new InputControl(InputControlKind.Button, 0), value, time);
 
