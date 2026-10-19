@@ -66,8 +66,6 @@ namespace ChartBuilder.Services
         private EditorServices? _services;
         private AvaloniaAuthoringDialogService? _authoring;
 
-        private EditorWindow Editor => _editor ?? throw new InvalidOperationException("The Editor window isn't open yet.");
-
         private EditorServices Services => _services ?? throw new InvalidOperationException("The Editor window isn't open yet.");
 
         /// <summary>Makes the Editor the app's main window, opening <paramref name="args"/> in it once it's showing.</summary>
@@ -120,7 +118,7 @@ namespace ChartBuilder.Services
                     break;
             }
 
-            if (Editor.DataContext is EditorWindowViewModel current)
+            if (_editor?.DataContext is EditorWindowViewModel current)
                 await current.OfferUnsavedChartsAsync();
         }
 
@@ -140,10 +138,10 @@ namespace ChartBuilder.Services
         }
 
         public void OpenSong(OpenedSong song, SongLock songLock) =>
-            Load(() => EditorWindowViewModel.ForSong(Services, song, songLock));
+            Load(() => EditorWindowViewModel.ForSong(Services, song, songLock), songLock);
 
         public void OpenRecovered(EditorSong song, SongLock? songLock, string recoveryKey) =>
-            Load(() => EditorWindowViewModel.ForRecovered(Services, song, songLock, recoveryKey));
+            Load(() => EditorWindowViewModel.ForRecovered(Services, song, songLock, recoveryKey), songLock);
 
         /// <summary>What the Editors in <paramref name="editor"/> work with, their prompts and pickers shown over it.</summary>
         private EditorServices ServicesFor(EditorWindow editor, AvaloniaAuthoringDialogService authoring) => new(
@@ -172,9 +170,19 @@ namespace ChartBuilder.Services
         /// Opens the Editor <paramref name="create"/> makes in the Editor window in place of what's open, letting go of that
         /// one's song, and starts its audio. The window stays as it is: its screen, position, size and state.
         /// </summary>
-        private void Load(Func<EditorWindowViewModel> create)
+        /// <param name="songLock">
+        /// The lock the new Editor is given, let go of here if the window has closed by the time it's opened, as nothing
+        /// is opened then.
+        /// </param>
+        private void Load(Func<EditorWindowViewModel> create, SongLock? songLock = null)
         {
-            var editor = Editor;
+            if (_editor is not { } editor)
+            {
+                Logger.Information("The Editor window closed before what was opening in it was ready");
+                songLock?.Dispose();
+                return;
+            }
+
             var time = Stopwatch.StartNew();
 
             // The new Editor starts from the layout saved, so the one open saves its own first.
@@ -185,16 +193,26 @@ namespace ChartBuilder.Services
             // The views move on to the new Editor before the old one is disposed, so none is left on a disposed one.
             var previous = editor.DataContext as EditorWindowViewModel;
             editor.DataContext = viewModel;
-            _authoring?.Follow(viewModel.Editor.Preview);
-            long bound = time.ElapsedMilliseconds;
-            previous?.Dispose();
-            long disposed = time.ElapsedMilliseconds;
-            _ = viewModel.Playback.OpenAsync();
 
-            // The frame after the next has the new Editor laid out and drawn, which the next one starts on.
-            editor.RequestAnimationFrame(_ => editor.RequestAnimationFrame(_ => Logger.Information(
-                "Opened {Title} in the Editor: made in {MadeMs} ms, bound in {BoundMs} ms, the last disposed in {DisposedMs} ms, drawn after {DrawnMs} ms",
-                viewModel.Song.Title, made, bound - made, disposed - bound, time.ElapsedMilliseconds)));
+            // From here the new Editor is the one on screen, so what goes wrong is said on its message bar.
+            try
+            {
+                _authoring?.Follow(viewModel.Editor.Preview);
+                long bound = time.ElapsedMilliseconds;
+                previous?.Dispose();
+                long disposed = time.ElapsedMilliseconds;
+                _ = viewModel.Playback.OpenAsync();
+
+                // The frame after the next has the new Editor laid out and drawn, which the next one starts on.
+                editor.RequestAnimationFrame(_ => editor.RequestAnimationFrame(_ => Logger.Information(
+                    "Opened {Title} in the Editor: made in {MadeMs} ms, bound in {BoundMs} ms, the last disposed in {DisposedMs} ms, drawn after {DrawnMs} ms",
+                    viewModel.Song.Title, made, bound - made, disposed - bound, time.ElapsedMilliseconds)));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Opening {Title} in the Editor failed after it was shown", viewModel.Song.Title);
+                viewModel.Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.UnexpectedErrorFormat, ex.Message));
+            }
         }
 
         /// <summary>
@@ -305,11 +323,13 @@ namespace ChartBuilder.Services
             void OnLatencyChanged(object? sender, EventArgs e) => OfferCalibration(editor);
             latency.Changed += OnLatencyChanged;
 
-            // The song's audio and lock go with the Editor open when the window closes.
+            // The song's audio and lock go with the Editor open when the window closes. Nothing opens in it after that.
             editor.Closed += (_, _) =>
             {
                 latency.Changed -= OnLatencyChanged;
                 (editor.DataContext as EditorWindowViewModel)?.Dispose();
+                if (ReferenceEquals(_editor, editor))
+                    _editor = null;
             };
 
             // Unsaved edits are asked about first: Save, Discard or Cancel (charter-spec C15 item 7). The close is held

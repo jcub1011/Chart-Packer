@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -61,7 +62,13 @@ namespace ChartBuilder.Views
                 _viewModel?.Editor.Playtest.ReleaseKeys();
             };
             TopBand.SizeChanged += (_, _) => ApplyLayout();
+            TitleBand.SizeChanged += (_, e) => LoadingOverlay.Margin = new Thickness(0, e.NewSize.Height, 0, 0);
             Closing += (_, _) => CaptureLayout();
+
+            // While a song opens, keys don't reach the Editor being left: its edits would go with it, unsaved. First, so
+            // nothing below sees them. Key-ups still go through, so a key held then is let go of.
+            AddHandler(KeyDownEvent, OnOpeningInput, RoutingStrategies.Tunnel);
+            AddHandler(TextInputEvent, OnOpeningInput, RoutingStrategies.Tunnel);
 
             // Audio files dropped anywhere on the window start a new chart with them as its stems (charter-spec C1). A
             // song folder or .sng opens it (C2).
@@ -158,6 +165,12 @@ namespace ChartBuilder.Views
             if (e.Handled || _viewModel?.Editor.Playtest is not { IsActive: true } playtest)
                 return;
             e.Handled = playtest.HandleKey(e.PhysicalKey, e.KeyModifiers, down: false);
+        }
+
+        private void OnOpeningInput(object? sender, RoutedEventArgs e)
+        {
+            if (_viewModel is { IsOpening: true })
+                e.Handled = true;
         }
 
         private bool IsTyping(KeyEventArgs e) => e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox;

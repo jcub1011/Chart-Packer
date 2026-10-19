@@ -71,6 +71,8 @@ namespace ChartBuilder.ViewModels
         /// <summary>How much memory the spectrograms may take together (charter-spec C13 item 3).</summary>
         public void SetBudget(long bytes)
         {
+            if (_disposed)
+                return;
             _budget = bytes;
             if (_spectrograms is { } spectrograms)
                 spectrograms.BudgetBytes = bytes;
@@ -93,8 +95,7 @@ namespace ChartBuilder.ViewModels
                 if (_overBudget.Add(source.Key))
                 {
                     string format = result.IsCrowded ? Strings.SpectrogramBudgetFullFormat : Strings.SpectrogramOverBudgetFormat;
-                    string text = string.Format(CultureInfo.CurrentCulture, format, source.Label, result.NeededBytes / (1024.0 * 1024));
-                    SayAfterDrawing(messages => messages.Warning(text, BudgetKey));
+                    _messages?.Warning(string.Format(CultureInfo.CurrentCulture, format, source.Label, result.NeededBytes / (1024.0 * 1024)), BudgetKey);
                 }
                 return null;
             }
@@ -207,45 +208,38 @@ namespace ChartBuilder.ViewModels
             _followed.Clear();
 
             // The workers before the audio they read. Off the UI thread, which would otherwise wait for each worker to finish
-            // the chunk it's on, and for audio still being opened to analyse: as a song opens in this one's place, say.
+            // the chunk it's on, and for audio still being opened to analyse: as a song opens in this one's place, say. Nothing
+            // here reads them after this, as it's all been cancelled.
             _ = Task.Run(() =>
             {
-                lock (_audioLock)
+                try
                 {
-                    _spectrograms?.Dispose();
-                    _workers?.Dispose();
-                    _audio?.Dispose();
-                    _spectrograms = null;
-                    _workers = null;
-                    _audio = null;
+                    lock (_audioLock)
+                    {
+                        _spectrograms?.Dispose();
+                        _workers?.Dispose();
+                        _audio?.Dispose();
+                        _spectrograms = null;
+                        _workers = null;
+                        _audio = null;
+                    }
                 }
-            });
-        }
-
-        /// <summary>
-        /// Has <paramref name="say"/> put on the message bar once the UI thread is done with what it's doing, unless this has
-        /// been disposed by then. A lane asks for its spectrogram and its onsets as it's drawn, and the message bar changed
-        /// in the middle of a render pass is refused (Avalonia's "Visual was invalidated during the render pass").
-        /// </summary>
-        private void SayAfterDrawing(Action<EditorMessages> say)
-        {
-            if (_messages is not { } messages)
-                return;
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (!_disposed)
-                    say(messages);
+                catch (Exception ex)
+                {
+                    // Nothing waits on this, so a failure would go unseen otherwise.
+                    Trace.TraceWarning($"Closing the audio analysed failed: {ex}");
+                }
             });
         }
 
         private async Task<OnsetAnalysis?> FindOnsetsAsync(AudioSource source, bool drumBands, bool requested)
         {
             var token = _cancel.Token;
-            string finding = string.Format(CultureInfo.CurrentCulture, Strings.OnsetsFindingFormat, source.Label);
-            SayAfterDrawing(messages => messages.Info(finding, RunningKey));
+            _messages?.Info(string.Format(CultureInfo.CurrentCulture, Strings.OnsetsFindingFormat, source.Label), RunningKey);
             try
             {
-                if (await PrepareAsync(source) is not { } prepared || _workers is not { } workers)
+                // Disposed meanwhile, its workers are being let go of off the UI thread, so they're left alone.
+                if (await PrepareAsync(source) is not { } prepared || token.IsCancellationRequested || _workers is not { } workers)
                     return null;
                 var onsets = await OnsetDetector.Start(prepared.Input, drumBands, workers, requested, token);
                 if (!token.IsCancellationRequested)
@@ -258,6 +252,11 @@ namespace ChartBuilder.ViewModels
             }
             catch (OperationCanceledException)
             {
+                return null;
+            }
+            catch (ObjectDisposedException) when (token.IsCancellationRequested)
+            {
+                // The workers were let go of mid-run, as this was disposed.
                 return null;
             }
             catch (IOException ex)

@@ -72,7 +72,12 @@ namespace ChartBuilder.ViewModels
 
         public bool HasRecent => Recent.Count > 0;
 
-        private bool CanOpen() => !IsOpening && !IsSaving;
+        // Not once this Editor has been disposed: its window closed, or another opened in its place, as a picker or a drop
+        // started from it may finish after that.
+        private bool CanOpen() => !IsOpening && !IsSaving && !IsClosed;
+
+        /// <summary>Whether this Editor has been disposed, so nothing more is to open in its window.</summary>
+        private bool IsClosed => _closing.IsCancellationRequested;
 
         /// <summary>Closes what's open, once it's saved or discarded, and opens a new chart, with no audio.</summary>
         [RelayCommand(CanExecute = nameof(CanOpen))]
@@ -165,6 +170,10 @@ namespace ChartBuilder.ViewModels
                 var result = await SongOpener.OpenAsync(entry);
                 Logger.Information("Read {Song} in {ReadMs} ms", entry.DisplayName, reading.ElapsedMilliseconds);
 
+                // The window may have closed meanwhile, this Editor with it; the lock taken is let go of below.
+                if (IsClosed)
+                    return;
+
                 // An autosave of edits a crash or a shutdown left unsaved is offered first (charter-spec C2 item 7).
                 RecoveryFile? recovered = null;
                 if (result.Song is not null || result.Empty is not null)
@@ -179,10 +188,10 @@ namespace ChartBuilder.ViewModels
                 if (result.Empty is { } empty)
                 {
                     // A song with neither chart file can be given one (charter-spec C1, New chart in this song).
-                    if (recovered is null && !await _confirmations.ConfirmAsync(
+                    if (recovered is null && !await AskAsync(() => _confirmations.ConfirmAsync(
                             Strings.NewChartInSongTitle,
                             string.Format(CultureInfo.CurrentCulture, Strings.NewChartInSongMessageFormat, entry.DisplayName),
-                            Strings.NewChartInSongButton))
+                            Strings.NewChartInSongButton)))
                     {
                         return;
                     }
@@ -199,10 +208,10 @@ namespace ChartBuilder.ViewModels
                 }
 
                 // A .chart's conversion is shown before the editor opens, so the user can go back (charter-spec C2 item 3).
-                if (song.ImportWarnings.Count > 0 && !await _confirmations.ConfirmAsync(
+                if (song.ImportWarnings.Count > 0 && !await AskAsync(() => _confirmations.ConfirmAsync(
                         Strings.ImportTitle,
                         string.Format(CultureInfo.CurrentCulture, Strings.ImportMessageFormat, song.Title, string.Join(Environment.NewLine, song.ImportWarnings.Select(Describe))),
-                        Strings.ImportConfirmButton))
+                        Strings.ImportConfirmButton)))
                 {
                     return;
                 }
@@ -215,12 +224,14 @@ namespace ChartBuilder.ViewModels
                 // The new Editor is made on the UI thread, which holds the window up for a big chart, so what's opening is
                 // on screen first.
                 await _services.Editors.WaitForRenderAsync();
+                if (IsClosed)
+                    return;
 
                 // This Editor is disposed as the new one opens, so it mustn't let go of the lock it hands over as it is.
                 if (ownLock)
                     _songLock = null;
-                if (recovered is not null && recoveredSong is not null)
-                    _services.Editors.OpenRecovered(recoveredSong, songLock, recovered.Key);
+                if (recoveredSong is not null)
+                    _services.Editors.OpenRecovered(recoveredSong, songLock, recovered!.Key);
                 else
                     _services.Editors.OpenSong(song, songLock);
                 songLock = null;
@@ -275,13 +286,16 @@ namespace ChartBuilder.ViewModels
                     Strings.DiscardUnsavedButton);
                 if (choice == ConfirmChoice.First)
                 {
+                    // Opening, as a song is, so nothing else is opened or edited here meanwhile.
+                    IsOpening = true;
                     LoadingText = string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, file.Manifest.Title);
                     try
                     {
                         // Read off the UI thread, as a song is, then made into its Editor once what's opening is on screen.
                         var song = await Task.Run(() => Autosave.RecoverNew(file));
                         await _services.Editors.WaitForRenderAsync();
-                        _services.Editors.OpenRecovered(song, null, file.Key);
+                        if (!IsClosed)
+                            _services.Editors.OpenRecovered(song, null, file.Key);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
@@ -290,6 +304,7 @@ namespace ChartBuilder.ViewModels
                     finally
                     {
                         LoadingText = null;
+                        IsOpening = false;
                     }
 
                     return;
@@ -329,7 +344,7 @@ namespace ChartBuilder.ViewModels
             string message = string.Format(CultureInfo.CurrentCulture, Strings.RecoverMessageFormat, entry.DisplayName, when);
             if (offer == RecoveryOffer.OfferChanged)
                 message += Environment.NewLine + Environment.NewLine + Strings.RecoverChangedWarning;
-            switch (await _confirmations.ChooseAsync(Strings.RecoverTitle, message, Strings.RecoverButton, Strings.RecoverDiscardButton))
+            switch (await AskAsync(() => _confirmations.ChooseAsync(Strings.RecoverTitle, message, Strings.RecoverButton, Strings.RecoverDiscardButton)))
             {
                 case ConfirmChoice.First:
                     return (true, file);
@@ -338,6 +353,24 @@ namespace ChartBuilder.ViewModels
                     return (true, null);
                 default:
                     return (false, null);
+            }
+        }
+
+        /// <summary>
+        /// Asks the user something as a song opens, with what's opening taken off the window while they answer: it's
+        /// waiting on them, not on work.
+        /// </summary>
+        private async Task<T> AskAsync<T>(Func<Task<T>> ask)
+        {
+            string? loading = LoadingText;
+            LoadingText = null;
+            try
+            {
+                return await ask();
+            }
+            finally
+            {
+                LoadingText = loading;
             }
         }
 

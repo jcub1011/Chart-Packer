@@ -89,13 +89,14 @@
             <!-- The window draws its own title bar (TitleBar): the icon, the File and Edit menus, and the window's title and
                  the program version. Dragging anywhere but the menus, the title and the version moves the window. Layered
                  over the progress of a song being opened, see-through so it shows. -->
-            <Panel>
+            <Panel x:Name="TitleBand">
                 <ctl:BusyBar Foreground="{DynamicResource AccentTintBrush}"
                              IsActive="{Binding IsLoading}"
                              AutomationProperties.Name="{Binding LoadingText}" />
                 <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}" Background="Transparent">
                     <ctl:TitleBar.Menu>
-                        <Menu chrome:WindowDecorationProperties.ElementRole="User">
+                        <!-- Off while a song opens, as what's chosen would act on the Editor being left. -->
+                        <Menu chrome:WindowDecorationProperties.ElementRole="User" IsEnabled="{Binding !IsOpening}">
                             <MenuItem Header="{x:Static res:Strings.MenuFile}">
                                 <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N" />
                                 <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O" />
@@ -766,18 +767,21 @@
             </Grid>
         </Button>
 
-        <!-- While a song is read and its Editor made: the window under the title bar (30 high, Border.title-bar) dimmed,
-             with a spinner and what's opening, as the title bar's progress runs. Both are moved on the render thread
-             (Spinner, BusyBar), as the Editor is made on the UI thread. It takes the pointer, so the song being left isn't
-             edited meanwhile. -->
-        <Panel Grid.Row="0"
+        <!-- While a song opens, the window under the title bar takes the pointer, so the song being left isn't edited
+             meanwhile; the code-behind keeps it below the title bar, whatever its height, and holds the keys. While it's
+             read and its Editor made, rather than asking the user, it's dimmed, with a spinner and what's opening, as the
+             title bar's progress runs. Both are moved on the render thread (Spinner, BusyBar), as the Editor is made on
+             the UI thread. -->
+        <Panel x:Name="LoadingOverlay"
+               Grid.Row="0"
                Grid.RowSpan="5"
-               Margin="0,30,0,0"
-               IsVisible="{Binding IsLoading}">
-            <Border Background="{DynamicResource AppBackgroundBrush}" Opacity="0.85" />
+               Background="Transparent"
+               IsVisible="{Binding IsOpening}">
+            <Border Background="{DynamicResource AppBackgroundBrush}" Opacity="0.85" IsVisible="{Binding IsLoading}" />
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Spacing="12">
+                        Spacing="12"
+                        IsVisible="{Binding IsLoading}">
                 <ctl:Spinner Classes="spinner"
                              IsActive="{Binding IsLoading}"
                              Width="36" Height="36" StrokeThickness="3"
