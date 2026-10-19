@@ -277,7 +277,7 @@ public sealed class StemPlayer : IDisposable
     /// <summary>
     /// The sounds laid over the mix, such as the metronome's clicks; none if <see langword="null"/>. A new schedule is
     /// taken up from the next chunk mixed: sounds already playing play out, and the new one's sounds start from where the
-    /// last one's were asked up to.
+    /// mix has got to, even after a while with none.
     /// </summary>
     public ISoundSchedule? Sounds
     {
@@ -784,19 +784,20 @@ public sealed class StemPlayer : IDisposable
     /// <returns>Whether any sound plays in them.</returns>
     private bool MixSounds(int frames)
     {
-        if (Sounds is { } schedule)
-        {
-            // Stretched, the frames played can step back a little; a sound starts once they first reach it.
-            double reached = double.MinValue;
-            foreach (var piece in _pieces)
-                reached = Math.Max(reached, Math.Max(piece.From, piece.To));
+        // Stretched, the frames played can step back a little; a sound starts once they first reach it.
+        double reached = double.MinValue;
+        foreach (var piece in _pieces)
+            reached = Math.Max(reached, Math.Max(piece.From, piece.To));
 
-            long to = (long)Math.Floor(reached) + 1;
-            if (to > _soundsFrom)
+        // Moved on with no schedule too, so one given later starts from here rather than playing every sound since the
+        // last seek at once.
+        long to = (long)Math.Floor(reached) + 1;
+        if (to > _soundsFrom)
+        {
+            if (Sounds is { } schedule)
             {
                 _found.Clear();
                 schedule.SoundsBetween(_soundsFrom, to, _found);
-                _soundsFrom = to;
 
                 // Played as mixed, the device plays it at the speed, so each sound is read that much faster or slower
                 // to be heard at its own pitch and length.
@@ -807,6 +808,8 @@ public sealed class StemPlayer : IDisposable
                         _voices.Add(new Voice(sound.Sound, sound.Gain, OffsetOf(sound.SourceFrame), sound.Sound.SampleRate / (_mixer.OutputRate * speed)));
                 }
             }
+
+            _soundsFrom = to;
         }
 
         if (_voices.Count == 0)
