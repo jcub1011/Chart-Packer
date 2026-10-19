@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartShared.UI.ViewModels"
+             xmlns:res="using:ChartShared.UI.Resources"
+             xmlns:ui="using:ChartShared.UI.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="440" d:DesignHeight="520"
+             x:Class="ChartShared.UI.Views.AudioCalibrationPanel"
+             x:DataType="vm:CalibrationViewModel">
+
+    <!-- The audio/visual test's controls, at the right of CalibrationWindow, whose styles they use. -->
+    <StackPanel>
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationDeviceCaption}" />
+        <Border Classes="card">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <PathIcon Grid.Column="0"
+                          Width="14" Height="14"
+                          Opacity="0.7"
+                          VerticalAlignment="Center"
+                          Data="{StaticResource VolumeIconGeometry}" />
+                <TextBlock Grid.Column="1"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding DeviceName}"
+                           ToolTip.Tip="{Binding DeviceName}" />
+            </Grid>
+        </Border>
+
+        <!-- The latency: a box to drag or type in, as the inspector's offsets are, steps, and a slider, each within ±500 ms
+             (AudioLatencyFile.MaxMilliseconds). -->
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationLatencyLabel}" />
+        <Border Classes="card">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
+                    <PathIcon Grid.Column="0" Opacity="0.7" VerticalAlignment="Center" Data="{StaticResource OffsetIconGeometry}" />
+                    <NumericUpDown Grid.Column="1"
+                                   ui:DragScrub.IsEnabled="True"
+                                   Width="80"
+                                   ShowButtonSpinner="False"
+                                   VerticalAlignment="Center"
+                                   Value="{Binding Value}"
+                                   Minimum="-500"
+                                   Maximum="500"
+                                   Increment="1"
+                                   FormatString="+0;−0;0"
+                                   ParsingNumberStyle="Integer"
+                                   ClipValueToMinMax="True"
+                                   AutomationProperties.Name="{x:Static res:SharedStrings.CalibrationLatencyLabel}">
+                        <ToolTip.Tip>
+                            <StackPanel Spacing="6">
+                                <TextBlock TextWrapping="Wrap" Text="{x:Static res:SharedStrings.CalibrationLatencyToolTip}" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{x:Static res:SharedStrings.OffsetControlsHelp}" />
+                            </StackPanel>
+                        </ToolTip.Tip>
+                    </NumericUpDown>
+                    <TextBlock Grid.Column="2" Classes="muted" VerticalAlignment="Center" Text="{x:Static res:SharedStrings.CalibrationLatencyUnit}" />
+                    <Button Grid.Column="3"
+                            Classes="nudge"
+                            Command="{Binding RevertCommand}"
+                            ToolTip.Tip="{x:Static res:SharedStrings.CalibrationRevertToolTip}"
+                            ToolTip.ShowOnDisabled="True"
+                            AutomationProperties.Name="{x:Static res:SharedStrings.CalibrationRevertToolTip}">
+                        <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                    </Button>
+                    <Border Grid.Column="5" Classes="toolbar-group">
+                        <ItemsControl ItemsSource="{x:Static vm:CalibrationViewModel.Steps}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="1" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:LatencyStep">
+                                    <Button Classes="tool step"
+                                            Content="{Binding Label}"
+                                            Command="{Binding $parent[UserControl].((vm:CalibrationViewModel)DataContext).NudgeCommand}"
+                                            CommandParameter="{Binding Amount}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Grid>
+                <Slider Value="{Binding Value}"
+                        Minimum="-500"
+                        Maximum="500"
+                        SmallChange="1"
+                        LargeChange="10"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        AutomationProperties.Name="{x:Static res:SharedStrings.CalibrationLatencyLabel}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <TextBlock Grid.Column="0" Classes="note" VerticalAlignment="Center" Text="{x:Static res:SharedStrings.CalibrationKeysHint}" />
+                    <Button Grid.Column="1"
+                            Classes="nudge"
+                            Content="{x:Static res:SharedStrings.CalibrationReset}"
+                            Command="{Binding ResetCommand}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Held, the notes are drawn with no latency, to see how far it moves them; let go, they go back. -->
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationCompareSection}" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <Button x:Name="HoldButton"
+                        Classes="labelled hold"
+                        Classes.active="{Binding IsCalibrationOff}"
+                        HorizontalAlignment="Left"
+                        Focusable="False"
+                        AutomationProperties.Name="{x:Static res:SharedStrings.CalibrationHoldOffButton}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:LineIcon Data="{StaticResource ViewStroke}" VerticalAlignment="Center" />
+                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:SharedStrings.CalibrationHoldOffButton}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Classes="note" Text="{x:Static res:SharedStrings.CalibrationHoldOffHint}" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationHowSection}" />
+        <TextBlock Classes="note" Text="{x:Static res:SharedStrings.CalibrationInstructions}" />
+    </StackPanel>
+</UserControl>

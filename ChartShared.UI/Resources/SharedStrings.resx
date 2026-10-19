@@ -770,6 +770,59 @@
     <value>Calibration off</value>
     <comment>Over the highway while calibration is held off.</comment>
   </data>
+  <data name="CalibrationDeviceWindowTitle" xml:space="preserve">
+    <value>Calibrate Input Device</value>
+  </data>
+  <data name="CalibrationInputDeviceCaption" xml:space="preserve">
+    <value>Input device</value>
+    <comment>Over the name of the input device being calibrated.</comment>
+  </data>
+  <data name="CalibrationSavedOffsetFormat" xml:space="preserve">
+    <value>Saved offset: {0:+0;−0;0} ms</value>
+    <comment>{0} is the offset stored for the device, in milliseconds.</comment>
+  </data>
+  <data name="CalibrationTestSection" xml:space="preserve">
+    <value>Test</value>
+    <comment>The section over the input-device test's Start button and result.</comment>
+  </data>
+  <data name="CalibrationStartTest" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="CalibrationTryAgain" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="CalibrationGetReady" xml:space="preserve">
+    <value>Get ready</value>
+    <comment>Over the highway in the input-device test's first bar, before the count-down.</comment>
+  </data>
+  <data name="CalibrationNoteProgressFormat" xml:space="preserve">
+    <value>Note {0} of {1}</value>
+    <comment>{0} is the note the test is on, {1} how many there are.</comment>
+  </data>
+  <data name="CalibrationDeviceReady" xml:space="preserve">
+    <value>Press Start and watch the count-in, then hit the device as each of the 16 notes reaches the strike line.</value>
+  </data>
+  <data name="CalibrationDeviceResultFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, with a spread of {1} ms over {2} taps.</value>
+    <comment>{0} is the offset, {1} the taps' interquartile range, both in milliseconds; {2} how many taps were used.</comment>
+  </data>
+  <data name="CalibrationDeviceResultWideFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, but with a spread of {1} ms over {2} taps. Try it again for a steadier value.</value>
+    <comment>As CalibrationDeviceResultFormat, when the spread is over 30 ms.</comment>
+  </data>
+  <data name="CalibrationDeviceClampedFormat" xml:space="preserve">
+    <value>That's more than an offset can be, so {0:+0;−0;0} ms will be saved.</value>
+    <comment>After the result when it's beyond ±250 ms. {0} is what's saved, in milliseconds.</comment>
+  </data>
+  <data name="CalibrationDeviceTooFew" xml:space="preserve">
+    <value>There weren't enough taps near the notes to measure. Try again.</value>
+  </data>
+  <data name="CalibrationDeviceSaveFailed" xml:space="preserve">
+    <value>The offset couldn't be saved.</value>
+  </data>
+  <data name="CalibrationDeviceHowText" xml:space="preserve">
+    <value>There's no sound: hit along with what you see. Any button, fret, strum, key or pad counts; letting go doesn't. The result allows for the device's own lag, the screen's, and how early or late you tend to hit, and the playtest takes it off every input from the device.</value>
+  </data>
   <data name="CalibrationAudioUnavailableFormat" xml:space="preserve">
     <value>The audio can't be played: {0}</value>
     <comment>{0} is the error.</comment>

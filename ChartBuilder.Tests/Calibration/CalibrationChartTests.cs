@@ -42,6 +42,19 @@ public sealed class CalibrationChartTests
         Assert.AreEqual(beats, CalibrationChart.BeatsIn(TimeSpan.FromSeconds(seconds)));
 
     [TestMethod]
+    public void TheDeviceTestLeadsInForTwoBarsThenHas16NotesAndEndsABeatLater()
+    {
+        var times = CalibrationChart.DeviceNoteTimes();
+        var notes = CalibrationChart.Notes(CalibrationChart.DeviceNoteCount, CalibrationChart.DeviceLeadBeats);
+
+        Assert.HasCount(16, times);
+        Assert.AreEqual(6.0, times[0], 1e-12);
+        Assert.AreEqual(17.25, times[^1], 1e-12);
+        Assert.AreEqual(18.0, CalibrationChart.DeviceEndSeconds, 1e-12);
+        Assert.AreSequenceEqual(times, [.. notes.Select(n => CalibrationChart.Tempo.SecondsAt(n.Tick))]);
+    }
+
+    [TestMethod]
     public void TheMetronomeClicksAsEachNoteIsStruck()
     {
         // As the tool plays it: a bar's lead, then a note on each beat, the measures' clicks accented.

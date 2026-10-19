@@ -27,6 +27,24 @@ public static class CalibrationChart
     public static int BeatsIn(TimeSpan length) =>
         length < TimeSpan.Zero ? 0 : (int)Math.Floor(length.TotalSeconds / BeatSeconds) + 1;
 
+    /// <summary>How many beats the input-device test leads in with, from song 0, before its first note: two bars.</summary>
+    public const int DeviceLeadBeats = 8;
+
+    /// <summary>How many notes the input-device test has.</summary>
+    public const int DeviceNoteCount = 16;
+
+    /// <summary>When the input-device test's notes reach the strike line, in seconds from its start.</summary>
+    public static double[] DeviceNoteTimes()
+    {
+        var times = new double[DeviceNoteCount];
+        for (int i = 0; i < DeviceNoteCount; i++)
+            times[i] = (DeviceLeadBeats + i) * BeatSeconds;
+        return times;
+    }
+
+    /// <summary>When the input-device test ends, in seconds from its start: a beat after its last note, for a late last tap.</summary>
+    public static double DeviceEndSeconds => (DeviceLeadBeats + DeviceNoteCount) * BeatSeconds;
+
     /// <summary>An open note on each of <paramref name="count"/> beats, from beat <paramref name="first"/>.</summary>
     public static ChartNote[] Notes(int count, int first = 0)
     {

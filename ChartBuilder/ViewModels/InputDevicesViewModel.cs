@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Input;
 using Avalonia.Threading;
 using ChartBuilder.Instruments;
@@ -62,9 +63,6 @@ namespace ChartBuilder.ViewModels
 
         public bool IsController => Info.Id.Kind == InputDeviceKind.Controller;
 
-        /// <summary>Whether the device has settings of its own: all but the keyboard, which is timed as it's handled.</summary>
-        public bool HasOffset => Info.Id.Kind != InputDeviceKind.Keyboard;
-
         /// <summary>How recently the device did anything, from 1 (now) to 0.</summary>
         [ObservableProperty]
         public partial double Activity { get; set; }
@@ -86,6 +84,18 @@ namespace ChartBuilder.ViewModels
 
         [RelayCommand]
         private void UseGeneralMidi() => _owner.UseGeneralMidi(this);
+
+        /// <summary>Opens the calibration tool to measure the device's offset (charter-spec C11 item 2).</summary>
+        [RelayCommand]
+        private Task CalibrateAsync() => _owner.CalibrateAsync(this);
+
+        /// <summary>Shows <paramref name="offsetMs"/>, as the calibration tool saved it, without saving it again.</summary>
+        internal void ShowOffset(int offsetMs)
+        {
+            _loading = true;
+            OffsetMs = offsetMs;
+            _loading = false;
+        }
 
         [RelayCommand]
         private void UseGuitarLayout() => _owner.UseGuitarLayout(this);
@@ -160,15 +170,18 @@ namespace ChartBuilder.ViewModels
         private const double MeterFall = 0.4;
 
         private readonly InputService _input;
+        private readonly Func<InputDeviceInfo, Task>? _calibrate;
         private readonly IDisposable _lease;
         private readonly DispatcherTimer _meters;
         private BindingDetector? _detector;
         private InputActionRow? _listening;
         private bool _disposed;
 
-        public InputDevicesViewModel(InputService input)
+        /// <param name="calibrate">Opens the calibration tool to measure a device's offset, and waits for it to close.</param>
+        public InputDevicesViewModel(InputService input, Func<InputDeviceInfo, Task>? calibrate = null)
         {
             _input = input;
+            _calibrate = calibrate;
             _lease = input.Hub.Acquire();
             Profiles =
             [
@@ -246,6 +259,17 @@ namespace ChartBuilder.ViewModels
         {
             _input.Settings.Settings.SetTuning(tuning);
             _input.SaveBindings();
+        }
+
+        /// <summary>Measures a device's offset with the calibration tool, then shows what it saved, if anything.</summary>
+        internal async Task CalibrateAsync(InputDeviceRow row)
+        {
+            if (_calibrate is null)
+                return;
+
+            await _calibrate(row.Info);
+            if (!_disposed)
+                row.ShowOffset(_input.Settings.Settings.TuningOf(row.Info.Id).OffsetMs);
         }
 
         /// <summary>The General MIDI drum map on a MIDI device, in place of the drums bindings it had.</summary>

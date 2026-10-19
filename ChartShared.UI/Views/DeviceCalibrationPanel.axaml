@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChartShared.UI.ViewModels"
+             xmlns:res="using:ChartShared.UI.Resources"
+             xmlns:ui="using:ChartShared.UI.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="440" d:DesignHeight="440"
+             x:Class="ChartShared.UI.Views.DeviceCalibrationPanel"
+             x:DataType="vm:DeviceCalibrationViewModel">
+
+    <!-- The input-device test's controls, at the right of CalibrationWindow, whose styles they use. -->
+    <StackPanel>
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationInputDeviceCaption}" />
+        <Border Classes="card">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <PathIcon Grid.Column="0"
+                          Width="14" Height="14"
+                          Opacity="0.7"
+                          VerticalAlignment="Center"
+                          Data="{StaticResource OffsetIconGeometry}" />
+                <TextBlock Grid.Column="1"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding DeviceName}"
+                           ToolTip.Tip="{Binding DeviceName}" />
+                <TextBlock Grid.Column="2" Classes="muted" FontSize="12" VerticalAlignment="Center" Text="{Binding SavedOffsetText}" />
+            </Grid>
+        </Border>
+
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationTestSection}" />
+        <Border Classes="card">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <!-- Not focusable, so a key or Space pressed as a tap never presses it again. -->
+                <Button Grid.Column="0"
+                        Classes="labelled"
+                        VerticalAlignment="Top"
+                        Focusable="False"
+                        Command="{Binding BeginCommand}"
+                        AutomationProperties.Name="{Binding StartLabel}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ui:LineIcon Data="{StaticResource ArrowRightStroke}" VerticalAlignment="Center" />
+                        <TextBlock VerticalAlignment="Center" Text="{Binding StartLabel}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Grid.Column="1"
+                           Classes="status"
+                           Classes.warning="{Binding IsStatusWarning}"
+                           VerticalAlignment="Center"
+                           Text="{Binding Status}" />
+            </Grid>
+        </Border>
+
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationHowSection}" />
+        <TextBlock Classes="note" Text="{x:Static res:SharedStrings.CalibrationDeviceHowText}" />
+    </StackPanel>
+</UserControl>

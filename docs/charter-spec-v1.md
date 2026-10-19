@@ -1434,10 +1434,12 @@ Acceptance criteria:
 A tool for measuring the audio/visual latency of the user's setup, so that what is seen and what is
 heard line up while charting. **The display is the ground truth.** The audio is adjusted (in
 practice, everything drawn is shifted against the audio, [C10](#c10-playback)) until it matches
-the display.
+the display. The same window also measures an instrument device's own lag (item 2), which the
+playtest takes off its inputs ([C19](#c19-playtest-and-instrument-input)).
 
 **Input:** none.
-**Output:** a latency in milliseconds for the current audio output device.
+**Output:** a latency in milliseconds for the current audio output device, or an input offset in
+milliseconds for an instrument device.
 
 **Opening:**
 
@@ -1452,12 +1454,16 @@ both read and write the one shared latency file ([§10](#10-settings)). It opens
 - **automatically, once**, the first time Chart Builder opens on a device that has no calibration.
   This can be skipped.
 
+Its input-device test opens from **Calibrate…** beside a device's offset in Chart Builder's Input
+devices window, over that window, pausing the Editor. Chart Packer has no instrument input, so it
+has only the audio/visual test.
+
 **Behaviour:**
 
 1. **The test.** The window has the shared title bar (`TitleBar`), and two columns: the highway on
    the left, and on the right the controls in sections, as the song inspector lays them out
-   (`Inspector.axaml`): the output device, the latency, Compare, and how to calibrate. Reset,
-   Cancel and Save are in a toolbar along the bottom.
+   (`Inspector.axaml`): the output device, the latency (with **Reset to 0**), Compare, and how to
+   calibrate. Cancel and Save are in a toolbar along the bottom.
    - The highway is the real one (`NoteHighwayView`), as the song's preview draws it, not a
      drawing of its own. What it draws, and when the frame reaches the screen, is what the user
      will be judging against while charting.
@@ -1486,11 +1492,43 @@ both read and write the one shared latency file ([§10](#10-settings)). It opens
      no latency, and the highway says so. Let go, they're drawn with the value again, so the user
      can see how much it moves them. The value itself doesn't change. Space never presses the
      button with the focus, and the window losing focus lets it go.
-   - **No tap test.** Tapping along adds the input device's latency, which is a separate
-     measurement.
+   - **No tap test.** Tapping along adds the input device's latency, which is measured apart
+     (item 2).
    - The highway is only watched: it can't be scrubbed here, and Shift doesn't show its whole
      chart.
-2. **Per device.**
+2. **Input devices.** The same window, with the device test's controls on the right
+   (`DeviceCalibrationViewModel`, `DeviceCalibrationPanel`): the device and its saved offset, a
+   **Start** button, and how to calibrate. Chart Builder hands it the device through
+   `ICalibrationInput` (`DeviceCalibrationInput`, over the Input devices' hub), since
+   `ChartShared.UI` can't see Chart Builder's input.
+   - **Seen, not heard.** Nothing plays until Start. Then two bars lead in, "Get ready" for the
+     first and a count-down of 4, 3, 2, 1 for the second, and **16 open notes** fall, one a beat at
+     80 BPM, with no sound. The user hits the device as each reaches the strike line. "Note n of 16"
+     shows where it is.
+   - **What counts** (`PressDetector`): any key, button or MIDI note pressed, or the hat pushed any
+     way, so a fret and a strum both count. Letting go doesn't, nor does a key repeating while it's
+     held, nor an axis or a MIDI control, so a whammy bar, a tilt or a pedal is no tap. A MIDI note
+     counts from the device's velocity floor.
+   - **One clock.** The highway is drawn at the time since Start on `InputClock`, and the presses
+     are timed by their own events on that clock, with no offset taken off. A press is measured
+     against the note as it was drawn, so what's measured is how much later than the screen shows a
+     note the device reports the hit: the device's lag, the display's and the renderer's, and the
+     player's habit. The playtest judges presses on the drawn timeline too
+     (`SmoothPosition` − latency), so the audio/visual latency drops out of both, and an offset
+     measured here stays right when the audio/visual latency is calibrated again.
+   - **Scoring** (`TapTest`): each tap is measured against its nearest note, ignoring taps more
+     than half a beat from any (as in the lead-in); only the closest tap to each note is kept; taps
+     more than 1.5 interquartile ranges from the median (and more than 5 ms) are dropped; with at
+     least 8 left, the offset is their mean. The result shows the offset, the spread and how many
+     taps were used. A spread over 30 ms suggests trying again. An offset beyond the ±250 ms an
+     input offset can be is saved as the nearest it can.
+   - **Try again** runs the test anew. **Save** stores the offset in the device's settings
+     (`input-bindings.json`), keeping the rest, and the playtest takes it up at once; the Input
+     devices window shows it. **Cancel** stores nothing.
+   - **The keyboard** has an offset too. The window hands its keys on to the keyboard device, all
+     but Escape, which cancels, before any button has them, so Space or Enter never presses one.
+     Key events carry no timestamp, so a key is timed when it's handled, and its spread is wider.
+3. **Per device.**
    - Latency is stored **per audio output device**, because headphones, Bluetooth and speakers
      differ by hundreds of milliseconds.
    - **Device key.** A device is identified by a stable OS device ID where the platform gives one
@@ -1511,7 +1549,7 @@ both read and write the one shared latency file ([§10](#10-settings)). It opens
      fallback**. When a device is found by name, its value is also saved under its ID if it has
      one, so a later rename doesn't lose it.
    - The tool always says which device it is calibrating.
-3. **Where it applies.**
+4. **Where it applies.**
    - Chart Builder ([C10](#c10-playback));
    - **record mode**, where key presses are shifted by the latency before they're quantised
      ([C15](#c15-editing-ergonomics));
@@ -1520,7 +1558,7 @@ both read and write the one shared latency file ([§10](#10-settings)). It opens
      latency file ([§10](#10-settings)). The seek bar's waveform isn't moved: it marks what has
      played a column at a time, where tens of milliseconds don't show, and its position is the
      seek position. The merge window resumes from the audio's own position, not the drawn one.
-4. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
+5. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
    previous value. **Reset** sets 0.
 
 *Settled in CM2:*
@@ -1533,22 +1571,27 @@ both read and write the one shared latency file ([§10](#10-settings)). It opens
 
 *Changed for issue #49:* the flashing light, the hand-drawn highway, the beeps and the tap test are
 gone. The beeps were moved by the latency against a fixed flash (`CalibrationSchedule`), the
-opposite of playback, which never moves the audio. The tap test's estimator (`TapTest`) stays, for
-measuring input devices.
+opposite of playback, which never moves the audio. The tap test's estimator (`TapTest`) now scores
+the input-device test, in one phase.
 
 Acceptance criteria:
 
 - **AC C11.1** With the latency set to +100 ms, the highway is drawn 100 ms of song earlier than at
   0 ms (`LatencyCompensation.Drawn`), and the clicks are where they were.
-- **AC C11.2** The tap-test estimator is given simulated taps: a known audio offset, normal jitter
-  with σ = 20 ms, and 2 outliers of ±150 ms per phase. Over 1,000 seeded trials, the median
-  estimate is within ±2 ms of the offset, and 95% of estimates are within ±20 ms. (With 12 kept
-  taps per phase, ±20 ms is about two standard deviations of the estimate.)
+- **AC C11.2** The input-device test's estimator is given simulated taps on its 16 notes: a known
+  offset, normal jitter with σ = 20 ms, and 2 outliers of ±150 ms. Over 1,000 seeded trials, the
+  median estimate is within ±2 ms of the offset, and 95% of estimates are within ±20 ms. Taps in
+  the lead-in are ignored, and only the closest tap to a note counts.
 - **AC C11.3** When the output moves to another device (`DeviceChanged`), Chart Builder and the tool
   load that device's stored latency, or the fallback.
 - **AC C11.4** The metronome clicks as each of the tool's notes is struck, accented on every fourth,
   the first beat of each bar.
 - **AC C11.5** Cancel leaves the stored latency as it was before the tool opened.
+- **AC C11.6** A button, key or MIDI note pressed is one tap, and letting go is none; a key held and
+  repeating is one; a hat pushed any way is one; an axis, a MIDI control, a MIDI note under the
+  velocity floor, or another device is none.
+- **AC C11.7** Save stores the measured offset for the device, keeping its other settings, and has
+  the playtest take it up.
 
 ### C12. Waveform
 
@@ -2097,7 +2140,8 @@ item 5).
    - Presets: the keyboard defaults (the number keys, as record mode's, with Enter and the arrow keys
      to strum), a General MIDI drum map, and the usual layout of Xbox 360 guitars.
    - Each device has an input offset in milliseconds, for wireless controllers and drum modules that
-     add their own delay. A MIDI device also has a velocity floor (against crosstalk), a retrigger
+     add their own delay, typed in or measured with **Calibrate…** beside it
+     ([C11](#c11-calibration-tool) item 2). The keyboard has one too. A MIDI device also has a velocity floor (against crosstalk), a retrigger
      time (against double triggers), and the velocities taken as an accent and as a ghost.
    - Space, Esc, P and N are the editor's while playtesting, and can't be bound.
 3. **Timing.** Every input is timed by its own event's timestamp, on one monotonic clock, and turned
@@ -2736,7 +2780,7 @@ layout. It isn't a row in Settings.
 | Tempo map | Tick ↔ seconds property tests against `TempoMap`; anchors stay put under edits (AC C4.1) |
 | Lint | At least one fixture per CHR rule, and a clean fixture triggers none (AC C16.1) |
 | Analysis | Synthetic click tracks at fixed and changing tempos for `TempoEstimator`; synthetic drum hits in separate bands for `OnsetDetector`; spectrogram bins checked against known sine frequencies |
-| Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4) |
+| Calibration | The input-device test's estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4); what counts as a tap (AC C11.6); saving a device's offset (AC C11.7) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
 | Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |
@@ -2773,7 +2817,6 @@ fails the run if anything there changes anyway.
   ([C19](#c19-playtest-and-instrument-input)).
 - MIDI devices on macOS and Linux.
 - Keeping and replaying a playtest performance, judged again against the chart as it changes.
-- Measuring a device's input offset by tapping along with the calibration tool's highway (issue #49).
 - Rebindable editor shortcuts (instrument bindings are in C19).
 - Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
   library and inspector as well as Chart Builder.

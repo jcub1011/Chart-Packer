@@ -174,6 +174,18 @@ namespace ChartBuilder.Services
         }
 
         /// <summary>
+        /// Opens the calibration tool's input-device test (charter-spec C11 item 2) for <paramref name="device"/> over the
+        /// Input devices window, pausing the Editor's playback, so its notes are the only ones moving.
+        /// </summary>
+        private async Task ShowDeviceCalibrationAsync(InputDevicesWindow owner, InputDeviceInfo device)
+        {
+            if (!_calibration.IsOpen && desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
+                editor.Playback.Pause();
+
+            await _calibration.ShowDeviceAsync(owner, new DeviceCalibrationInput(input, device));
+        }
+
+        /// <summary>
         /// Opens the Input devices window (charter-spec C19 item 2), where devices are bound to the instruments. Only one is
         /// open at a time; opening it again brings that one to the front. It doesn't hold up the Editor, so a binding can
         /// be tried in a playtest while it's open.
@@ -186,7 +198,8 @@ namespace ChartBuilder.Services
                 return;
             }
 
-            var window = new InputDevicesWindow { DataContext = new InputDevicesViewModel(input) };
+            var window = new InputDevicesWindow();
+            window.DataContext = new InputDevicesViewModel(input, device => ShowDeviceCalibrationAsync(window, device));
             var owner = desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow;
             _inputDevices = window;
             window.Closed += (_, _) => _inputDevices = null;

@@ -38,7 +38,7 @@ namespace ChartShared.UI.ViewModels
     /// it was (AC C11.5).
     /// </para>
     /// </remarks>
-    public sealed partial class CalibrationViewModel : ViewModelBase, IDisposable
+    public sealed partial class CalibrationViewModel : CalibrationViewModelBase
     {
         private const int SampleRate = 48000;
 
@@ -79,9 +79,6 @@ namespace ChartShared.UI.ViewModels
                 Lead);
         }
 
-        /// <summary>Raised when the tool has saved, and its window should close.</summary>
-        public event EventHandler? CloseRequested;
-
         public static int MinLatency => -AudioLatencyFile.MaxMilliseconds;
 
         public static int MaxLatency => AudioLatencyFile.MaxMilliseconds;
@@ -90,7 +87,9 @@ namespace ChartShared.UI.ViewModels
             [new(-10), new(-5), new(-1), new(1), new(5), new(10)];
 
         /// <summary>The highway's open notes, one on every beat.</summary>
-        public HighwayScene Scene { get; }
+        public override HighwayScene Scene { get; }
+
+        public override string Title => SharedStrings.CalibrationWindowTitle;
 
         /// <summary>The latency being tried, in milliseconds: positive when the audio is heard after the display shows it.</summary>
         [ObservableProperty]
@@ -100,35 +99,37 @@ namespace ChartShared.UI.ViewModels
         [ObservableProperty]
         public partial string DeviceName { get; private set; }
 
+        /// <summary>Whether the hold button is held down, which holds calibration off.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsCalibrationOff))]
+        public partial bool IsHeldByButton { get; set; }
+
+        /// <summary>Whether Space is held down, which holds calibration off.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsCalibrationOff))]
+        public partial bool IsHeldBySpace { get; set; }
+
         /// <summary>
         /// Whether the highway is drawn with no latency for now, while the hold button or Space is held, to show how far
         /// the latency moves the notes. <see cref="Value"/> is kept, and is what's saved.
         /// </summary>
-        [ObservableProperty]
-        public partial bool IsCalibrationOff { get; set; }
+        public bool IsCalibrationOff => IsHeldByButton || IsHeldBySpace;
 
         /// <summary>Whether <see cref="Value"/> differs from the latency stored for the device, which Revert goes back to.</summary>
         public bool IsChanged => Value != _calibration.Stored;
-
-        /// <summary>Why the clicks can't be played, or the latency couldn't be saved; null when all's well.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasMessage))]
-        public partial string? Message { get; private set; }
-
-        public bool HasMessage => Message is not null;
 
         /// <summary>
         /// Where the highway is drawn: where the clicks are heard, less the latency, as playback draws a song. Without
         /// audio, the time since <see cref="Start"/>.
         /// </summary>
-        public TimeSpan Now()
+        public override TimeSpan Now()
         {
             var position = _player is { IsPlaying: true } player ? player.SmoothPosition : _clock.GetElapsedTime(_startedAt);
             return LatencyCompensation.Drawn(position, IsCalibrationOff ? 0 : Value, 1);
         }
 
         /// <summary>Opens the output and starts the clicks. Never throws: a device that can't be opened is said in <see cref="Message"/>.</summary>
-        public void Start()
+        public override void Start()
         {
             if (_disposed || _player is not null)
                 return;
@@ -160,20 +161,25 @@ namespace ChartShared.UI.ViewModels
         [RelayCommand(CanExecute = nameof(IsChanged))]
         private void Revert() => Value = _calibration.Stored;
 
-        /// <summary>Stores the latency for the device, and closes the tool.</summary>
-        [RelayCommand]
-        private void Save()
+        /// <summary>Stores the latency for the device.</summary>
+        protected override bool OnSave()
         {
             _calibration.Value = Value;
             if (!_calibration.Save())
             {
                 Message = SharedStrings.CalibrationSaveFailed;
-                return;
+                return false;
             }
 
             _latency.Reload();
-            CloseRequested?.Invoke(this, EventArgs.Empty);
+            return true;
         }
+
+        partial void OnIsHeldByButtonChanged(bool value) => ShowHeld();
+
+        partial void OnIsHeldBySpaceChanged(bool value) => ShowHeld();
+
+        private void ShowHeld() => Banner = IsCalibrationOff ? SharedStrings.CalibrationOffBadge : null;
 
         partial void OnValueChanged(int value)
         {
@@ -187,7 +193,7 @@ namespace ChartShared.UI.ViewModels
             OnChangedChanged();
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             if (_disposed)
                 return;
