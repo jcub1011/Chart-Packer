@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,12 +22,13 @@ using ChartShared.UI.Resources;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels.Settings;
 using ChartShared.UI.Views;
+using Serilog;
 
 namespace ChartBuilder.Services
 {
     /// <summary>
-    /// Chart Builder's top-level window: the Editor. Opening a song or a new chart swaps it for a new Editor window,
-    /// closing this one; closing the last Editor exits the app.
+    /// Chart Builder's top-level window: the Editor, one for the app's lifetime. Opening a song or a new chart swaps
+    /// what it edits, in place; closing it exits the app.
     /// </summary>
     /// <param name="openOutput">Opens the audio output at a rate, for the Editor's playback and the calibration tool.</param>
     /// <param name="latency">The audio/visual latency, which the calibration tool measures.</param>
@@ -50,22 +52,45 @@ namespace ChartBuilder.Services
                 editor.Playback.Pause();
         });
 
+        private static ILogger Logger => Log.ForContext<BuilderWindows>();
+
+        // How long WaitForRenderAsync waits for the window's next frame.
+        private static readonly TimeSpan FrameWaitLimit = TimeSpan.FromMilliseconds(100);
+
         // The Input devices window, while it's open.
         private InputDevicesWindow? _inputDevices;
 
-        /// <summary>Makes a new Editor the app's main window, opening <paramref name="args"/> in it once it's showing.</summary>
+        // The Editor window, made as the app starts; what its Editors work with, the same for every one opened in it; and
+        // its authoring dialogs, whose preview window follows the Editor open.
+        private EditorWindow? _editor;
+        private EditorServices? _services;
+        private AvaloniaAuthoringDialogService? _authoring;
+
+        private EditorWindow Editor => _editor ?? throw new InvalidOperationException("The Editor window isn't open yet.");
+
+        private EditorServices Services => _services ?? throw new InvalidOperationException("The Editor window isn't open yet.");
+
+        /// <summary>Makes the Editor the app's main window, opening <paramref name="args"/> in it once it's showing.</summary>
         /// <remarks>Called before the app has started, so the lifetime shows it.</remarks>
         public void StartWith(BuilderArgs args)
         {
-            var (editor, viewModel) = CreateNewChart([]);
+            var editor = new EditorWindow();
+            _editor = editor;
+            _authoring = new AvaloniaAuthoringDialogService(() => editor);
+            _services = ServicesFor(editor, _authoring);
+            RestorePlacement(editor);
+            WatchWindow(editor);
 
+            var viewModel = CreateNewChart([]);
+            editor.DataContext = viewModel;
             editor.Opened += OnOpened;
-            OpenEditor(editor, viewModel);
+            Show(editor);
+            _ = viewModel.Playback.OpenAsync();
 
             void OnOpened(object? sender, EventArgs e)
             {
                 editor.Opened -= OnOpened;
-                // Posted, since it can swap the window (a song to open replaces the blank chart) and Opened is still running.
+                // Posted, since it can swap what's open (a song to open replaces the blank chart) and Opened is still running.
                 Dispatcher.UIThread.Post(() => _ = StartAsync(viewModel, args));
             }
         }
@@ -95,44 +120,33 @@ namespace ChartBuilder.Services
                     break;
             }
 
-            if (desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel current })
+            if (Editor.DataContext is EditorWindowViewModel current)
                 await current.OfferUnsavedChartsAsync();
         }
 
-        public void OpenNewChart(IReadOnlyList<string> audioFiles)
-        {
-            var (editor, viewModel) = CreateNewChart(audioFiles);
-            OpenEditor(editor, viewModel);
-        }
+        public void OpenNewChart(IReadOnlyList<string> audioFiles) => Load(() => CreateNewChart(audioFiles));
 
         /// <summary>
         /// A new chart (charter-spec C1), with <paramref name="audioFiles"/>' tracks as its stems. It has no folder,
         /// and so no lock, until it's first saved. The chart starts on the default resolution, 120 BPM and 4/4 with a
         /// Lead part, all of which the Chart settings tab changes.
         /// </summary>
-        private (EditorWindow Window, EditorWindowViewModel ViewModel) CreateNewChart(IReadOnlyList<string> audioFiles)
+        private EditorWindowViewModel CreateNewChart(IReadOnlyList<string> audioFiles)
         {
             var chart = EditableChart.CreateNew(new NewChartSettings(
                 "", settings.Settings.DefaultChartResolution, NewChartSettings.DefaultBpm, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
             var audio = NewChartStems.TracksOf(audioFiles);
-            var editor = new EditorWindow();
-            return (editor, EditorWindowViewModel.ForNewChart(ServicesFor(editor), chart, audio));
+            return EditorWindowViewModel.ForNewChart(Services, chart, audio);
         }
 
-        public void OpenSong(OpenedSong song, SongLock songLock)
-        {
-            var editor = new EditorWindow();
-            OpenEditor(editor, EditorWindowViewModel.ForSong(ServicesFor(editor), song, songLock));
-        }
+        public void OpenSong(OpenedSong song, SongLock songLock) =>
+            Load(() => EditorWindowViewModel.ForSong(Services, song, songLock));
 
-        public void OpenRecovered(EditorSong song, SongLock? songLock, string recoveryKey)
-        {
-            var editor = new EditorWindow();
-            OpenEditor(editor, EditorWindowViewModel.ForRecovered(ServicesFor(editor), song, songLock, recoveryKey));
-        }
+        public void OpenRecovered(EditorSong song, SongLock? songLock, string recoveryKey) =>
+            Load(() => EditorWindowViewModel.ForRecovered(Services, song, songLock, recoveryKey));
 
-        /// <summary>What the Editor in <paramref name="editor"/> works with, its prompts and pickers shown over it.</summary>
-        private EditorServices ServicesFor(EditorWindow editor) => new(
+        /// <summary>What the Editors in <paramref name="editor"/> work with, their prompts and pickers shown over it.</summary>
+        private EditorServices ServicesFor(EditorWindow editor, AvaloniaAuthoringDialogService authoring) => new(
             settings,
             SettingsWindowFor(editor),
             new AvaloniaConfirmationService(() => editor),
@@ -148,22 +162,39 @@ namespace ChartBuilder.Services
             () => _ = ShowCalibrationAsync(),
             chartPackerSettingsFile,
             recovery,
-            new AvaloniaAuthoringDialogService(() => editor),
+            authoring,
             this,
             input,
             ShowInputDevices,
             new FileRevealService(() => editor));
 
-        /// <summary>Shows the Editor, replacing the window open, and starts its audio.</summary>
-        private void OpenEditor(EditorWindow editor, EditorWindowViewModel viewModel)
+        /// <summary>
+        /// Opens the Editor <paramref name="create"/> makes in the Editor window in place of what's open, letting go of that
+        /// one's song, and starts its audio. The window stays as it is: its screen, position, size and state.
+        /// </summary>
+        private void Load(Func<EditorWindowViewModel> create)
         {
-            Open(editor, viewModel);
+            var editor = Editor;
+            var time = Stopwatch.StartNew();
 
-            // The song's output says which device it's on, which may never have been calibrated.
-            void OnLatencyChanged(object? sender, EventArgs e) => OfferCalibration(editor);
-            latency.Changed += OnLatencyChanged;
-            editor.Closed += (_, _) => latency.Changed -= OnLatencyChanged;
+            // The new Editor starts from the layout saved, so the one open saves its own first.
+            editor.CaptureLayout();
+            var viewModel = create();
+            long made = time.ElapsedMilliseconds;
+
+            // The views move on to the new Editor before the old one is disposed, so none is left on a disposed one.
+            var previous = editor.DataContext as EditorWindowViewModel;
+            editor.DataContext = viewModel;
+            _authoring?.Follow(viewModel.Editor.Preview);
+            long bound = time.ElapsedMilliseconds;
+            previous?.Dispose();
+            long disposed = time.ElapsedMilliseconds;
             _ = viewModel.Playback.OpenAsync();
+
+            // The frame after the next has the new Editor laid out and drawn, which the next one starts on.
+            editor.RequestAnimationFrame(_ => editor.RequestAnimationFrame(_ => Logger.Information(
+                "Opened {Title} in the Editor: made in {MadeMs} ms, bound in {BoundMs} ms, the last disposed in {DisposedMs} ms, drawn after {DrawnMs} ms",
+                viewModel.Song.Title, made, bound - made, disposed - bound, time.ElapsedMilliseconds)));
         }
 
         /// <summary>
@@ -172,6 +203,20 @@ namespace ChartBuilder.Services
         /// </summary>
         public async Task ShowCalibrationAsync() =>
             await _calibration.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow);
+
+        public async Task WaitForRenderAsync()
+        {
+            if (_editor is not { IsVisible: true } editor)
+                return;
+
+            // The next frame's callbacks run before its changes go to the renderer, in the same pass, so a yield after
+            // them finds the frame handed over. Not waited on for long: a window that isn't drawing, minimized say,
+            // may not ask for frames.
+            var frame = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            editor.RequestAnimationFrame(_ => frame.TrySetResult());
+            await Task.WhenAny(frame.Task, Task.Delay(FrameWaitLimit));
+            await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+        }
 
         /// <summary>
         /// Opens the calibration tool's input-device test (charter-spec C11 item 2) for <paramref name="device"/> over the
@@ -188,7 +233,7 @@ namespace ChartBuilder.Services
         /// </summary>
         /// <remarks>
         /// The Editor owns it, never the window in front, which may be the Settings dialog it was opened from: an owned
-        /// window closes with its owner. When the Editor is swapped for another, it's opened again over that one.
+        /// window closes with its owner. It stays open as a song or a new chart opens, as that's done in the same window.
         /// </remarks>
         public void ShowInputDevices()
         {
@@ -250,26 +295,30 @@ namespace ChartBuilder.Services
                 await ShowCalibrationAsync();
         }
 
-        private void Open(EditorWindow editor, EditorWindowViewModel viewModel)
+        /// <summary>
+        /// Follows the Editor window for as long as it's open: the calibration offer as the audio's device changes, the
+        /// Editor open's unsaved edits as it closes, and where the window was.
+        /// </summary>
+        private void WatchWindow(EditorWindow editor)
         {
-            editor.DataContext = viewModel;
+            // The song's output says which device it's on, which may never have been calibrated.
+            void OnLatencyChanged(object? sender, EventArgs e) => OfferCalibration(editor);
+            latency.Changed += OnLatencyChanged;
 
-            // The window this one replaces, if any: a new project keeps its screen, position, size and state.
-            var previous = desktop.MainWindow as EditorWindow;
-            if (previous is not null && !ReferenceEquals(previous, editor) && previous.WindowState != WindowState.Minimized)
-                HandOff(previous, editor);
-            else
-                RestorePlacement(editor);
-
-            // The song's audio and lock go with the window.
-            editor.Closed += (_, _) => viewModel.Dispose();
+            // The song's audio and lock go with the Editor open when the window closes.
+            editor.Closed += (_, _) =>
+            {
+                latency.Changed -= OnLatencyChanged;
+                (editor.DataContext as EditorWindowViewModel)?.Dispose();
+            };
 
             // Unsaved edits are asked about first: Save, Discard or Cancel (charter-spec C15 item 7). The close is held
             // while the user answers, and made again once they've chosen to go ahead.
             bool closeAllowed = false;
             editor.Closing += (_, e) =>
             {
-                if (closeAllowed || e.Cancel || !viewModel.HasUnsavedChanges && !viewModel.IsSaving)
+                if (closeAllowed || e.Cancel || editor.DataContext is not EditorWindowViewModel viewModel
+                    || !viewModel.HasUnsavedChanges && !viewModel.IsSaving)
                     return;
 
                 // The OS won't wait for an answer, so the edits are autosaved, to be offered when the song is next opened.
@@ -312,37 +361,6 @@ namespace ChartBuilder.Services
 
                 settings.Save();
             };
-
-            // The window this one replaces closes once it's showing, so the app, which exits when its last window
-            // closes, stays up.
-            var replaced = desktop.MainWindow;
-            Show(editor);
-            if (replaced is not null && !ReferenceEquals(replaced, editor))
-            {
-                // The Input devices window would close with the Editor that owns it; it's opened again over this one.
-                if (_inputDevices is { } devices && ReferenceEquals(devices.Owner, replaced))
-                {
-                    _inputDevices = null;
-                    devices.Close();
-                    ShowInputDevices();
-                }
-
-                replaced.Close();
-            }
-        }
-
-        /// <summary>
-        /// Puts <paramref name="editor"/> where <paramref name="previous"/> is: the same screen, position and size,
-        /// and the same state, fullscreen included. Opening a song or a new chart swaps windows in place.
-        /// </summary>
-        private static void HandOff(EditorWindow previous, EditorWindow editor)
-        {
-            editor.Width = previous.Width;
-            editor.Height = previous.Height;
-            editor.WindowStartupLocation = WindowStartupLocation.Manual;
-            editor.Position = previous.Position;
-            if (previous.WindowState != WindowState.Normal)
-                editor.WindowState = previous.WindowState;
         }
 
         /// <summary>

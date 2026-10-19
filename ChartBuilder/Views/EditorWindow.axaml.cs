@@ -87,6 +87,14 @@ namespace ChartBuilder.Views
             _viewModel = DataContext as EditorWindowViewModel;
             if (_viewModel is not null)
                 _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+            // A song or a new chart opened in place of another: the sizes given were the last one's, not moves of the
+            // splitters, and the new one's sizes show straight away.
+            _leftApplied = double.NaN;
+            _rightApplied = double.NaN;
+            _timelineApplied = double.NaN;
+            _isSpaceHeld = false;
+            ApplyLayout();
         }
 
         /// <summary>
@@ -175,7 +183,7 @@ namespace ChartBuilder.Views
             if (_viewModel is not { } vm)
                 return;
 
-            // Posted, since it swaps the window and the drop is still being handled.
+            // Posted, since it swaps what the window edits and the drop is still being handled.
             if (DroppedFiles.SongOf(e) is { } song)
             {
                 Dispatcher.UIThread.Post(() => _ = vm.OpenSongAsync(song));
@@ -261,7 +269,11 @@ namespace ChartBuilder.Views
         private static double Absorb(GridLength now, double applied, double preferred) =>
             !double.IsNaN(applied) && now.IsAbsolute && now.Value != applied ? Math.Round(now.Value) : preferred;
 
-        private void CaptureLayout()
+        /// <summary>
+        /// Saves the panels' and the lanes' sizes, as the window closes, and before a song or a new chart opens in place
+        /// of the one open, which starts from the sizes saved.
+        /// </summary>
+        public void CaptureLayout()
         {
             if (_viewModel is not { } vm)
                 return;

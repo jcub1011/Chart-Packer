@@ -47,6 +47,16 @@ namespace ChartBuilder.Services
             preview.Show(window);
         }
 
+        /// <summary>
+        /// Moves the preview's window, if it's open, on to <paramref name="viewModel"/>, the preview of the song just
+        /// opened in the Editor, so it stays open showing that song.
+        /// </summary>
+        public void Follow(PreviewViewModel viewModel)
+        {
+            if (_preview is { } open)
+                open.DataContext = viewModel;
+        }
+
         public async Task ShowReduceAsync(ReduceViewModel viewModel)
         {
             if (owner() is not { } window)

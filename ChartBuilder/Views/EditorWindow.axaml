@@ -87,72 +87,78 @@
              the window narrows. -->
         <StackPanel x:Name="TopBand" Grid.Row="0">
             <!-- The window draws its own title bar (TitleBar): the icon, the File and Edit menus, and the window's title and
-                 the program version. Dragging anywhere but the menus, the title and the version moves the window. -->
-            <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}">
-                <ctl:TitleBar.Menu>
-                    <Menu chrome:WindowDecorationProperties.ElementRole="User">
-                        <MenuItem Header="{x:Static res:Strings.MenuFile}">
-                            <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N" />
-                            <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O" />
-                            <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
-                                 the logical tree ($parent), as the submenu's popup isn't under the menu in the visual tree. -->
-                            <MenuItem Header="{x:Static res:Strings.MenuOpenRecent}" ItemsSource="{Binding Recent}" IsEnabled="{Binding HasRecent}">
-                                <MenuItem.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:RecentSongItem">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" MinWidth="240">
-                                            <TextBlock Grid.Column="0" MaxWidth="360" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
-                                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding OpenedText}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </MenuItem.ItemTemplate>
-                                <MenuItem.ItemContainerTheme>
-                                    <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:RecentSongItem">
-                                        <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
-                                        <Setter Property="Command" Value="{Binding $parent[Menu].((vm:EditorWindowViewModel)DataContext).OpenRecentCommand}" />
-                                        <Setter Property="CommandParameter" Value="{Binding}" />
-                                    </ControlTheme>
-                                </MenuItem.ItemContainerTheme>
+                 the program version. Dragging anywhere but the menus, the title and the version moves the window. Layered
+                 over the progress of a song being opened, see-through so it shows. -->
+            <Panel>
+                <ctl:BusyBar Foreground="{DynamicResource AccentTintBrush}"
+                             IsActive="{Binding IsLoading}"
+                             AutomationProperties.Name="{Binding LoadingText}" />
+                <ctl:TitleBar Icon="/Assets/ChartBuilder.ico" AppName="{x:Static res:Strings.AppName}" Background="Transparent">
+                    <ctl:TitleBar.Menu>
+                        <Menu chrome:WindowDecorationProperties.ElementRole="User">
+                            <MenuItem Header="{x:Static res:Strings.MenuFile}">
+                                <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N" />
+                                <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O" />
+                                <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
+                                     the logical tree ($parent), as the submenu's popup isn't under the menu in the visual tree. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuOpenRecent}" ItemsSource="{Binding Recent}" IsEnabled="{Binding HasRecent}">
+                                    <MenuItem.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RecentSongItem">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" MinWidth="240">
+                                                <TextBlock Grid.Column="0" MaxWidth="360" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                                <TextBlock Grid.Column="1" Classes="muted" Text="{Binding OpenedText}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </MenuItem.ItemTemplate>
+                                    <MenuItem.ItemContainerTheme>
+                                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:RecentSongItem">
+                                            <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
+                                            <Setter Property="Command" Value="{Binding $parent[Menu].((vm:EditorWindowViewModel)DataContext).OpenRecentCommand}" />
+                                            <Setter Property="CommandParameter" Value="{Binding}" />
+                                        </ControlTheme>
+                                    </MenuItem.ItemContainerTheme>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
+                                <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
+                                          Command="{Binding SaveAndPackCommand}"
+                                          ToolTip.Tip="{Binding SaveAndPackToolTip}"
+                                          ToolTip.ShowOnDisabled="True" />
+                                <MenuItem Header="{x:Static res:Strings.MenuExportCopy}"
+                                          Command="{Binding ExportCopyCommand}"
+                                          ToolTip.Tip="{Binding ExportCopyToolTip}"
+                                          ToolTip.ShowOnDisabled="True" />
+                                <Separator />
+                                <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
+                                     left panel. Its Ctrl+, isn't shown, as Avalonia would print it as Ctrl+OemComma. -->
+                                <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
                             </MenuItem>
-                            <Separator />
-                            <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
-                            <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
-                                      Command="{Binding SaveAndPackCommand}"
-                                      ToolTip.Tip="{Binding SaveAndPackToolTip}"
-                                      ToolTip.ShowOnDisabled="True" />
-                            <MenuItem Header="{x:Static res:Strings.MenuExportCopy}"
-                                      Command="{Binding ExportCopyCommand}"
-                                      ToolTip.Tip="{Binding ExportCopyToolTip}"
-                                      ToolTip.ShowOnDisabled="True" />
-                            <Separator />
-                            <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
-                                 left panel. Its Ctrl+, isn't shown, as Avalonia would print it as Ctrl+OemComma. -->
-                            <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
-                        </MenuItem>
-                        <MenuItem Header="{x:Static res:Strings.MenuEdit}">
-                            <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
-                            <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
-                        </MenuItem>
-                    </Menu>
-                </ctl:TitleBar.Menu>
-                <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
-                     is a button (title-link, in Theme.axaml) that shows the song in the file manager; a new chart's, with
-                     nowhere to show, is plain text. The version opens the releases page. -->
-                <Grid ColumnDefinitions="*,Auto"
-                      ColumnSpacing="8"
-                      Margin="6,0,0,0"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Center">
-                    <Button Grid.Column="0"
-                            Classes="title-link"
-                            chrome:WindowDecorationProperties.ElementRole="User"
-                            Command="{Binding ShowSongCommand}"
-                            ToolTip.Tip="{Binding ShowSongToolTip}"
-                            AutomationProperties.Name="{Binding ShowSongToolTip}">
-                        <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
-                    </Button>
-                    <ctl:VersionLink Grid.Column="1" chrome:WindowDecorationProperties.ElementRole="User" />
-                </Grid>
-            </ctl:TitleBar>
+                            <MenuItem Header="{x:Static res:Strings.MenuEdit}">
+                                <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
+                                <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
+                            </MenuItem>
+                        </Menu>
+                    </ctl:TitleBar.Menu>
+                    <!-- Left-aligned, so the version follows the title, and the title is trimmed when they don't fit. The title
+                         is a button (title-link, in Theme.axaml) that shows the song in the file manager; a new chart's, with
+                         nowhere to show, is plain text. The version opens the releases page. -->
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="8"
+                          Margin="6,0,0,0"
+                          HorizontalAlignment="Left"
+                          VerticalAlignment="Center">
+                        <Button Grid.Column="0"
+                                Classes="title-link"
+                                chrome:WindowDecorationProperties.ElementRole="User"
+                                Command="{Binding ShowSongCommand}"
+                                ToolTip.Tip="{Binding ShowSongToolTip}"
+                                AutomationProperties.Name="{Binding ShowSongToolTip}">
+                            <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                        </Button>
+                        <ctl:VersionLink Grid.Column="1" chrome:WindowDecorationProperties.ElementRole="User" />
+                    </Grid>
+                </ctl:TitleBar>
+            </Panel>
 
             <!-- The toolbar's groups wrap onto more rows as the window narrows, rather than scrolling. -->
             <Border Classes="toolbar">
@@ -759,5 +765,28 @@
                            IsVisible="{Binding !Messages.HasLatest}" />
             </Grid>
         </Button>
+
+        <!-- While a song is read and its Editor made: the window under the title bar (30 high, Border.title-bar) dimmed,
+             with a spinner and what's opening, as the title bar's progress runs. Both are moved on the render thread
+             (Spinner, BusyBar), as the Editor is made on the UI thread. It takes the pointer, so the song being left isn't
+             edited meanwhile. -->
+        <Panel Grid.Row="0"
+               Grid.RowSpan="5"
+               Margin="0,30,0,0"
+               IsVisible="{Binding IsLoading}">
+            <Border Background="{DynamicResource AppBackgroundBrush}" Opacity="0.85" />
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12">
+                <ctl:Spinner Classes="spinner"
+                             IsActive="{Binding IsLoading}"
+                             Width="36" Height="36" StrokeThickness="3"
+                             HorizontalAlignment="Center" />
+                <TextBlock Classes="muted centered"
+                           MaxWidth="480"
+                           TextWrapping="Wrap"
+                           Text="{Binding LoadingText}" />
+            </StackPanel>
+        </Panel>
     </Grid>
 </Window>

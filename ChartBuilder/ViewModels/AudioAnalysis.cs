@@ -205,16 +205,20 @@ namespace ChartBuilder.ViewModels
                 spectrogram.Updated -= OnSpectrogramUpdated;
             _followed.Clear();
 
-            // The workers before the audio they read.
-            lock (_audioLock)
+            // The workers before the audio they read. Off the UI thread, which would otherwise wait for each worker to finish
+            // the chunk it's on, and for audio still being opened to analyse: as a song opens in this one's place, say.
+            _ = Task.Run(() =>
             {
-                _spectrograms?.Dispose();
-                _workers?.Dispose();
-                _audio?.Dispose();
-                _spectrograms = null;
-                _workers = null;
-                _audio = null;
-            }
+                lock (_audioLock)
+                {
+                    _spectrograms?.Dispose();
+                    _workers?.Dispose();
+                    _audio?.Dispose();
+                    _spectrograms = null;
+                    _workers = null;
+                    _audio = null;
+                }
+            });
         }
 
         private async Task<OnsetAnalysis?> FindOnsetsAsync(AudioSource source, bool drumBands, bool requested)

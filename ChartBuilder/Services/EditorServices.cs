@@ -22,7 +22,7 @@ namespace ChartBuilder.Services
     /// <param name="ChartPackerSettingsFile">Chart Packer's settings, read for its library and packing settings, never written.</param>
     /// <param name="Recovery">Where the chart is autosaved, for recovery after a crash.</param>
     /// <param name="Authoring">Shows the authoring tools' dialogs: Reduce and the rest.</param>
-    /// <param name="Editors">Opens songs and new charts in new Editor windows, closing this one.</param>
+    /// <param name="Editors">Opens songs and new charts in the Editor window, in this Editor's place.</param>
     /// <param name="Input">The instrument devices and their bindings, for playtest and record mode (charter-spec C19).</param>
     /// <param name="OpenInputDevices">Opens the Input devices window, where the bindings are set.</param>
     /// <param name="Reveal">Shows the song's folder or <c>.sng</c> in the file manager, from the title bar.</param>

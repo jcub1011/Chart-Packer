@@ -138,6 +138,11 @@ namespace ChartBuilder.Controls
                 _subscribed = Lanes;
                 if (_subscribed is not null)
                     _subscribed.LayoutChanged += OnLayoutChanged;
+
+                // Another song's lanes: new views for them, as a lane's view keeps what it drew of the last one. Its
+                // lanes' Ids, from the same saved layout, would otherwise be taken as the same lanes. The old views
+                // leave with the content Rebuild takes down.
+                _views.Clear();
                 Rebuild();
             }
             else if (change.Property == SplitterBrushProperty)

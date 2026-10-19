@@ -57,6 +57,16 @@ namespace ChartBuilder.ViewModels
         [NotifyCanExecuteChangedFor(nameof(NewChartCommand), nameof(OpenChartCommand), nameof(OpenRecentCommand))]
         public partial bool IsOpening { get; private set; }
 
+        /// <summary>
+        /// What's being opened, while a song is read and its Editor made, which the window shows over the chart with a
+        /// spinner; null otherwise.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsLoading))]
+        public partial string? LoadingText { get; private set; }
+
+        public bool IsLoading => LoadingText is not null;
+
         /// <summary>The songs opened lately, the latest first.</summary>
         public ObservableCollection<RecentSongItem> Recent { get; } = [];
 
@@ -104,7 +114,7 @@ namespace ChartBuilder.ViewModels
         private Task OpenRecentAsync(RecentSongItem? song) => song is null ? Task.CompletedTask : OpenSongAsync(song.Path);
 
         /// <summary>
-        /// Opens the song at <paramref name="path"/> in a new Editor window, closing this one once its chart is saved
+        /// Opens the song at <paramref name="path"/> in the Editor window in place of this Editor, once its chart is saved
         /// or discarded (charter-spec C2): a folder, a <c>.sng</c>, or a file in a song folder. Never throws: it's
         /// started from the command line, a drop, the picker or the Recent list, so whatever stops it is said on the
         /// message bar instead.
@@ -148,8 +158,12 @@ namespace ChartBuilder.ViewModels
                     }
                 }
 
-                Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, entry.DisplayName));
+                string opening = string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, entry.DisplayName);
+                Messages.Info(opening);
+                LoadingText = opening;
+                var reading = Stopwatch.StartNew();
                 var result = await SongOpener.OpenAsync(entry);
+                Logger.Information("Read {Song} in {ReadMs} ms", entry.DisplayName, reading.ElapsedMilliseconds);
 
                 // An autosave of edits a crash or a shutdown left unsaved is offered first (charter-spec C2 item 7).
                 RecoveryFile? recovered = null;
@@ -195,11 +209,18 @@ namespace ChartBuilder.ViewModels
 
                 RememberRecent(song);
 
-                // This window closes as the new one opens, so it mustn't let go of the lock it hands over as it does.
+                // A recovered chart is read again, from its autosave, off the UI thread as the song was.
+                var recoveredSong = recovered is null ? null : await Task.Run(() => Autosave.Recover(song, recovered));
+
+                // The new Editor is made on the UI thread, which holds the window up for a big chart, so what's opening is
+                // on screen first.
+                await _services.Editors.WaitForRenderAsync();
+
+                // This Editor is disposed as the new one opens, so it mustn't let go of the lock it hands over as it is.
                 if (ownLock)
                     _songLock = null;
-                if (recovered is not null)
-                    _services.Editors.OpenRecovered(Autosave.Recover(song, recovered), songLock, recovered.Key);
+                if (recovered is not null && recoveredSong is not null)
+                    _services.Editors.OpenRecovered(recoveredSong, songLock, recovered.Key);
                 else
                     _services.Editors.OpenSong(song, songLock);
                 songLock = null;
@@ -217,6 +238,7 @@ namespace ChartBuilder.ViewModels
                     songLock?.Dispose();
                 else if (songLock is not null)
                     _songLock = songLock;
+                LoadingText = null;
                 IsOpening = false;
             }
         }
@@ -238,8 +260,8 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// Offers the new charts a crash left autosaved but never saved, the latest first: Recover, Delete, or Cancel
-        /// to leave the rest alone. Called once, on the first Editor window. Stops after a recovery, as the recovered
-        /// chart opens in a new window in this one's place.
+        /// to leave the rest alone. Called once, as the app starts. Stops after a recovery, as the recovered chart opens
+        /// in this Editor's place.
         /// </summary>
         public async Task OfferUnsavedChartsAsync()
         {
@@ -253,13 +275,21 @@ namespace ChartBuilder.ViewModels
                     Strings.DiscardUnsavedButton);
                 if (choice == ConfirmChoice.First)
                 {
+                    LoadingText = string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, file.Manifest.Title);
                     try
                     {
-                        _services.Editors.OpenRecovered(Autosave.RecoverNew(file), null, file.Key);
+                        // Read off the UI thread, as a song is, then made into its Editor once what's opening is on screen.
+                        var song = await Task.Run(() => Autosave.RecoverNew(file));
+                        await _services.Editors.WaitForRenderAsync();
+                        _services.Editors.OpenRecovered(song, null, file.Key);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.RecoverFailedFormat, ex.Message));
+                    }
+                    finally
+                    {
+                        LoadingText = null;
                     }
 
                     return;
