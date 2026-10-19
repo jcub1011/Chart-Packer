@@ -151,7 +151,7 @@
                            IsVisible="{Binding ChartSettings.HasDrums}" />
             </StackPanel>
 
-            <!-- The song's metadata, as Chart Packer's inspector edits it; Revert and Remove are on a row's right-click menu. -->
+            <!-- The song's metadata, as Chart Packer's inspector edits it. -->
             <TextBlock Classes="caption" Margin="0,10,0,4" Text="{x:Static res:Strings.ChartSettingsSectionMetadata}" />
             <uiviews:MetadataEditorView DataContext="{Binding Metadata.MetadataEditor}" />
 

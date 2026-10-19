@@ -14,8 +14,7 @@ namespace ChartBuilder.ViewModels
 {
     /// <summary>
     /// Chart settings' Metadata (charter-spec C1): a row per <c>song.ini</c> key, as Chart Packer's inspector edits them,
-    /// but each edit an undo step (<see cref="SongCommands"/>). The difficulties are left to Parts; Revert and Remove are on
-    /// a row's right-click menu.
+    /// but each edit an undo step (<see cref="SongCommands"/>). The difficulties are left to Parts.
     /// </summary>
     /// <remarks>
     /// Every edit is a pending change until the song is saved. While it's being saved nothing can be edited, as the save
@@ -38,7 +37,7 @@ namespace ChartBuilder.ViewModels
             ArgumentNullException.ThrowIfNull(execute);
             _song = song;
             _execute = execute;
-            MetadataEditor = new MetadataEditorViewModel(this, showDifficulties: false, actionsInContextMenu: true);
+            MetadataEditor = new MetadataEditorViewModel(this, showDifficulties: false);
             _song.Changed += OnSongChanged;
             Refresh();
         }

@@ -303,11 +303,12 @@
   <data name="MergePartDance" xml:space="preserve">
     <value>Dance</value>
   </data>
-  <data name="AddButton" xml:space="preserve">
-    <value>Add</value>
-  </data>
   <data name="AddRowButton" xml:space="preserve">
     <value>Add row</value>
+  </data>
+  <data name="AddRowHint" xml:space="preserve">
+    <value>Enter to add, Esc to close</value>
+    <comment>Under the metadata editor's new row, while a key is being added.</comment>
   </data>
   <data name="AutoSetLengthButton" xml:space="preserve">
     <value>Auto-set song length</value>
@@ -414,8 +415,16 @@
   <data name="RemoveRowToolTip" xml:space="preserve">
     <value>Remove this row</value>
   </data>
+  <data name="RestoreRowToolTip" xml:space="preserve">
+    <value>Restore this row</value>
+    <comment>Undo on a metadata row that's removed until saved.</comment>
+  </data>
   <data name="RevertRowToolTip" xml:space="preserve">
     <value>Undo the changes to this row</value>
+  </data>
+  <data name="StopAddingToolTip" xml:space="preserve">
+    <value>Stop adding</value>
+    <comment>Closes the metadata editor's new row, dropping what was typed.</comment>
   </data>
   <data name="StoredMillisecondsFormat" xml:space="preserve">
     <value>Stored value: {0} (milliseconds)</value>

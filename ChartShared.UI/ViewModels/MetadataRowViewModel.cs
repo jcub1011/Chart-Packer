@@ -39,7 +39,7 @@ namespace ChartShared.UI.ViewModels
         public partial string? Value { get; set; }
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove), nameof(ShowRevertButton), nameof(ShowRemoveButton))]
+        [NotifyPropertyChangedFor(nameof(Marker), nameof(IsRemoved), nameof(IsChanged), nameof(CanRemove), nameof(ShowUndo), nameof(ShowRemove), nameof(HasUndoOrRemove), nameof(UndoToolTip))]
         [NotifyCanExecuteChangedFor(nameof(BeginEditCommand), nameof(RemoveCommand), nameof(RevertCommand), nameof(QuickFixCommand))]
         public partial MetadataRowState State { get; set; }
 
@@ -134,20 +134,29 @@ namespace ChartShared.UI.ViewModels
 
         public bool ShowDistinct => !IsEditing && IsDistinct;
 
-        /// <summary>Whether the row's actions are shown: the songs can be edited.</summary>
+        /// <summary>Whether the row's buttons are shown: the songs can be edited.</summary>
         public bool ShowActions => _owner.CanEdit;
 
-        /// <summary>The Revert button: the row has a change, and the editor doesn't put Revert on the right-click menu.</summary>
-        public bool ShowRevertButton => IsChanged && !_owner.ActionsInContextMenu;
+        /// <summary>
+        /// Undo, as a button and on the right-click menu: an edited or removed row whose key can be changed. An added row
+        /// has none, as removing it is its undo; the row goes, since the key was never saved.
+        /// </summary>
+        public bool ShowUndo => CanChange() && State is MetadataRowState.Edited or MetadataRowState.Removed;
 
-        /// <summary>The Remove button: the key isn't removed, and the editor doesn't put Remove on the right-click menu.</summary>
-        public bool ShowRemoveButton => CanRemove && !_owner.ActionsInContextMenu;
+        /// <summary>
+        /// Remove, as a button and on the right-click menu: the key isn't removed, and the songs can be edited. A key the
+        /// songs decide still shows it, disabled.
+        /// </summary>
+        public bool ShowRemove => _owner.CanEdit && CanRemove;
 
-        /// <summary>Whether the row's right-click menu has Revert and Remove: the editor puts them there, and the songs can be edited.</summary>
-        public bool ShowMenuActions => _owner.ActionsInContextMenu && _owner.CanEdit;
+        /// <summary>The right-click menu has Undo or Remove, which a separator puts apart from the rest.</summary>
+        public bool HasUndoOrRemove => ShowUndo || ShowRemove;
 
-        /// <summary>The row's Auto Set button: Auto Set for a <c>song_length</c> row, where the editor offers it.</summary>
-        public bool ShowAutoSetLength => IsSongLength && _owner.AutoSetSongLengthCommand is not null;
+        /// <summary>What Undo does: puts a removed row back, or the saved value back in an edited one.</summary>
+        public string UndoToolTip => IsRemoved ? SharedStrings.RestoreRowToolTip : SharedStrings.RevertRowToolTip;
+
+        /// <summary>The row's Auto Set link: Auto Set for a <c>song_length</c> row, where the editor offers it and the songs can be edited.</summary>
+        public bool ShowAutoSetLength => IsSongLength && _owner.AutoSetSongLengthCommand is not null && _owner.CanEdit;
 
         /// <summary>Works out <c>song_length</c> from the songs' files; none where the editor doesn't offer it.</summary>
         public IRelayCommand? AutoSetSongLengthCommand => _owner.AutoSetSongLengthCommand;
@@ -174,7 +183,10 @@ namespace ChartShared.UI.ViewModels
         public void RefreshCommands()
         {
             OnPropertyChanged(nameof(ShowActions));
-            OnPropertyChanged(nameof(ShowMenuActions));
+            OnPropertyChanged(nameof(ShowUndo));
+            OnPropertyChanged(nameof(ShowRemove));
+            OnPropertyChanged(nameof(HasUndoOrRemove));
+            OnPropertyChanged(nameof(ShowAutoSetLength));
             BeginEditCommand.NotifyCanExecuteChanged();
             RemoveCommand.NotifyCanExecuteChanged();
             RevertCommand.NotifyCanExecuteChanged();
