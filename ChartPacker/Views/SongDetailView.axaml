@@ -149,15 +149,16 @@
             <Setter Property="TextElement.FontSize" Value="12" />
         </Style>
         <!-- While the save bar shows, over the bottom of the panel, the tip strip sits on it, and the details end above
-             it, so the last of them can still be scrolled into view. The bar is 45 high. -->
+             it, so the last of them can still be scrolled into view. The bar is 45 high. The details also end 48 higher
+             either way, so scrolled to the bottom, the tip strip doesn't cover the last of them. -->
         <Style Selector="ctl|ToolTipStrip.save-bar">
             <Setter Property="Margin" Value="0,0,0,45" />
         </Style>
         <Style Selector="StackPanel.details">
-            <Setter Property="Margin" Value="12,10" />
+            <Setter Property="Margin" Value="12,10,12,58" />
         </Style>
         <Style Selector="StackPanel.details.save-bar">
-            <Setter Property="Margin" Value="12,10,12,55" />
+            <Setter Property="Margin" Value="12,10,12,103" />
         </Style>
 
         <!-- The background's Image | Video switch: radio buttons, so one is always picked, drawn as
