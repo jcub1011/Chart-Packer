@@ -17,6 +17,7 @@ using ChartShared.Core.Input;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Resources;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels.Settings;
 using ChartShared.UI.Views;
@@ -41,8 +42,8 @@ namespace ChartBuilder.Services
         RecoveryStore recovery,
         InputService input) : IEditorWindowService
     {
-        // The calibration tool, while it's open.
-        private CalibrationWindow? _calibration;
+        // The calibration tool, shared with Chart Packer.
+        private readonly CalibrationWindowService _calibration = new(openOutput, latency);
 
         // The Input devices window, while it's open.
         private InputDevicesWindow? _inputDevices;
@@ -80,9 +81,6 @@ namespace ChartBuilder.Services
                     break;
                 case { Start: BuilderStart.OpenSong, SongPath: { } path }:
                     await viewModel.OpenSongAsync(path);
-                    break;
-                case { Start: BuilderStart.Calibrate }:
-                    await ShowCalibrationAsync();
                     break;
                 default:
                     if (settings.Settings.StartupAction == StartupAction.ReopenRecent
@@ -169,37 +167,10 @@ namespace ChartBuilder.Services
         /// </summary>
         public async Task ShowCalibrationAsync()
         {
-            if (_calibration is { } open)
-            {
-                open.Activate();
-                return;
-            }
-
-            if (desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
+            if (!_calibration.IsOpen && desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
                 editor.Playback.Pause();
 
-            var window = new CalibrationWindow { DataContext = new CalibrationViewModel(openOutput, latency) };
-            var owner = desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow;
-            _calibration = window;
-            try
-            {
-                if (owner is null)
-                {
-                    var closed = new TaskCompletionSource();
-                    window.Closed += (_, _) => closed.TrySetResult();
-                    window.Show();
-                    await closed.Task;
-                }
-                else
-                {
-                    WindowChrome.UseOwnerIcon(window, owner);
-                    await window.ShowDialog(owner);
-                }
-            }
-            finally
-            {
-                _calibration = null;
-            }
+            await _calibration.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow);
         }
 
         /// <summary>
@@ -231,7 +202,7 @@ namespace ChartBuilder.Services
         private void OfferCalibration(EditorWindow editor)
         {
             if (!settings.Settings.PromptForCalibration
-                || _calibration is not null
+                || _calibration.IsOpen
                 || latency.Source != LatencySource.Fallback
                 || latency.Device is not { } device)
                 return;
@@ -249,7 +220,7 @@ namespace ChartBuilder.Services
         private async Task OfferCalibrationAsync(EditorWindow editor, AudioDevice device)
         {
             var confirmations = new AvaloniaConfirmationService(() => editor);
-            string name = string.IsNullOrEmpty(device.Name) ? Strings.CalibrationUnknownDevice : device.Name;
+            string name = string.IsNullOrEmpty(device.Name) ? SharedStrings.CalibrationUnknownDevice : device.Name;
             if (await confirmations.ConfirmAsync(
                     Strings.CalibrationPromptTitle,
                     string.Format(CultureInfo.CurrentCulture, Strings.CalibrationPromptFormat, name),

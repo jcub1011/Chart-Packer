@@ -440,8 +440,8 @@ namespace ChartPacker.ViewModels
             : CurrentPosition;
 
         /// <summary>
-        /// Reads the latency of the device the song plays on again, as when the window is activated after Chart Builder's
-        /// calibration tool may have changed it (charter-spec §4.8).
+        /// Reads the latency of the device the song plays on again, as when the calibration tool closes, or when the window
+        /// is activated after Chart Builder's may have changed it (charter-spec §4.8).
         /// </summary>
         public void RefreshLatency()
         {
@@ -681,13 +681,22 @@ namespace ChartPacker.ViewModels
             RefreshCommands();
         }
 
+        /// <summary>Pauses the song, if it's playing, as when the calibration tool opens.</summary>
+        public void Pause()
+        {
+            if (!IsPlaying)
+                return;
+
+            _player?.Pause();
+            SetPlaying(false);
+        }
+
         [RelayCommand(CanExecute = nameof(CanPlay))]
         private async Task PlayPauseAsync()
         {
             if (IsPlaying)
             {
-                _player?.Pause();
-                SetPlaying(false);
+                Pause();
                 return;
             }
 

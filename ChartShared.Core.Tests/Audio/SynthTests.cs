@@ -12,7 +12,7 @@ public sealed class SynthTests
     [TestMethod]
     [DataRow(1000.0)]
     [DataRow(2000.0)]
-    public void TheCalibrationBeepIsItsToneForItsLengthWithShortFades(double hz)
+    public void ABeepIsItsToneForItsLengthWithShortFades(double hz)
     {
         var beep = Synth.Beep(hz, 30, 2, Rate);
 

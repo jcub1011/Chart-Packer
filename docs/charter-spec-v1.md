@@ -93,7 +93,7 @@ saved as `pro_drums` and `five_lane_drums` in `song.ini`, as the games read it
 ```txt
 Chart-Packer.slnx
 ├── ChartPacker/                  Chart Packer app: library, inspector, packing. Launches Chart Builder (§4.8)
-├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases, calibration tool
+├── ChartBuilder/                 Chart Builder app (new): launcher (home screen), Editor window, canvases
 ├── ChartBuilder.Devices/         Instrument devices (new, C19): SDL3 game controllers, and MIDI input on Windows (winmm)
 ├── ChartShared.UI/               Shared Avalonia library (new): theme, icons, WindowChrome, dialogs, pickers,
 │                                 settings window, shared controls, and the drawing of notes and waveforms
@@ -274,7 +274,7 @@ changed in this way. Keeping ticks (the default) never touches passthrough track
 | `SpectrogramBuilder` | STFT over a stem using the existing `Spectrum/Fft` and `Dsp/Windowing`, mapped to log-frequency bins and quantised to bytes. Runs off the UI thread, produces columns in chunks so the view can draw as they arrive, and is **held in memory only** ([C13](#c13-spectrogram)). |
 | `OnsetDetector` | Spectral-flux onset detection with an adaptive threshold: one envelope per stem, plus one per band for drums ([C14](#c14-onset-and-beat-assist)) |
 | `TempoEstimator` | Estimates a local tempo through the song from the onset envelope's windowed autocorrelation (a tempogram), with a preference for 60–200 BPM, then tracks beats with dynamic programming that follows that local tempo, so step changes are tracked rather than averaged. Gives a proposed list of beat times, a confidence per region, and a tempo map with anchors. |
-| `Synth` | Makes the metronome click, the note hit sounds and the calibration beep as PCM. They are mixed in **after** the time-stretcher, so they are never stretched, and share the stems' output clock and latency ([§4.4.1](#441-playback-changes)). |
+| `Synth` | Makes the metronome click and the note hit sounds as PCM. They are mixed in **after** the time-stretcher, so they are never stretched, and share the stems' output clock and latency ([§4.4.1](#441-playback-changes)). |
 
 Decoding reuses `AudioDecoder`/`IPcmSource` and `StemReader`, and waveforms reuse `StemPeaks` and
 `StemPeaksCache`, adding a stereo option for [C12](#c12-waveform). Playback builds on `StemPlayer`,
@@ -370,8 +370,8 @@ the chart is in **chart time**, from `TempoMap.SecondsAt`. They are related by
     Chart Packer's `NoteHighwayView` into `ChartShared.UI`.
   - Chart Packer's player and highway view models stay in Chart Packer. They're built round the
     inspector's song, drafts and offsets, which the editor doesn't have.
-- **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog. It uses the shared
-  `WindowChrome` for the dark title bar and icon, as the other dialogs do.
+- **`CalibrationWindow`** ([C11](#c11-calibration-tool)) is a dialog in `ChartShared.UI`, which both
+  apps open. It uses the shared `WindowChrome` for the dark title bar and its owner's icon.
 - **Drag and drop.** Chart Builder's launcher takes dropped audio files, which start a new chart
   with them as its stems ([C1](#c1-new-chart-and-chart-settings)), and a dropped song folder or
   `.sng`, which opens it
@@ -453,7 +453,6 @@ same song at once, and Chart Packer re-reads the songs Chart Builder may have ch
 | *(none)* | The home screen ([§4.5](#45-app-chartbuilder)) |
 | `[--] <song path>` | That song folder or `.sng` in the editor ([C2](#c2-open-and-import)) |
 | `--new [--] [<audio file>…]` | A new chart in the editor, with the audio files as its stems ([C1](#c1-new-chart-and-chart-settings)) |
-| `--calibrate` | The calibration tool ([C11](#c11-calibration-tool)) |
 
 `--` ends the options, so a path that starts with `-` is still a path. Paths are made absolute against
 the current folder as they're read (`BuilderArgs.Parse`). Arguments that can't be used (an unknown
@@ -1442,72 +1441,56 @@ the display.
 
 **Opening:**
 
-The tool is part of Chart Builder. It opens:
+The tool is a window in `ChartShared.UI` (`CalibrationWindow`, opened through
+`CalibrationWindowService`), so it belongs to neither app. Both open it in their own process, and
+both read and write the one shared latency file ([§10](#10-settings)). It opens:
 
 - from Chart Builder's **Settings**;
 - from Chart Builder's transport bar;
-- from **Calibrate…** in Chart Packer's Settings, which runs `ChartBuilder --calibrate`
-  ([§4.8](#48-launching-and-coordination));
+- from **Calibrate…** in Chart Packer's Settings, which pauses the song and reads the latency again
+  when the tool closes;
 - **automatically, once**, the first time Chart Builder opens on a device that has no calibration.
   This can be skipped.
 
 **Behaviour:**
 
-1. **Manual test.** This is the main test.
-   - A loop at 100 BPM in 4/4. On every beat:
-     - a **light flashes**: a large tile goes bright for 60 ms;
-     - a **note scrolls down a small highway** and reaches the strike line;
-     - a **beep plays**: a 1 kHz tone of 30 ms with 2 ms fades, which has a sharp start.
-   - **The first beat of each bar is marked**: a 2 kHz beep, a differently coloured flash and a
-     wider note. One beat lasts 600 ms, so without the mark a latency of 400 ms would look and
-     sound the same as −200 ms. With it, the pattern repeats every 2.4 s, and the whole ±500 ms
-     range can't be mistaken for anything else.
-   - The beep is made by `Synth` and played through `StemPlayer`'s post-stretch stage and
-     `IAudioOutput` ([§4.4.1](#441-playback-changes)), the same output path as a chart's stems, so
-     it has exactly their queueing and device latency.
-   - **One schedule.** The beats are scheduled on the app's monotonic clock.
-     - The flash and the note are drawn at each beat's time.
-     - Each beep is written into the output at the frame that `SmoothPosition` says will leave
-       SDL's queue at the beat's time minus the current latency.
-     - Changing the latency therefore **moves the beep, never the flash**.
-   - The user adjusts the latency until the beep and the flash (or the note reaching the line)
-     happen together. Controls:
-     - a slider from −500 to +500 ms (Bluetooth output can be well over 200 ms late);
+1. **The test.** The window has the shared title bar (`TitleBar`), and two columns: the highway on
+   the left, and on the right the controls in sections, as the song inspector lays them out
+   (`Inspector.axaml`): the output device, the latency, Compare, and how to calibrate. Reset,
+   Cancel and Save are in a toolbar along the bottom.
+   - The highway is the real one (`NoteHighwayView`), as the song's preview draws it, not a
+     drawing of its own. What it draws, and when the frame reaches the screen, is what the user
+     will be judging against while charting.
+   - It plays an endless loop at **80 BPM in 4/4** (`CalibrationChart`): an **open note on every
+     beat**, struck at the strike line with the real hit animation (`StrikeGlow`).
+   - The **metronome** (`MetronomeSchedule`, `Synth.Click`) clicks on every beat, over a silent mix
+     played through `StemPlayer` and `IAudioOutput` ([§4.4.1](#441-playback-changes)), the same
+     output path as a chart's stems, so it has exactly their queueing and device latency.
+   - **The first beat of each bar is marked**: an accented click and a measure line. One beat
+     lasts 750 ms, so without the mark a latency of 400 ms would look and sound the same as
+     −350 ms. With it, the pattern repeats every 3 s, and the whole ±500 ms range can't be
+     mistaken for anything else.
+   - **As playback draws it.** The highway is drawn at `SmoothPosition` − latency
+     (`LatencyCompensation.Drawn`), exactly as a song's highway is ([C10](#c10-playback)). The
+     clicks never move: changing the latency **moves the notes**, so the value found is the one
+     playback needs, through the same code.
+   - The user adjusts the latency until each click is heard as a note hits the line. Controls:
+     - a number box, dragged or typed in as the inspector's offsets are (`DragScrub`), with a
+       button back to the saved value;
      - buttons for −10, −5, −1, +1, +5 and +10 ms;
-     - the arrow keys (Shift for ×5);
-     - a number box.
+     - a slider from −500 to +500 ms (Bluetooth output can be well over 200 ms late);
+     - the arrow keys (Shift for ×5).
 
-     The change is heard from the next beat that hasn't yet been queued (the queue holds about
-     150 ms).
-   - **Why the highway note as well as the light.** A moving object reaching a line is easier to
-     judge than two instants. It is also what the user will be judging against while charting.
-     The light is kept as the user asked, and either can be hidden.
-2. **Tap test (optional).** This gives a measured starting value, which the manual test then fine
-   tunes.
-   - Both phases run at **60 BPM**, so a tap's nearest beat is unambiguous for any latency in the
-     ±500 ms range.
-   - **Visual phase.** The user taps in time with 16 flashes, with no sound.
-   - **Audio phase.** The user taps in time with 16 beeps, with the screen blank.
-   - Taps are mouse clicks or touches on the tile. (Not the Space key: see the timestamps below.)
-   - The first 4 taps of each phase are warm-up and are ignored.
-   - Each tap's error is measured against its nearest beat. Taps more than 1.5 interquartile
-     ranges from the median are dropped.
-   - **Latency = mean audio error − mean visual error**, over the taps kept. The user's reaction
-     time and the mouse's latency are the same in both phases, so they cancel out. What's left is
-     how much later the audio arrives than the display.
-   - The result shows the estimate, its spread (the larger of the two phases' interquartile
-     ranges), and how many taps were kept. **Use this value** puts it into the manual test to be
-     checked. A spread over 30 ms suggests trying again.
-   - **Tap times** come from the input events' own timestamps, not from when the UI thread handles
-     them.
-     - In Avalonia 12, pointer events carry a timestamp (`PointerEventArgs.Timestamp`) but key
-       events don't. The raw input events that do (`RawInputEventArgs.Timestamp`) can't be reached
-       from app code (`InputManager` and `RawKeyEventArgs`' members aren't public in 12.1), so the
-       tap test takes pointer taps only.
-     - A timestamp is on the OS input clock. It is moved onto the app's clock by subtracting, at
-       handling time, how long the event waited: the input clock's current time minus the event's
-       timestamp.
-3. **Per device.**
+     The notes move as soon as the value changes.
+   - **Compare.** While **Hold for no calibration** or Space is held down, the notes are drawn with
+     no latency, and the highway says so. Let go, they're drawn with the value again, so the user
+     can see how much it moves them. The value itself doesn't change. Space never presses the
+     button with the focus, and the window losing focus lets it go.
+   - **No tap test.** Tapping along adds the input device's latency, which is a separate
+     measurement.
+   - The highway is only watched: it can't be scrubbed here, and Shift doesn't show its whole
+     chart.
+2. **Per device.**
    - Latency is stored **per audio output device**, because headphones, Bluetooth and speakers
      differ by hundreds of milliseconds.
    - **Device key.** A device is identified by a stable OS device ID where the platform gives one
@@ -1523,12 +1506,12 @@ The tool is part of Chart Builder. It opens:
      events only reach an SDL event loop, which the app doesn't run, and a silent move raises
      none. `SdlAudioOutput` therefore checks which device it is on when playback starts and once a
      second, and raises `DeviceChanged` when it differs. Chart Builder, the tool and Chart Packer
-     then load that device's latency.
+     then load that device's latency (`AudioLatencyService`, in `ChartShared.UI`).
    - **Lookup order:** the stored value for the device's ID, then for its name, then a **global
      fallback**. When a device is found by name, its value is also saved under its ID if it has
      one, so a later rename doesn't lose it.
    - The tool always says which device it is calibrating.
-4. **Where it applies.**
+3. **Where it applies.**
    - Chart Builder ([C10](#c10-playback));
    - **record mode**, where key presses are shifted by the latency before they're quantised
      ([C15](#c15-editing-ergonomics));
@@ -1537,39 +1520,34 @@ The tool is part of Chart Builder. It opens:
      latency file ([§10](#10-settings)). The seek bar's waveform isn't moved: it marks what has
      played a column at a time, where tens of milliseconds don't show, and its position is the
      seek position. The merge window resumes from the audio's own position, not the drawn one.
-5. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
+4. **Saving.** **Save** stores the value in the shared latency file. **Cancel** restores the
    previous value. **Reset** sets 0.
 
 *Settled in CM2:*
 
-- **The tap test's estimate is a mean, not a median.** Once the outliers are dropped, about ten
-  taps are left in each phase. With so few, the median's spread is too wide for AC C11.2: 92% of
-  estimates fell within ±20 ms in its test. The mean gives 96.5%.
-- **One schedule, re-anchored.** The beeps are a `CalibrationSchedule` over a silent mix. It ties
-  the monotonic clock to `SmoothPosition` at an anchor, and is replaced when the latency changes
-  and once a second, so the device's clock can't drift from the system's.
-  - The schedules share a record of the beats already given (`CalibrationBeepsGiven`), so a
-    re-anchor never plays a beep twice.
-  - A latency raised past what's already queued skips one beep.
 - **The first-use prompt** comes the first time a song plays in the Editor on a device with only
   the fallback. Each device is offered it once (`BuilderSettings.CalibrationPrompted`), whatever
   the answer.
 - **The Settings rows.** The latency is an action-only row (`ActionSetting`), with a
   **Calibrate…** button, in both apps' Settings.
 
+*Changed for issue #49:* the flashing light, the hand-drawn highway, the beeps and the tap test are
+gone. The beeps were moved by the latency against a fixed flash (`CalibrationSchedule`), the
+opposite of playback, which never moves the audio. The tap test's estimator (`TapTest`) stays, for
+measuring input devices.
+
 Acceptance criteria:
 
-- **AC C11.1** With the latency set to +100 ms, the frames handed to `IAudioOutput` have the beep
-  starting 100 ms earlier against the flash schedule than at 0 ms, to within one frame. The flash
-  schedule is unchanged.
+- **AC C11.1** With the latency set to +100 ms, the highway is drawn 100 ms of song earlier than at
+  0 ms (`LatencyCompensation.Drawn`), and the clicks are where they were.
 - **AC C11.2** The tap-test estimator is given simulated taps: a known audio offset, normal jitter
   with σ = 20 ms, and 2 outliers of ±150 ms per phase. Over 1,000 seeded trials, the median
   estimate is within ±2 ms of the offset, and 95% of estimates are within ±20 ms. (With 12 kept
   taps per phase, ±20 ms is about two standard deviations of the estimate.)
 - **AC C11.3** When the output moves to another device (`DeviceChanged`), Chart Builder and the tool
   load that device's stored latency, or the fallback.
-- **AC C11.4** With a latency of 400 ms, each marked (2 kHz) beep is written 400 ms before the
-  marked beat it belongs to, so it can only be lined up with a marked flash.
+- **AC C11.4** The metronome clicks as each of the tool's notes is struck, accented on every fourth,
+  the first beat of each bar.
 - **AC C11.5** Cancel leaves the stored latency as it was before the tool opened.
 
 ### C12. Waveform
@@ -1795,8 +1773,8 @@ Acceptance criteria:
 5. **Record mode.**
    - While the song plays, number keys place notes on lanes at the moment they're pressed. Holding
      a key holds a sustain (on 5-fret and GHL).
-   - Press times come from the input events' timestamps where they can be had, as in the tap test
-     ([C11](#c11-calibration-tool)), and otherwise from when the event is handled.
+   - Press times come from the input events' timestamps where they can be had, and otherwise from
+     when the event is handled.
    - Each press is converted to song time as **`SmoothPosition` − latency × speed** at the moment
      of the press ([§4.4.1](#441-playback-changes)). It is then quantised to the grid, or to
      onsets if snap to onset is on.
@@ -2581,20 +2559,26 @@ it is made):
 **Calibration tool:**
 
 ```txt
-┌ Audio/visual calibration ─────────────────────── Device: Headphones (USB) ┐
-│                                                                            │
-│      ┌────────────┐            │  │  │  │                                  │
-│      │            │            │  │▼ │  │     ← note scrolls down          │
-│      │   FLASH    │            │  │  │  │                                  │
-│      │            │          ══╪══╪══╪══╪══  strike line                    │
-│      └────────────┘                                                        │
-│                                                                            │
-│  Adjust until the beep lands on the flash.                                 │
-│  Latency  [−10][−5][−1] ━━━━━━━━━━━●━━━━━━━━━━ [+1][+5][+10]   [ 42 ] ms   │
-│                                                                            │
-│  [Tap test…]   Last tap test: 39 ms (spread 11 ms, 24/24 taps)             │
-│                                   [Reset]   [Cancel]   [Save]              │
-└────────────────────────────────────────────────────────────────────────────┘
+┌ ⊞ Calibrate Audio Latency ────────────────────────────────────── ─  □  ✕ ┐
+├───────────────────────┬──────────────────────────────────────────────────┤
+│ ┌───────────────────┐ │  Output device                                   │
+│ │  Calibration off  │ │  ┌────────────────────────────────────────────┐  │
+│ │ ═════════════════ │ │  │ ♪ Headphones (USB)                         │  │
+│ │ ───────────────── │ │  └────────────────────────────────────────────┘  │
+│ │ ═════════════════ │ │  Latency                                         │
+│ │ ━━━━━━━━━━━━━━━━━ │ │  ┌────────────────────────────────────────────┐  │
+│ │ ═════════════════ │ │  │ ◷ [ +42 ] ms ↶    [−10 −5 −1 +1 +5 +10]    │  │
+│ │                   │ │  │ ━━━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━  │  │
+│ │ ═════════════════ │ │  │ The arrow keys move it by 1 ms, …          │  │
+│ │ [ ][ ][ ][ ][ ]   │ │  └────────────────────────────────────────────┘  │
+│ │                   │ │  Compare                                         │
+│ │                   │ │  ┌────────────────────────────────────────────┐  │
+│ │                   │ │  │ [◉ Hold for no calibration]                │  │
+│ │                   │ │  │ While the button or Space is held, …       │  │
+│ └───────────────────┘ │  └────────────────────────────────────────────┘  │
+├───────────────────────┴──────────────────────────────────────────────────┤
+│ [Reset to 0]                                        [Cancel]   [Save]    │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 9. Keyboard shortcuts
@@ -2681,15 +2665,15 @@ save writes its own temp file and renames it into place.
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
 | `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
-| `audio-latency.json` | Chart Builder's calibration tool | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when its window is activated ([§4.8](#48-launching-and-coordination)). |
+| `audio-latency.json` | The calibration tool, which both apps open | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when the tool closes and when its window is activated ([§4.8](#48-launching-and-coordination)). |
 | `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
 and the Core `SettingDefinition` catalog that Chart Packer's uses. The catalog can express Toggle,
 Integer, Range, Choice, Folder and Text rows. The latency map and the reduction rules aren't rows:
 they are edited in the calibration tool and the Reduce dialog, and Settings shows a button that
-opens each. Chart Packer's Settings shows a **Calibrate…** button that runs
-`ChartBuilder --calibrate`.
+opens each. Chart Packer's Settings shows a **Calibrate…** button that opens the same calibration
+tool.
 
 | Setting | Default |
 | ------- | ------- |
@@ -2752,7 +2736,7 @@ layout. It isn't a row in Settings.
 | Tempo map | Tick ↔ seconds property tests against `TempoMap`; anchors stay put under edits (AC C4.1) |
 | Lint | At least one fixture per CHR rule, and a clean fixture triggers none (AC C16.1) |
 | Analysis | Synthetic click tracks at fixed and changing tempos for `TempoEstimator`; synthetic drum hits in separate bands for `OnsetDetector`; spectrogram bins checked against known sine frequencies |
-| Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the beep's position in the mixed output for a given latency (AC C11.1) |
+| Calibration | The tap-test estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
 | Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |
@@ -2789,7 +2773,7 @@ fails the run if anything there changes anyway.
   ([C19](#c19-playtest-and-instrument-input)).
 - MIDI devices on macOS and Linux.
 - Keeping and replaying a playtest performance, judged again against the chart as it changes.
-- Measuring a device's input offset by tapping along, as the tap test does.
+- Measuring a device's input offset by tapping along with the calibration tool's highway (issue #49).
 - Rebindable editor shortcuts (instrument bindings are in C19).
 - Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
   library and inspector as well as Chart Builder.

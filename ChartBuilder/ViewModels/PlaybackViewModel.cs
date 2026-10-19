@@ -16,6 +16,7 @@ using ChartShared.Audio.Synthesis;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Scanning;
+using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;

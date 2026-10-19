@@ -711,4 +711,67 @@
     <value>See the releases on GitHub</value>
     <comment>The title bar's version, which opens the project's releases page in the browser.</comment>
   </data>
+  <data name="CalibrationWindowTitle" xml:space="preserve">
+    <value>Calibrate Audio Latency</value>
+  </data>
+  <data name="CalibrationUnknownDevice" xml:space="preserve">
+    <value>Default output device</value>
+    <comment>The device's name in the calibration tool when it isn't known.</comment>
+  </data>
+  <data name="CalibrationInstructions" xml:space="preserve">
+    <value>Move the latency until each click is heard as a note hits the strike line and lights it up. The first beat of each bar has an accented click and a bolder line across the highway.</value>
+  </data>
+  <data name="CalibrationLatencyLabel" xml:space="preserve">
+    <value>Latency</value>
+    <comment>The section over the latency's controls, and their name.</comment>
+  </data>
+  <data name="CalibrationKeysHint" xml:space="preserve">
+    <value>The arrow keys move it by 1 ms, or by 5 ms with Shift.</value>
+  </data>
+  <data name="CalibrationReset" xml:space="preserve">
+    <value>Reset to 0</value>
+  </data>
+  <data name="CalibrationSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="CalibrationSaveFailed" xml:space="preserve">
+    <value>The latency couldn't be saved.</value>
+  </data>
+  <data name="CalibrationDeviceCaption" xml:space="preserve">
+    <value>Output device</value>
+    <comment>Over the name of the audio device being calibrated.</comment>
+  </data>
+  <data name="CalibrationHowSection" xml:space="preserve">
+    <value>How to calibrate</value>
+    <comment>The section over the instructions.</comment>
+  </data>
+  <data name="CalibrationLatencyUnit" xml:space="preserve">
+    <value>ms</value>
+    <comment>After the latency's box: milliseconds.</comment>
+  </data>
+  <data name="CalibrationLatencyToolTip" xml:space="preserve">
+    <value>How much later the audio is heard than the screen shows it. A positive latency draws the notes that much earlier.</value>
+  </data>
+  <data name="CalibrationRevertToolTip" xml:space="preserve">
+    <value>Back to the saved latency</value>
+  </data>
+  <data name="CalibrationCompareSection" xml:space="preserve">
+    <value>Compare</value>
+    <comment>The section over the button that holds calibration off.</comment>
+  </data>
+  <data name="CalibrationHoldOffButton" xml:space="preserve">
+    <value>Hold for no calibration</value>
+    <comment>A button that draws the notes with no latency while it's held down.</comment>
+  </data>
+  <data name="CalibrationHoldOffHint" xml:space="preserve">
+    <value>While the button or Space is held, the notes are drawn with no calibration, so you can see how far it moves them.</value>
+  </data>
+  <data name="CalibrationOffBadge" xml:space="preserve">
+    <value>Calibration off</value>
+    <comment>Over the highway while calibration is held off.</comment>
+  </data>
+  <data name="CalibrationAudioUnavailableFormat" xml:space="preserve">
+    <value>The audio can't be played: {0}</value>
+    <comment>{0} is the error.</comment>
+  </data>
 </root>

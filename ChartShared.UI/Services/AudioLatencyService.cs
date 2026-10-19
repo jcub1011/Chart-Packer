@@ -3,10 +3,10 @@ using Avalonia.Threading;
 using ChartShared.Audio.Playback;
 using ChartShared.Core.Settings;
 
-namespace ChartBuilder.Services
+namespace ChartShared.UI.Services
 {
     /// <summary>
-    /// The audio/visual latency of the device Chart Builder is playing on (charter-spec C10 item 5, C11): what's drawn
+    /// The audio/visual latency of the device an app is playing on (charter-spec C10 item 5, C11): what's drawn
     /// against the audio is drawn this much earlier, times the speed. One for the app, used on the UI thread.
     /// </summary>
     /// <param name="file">The shared latency file, which the calibration tool writes.</param>
