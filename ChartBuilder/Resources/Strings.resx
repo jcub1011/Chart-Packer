@@ -2943,7 +2943,7 @@ Saving also makes these changes to song.ini:
     <comment>The Input devices window: the heading over the devices connected.</comment>
   </data>
   <data name="InputDevicesHint" xml:space="preserve">
-    <value>A device's meter lights when it does anything. Devices are read only while this window is open, or while playtesting or recording.</value>
+    <value>A device's light, and the actions its controls are bound to, light up as you play it. Devices are read only while this window is open, or while playtesting or recording.</value>
     <comment>The Input devices window: the note under the devices.</comment>
   </data>
   <data name="InputRescanButton" xml:space="preserve">
@@ -3007,8 +3007,8 @@ Saving also makes these changes to song.ini:
     <comment>The input offset's tooltip.</comment>
   </data>
   <data name="InputMidiSettings" xml:space="preserve">
-    <value>MIDI Settings</value>
-    <comment>The Input devices window: the expander with a MIDI device's velocities.</comment>
+    <value>Velocity</value>
+    <comment>The Input devices window: the heading over a MIDI device's velocities.</comment>
   </data>
   <data name="InputMinVelocityLabel" xml:space="preserve">
     <value>Softest hit</value>
@@ -3125,6 +3125,10 @@ Saving also makes these changes to song.ini:
   <data name="InputRemoveBindingToolTip" xml:space="preserve">
     <value>Remove this binding</value>
     <comment>The Input devices window: the ✕ on a binding's chip.</comment>
+  </data>
+  <data name="InputNotBound" xml:space="preserve">
+    <value>Not bound</value>
+    <comment>The Input devices window: in place of the chips of an action no control is bound to.</comment>
   </data>
   <data name="InputChipFormat" xml:space="preserve">
     <value>{0}: {1}</value>

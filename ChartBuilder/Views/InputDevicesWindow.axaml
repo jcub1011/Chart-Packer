@@ -2,209 +2,429 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
+        xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="640"
+        mc:Ignorable="d" d:DesignWidth="960" d:DesignHeight="660"
         x:Class="ChartBuilder.Views.InputDevicesWindow"
         x:DataType="vm:InputDevicesViewModel"
         Icon="/Assets/ChartBuilder.ico"
         Title="{x:Static res:Strings.InputDevicesWindowTitle}"
         Background="{DynamicResource AppBackgroundBrush}"
-        WindowStartupLocation="CenterOwner"
-        Width="900" Height="640"
-        MinWidth="680" MinHeight="480">
+        Width="960" Height="660"
+        MinWidth="760" MinHeight="520"
+        ShowInTaskbar="False"
+        CanMinimize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
+        WindowStartupLocation="CenterOwner">
 
-    <!-- The Input devices window (charter-spec C19 item 2): the devices on the left, each profile's actions and the
-         controls bound to them on the right. Bind takes the next control pressed on any device. -->
+    <!-- The Input devices window (charter-spec C19 item 2): the devices on the left, the one picked with its own settings
+         under them; each profile's actions on the right, with the controls bound to them, lit in the action's colour as
+         they're pressed. Bind takes the next control pressed on any device. Opened over the window in front, it can't be
+         minimized: with no taskbar entry it would have nothing to restore it from. -->
     <Window.Styles>
         <Style Selector="TextBlock.heading">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
         </Style>
-        <Style Selector="Border.chip.missing">
+        <Style Selector="TextBlock.device-name">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="TextBlock.subheading">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.caption.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- The devices, as the library lists its songs: the one picked tinted, with the accent's bar at its left. -->
+        <Style Selector="ListBox.devices">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.devices ListBoxItem">
+            <Setter Property="Padding" Value="13,0,16,0" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.devices ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox.devices ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="ListBox.devices ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+        </Style>
+        <!-- A device's light: lit as it does anything, fading out after. -->
+        <Style Selector="Ellipse.light">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Fill" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+        <Style Selector="Ellipse.light.lit">
+            <Setter Property="Fill" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+
+        <!-- The profiles, as filter chips: the one shown in the accent. -->
+        <Style Selector="ListBox.profiles">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.profiles ListBoxItem">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="12,3" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox.profiles ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+        </Style>
+        <Style Selector="ListBox.profiles ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="ListBox.profiles ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+        </Style>
+
+        <!-- An action: its lane's stripe at its start, and its whole background lit in the lane's colour as its controls
+             are pressed, filling from the left as far as an axis has moved. Outlined in the accent while Bind waits for
+             it. -->
+        <Style Selector="Border.action">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <Style Selector="Border.action.listening">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="Border.lane">
+            <Setter Property="Width" Value="4" />
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+        <Style Selector="Border.lane.pressed">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- A control bound to an action: outlined and filled in the action's colour while it's pressed; faded while its
+             device isn't connected. -->
+        <Style Selector="Border.binding">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8,0,2,0" />
+            <Setter Property="MinHeight" Value="24" />
+        </Style>
+        <Style Selector="Border.binding.pressed" x:DataType="vm:InputBindingChip">
+            <Setter Property="BorderBrush" Value="{Binding LaneBrush}" />
+            <Setter Property="Background" Value="{Binding LaneTintBrush}" />
+        </Style>
+        <Style Selector="Border.binding.missing">
             <Setter Property="Opacity" Value="0.5" />
         </Style>
-        <Style Selector="Button.chip-remove">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="4,0" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="FontSize" Value="11" />
+        <Style Selector="Border.binding TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="ToggleButton.bind">
-            <Setter Property="MinWidth" Value="132" />
+        <Style Selector="Button.remove">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.remove:pointerover">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.remove:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="TextBlock.unbound">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="Opacity" Value="0.45" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Bind: in the accent while it waits for a control, as a filter chip that's on. -->
+        <Style Selector="ToggleButton.bind">
+            <Setter Property="MinWidth" Value="112" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ToggleButton.bind:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.bind:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
         </Style>
     </Window.Styles>
 
-    <DockPanel Margin="16">
-        <!-- What Bind did, and the question when a control another action has was pressed. -->
-        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,12,0,0">
-            <TextBlock Grid.Column="0"
-                       Text="{Binding Status}"
-                       TextWrapping="Wrap"
-                       VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasPendingMove}">
-                <Button Content="{x:Static res:Strings.InputMoveConfirm}" Command="{Binding ConfirmMoveCommand}" />
-                <Button Content="{x:Static res:Strings.InputMoveCancel}" Command="{Binding CancelMoveCommand}" />
-            </StackPanel>
-        </Grid>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- The title bar, as the main window's is: the icon (the owner's, set in code) and the title. -->
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     Grid.Row="0"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.InputDevicesWindowTitle}" />
+        </ui:TitleBar>
 
-        <Grid ColumnDefinitions="320,*" ColumnSpacing="16">
-            <!-- The devices: a meter of what each is doing, and its own settings. -->
-            <DockPanel Grid.Column="0">
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                    <TextBlock Classes="heading" VerticalAlignment="Center" Text="{x:Static res:Strings.InputDevicesHeading}" />
-                    <Button Grid.Column="1"
-                            Classes="labelled"
-                            Content="{x:Static res:Strings.InputRescanButton}"
-                            ToolTip.Tip="{x:Static res:Strings.InputRescanToolTip}"
-                            Command="{Binding RescanCommand}" />
-                </Grid>
-                <TextBlock DockPanel.Dock="Bottom"
-                           Classes="muted"
-                           FontSize="12"
-                           Margin="0,8,0,0"
-                           TextWrapping="Wrap"
-                           Text="{x:Static res:Strings.InputDevicesHint}" />
-                <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Devices}">
+        <Grid Grid.Row="1" ColumnDefinitions="300,*">
+            <!-- The devices, each with a light that shows when it's doing anything; under them, the one picked and its own settings. -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="16,12,12,8">
+                        <TextBlock Classes="heading" VerticalAlignment="Center" Text="{x:Static res:Strings.InputDevicesHeading}" />
+                        <Button Grid.Column="1"
+                                Classes="labelled"
+                                Content="{x:Static res:Strings.InputRescanButton}"
+                                ToolTip.Tip="{x:Static res:Strings.InputRescanToolTip}"
+                                Command="{Binding RescanCommand}" />
+                    </Grid>
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Classes="note"
+                               Margin="16,10,16,14"
+                               Text="{x:Static res:Strings.InputDevicesHint}" />
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <ListBox Classes="devices"
+                                     SelectionMode="AlwaysSelected"
+                                     ItemsSource="{Binding Devices}"
+                                     SelectedItem="{Binding SelectedDevice}"
+                                     AutomationProperties.Name="{x:Static res:Strings.InputDevicesHeading}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:InputDeviceRow">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,7">
+                                            <StackPanel Spacing="1">
+                                                <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" />
+                                                <TextBlock Classes="caption" Classes.warning="{Binding HasProblem}" Text="{Binding Detail}" />
+                                            </StackPanel>
+                                            <Panel Grid.Column="1"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip.Tip="{x:Static res:Strings.InputActivityLabel}"
+                                                   AutomationProperties.Name="{x:Static res:Strings.InputActivityLabel}">
+                                                <Ellipse Classes="light" />
+                                                <Ellipse Classes="light lit" Opacity="{Binding Activity}" />
+                                            </Panel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Border BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                    BorderThickness="0,1,0,0"
+                                    Margin="0,8,0,0"
+                                    Padding="16,12,16,4"
+                                    IsVisible="{Binding SelectedDevice, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <ContentControl Content="{Binding SelectedDevice}">
+                                    <ContentControl.ContentTemplate>
+                                        <DataTemplate x:DataType="vm:InputDeviceRow">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Classes="device-name" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" />
+
+                                                <!-- The offset, typed in or measured with the calibration tool (charter-spec C11 item 2). -->
+                                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+                                                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.InputOffsetLabel}" ToolTip.Tip="{x:Static res:Strings.InputOffsetToolTip}" />
+                                                    <NumericUpDown Grid.Column="1" Width="104" Minimum="-250" Maximum="250" Increment="1"
+                                                                   ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True"
+                                                                   Value="{Binding OffsetMs}"
+                                                                   AutomationProperties.Name="{x:Static res:Strings.InputOffsetLabel}" />
+                                                    <Button Grid.Row="1"
+                                                            Grid.Column="1"
+                                                            Classes="labelled"
+                                                            HorizontalAlignment="Stretch"
+                                                            HorizontalContentAlignment="Center"
+                                                            Content="{x:Static res:Strings.InputCalibrateButton}"
+                                                            ToolTip.Tip="{x:Static res:Strings.InputCalibrateToolTip}"
+                                                            Command="{Binding CalibrateCommand}" />
+                                                </Grid>
+
+                                                <!-- A MIDI device's velocities: the floor against crosstalk, the retrigger time, and accents and ghosts. -->
+                                                <TextBlock Classes="subheading" Text="{x:Static res:Strings.InputMidiSettings}" IsVisible="{Binding IsMidi}" />
+                                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6" IsVisible="{Binding IsMidi}">
+                                                    <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="{x:Static res:Strings.InputMinVelocityLabel}" ToolTip.Tip="{x:Static res:Strings.InputMinVelocityToolTip}" />
+                                                    <NumericUpDown Grid.Row="0" Grid.Column="1" Width="104" Minimum="1" Maximum="127" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding MinVelocity}" AutomationProperties.Name="{x:Static res:Strings.InputMinVelocityLabel}" />
+                                                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="{x:Static res:Strings.InputRetriggerLabel}" ToolTip.Tip="{x:Static res:Strings.InputRetriggerToolTip}" />
+                                                    <NumericUpDown Grid.Row="1" Grid.Column="1" Width="104" Minimum="0" Maximum="100" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding RetriggerMs}" AutomationProperties.Name="{x:Static res:Strings.InputRetriggerLabel}" />
+                                                    <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="{x:Static res:Strings.InputAccentLabel}" />
+                                                    <NumericUpDown Grid.Row="2" Grid.Column="1" Width="104" Minimum="1" Maximum="127" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding AccentVelocity}" AutomationProperties.Name="{x:Static res:Strings.InputAccentLabel}" />
+                                                    <TextBlock Grid.Row="3" VerticalAlignment="Center" Text="{x:Static res:Strings.InputGhostLabel}" />
+                                                    <NumericUpDown Grid.Row="3" Grid.Column="1" Width="104" Minimum="0" Maximum="126" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding GhostVelocity}" AutomationProperties.Name="{x:Static res:Strings.InputGhostLabel}" />
+                                                </Grid>
+
+                                                <!-- A layout of bindings for the device, in place of those it has. -->
+                                                <Button Classes="labelled"
+                                                        Margin="0,4,0,0"
+                                                        Content="{x:Static res:Strings.InputPresetGeneralMidiButton}"
+                                                        ToolTip.Tip="{x:Static res:Strings.InputPresetGeneralMidiToolTip}"
+                                                        IsVisible="{Binding IsMidi}"
+                                                        Command="{Binding UseGeneralMidiCommand}" />
+                                                <Button Classes="labelled"
+                                                        Margin="0,4,0,0"
+                                                        Content="{x:Static res:Strings.InputPresetGuitarButton}"
+                                                        ToolTip.Tip="{x:Static res:Strings.InputPresetGuitarToolTip}"
+                                                        IsVisible="{Binding IsController}"
+                                                        Command="{Binding UseGuitarLayoutCommand}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ContentControl.ContentTemplate>
+                                </ContentControl>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- The profile picked: its actions, and the controls bound to each. -->
+            <DockPanel Grid.Column="1">
+                <Border DockPanel.Dock="Top" Classes="toolbar" Padding="16,6,12,6">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <ListBox Classes="profiles"
+                                 SelectionMode="AlwaysSelected"
+                                 ItemsSource="{Binding Profiles}"
+                                 SelectedItem="{Binding SelectedProfile}"
+                                 VerticalAlignment="Center">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:InputProfileTab">
+                                    <TextBlock Text="{Binding Header}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Button Grid.Column="1"
+                                Classes="labelled"
+                                Content="{x:Static res:Strings.InputResetProfileButton}"
+                                Command="{Binding ResetProfileCommand}"
+                                CommandParameter="{Binding SelectedProfile}" />
+                    </Grid>
+                </Border>
+
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding SelectedProfile.Actions}" Margin="16,12,16,16">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Spacing="8" />
+                                <StackPanel Spacing="4" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:InputDeviceRow">
-                                <Border Background="{DynamicResource SurfaceBrush}"
-                                        BorderBrush="{DynamicResource SubtleBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Padding="10">
-                                    <StackPanel Spacing="6">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" />
-                                            <ProgressBar Grid.Column="1"
-                                                         Width="56"
-                                                         MinWidth="0"
-                                                         Height="6"
-                                                         Minimum="0"
-                                                         Maximum="1"
-                                                         VerticalAlignment="Center"
-                                                         Value="{Binding Activity}"
-                                                         AutomationProperties.Name="{x:Static res:Strings.InputActivityLabel}" />
+                            <DataTemplate x:DataType="vm:InputActionRow">
+                                <Border Classes="action" Classes.listening="{Binding IsListening}">
+                                    <!-- Layered: how far its controls are pressed, then the row, see-through so that shows. -->
+                                    <Panel>
+                                        <ProgressBar Classes="fill"
+                                                     Minimum="0"
+                                                     Maximum="1"
+                                                     Value="{Binding Level}"
+                                                     Foreground="{Binding LaneTintBrush}"
+                                                     IsHitTestVisible="False" />
+                                        <Grid ColumnDefinitions="Auto,140,*,Auto" ColumnSpacing="12" Margin="0,0,6,0">
+                                            <Border Grid.Column="0" Classes="lane" Classes.pressed="{Binding IsPressed}" Background="{Binding LaneBrush}" />
+                                            <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Label}" />
+                                            <TextBlock Grid.Column="2" Classes="unbound" Text="{x:Static res:Strings.InputNotBound}" IsVisible="{Binding !HasChips}" />
+                                            <ItemsControl Grid.Column="2" Margin="0,7" VerticalAlignment="Center" ItemsSource="{Binding Chips}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel ItemSpacing="6" LineSpacing="4" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:InputBindingChip">
+                                                        <Border Classes="binding"
+                                                                Classes.pressed="{Binding IsPressed}"
+                                                                Classes.missing="{Binding !IsConnected}"
+                                                                ToolTip.Tip="{Binding ToolTip}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <TextBlock Text="{Binding Label}" />
+                                                                <Button Classes="remove"
+                                                                        Content="✕"
+                                                                        ToolTip.Tip="{x:Static res:Strings.InputRemoveBindingToolTip}"
+                                                                        AutomationProperties.Name="{x:Static res:Strings.InputRemoveBindingToolTip}"
+                                                                        Command="{Binding $parent[Window].((vm:InputDevicesViewModel)DataContext).RemoveBindingCommand}"
+                                                                        CommandParameter="{Binding}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <ToggleButton Grid.Column="3"
+                                                          Classes="bind"
+                                                          IsChecked="{Binding IsListening, Mode=OneWay}"
+                                                          Content="{Binding BindText}"
+                                                          Command="{Binding $parent[Window].((vm:InputDevicesViewModel)DataContext).BindCommand}"
+                                                          CommandParameter="{Binding}" />
                                         </Grid>
-                                        <TextBlock Classes="caption" Text="{Binding Detail}" Classes.warning="{Binding HasProblem}" />
-                                        <!-- The offset, typed in or measured with the calibration tool (charter-spec C11 item 2). -->
-                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.InputOffsetLabel}" ToolTip.Tip="{x:Static res:Strings.InputOffsetToolTip}" />
-                                            <NumericUpDown Grid.Column="1" Width="110" Minimum="-250" Maximum="250" Increment="1"
-                                                           ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True"
-                                                           Value="{Binding OffsetMs}"
-                                                           AutomationProperties.Name="{x:Static res:Strings.InputOffsetLabel}" />
-                                            <Button Grid.Column="2"
-                                                    Classes="labelled"
-                                                    Content="{x:Static res:Strings.InputCalibrateButton}"
-                                                    ToolTip.Tip="{x:Static res:Strings.InputCalibrateToolTip}"
-                                                    Command="{Binding CalibrateCommand}" />
-                                        </Grid>
-                                        <!-- A MIDI device's velocities: the floor against crosstalk, the retrigger time, and accents and ghosts. -->
-                                        <Expander Header="{x:Static res:Strings.InputMidiSettings}" IsVisible="{Binding IsMidi}" HorizontalAlignment="Stretch">
-                                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
-                                                <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="{x:Static res:Strings.InputMinVelocityLabel}" ToolTip.Tip="{x:Static res:Strings.InputMinVelocityToolTip}" />
-                                                <NumericUpDown Grid.Row="0" Grid.Column="1" Width="110" Minimum="1" Maximum="127" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding MinVelocity}" />
-                                                <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="{x:Static res:Strings.InputRetriggerLabel}" ToolTip.Tip="{x:Static res:Strings.InputRetriggerToolTip}" />
-                                                <NumericUpDown Grid.Row="1" Grid.Column="1" Width="110" Minimum="0" Maximum="100" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding RetriggerMs}" />
-                                                <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="{x:Static res:Strings.InputAccentLabel}" />
-                                                <NumericUpDown Grid.Row="2" Grid.Column="1" Width="110" Minimum="1" Maximum="127" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding AccentVelocity}" />
-                                                <TextBlock Grid.Row="3" VerticalAlignment="Center" Text="{x:Static res:Strings.InputGhostLabel}" />
-                                                <NumericUpDown Grid.Row="3" Grid.Column="1" Width="110" Minimum="0" Maximum="126" Increment="1" ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True" Value="{Binding GhostVelocity}" />
-                                            </Grid>
-                                        </Expander>
-                                        <Button Classes="labelled"
-                                                Content="{x:Static res:Strings.InputPresetGeneralMidiButton}"
-                                                ToolTip.Tip="{x:Static res:Strings.InputPresetGeneralMidiToolTip}"
-                                                IsVisible="{Binding IsMidi}"
-                                                Command="{Binding UseGeneralMidiCommand}" />
-                                        <Button Classes="labelled"
-                                                Content="{x:Static res:Strings.InputPresetGuitarButton}"
-                                                ToolTip.Tip="{x:Static res:Strings.InputPresetGuitarToolTip}"
-                                                IsVisible="{Binding IsController}"
-                                                Command="{Binding UseGuitarLayoutCommand}" />
-                                    </StackPanel>
+                                    </Panel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
             </DockPanel>
-
-            <!-- Each profile's actions, and the controls bound to each. -->
-            <TabControl Grid.Column="1" ItemsSource="{Binding Profiles}">
-                <TabControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:InputProfileTab">
-                        <TextBlock Text="{Binding Header}" />
-                    </DataTemplate>
-                </TabControl.ItemTemplate>
-                <TabControl.ContentTemplate>
-                    <DataTemplate x:DataType="vm:InputProfileTab">
-                        <DockPanel>
-                            <Button DockPanel.Dock="Bottom"
-                                    HorizontalAlignment="Right"
-                                    Margin="0,8,0,0"
-                                    Classes="labelled"
-                                    Content="{x:Static res:Strings.InputResetProfileButton}"
-                                    Command="{Binding $parent[Window].((vm:InputDevicesViewModel)DataContext).ResetProfileCommand}"
-                                    CommandParameter="{Binding}" />
-                            <ScrollViewer>
-                                <ItemsControl ItemsSource="{Binding Actions}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Spacing="6" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:InputActionRow">
-                                            <Grid ColumnDefinitions="120,*,Auto" ColumnSpacing="12" MinHeight="32">
-                                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Label}" />
-                                                <ItemsControl Grid.Column="1" VerticalAlignment="Center" ItemsSource="{Binding Chips}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel ItemSpacing="6" LineSpacing="4" />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="vm:InputBindingChip">
-                                                            <Border Classes="chip" Classes.missing="{Binding !IsConnected}" ToolTip.Tip="{Binding ToolTip}">
-                                                                <StackPanel Orientation="Horizontal" Spacing="2">
-                                                                    <TextBlock VerticalAlignment="Center" Text="{Binding Label}" />
-                                                                    <Button Classes="chip-remove"
-                                                                            Content="✕"
-                                                                            ToolTip.Tip="{x:Static res:Strings.InputRemoveBindingToolTip}"
-                                                                            AutomationProperties.Name="{x:Static res:Strings.InputRemoveBindingToolTip}"
-                                                                            Command="{Binding $parent[Window].((vm:InputDevicesViewModel)DataContext).RemoveBindingCommand}"
-                                                                            CommandParameter="{Binding}" />
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                <ToggleButton Grid.Column="2"
-                                                              Classes="bind"
-                                                              VerticalAlignment="Center"
-                                                              IsChecked="{Binding IsListening, Mode=OneWay}"
-                                                              Content="{Binding BindText}"
-                                                              Command="{Binding $parent[Window].((vm:InputDevicesViewModel)DataContext).BindCommand}"
-                                                              CommandParameter="{Binding}" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </DockPanel>
-                    </DataTemplate>
-                </TabControl.ContentTemplate>
-            </TabControl>
         </Grid>
-    </DockPanel>
+
+        <!-- What Bind did, and the question when a control another action has was pressed. -->
+        <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0" Padding="16,6,12,6" MinHeight="41">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Grid.Column="0"
+                           FontSize="12"
+                           Text="{Binding Status}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasPendingMove}">
+                    <Button Classes="labelled accent" MinWidth="72" HorizontalContentAlignment="Center" Content="{x:Static res:Strings.InputMoveConfirm}" Command="{Binding ConfirmMoveCommand}" />
+                    <Button Classes="labelled" MinWidth="72" HorizontalContentAlignment="Center" Content="{x:Static res:Strings.InputMoveCancel}" Command="{Binding CancelMoveCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

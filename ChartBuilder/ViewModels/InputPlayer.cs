@@ -78,9 +78,13 @@ namespace ChartBuilder.ViewModels
             return true;
         }
 
-        /// <summary>Lets go of the keys held, as when the window loses focus or the song stops.</summary>
+        /// <summary>
+        /// Lets go of the keys held, as when the window loses focus or the song stops: in the hub too, so the Input devices
+        /// window doesn't show them held.
+        /// </summary>
         public void ReleaseKeys()
         {
+            _input.Hub.ReleaseKeys();
             _router?.ReleaseKeys(InputClock.Now, _actions);
             Send();
         }

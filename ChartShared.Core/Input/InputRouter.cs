@@ -19,9 +19,6 @@ public readonly record struct ActionEvent(InstrumentAction Action, bool IsDown, 
 /// </remarks>
 public sealed class InputRouter
 {
-    // An axis pressed is let go only once it's back inside this much of its threshold, so it doesn't chatter at the edge.
-    private const float Hysteresis = 0.7f;
-
     private readonly Dictionary<(InputDeviceId, InputControlKind, int), List<Entry>> _entries = [];
     private readonly Dictionary<InputDeviceId, DeviceTuning> _tuning = [];
     private readonly Dictionary<InstrumentAction, int> _held = [];
@@ -138,11 +135,16 @@ public sealed class InputRouter
         }
     }
 
-    // A binding's device among those connected: the one with its key and ordinal; else, as a driver or OS can give a
-    // device another key, the one of its kind with its name, at its ordinal among those of that name. The keyboard is
-    // always there.
-    private static InputDeviceId? DeviceOf(InputBinding binding, IReadOnlyList<InputDeviceInfo> connected)
+    /// <summary>
+    /// A binding's device among those connected: the one with its key and ordinal; else, as a driver or OS can give a
+    /// device another key, the one of its kind with its name, at its ordinal among those of that name. The keyboard is
+    /// always there.
+    /// </summary>
+    /// <returns>Null when it isn't connected.</returns>
+    public static InputDeviceId? DeviceOf(InputBinding binding, IReadOnlyList<InputDeviceInfo> connected)
     {
+        ArgumentNullException.ThrowIfNull(binding);
+        ArgumentNullException.ThrowIfNull(connected);
         if (binding.DeviceKind == InputDeviceKind.Keyboard)
             return InputDeviceId.Keyboard;
         var device = binding.Device;
@@ -154,23 +156,8 @@ public sealed class InputRouter
         return named.Count == 0 ? null : named[Math.Min(binding.Ordinal, named.Count - 1)].Id;
     }
 
-    private static bool IsDown(Entry entry, float value) => entry.Kind switch
-    {
-        InputControlKind.Axis or InputControlKind.MidiControl => Beyond(entry, value),
-        InputControlKind.Hat => ((int)value & entry.Direction) != 0,
-        InputControlKind.MidiNote => value > 0,
-        _ => value >= 0.5f,
-    };
-
-    // Whether an axis is past its threshold from where it rests, towards its direction; once pressed, it stays pressed
-    // until it's back inside the hysteresis.
-    private static bool Beyond(Entry entry, float value)
-    {
-        int direction = entry.Direction == 0 ? 1 : Math.Sign(entry.Direction);
-        float moved = (value - entry.Rest) * direction;
-        float threshold = Math.Max(0.05f, entry.Threshold);
-        return moved >= (entry.Down ? threshold * Hysteresis : threshold);
-    }
+    private static bool IsDown(Entry entry, float value) =>
+        ControlReading.IsPressed(entry.Kind, entry.Direction, entry.Rest, entry.Threshold, value, entry.Down);
 
     private DeviceTuning TuningOf(InputDeviceId device)
     {

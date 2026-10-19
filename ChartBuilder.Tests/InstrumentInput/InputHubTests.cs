@@ -45,6 +45,44 @@ public sealed class InputHubTests
         Assert.AreEqual(1f, hub.LastValue(InputDeviceId.Keyboard, new InputControl(InputControlKind.Key, 1)));
     }
 
+    [TestMethod]
+    public void AnInputObservedIsLastReadButNotPlayed()
+    {
+        var source = new FakeSource();
+        using var hub = new InputHub([source], () => { });
+        int received = 0;
+        hub.Received += _ => received++;
+
+        hub.Observe(Input(1.0));
+        Assert.IsNull(hub.LastValue(InputDeviceId.Keyboard, new InputControl(InputControlKind.Key, 1)), "Observed while the backends weren't running.");
+
+        using var lease = hub.Acquire();
+        hub.Observe(Input(2.0));
+        hub.Drain();
+
+        Assert.AreEqual(0, received);
+        Assert.AreEqual(1f, hub.LastValue(InputDeviceId.Keyboard, new InputControl(InputControlKind.Key, 1)));
+        Assert.AreEqual(2.0, hub.LastActivity(InputDeviceId.Keyboard));
+    }
+
+    [TestMethod]
+    public void ReleasingKeysLetsGoOfTheKeyboardsKeysOnly()
+    {
+        var source = new FakeSource();
+        using var hub = new InputHub([source], () => { });
+        using var lease = hub.Acquire();
+        var pad = new InputDeviceId(InputDeviceKind.Controller, "pad", 0);
+        var button = new InputControl(InputControlKind.Button, 0);
+        hub.Observe(Input(1.0));
+        hub.Observe(new RawInputEvent(pad, button, 1, 1.0));
+
+        hub.ReleaseKeys();
+
+        Assert.AreEqual(0f, hub.LastValue(InputDeviceId.Keyboard, new InputControl(InputControlKind.Key, 1)));
+        Assert.AreEqual(1f, hub.LastValue(pad, button));
+        Assert.AreEqual(1.0, hub.LastActivity(InputDeviceId.Keyboard), "Letting go isn't something the keyboard did.");
+    }
+
     private static RawInputEvent Input(double time) => new(InputDeviceId.Keyboard, new InputControl(InputControlKind.Key, 1), 1, time);
 
     private sealed class FakeSource : IInputSource
