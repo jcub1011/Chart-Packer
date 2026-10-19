@@ -93,7 +93,8 @@ namespace ChartBuilder.ViewModels
                 if (_overBudget.Add(source.Key))
                 {
                     string format = result.IsCrowded ? Strings.SpectrogramBudgetFullFormat : Strings.SpectrogramOverBudgetFormat;
-                    _messages?.Warning(string.Format(CultureInfo.CurrentCulture, format, source.Label, result.NeededBytes / (1024.0 * 1024)), BudgetKey);
+                    string text = string.Format(CultureInfo.CurrentCulture, format, source.Label, result.NeededBytes / (1024.0 * 1024));
+                    SayAfterDrawing(messages => messages.Warning(text, BudgetKey));
                 }
                 return null;
             }
@@ -221,10 +222,27 @@ namespace ChartBuilder.ViewModels
             });
         }
 
+        /// <summary>
+        /// Has <paramref name="say"/> put on the message bar once the UI thread is done with what it's doing, unless this has
+        /// been disposed by then. A lane asks for its spectrogram and its onsets as it's drawn, and the message bar changed
+        /// in the middle of a render pass is refused (Avalonia's "Visual was invalidated during the render pass").
+        /// </summary>
+        private void SayAfterDrawing(Action<EditorMessages> say)
+        {
+            if (_messages is not { } messages)
+                return;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (!_disposed)
+                    say(messages);
+            });
+        }
+
         private async Task<OnsetAnalysis?> FindOnsetsAsync(AudioSource source, bool drumBands, bool requested)
         {
             var token = _cancel.Token;
-            _messages?.Info(string.Format(CultureInfo.CurrentCulture, Strings.OnsetsFindingFormat, source.Label), RunningKey);
+            string finding = string.Format(CultureInfo.CurrentCulture, Strings.OnsetsFindingFormat, source.Label);
+            SayAfterDrawing(messages => messages.Info(finding, RunningKey));
             try
             {
                 if (await PrepareAsync(source) is not { } prepared || _workers is not { } workers)
