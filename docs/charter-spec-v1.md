@@ -586,7 +586,8 @@ above it, as the panel can be narrow (mock-up in [§8](#8-ui-outline)). The pane
 
 **Metadata** is Chart Packer's inspector's metadata, shared with it (`MetadataEditorView`): a row per
 `song.ini` key, edited in place, and a row to add one. The ratings are left to Parts. A row's
-**Revert** (back to the song as saved) and **Remove** are on its right-click menu, with Quick Fix.
+**Undo** (back to the song as saved) and **Remove** show as it's hovered or focused, Undo staying
+while there's a change, and are on its right-click menu too; Quick Fix is a link under a failing value.
 
 **Tracks** is Chart Packer's inspector's track list, shared with it (`TrackListView`): a row per
 track with its mute, solo, volume and waveform, the tracks a pending change removes, and **Add

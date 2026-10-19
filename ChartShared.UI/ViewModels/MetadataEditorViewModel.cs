@@ -36,21 +36,26 @@ namespace ChartShared.UI.ViewModels
         private readonly Dictionary<string, IRelayCommand> _quickFixKeyCommands = new(StringComparer.OrdinalIgnoreCase);
         private HashSet<string> _keysWithQuickFix = new(StringComparer.OrdinalIgnoreCase);
 
+        // A key was just added from the new row, which goes back to its key once the rows have it; the host refreshes
+        // them during the add or later.
+        private bool _focusNewKeyOnRefresh;
+
         /// <param name="showDifficulties">Whether the difficulties are shown as icons above the rows; Chart Builder edits them with its parts.</param>
-        /// <param name="actionsInContextMenu">Whether a row's Revert and Remove are on its right-click menu rather than buttons on it.</param>
-        public MetadataEditorViewModel(IMetadataEditorHost host, bool showDifficulties = true, bool actionsInContextMenu = false)
+        public MetadataEditorViewModel(IMetadataEditorHost host, bool showDifficulties = true)
         {
             _host = host;
             ShowDifficulties = showDifficulties;
-            ActionsInContextMenu = actionsInContextMenu;
             Instruments = [.. DifficultySlots.All.Select(s => new InstrumentDifficultyViewModel(this, s))];
         }
 
+        /// <summary>
+        /// The new row's key box should take focus: a key was added and the rows now have it, so the row is empty for the
+        /// next and the known keys leave it out, or the key typed was refused.
+        /// </summary>
+        public event EventHandler? NewKeyFocusRequested;
+
         /// <summary>Whether the difficulties are shown as icons above the rows, which leave them out either way.</summary>
         public bool ShowDifficulties { get; }
-
-        /// <summary>Whether a row's Revert and Remove are on its right-click menu rather than buttons on it.</summary>
-        public bool ActionsInContextMenu { get; }
 
         public AvaloniaList<MetadataRowViewModel> Metadata { get; } = [];
 
@@ -123,8 +128,13 @@ namespace ChartShared.UI.ViewModels
         /// <summary>No song has a <c>song_length</c> row, so Auto Set is offered beside Add row instead.</summary>
         public bool ShowAutoSetLengthFallback => CanEdit && AutoSetSongLengthCommand is not null && !Metadata.Any(r => r.IsSongLength);
 
-        /// <summary>A row is being edited, or a key added, which a change from elsewhere shouldn't land under.</summary>
-        public bool IsEditingAny => IsAdding || Metadata.Any(r => r.IsEditing);
+        /// <summary>
+        /// A row is being edited, or a key added, which a change from elsewhere shouldn't land under. An open new row with
+        /// nothing typed doesn't count, as there's nothing to lose.
+        /// </summary>
+        public bool IsEditingAny =>
+            (IsAdding && !(string.IsNullOrWhiteSpace(NewKey) && string.IsNullOrWhiteSpace(NewValue)))
+            || Metadata.Any(r => r.IsEditing);
 
         /// <summary>Whether <paramref name="key"/> can be changed: the songs can be edited, and nothing else decides it.</summary>
         public bool CanEditKey(string key) => CanEdit && _host.CanEditKey(key);
@@ -163,6 +173,12 @@ namespace ChartShared.UI.ViewModels
             OnPropertyChanged(nameof(MetadataHeader));
             OnPropertyChanged(nameof(ShowInstruments));
             OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
+
+            if (_focusNewKeyOnRefresh && IsAdding)
+            {
+                _focusNewKeyOnRefresh = false;
+                NewKeyFocusRequested?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         /// <summary>
@@ -199,6 +215,7 @@ namespace ChartShared.UI.ViewModels
             OnPropertyChanged(nameof(ShowAddRow));
             OnPropertyChanged(nameof(ShowAutoSetLengthFallback));
             BeginAddCommand.NotifyCanExecuteChanged();
+            CommitAddCommand.NotifyCanExecuteChanged();
             foreach (var row in Metadata)
                 row.RefreshCommands();
             foreach (var instrument in Instruments)
@@ -252,26 +269,40 @@ namespace ChartShared.UI.ViewModels
             IsAdding = true;
         }
 
-        [RelayCommand]
+        /// <summary>
+        /// Puts the new row's key and value into the drafts, then empties the row for the next key; it stays open until
+        /// closed. A key or value song.ini can't hold stays in the row with an error, and while the songs can't be edited,
+        /// what's typed stays for later.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         private void CommitAdd()
         {
-            if (!IsAdding)
+            if (!IsAdding || !CanEdit)
                 return;
 
             string key = NewKey.Trim();
             string value = NewValue.Trim();
 
             // A hidden unset difficulty isn't a row, so adding it edits the stored value.
-            string? error = MetadataEditRules.ValidateKey(key)
-                ?? (Metadata.Any(r => !r.IsRemoved && r.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) ? SharedStrings.KeyExists : null)
-                ?? MetadataEditRules.ValidateValue(value);
-            if (error is not null)
+            string? keyError = MetadataEditRules.ValidateKey(key)
+                ?? (Metadata.Any(r => !r.IsRemoved && r.Key.Equals(key, StringComparison.OrdinalIgnoreCase)) ? SharedStrings.KeyExists : null);
+            if (keyError is not null)
             {
-                NewRowError = error;
+                NewRowError = keyError;
+                NewKeyFocusRequested?.Invoke(this, EventArgs.Empty);
                 return;
             }
 
-            CancelAdd();
+            if (MetadataEditRules.ValidateValue(value) is { } valueError)
+            {
+                NewRowError = valueError;
+                return;
+            }
+
+            NewKey = "";
+            NewValue = "";
+            NewRowError = null;
+            _focusNewKeyOnRefresh = true;
             SetValue(key, value);
         }
 
@@ -280,6 +311,7 @@ namespace ChartShared.UI.ViewModels
         {
             IsAdding = false;
             NewRowError = null;
+            _focusNewKeyOnRefresh = false;
         }
 
         /// <summary>
