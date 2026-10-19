@@ -31,7 +31,10 @@ public static class SongFolderFiles
     /// <exception cref="ArgumentException">A name is the folder's <c>song.ini</c>, which is edited as metadata, or points outside the folder.</exception>
     /// <exception cref="IOException">A file can't be read, written or deleted. The first failed delete is thrown once every delete has been tried.</exception>
     /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
-    /// <exception cref="OperationCanceledException">Cancelled before anything in the folder changed.</exception>
+    /// <exception cref="OperationCanceledException">
+    /// Cancelled before anything in the folder changed; or while waiting for a file in use to be let go of, as it's
+    /// replaced (the folder as a failed move leaves it) or removed (the files not yet deleted are left).
+    /// </exception>
     public static async Task ApplyAsync(
         string folder,
         IReadOnlyCollection<string> removes,
@@ -80,13 +83,13 @@ public static class SongFolderFiles
             {
                 if (!File.Exists(file.Path))
                     continue;
-                File.Move(file.Path, file.Aside);
+                SongFileCommit.Move(file.Path, file.Aside, cancellationToken);
                 setAside.Add(file);
             }
 
             for (; moved < temps.Count; moved++)
             {
-                File.Move(temps[moved], targets[moved], overwrite: true);
+                await SongFileCommit.MoveOverAsync(temps[moved], targets[moved], cancellationToken).ConfigureAwait(false);
                 Step("moved:" + adds[moved].StoredName);
             }
         }
@@ -125,12 +128,16 @@ public static class SongFolderFiles
 
         Step("before-deletes");
         Exception? firstFailure = null;
+
+        // Files still in use are waited for together: another Chart Packer lets go of all of a song's files at once,
+        // so the patience is for the deletes as a whole, not each.
+        DateTime giveUp = DateTime.UtcNow + SongFileCommit.Patience;
         foreach (string path in deleteLast.Concat(setAside.Select(f => f.Aside)))
         {
             try
             {
-                if (File.Exists(path))
-                    File.Delete(path);
+                TimeSpan patience = giveUp - DateTime.UtcNow;
+                await SongFileCommit.DeleteAsync(path, cancellationToken, patience > TimeSpan.Zero ? patience : TimeSpan.Zero).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

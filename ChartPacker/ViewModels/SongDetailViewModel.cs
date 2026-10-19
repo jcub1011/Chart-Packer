@@ -91,8 +91,15 @@ namespace ChartPacker.ViewModels
         private readonly SongFileGate _songFiles;
         private readonly IConfirmationService? _confirmation;
 
-        // Whether Chart Builder has the song at a path open, so saving asks first (charter-spec §4.8).
-        private readonly Func<string, bool>? _isOpenInChartBuilder;
+        // Holds the songs saved, and watches the songs shown, so a song another Chart Builder or Chart Packer has open to
+        // edit is read-only here and its files are let go of for it to replace (charter-spec §4.8).
+        private readonly SongLocks? _locks;
+
+        // The watch on each song shown.
+        private readonly List<IDisposable> _watches = [];
+
+        // Why the songs shown can't be edited or played here while another holds one; null while none is held elsewhere.
+        private string? _heldNote;
         private readonly DraftSaver _saver;
         private CancellationTokenSource? _loadCts;
         private CancellationTokenSource? _chartLintCts;
@@ -170,6 +177,7 @@ namespace ChartPacker.ViewModels
         /// </param>
         /// <param name="confirmation">Asks before saving metadata that fails validation; none for a panel that never saves.</param>
         /// <param name="saver">Writes the drafts; one of its own over <paramref name="songFiles"/> when none is given.</param>
+        /// <param name="locks">Holds the songs saved and watches the songs shown; none for a panel that only previews.</param>
         public SongDetailViewModel(
             MetadataDraftStore drafts,
             JobViewModel job,
@@ -183,10 +191,12 @@ namespace ChartPacker.ViewModels
             SongFileGate? songFiles = null,
             IConfirmationService? confirmation = null,
             DraftSaver? saver = null,
-            Func<string, bool>? isOpenInChartBuilder = null,
+            SongLocks? locks = null,
             IChartIssuesWindowService? chartIssuesWindow = null)
         {
-            _isOpenInChartBuilder = isOpenInChartBuilder;
+            _locks = locks;
+            if (_locks is not null)
+                _locks.HolderChanged += OnHolderChanged;
             _chartIssuesWindow = chartIssuesWindow;
             _drafts = drafts;
             _downloads = downloads;
@@ -611,6 +621,11 @@ namespace ChartPacker.ViewModels
                     },
                     cts.Token);
 
+                // The songs are checked off the UI thread once watched, which the read has likely outlasted; the player
+                // and background video learn whether one is held before they're given its files.
+                if (_locks is not null && _loadCts == cts)
+                    await _locks.CheckedAsync();
+
                 if (_loadCts == cts)
                 {
                     Apply(loaded, inPlace);
@@ -655,6 +670,7 @@ namespace ChartPacker.ViewModels
 
             _entries = entries;
             _songs = [];
+            WatchShown();
             SyncTimingOffsets();
             _downloadCommands.Clear();
             RevealCommand.NotifyCanExecuteChanged();
@@ -1356,16 +1372,29 @@ namespace ChartPacker.ViewModels
                 dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
             }
 
-            if (!await ChartBuilderSongs.ConfirmWriteAsync(
-                    _confirmation, _isOpenInChartBuilder, [.. dirty.Select(s => s.Entry)],
-                    Strings.ChartBuilderOpenSaveOneFormat, Strings.ChartBuilderOpenSaveManyFormat, Strings.SaveAnywayButton))
+            // Held while they're written, so none another Chart Builder or Chart Packer has open is written over. Their
+            // drafts hold them already, unless another took one first.
+            IDisposable? held = null;
+            if (_locks is not null)
             {
-                return;
-            }
+                IReadOnlyList<(string Path, SongLockHolder Holder)> refused;
+                try
+                {
+                    held = _locks.TryHold([.. dirty.Select(s => s.Entry.FullPath)], out refused);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    SaveError = string.Format(CultureInfo.CurrentCulture, Strings.NotSavedInUseFormat, ex.Message);
+                    return;
+                }
 
-            if (!ReferenceEquals(entries, _entries) || !CanSave())
-                return;
-            dirty = [.. _songs.Where(s => !s.Item.Draft.IsEmpty)];
+                if (held is null)
+                {
+                    string NameOf(string path) => dirty.First(s => s.Entry.FullPath == path).Entry.DisplayName;
+                    SaveError = string.Format(CultureInfo.CurrentCulture, Strings.NotSavedInUseFormat, SongLocks.Describe(refused, NameOf));
+                    return;
+                }
+            }
 
             MetadataEditor.CancelAddCommand.Execute(null);
             _savingEntries = entries;
@@ -1381,6 +1410,7 @@ namespace ChartPacker.ViewModels
             }
             finally
             {
+                held?.Dispose();
                 _savingEntries = null;
                 IsSaving = false;
             }
@@ -1544,8 +1574,75 @@ namespace ChartPacker.ViewModels
         {
             _drafts.DraftsChanged -= OnDraftsChangedElsewhere;
             _job.PropertyChanged -= OnJobPropertyChanged;
+            if (_locks is not null)
+                _locks.HolderChanged -= OnHolderChanged;
+            Unwatch();
             _externalChangeTimer.Stop();
             _loadCts?.Cancel();
+        }
+
+        /// <summary>
+        /// Watches the songs shown, and says why they can't be edited or played here while another Chart Builder or Chart
+        /// Packer holds one (charter-spec §4.8). The player and background video learn it before anything is loaded (see
+        /// <see cref="ShowAsync"/>), so they never open such a song's files.
+        /// </summary>
+        private void WatchShown()
+        {
+            Unwatch();
+            if (_locks is not null)
+            {
+                foreach (var entry in _entries)
+                    _watches.Add(_locks.Watch(entry.FullPath));
+            }
+
+            ApplyHeldNote();
+        }
+
+        private void Unwatch()
+        {
+            foreach (var watch in _watches)
+                watch.Dispose();
+            _watches.Clear();
+        }
+
+        // Works out why the songs shown are held elsewhere, and tells the player and background video.
+        private void ApplyHeldNote()
+        {
+            var held = _locks is null
+                ? []
+                : _entries.Select(e => (Entry: e, Holder: _locks.HolderElsewhere(e.FullPath))).Where(h => h.Holder is not null).ToList();
+            _heldNote = held switch
+            {
+                [] => null,
+                [var one] when _entries.Count == 1 => string.Format(
+                    CultureInfo.CurrentCulture, Strings.SongInUseReadOnlyFormat, SongLocks.Describe(one.Entry.DisplayName, one.Holder!.Value)),
+                _ => string.Format(CultureInfo.CurrentCulture, Strings.SongsInUseReadOnlyFormat, held.Count),
+            };
+            Player.FilesHeldNote = _heldNote;
+            Background.FilesHeldNote = _heldNote;
+        }
+
+        /// <summary>
+        /// Another Chart Builder or Chart Packer took or let go of a song shown: taken, it's read-only here, its files let
+        /// go of; let go of, it's read again, as it may have been changed.
+        /// </summary>
+        private void OnHolderChanged(string path)
+        {
+            if (_locks is null || !_entries.Any(e => SongLock.KeyOf(e.FullPath) == SongLock.KeyOf(path)))
+                return;
+
+            // Let go of, the songs are read again from scratch, which works out the note once nothing's open; working it
+            // out first would have the player and video open the files only for the reading to close them.
+            bool wasHeld = _heldNote is not null;
+            if (wasHeld && !_suspended && !IsSaving && !_entries.Any(e => _locks.HolderElsewhere(e.FullPath) is not null))
+            {
+                _ = ShowAsync(_entries);
+                return;
+            }
+
+            ApplyHeldNote();
+            if (_heldNote is not null && PreviewNote is null && _songs.Count > 0)
+                ReadOnlyNote = _heldNote;
         }
 
         /// <summary>
@@ -1725,7 +1822,7 @@ namespace ChartPacker.ViewModels
                 .OfType<string>()
                 .Select(p => Background.StagedAt(p)?.Error)
                 .FirstOrDefault(e => e is not null);
-            ReadOnlyNote = PreviewNote ?? loaded.Songs.Select(s => s.ReadOnlyReason).FirstOrDefault(r => r is not null);
+            ReadOnlyNote = PreviewNote ?? _heldNote ?? loaded.Songs.Select(s => s.ReadOnlyReason).FirstOrDefault(r => r is not null);
             _loadNote = loaded.MetadataNote;
 
             if (IsBulk)

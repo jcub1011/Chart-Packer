@@ -884,6 +884,7 @@
                                     Classes="transport accent"
                                     Command="{Binding Player.PlayPauseCommand}"
                                     ToolTip.Tip="{Binding Player.PlayPauseToolTip}"
+                                    ToolTip.ShowOnDisabled="True"
                                     AutomationProperties.Name="{Binding Player.PlayPauseToolTip}">
                                 <Panel>
                                     <PathIcon Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Player.IsPlaying}" />

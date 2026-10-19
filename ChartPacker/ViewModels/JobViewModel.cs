@@ -269,7 +269,8 @@ namespace ChartPacker.ViewModels
     /// opens. It waits for a job, shows progress while a pack or unpack job runs, then a summary and one
     /// row per item, grouped by outcome, until the next job.
     /// </summary>
-    public partial class JobViewModel(IJobProgressWindowService details) : ViewModelBase
+    /// <param name="locks">Holds each output while it's written, so a song open elsewhere isn't written over (charter-spec §4.8).</param>
+    public partial class JobViewModel(IJobProgressWindowService details, SongLockSet? locks = null) : ViewModelBase
     {
         private CancellationTokenSource? _cts;
         private JobKind _kind;
@@ -350,7 +351,7 @@ namespace ChartPacker.ViewModels
             reported.Start();
             try
             {
-                await Task.Run(() => SongJob.RunAsync(kind, entries, scanRoot, destination, policy, reported, layout, cancellationToken: cts.Token), cts.Token);
+                await Task.Run(() => SongJob.RunAsync(kind, entries, scanRoot, destination, policy, reported, layout, locks: locks, cancellationToken: cts.Token), cts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -433,6 +434,7 @@ namespace ChartPacker.ViewModels
                 SkipReason.AlreadyPacked => Format(Strings.JobAlreadyPackedFormat, Path.GetFileName(result.Entry.FullPath)),
                 SkipReason.AlreadyUnpacked => Format(Strings.JobAlreadyUnpackedFormat, Path.GetFileName(result.Entry.FullPath)),
                 SkipReason.DuplicateOutput => Format(Strings.JobDuplicateOutputFormat, result.OutputPath ?? "", result.ConflictsWith?.RelativePath ?? ""),
+                SkipReason.OutputInUse => Format(Strings.JobOutputInUseFormat, result.OutputPath ?? ""),
                 _ => Format(Strings.JobOutputExistsFormat, result.OutputPath ?? ""),
             },
             JobItemStatus.Failed when result.ErrorMessage is not null => Format(Strings.JobFailedFormat, result.ErrorMessage),

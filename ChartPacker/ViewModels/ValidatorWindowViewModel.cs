@@ -57,8 +57,8 @@ namespace ChartPacker.ViewModels
         private readonly DraftSaver _saver;
         private readonly IConfirmationService? _confirmation;
 
-        // Whether Chart Builder has the song at a path open, so saving asks first (charter-spec §4.8).
-        private readonly Func<string, bool>? _isOpenInChartBuilder;
+        // Holds the songs saved, so none another Chart Builder or Chart Packer has open is written over (charter-spec §4.8).
+        private readonly SongLocks? _locks;
         private readonly SettingsService _settings;
         private readonly int _parallelism;
         private readonly CancellationTokenSource _closing = new();
@@ -152,6 +152,7 @@ namespace ChartPacker.ViewModels
         /// <param name="saver">Writes the listed songs' drafts.</param>
         /// <param name="settings">Holds where the window's splitter was left.</param>
         /// <param name="confirmation">Asks before saving metadata that still fails; none to save without asking.</param>
+        /// <param name="locks">Holds the songs while they're saved; one open elsewhere stops the save.</param>
         public ValidatorWindowViewModel(
             IReadOnlyList<SongEntry> entries,
             MetadataDraftStore drafts,
@@ -161,9 +162,9 @@ namespace ChartPacker.ViewModels
             DraftSaver saver,
             SettingsService settings,
             IConfirmationService? confirmation = null,
-            Func<string, bool>? isOpenInChartBuilder = null)
+            SongLocks? locks = null)
         {
-            _isOpenInChartBuilder = isOpenInChartBuilder;
+            _locks = locks;
             ArgumentOutOfRangeException.ThrowIfLessThan(parallelism, 1);
             _entries = entries;
             _drafts = drafts;
@@ -512,15 +513,30 @@ namespace ChartPacker.ViewModels
                     return;
             }
 
-            if (!await ChartBuilderSongs.ConfirmWriteAsync(
-                    _confirmation, _isOpenInChartBuilder, [.. SongsToSave.Select(s => s.Entry)],
-                    Strings.ChartBuilderOpenSaveOneFormat, Strings.ChartBuilderOpenSaveManyFormat, Strings.SaveAnywayButton)
-                || !CanSaveAll())
+            var songs = SongsToSave.ToList();
+            IDisposable? held = null;
+            if (_locks is not null)
             {
-                return;
+                IReadOnlyList<(string Path, SongLockHolder Holder)> refused;
+                try
+                {
+                    held = _locks.TryHold([.. songs.Select(s => s.Path)], out refused);
+                }
+                catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+                {
+                    SaveError = string.Format(CultureInfo.CurrentCulture, Strings.NotSavedInUseFormat, ex.Message);
+                    return;
+                }
+
+                if (held is null)
+                {
+                    string NameOf(string path) => songs.First(s => s.Path == path).Entry.DisplayName;
+                    SaveError = string.Format(CultureInfo.CurrentCulture, Strings.NotSavedInUseFormat, SongLocks.Describe(refused, NameOf));
+                    return;
+                }
             }
 
-            var targets = SongsToSave
+            var targets = songs
                 .Select(s => new SaveTarget(s.Entry, s.Report.SongIniPath, _drafts.Get(s.Path)))
                 .ToList();
 
@@ -536,6 +552,7 @@ namespace ChartPacker.ViewModels
             }
             finally
             {
+                held?.Dispose();
                 IsSaving = false;
 
                 // The inspector let go of its song's files whether or not it was saved, so it's shown again, once.

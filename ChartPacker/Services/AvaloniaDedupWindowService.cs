@@ -15,6 +15,7 @@ namespace ChartPacker.Services
     /// <param name="mainPlayer">The main window's player, stopped so no song's files are held open while copies are deleted.</param>
     /// <param name="mergeWindowFor">Makes a Merge window service whose window belongs to the given owner.</param>
     /// <param name="logPath">The deletion log.</param>
+    /// <param name="locks">Holds the copies while they're deleted (charter-spec §4.8).</param>
     public sealed class AvaloniaDedupWindowService(
         Func<Window?> owner,
         MetadataDraftStore drafts,
@@ -22,7 +23,7 @@ namespace ChartPacker.Services
         PlayerViewModel mainPlayer,
         Func<Func<Window?>, IMergeWindowService> mergeWindowFor,
         string logPath,
-        Func<string, bool>? isOpenInChartBuilder = null) : IDedupWindowService
+        SongLocks? locks = null) : IDedupWindowService
     {
         public async Task<DedupWindowResult> ShowAsync(DedupRequest request)
         {
@@ -46,7 +47,7 @@ namespace ChartPacker.Services
                 mergeWindowFor(() => dialog),
                 SystemTrash.ForCurrentOS(() => handle),
                 new DeletionLog(logPath),
-                isOpenInChartBuilder);
+                locks);
             dialog.DataContext = viewModel;
 
             _ = viewModel.AnalyzeAsync();

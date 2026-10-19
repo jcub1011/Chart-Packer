@@ -36,7 +36,7 @@ public sealed class SongFolderFilesTests
         await SongFolderFiles.ApplyAsync(folder, [], [new AddedFile("song.ogg", source, 1)], TestContext.CancellationToken);
 
         Assert.AreSequenceEqual(["song.ogg"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
-        Assert.AreSequenceEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "song.ogg")));
+        Assert.AreSequenceEqual("\t"u8.ToArray(), File.ReadAllBytes(Path.Combine(folder, "song.ogg")));
     }
 
     [TestMethod]
@@ -134,7 +134,7 @@ public sealed class SongFolderFilesTests
         await SongFolderFiles.ApplyAsync(folder, ["song.ogg"], [new AddedFile("song.ogg", source, 1)], TestContext.CancellationToken);
 
         Assert.AreSequenceEqual(["song.ogg"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
-        Assert.AreSequenceEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "song.ogg")));
+        Assert.AreSequenceEqual("\t"u8.ToArray(), File.ReadAllBytes(Path.Combine(folder, "song.ogg")));
     }
 
     [TestMethod]
@@ -146,7 +146,28 @@ public sealed class SongFolderFilesTests
         await SongFolderFiles.ApplyAsync(folder, ["Guitar.ogg"], [new AddedFile("guitar.ogg", source, 1)], TestContext.CancellationToken);
 
         Assert.AreSequenceEqual(["guitar.ogg"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
-        Assert.AreSequenceEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "guitar.ogg")));
+        Assert.AreSequenceEqual("\t"u8.ToArray(), File.ReadAllBytes(Path.Combine(folder, "guitar.ogg")));
+    }
+
+    [TestMethod]
+    public async Task AReplaceAndADeleteWaitForAReaderToLetGo()
+    {
+        // Issue #89: another Chart Packer playing the song holds its stems open until it sees the song's lock.
+        string folder = CreateFolder(("song.ogg", [1]), ("drums.ogg", [2]), ("notes.mid", [3]));
+        string audio = WriteLoose("song.ogg", [9]);
+        var song = new FileStream(Path.Combine(folder, "song.ogg"), FileMode.Open, FileAccess.Read, FileShare.Read);
+        var drums = new FileStream(Path.Combine(folder, "drums.ogg"), FileMode.Open, FileAccess.Read, FileShare.Read);
+        Task letGo = Task.Delay(400, TestContext.CancellationToken).ContinueWith(_ =>
+        {
+            song.Dispose();
+            drums.Dispose();
+        }, TaskScheduler.Default);
+
+        await SongFolderFiles.ApplyAsync(folder, ["drums.ogg"], [new AddedFile("song.ogg", audio, 1)], TestContext.CancellationToken);
+
+        await letGo;
+        Assert.AreSequenceEqual(["notes.mid", "song.ogg"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+        Assert.AreSequenceEqual("\t"u8.ToArray(), File.ReadAllBytes(Path.Combine(folder, "song.ogg")));
     }
 
     [TestMethod]
@@ -154,6 +175,7 @@ public sealed class SongFolderFilesTests
     public async Task AMoveThatFailsPutsBackARemovalThatOnlyDiffersFromAnAddInCase()
     {
         // Only Windows refuses to replace a file that's open, as access denied.
+        SongFileCommit.PatienceOverride.Value = TimeSpan.Zero;
         string folder = CreateFolder(("Song.ogg", [1, 1, 1]), ("a.ini", [2]));
         string ini = WriteLoose("a.ini", [8]);
         string audio = WriteLoose("song.ogg", [9]);
@@ -175,6 +197,7 @@ public sealed class SongFolderFilesTests
     {
         // AC C2.4.
         // Only Windows refuses to delete a file that's open.
+        SongFileCommit.PatienceOverride.Value = TimeSpan.Zero;
         string folder = CreateFolder(("notes.chart", [1]));
         string source = WriteLoose("notes.mid", [9]);
         string chart = Path.Combine(folder, "notes.chart");
@@ -186,7 +209,7 @@ public sealed class SongFolderFilesTests
         }
 
         Assert.AreSequenceEqual(["notes.chart", "notes.mid"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
-        Assert.AreSequenceEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "notes.mid")));
+        Assert.AreSequenceEqual("\t"u8.ToArray(), File.ReadAllBytes(Path.Combine(folder, "notes.mid")));
         Assert.IsEmpty(Directory.GetFiles(folder, "*.tmp", SearchOption.AllDirectories));
     }
 
@@ -195,6 +218,7 @@ public sealed class SongFolderFilesTests
     public async Task ADeleteThatFailsDoesNotStopTheOtherRemovals()
     {
         // Only Windows refuses to delete a file that's open.
+        SongFileCommit.PatienceOverride.Value = TimeSpan.Zero;
         string folder = CreateFolder(("drums.ogg", [1]), ("bass.ogg", [2]), ("notes.mid", [3]));
 
         using (new FileStream(Path.Combine(folder, "drums.ogg"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
@@ -204,6 +228,26 @@ public sealed class SongFolderFilesTests
         }
 
         Assert.AreSequenceEqual(["drums.ogg", "notes.mid"], FileNames(folder), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task RemovalsInUseAreWaitedForTogether()
+    {
+        // Only Windows refuses to delete a file that's open. Each waited for in turn, these would take twice as long.
+        TimeSpan patience = TimeSpan.FromMilliseconds(600);
+        SongFileCommit.PatienceOverride.Value = patience;
+        string folder = CreateFolder(("drums.ogg", [1]), ("bass.ogg", [2]));
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        using (new FileStream(Path.Combine(folder, "drums.ogg"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        using (new FileStream(Path.Combine(folder, "bass.ogg"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            await Assert.ThrowsAsync<IOException>(() => SongFolderFiles.ApplyAsync(
+                folder, ["drums.ogg", "bass.ogg"], [], TestContext.CancellationToken));
+        }
+
+        Assert.IsLessThan(patience * 1.6, watch.Elapsed);
     }
 
     private string WriteLoose(string name, byte[] data)

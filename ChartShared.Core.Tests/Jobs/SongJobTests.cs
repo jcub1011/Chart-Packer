@@ -90,6 +90,38 @@ public sealed class SongJobTests
     }
 
     [TestMethod]
+    public async Task AnOutputOpenElsewhereIsSkippedAndLeft()
+    {
+        // charter-spec §4.8: a lock taken directly stands in for another process holding the output.
+        SongFolder("Song");
+        File.WriteAllText(P("Song.sng"), "open");
+        var locks = new SongLockSet(SongLockHolder.ChartPacker);
+
+        List<JobItemResult> results;
+        using (SongLock.TryAcquire(P("Song.sng"), SongLockHolder.ChartBuilder))
+            results = await RunAsync(JobKind.Pack, OverwritePolicy.Overwrite, locks: locks);
+
+        var result = results.Single(r => r.Entry.Kind == SongEntryKind.SongFolder);
+        Assert.AreEqual(JobItemStatus.Skipped, result.Status);
+        Assert.AreEqual(SkipReason.OutputInUse, result.SkipReason);
+        Assert.AreEqual(P("Song.sng"), result.OutputPath);
+        Assert.AreEqual("open", File.ReadAllText(P("Song.sng")));
+    }
+
+    [TestMethod]
+    public async Task AnOutputIsHeldOnlyWhileItsWritten()
+    {
+        SongFolder("Song");
+        var locks = new SongLockSet(SongLockHolder.ChartPacker);
+
+        var result = (await RunAsync(JobKind.Pack, OverwritePolicy.Overwrite, locks: locks)).Single(r => r.Entry.Kind == SongEntryKind.SongFolder);
+
+        Assert.AreEqual(JobItemStatus.Succeeded, result.Status, Describe(result));
+        Assert.IsFalse(locks.Holds(P("Song.sng")));
+        Assert.IsFalse(File.Exists(SongLock.LockPathOf(P("Song.sng"))));
+    }
+
+    [TestMethod]
     public async Task OverwritePolicyReplacesExistingOutput()
     {
         SongFolder("Song");
@@ -263,11 +295,12 @@ public sealed class SongJobTests
         OverwritePolicy policy,
         int maxDepth = 2,
         string? destination = null,
-        OutputLayout layout = OutputLayout.Mirror)
+        OutputLayout layout = OutputLayout.Mirror,
+        SongLockSet? locks = null)
     {
         var entries = SongLibraryScanner.Enumerate(_root.FullName, maxDepth, TestContext.CancellationToken).ToList();
         var results = new List<JobItemResult>();
-        await SongJob.RunAsync(kind, entries, _root.FullName, destination ?? _root.FullName, policy, new SyncProgress(results.Add), layout, cancellationToken: TestContext.CancellationToken);
+        await SongJob.RunAsync(kind, entries, _root.FullName, destination ?? _root.FullName, policy, new SyncProgress(results.Add), layout, locks: locks, cancellationToken: TestContext.CancellationToken);
         return results;
     }
 

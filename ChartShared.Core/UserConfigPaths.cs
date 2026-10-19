@@ -40,9 +40,6 @@ public static class UserConfigPaths
     /// </summary>
     public static string InputBindingsFile => Path.Combine(ConfigFolder, "input-bindings.json");
 
-    /// <summary>Where Chart Builder holds a lock file for each song it has open (charter-spec §4.8, <c>SongLock</c>).</summary>
-    public static string LockFolder => Path.Combine(ConfigFolder, "locks");
-
     /// <summary>
     /// Where Chart Builder autosaves the chart open, for recovery after a crash (charter-spec C15 item 6,
     /// <c>RecoveryStore</c>). Never inside a song.

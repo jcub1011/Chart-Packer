@@ -58,6 +58,12 @@ public enum SkipReason
     /// name packed flat), and the policy isn't <see cref="OverwritePolicy.Rename"/>.
     /// </summary>
     DuplicateOutput,
+
+    /// <summary>
+    /// The output is a song another Chart Builder or Chart Packer has open to edit (<see cref="Scanning.SongLock"/>),
+    /// which writing over it would lose.
+    /// </summary>
+    OutputInUse,
 }
 
 /// <summary>The outcome of one item in a job.</summary>

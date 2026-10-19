@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Text;
+using ChartShared.Core.Scanning;
 using ChartShared.Core.Validation;
 
 namespace ChartShared.Core.Sng;
@@ -236,7 +237,10 @@ public static class SngWriter
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        File.Move(tempPath, targetPath, overwrite);
+        if (overwrite)
+            SongFileCommit.MoveOver(tempPath, targetPath, cancellationToken);
+        else
+            File.Move(tempPath, targetPath);
         return findings;
     }
 

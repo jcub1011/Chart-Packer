@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
@@ -41,9 +42,14 @@ namespace ChartPacker
                 var reveal = new FileRevealService(() => window);
                 var notice = new NoticeViewModel(reveal);
                 var songFiles = new SongFileGate();
-                var downloads = new DownloadService(settings, () => window, notice, songFiles);
                 var drafts = new MetadataDraftStore();
-                var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window));
+
+                // Holds the songs with unsaved changes and those being written, and watches the songs shown, so that no
+                // Chart Builder or other Chart Packer edits a song this one is, nor this one a song they are (charter-spec §4.8).
+                var locks = new SongLocks(drafts);
+                locks.ChangeRefused += (_, reason) => notice.ShowError(string.Format(CultureInfo.CurrentCulture, Strings.ChangeRefusedFormat, reason));
+                var downloads = new DownloadService(settings, () => window, notice, songFiles, locks);
+                var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window), locks.Set);
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
                 var audio = new SdlAudio();
                 // Measured by Chart Builder's calibration tool, which writes it; read here (charter-spec C11 item 4).
@@ -55,12 +61,10 @@ namespace ChartPacker
                 _ = Task.Run(() => FfmpegLibrary.IsAvailable);
 
                 var videoProbe = new FfmpegVideoDurationProbe();
-                // Whether Chart Builder has a song open, so Chart Packer asks before writing to it (charter-spec §4.8).
-                Func<string, bool> isOpenInChartBuilder = path => SongLock.IsHeld(path, UserConfigPaths.LockFolder);
 
                 // A Merge window belongs to whichever window opens it: the main window, or the Deduplicate window.
                 Func<Func<Window?>, IMergeWindowService> mergeWindowFor = owner =>
-                    new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe, latency, isOpenInChartBuilder);
+                    new AvaloniaMergeWindowService(owner, drafts, settings, audio.Open, player, highway, imagePicker, filePicker, videoProbe, latency, locks);
                 var dedupWindow = new AvaloniaDedupWindowService(
                     () => window,
                     drafts,
@@ -68,12 +72,12 @@ namespace ChartPacker
                     player,
                     mergeWindowFor,
                     Path.Combine(UserConfigPaths.ConfigFolder, "dedup-log.jsonl"),
-                    isOpenInChartBuilder);
+                    locks);
                 var detail = new SongDetailViewModel(
-                    drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, isOpenInChartBuilder: isOpenInChartBuilder,
+                    drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, locks: locks,
                     chartIssuesWindow: new AvaloniaChartIssuesWindowService(() => window));
                 var validatorWindow = new AvaloniaValidatorWindowService(
-                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, isOpenInChartBuilder, latency);
+                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, locks, latency);
                 var chartBuilder = new ChartBuilderLauncher();
                 var library = new LibraryViewModel(
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice);

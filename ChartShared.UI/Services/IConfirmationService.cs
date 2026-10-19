@@ -23,5 +23,8 @@ namespace ChartShared.UI.Services
         /// prompt is <see cref="ConfirmChoice.Cancel"/>.
         /// </summary>
         Task<ConfirmChoice> ChooseAsync(string title, string message, string firstLabel, string secondLabel);
+
+        /// <summary>Tells the user something they must see before going on, with only OK to close it.</summary>
+        Task AlertAsync(string title, string message);
     }
 }

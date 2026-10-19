@@ -127,6 +127,14 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasNote))]
         public partial string? Note { get; set; }
 
+        /// <summary>
+        /// Shown instead of the video while another Chart Builder or Chart Packer is editing the song, so the video's file
+        /// is let go of for it to replace (charter-spec §4.8). Set by the details panel; images are read already, so
+        /// they're still shown.
+        /// </summary>
+        [ObservableProperty]
+        public partial string? FilesHeldNote { get; set; }
+
         /// <summary>The video is shown rather than the image. Only a choice when <see cref="HasBoth"/>.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsImageSelected))]
@@ -321,6 +329,8 @@ namespace ChartPacker.ViewModels
                 Render();
         }
 
+        partial void OnFilesHeldNoteChanged(string? value) => Render();
+
         // Only turning a kind on picks it; the other's radio button turning off follows from that.
         private void Select(BackgroundKind kind, bool selected)
         {
@@ -362,6 +372,12 @@ namespace ChartPacker.ViewModels
                 ? new VideoSource(first.Entry, null, staged)
                 : new VideoSource(first.Entry, first.Stored.Video!.StoredName, null);
             Timeline = first.Timeline;
+
+            if (FilesHeldNote is { } held)
+            {
+                ShowStill(null, held);
+                return;
+            }
 
             if (!FfmpegLibrary.IsAvailable)
             {
