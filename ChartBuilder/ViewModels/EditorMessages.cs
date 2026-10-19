@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using Avalonia.Threading;
 using ChartBuilder.Resources;
 using ChartShared.Core.Validation;
 using ChartShared.UI.ViewModels;
@@ -63,10 +64,20 @@ namespace ChartBuilder.ViewModels
         /// Says <paramref name="text"/>. The same message said again, such as a refusal repeated as a note is dragged, or
         /// the next of a running message with the same <paramref name="key"/>, replaces the latest rather than adding one.
         /// </summary>
+        /// <remarks>
+        /// Shown once the UI thread is done with what it's doing, in the order said. A lane can have something to say as
+        /// it's drawn, such as its spectrogram being over budget, and the message bar changed in the middle of a render pass
+        /// is refused (Avalonia's "Visual was invalidated during the render pass").
+        /// </remarks>
         public void Post(Severity severity, string text, string? key = null)
         {
             ArgumentNullException.ThrowIfNull(text);
             var message = new EditorMessage(severity, text, DateTime.Now, key);
+            Dispatcher.UIThread.Post(() => Show(message));
+        }
+
+        private void Show(EditorMessage message)
+        {
             if (Entries.Count > 0 && Repeats(Entries[0], message))
             {
                 Entries[0] = message;

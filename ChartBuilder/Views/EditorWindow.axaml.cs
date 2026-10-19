@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -61,7 +62,13 @@ namespace ChartBuilder.Views
                 _viewModel?.Editor.Playtest.ReleaseKeys();
             };
             TopBand.SizeChanged += (_, _) => ApplyLayout();
+            TitleBand.SizeChanged += (_, e) => LoadingOverlay.Margin = new Thickness(0, e.NewSize.Height, 0, 0);
             Closing += (_, _) => CaptureLayout();
+
+            // While a song opens, keys don't reach the Editor being left: its edits would go with it, unsaved. First, so
+            // nothing below sees them. Key-ups still go through, so a key held then is let go of.
+            AddHandler(KeyDownEvent, OnOpeningInput, RoutingStrategies.Tunnel);
+            AddHandler(TextInputEvent, OnOpeningInput, RoutingStrategies.Tunnel);
 
             // Audio files dropped anywhere on the window start a new chart with them as its stems (charter-spec C1). A
             // song folder or .sng opens it (C2).
@@ -87,6 +94,14 @@ namespace ChartBuilder.Views
             _viewModel = DataContext as EditorWindowViewModel;
             if (_viewModel is not null)
                 _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+            // A song or a new chart opened in place of another: the sizes given were the last one's, not moves of the
+            // splitters, and the new one's sizes show straight away.
+            _leftApplied = double.NaN;
+            _rightApplied = double.NaN;
+            _timelineApplied = double.NaN;
+            _isSpaceHeld = false;
+            ApplyLayout();
         }
 
         /// <summary>
@@ -152,6 +167,12 @@ namespace ChartBuilder.Views
             e.Handled = playtest.HandleKey(e.PhysicalKey, e.KeyModifiers, down: false);
         }
 
+        private void OnOpeningInput(object? sender, RoutedEventArgs e)
+        {
+            if (_viewModel is { IsOpening: true })
+                e.Handled = true;
+        }
+
         private bool IsTyping(KeyEventArgs e) => e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox;
 
         /// <summary>Letting go of a Space that played or paused, so the focused control doesn't see half a press.</summary>
@@ -175,7 +196,7 @@ namespace ChartBuilder.Views
             if (_viewModel is not { } vm)
                 return;
 
-            // Posted, since it swaps the window and the drop is still being handled.
+            // Posted, since it swaps what the window edits and the drop is still being handled.
             if (DroppedFiles.SongOf(e) is { } song)
             {
                 Dispatcher.UIThread.Post(() => _ = vm.OpenSongAsync(song));
@@ -261,7 +282,11 @@ namespace ChartBuilder.Views
         private static double Absorb(GridLength now, double applied, double preferred) =>
             !double.IsNaN(applied) && now.IsAbsolute && now.Value != applied ? Math.Round(now.Value) : preferred;
 
-        private void CaptureLayout()
+        /// <summary>
+        /// Saves the panels' and the lanes' sizes, as the window closes, and before a song or a new chart opens in place
+        /// of the one open, which starts from the sizes saved.
+        /// </summary>
+        public void CaptureLayout()
         {
             if (_viewModel is not { } vm)
                 return;

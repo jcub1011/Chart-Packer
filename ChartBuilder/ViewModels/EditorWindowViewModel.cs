@@ -303,7 +303,7 @@ namespace ChartBuilder.ViewModels
 
         private static bool IsSongEdit(IChartCommand? command) => command is SongValueCommand or MediaCommand;
 
-        /// <summary>Saves the panels' sizes and whether they're collapsed, and the lanes, for the next Editor window.</summary>
+        /// <summary>Saves the panels' sizes and whether they're collapsed, and the lanes, for the next Editor.</summary>
         public void SaveLayout()
         {
             var saved = _settings.Settings;

@@ -436,7 +436,7 @@
     <comment>{0} is the chart's name; {1} is when it was autosaved.</comment>
   </data>
   <data name="OpeningSongFormat" xml:space="preserve">
-    <value>Opening {0}…</value>
+    <value>Opening "{0}"…</value>
     <comment>{0} is the song's name.</comment>
   </data>
   <data name="OpenSongMissingFormat" xml:space="preserve">
