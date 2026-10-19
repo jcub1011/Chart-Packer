@@ -2310,34 +2310,53 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>{0} has metadata changes that aren't saved. Chart Builder opens the song as it is on disk, so save or discard them first.</value>
     <comment>{0} is the song's name.</comment>
   </data>
-  <data name="ChartBuilderOpenTitle" xml:space="preserve">
-    <value>Open in Chart Builder</value>
-  </data>
-  <data name="ChartBuilderOpenSaveOneFormat" xml:space="preserve">
-    <value>Chart Builder has {0} open. It may overwrite these changes when it saves the song. Save anyway?</value>
+  <data name="SongInUseByBuilderFormat" xml:space="preserve">
+    <value>{0} is open in Chart Builder.</value>
     <comment>{0} is the song's name.</comment>
   </data>
-  <data name="ChartBuilderOpenSaveManyFormat" xml:space="preserve">
-    <value>Chart Builder has {0} of these songs open. It may overwrite these changes when it saves them. Save anyway?</value>
-    <comment>{0} is how many.</comment>
-  </data>
-  <data name="ChartBuilderOpenDeleteOneFormat" xml:space="preserve">
-    <value>Chart Builder has {0} open. Delete it anyway?</value>
+  <data name="SongInUseByPackerFormat" xml:space="preserve">
+    <value>{0} has unsaved changes in another Chart Packer window.</value>
     <comment>{0} is the song's name.</comment>
   </data>
-  <data name="ChartBuilderOpenDeleteManyFormat" xml:space="preserve">
-    <value>Chart Builder has {0} of these songs open. Delete them anyway?</value>
+  <data name="SongInUseElsewhereFormat" xml:space="preserve">
+    <value>{0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <comment>{0} is the song's name.</comment>
+  </data>
+  <data name="SongsInUseFormat" xml:space="preserve">
+    <value>{0} of these songs are being edited in Chart Builder or another Chart Packer window.</value>
     <comment>{0} is how many.</comment>
   </data>
-  <data name="DeleteAnywayButton" xml:space="preserve">
-    <value>Delete anyway</value>
+  <data name="SongInUseReadOnlyFormat" xml:space="preserve">
+    <value>{0} It can be edited and played here once it's closed there.</value>
+    <comment>{0} says where the song is open, e.g. SongInUseByBuilderFormat.</comment>
   </data>
-  <data name="ChartBuilderOpenOverwriteFormat" xml:space="preserve">
-    <value>Chart Builder has {0} open. It may overwrite the merged song when it saves. Overwrite anyway?</value>
-    <comment>{0} is the .sng's file name.</comment>
+  <data name="SongsInUseReadOnlyFormat" xml:space="preserve">
+    <value>{0} of these songs are being edited in Chart Builder or another Chart Packer window. They can be edited here once they're closed there.</value>
+    <comment>{0} is how many.</comment>
   </data>
-  <data name="OverwriteAnywayButton" xml:space="preserve">
-    <value>Overwrite anyway</value>
+  <data name="NotSavedInUseFormat" xml:space="preserve">
+    <value>Nothing was saved. {0}</value>
+    <comment>{0} says where the songs are open, e.g. SongInUseByBuilderFormat.</comment>
+  </data>
+  <data name="NotDeletedInUseFormat" xml:space="preserve">
+    <value>Nothing was deleted. {0}</value>
+    <comment>{0} says where the songs are open, e.g. SongInUseByBuilderFormat.</comment>
+  </data>
+  <data name="NotMergedInUseFormat" xml:space="preserve">
+    <value>The songs weren't merged. {0}</value>
+    <comment>{0} says where the merged song is open, e.g. SongInUseByBuilderFormat.</comment>
+  </data>
+  <data name="ChangeRefusedFormat" xml:space="preserve">
+    <value>The change wasn't kept. {0}</value>
+    <comment>{0} says why, e.g. SongInUseByBuilderFormat or SongLockFailedFormat.</comment>
+  </data>
+  <data name="SongLockFailedFormat" xml:space="preserve">
+    <value>{0} can't be locked for editing: {1}</value>
+    <comment>{0} is the song's name; {1} is the system's reason, e.g. access denied.</comment>
+  </data>
+  <data name="JobOutputInUseFormat" xml:space="preserve">
+    <value>Skipped because {0} is being edited in Chart Builder or another Chart Packer window.</value>
+    <comment>{0} is the output path.</comment>
   </data>
   <data name="AudioLatencyLabel" xml:space="preserve">
     <value>Audio/visual latency</value>

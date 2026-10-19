@@ -468,18 +468,41 @@ which Chart Packer uses when Chart Builder isn't beside it. Release builds have 
 **One song per Chart Builder process.** Each Chart Builder window has at most one song open, and
 several can run at once on different songs.
 
-**Song lock (`ChartShared.Core/Scanning/SongLock`).**
+**Song lock (`ChartShared.Core/Scanning/SongLock`).** Whoever is editing a song holds its lock, and
+no other process of either app writes to it meanwhile, however many of each are running
+(GitHub issue #89).
 
-- While a song is open, Chart Builder holds a lock file for it in the per-user config folder
-  (`locks/<hash of the song's full path>`), opened with `FileShare.None`. .NET maps `FileShare` to
-  `flock` on Linux and macOS, so the lock works on every platform, and the OS releases it if the
-  process dies.
-- Opening a song that another Chart Builder has open says so, and doesn't open it a second time.
-  *Settled in CM2:* checking the lock opens its file for a moment, so taking the lock tries twice,
-  50 ms apart, before saying another Chart Builder has the song open.
-- Before Chart Packer writes to a song (a metadata save, delete, dedup, merge into it, or replacing
-  it with a download), it checks the lock. When Chart Builder has the song open, it warns that
-  Chart Builder may overwrite the change, and the user can go ahead or cancel.
+- The lock is an open handle on `{song}.lock` beside the song: `Foo.sng.lock` for `Foo.sng`, and
+  `Foo.lock` beside the song folder `Foo`, so it's never one of the song's files. Beside the song,
+  it also keeps out other users and other computers sharing the library. The handle is the lock,
+  never the file: a lock file nobody has open means nothing, and the next lock takes it.
+  - On Windows the file is opened delete-on-close, sharing reads only, so a second holder is
+    refused, and the OS deletes the file however the process ends. The holder writes which app it
+    is into the file, which the others read to say who has the song.
+  - On Linux and macOS it's opened with `FileShare.None`, which .NET maps to an exclusive `flock`
+    that the OS lets go of if the process dies. The file is deleted as the lock is let go (left
+    behind by a crash), and the holder can't be read, so messages don't name the app.
+  - A song whose folder can't be written to isn't locked: no one can write it there.
+  - *Settled in CM2:* checking the lock opens its file for a moment, so taking the lock tries a
+    few times, 50 ms apart, before saying another has the song.
+- **Chart Builder** holds the lock while the song is open, and takes it for a new chart's first
+  save. Opening a song another holds says who has it (another Chart Builder, or a Chart Packer with
+  unsaved changes to it) and doesn't open it. Opening the song a window already has reads it again
+  under the lock it holds. Save and pack holds the `.sng` it writes, and skips one another holds.
+- **Chart Packer** holds a song from its first unsaved change until the change is saved or
+  discarded (`SongLocks`, over a per-process `SongLockSet`, so its own holds don't refuse each
+  other), and holds every song it writes for as long as it writes it: a metadata save, Save all, a
+  dedup delete, a merge into it, a pack or unpack written over it, or a download replacing it. A
+  write to a song another holds is refused and says who has it; there's no going ahead. A change
+  made to a song just taken elsewhere is dropped, with a notice.
+- Chart Packer watches the songs its inspectors show, about once a second. While another holds
+  one, the inspector is read-only and says why, and its player and background video let go of the
+  song's files and don't open them again, so the holder can replace them; once it's let go, the
+  song is read again.
+- On Windows a file can't be replaced or deleted while another process has it open, even only to
+  read, so every save replaces and deletes a song's files through `SongFileCommit`, which tries again
+  for up to 5 s while one is in use. That outlasts Chart Packer's watch letting go, and brief
+  readers such as Explorer's thumbnails.
 - `SongFileGate` stays the gate between reads and writes within each process.
 
 **Refreshing Chart Packer.**
@@ -1799,7 +1822,7 @@ Acceptance criteria:
    - **How it is written** (`RecoveryStore`). The chart, then a JSON manifest, each to a temp file
      renamed into place. The manifest holds the chart's length and SHA-256, so a chart without a
      manifest that matches it, as a crash between the two would leave, is ignored. A song's files are
-     named by a hash of its full path, as its lock is. The manifest also holds the song's `song.ini`
+     named by a hash of its full path (`SongLock.KeyOf`). The manifest also holds the song's `song.ini`
      as the next save would leave it, which the chart is read back with, and the keys of the pending
      changes the user reverted, which stay reverted.
    - **A save** writes the recovery file from the bytes it's about to save, before it touches the
@@ -2733,11 +2756,12 @@ layout. It isn't a row in Settings.
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
 | Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |
-| Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two `FileStream`s in one test process standing in for two processes, and released when the holder is disposed (AC C2.5); `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
+| Two apps | `BuilderArgs` parsing of every form in [§4.8](#48-launching-and-coordination), including bad arguments; `SongLock` held and refused, with two locks in one test process standing in for two processes, released and its file gone when the holder is disposed, and a lock file left behind taken (AC C2.5); `SongLockSet`'s holds counted within a process; `SongFileCommit` waiting for a reader to let go; `JsonSettingsFile` keeping two processes' changes to different settings, and keys it doesn't know |
 
 **Test isolation** is as in [project-spec §10](project-spec-v1.md#10-testing-strategy). Tests use
-temp folders only. The recovery folder, the lock folder, the latency file and Chart Builder's
-settings file take explicit paths, which keep tests away from the real config folder. `UserConfigGuard`
+temp folders only. The recovery folder, the latency file and Chart Builder's settings file take
+explicit paths, and song locks sit beside the temp songs, which keep tests away from the real config
+folder. `UserConfigGuard`
 fails the run if anything there changes anyway.
 
 ## 13. Milestones

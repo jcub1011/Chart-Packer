@@ -159,7 +159,7 @@ public sealed class OpusTranscoderTests
             JobKind.Pack, entries, _root.FullName, _root.FullName, OverwritePolicy.Overwrite,
             new SyncProgress<JobItemResult>(results.Add), OutputLayout.Mirror,
             new PackOptions(TranscodeToOpus: true, OpusBitrateKbps: 96), new OpusPackTranscoder(),
-            new SyncProgress<ExportProgress>(phases.Add), TestContext.CancellationToken);
+            new SyncProgress<ExportProgress>(phases.Add), cancellationToken: TestContext.CancellationToken);
 
         var packed = results.Single();
         Assert.AreEqual(JobItemStatus.Succeeded, packed.Status, packed.ErrorMessage ?? string.Join("; ", packed.Findings.Select(f => f.Message)));

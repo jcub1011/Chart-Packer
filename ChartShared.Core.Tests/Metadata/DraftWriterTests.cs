@@ -37,7 +37,7 @@ public sealed class DraftWriterTests
         Assert.AreSequenceEqual(["notes.chart", "guitar.ogg", "song.ogg"], [.. after.Files.Select(f => f.Name)]);
         Assert.AreSequenceEqual(new byte[] { 1, 2, 3 }, Extract(sng, after, "notes.chart"));
         Assert.AreSequenceEqual(new byte[] { 7, 7 }, Extract(sng, after, "guitar.ogg"));
-        Assert.AreSequenceEqual(new byte[] { 9, 9, 9 }, Extract(sng, after, "song.ogg"));
+        Assert.AreSequenceEqual("\t\t\t"u8.ToArray(), Extract(sng, after, "song.ogg"));
         Assert.AreSequenceEqual([("name", "A")], [.. after.Metadata.Select(p => (p.Key, p.Value))]);
     }
 
@@ -144,7 +144,7 @@ public sealed class DraftWriterTests
         await DraftWriter.SaveFolderAsync(folder, Path.Combine(folder, SongIni.FileName), draft, TestContext.CancellationToken);
 
         Assert.AreSequenceEqual(["background.png", "notes.chart"], Directory.GetFiles(folder).Select(Path.GetFileName).ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
-        Assert.AreSequenceEqual(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(folder, "background.png")));
+        Assert.AreSequenceEqual("\t"u8.ToArray(), File.ReadAllBytes(Path.Combine(folder, "background.png")));
         Assert.IsTrue(File.Exists(Path.Combine(sub, "video.mp4")));
     }
 

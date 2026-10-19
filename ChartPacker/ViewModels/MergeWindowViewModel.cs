@@ -389,8 +389,10 @@ namespace ChartPacker.ViewModels
     /// </param>
     /// <param name="previewDrafts">The preview's drafts: the offsets set on it, which the merge applies.</param>
     /// <param name="settings">Persisted window state: whether the window was maximized and the split ratio.</param>
-    /// <param name="confirmation">Asks before overwriting a <c>.sng</c> that Chart Builder has open.</param>
-    /// <param name="isOpenInChartBuilder">Whether Chart Builder has the song at a path open (charter-spec §4.8).</param>
+    /// <param name="locks">
+    /// Holds the merged song while it's written, so one another Chart Builder or Chart Packer has open isn't written over
+    /// (charter-spec §4.8).
+    /// </param>
     public sealed partial class MergeWindowViewModel(
         IReadOnlyList<SongEntry> entries,
         IReadOnlyList<bool> hasDrafts,
@@ -400,8 +402,7 @@ namespace ChartPacker.ViewModels
         SongDetailViewModel preview,
         MetadataDraftStore previewDrafts,
         SettingsService settings,
-        IConfirmationService? confirmation = null,
-        Func<string, bool>? isOpenInChartBuilder = null) : ViewModelBase
+        SongLocks? locks = null) : ViewModelBase
     {
         private readonly SettingsService _settings = settings;
 
@@ -976,13 +977,26 @@ namespace ChartPacker.ViewModels
             if (Plan() is not { } plan)
                 return;
 
-            // Chart Builder would save over the merge with the song it has open.
-            if (SongMerger.TargetFor(plan, outputFolder, policy) is { } target && File.Exists(target)
-                && !await ChartBuilderSongs.ConfirmWriteAsync(
-                    confirmation, isOpenInChartBuilder, target, Path.GetFileName(target),
-                    Strings.ChartBuilderOpenOverwriteFormat, Strings.OverwriteAnywayButton))
+            // Another Chart Builder or Chart Packer would save over the merge with the song it has open.
+            IDisposable? held = null;
+            if (locks is not null && SongMerger.TargetFor(plan, outputFolder, policy) is { } target)
             {
-                return;
+                IReadOnlyList<(string Path, SongLockHolder Holder)> refused;
+                try
+                {
+                    held = locks.TryHold([target], out refused);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    ErrorMessage = string.Format(CultureInfo.CurrentCulture, Strings.NotMergedInUseFormat, ex.Message);
+                    return;
+                }
+
+                if (held is null)
+                {
+                    ErrorMessage = string.Format(CultureInfo.CurrentCulture, Strings.NotMergedInUseFormat, SongLocks.Describe(refused, Path.GetFileName));
+                    return;
+                }
             }
 
             _cts?.Dispose();
@@ -1007,6 +1021,7 @@ namespace ChartPacker.ViewModels
             }
             finally
             {
+                held?.Dispose();
                 IsMerging = false;
                 Refresh();
             }

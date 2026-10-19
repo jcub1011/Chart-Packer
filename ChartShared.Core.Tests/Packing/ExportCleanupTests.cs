@@ -102,6 +102,29 @@ public sealed class ExportCleanupTests
             await File.ReadAllBytesAsync(target, TestContext.CancellationToken));
     }
 
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ACopyThatCantReplaceTheTargetLeavesItAsItWas()
+    {
+        // Only Windows refuses to replace a file that's open, as another Chart Packer playing it would have it.
+        SongFileCommit.PatienceOverride.Value = TimeSpan.Zero;
+        string source = Path.Combine(_root.FullName, "Source.sng");
+        string midiPath = Path.Combine(_root.FullName, "notes.mid");
+        byte[] midi = Anchored();
+        await File.WriteAllBytesAsync(midiPath, midi, TestContext.CancellationToken);
+        await SngWriter.WriteAsync(
+            source, SngMask.Generate(), [KeyValuePair.Create("name", "Song")],
+            [new SngSourceFile("notes.mid", midiPath, midi.Length)], overwrite: false, cancellationToken: TestContext.CancellationToken);
+        string target = Path.Combine(_root.FullName, "Copy.sng");
+        await File.WriteAllBytesAsync(target, [7], TestContext.CancellationToken);
+
+        using (new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read))
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => ExportCleanup.CopySngAsync(source, target, TestContext.CancellationToken));
+
+        Assert.AreSequenceEqual(new byte[] { 7 }, await File.ReadAllBytesAsync(target, TestContext.CancellationToken));
+        Assert.AreSequenceEqual(["Copy.sng", "notes.mid", "Source.sng"], [.. Directory.GetFiles(_root.FullName).Select(Path.GetFileName).Order()]);
+    }
+
     /// <summary>A guitar chart whose tempo track has two anchors among its other events.</summary>
     private static byte[] Anchored() => new MidiBuilder()
         .Track("Song").Tempo(0, 120).Text(0, "[chartpacker_anchor 0]").Tempo(480, 140).Text(480, "[chartpacker_anchor 500000]").Text(960, "[other]")

@@ -1,5 +1,6 @@
 using System.Text;
 using ChartShared.Core.Metadata;
+using ChartShared.Core.Scanning;
 
 namespace ChartShared.Core.Ini;
 
@@ -352,7 +353,7 @@ public static class SongIni
         try
         {
             await File.WriteAllBytesAsync(tempPath, output, cancellationToken).ConfigureAwait(false);
-            File.Move(tempPath, path, overwrite: true);
+            SongFileCommit.MoveOver(tempPath, path, cancellationToken);
         }
         catch
         {

@@ -443,6 +443,18 @@
     <value>{0} isn't there any more.</value>
     <comment>{0} is the song's path.</comment>
   </data>
+  <data name="SongLockedTitle" xml:space="preserve">
+    <value>Song Already Open</value>
+    <comment>The title of the alert that a song is open elsewhere, so it can't be opened or saved to here.</comment>
+  </data>
+  <data name="OpenSongLockedInPackerFormat" xml:space="preserve">
+    <value>{0} has unsaved changes in Chart Packer. Save or discard them there, then open it again.</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
+  <data name="OpenSongLockedElsewhereFormat" xml:space="preserve">
+    <value>{0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <comment>{0} is the song's path.</comment>
+  </data>
   <data name="OpenSongLockedFormat" xml:space="preserve">
     <value>{0} is already open in another Chart Builder.</value>
     <comment>{0} is the song's path.</comment>
@@ -1325,6 +1337,10 @@ Open it anyway?</value>
     <value>Saved and packed to {0}.</value>
     <comment>{0} is the .sng written.</comment>
   </data>
+  <data name="PackSkippedInUseFormat" xml:space="preserve">
+    <value>Saved, but not packed: {0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <comment>{0} is the .sng that's open.</comment>
+  </data>
   <data name="PackSkippedExistsFormat" xml:space="preserve">
     <value>Saved, but not packed: {0} is already there, and Chart Packer's overwrite setting is to skip it.</value>
     <comment>{0} is the .sng that exists.</comment>
@@ -1417,6 +1433,12 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="FirstSaveInvalidName" xml:space="preserve">
     <value>That can't be a folder's name.</value>
+  </data>
+  <data name="FirstSaveLockedInPackerFormat" xml:space="preserve">
+    <value>{0} has unsaved changes in Chart Packer.</value>
+  </data>
+  <data name="FirstSaveLockedElsewhereFormat" xml:space="preserve">
+    <value>{0} is being edited in another window of Chart Builder or Chart Packer.</value>
   </data>
   <data name="FirstSaveLockedFormat" xml:space="preserve">
     <value>{0} is open in another Chart Builder.</value>
@@ -1637,6 +1659,10 @@ Saving also makes these changes to song.ini:
   <data name="ExportSngCopiedFormat" xml:space="preserve">
     <value>Saved and copied the .sng to {0}.</value>
     <comment>{0} is the .sng written.</comment>
+  </data>
+  <data name="ExportSngSkippedInUseFormat" xml:space="preserve">
+    <value>Saved, but nothing was written: {0} is being edited in another window of Chart Builder or Chart Packer.</value>
+    <comment>{0} is the .sng that's open.</comment>
   </data>
   <data name="ExportSngSkippedExistsFormat" xml:space="preserve">
     <value>Saved, but nothing was written: {0} is already there, and the choice is to skip it.</value>

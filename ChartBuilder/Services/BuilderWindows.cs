@@ -29,7 +29,6 @@ namespace ChartBuilder.Services
     /// </summary>
     /// <param name="openOutput">Opens the audio output at a rate, for the Editor's playback and the calibration tool.</param>
     /// <param name="latency">The audio/visual latency, which the calibration tool measures.</param>
-    /// <param name="lockFolder">Where the songs open are locked (<see cref="SongLock"/>).</param>
     /// <param name="chartPackerSettingsFile">Chart Packer's settings, which a save reads for the library and packing, never writes.</param>
     /// <param name="recovery">Where the Editor autosaves the chart open, and where what's left to recover is found on startup.</param>
     /// <param name="input">The instrument devices and their bindings (charter-spec C19).</param>
@@ -38,7 +37,6 @@ namespace ChartBuilder.Services
         BuilderSettingsService settings,
         Func<int, IAudioOutput> openOutput,
         AudioLatencyService latency,
-        string lockFolder,
         string chartPackerSettingsFile,
         RecoveryStore recovery,
         InputService input) : IEditorWindowService
@@ -145,7 +143,6 @@ namespace ChartBuilder.Services
             openOutput,
             latency,
             () => _ = ShowCalibrationAsync(),
-            lockFolder,
             chartPackerSettingsFile,
             recovery,
             new AvaloniaAuthoringDialogService(() => editor),

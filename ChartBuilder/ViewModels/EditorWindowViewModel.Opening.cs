@@ -117,6 +117,7 @@ namespace ChartBuilder.ViewModels
                 return;
 
             SongLock? songLock = null;
+            bool ownLock = false;
             IsOpening = true;
             try
             {
@@ -127,12 +128,24 @@ namespace ChartBuilder.ViewModels
                     return;
                 }
 
-                // Held from before the song is read, so another Chart Builder can't open it meanwhile.
-                songLock = SongLock.TryAcquire(entry.FullPath, _services.LockFolder);
-                if (songLock is null)
+                // Opening this window's own song again reads it afresh, under the lock this window already holds.
+                if (_songLock is { } held && SongLock.KeyOf(held.SongPath) == SongLock.KeyOf(entry.FullPath))
                 {
-                    Messages.Error(string.Format(CultureInfo.CurrentCulture, Strings.OpenSongLockedFormat, entry.FullPath));
-                    return;
+                    songLock = held;
+                    ownLock = true;
+                }
+                else
+                {
+                    // Held from before the song is read, so nothing else can open it to edit meanwhile.
+                    songLock = SongLock.TryAcquire(entry.FullPath, SongLockHolder.ChartBuilder);
+                    if (songLock is null)
+                    {
+                        // Said in a dialog: the song the user asked for isn't opened, which the message bar is too easy to miss.
+                        await _confirmations.AlertAsync(
+                            Strings.SongLockedTitle,
+                            LockedText(entry.FullPath, Strings.OpenSongLockedFormat, Strings.OpenSongLockedInPackerFormat, Strings.OpenSongLockedElsewhereFormat));
+                        return;
+                    }
                 }
 
                 Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.OpeningSongFormat, entry.DisplayName));
@@ -181,6 +194,10 @@ namespace ChartBuilder.ViewModels
                 }
 
                 RememberRecent(song);
+
+                // This window closes as the new one opens, so it mustn't let go of the lock it hands over as it does.
+                if (ownLock)
+                    _songLock = null;
                 if (recovered is not null)
                     _services.Editors.OpenRecovered(Autosave.Recover(song, recovered), songLock, recovered.Key);
                 else
@@ -195,10 +212,28 @@ namespace ChartBuilder.ViewModels
             }
             finally
             {
-                // Still held only if the editor didn't take it.
-                songLock?.Dispose();
+                // Still held only if the editor didn't take it; this window's own lock stays with it.
+                if (!ownLock)
+                    songLock?.Dispose();
+                else if (songLock is not null)
+                    _songLock = songLock;
                 IsOpening = false;
             }
+        }
+
+        /// <summary>
+        /// Says that the song at <paramref name="path"/> is held by something else, in the format for who holds it:
+        /// another Chart Builder, a Chart Packer with unsaved changes to it, or another that can't be told.
+        /// </summary>
+        private static string LockedText(string path, string builderFormat, string packerFormat, string elsewhereFormat)
+        {
+            string format = SongLock.HolderOf(path) switch
+            {
+                SongLockHolder.ChartBuilder => builderFormat,
+                SongLockHolder.ChartPacker => packerFormat,
+                _ => elsewhereFormat,
+            };
+            return string.Format(CultureInfo.CurrentCulture, format, path);
         }
 
         /// <summary>

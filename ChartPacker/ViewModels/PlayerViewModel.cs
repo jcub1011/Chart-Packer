@@ -164,6 +164,15 @@ namespace ChartPacker.ViewModels
         [NotifyPropertyChangedFor(nameof(HasError))]
         public partial string? Error { get; set; }
 
+        /// <summary>
+        /// Why the song's audio isn't opened: another Chart Builder or Chart Packer is editing the song, so its files are
+        /// let go of for it to replace (charter-spec §4.8). The tracks are still shown, but can't be played until it's
+        /// <see langword="null"/> again. Set by the details panel.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(PlayPauseToolTip))]
+        public partial string? FilesHeldNote { get; set; }
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PositionText))]
         public partial double PositionSeconds { get; set; }
@@ -472,7 +481,7 @@ namespace ChartPacker.ViewModels
         public string? LengthToolTip => IsLengthKnown ? null : Strings.LengthPendingToolTip;
 
         /// <summary>What the play button does now, with Space, which does the same from anywhere in the window.</summary>
-        public string PlayPauseToolTip => IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip;
+        public string PlayPauseToolTip => FilesHeldNote ?? (IsPlaying ? Strings.PauseShortcutToolTip : Strings.PlayShortcutToolTip);
 
         /// <summary>
         /// Shows <paramref name="tracks"/> of <paramref name="entry"/>. When they're the tracks
@@ -654,7 +663,23 @@ namespace ChartPacker.ViewModels
         /// <summary>Marks each track heard or not, the way the mixer and <see cref="WaveformPeaks.Mix"/> decide it.</summary>
         private void RefreshHeard() => TrackRowViewModel.RefreshHeard(Tracks);
 
-        private bool CanPlay() => HasTracks && !IsOpening;
+        private bool CanPlay() => HasTracks && !IsOpening && FilesHeldNote is null;
+
+        partial void OnFilesHeldNoteChanged(string? value)
+        {
+            if (value is not null)
+            {
+                // Every file goes: the audio's, and any waveform still being read.
+                CancelPeaks();
+                Close();
+            }
+            else if (ShowWaveforms && _entry is { } entry && HasTracks)
+            {
+                StartPeaks(entry, [.. Tracks.Select(t => t.Track).Where(t => !_peaks.ContainsKey(t) || _partialPeaks.Contains(t))]);
+            }
+
+            RefreshCommands();
+        }
 
         [RelayCommand(CanExecute = nameof(CanPlay))]
         private async Task PlayPauseAsync()
@@ -758,7 +783,7 @@ namespace ChartPacker.ViewModels
         /// </summary>
         private void StartPeaks(SongEntry entry, IReadOnlyList<SongTrack> tracks)
         {
-            if (tracks.Count == 0)
+            if (tracks.Count == 0 || FilesHeldNote is not null)
                 return;
 
             var cts = new CancellationTokenSource();
@@ -1101,7 +1126,7 @@ namespace ChartPacker.ViewModels
         {
             if (_player is not null)
                 return _player;
-            if (_entry is not { } entry)
+            if (_entry is not { } entry || FilesHeldNote is not null)
                 return null;
 
             int generation = ++_generation;
