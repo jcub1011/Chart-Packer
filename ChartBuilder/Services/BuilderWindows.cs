@@ -182,10 +182,14 @@ namespace ChartBuilder.Services
             _calibration.ShowDeviceAsync(owner, new DeviceCalibrationInput(input, device));
 
         /// <summary>
-        /// Opens the Input devices window (charter-spec C19 item 2), where devices are bound to the instruments. Only one is
-        /// open at a time; opening it again brings that one to the front. It doesn't hold up the Editor, so a binding can
-        /// be tried in a playtest while it's open.
+        /// Opens the Input devices window (charter-spec C19 item 2), where devices are bound to the instruments, centred over
+        /// the Editor and kept above it. Only one is open at a time; opening it again brings that one to the front. It
+        /// doesn't hold up the Editor, so a binding can be tried in a playtest while it's open.
         /// </summary>
+        /// <remarks>
+        /// The Editor owns it, never the window in front, which may be the Settings dialog it was opened from: an owned
+        /// window closes with its owner. When the Editor is swapped for another, it's opened again over that one.
+        /// </remarks>
         public void ShowInputDevices()
         {
             if (_inputDevices is { } open)
@@ -196,12 +200,21 @@ namespace ChartBuilder.Services
 
             var window = new InputDevicesWindow();
             window.DataContext = new InputDevicesViewModel(input, device => ShowDeviceCalibrationAsync(window, device));
-            var owner = desktop.Windows.LastOrDefault(w => w.IsActive) ?? desktop.MainWindow;
+            var owner = desktop.MainWindow;
             _inputDevices = window;
-            window.Closed += (_, _) => _inputDevices = null;
-            if (owner is not null)
-                WindowChrome.UseOwnerIcon(window, owner);
-            window.Show();
+            window.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_inputDevices, window))
+                    _inputDevices = null;
+            };
+            if (owner is null)
+            {
+                window.Show();
+                return;
+            }
+
+            WindowChrome.UseOwnerIcon(window, owner);
+            window.Show(owner);
         }
 
         /// <summary>
@@ -305,7 +318,17 @@ namespace ChartBuilder.Services
             var replaced = desktop.MainWindow;
             Show(editor);
             if (replaced is not null && !ReferenceEquals(replaced, editor))
+            {
+                // The Input devices window would close with the Editor that owns it; it's opened again over this one.
+                if (_inputDevices is { } devices && ReferenceEquals(devices.Owner, replaced))
+                {
+                    _inputDevices = null;
+                    devices.Close();
+                    ShowInputDevices();
+                }
+
                 replaced.Close();
+            }
         }
 
         /// <summary>

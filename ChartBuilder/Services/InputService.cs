@@ -55,6 +55,10 @@ namespace ChartBuilder.Services
             return true;
         }
 
+        /// <summary>Has the hub see <paramref name="key"/> pressed or let go, without playing it (<see cref="InputHub.Observe"/>).</summary>
+        public void ObserveKey(PhysicalKey key, bool down) =>
+            Hub.Observe(new RawInputEvent(InputDeviceId.Keyboard, KeyboardInputSource.ControlOf(key), down ? 1 : 0, InputClock.Now));
+
         /// <summary>Saves the bindings and has everything that plays take them up.</summary>
         public void SaveBindings()
         {

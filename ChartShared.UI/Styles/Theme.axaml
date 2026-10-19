@@ -109,6 +109,12 @@
             <Style Selector="^ /template/ Button#PART_FullScreenButton">
                 <Setter Property="IsVisible" Value="False" />
             </Style>
+            <!-- The caption buttons never take the keyboard, as Windows' own don't. They're drawn beside the window, not in
+                 it, so a key pressed with one focused (tabbed to, or clicked) never reaches the window's own handlers: its
+                 shortcuts, playtest and the Input devices window's keys all stop until something in it is clicked. -->
+            <Style Selector="^ /template/ Button">
+                <Setter Property="Focusable" Value="False" />
+            </Style>
         </ControlTheme>
     </Styles.Resources>
 
