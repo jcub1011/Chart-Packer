@@ -95,12 +95,18 @@
                                                          AutomationProperties.Name="{x:Static res:Strings.InputActivityLabel}" />
                                         </Grid>
                                         <TextBlock Classes="caption" Text="{Binding Detail}" Classes.warning="{Binding HasProblem}" />
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasOffset}">
+                                        <!-- The offset, typed in or measured with the calibration tool (charter-spec C11 item 2). -->
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                             <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.InputOffsetLabel}" ToolTip.Tip="{x:Static res:Strings.InputOffsetToolTip}" />
                                             <NumericUpDown Grid.Column="1" Width="110" Minimum="-250" Maximum="250" Increment="1"
                                                            ParsingNumberStyle="Integer" FormatString="0" ClipValueToMinMax="True"
                                                            Value="{Binding OffsetMs}"
                                                            AutomationProperties.Name="{x:Static res:Strings.InputOffsetLabel}" />
+                                            <Button Grid.Column="2"
+                                                    Classes="labelled"
+                                                    Content="{x:Static res:Strings.InputCalibrateButton}"
+                                                    ToolTip.Tip="{x:Static res:Strings.InputCalibrateToolTip}"
+                                                    Command="{Binding CalibrateCommand}" />
                                         </Grid>
                                         <!-- A MIDI device's velocities: the floor against crosstalk, the retrigger time, and accents and ghosts. -->
                                         <Expander Header="{x:Static res:Strings.InputMidiSettings}" IsVisible="{Binding IsMidi}" HorizontalAlignment="Stretch">

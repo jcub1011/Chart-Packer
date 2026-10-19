@@ -10,6 +10,7 @@ using ChartShared.Core.Charting.Saving;
 using ChartBuilder.Devices;
 using ChartShared.Core.Launching;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Services;
 
 namespace ChartBuilder
 {

@@ -1,12 +1,13 @@
 using System;
 using Avalonia.Threading;
 using ChartShared.Audio.Playback;
+using ChartShared.Core;
 using ChartShared.Core.Settings;
 
-namespace ChartBuilder.Services
+namespace ChartShared.UI.Services
 {
     /// <summary>
-    /// The audio/visual latency of the device Chart Builder is playing on (charter-spec C10 item 5, C11): what's drawn
+    /// The audio/visual latency of the device an app is playing on (charter-spec C10 item 5, C11): what's drawn
     /// against the audio is drawn this much earlier, times the speed. One for the app, used on the UI thread.
     /// </summary>
     /// <param name="file">The shared latency file, which the calibration tool writes.</param>
@@ -36,7 +37,7 @@ namespace ChartBuilder.Services
             void OnDeviceChanged(AudioDevice device) => Dispatcher.UIThread.Post(() => SetDevice(device));
             output.DeviceChanged += OnDeviceChanged;
             SetDevice(output.Device);
-            return new Unsubscriber(() => output.DeviceChanged -= OnDeviceChanged);
+            return new DisposeAction(() => output.DeviceChanged -= OnDeviceChanged);
         }
 
         /// <summary>Loads <paramref name="device"/>'s latency.</summary>
@@ -57,17 +58,6 @@ namespace ChartBuilder.Services
             Milliseconds = found.Milliseconds;
             Source = found.Source;
             Changed?.Invoke(this, EventArgs.Empty);
-        }
-
-        private sealed class Unsubscriber(Action unsubscribe) : IDisposable
-        {
-            private Action? _unsubscribe = unsubscribe;
-
-            public void Dispose()
-            {
-                _unsubscribe?.Invoke();
-                _unsubscribe = null;
-            }
         }
     }
 }

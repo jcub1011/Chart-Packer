@@ -126,7 +126,19 @@ public sealed class AudioLatencyFileTests
     {
         Open().Save("Speakers", "{speakers}", 20);
 
-        Assert.AreSequenceEqual(new[] { "audio-latency.json" }, [.. _root.GetFiles().Select(f => f.Name)]);
+        // The lock file is deleted as it's let go on Windows only.
+        Assert.AreSequenceEqual(new[] { "audio-latency.json" }, [.. _root.GetFiles().Select(f => f.Name).Where(n => !n.EndsWith(".lock", StringComparison.Ordinal))]);
+    }
+
+    [TestMethod]
+    public void ASaveWaitsForAnotherProcessesUpdateAndFailsIfItNeverEnds()
+    {
+        using (new FileStream(_path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            Assert.IsFalse(Open().Save("Speakers", "{speakers}", 20));
+        Assert.IsFalse(File.Exists(_path));
+
+        Assert.IsTrue(Open().Save("Speakers", "{speakers}", 20));
+        Assert.AreEqual(new LatencyLookup(20, LatencySource.Id), Open().Find("Speakers", "{speakers}"));
     }
 
     [TestMethod]

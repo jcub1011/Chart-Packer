@@ -117,7 +117,7 @@ namespace ChartPacker.ViewModels
         /// </param>
         /// <param name="openOutput">Opens the audio device at a sample rate.</param>
         /// <param name="latency">
-        /// The audio/visual latency Chart Builder's calibration tool measured for each device, which what's drawn against
+        /// The audio/visual latency the calibration tool measured for each device, which what's drawn against
         /// the audio allows for (charter-spec C11 item 4); none to allow for none.
         /// </param>
         public PlayerViewModel(SettingsService settings, Func<int, IAudioOutput> openOutput, AudioLatencyFile? latency = null)
@@ -440,8 +440,8 @@ namespace ChartPacker.ViewModels
             : CurrentPosition;
 
         /// <summary>
-        /// Reads the latency of the device the song plays on again, as when the window is activated after Chart Builder's
-        /// calibration tool may have changed it (charter-spec §4.8).
+        /// Reads the latency of the device the song plays on again, as when the calibration tool closes, or when the window
+        /// is activated after Chart Builder's may have changed it (charter-spec §4.8).
         /// </summary>
         public void RefreshLatency()
         {
@@ -681,13 +681,25 @@ namespace ChartPacker.ViewModels
             RefreshCommands();
         }
 
+        /// <summary>The device the song plays on; null before one has been opened.</summary>
+        public AudioDevice? OutputDevice => _output?.Device;
+
+        /// <summary>Pauses the song, if it's playing, as when the calibration tool opens.</summary>
+        public void Pause()
+        {
+            if (!IsPlaying)
+                return;
+
+            _player?.Pause();
+            SetPlaying(false);
+        }
+
         [RelayCommand(CanExecute = nameof(CanPlay))]
         private async Task PlayPauseAsync()
         {
             if (IsPlaying)
             {
-                _player?.Pause();
-                SetPlaying(false);
+                Pause();
                 return;
             }
 

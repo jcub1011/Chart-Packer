@@ -1,0 +1,157 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartShared.UI.ViewModels"
+        xmlns:views="using:ChartShared.UI.Views"
+        xmlns:res="using:ChartShared.UI.Resources"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:hw="using:ChartShared.UI.Controls.Highway"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="580"
+        x:Class="ChartShared.UI.Views.CalibrationWindow"
+        x:DataType="vm:CalibrationViewModelBase"
+        Title="{Binding Title}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="760" Height="580"
+        MinWidth="640" MinHeight="500"
+        ShowInTaskbar="False"
+        CanMinimize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
+        WindowStartupLocation="CenterOwner">
+
+    <!-- The calibration tool (charter-spec C11), which both apps open: the audio/visual test, or an input device's. It can't
+         be minimized: a modal window with no taskbar entry would have nothing to restore it from, leaving its owner
+         disabled. -->
+
+    <Window.Styles>
+        <!-- The sections and the highway's tile, as the song inspector has them. -->
+        <StyleInclude Source="avares://ChartShared.UI/Styles/Inspector.axaml" />
+
+        <!-- A section's controls, grouped as a settings row is. -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="Margin" Value="0,18,0,8" />
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.status.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+
+        <!-- The steps: flat toolbar buttons, wide enough for their labels. -->
+        <Style Selector="Button.tool.step">
+            <Setter Property="Width" Value="NaN" />
+            <Setter Property="MinWidth" Value="36" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <!-- Lit while calibration is held off, whether by the button or by Space. -->
+        <Style Selector="Button.hold.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}" />
+        </Style>
+        <Style Selector="Button.hold.active">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <!-- Each test's controls, on the right. -->
+    <Window.DataTemplates>
+        <DataTemplate DataType="vm:CalibrationViewModel">
+            <views:AudioCalibrationPanel />
+        </DataTemplate>
+        <DataTemplate DataType="vm:DeviceCalibrationViewModel">
+            <views:DeviceCalibrationPanel />
+        </DataTemplate>
+    </Window.DataTemplates>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- The title bar, as the main window's is: the icon (the owner's, set in code) and the title. -->
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     Grid.Row="0"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding Title}" />
+        </ui:TitleBar>
+
+        <Grid Grid.Row="1" ColumnDefinitions="280,*">
+            <!-- The highway, as the song's preview draws it. Only watched: a press doesn't scrub it, nor does Shift show
+                 its whole chart. -->
+            <Border Grid.Column="0" Classes="artTile" Margin="12,12,0,12">
+                <Panel>
+                    <hw:NoteHighwayView x:Name="Highway"
+                                        Scene="{Binding Scene}"
+                                        IsHitTestVisible="False" />
+                    <Border Classes="banner"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            Margin="0,10,0,0"
+                            IsHitTestVisible="False"
+                            IsVisible="{Binding HasBanner}">
+                        <TextBlock FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AccentTextBrush}"
+                                   Text="{Binding Banner}" />
+                    </Border>
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Margin="12,0,12,80"
+                               FontSize="32"
+                               FontWeight="SemiBold"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource AccentHighlightBrush}"
+                               IsHitTestVisible="False"
+                               IsVisible="{Binding HasCountIn}"
+                               Text="{Binding CountIn}" />
+                </Panel>
+            </Border>
+
+            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="20,0,20,16">
+                    <ContentControl Content="{Binding}" />
+
+                    <Border Classes="banner error" Margin="0,16,0,0" IsVisible="{Binding HasMessage}">
+                        <TextBlock TextWrapping="Wrap" Text="{Binding Message}" />
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Cancel and Save at the right, as the other dialogs have them. -->
+        <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Content="{x:Static res:SharedStrings.CancelButton}"
+                        IsCancel="True"
+                        Click="OnCancel" />
+                <Button MinWidth="80"
+                        HorizontalContentAlignment="Center"
+                        Classes="accent"
+                        Content="{x:Static res:SharedStrings.CalibrationSave}"
+                        Command="{Binding SaveCommand}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

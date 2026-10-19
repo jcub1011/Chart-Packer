@@ -177,7 +177,7 @@ namespace ChartPacker.Services
                         Get = () => player.PitchCorrection,
                         Set = correct => player.PitchCorrection = correct,
                     },
-                    // Measured, per device, by Chart Builder's calibration tool, which owns the file (charter-spec §10).
+                    // Measured, per device, by the calibration tool both apps share (charter-spec C11).
                     new ActionSetting
                     {
                         Id = "playback.latency",

@@ -1,6 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -12,7 +14,6 @@ using ChartPacker.ViewModels;
 using ChartPacker.Views;
 using ChartShared.Audio.Playback;
 using ChartShared.Core;
-using ChartShared.Core.Launching;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
 using ChartShared.Ffmpeg;
@@ -52,7 +53,7 @@ namespace ChartPacker
                 var job = new JobViewModel(new AvaloniaJobProgressWindowService(() => window), locks.Set);
                 // Started here, on the UI thread, as SDL requires; devices are opened on it from any thread.
                 var audio = new SdlAudio();
-                // Measured by Chart Builder's calibration tool, which writes it; read here (charter-spec C11 item 4).
+                // Measured by the calibration tool, which both apps share and either may write (charter-spec C11 item 4).
                 var latency = new AudioLatencyFile(UserConfigPaths.AudioLatencyFile);
                 var player = new PlayerViewModel(settings, audio.Open, latency);
                 var highway = new HighwayViewModel(settings, player);
@@ -82,13 +83,34 @@ namespace ChartPacker
                 var library = new LibraryViewModel(
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice);
 
-                // Settings' Calibrate… runs Chart Builder's calibration tool (charter-spec §4.8); the latency it saves is
-                // read again when this window is next activated.
-                void Calibrate()
+                // Settings' Calibrate… opens the calibration tool (charter-spec C11) over the window in front, pausing the
+                // song; the latency it saves is read again once it closes. The tool starts on the device the song plays on,
+                // so it names it and shows its latency even when its own output can't be opened.
+                var calibrationLatency = new AudioLatencyService(latency);
+                var calibration = new CalibrationWindowService(audio.Open, calibrationLatency, () =>
                 {
-                    if (chartBuilder.Start(BuilderArgs.ForCalibrate()) is { } problem)
-                        notice.ShowError(problem);
+                    player.Pause();
+                    if (player.OutputDevice is { } device)
+                        calibrationLatency.SetDevice(device);
+                });
+                async Task CalibrateAsync()
+                {
+                    try
+                    {
+                        await calibration.ShowAsync(desktop.Windows.LastOrDefault(w => w.IsActive) ?? window);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Nothing awaits this, so anything not caught here would be lost.
+                        Trace.TraceError($"The calibration tool failed: {ex}");
+                    }
+                    finally
+                    {
+                        player.RefreshLatency();
+                    }
                 }
+
+                void Calibrate() => _ = CalibrateAsync();
 
                 var settingsWindow = new AvaloniaSettingsWindowService(
                     () => window,

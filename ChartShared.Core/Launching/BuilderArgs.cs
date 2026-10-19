@@ -11,9 +11,6 @@ public enum BuilderStart
 
     /// <summary>A new chart, in the editor.</summary>
     NewChart,
-
-    /// <summary>The audio/visual calibration tool.</summary>
-    Calibrate,
 }
 
 /// <summary>Why Chart Builder's arguments can't be used. Chart Builder then opens the home screen and says why.</summary>
@@ -35,19 +32,18 @@ public enum BuilderArgsProblemKind
 public sealed record BuilderArgsProblem(BuilderArgsProblemKind Kind, string Argument);
 
 /// <summary>
-/// Chart Builder's command line (charter-spec §4.8). Chart Packer builds it with <see cref="ForSong"/>
-/// and <see cref="ForCalibrate"/>, and Chart Builder reads it with <see cref="Parse"/>.
+/// Chart Builder's command line (charter-spec §4.8). Chart Packer builds it with <see cref="ForSong"/>,
+/// and Chart Builder reads it with <see cref="Parse"/>.
 /// </summary>
 /// <remarks>
 /// The forms are: nothing (the home screen); <c>[--] &lt;song path&gt;</c>;
-/// <c>--new [--] [&lt;audio file&gt;…]</c>; and <c>--calibrate</c>. <c>--</c> ends the options, so a path
+/// and <c>--new [--] [&lt;audio file&gt;…]</c>. <c>--</c> ends the options, so a path
 /// that starts with <c>-</c> is still a path. Paths are made absolute against the current folder, so they
 /// don't depend on it once read; whether they exist is checked when they're used.
 /// </remarks>
 public sealed record BuilderArgs
 {
     public const string NewOption = "--new";
-    public const string CalibrateOption = "--calibrate";
     public const string EndOfOptions = "--";
 
     /// <summary>What to open.</summary>
@@ -73,10 +69,6 @@ public sealed record BuilderArgs
         {
             case NewOption:
                 return ParseNewChart(args);
-            case CalibrateOption:
-                return args.Count == 1
-                    ? new BuilderArgs { Start = BuilderStart.Calibrate }
-                    : Fail(BuilderArgsProblemKind.UnexpectedArgument, args[1]);
             case EndOfOptions:
                 return ParseSong(args, 1);
             case var option when IsOption(option):
@@ -93,9 +85,6 @@ public sealed record BuilderArgs
         // A full path never looks like an option, so it needs no "--" before it.
         return [Path.GetFullPath(songPath)];
     }
-
-    /// <summary>The arguments that open the calibration tool.</summary>
-    public static IReadOnlyList<string> ForCalibrate() => [CalibrateOption];
 
     // The song form: one path at args[first], and nothing after it.
     private static BuilderArgs ParseSong(IReadOnlyList<string> args, int first)
