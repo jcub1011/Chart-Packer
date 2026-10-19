@@ -715,6 +715,38 @@ public sealed class StemPlayerTests
     }
 
     [TestMethod]
+    public void AScheduleGivenWhilePlayingStartsFromWhereTheMixIs()
+    {
+        // Turning the metronome on mid-song must not play every click since playback started at once.
+        using var output = new FakeOutput();
+        using var player = SilentPlayer(output, seconds: 10);
+        var schedule = new Schedule(
+            new ScheduledSound(0, Constant(0.25f, Rate / 10)),
+            new ScheduledSound(Rate / 10, Constant(0.25f, Rate / 10)),
+            new ScheduledSound(2 * Rate, Constant(0.125f, Rate / 10)));
+        player.Play();
+        PlayFor(output, Rate / 2);
+
+        player.Sounds = schedule;
+        PlayFor(output, 3 * Rate);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        float[] written = output.WrittenLeft();
+        Assert.IsTrue(written[..(2 * Rate)].All(sample => sample == 0f), "Sounds from before the schedule was given played.");
+        Assert.AreEqual(0.125f, written[2 * Rate], 1e-6f, "The schedule's next sound didn't play.");
+
+        // Off and on again, the same.
+        player.Sounds = null;
+        PlayFor(output, Rate);
+        player.Sounds = schedule;
+        PlayFor(output, Rate);
+        WaitUntil(() => output.QueuedFrames > 0);
+
+        written = output.WrittenLeft();
+        Assert.IsTrue(written[((2 * Rate) + (Rate / 10))..].All(sample => sample == 0f), "Sounds from before the schedule was given again played.");
+    }
+
+    [TestMethod]
     public void PlayedAsMixedASoundIsReadAtTheSpeedSoItKeepsItsLength()
     {
         // The device plays what's written twice as fast, so the sound is written over twice as many frames, to be heard
