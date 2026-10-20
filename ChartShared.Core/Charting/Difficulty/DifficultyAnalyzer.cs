@@ -39,7 +39,7 @@ public static class DifficultyAnalyzer
 
     /// <summary>The difficulty of <paramref name="track"/> as the games read it (see <see cref="DifficultyNotes.Of"/>).</summary>
     public static DifficultyProfile Analyze(NoteTrack track, TempoMap tempo, long? endTick = null, DifficultyParameters? parameters = null) =>
-        Analyze(DifficultyNotes.Of(track, tempo, endTick), parameters);
+        Analyze(DifficultyNotes.Of(track, tempo, endTick, parameters), parameters);
 
     // One pass: a sample just after each note, and at the start of each window from the first note to endMs.
     private static DifficultyProfile Run(DifficultyModel model, IReadOnlyList<DifficultyNote> notes, double endMs)

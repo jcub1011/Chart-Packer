@@ -26,9 +26,9 @@ public sealed class DifficultySanityTests
     [TestMethod]
     public void ALongEasyIntroAddsNoEnduranceAndHardlyMovesTheScore()
     {
-        // Hard sixteenths at 120 BPM for 64 seconds, then the same after a minute of whole notes: 120 beats, which is 150
-        // windows, so the windows fall alike.
-        var hard = Varied(2, 32, 480, [0.25, 0.25, 1.0 / 3]);
+        // Hard sixteenths at 120 BPM for about five minutes, longer than the K windows the score reads (§10.3), then the
+        // same after a minute of whole notes: 120 beats, which is 150 windows, so the windows fall alike.
+        var hard = Varied(2, 144, 480, [0.25, 0.25, 1.0 / 3]);
         var intro = Enumerable.Range(0, 30).Select(i => new EditableNote(i * 1920L, 1, i % 2));
         var plain = Profile(Chart(hard));
         var introduced = Profile(Chart(intro.Concat(hard.Select(n => n with { Tick = n.Tick + 57_600 }))));
@@ -74,6 +74,33 @@ public sealed class DifficultySanityTests
 
         Assert.AreEqual(on.Rhythm, off.Rhythm, 0.01 * on.Rhythm);
         Assert.AreEqual(on.Pattern, off.Pattern, 0.01 * on.Pattern);
+    }
+
+    [TestMethod]
+    public void ARolledChordRatesAsTheChord()
+    {
+        // Two-fret chords in eighths at 120 BPM, then the same with each chord's upper fret three ticks (3 ms) late.
+        var chords = Enumerable.Range(0, 96).SelectMany(i => new[] { new EditableNote(i * 240L, 1, i % 3), new EditableNote(i * 240L, 1, (i % 3) + 2) }).ToList();
+        var rolled = chords.Select((n, k) => k % 2 == 1 ? n with { Tick = n.Tick + 3 } : n);
+        var plain = Profile(Chart(chords));
+        var played = Profile(Chart(rolled));
+
+        Assert.AreEqual(plain.ChartScore, played.ChartScore, 1e-9);
+        Assert.AreEqual(plain.ChartAttributes.Rhythm, played.ChartAttributes.Rhythm, 1e-9);
+        Assert.AreEqual(plain.ChartAttributes.Note, played.ChartAttributes.Note, 1e-9);
+    }
+
+    [TestMethod]
+    public void ANoteJustAfterAChordIsPlayedWithItAndOneLaterIsNot()
+    {
+        // At 120 BPM a tick is about a millisecond: a strummed green, red three ticks later, then yellow thirty after.
+        var notes = Notes(Chart([new EditableNote(0, 1, 0), new EditableNote(3, 1, 1), new EditableNote(33, 1, 2)]));
+
+        Assert.HasCount(2, notes);
+        Assert.AreEqual((byte)0b011, notes[0].Lanes);
+        Assert.AreEqual(NoteKind.Strum, notes[0].Kind);
+        Assert.AreEqual(0, notes[0].TimeMs, 1e-9);
+        Assert.AreEqual((byte)0b100, notes[1].Lanes);
     }
 
     [TestMethod]

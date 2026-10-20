@@ -79,6 +79,8 @@ Every heuristic depends on correct note types. Misclassified HOPOs are the most 
 
 Merge duplicate notes on the same tick into a single chord, ignore notes after the chart's end event, and treat sustains shorter than the engine's sustain cutoff as unsustained. Malformed custom charts are common, and cleanup prevents them from producing artificial spikes.
 
+Notes less than $\Delta_{\text{chord}}$ (default 10 ms) after a chord are merged into it too: a rolled or unquantized chord, its frets a few milliseconds apart, is played as one. The merged chord keeps the first note's time, beat, and type, as it's struck as the first note is. Unmerged, each roll reads as notes a few milliseconds apart, and charts rated 3 scored as overcharts of rank 10 to 20. No intended rhythm is that close: 64th notes at 240 BPM are 15.6 ms apart.
+
 ### 2.5 Initialization
 
 Every quantity is defined for the first notes of a chart or range:
@@ -296,12 +298,12 @@ With the defaults, strummed single notes moving between two frets, held for four
 
 | Held for four minutes | Steady-state $\tilde E$ | Chart rank |
 |---|---|---|
-| Eighths at 120 BPM | 0 | 0.4 |
-| Eighths at 185 BPM | 23 | 1.0 |
-| Sixteenths at 150 BPM | 83 | 3.9 |
-| Sixteenths at 170 BPM | 118 | 5.5 |
-| Sixteenths at 210 BPM (the strum reference) | 196 | 8.3 |
-| The same, for only 15 seconds | 65 | 5.4 |
+| Eighths at 120 BPM | 0 | 1.2 |
+| Eighths at 185 BPM | 23 | 3.1 |
+| Sixteenths at 150 BPM | 83 | 6.0 |
+| Sixteenths at 170 BPM | 118 | 6.5 |
+| Sixteenths at 210 BPM (the strum reference) | 196 | 7.6 |
+| The same, for only 15 seconds | 77 | 6.4 |
 
 The threshold $L_0$ is **absolute**, not relative to the chart's own peak, so a long but easy song never builds endurance strain simply because it never stops. The default of 20 is about the load of strummed eighths at 120 BPM, a pace that can be kept up indefinitely. The half-life $h_E$ is much longer than the other attributes' (tens of seconds rather than fractions of a second), which is what separates stamina from burst difficulty.
 
@@ -363,11 +365,12 @@ With the default weights, one attribute at its reference (100) and the rest at 0
 
 | Attribute at 100 | Short burst ($\tilde E = 0$) | Sustained (endurance at steady state) |
 |---|---|---|
-| Strum | 70.7 | about 125 |
-| Note | 74.0 | about 130 |
-| Rhythm or pattern | 62.2 | 62.2 |
+| Strum | 73.6 | about 130 |
+| Note | 77.1 | about 135 |
+| Pattern | 64.8 | 64.8 |
+| Rhythm | 0 | 0 |
 
-For comparison, $p = 1.5$ gives 40 for the strum case and 28 for rhythm or pattern. A short burst at one reference sits in rank 5 under the placeholder thresholds (section 7.1), approaching the soft cap (section 3.3). Held for minutes, the strum or note reference also far exceeds the stamina limit, and the chart is an overchart. Rhythm and pattern put no load on the hands, so they build no endurance (section 4.4). Endurance at its own reference, with little else hard, gives about 62, as rhythm or pattern alone do.
+For comparison, $p = 1.5$ gives 44 for the strum case and 33 for pattern. A short burst at one reference sits in rank 6 under the calibrated thresholds (section 7.1), below the soft cap (section 3.3). Held for minutes, the strum or note reference also far exceeds the stamina limit, and the chart is an overchart. Rhythm and pattern put no load on the hands, so they build no endurance (section 4.4). Endurance at its own reference, with little else hard, gives about 65, as pattern alone does. Rhythm has no weight (section 5.2), so it adds nothing to $D$.
 
 A higher $p$ also makes $D$ less sensitive to correlated attributes, since only the largest input matters much, but it does not remove double counting (section 5.2).
 
@@ -379,17 +382,17 @@ $$D(t) = M_p\big(\tilde S_S(t),\, \tilde S_N(t),\, \tilde S_R(t),\, \tilde S_P(t
 
 There is no circularity: endurance depends on the physical load $L$ from section 4.4, which only strum and note make up.
 
-**Starting weights:**
+**Weights:**
 
 | Attribute | Weight | Rationale |
 |---|---|---|
 | Strum difficulty | 0.25 | Primary physical limit for most players |
 | Note difficulty | 0.30 | Primary limit in HOPO, tap, and chord-heavy passages |
-| Rhythmic complexity | 0.15 | Matters most in combination with speed, which is already reflected elsewhere |
+| Rhythmic complexity | 0 | Still measured and shown, but not part of $D$: against charter ratings it added nothing the other attributes don't already carry (section 13, Calibration) |
 | Endurance | 0.15 | Separates sustained difficulty from short bursts |
 | Pattern irregularity | 0.15 | Separates readable passages from chaotic ones |
 
-The load $L$ uses the same weights for its four attributes. The power mean divides by the sum of the weights it is given, so no separate renormalization is needed.
+The load $L$ has weights of its own for strum and note, 0.25 and 0.30 (section 11), so changing how much an attribute counts towards $D$ doesn't change what tires. The power mean divides by the sum of the weights it is given, so no separate renormalization is needed.
 
 **Watch for double counting.** Endurance is derived from strum and note, and pattern irregularity tends to correlate with note difficulty. During calibration, check the correlation between attributes across a set of charts. If two correlate very strongly, reduce one weight or adjust one heuristic so it measures something more distinct.
 
@@ -427,7 +430,7 @@ Sort the $J$ window peaks in descending order, $P_{(1)} \ge P_{(2)} \ge \dots \g
 
 $$\text{Score}(a, b) = \frac{\sum_{m=1}^{J} \omega^{\,m-1}\, P_{(m)}}{\sum_{m=1}^{J} \omega^{\,m-1}}$$
 
-This implements the principle that **difficulty lives in the hardest part of the song** without letting a single 400 ms flourish define the whole chart. The effective length of the "hardest part" is about $W / (1 - \omega)$: with $\omega = 0.9$, the hardest ~4 seconds carry about 65% of the score, and the hardest ~9 seconds carry about 90% of it. Raising $\omega$ toward 0.95 lengthens that span. Because the average is normalized, a constant $D$ scores exactly $D$.
+This implements the principle that **difficulty lives in the hardest part of the song** without letting a single 400 ms flourish define the whole chart. The effective length of the "hardest part" is about $W / (1 - \omega)$: with $\omega = 0.99$, the hardest ~40 seconds carry about 65% of the score, and the hardest ~90 seconds carry about 90% of it. With $\omega = 0.9$ it would be the hardest ~4 seconds, but charter ratings follow sustained difficulty far more closely than the hardest few seconds (section 13, Calibration). The cost is that a chart whose difficulty is all in one short solo scores below what the solo alone would. Because the average is normalized, a constant $D$ scores exactly $D$. In a song shorter than $K$ windows (section 6.4), every window counts, the easy ones too.
 
 **Finding window peaks.** Between note onsets every strain decreases, so $D$ can only rise through endurance, which changes slowly (half-life 20 s). Evaluating $D$ at note onsets and at window boundaries therefore finds each window's peak to within a negligible error. Implementations that need exact peaks can also sample inside windows.
 
@@ -456,7 +459,7 @@ The score can also be maintained as a running value while notes are processed. B
 
 $$K = \left\lceil \frac{\ln \varepsilon}{\ln \omega} \right\rceil$$
 
-for a chosen relative precision $\varepsilon$. With $\omega = 0.9$ and $\varepsilon = 10^{-3}$, about 66 windows matter, so a running chart score needs only the top $K$ window peaks plus a running total of the weights.
+for a chosen relative precision $\varepsilon$. With $\omega = 0.99$ and $\varepsilon = 10^{-3}$, about 690 windows (275 s) matter, so a running chart score needs only the top $K$ window peaks plus a running total of the weights.
 
 ---
 
@@ -474,21 +477,21 @@ $$\mathcal{R}(x) = \begin{cases} 0 & \text{if } x \le \theta_0 \\[4pt] j + \dfra
 
 The last case is rank 6's segment extended without limit, so rank $j \ge 7$ begins at $\theta_6 + (j - 6)(\theta_7 - \theta_6)$. The integer rank is $\lfloor \mathcal{R}(x) \rfloor$, and the continuous value (e.g. 5.42 or 7.81) can be shown for sorting within a tier.
 
-**Starting thresholds (placeholders until calibrated):**
+**Thresholds (calibrated against charter ratings, section 13):**
 
 | Rank | Begins at score |
 |---|---|
 | 0 | $\theta_0 = 0$ |
-| 1 | $\theta_1 = 15$ |
-| 2 | $\theta_2 = 28$ |
-| 3 | $\theta_3 = 41$ |
-| 4 | $\theta_4 = 54$ |
-| 5 | $\theta_5 = 67$ |
-| 6 | $\theta_6 = 80$ |
+| 1 | $\theta_1 = 2.5$ |
+| 2 | $\theta_2 = 10.5$ |
+| 3 | $\theta_3 = 14$ |
+| 4 | $\theta_4 = 25$ |
+| 5 | $\theta_5 = 40$ |
+| 6 | $\theta_6 = 53$ |
 | 7 (soft cap) | $\theta_7 = 100$ |
-| 8, 9, … | 120, 140, … (derived: width 20) |
+| 8, 9, … | 147, 194, … (derived: width 47) |
 
-Expert charts span an enormous range, and custom charts cluster toward the top of it, so the calibrated thresholds will likely be uneven. The placeholders are evenly spaced only as a neutral starting point. $\theta_6 = 80$ is placed where a single attribute sustained at its reference lands (section 5.1), and reaching rank 7 requires either well beyond-reference difficulty in one attribute or reference-level difficulty in several at once.
+Each rank is the tier official charts of that score are most often rated, by their `song.ini` files (section 7.3): the thresholds put the fewest tiers between the ranks and the ratings of official charts. Official charts are rated more consistently than community ones, and at the same score about a tier higher. Because ratings vary a lot at any one score, the ranks bunch towards the middle: official charts rated 0 and 1 score alike, so few charts rank 0, and only clearly hard ones reach 5 and 6. $\theta_6$ rests on few charts, as official charts rated 6 are rare. The soft cap stays at 100: a single attribute at its reference (section 5.1) lands in rank 6, and reaching rank 7 requires either well beyond-reference difficulty in one attribute or reference-level difficulty in several at once.
 
 ### 7.2 Parametric alternative
 
@@ -510,6 +513,8 @@ Because overchart ranks reuse rank 6's width, $\xi > 1$ also makes overcharts cl
 3. Place each threshold in the gap between the highest-scoring anchor of one rank and the lowest-scoring anchor of the next. Place the soft cap $\theta_7$ between the hardest realistic anchors and the easiest overcharts.
 4. Check the overchart anchors against the linear extension. If their computed ranks are consistently compressed or spread compared with community judgment, revisit the width rule rather than the thresholds below the cap.
 5. If anchors overlap heavily and no gap exists, the problem is in the attributes or weights, not the curve. Fix that first.
+
+With charter ratings in place of anchors, the tiers overlap heavily, as charters rate inconsistently, so there is no clean gap. There are then two ways to place the thresholds. Halfway between neighbouring tiers' median scores, the typical chart of each tier lands in it, and the ranks keep the ratings' spread. Fitted to the fewest tiers of error, each rank is the tier charts of that score are most often rated: more accurate for any one chart, but the ranks bunch towards the middle. The ranks here are suggestions for one chart at a time, so they take the second, from the most consistent ratings there are, such as official charts'.
 
 ---
 
@@ -568,7 +573,7 @@ Shows how difficulty changes over the course of the song.
 | Attribute lines | Toggleable lines for each attribute's normalized strain, including endurance |
 | Section markers | Vertical guides and labels from the chart's section events (e.g. "Solo 1") |
 | Rank guide lines | Horizontal lines at each rank threshold, including rank 7 and above when they fall within the visible range; a passage between the rank 5 and rank 6 lines is rank-5 material |
-| Score contributors | Highlighting on the windows that contributed most to the chart score |
+| Score contributors | Highlighting on the windows that contributed most to the chart score: the hardest, as many as make up about 65% of it, each counting its weight times its peak |
 | Tooltip | Time, section name, $D(t)$, rank-equivalent $r(t)$, and the attribute contributing most at that moment |
 
 Because the graph is drawn from the same online quantities as the chart score, it can update immediately as notes are edited.
@@ -614,7 +619,7 @@ These should hold for any tuning:
 | Test | Expected behavior |
 |---|---|
 | Speed up a chart by 10% | Strum, note, and rhythm scores increase or stay the same. Pattern irregularity, endurance, and the chart score normally increase, but can dip slightly because novelty and fatigue depend on elapsed real time |
-| Add a long, easy intro | Endurance does not increase. The chart score drops by less than $\varepsilon$ (relative) when the chart already spans at least $K$ windows (about 26 s); shorter charts can drop more |
+| Add a long, easy intro | Endurance does not increase. The chart score drops by less than $\varepsilon$ (relative) when the chart already spans at least $K$ windows (about 275 s at $\omega = 0.99$); shorter charts can drop more |
 | Duplicate the hardest section back to back | Endurance increases; other attribute scores rise only modestly |
 | Shift all notes up one lane (where possible) | Scores stay similar, apart from open-note and hand-position effects |
 | Change chart resolution without changing timing | All values identical |
@@ -624,7 +629,8 @@ These should hold for any tuning:
 | Edit notes at or after $t_e$ | No value before $t_e$ changes |
 | Open-note and chord alternation | Open↔any lane costs more than green↔yellow; each chord alternation costs more than the corresponding single-note alternation (section 4.2) |
 | Clean ratios | Every ratio in $\mathcal{Q}$, played exactly, scores its own Tenney height (section 4.3) |
-| Reference patterns | A short burst of each single-attribute reference pattern lands in rank 5; the endurance reference, held, settles at $\tilde E = 100$ (sections 4.4 and 5.1) |
+| Reference patterns | A short burst of the strum, note, or pattern reference lands in rank 5 or 6; the endurance reference, held, settles at $\tilde E = 100$ and is still realistic (sections 4.4 and 5.1) |
+| Rolled chords | A chord whose frets are a few milliseconds apart rates as the chord (section 2.4) |
 
 ---
 
@@ -636,8 +642,9 @@ All values are starting points to be tuned during calibration. Attribute weights
 |---|---|---|
 | $\Delta_{\min}$ | 20 ms | All attributes (guards against near-zero intervals) |
 | Sustain cutoff | From the engine profile | Cleanup |
+| $\Delta_{\text{chord}}$ (chord merge) | 10 ms | Cleanup (rolled chords) |
 | $W$ (window length) | 400 ms | Window peaks, peak envelope |
-| $\omega$ (peak weight) | 0.9 | Chart and range scores |
+| $\omega$ (peak weight) | 0.99 | Chart and range scores |
 | $\varepsilon$ (relative precision) | $10^{-3}$ | Top-$K$ windows, edit horizon |
 | $\tau_{\text{ema}}$ (smoothing time constant) | 150 ms | Smoothed display values |
 | Snapshot interval | 5 s | Charting program state |
@@ -675,6 +682,7 @@ All values are starting points to be tuned during calibration. Attribute weights
 | $\gamma_P$ | 0.75 | Pattern irregularity |
 | $L_0$ (endurance threshold) | 20 | Endurance |
 | $q$ (physical load power) | 0.5 | Endurance |
+| Load weights (strum, note) | 0.25, 0.30 | Endurance (physical load) |
 | $p$ (power mean exponent) | 4 | Load, instantaneous difficulty |
 | $\alpha_S,\ \alpha_N,\ \alpha_R,\ \alpha_P$ | 1.0 each | Overall scale; largely absorbed by $\rho_k$ |
 | $\rho_S,\ \rho_N,\ \rho_R,\ \rho_P$ | Steady-state strain of each reference pattern | Normalization |
@@ -730,3 +738,22 @@ milliseconds, so after an edit the whole track is read again, off the UI thread.
 section 8 aren't needed at this size. The state can be cloned, which leaves them open for later.
 
 **Phrase history.** Only the last time each phrase ended is kept, since passes always start from the beginning.
+
+**Calibration.** The weights, $\omega$ and the rank thresholds were fitted against the `diff_guitar` and `diff_bass` ratings of a test library of 1,370 songs, with `tools/DifficultyCalibration` (its README has the commands). With songs present twice left out, 1,477 parts were rated, 369 of them official charts (Harmonix, Neversoft and others, from the `charter` key). Official charts' ratings are the more consistent, so the model is aligned to them first. The parts were split by artist, 70% to fit and 30% held out, so no song is on both sides; each change was chosen on the fit set and checked on the held-out one, by the Spearman correlation between rank and rated tier:
+
+| Spearman | Before | After |
+|---|---|---|
+| Guitar, held out | 0.49 | 0.53 |
+| Guitar, official charts | 0.58 | 0.72 |
+| Bass, held out | 0.65 | 0.83 |
+| Bass, official charts | 0.62 | 0.70 |
+
+What changed, and why:
+
+- **Rolled chords merged** (section 2.4). They made most of the charts rated 3 or under that scored as overcharts.
+- **$\omega$ from 0.9 to 0.99** (section 6.1). The largest single gain: ratings follow how hard a chart is for much of its length, not its hardest 4 seconds.
+- **Rhythm's weight from 0.15 to 0** (section 5.2). Alone, rhythm ordered the charts worst of the five but strum (0.43, against pattern's 0.65), and given the others it predicted nothing more. Its scale was also high: it topped 40% of charts, and its highest values were repeated grooves charted a little off the grid, such as swung or sextuplet riffs. Discounting repeated rhythms, as pattern novelty does, didn't improve its ordering.
+- **The load's own weights** (section 5.2). The load once took strum's and note's weights in $D$, so lowering strum's to 0.10 seemed to help official charts, but only by raising the endurance of charts tapped or hammered on without strumming. Those then ranked a tier or more above what they play like.
+- **Thresholds refitted** (section 7.1) to the tier official charts of each score are most often rated. By five-fold cross-validation over artists, official charts land on their tier 43% of the time and within one 87%. Thresholds halfway between official tiers' median scores keep the spread better (each official tier's median chart lands within 0.15 of the middle of its tier) but are less accurate for one chart (41% and 82%), and put community charts that play like a 3 at 4 to 5.
+
+Raising the power mean to 2, or note's weight, helped official charts a little but hurt the rest, so they're unchanged. What's left is mostly how charters rate. Guitar's held-out correlation stays about 0.53 across every variant tried. Community charts are rated about a tier lower than official ones at the same score, so their suggestions often run above their own ratings. Rated by official charters, bass and guitar agree on the scale, so one curve serves every part.

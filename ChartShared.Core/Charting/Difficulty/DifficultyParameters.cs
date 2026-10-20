@@ -1,8 +1,9 @@
 namespace ChartShared.Core.Charting.Difficulty;
 
 /// <summary>
-/// The constants the difficulty model is tuned by (docs/difficulty-model.md §11). They're starting points, to be fitted
-/// to rated charts; <see cref="Default"/> is what the program uses.
+/// The constants the difficulty model is tuned by (docs/difficulty-model.md §11). The weights, the peak weight and the
+/// rank thresholds are fitted to charters' ratings (§13, Calibration; tools/DifficultyCalibration); the rest are starting
+/// points. <see cref="Default"/> is what the program uses.
 /// </summary>
 /// <remarks>
 /// Times are in milliseconds and half-lives in seconds. The references each attribute is normalized against are worked
@@ -18,11 +19,14 @@ public sealed record DifficultyParameters
     /// <summary>The shortest interval counted, so notes all but on top of one another don't make spikes (Δmin).</summary>
     public double MinIntervalMs { get; init; } = 20;
 
+    /// <summary>How soon after a chord a note is read as part of it: a rolled or unquantized chord (Δchord, §2.4).</summary>
+    public double ChordMergeMs { get; init; } = 10;
+
     /// <summary>The length of the score windows and of the peak envelope (W).</summary>
     public double WindowMs { get; init; } = 400;
 
     /// <summary>How much each window counts against the one before it, hardest first (ω).</summary>
-    public double PeakWeight { get; init; } = 0.9;
+    public double PeakWeight { get; init; } = 0.99;
 
     /// <summary>The power the attributes are combined with (p): the higher, the more the hardest dominates.</summary>
     public double PowerMean { get; init; } = 4;
@@ -36,7 +40,8 @@ public sealed record DifficultyParameters
 
     public double NoteWeight { get; init; } = 0.30;
 
-    public double RhythmWeight { get; init; } = 0.15;
+    /// <summary>None: rhythm is measured and shown, but added nothing to the ratings the other attributes give (§5.2).</summary>
+    public double RhythmWeight { get; init; } = 0;
 
     public double PatternWeight { get; init; } = 0.15;
 
@@ -170,10 +175,19 @@ public sealed record DifficultyParameters
     /// </summary>
     public double EnduranceLoadPower { get; init; } = 0.5;
 
+    /// <summary>
+    /// How much the strumming hand's strain counts in the load, against the fretting hand's: the load's own, so tuning
+    /// how strum counts towards the overall difficulty doesn't change what tires.
+    /// </summary>
+    public double LoadStrumWeight { get; init; } = 0.25;
+
+    /// <summary>How much the fretting hand's strain counts in the load, against the strumming hand's.</summary>
+    public double LoadNoteWeight { get; init; } = 0.30;
+
     // Rank curve (§7, ranks from 0).
 
     /// <summary>The scores ranks 0 to 6 start at (θ₀ to θ₆), rising.</summary>
-    public IReadOnlyList<double> RankThresholds { get; init; } = [0, 15, 28, 41, 54, 67, 80];
+    public IReadOnlyList<double> RankThresholds { get; init; } = [0, 2.5, 10.5, 14, 25, 40, 53];
 
     /// <summary>The soft cap (θ₇): where rank 7, the first beyond realistic play, starts.</summary>
     public double SoftCap { get; init; } = 100;

@@ -26,7 +26,7 @@ internal sealed class DifficultyModel
         RhythmScale = 100 / references.Rhythm;
         PatternScale = 100 / references.Pattern;
         _enduranceScale = 100 / references.Endurance;
-        LoadWeights = [parameters.StrumWeight, parameters.NoteWeight];
+        LoadWeights = [parameters.LoadStrumWeight, parameters.LoadNoteWeight];
         Weights = [parameters.StrumWeight, parameters.NoteWeight, parameters.RhythmWeight, parameters.PatternWeight, parameters.EnduranceWeight];
     }
 

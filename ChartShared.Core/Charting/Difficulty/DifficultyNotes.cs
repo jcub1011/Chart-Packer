@@ -36,12 +36,14 @@ public static class DifficultyNotes
     /// </summary>
     /// <remarks>
     /// A chord with an open note and frets is read as its frets. A tap anywhere in a chord makes it a tap, then a HOPO a
-    /// HOPO, as the flags are the chord's.
+    /// HOPO, as the flags are the chord's. Notes less than <see cref="DifficultyParameters.ChordMergeMs"/> after a chord
+    /// are read as part of it, played as it is: a rolled or unquantized chord is played as one.
     /// </remarks>
-    public static IReadOnlyList<DifficultyNote> Of(NoteTrack track, TempoMap tempo, long? endTick = null)
+    public static IReadOnlyList<DifficultyNote> Of(NoteTrack track, TempoMap tempo, long? endTick = null, DifficultyParameters? parameters = null)
     {
         ArgumentNullException.ThrowIfNull(track);
         ArgumentNullException.ThrowIfNull(tempo);
+        var p = parameters ?? DifficultyParameters.Default;
         var notes = new List<DifficultyNote>();
         double resolution = tempo.Resolution;
 
@@ -54,15 +56,15 @@ public static class DifficultyNotes
             long tick = source[i].Tick;
             if (endTick is { } end && tick > end)
                 break;
+            double timeMs = tempo.SecondsAt(tick) * 1000;
             byte lanes = 0;
             var flags = NoteFlags.None;
-            long longest = 0;
             int j = i;
-            for (; j < source.Count && source[j].Tick == tick; j++)
+            for (; j < source.Count && (source[j].Tick == tick || IsRolled(source[j].Tick)); j++)
             {
                 var note = source[j];
-                flags |= note.Flags;
-                longest = Math.Max(longest, note.Length);
+                if (note.Tick == tick)
+                    flags |= note.Flags;
                 if (note.Lane is >= 0 and < 5)
                     lanes |= (byte)(1 << note.Lane);
             }
@@ -78,15 +80,18 @@ public static class DifficultyNotes
             {
                 var note = source[k];
                 if (note.Length > 0 && note.Lane is >= 0 and < 5 && (lanes & (1 << note.Lane)) != 0)
-                    holds[note.Lane] = Math.Max(holds[note.Lane], tick + note.Length);
+                    holds[note.Lane] = Math.Max(holds[note.Lane], note.Tick + note.Length);
             }
 
             var kind = (flags & NoteFlags.Tap) != 0 ? NoteKind.Tap : (flags & NoteFlags.Hopo) != 0 ? NoteKind.Hopo : NoteKind.Strum;
-            notes.Add(new DifficultyNote(tempo.SecondsAt(tick) * 1000, tick / resolution, lanes, kind, held));
+            notes.Add(new DifficultyNote(timeMs, tick / resolution, lanes, kind, held));
             i = j;
+
+            // A later note close enough to the chord's to be played with it, and not past the end.
+            bool IsRolled(long at) => p.ChordMergeMs > 0 && !(endTick is { } last && at > last) && (tempo.SecondsAt(at) * 1000) - timeMs < p.ChordMergeMs;
         }
 
-        double offset = GridOffset(notes.Select(static n => n.Beat).ToList(), DifficultyParameters.Default.BeatTolerance);
+        double offset = GridOffset(notes.Select(static n => n.Beat).ToList(), p.BeatTolerance);
         if (offset != 0)
         {
             for (int k = 0; k < notes.Count; k++)

@@ -9,30 +9,30 @@ public sealed class RankCurveTests
     [TestMethod]
     [DataRow(-5.0, 0.0)]
     [DataRow(0.0, 0.0)]
-    [DataRow(7.5, 0.5)]
-    [DataRow(15.0, 1.0)]
-    [DataRow(21.5, 1.5)]
-    [DataRow(80.0, 6.0)]
-    [DataRow(90.0, 6.5)]
+    [DataRow(1.25, 0.5)]
+    [DataRow(2.5, 1.0)]
+    [DataRow(6.5, 1.5)]
+    [DataRow(53.0, 6.0)]
+    [DataRow(76.5, 6.5)]
     [DataRow(100.0, 7.0)]
-    [DataRow(130.0, 8.5)]
+    [DataRow(170.5, 8.5)]
     public void TheCurveIsPiecewiseLinearAndGoesOnPastTheSoftCap(double score, double rank) => Assert.AreEqual(rank, RankCurve.Continuous(score), 1e-9);
 
     [TestMethod]
     public void TheTierIsTheWholeRank()
     {
-        Assert.AreEqual(0, RankCurve.Tier(14.9));
+        Assert.AreEqual(0, RankCurve.Tier(2.4));
         Assert.AreEqual(6, RankCurve.Tier(99.9));
         Assert.AreEqual(7, RankCurve.Tier(100));
-        Assert.AreEqual(9, RankCurve.Tier(141));
+        Assert.AreEqual(9, RankCurve.Tier(194));
     }
 
     [TestMethod]
     public void RanksPastTheSoftCapAreAsWideAsRankSix()
     {
-        Assert.AreEqual(80, RankCurve.ThresholdOf(6));
+        Assert.AreEqual(53, RankCurve.ThresholdOf(6));
         Assert.AreEqual(100, RankCurve.ThresholdOf(7));
-        Assert.AreEqual(120, RankCurve.ThresholdOf(8));
+        Assert.AreEqual(147, RankCurve.ThresholdOf(8));
         Assert.AreEqual(0, RankCurve.ThresholdOf(0));
     }
 }

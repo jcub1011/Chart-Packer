@@ -42,10 +42,10 @@ public sealed class DifficultyModelTests
     [TestMethod]
     public void OneAttributeAtItsReferenceCombinesAsTheDocumentSays()
     {
-        Assert.AreEqual(70.7, Model.Combine(new DifficultyAttributes(100, 0, 0, 0, 0)), 0.05);
-        Assert.AreEqual(74.0, Model.Combine(new DifficultyAttributes(0, 100, 0, 0, 0)), 0.05);
-        Assert.AreEqual(62.2, Model.Combine(new DifficultyAttributes(0, 0, 100, 0, 0)), 0.05);
-        Assert.AreEqual(62.2, Model.Combine(new DifficultyAttributes(0, 0, 0, 100, 0)), 0.05);
+        Assert.AreEqual(73.6, Model.Combine(new DifficultyAttributes(100, 0, 0, 0, 0)), 0.05);
+        Assert.AreEqual(77.1, Model.Combine(new DifficultyAttributes(0, 100, 0, 0, 0)), 0.05);
+        Assert.AreEqual(0, Model.Combine(new DifficultyAttributes(0, 0, 100, 0, 0)), 1e-9);
+        Assert.AreEqual(64.8, Model.Combine(new DifficultyAttributes(0, 0, 0, 100, 0)), 0.05);
         Assert.AreEqual(100, Model.Combine(new DifficultyAttributes(100, 100, 100, 100, 100)), 1e-9);
     }
 
@@ -89,11 +89,11 @@ public sealed class DifficultyModelTests
     public void HoldingTheEnduranceReferenceIsHardButRealistic()
     {
         // The stamina limit for a whole song, with the strumming itself well under the speed limit: endurance at 100 and
-        // little else combine to about 62 (§5.1), as rhythm or pattern alone at theirs do.
+        // little else combine to about 65 (§5.1), as pattern alone at its reference does: the hardest realistic rank.
         var held = DifficultyAnalyzer.Analyze([.. DifficultyReferences.EndurancePattern(P, 240)]);
 
         Assert.AreEqual(100, held.ChartAttributes.Endurance, 2);
-        Assert.IsTrue(held.Rank is >= 4 and < 6, $"{held.Rank}");
+        Assert.IsTrue(held.Rank is >= 5 and < RankCurve.FirstOverchart, $"{held.Rank}");
     }
 
     [TestMethod]

@@ -141,15 +141,19 @@ public sealed class DifficultyProfile
 
     /// <summary>
     /// The windows that count the most towards <see cref="ChartScore"/>, hardest first: as many as make up about
-    /// <paramref name="share"/> of its weight.
+    /// <paramref name="share"/> of it, each window counting its weight times its peak.
     /// </summary>
     public IReadOnlyList<DifficultySpan> Contributors(double share = 0.65)
     {
         var peaks = _peaks[OverallSeries];
         var order = Enumerable.Range(0, peaks.Length).Where(j => peaks[j] > 0).OrderByDescending(j => peaks[j]).ToList();
         double total = 0, weight = 1;
-        for (int m = 0; m < peaks.Length; m++, weight *= Parameters.PeakWeight)
-            total += weight;
+        foreach (int j in order)
+        {
+            total += weight * peaks[j];
+            weight *= Parameters.PeakWeight;
+        }
+
         var spans = new List<DifficultySpan>();
         double sum = 0;
         weight = 1;
@@ -158,7 +162,7 @@ public sealed class DifficultyProfile
             if (sum >= share * total)
                 break;
             spans.Add(new DifficultySpan(j * _window, Math.Min((j + 1) * _window, EndMs)));
-            sum += weight;
+            sum += weight * peaks[j];
             weight *= Parameters.PeakWeight;
         }
 
