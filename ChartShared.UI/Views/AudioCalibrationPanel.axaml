@@ -100,6 +100,36 @@
             </StackPanel>
         </Border>
 
+        <!-- Tapped along with the clicks, the notes hidden, the latency is measured into the box above, not saved. -->
+        <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationTapSection}" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <!-- Not focusable, so a key or Space pressed as a tap never presses it again. -->
+                    <Button Grid.Column="0"
+                            Classes="labelled"
+                            VerticalAlignment="Top"
+                            Focusable="False"
+                            Command="{Binding BeginTapsCommand}"
+                            AutomationProperties.Name="{Binding TapStartLabel}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Data="{StaticResource ArrowRightStroke}" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center" Text="{Binding TapStartLabel}" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Grid.Column="1"
+                               Classes="status"
+                               Classes.warning="{Binding IsTapStatusWarning}"
+                               VerticalAlignment="Center"
+                               Text="{Binding TapStatus}" />
+                </Grid>
+                <TextBlock Classes="note" Text="{x:Static res:SharedStrings.CalibrationTapHowText}" />
+                <TextBlock Classes="note"
+                           IsVisible="{Binding HasDeviceOffsets}"
+                           Text="{x:Static res:SharedStrings.CalibrationTapDevicesNote}" />
+            </StackPanel>
+        </Border>
+
         <!-- Held, the notes are drawn with no latency, to see how far it moves them; let go, they go back. -->
         <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationCompareSection}" />
         <Border Classes="card">

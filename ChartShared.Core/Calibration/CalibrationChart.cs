@@ -27,6 +27,9 @@ public static class CalibrationChart
     public static int BeatsIn(TimeSpan length) =>
         length < TimeSpan.Zero ? 0 : (int)Math.Floor(length.TotalSeconds / BeatSeconds) + 1;
 
+    /// <summary>How many of <see cref="DeviceLeadBeats"/> the input-device test gets ready for, before its count-in: a bar.</summary>
+    public const int DeviceReadyBeats = 4;
+
     /// <summary>How many beats the input-device test leads in with, from song 0, before its first note: two bars.</summary>
     public const int DeviceLeadBeats = 8;
 

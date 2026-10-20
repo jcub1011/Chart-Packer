@@ -96,11 +96,16 @@
 
         <Grid Grid.Row="1" ColumnDefinitions="280,*">
             <!-- The highway, as the song's preview draws it. Only watched: a press doesn't scrub it, nor does Shift show
-                 its whole chart. -->
-            <Border Grid.Column="0" Classes="artTile" Margin="12,12,0,12">
-                <Panel>
+                 its whole chart; while the audio tap test runs, a press is a tap. Transparent, so a press anywhere on it
+                 reaches the tile while the notes are hidden. -->
+            <Border x:Name="HighwayTile"
+                    Grid.Column="0"
+                    Classes="artTile"
+                    Margin="12,12,0,12">
+                <Panel Background="Transparent">
                     <hw:NoteHighwayView x:Name="Highway"
                                         Scene="{Binding Scene}"
+                                        IsVisible="{Binding !HidesNotes}"
                                         IsHitTestVisible="False" />
                     <Border Classes="banner"
                             HorizontalAlignment="Center"

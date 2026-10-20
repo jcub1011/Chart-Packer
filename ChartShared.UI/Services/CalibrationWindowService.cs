@@ -18,7 +18,11 @@ namespace ChartShared.UI.Services
     /// Run as the tool opens, before its test is made, never when it's open already: to pause the app's playback, so the
     /// test's notes are the only ones moving.
     /// </param>
-    public sealed class CalibrationWindowService(Func<int, IAudioOutput> openOutput, AudioLatencyService latency, Action? opening = null)
+    /// <param name="taps">
+    /// The app's input devices, for the audio/visual test's tap test, from the app that has them; without, it hears the
+    /// keyboard and the mouse in its own window.
+    /// </param>
+    public sealed class CalibrationWindowService(Func<int, IAudioOutput> openOutput, AudioLatencyService latency, Action? opening = null, Func<ICalibrationTaps>? taps = null)
     {
         // The tool, while it's open.
         private CalibrationWindow? _open;
@@ -28,7 +32,7 @@ namespace ChartShared.UI.Services
 
         /// <summary>Opens the audio/visual test over <paramref name="owner"/>, or on its own without one, and waits for it to close.</summary>
         /// <returns>Whether it ran: false when the tool was open already, which is brought to the front instead.</returns>
-        public Task<bool> ShowAsync(Window? owner) => ShowAsync(owner, () => new CalibrationViewModel(openOutput, latency));
+        public Task<bool> ShowAsync(Window? owner) => ShowAsync(owner, () => new CalibrationViewModel(openOutput, latency, taps?.Invoke()));
 
         /// <summary>Opens <paramref name="input"/>'s test over <paramref name="owner"/>, or on its own without one, and waits for it to close.</summary>
         /// <returns>Whether it ran: false when the tool was open already, which is brought to the front instead.</returns>

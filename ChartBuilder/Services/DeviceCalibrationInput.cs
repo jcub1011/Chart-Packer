@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using Avalonia.Input;
-using ChartShared.Core;
 using ChartShared.Core.Input;
 using ChartShared.UI.Services;
 
@@ -21,28 +19,11 @@ namespace ChartBuilder.Services
 
         public bool IsKeyboard => device.Id.Kind == InputDeviceKind.Keyboard;
 
-        /// <summary>Runs the devices while it listens, and hands on each press of this one (<see cref="PressDetector"/>).</summary>
+        /// <summary>Runs the devices while it listens, and hands on each press of this one (<see cref="InputService.ListenPresses"/>).</summary>
         public IDisposable Listen(Action<double> pressed)
         {
             ArgumentNullException.ThrowIfNull(pressed);
-
-            var lease = input.Hub.Acquire();
-            var presses = new PressDetector(device.Id, input.Settings.Settings.TuningOf(device.Id).MinVelocity);
-            void OnReceived(IReadOnlyList<RawInputEvent> batch)
-            {
-                foreach (var e in batch)
-                {
-                    if (presses.Feed(e))
-                        pressed(e.Time);
-                }
-            }
-
-            input.Hub.Received += OnReceived;
-            return new DisposeAction(() =>
-            {
-                input.Hub.Received -= OnReceived;
-                lease.Dispose();
-            });
+            return input.ListenPresses(id => id == device.Id, (e, _) => pressed(e.Time));
         }
 
         public void Key(PhysicalKey key, bool down) => input.PostKey(key, down);

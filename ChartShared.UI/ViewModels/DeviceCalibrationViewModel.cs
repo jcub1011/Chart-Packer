@@ -176,23 +176,25 @@ namespace ChartShared.UI.ViewModels
             }
 
             // The first bar to get ready, the second counted down; then the notes, each from half a beat before it.
-            double beat = at / CalibrationChart.BeatSeconds;
-            const int BeatsPerBar = 4;
-            if (beat < BeatsPerBar)
+            var step = CalibrationCountIn.At(
+                at / CalibrationChart.BeatSeconds,
+                CalibrationChart.DeviceReadyBeats,
+                CalibrationChart.DeviceLeadBeats,
+                CalibrationChart.DeviceNoteCount);
+            switch (step.Phase)
             {
-                CountIn = SharedStrings.CalibrationGetReady;
-                Status = SharedStrings.CalibrationGetReady;
-            }
-            else if (beat < CalibrationChart.DeviceLeadBeats)
-            {
-                CountIn = ((int)(CalibrationChart.DeviceLeadBeats - Math.Floor(beat))).ToString(CultureInfo.CurrentCulture);
-                Status = SharedStrings.CalibrationGetReady;
-            }
-            else
-            {
-                CountIn = null;
-                int note = Math.Clamp((int)Math.Floor(beat + 0.5) - CalibrationChart.DeviceLeadBeats + 1, 1, CalibrationChart.DeviceNoteCount);
-                Status = string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationNoteProgressFormat, note, CalibrationChart.DeviceNoteCount);
+                case CountInPhase.GetReady:
+                    CountIn = SharedStrings.CalibrationGetReady;
+                    Status = SharedStrings.CalibrationGetReady;
+                    break;
+                case CountInPhase.CountIn:
+                    CountIn = step.Number.ToString(CultureInfo.CurrentCulture);
+                    Status = SharedStrings.CalibrationGetReady;
+                    break;
+                default:
+                    CountIn = null;
+                    Status = string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationNoteProgressFormat, step.Number, CalibrationChart.DeviceNoteCount);
+                    break;
             }
         }
 

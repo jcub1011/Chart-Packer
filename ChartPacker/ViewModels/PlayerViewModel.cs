@@ -434,9 +434,11 @@ namespace ChartPacker.ViewModels
         /// Where to draw what's drawn against the audio (the highway, the lyrics, the background): while playing, where
         /// the audio is, moving smoothly (<see cref="StemPlayer.SmoothPosition"/>), less the calibrated latency times the
         /// speed, so it's seen as it's heard (charter-spec C10 item 5, C11 item 4); otherwise <see cref="CurrentPosition"/>.
+        /// Pausing leaves the audio where this was, and playing holds here until that's heard
+        /// (<see cref="StemPlayer.DrawnPosition"/>), so it never jumps.
         /// </summary>
         public TimeSpan DrawnPosition => _player is { IsPlaying: true } player && !IsScrubbing
-            ? TimeSpan.FromTicks(Math.Max(0, LatencyCompensation.Drawn(player.SmoothPosition, _latencyMilliseconds, player.Speed).Ticks))
+            ? TimeSpan.FromTicks(Math.Max(0, player.DrawnPosition(_latencyMilliseconds).Ticks))
             : CurrentPosition;
 
         /// <summary>
@@ -690,8 +692,11 @@ namespace ChartPacker.ViewModels
             if (!IsPlaying)
                 return;
 
-            _player?.Pause();
+            // Where it's drawn, so what's seen stays where it is; the timer stops, so the position is taken here.
+            _player?.PauseWhereDrawn(_latencyMilliseconds);
             SetPlaying(false);
+            if (_player is { } player && !IsScrubbing)
+                SetPosition(player.Position.TotalSeconds);
         }
 
         [RelayCommand(CanExecute = nameof(CanPlay))]
