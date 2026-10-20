@@ -45,12 +45,19 @@ namespace ChartBuilder.Services
         InputService input) : IEditorWindowService
     {
         // The calibration tool, shared with Chart Packer, which pauses the Editor's playback as it opens, so its notes are
-        // the only ones moving.
-        private readonly CalibrationWindowService _calibration = new(openOutput, latency, () =>
-        {
-            if (desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
-                editor.Playback.Pause();
-        });
+        // the only ones moving, and stops a Bind waiting in the Input devices window, so its taps don't bind a control. Its
+        // audio tap test hears every instrument device.
+        private readonly CalibrationWindowService _calibration = new(
+            openOutput,
+            latency,
+            () =>
+            {
+                if (desktop.MainWindow is EditorWindow { DataContext: EditorWindowViewModel editor })
+                    editor.Playback.Pause();
+                if (desktop.Windows.OfType<InputDevicesWindow>().FirstOrDefault() is { DataContext: InputDevicesViewModel devices })
+                    devices.StopBinding();
+            },
+            () => new CalibrationTapInput(input));
 
         private static ILogger Logger => Log.ForContext<BuilderWindows>();
 

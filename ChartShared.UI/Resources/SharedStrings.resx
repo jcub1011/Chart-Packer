@@ -719,7 +719,7 @@
     <comment>The device's name in the calibration tool when it isn't known.</comment>
   </data>
   <data name="CalibrationInstructions" xml:space="preserve">
-    <value>Move the latency until each click is heard as a note hits the strike line and lights it up. The first beat of each bar has an accented click and a bolder line across the highway.</value>
+    <value>Move the latency until each click is heard as a note hits the strike line and lights it up. The first beat of each bar has an accented click and a bolder line across the highway. Or tap along with the clicks to measure it, then fine-tune it here.</value>
   </data>
   <data name="CalibrationLatencyLabel" xml:space="preserve">
     <value>Latency</value>
@@ -826,5 +826,39 @@
   <data name="CalibrationAudioUnavailableFormat" xml:space="preserve">
     <value>The audio can't be played: {0}</value>
     <comment>{0} is the error.</comment>
+  </data>
+  <data name="CalibrationTapSection" xml:space="preserve">
+    <value>Tap along</value>
+  </data>
+  <data name="CalibrationTapReady" xml:space="preserve">
+    <value>Press Start and get ready: after a quiet bar, the highway counts you in from 4 at the clicks' tempo, then tap with each of the 16 clicks that follow.</value>
+  </data>
+  <data name="CalibrationTapNow" xml:space="preserve">
+    <value>Tap with each click</value>
+  </data>
+  <data name="CalibrationTapProgressFormat" xml:space="preserve">
+    <value>Click {0} of {1}</value>
+    <comment>{0} is the click the test is on; {1} is how many there are.</comment>
+  </data>
+  <data name="CalibrationTapResultFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, with a spread of {1} ms over {2} taps. Check it against the notes, then save.</value>
+    <comment>{0} is the latency measured; {1} is the spread in ms; {2} is how many taps were used.</comment>
+  </data>
+  <data name="CalibrationTapResultWideFormat" xml:space="preserve">
+    <value>Measured {0:+0;−0;0} ms, but with a spread of {1} ms over {2} taps. Try it again for a steadier value.</value>
+    <comment>{0} is the latency measured; {1} is the spread in ms; {2} is how many taps were used.</comment>
+  </data>
+  <data name="CalibrationTapClampedFormat" xml:space="preserve">
+    <value>That's more than a latency can be, so it's set to {0:+0;−0;0} ms.</value>
+    <comment>{0} is the latency it's set to.</comment>
+  </data>
+  <data name="CalibrationTapTooFew" xml:space="preserve">
+    <value>There weren't enough taps near the clicks to measure. Try again.</value>
+  </data>
+  <data name="CalibrationTapHowText" xml:space="preserve">
+    <value>The notes are hidden while you tap, so you follow the sound alone. Any key counts, or a click on the highway; letting go doesn't. The result is put in the latency above, for you to check against the notes before saving.</value>
+  </data>
+  <data name="CalibrationTapDevicesNote" xml:space="preserve">
+    <value>Any instrument device counts too. A device calibrated in Input devices has its own offset taken off, which makes the result more accurate.</value>
   </data>
 </root>

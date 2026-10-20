@@ -7,7 +7,8 @@ namespace ChartShared.Audio.Playback;
 /// <remarks>
 /// <see cref="StemPlayer.Position"/> already allows for what's waiting in SDL's queue; the latency (C11) is everything
 /// after it, the device's buffer and the output's own delay. It's in real time, so it's scaled by the speed to give
-/// song time: at 50%, 40 ms of latency is 20 ms of song. The audio itself never moves.
+/// song time: at 50%, 40 ms of latency is 20 ms of song. The audio itself never moves while it plays.
+/// <see cref="StemPlayer.DrawnPosition"/> applies it to a player, holding as playing starts so it never steps back.
 /// </remarks>
 public static class LatencyCompensation
 {

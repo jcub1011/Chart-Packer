@@ -371,8 +371,7 @@ namespace ChartBuilder.ViewModels
             if (_calibrate is null)
                 return;
 
-            StopListening();
-            PendingMove = null;
+            StopBinding();
             Status = null;
             bool ran = await _calibrate(row.Info);
             if (_disposed)
@@ -382,6 +381,13 @@ namespace ChartBuilder.ViewModels
                 row.ShowOffset(_input.Settings.Settings.TuningOf(row.Info.Id).OffsetMs);
             else
                 Status = Strings.InputCalibrationAlreadyOpen;
+        }
+
+        /// <summary>Bind stops waiting, and a move it found is let go, as the calibration tool opens, so its taps aren't taken for a control to bind.</summary>
+        public void StopBinding()
+        {
+            StopListening();
+            PendingMove = null;
         }
 
         /// <summary>The General MIDI drum map on a MIDI device, in place of the drums bindings it had.</summary>

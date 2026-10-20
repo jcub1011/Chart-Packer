@@ -189,10 +189,15 @@ namespace ChartBuilder.ViewModels
         /// Where to draw what's drawn against the audio now, moving smoothly, for drawing every frame: where the audio
         /// is, less the calibrated latency times the speed (charter-spec C10 item 5).
         /// </summary>
-        /// <remarks>While paused, nothing heard lags behind, so it's the audio's position.</remarks>
+        /// <remarks>
+        /// While paused, it's the audio's position, which pausing puts where this was (<see cref="StemPlayer.PauseWhereDrawn"/>);
+        /// played again, it holds there until that's heard (<see cref="StemPlayer.DrawnPosition"/>), so it never jumps.
+        /// </remarks>
         public Func<TimeSpan> Clock => _clock ??= () => _player is { } player
-            ? player.IsPlaying ? LatencyCompensation.Drawn(player.SmoothPosition, _latency?.Milliseconds ?? 0, player.Speed) : player.Position
+            ? player.DrawnPosition(LatencyMilliseconds)
             : TimeSpan.FromSeconds(PositionSeconds);
+
+        private int LatencyMilliseconds => _latency?.Milliseconds ?? 0;
 
         /// <summary>Moves the playhead to <paramref name="seconds"/> as the editor's cursor moves, without raising <see cref="Scrubbed"/>.</summary>
         public void SeekTo(double seconds)
@@ -242,7 +247,7 @@ namespace ChartBuilder.ViewModels
         {
             if (_player is { IsPlaying: true } player)
             {
-                player.Pause();
+                player.PauseWhereDrawn(LatencyMilliseconds);
                 SetPlaying(false);
             }
         }
@@ -339,7 +344,7 @@ namespace ChartBuilder.ViewModels
             ++_openings;
             if (_player is { IsPlaying: true } playing)
             {
-                playing.Pause();
+                playing.PauseWhereDrawn(LatencyMilliseconds);
                 SetPlaying(false);
             }
 
@@ -362,9 +367,10 @@ namespace ChartBuilder.ViewModels
             if (_disposed)
                 return;
 
+            // Where it was drawn, which letting go pauses at.
             bool wasPlaying = IsPlaying;
-            double position = PositionSeconds;
             Release();
+            double position = PositionSeconds;
             _tracks = tracks;
             Message = null;
             await OpenAsync();
@@ -421,7 +427,7 @@ namespace ChartBuilder.ViewModels
 
             if (player.IsPlaying)
             {
-                player.Pause();
+                player.PauseWhereDrawn(LatencyMilliseconds);
                 SetPlaying(false);
                 return;
             }

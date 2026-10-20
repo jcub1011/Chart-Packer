@@ -321,8 +321,11 @@ which already has speed, pitch correction (`Dsp/TimeStretcher`) and a heard `Pos
 **Latency and speed.** The calibrated latency ([C11](#c11-calibration-tool)) is in real time, and
 `Position` is in song time. Everything drawn against the audio is drawn at
 **`SmoothPosition` − latency × speed**, so at 50% speed a 40 ms latency is 20 ms of song.
-*Settled in CM2:* the latency is taken off only while playing. Paused, what is drawn is at the
-audio's own position.
+*Changed for issue #103:* starting and stopping never jumps (`StemPlayer.DrawnPosition`). Paused,
+what is drawn is at the audio's own position, and pausing (`PauseWhereDrawn`) puts the audio where
+it was drawn, so the audio still to be heard is heard again on playing. Played from a standstill, a
+seek or a region's start, what is drawn holds there until what's heard gets there. A negative
+latency still steps forward as playing starts.
 
 **Audio time and chart time.** The song's delay is how much later than its ticks say the chart plays
 against the audio. It comes from `SongChartSettings.DelayOf` (`delay`, then `delay_seconds`, then
@@ -1406,8 +1409,9 @@ Acceptance criteria:
    - The calibration covers everything after that: SDL's device buffer and the output device's
      own latency, which the app can't see.
    - The latency is in real time, so it is scaled by the playback speed to give song time.
-   - *Settled in CM2:* it's taken off only while playing. Paused, what is drawn is at the audio's
-     own position.
+   - *Changed for issue #103:* pausing leaves the audio, the cursor and the playhead where they were
+     drawn, and playing holds there until it's heard, so neither jumps
+     ([§4.4.1](#441-playback-changes)).
 6. **Following.** While playing, the view keeps the cursor at a fixed place, a quarter of the way
    from the strike end. Scrolling pauses following until playback is restarted. *Restated in
    CM2:*
@@ -1498,8 +1502,26 @@ device isn't measured.
      no latency, and the highway says so. Let go, they're drawn with the value again, so the user
      can see how much it moves them. The value itself doesn't change. Space never presses the
      button with the focus, and the window losing focus lets it go.
-   - **No tap test.** Tapping along adds the input device's latency, which is measured apart
-     (item 2).
+   - **Tap along** (*changed for issue #105*). **Start** hides the notes, so only the sound is
+     followed. The metronome gives way to the test's own clicks (`CalibrationViewModel.TapClicks`).
+     There is a quiet bar to get ready ("Get ready"), then a bar counted in on screen, 4, 3, 2, 1,
+     at the clicks' tempo, still with no sound. Then the user taps with each of the 16 clicks that
+     follow, the first on the beat after 1 ("Click n of 16"), and nothing clicks after. The metronome
+     comes back once the test ends. The count is timed to the clicks' beat with no latency, so the
+     value being measured never moves it.
+     - **What counts:** any key but Escape, and a press on the highway. In Chart Builder, any
+       instrument device counts too (`ICalibrationTaps`, `CalibrationTapInput`, over the Input
+       devices' hub, as item 2 counts presses).
+     - **Timing:** each tap is placed on the clicks' timeline (`SmoothPosition`, less how long ago
+       it came), less the device's own offset from item 2. That offset is the screen's lag, the
+       device's and the player's habit, so the device's lag and the habit drop out. What's left is
+       the audio's lag less the screen's: the latency. A key or a press with no offset counts as
+       is.
+     - **Scoring** (`AudioTapTest`): as item 2's, except that a tap counts against a click from
+       250 ms before it to 500 ms after it, so a Bluetooth latency isn't taken for the next beat.
+     - **The result** goes in the latency, clamped to ±500 ms, with the spread and the taps used. It
+       isn't saved, so the user can check it against the notes before **Save**. A change of output
+       device stops a test that's running.
    - The highway is only watched: it can't be scrubbed here, and Shift doesn't show its whole
      chart.
 2. **Input devices.** The same window, with the device test's controls on the right
@@ -1599,6 +1621,12 @@ Acceptance criteria:
   velocity floor, or another device is none.
 - **AC C11.7** Save stores the measured offset for the device, keeping its other settings, and has
   the playtest take it up.
+- **AC C11.8** The audio tap test's estimator is given simulated taps on its 16 clicks: a known
+  latency from −100 to +400 ms, plus a device offset that the taps have taken off, normal jitter
+  with σ = 20 ms, and 2 outliers of ±150 ms. Over 1,000 seeded trials, the median estimate is
+  within ±2 ms of the latency, and 95% of estimates are within ±20 ms. Taps with the count-in are
+  ignored, the test's own clicks are only the 16, and a tap 450 ms late counts against its own click. Every device's presses count, each
+  with its own offset.
 
 ### C12. Waveform
 
@@ -2784,13 +2812,13 @@ layout. It isn't a row in Settings.
 | Model ↔ MIDI | Round trips (load → save → load gives an equal model, AC C17.4) for golden `.mid` fixtures covering every part, variant and note kind in [§7](#midi-layout), with anchors, `RawEvent`s and velocities. Passthrough tracks stay byte-identical, and are re-ticked correctly after a keep-times tempo edit. The fixtures are written for these tests, not taken from community charts. |
 | Writer vs reader | Every saved chart is read by `ChartReader` and compared with the model's game view (AC C17.2), over all the fixtures and every HOPO-threshold setting |
 | Saving | The folder save's new order (move in, then delete), with a failure injected between the steps (AC C2.4) |
-| Playback | Clicks in the post-stretch mix against `PositionMap` at several speeds (AC C10.1); `SmoothPosition` against a fake output whose queue drains in steps; latency scaled by speed (AC C10.2, C15.3) |
+| Playback | Clicks in the post-stretch mix against `PositionMap` at several speeds (AC C10.1); `SmoothPosition` against a fake output whose queue drains in steps; latency scaled by speed (AC C10.2, C15.3); the drawn position held as playing starts and the audio paused where it's drawn (issue #103) |
 | `.chart` import | Every `.chart` fixture in the existing `ChartToMidi` tests imports with the same warnings |
 | Commands | Each command reverses exactly; random command sequences, undone, give back the start (AC C15.1) |
 | Tempo map | Tick ↔ seconds property tests against `TempoMap`; anchors stay put under edits (AC C4.1) |
 | Lint | At least one fixture per CHR rule, and a clean fixture triggers none (AC C16.1) |
 | Analysis | Synthetic click tracks at fixed and changing tempos for `TempoEstimator`; synthetic drum hits in separate bands for `OnsetDetector`; spectrogram bins checked against known sine frequencies |
-| Calibration | The input-device test's estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4); what counts as a tap (AC C11.6); saving a device's offset (AC C11.7) |
+| Calibration | The input-device test's estimator with simulated taps that have a known offset, jitter and outliers (AC C11.2); the drawn position for a given latency (AC C11.1); the tool's chart and its clicks (AC C11.4); what counts as a tap (AC C11.6); saving a device's offset (AC C11.7); the audio tap test's estimator and every device's taps with their offsets (AC C11.8) |
 | Reduction | Each rule in [C9](#c9-difficulty-authoring), on fixtures |
 | View models | `ChartEditorViewModel`, the Editor window's and calibration view models against fake services. There are no automated UI tests, as in v1. |
 | Playtest and input | Each 5-fret and drums rule with synthetic timed inputs (AC C19.2); timestamps through the song clock at several speeds and across seeks (AC C19.1, C19.4); bindings routing keys, buttons, axes, hats and MIDI notes, and their file round trip (AC C19.3); recording from timed actions. Device backends are checked by hand. |

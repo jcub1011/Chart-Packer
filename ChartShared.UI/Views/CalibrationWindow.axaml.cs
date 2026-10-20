@@ -9,8 +9,9 @@ namespace ChartShared.UI.Views
     /// <summary>
     /// The calibration tool's window (charter-spec C11), which Chart Packer and Chart Builder both open, for the
     /// audio/visual test or an input device's. In the first, the arrow keys move the latency, by 5 with Shift, and holding
-    /// Space draws the notes with no calibration until it's let go. In the second, with the keyboard as the device, its keys
-    /// are the device's, all but Escape. Closing it any way but Save leaves what's stored as it was.
+    /// Space draws the notes with no calibration until it's let go; while its tap test runs, every key but Escape is a tap,
+    /// and so is a press on the highway. In the second, with the keyboard as the device, its keys are the device's, all but
+    /// Escape. Closing it any way but Save leaves what's stored as it was.
     /// </summary>
     public partial class CalibrationWindow : Window
     {
@@ -36,9 +37,19 @@ namespace ChartShared.UI.Views
 
             AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, OnKeyUp, RoutingStrategies.Tunnel);
+            HighwayTile.PointerPressed += OnHighwayPressed;
         }
 
         private void OnCancel(object? sender, RoutedEventArgs e) => Close();
+
+        private void OnHighwayPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (DataContext is CalibrationViewModel { IsTapping: true } audio)
+            {
+                audio.TapNow();
+                e.Handled = true;
+            }
+        }
 
         private void OnKeyDown(object? sender, KeyEventArgs e)
         {
@@ -48,6 +59,13 @@ namespace ChartShared.UI.Views
                     // Handled before any button has it, so a tap of Space or Enter never presses one.
                     _keysDown.Add(e.PhysicalKey);
                     device.Key(e.PhysicalKey, down: true);
+                    e.Handled = true;
+                    break;
+
+                // Every key is a tap, before a button or the latency's box has it, so none moves the latency.
+                case CalibrationViewModel { IsTapping: true } audio when e.Key != Key.Escape:
+                    _keysDown.Add(e.PhysicalKey);
+                    audio.Key(e.PhysicalKey, down: true);
                     e.Handled = true;
                     break;
 
@@ -64,6 +82,10 @@ namespace ChartShared.UI.Views
             {
                 case DeviceCalibrationViewModel { IsKeyboard: true } device when _keysDown.Remove(e.PhysicalKey):
                     device.Key(e.PhysicalKey, down: false);
+                    e.Handled = true;
+                    break;
+                case CalibrationViewModel audio when _keysDown.Remove(e.PhysicalKey):
+                    audio.Key(e.PhysicalKey, down: false);
                     e.Handled = true;
                     break;
                 case CalibrationViewModel { IsHeldBySpace: true } audio when e.Key == Key.Space:
@@ -104,6 +126,8 @@ namespace ChartShared.UI.Views
             {
                 case CalibrationViewModel audio:
                     audio.IsHeldBySpace = false;
+                    foreach (var key in _keysDown)
+                        audio.Key(key, down: false);
                     break;
                 case DeviceCalibrationViewModel device:
                     foreach (var key in _keysDown)

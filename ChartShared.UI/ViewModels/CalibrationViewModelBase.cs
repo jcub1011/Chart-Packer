@@ -33,6 +33,10 @@ namespace ChartShared.UI.ViewModels
         [NotifyPropertyChangedFor(nameof(HasCountIn))]
         public partial string? CountIn { get; protected set; }
 
+        /// <summary>Whether the highway's notes are hidden, as while the audio tap test runs, so only what's heard is followed.</summary>
+        [ObservableProperty]
+        public partial bool HidesNotes { get; protected set; }
+
         /// <summary>Why the test can't run, or what it measured couldn't be saved; null when all's well.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasMessage))]
