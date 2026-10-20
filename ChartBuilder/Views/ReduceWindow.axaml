@@ -1,11 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:svm="using:ChartShared.UI.ViewModels"
+        xmlns:sv="using:ChartShared.UI.Views"
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:sres="using:ChartShared.UI.Resources"
         xmlns:ui="using:ChartShared.UI.Controls"
-        xmlns:hw="using:ChartShared.UI.Controls.Highway"
-        xmlns:bctl="using:ChartBuilder.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="780" d:DesignHeight="600"
@@ -37,74 +37,6 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Opacity" Value="0.6" />
             <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <!-- A rule's name: wrapped rather than cut short, beside its control. -->
-        <Style Selector="Grid.fields > TextBlock">
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <Style Selector="Grid.fields > ComboBox, Grid.fields > NumericUpDown">
-            <Setter Property="Width" Value="132" />
-        </Style>
-        <Style Selector="CheckBox.rule">
-            <Setter Property="Margin" Value="0,2,0,0" />
-        </Style>
-        <Style Selector="CheckBox.rule > TextBlock">
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-
-        <!-- The rules, grouped as a settings row is. -->
-        <Style Selector="Border.card">
-            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,10" />
-        </Style>
-
-        <!-- A difficulty on the ladder: the draft's own marked as the library marks its selection, with the accent's bar
-             at its left; one no easier than the one above it marked as a failing row is. -->
-        <Style Selector="Border.rung">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="CornerRadius" Value="2" />
-            <Setter Property="Padding" Value="10,6,8,6" />
-        </Style>
-        <Style Selector="Border.rung.draft">
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
-        </Style>
-        <Style Selector="Border.rung.outOfOrder">
-            <Setter Property="BorderBrush" Value="{DynamicResource InvalidBrush}" />
-            <Setter Property="Background" Value="{DynamicResource InvalidTintBrush}" />
-        </Style>
-        <Style Selector="Border.rung TextBlock.name">
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="Border.rung.draft TextBlock.name">
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <!-- Its peak notes a second, as a bar against the part's highest: in the accent for the draft, faint for the rest. -->
-        <Style Selector="ProgressBar.peak">
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="Height" Value="6" />
-            <Setter Property="CornerRadius" Value="3" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource SubtleBorderBrush}" />
-        </Style>
-        <Style Selector="Border.rung.draft ProgressBar.peak">
-            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-        </Style>
-        <Style Selector="Border.rung.outOfOrder ProgressBar.peak">
-            <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
-        </Style>
-
-        <Style Selector="TextBlock.warning">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
         </Style>
     </Window.Styles>
 
@@ -143,7 +75,7 @@
                             <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" IsVisible="{Binding IsDefaults}"
                                       ItemsSource="{Binding FamilyChoices}"
                                       SelectedItem="{Binding SelectedFamily}"
-                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:FamilyChoice}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=svm:FamilyChoice}"
                                       AutomationProperties.Name="{x:Static res:Strings.ReduceFamilyLabel}" />
                             <TextBlock Grid.Row="1" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
                                        Text="{x:Static res:Strings.ReduceToLabel}" />
@@ -157,7 +89,7 @@
                             <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" IsVisible="{Binding IsOne}"
                                       ItemsSource="{Binding FromChoices}"
                                       SelectedItem="{Binding SelectedFrom}"
-                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=svm:DifficultyChoice}"
                                       AutomationProperties.Name="{x:Static res:Strings.ReduceFromLabel}" />
                             <TextBlock Grid.Row="3" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
                                        Text="{x:Static res:Strings.ReduceScopeLabel}" IsVisible="{Binding IsRun}" />
@@ -189,74 +121,13 @@
                                       IsVisible="{Binding IsAll}"
                                       ItemsSource="{Binding RulesForChoices}"
                                       SelectedItem="{Binding SelectedRulesFor}"
-                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:DifficultyChoice}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=svm:DifficultyChoice}"
                                       ToolTip.Tip="{x:Static res:Strings.ReduceRulesForLabel}"
                                       AutomationProperties.Name="{x:Static res:Strings.ReduceRulesForLabel}" />
                         </Grid>
 
-                        <!-- 5-fret and GHL. -->
-                        <Border Classes="card" IsVisible="{Binding IsFrets}">
-                            <StackPanel Spacing="8">
-                                <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                                    <TextBlock Grid.Row="0" Text="{x:Static res:Strings.ReduceChordSizeLabel}" />
-                                    <NumericUpDown Grid.Row="0" Grid.Column="1"
-                                                   Value="{Binding MaxChordSize}" Minimum="1" Maximum="{Binding ChordSizeMaximum}"
-                                                   Increment="1" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
-                                                   AutomationProperties.Name="{x:Static res:Strings.ReduceChordSizeLabel}" />
-                                    <TextBlock Grid.Row="1" Text="{Binding LaneLimitLabel}" />
-                                    <ComboBox Grid.Row="1" Grid.Column="1"
-                                              ItemsSource="{Binding LaneLimitChoices}"
-                                              SelectedItem="{Binding HighestLane}"
-                                              DisplayMemberBinding="{Binding Label, x:DataType=vm:LaneLimitChoice}"
-                                              AutomationProperties.Name="{Binding LaneLimitLabel}" />
-                                    <TextBlock Grid.Row="2" Text="{x:Static res:Strings.ReduceThinningLabel}" />
-                                    <ComboBox Grid.Row="2" Grid.Column="1"
-                                              ItemsSource="{Binding DivisionChoices}"
-                                              SelectedItem="{Binding Thinning}"
-                                              DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
-                                              AutomationProperties.Name="{x:Static res:Strings.ReduceThinningLabel}" />
-                                    <TextBlock Grid.Row="3" Text="{x:Static res:Strings.ReduceMinGapLabel}" />
-                                    <NumericUpDown Grid.Row="3" Grid.Column="1"
-                                                   Value="{Binding MinGapMs}" Minimum="0" Maximum="{Binding MinGapMaximum}"
-                                                   Increment="10" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
-                                                   AutomationProperties.Name="{x:Static res:Strings.ReduceMinGapLabel}" />
-                                </Grid>
-                                <CheckBox Classes="rule" IsChecked="{Binding KeepForcedHopoAndTap}">
-                                    <TextBlock Text="{x:Static res:Strings.ReduceKeepForcing}" />
-                                </CheckBox>
-                                <CheckBox Classes="rule" IsChecked="{Binding KeepShortSustains}">
-                                    <TextBlock Text="{x:Static res:Strings.ReduceKeepShortSustains}" />
-                                </CheckBox>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Drums. -->
-                        <Border Classes="card" IsVisible="{Binding IsDrums}">
-                            <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                                <TextBlock Grid.Row="0" Text="{x:Static res:Strings.ReducePadsLabel}" />
-                                <NumericUpDown Grid.Row="0" Grid.Column="1"
-                                               Value="{Binding PadsPerHit}" Minimum="1" Maximum="5"
-                                               Increment="1" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
-                                               AutomationProperties.Name="{x:Static res:Strings.ReducePadsLabel}" />
-                                <TextBlock Grid.Row="1" Text="{x:Static res:Strings.ReduceThinningLabel}" />
-                                <ComboBox Grid.Row="1" Grid.Column="1"
-                                          ItemsSource="{Binding DivisionChoices}"
-                                          SelectedItem="{Binding Thinning}"
-                                          DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
-                                          AutomationProperties.Name="{x:Static res:Strings.ReduceThinningLabel}" />
-                                <TextBlock Grid.Row="2" Text="{x:Static res:Strings.ReduceMinGapLabel}" />
-                                <NumericUpDown Grid.Row="2" Grid.Column="1"
-                                               Value="{Binding MinGapMs}" Minimum="0" Maximum="{Binding MinGapMaximum}"
-                                               Increment="10" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
-                                               AutomationProperties.Name="{x:Static res:Strings.ReduceMinGapLabel}" />
-                                <TextBlock Grid.Row="3" Text="{x:Static res:Strings.ReduceKickLabel}" />
-                                <ComboBox Grid.Row="3" Grid.Column="1"
-                                          ItemsSource="{Binding KickChoices}"
-                                          SelectedItem="{Binding KickThinning}"
-                                          DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
-                                          AutomationProperties.Name="{x:Static res:Strings.ReduceKickLabel}" />
-                            </Grid>
-                        </Border>
+                        <!-- The rules themselves, as Chart Packer's Generate difficulties shows them too. -->
+                        <sv:ReductionRulesView DataContext="{Binding Rules}" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -276,33 +147,7 @@
                     <!-- Expert down to Easy, each a little easier than the one above it, if all's well. -->
                     <StackPanel Spacing="8" Margin="0,12,0,0" IsVisible="{Binding HasCheck}">
                         <TextBlock Classes="heading" Text="{x:Static res:Strings.ReduceDifficultiesHeading}" />
-                        <ItemsControl ItemsSource="{Binding Ratings}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="2" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ReduceRatingRow">
-                                    <Border Classes="rung" Classes.draft="{Binding IsDraft}" Classes.outOfOrder="{Binding IsOutOfOrder}">
-                                        <Grid ColumnDefinitions="72,*,76,Auto" ColumnSpacing="12">
-                                            <TextBlock Grid.Column="0" Classes="name" Text="{Binding Difficulty}" />
-                                            <ProgressBar Grid.Column="1" Classes="peak"
-                                                         Minimum="0" Maximum="1" Value="{Binding Share}"
-                                                         ToolTip.Tip="{x:Static res:Strings.ReducePeakToolTip}" />
-                                            <TextBlock Grid.Column="2" FontSize="12" Opacity="0.7" VerticalAlignment="Center"
-                                                       TextAlignment="Right" Text="{Binding Peak}"
-                                                       ToolTip.Tip="{x:Static res:Strings.ReducePeakToolTip}" />
-                                            <Border Grid.Column="3" Classes="chip large" MinWidth="22"
-                                                    ToolTip.Tip="{x:Static res:Strings.ReduceTierToolTip}">
-                                                <TextBlock HorizontalAlignment="Center" Text="{Binding Tier}" />
-                                            </Border>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Classes="warning" Text="{Binding OrderWarning}" IsVisible="{Binding HasOrderWarning}" />
+                        <sv:DifficultyLadderView DataContext="{Binding Ladder}" />
                     </StackPanel>
 
                     <!-- The draft's findings: the rule, the difficulty, and what's wrong. -->
@@ -356,135 +201,12 @@
                           ResizeDirection="Columns"
                           Background="{DynamicResource SubtleBorderBrush}" />
 
-            <!-- The preview: the source and the drafts as highways, played with the song, and the strip of where they changed. -->
-            <DockPanel x:Name="PreviewPane"
-                       Grid.Column="3"
-                       IsVisible="False"
-                       DataContext="{Binding Preview}"
-                       x:DataType="vm:ReducePreviewViewModel">
-                <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1" Padding="10,2">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                        <WrapPanel Grid.Column="0" ItemSpacing="6" VerticalAlignment="Center">
-                            <Button Classes="tool"
-                                    Command="{Binding PlayPauseCommand}"
-                                    IsEnabled="{Binding Playback.IsReady}"
-                                    ToolTip.Tip="{x:Static res:Strings.ReducePreviewPlayToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.PlayPauseButton}">
-                                <Panel>
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Playback.IsPlaying}" />
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Playback.IsPlaying}" />
-                                </Panel>
-                            </Button>
-                            <Button Classes="tool"
-                                    Command="{Binding PreviousChangeCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.ReducePreviewPreviousToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.ReducePreviewPreviousToolTip}">
-                                <PathIcon Width="12" Height="12" Data="{StaticResource SkipPreviousIconGeometry}" />
-                            </Button>
-                            <TextBlock FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" MinWidth="48" TextAlignment="Center" Text="{Binding StopText}" />
-                            <Button Classes="tool"
-                                    Command="{Binding NextChangeCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.ReducePreviewNextToolTip}"
-                                    AutomationProperties.Name="{x:Static res:Strings.ReducePreviewNextToolTip}">
-                                <PathIcon Width="12" Height="12" Data="{StaticResource SkipNextIconGeometry}" />
-                            </Button>
-                            <ComboBox ItemsSource="{Binding Playback.SpeedPercents}"
-                                      SelectedItem="{Binding Playback.SpeedPercent}"
-                                      IsEnabled="{Binding Playback.IsReady}"
-                                      MinWidth="80"
-                                      VerticalAlignment="Center"
-                                      ToolTip.Tip="{x:Static res:Strings.SpeedToolTip}"
-                                      AutomationProperties.Name="{x:Static res:Strings.SpeedToolTip}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="x:Int32">
-                                        <TextBlock Text="{Binding StringFormat={x:Static res:Strings.SpeedPercentFormat}}" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <!-- The look-ahead, in half-second steps, with the seconds it's at beside it; kept together as the bar wraps. -->
-                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
-                                        ToolTip.Tip="{x:Static res:Strings.LaneLookAheadToolTip}">
-                                <Slider Width="160"
-                                        Minimum="{x:Static vm:ReducePreviewViewModel.MinLookAhead}"
-                                        Maximum="{x:Static vm:ReducePreviewViewModel.MaxLookAhead}"
-                                        TickFrequency="{x:Static vm:ReducePreviewViewModel.LookAheadStep}"
-                                        IsSnapToTickEnabled="True"
-                                        SmallChange="{x:Static vm:ReducePreviewViewModel.LookAheadStep}"
-                                        LargeChange="2"
-                                        Value="{Binding LookAhead}"
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}" />
-                                <TextBlock FontSize="12" FontFeatures="tnum" MinWidth="40" VerticalAlignment="Center" Text="{Binding LookAheadText}" />
-                            </StackPanel>
-                        </WrapPanel>
-                        <!-- Figures all one width, so the bar isn't laid out again each time the position changes while it plays. -->
-                        <TextBlock Grid.Column="1" FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
-                    </Grid>
-                </Border>
-
-                <!-- The kinds of change to mark and stop at, then the strip of where they are. -->
-                <StackPanel DockPanel.Dock="Bottom" Margin="10,6,10,10" Spacing="6">
-                    <ItemsControl ItemsSource="{Binding Filters}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel ItemSpacing="14" LineSpacing="2" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ReduceChangeFilter">
-                                <CheckBox IsChecked="{Binding IsChecked}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="{Binding Name}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Border Width="10" Height="10" CornerRadius="2" VerticalAlignment="Center" Background="{Binding Swatch}" />
-                                        <TextBlock VerticalAlignment="Center" Text="{Binding Label}" />
-                                    </StackPanel>
-                                </CheckBox>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <bctl:ChangeStripView Cursor="Hand"
-                                          Start="{Binding StripStart}"
-                                          End="{Binding StripEnd}"
-                                          Position="{Binding Playback.PositionSeconds}"
-                                          IsPlaying="{Binding Playback.IsPlaying}"
-                                          Clock="{Binding Clock}"
-                                          WheelUpIsLater="{Binding WheelUpIsLater}"
-                                          Beats="{Binding Playback.Beats}"
-                                          Marks="{Binding Marks}"
-                                          RowLabels="{Binding RowLabels}"
-                                          Current="{Binding Current}"
-                                          Lead="{Binding Lead}"
-                                          RowBrush="{DynamicResource ToolbarGroupBrush}"
-                                          MeasureBrush="#4A4D66"
-                                          TickBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                          PlayheadBrush="{DynamicResource AccentTextBrush}"
-                                          ToolTip.Tip="{x:Static res:Strings.ReducePreviewStripToolTip}"
-                                          AutomationProperties.Name="{x:Static res:Strings.ReducePreviewStripToolTip}" />
-                </StackPanel>
-
-                <!-- What changed at the stop last gone to, and where. -->
-                <TextBlock DockPanel.Dock="Bottom"
-                           Margin="12,6,12,0"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           MaxLines="3"
-                           TextTrimming="CharacterEllipsis"
-                           Text="{Binding CurrentText}"
-                           IsVisible="{Binding CurrentText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-
-                <Panel>
-                    <hw:NoteHighwayView x:Name="Highway"
-                                        Scene="{Binding Scene}"
-                                        Clock="{Binding Clock}"
-                                        LookAhead="{Binding LookAhead}"
-                                        LengthSeconds="{Binding Playback.LengthSeconds}" />
-                    <TextBlock Classes="muted centered"
-                               VerticalAlignment="Center"
-                               TextWrapping="Wrap"
-                               Margin="16"
-                               Text="{Binding EmptyText}"
-                               IsVisible="{Binding !HasScene}" />
-                </Panel>
-            </DockPanel>
+            <!-- The preview: the source and the drafts as highways, played with the song, and the strip of where they changed,
+                 as Chart Packer's Generate difficulties shows it too. -->
+            <sv:ReductionPreviewView x:Name="PreviewPane"
+                                     Grid.Column="3"
+                                     IsVisible="False"
+                                     DataContext="{Binding Preview}" />
         </Grid>
 
         <!-- Reset and the preview at the left; Cancel and Apply (or Save) at the right, as the other dialogs have them. -->

@@ -2409,4 +2409,94 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorTypeChartLoad" xml:space="preserve">
     <value>Chart: load</value>
   </data>
+  <data name="ValidatorSuggestedRatingFixFormat" xml:space="preserve">
+    <value>Set to {0} (estimated)</value>
+    <comment>{0} is the difficulty estimator's tier for the part, e.g. 4.</comment>
+  </data>
+  <data name="ValidatorMissingDifficultiesFormat" xml:space="preserve">
+    <value>Missing difficulties: {0}</value>
+    <comment>{0} lists each part's missing difficulties, e.g. "Guitar Hard, Medium; Drums Easy".</comment>
+  </data>
+  <data name="ValidatorMissingPartFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{0} is the part, {1} its missing difficulties, e.g. "Guitar Hard, Medium".</comment>
+  </data>
+  <data name="ValidatorMissingPartSeparator" xml:space="preserve">
+    <value>; </value>
+    <comment>Between parts in the list of missing difficulties.</comment>
+  </data>
+  <data name="ValidatorGenerateFix" xml:space="preserve">
+    <value>Generate them from the difficulties above</value>
+  </data>
+  <data name="ValidatorGeneratingFormat" xml:space="preserve">
+    <value>Generating difficulties for {0} of {1} songs…</value>
+    <comment>{0} is how many songs are done, {1} how many are being generated.</comment>
+  </data>
+  <data name="ValidatorGenerateFailedFormat" xml:space="preserve">
+    <value>Some songs' difficulties weren't generated:
+{0}</value>
+    <comment>{0} is one line per song.</comment>
+  </data>
+  <data name="ValidatorGenerateSongFailedFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>{0} is the song, {1} why its difficulties weren't generated.</comment>
+  </data>
+  <data name="ValidatorGenerateChangedMeanwhile" xml:space="preserve">
+    <value>its draft changed the chart meanwhile.</value>
+  </data>
+  <data name="GenerateDifficultiesTitle" xml:space="preserve">
+    <value>Generate missing difficulties</value>
+  </data>
+  <data name="GenerateDifficultiesIntro" xml:space="preserve">
+    <value>Each missing difficulty is made from the one above it by these rules, as Chart Builder's Reduce makes it. The new charts go into the songs' drafts; nothing is written until they're saved.</value>
+  </data>
+  <data name="GenerateDifficultiesSongsHeading" xml:space="preserve">
+    <value>Songs</value>
+  </data>
+  <data name="GenerateDifficultiesPreviewHeading" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="GenerateDifficultiesPickSong" xml:space="preserve">
+    <value>Pick a song to see its difficulties as they'd be generated.</value>
+  </data>
+  <data name="GenerateDifficultiesWorking" xml:space="preserve">
+    <value>Working out the difficulties…</value>
+  </data>
+  <data name="GenerateDifficultiesPreviewFailedFormat" xml:space="preserve">
+    <value>Couldn't preview this song: {0}</value>
+    <comment>{0} is why.</comment>
+  </data>
+  <data name="GenerateDifficultiesNothing" xml:space="preserve">
+    <value>Nothing to generate: the song has no missing difficulties now.</value>
+  </data>
+  <data name="GenerateDifficultiesFindingsFormat" xml:space="preserve">
+    <value>Findings on the new difficulties: {0}</value>
+    <comment>{0} is how many chart lint findings the generated difficulties have.</comment>
+  </data>
+  <data name="GenerateDifficultiesNoFindings" xml:space="preserve">
+    <value>No findings on the new difficulties.</value>
+  </data>
+  <data name="GenerateDifficultiesGenerateButton" xml:space="preserve">
+    <value>Generate</value>
+  </data>
+  <data name="GenerateDifficultiesSaveDefaultsButton" xml:space="preserve">
+    <value>Save as defaults</value>
+  </data>
+  <data name="GenerateDifficultiesSaveDefaultsToolTip" xml:space="preserve">
+    <value>Make these the rules this dialog and Chart Builder's Reduce start from</value>
+  </data>
+  <data name="GenerateDifficultiesSavedDefaults" xml:space="preserve">
+    <value>Saved as the default rules.</value>
+  </data>
+  <data name="GenerateDifficultiesSaveDefaultsFailed" xml:space="preserve">
+    <value>The default rules couldn't be saved.</value>
+  </data>
+  <data name="GenerateDifficultiesPositionFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+    <comment>Where the preview's song is, and how long it is, e.g. "0:42 / 3:00".</comment>
+  </data>
+  <data name="GenerateDifficultiesPreviewPartLabel" xml:space="preserve">
+    <value>Part</value>
+    <comment>Which part of the song picked the preview's highways show.</comment>
+  </data>
 </root>

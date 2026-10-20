@@ -134,7 +134,7 @@ public sealed class ReduceProposals
         bool added;
         try
         {
-            added = _session.ExecuteAsOne(Drafts.Select(static draft => (Func<(IChartCommand?, string?)>)(() => (Replace(draft), null))));
+            added = _session.ExecuteAsOne(Drafts.Select(static draft => (Func<(IChartCommand?, string?)>)(() => (DifficultyGenerator.Replace(draft), null))));
         }
         finally
         {
@@ -162,15 +162,7 @@ public sealed class ReduceProposals
         _session.Status = Dropped;
     }
 
-    private static ReplaceTrack Replace(ReductionDraft draft)
-    {
-        var (part, to) = draft.Target;
-        bool drums = ChartInstruments.KindOf(part) == ChartInstrumentKind.Drums;
-        return new ReplaceTrack(part, to, draft.Result.Notes, draft.Result.Flags, drums ? draft.Result.Mixes : null);
-    }
-
-    // Each step's target from its source, or from the nearest difficulty above it with notes, highest target first, each
-    // added to a copy of the chart before the next is reduced.
+    // Each step's target from its source, or from the nearest difficulty above it with notes (DifficultyGenerator.Draft).
     private bool Start(ChartInstrument part, (long From, long To)? range, IReadOnlyList<(ChartDifficulty? From, ChartDifficulty To)> steps, Func<EditableChart, ChartDifficulty, ChartDifficulty, ReductionResult> reduce)
     {
         _session.Tools.Cancel();
@@ -181,20 +173,10 @@ public sealed class ReduceProposals
             return false;
         }
 
-        var drafted = _session.Chart.Clone();
-        var drafts = new List<ReductionDraft>();
+        GeneratedDifficulties generated;
         try
         {
-            foreach (var (given, to) in steps.OrderByDescending(static s => s.To))
-            {
-                var whole = drafted.PartOf(part)!;
-                var from = given ?? Enum.GetValues<ChartDifficulty>().Where(d => d > to && HasNotes(whole[d], range)).Order().Cast<ChartDifficulty?>().FirstOrDefault();
-                if (from is not { } source || !HasNotes(whole[source], range))
-                    continue;
-                var draft = new ReductionDraft(source, new ChartTrackKey(part, to), reduce(drafted, source, to), whole[to]);
-                Replace(draft).Apply(drafted);
-                drafts.Add(draft);
-            }
+            generated = DifficultyGenerator.Draft(_session.Chart, part, steps, reduce, range);
         }
         catch (Exception e) when (EditorSession.IsRefusal(e))
         {
@@ -202,7 +184,7 @@ public sealed class ReduceProposals
             return false;
         }
 
-        if (drafts.Count == 0)
+        if (generated.Drafts.Count == 0)
         {
             _session.Status = NoSourceNotes;
             return false;
@@ -210,16 +192,12 @@ public sealed class ReduceProposals
 
         Part = part;
         Range = range;
-        Drafts = drafts;
-        Drafted = drafted;
+        Drafts = generated.Drafts;
+        Drafted = generated.Drafted;
         _session.Status = null;
         _session.RaiseState();
         return true;
     }
-
-    // Whether a source has notes to reduce: in the range, or anywhere for the whole part.
-    private static bool HasNotes(EditableTrack track, (long From, long To)? range) =>
-        range is { } r ? !track.Notes.Between(r.From, r.To).IsEmpty : track.Notes.Count > 0;
 
     private void End()
     {

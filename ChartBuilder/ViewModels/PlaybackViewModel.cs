@@ -16,6 +16,7 @@ using ChartShared.Audio.Synthesis;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Scanning;
+using ChartShared.UI.Controls;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -34,7 +35,7 @@ namespace ChartBuilder.ViewModels
     /// drawn against the audio while it plays is drawn the calibrated latency earlier, times the speed (C10 item 5),
     /// for the device the audio is on (C11).
     /// </remarks>
-    public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable, ITrackMixer
+    public sealed partial class PlaybackViewModel : ViewModelBase, IDisposable, ITrackMixer, IReductionPreviewPlayback
     {
         /// <summary>How long the timeline is when there's no audio to say.</summary>
         private const double PlaceholderLengthSeconds = 180;
@@ -198,6 +199,10 @@ namespace ChartBuilder.ViewModels
             : TimeSpan.FromSeconds(PositionSeconds);
 
         private int LatencyMilliseconds => _latency?.Milliseconds ?? 0;
+
+        IReadOnlyList<int> IReductionPreviewPlayback.SpeedPercents => SpeedPercents;
+
+        void IReductionPreviewPlayback.PlayPause() => PlayPauseCommand.Execute(null);
 
         /// <summary>Moves the playhead to <paramref name="seconds"/> as the editor's cursor moves, without raising <see cref="Scrubbed"/>.</summary>
         public void SeekTo(double seconds)
@@ -594,24 +599,8 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>The chart's beat lines from 0 to <paramref name="length"/> seconds of audio.</summary>
-        private static IReadOnlyList<TimelineBeat> BeatsOf(EditorSong song, double length)
-        {
-            var tempoMap = song.Chart.TempoMap.ToTempoMap();
-            double delay = song.Delay.TotalSeconds;
-            long lastTick = (long)Math.Ceiling(tempoMap.TickAt(length - delay));
-            if (lastTick < 0)
-                return [];
-
-            var beats = new List<TimelineBeat>();
-            foreach (var line in tempoMap.BeatLines(0, lastTick))
-            {
-                double seconds = tempoMap.SecondsAt(line.Tick) + delay;
-                if (seconds >= 0 && seconds <= length)
-                    beats.Add(new TimelineBeat(seconds, line.IsMeasure));
-            }
-
-            return beats;
-        }
+        private static IReadOnlyList<TimelineBeat> BeatsOf(EditorSong song, double length) =>
+            TimelineBeats.Of(song.Chart.TempoMap.ToTempoMap(), song.Delay, length);
 
         /// <summary>Draws the mix of the peaks read so far, the preview left out as it's muted, and each track's own.</summary>
         private void OnWaveformsChanged(object? sender, EventArgs e)

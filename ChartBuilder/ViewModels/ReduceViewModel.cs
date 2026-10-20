@@ -19,28 +19,11 @@ using Serilog;
 
 namespace ChartBuilder.ViewModels
 {
-    /// <summary>A choice of family in the Reduce dialog's Settings mode.</summary>
-    public sealed record FamilyChoice(ChartInstrumentKind Kind, string Label);
-
-    /// <summary>A thinning grid the Reduce dialog offers: a snap's division, or 0 for none.</summary>
-    public sealed record DivisionChoice(int Division, string Label);
-
-    /// <summary>The highest fret or column a reduced chord may use.</summary>
-    public sealed record LaneLimitChoice(int Lane, string Label);
-
     /// <summary>What the Reduce dialog makes a draft of: one difficulty, or, for null, Hard, Medium and Easy together.</summary>
     public sealed record TargetChoice(ChartDifficulty? Difficulty, string Label);
 
     /// <summary>What a run of Reduce covers: the whole part when <paramref name="Range"/> is null, else those ticks.</summary>
     public sealed record ScopeChoice(string Label, (long From, long To)? Range);
-
-    /// <summary>
-    /// A difficulty in the Reduce dialog's ladder, the draft in place: its suggested rating, and its peak notes per second
-    /// as a share of the part's highest.
-    /// </summary>
-    /// <param name="IsDraft">Whether this run drafts it.</param>
-    /// <param name="IsOutOfOrder">Whether it's rated as hard as the difficulty above it, or harder.</param>
-    public sealed record ReduceRatingRow(string Difficulty, string Tier, string Peak, double Share, bool IsDraft, bool IsOutOfOrder);
 
     /// <summary>A lint finding on the Reduce dialog's draft: the rule, the difficulty it's on, and what it says.</summary>
     /// <param name="Tick">Where it is, which clicking it goes to in the preview.</param>
@@ -72,13 +55,12 @@ namespace ChartBuilder.ViewModels
         // The most findings listed; the rest are counted.
         private const int MostFindingsShown = 8;
 
-        private static readonly ChartDifficulty[] Lower = [ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy];
+        private static readonly IReadOnlyList<ChartDifficulty> Lower = ReductionRulesViewModel.Targets;
 
         private readonly ChartEditorViewModel? _editor;
         private readonly BuilderSettingsService _settings;
         private readonly ChartInstrument _part;
         private readonly DispatcherTimer? _redraw;
-        private ReductionDefaults _defaults;
         private bool _loading;
         private bool _done;
         private int _checks;
@@ -88,17 +70,8 @@ namespace ChartBuilder.ViewModels
             _settings = settings;
             _editor = editor;
             _part = part;
-            _defaults = settings.Settings.ReductionRules;
-            Kind = kind;
-            DivisionChoices = [new DivisionChoice(0, Strings.ReduceNoThinning), .. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, BuilderSettingsCatalog.SnapLabel(d)))];
-            KickChoices = [new DivisionChoice(0, Strings.ReduceKickKept), .. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, BuilderSettingsCatalog.SnapLabel(d)))];
-            FamilyChoices =
-            [
-                new FamilyChoice(ChartInstrumentKind.FiveFret, Strings.ReduceFamilyFiveFret),
-                new FamilyChoice(ChartInstrumentKind.SixFret, Strings.ReduceFamilyGhl),
-                new FamilyChoice(ChartInstrumentKind.Drums, Strings.ReduceFamilyDrums),
-            ];
-            RulesForChoices = [.. Lower.Select(Choice)];
+            Rules = new ReductionRulesViewModel(settings.ReductionRules.Load(), kind, ChartDifficulty.Hard);
+            Rules.Changed += (_, _) => ScheduleRedraw();
             if (editor is not null)
             {
                 _redraw = new DispatcherTimer { Interval = RedrawDelay };
@@ -111,9 +84,10 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// A run over <paramref name="lane"/>'s part, to the lane's difficulty, or the one below it when it's Expert; over the
-        /// selection when there's one.
+        /// selection when there's one. For <paramref name="all"/>, Reduce all over the whole part instead, the difficulties
+        /// without notes ticked and the lane's rules shown.
         /// </summary>
-        public static ReduceViewModel ForRun(ChartEditorViewModel editor, BuilderSettingsService settings, ChartTrackKey lane)
+        public static ReduceViewModel ForRun(ChartEditorViewModel editor, BuilderSettingsService settings, ChartTrackKey lane, bool all = false)
         {
             var vm = new ReduceViewModel(settings, editor, lane.Instrument, ChartInstruments.KindOf(lane.Instrument));
             var session = editor.Session;
@@ -132,15 +106,15 @@ namespace ChartBuilder.ViewModels
             vm.ScopeChoices = scopes;
 
             vm._loading = true;
-            vm.SelectedTo = vm.ToChoices.First(c => c.Difficulty == to);
+            vm.SelectedTo = vm.ToChoices.First(c => c.Difficulty == (all ? null : to));
             vm.SelectedRulesFor = vm.RulesForChoices.First(c => c.Difficulty == to);
-            vm.SelectedScope = scopes.FirstOrDefault(s => s.Label == Strings.ReduceScopeSelection) ?? scopes[0];
+            vm.SelectedScope = all ? scopes[0] : scopes.FirstOrDefault(s => s.Label == Strings.ReduceScopeSelection) ?? scopes[0];
             vm.RefreshFrom(part is null ? null : d => part[d].Notes.Count > 0);
             vm._loading = false;
-            vm.LoadRules();
+            vm.ShowRules();
 
             // Before the first draft, so the playback is lent, and any pass of record mode ended, before it's made.
-            vm.Preview = new ReducePreviewViewModel(editor, settings);
+            vm.Preview = new ReductionPreviewViewModel(editor.Playback, new BuilderReductionPreviewSettings(settings.Settings), editor.WheelUpIsLater, editor.BorrowPlayback());
             vm.Redraw();
             return vm;
         }
@@ -154,7 +128,7 @@ namespace ChartBuilder.ViewModels
             vm.SelectedFamily = vm.FamilyChoices[0];
             vm.SelectedTo = vm.ToChoices[0];
             vm._loading = false;
-            vm.LoadRules();
+            vm.ShowRules();
             return vm;
         }
 
@@ -162,7 +136,7 @@ namespace ChartBuilder.ViewModels
         public IConfirmationService? Confirmations { get; set; }
 
         /// <summary>The preview of the draft against its source, with the song; null on the defaults in Settings.</summary>
-        public ReducePreviewViewModel? Preview { get; private set; }
+        public ReductionPreviewViewModel? Preview { get; private set; }
 
         /// <summary>Whether this is a run over a lane, rather than the defaults in Settings.</summary>
         public bool IsRun => _editor is not null;
@@ -175,16 +149,10 @@ namespace ChartBuilder.ViewModels
 
         public string ApplyLabel => IsRun ? Strings.ReduceApplyButton : Strings.ReduceSaveButton;
 
-        /// <summary>The family whose rules are shown.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsDrums), nameof(IsFrets), nameof(LaneLimitChoices), nameof(LaneLimitLabel), nameof(ChordSizeMaximum))]
-        public partial ChartInstrumentKind Kind { get; private set; }
+        /// <summary>The rules for the family and the difficulty picked, as fields; a run's changes are its own.</summary>
+        public ReductionRulesViewModel Rules { get; }
 
-        public bool IsDrums => Kind == ChartInstrumentKind.Drums;
-
-        public bool IsFrets => !IsDrums;
-
-        public IReadOnlyList<FamilyChoice> FamilyChoices { get; }
+        public IReadOnlyList<FamilyChoice> FamilyChoices => ReductionRulesViewModel.FamilyChoices;
 
         /// <summary>The family whose defaults are edited, in Settings mode.</summary>
         [ObservableProperty]
@@ -214,7 +182,7 @@ namespace ChartBuilder.ViewModels
         /// <summary>The difficulties Reduce all can fill, those without notes ticked.</summary>
         public IReadOnlyList<TargetToggle> Toggles { get; private set; } = [];
 
-        public IReadOnlyList<DifficultyChoice> RulesForChoices { get; }
+        public IReadOnlyList<DifficultyChoice> RulesForChoices => ReductionRulesViewModel.TargetChoices;
 
         /// <summary>Which difficulty's rules are shown, in Reduce all.</summary>
         [ObservableProperty]
@@ -225,45 +193,6 @@ namespace ChartBuilder.ViewModels
         /// <summary>What the run covers: the whole part, the selection or the section at the cursor.</summary>
         [ObservableProperty]
         public partial ScopeChoice? SelectedScope { get; set; }
-
-        public IReadOnlyList<DivisionChoice> DivisionChoices { get; }
-
-        public IReadOnlyList<DivisionChoice> KickChoices { get; }
-
-        public IReadOnlyList<LaneLimitChoice> LaneLimitChoices => Kind == ChartInstrumentKind.SixFret
-            ? [.. Enumerable.Range(0, 3).Select(c => new LaneLimitChoice(c, string.Format(CultureInfo.CurrentCulture, Strings.ReduceColumnsFormat, c + 1)))]
-            : [.. Enumerable.Range(0, 5).Select(f => new LaneLimitChoice(f, string.Format(CultureInfo.CurrentCulture, Strings.ReduceFretsFormat, FretName(f))))];
-
-        public string LaneLimitLabel => Kind == ChartInstrumentKind.SixFret ? Strings.ReduceColumnsLabel : Strings.ReduceFretsLabel;
-
-        public decimal ChordSizeMaximum => Kind == ChartInstrumentKind.SixFret ? 3 : 5;
-
-        public decimal MinGapMaximum => ReductionDefaults.MaxGapMs;
-
-        [ObservableProperty]
-        public partial decimal? MaxChordSize { get; set; }
-
-        [ObservableProperty]
-        public partial LaneLimitChoice? HighestLane { get; set; }
-
-        [ObservableProperty]
-        public partial DivisionChoice? Thinning { get; set; }
-
-        /// <summary>The fewest milliseconds two chords are apart, beside the thinning grid.</summary>
-        [ObservableProperty]
-        public partial decimal? MinGapMs { get; set; }
-
-        [ObservableProperty]
-        public partial bool KeepForcedHopoAndTap { get; set; }
-
-        [ObservableProperty]
-        public partial bool KeepShortSustains { get; set; }
-
-        [ObservableProperty]
-        public partial decimal? PadsPerHit { get; set; }
-
-        [ObservableProperty]
-        public partial DivisionChoice? KickThinning { get; set; }
 
         /// <summary>What the draft holds, or why there's none, as one line per draft.</summary>
         [ObservableProperty]
@@ -277,16 +206,9 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial bool HasCheck { get; private set; }
 
-        /// <summary>Each difficulty of the part with notes, Expert first, the draft in place.</summary>
+        /// <summary>Each difficulty of the part with notes, Expert first, the draft in place, with its suggested rating.</summary>
         [ObservableProperty]
-        public partial IReadOnlyList<ReduceRatingRow> Ratings { get; private set; } = [];
-
-        /// <summary>Where a lower difficulty isn't easier than the one above it; empty when they're in order.</summary>
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasOrderWarning))]
-        public partial string OrderWarning { get; private set; } = "";
-
-        public bool HasOrderWarning => OrderWarning.Length > 0;
+        public partial DifficultyLadder Ladder { get; private set; } = DifficultyLadder.Empty;
 
         /// <summary>The draft's lint findings, the first few of them until all are asked for.</summary>
         [ObservableProperty]
@@ -352,9 +274,7 @@ namespace ChartBuilder.ViewModels
             }
             else
             {
-                Store();
-                _settings.Settings.ReductionRules = _defaults;
-                _settings.Save();
+                _settings.ReductionRules.Save(Rules.Defaults);
             }
 
             Finish();
@@ -372,87 +292,51 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The shipped rules for this family and target, in place of what's shown.</summary>
         [RelayCommand]
-        private void Reset()
+        private void Reset() => Rules.Reset();
+
+        partial void OnSelectedFamilyChanged(FamilyChoice? value)
         {
-            if (RulesTarget is not { } to)
+            if (value is null || IsRun)
                 return;
-            var shipped = ReductionDefaults.Shipped;
-            _defaults = Kind == ChartInstrumentKind.Drums
-                ? _defaults.WithDrums(to, shipped.DrumsFor(to))
-                : _defaults.WithFrets(Kind, to, shipped.FretsFor(Kind, to));
-            LoadRules();
-            ScheduleRedraw();
+            Rules.Show(value.Kind, RulesTarget ?? ChartDifficulty.Hard);
         }
 
-        partial void OnSelectedFamilyChanged(FamilyChoice? oldValue, FamilyChoice? newValue)
+        partial void OnSelectedToChanged(TargetChoice? value)
         {
-            if (newValue is null || IsRun)
+            if (_loading || value is null)
                 return;
-            if (!_loading && oldValue is not null)
-                Store(oldValue.Kind, SelectedTo?.Difficulty);
-            Kind = newValue.Kind;
-            if (!_loading)
-                LoadRules();
-        }
-
-        partial void OnSelectedToChanged(TargetChoice? oldValue, TargetChoice? newValue)
-        {
-            if (_loading || newValue is null)
-                return;
-            if (oldValue is not null)
-                Store(Kind, oldValue.Difficulty ?? SelectedRulesFor?.Difficulty);
             if (_editor?.Session.Chart.PartOf(_part) is { } part)
                 RefreshFrom(d => part[d].Notes.Count > 0);
-            LoadRules();
+            ShowRules();
             ScheduleRedraw();
         }
 
-        partial void OnSelectedRulesForChanged(DifficultyChoice? oldValue, DifficultyChoice? newValue)
+        partial void OnSelectedRulesForChanged(DifficultyChoice? value)
         {
-            if (_loading || newValue is null)
+            if (_loading || value is null)
                 return;
-            if (oldValue is not null)
-                Store(Kind, oldValue.Difficulty);
-            LoadRules();
+            ShowRules();
         }
 
         partial void OnSelectedScopeChanged(ScopeChoice? value) => ScheduleRedraw();
 
         partial void OnSelectedFromChanged(DifficultyChoice? value) => ScheduleRedraw();
 
-        partial void OnMaxChordSizeChanged(decimal? value) => ScheduleRedraw();
-
-        partial void OnHighestLaneChanged(LaneLimitChoice? value) => ScheduleRedraw();
-
-        partial void OnThinningChanged(DivisionChoice? value) => ScheduleRedraw();
-
-        partial void OnMinGapMsChanged(decimal? value) => ScheduleRedraw();
-
-        partial void OnKeepForcedHopoAndTapChanged(bool value) => ScheduleRedraw();
-
-        partial void OnKeepShortSustainsChanged(bool value) => ScheduleRedraw();
-
-        partial void OnPadsPerHitChanged(decimal? value) => ScheduleRedraw();
-
-        partial void OnKickThinningChanged(DivisionChoice? value) => ScheduleRedraw();
-
         private void OnToggleChanged(object? sender, PropertyChangedEventArgs e) => ScheduleRedraw();
 
         private static DifficultyChoice Choice(ChartDifficulty difficulty) => new(difficulty, ChartLabels.DifficultyName(difficulty));
+
+        // The rules for the family and the difficulty picked, into the fields; the fields' changes are kept for those shown.
+        private void ShowRules()
+        {
+            if (RulesTarget is { } to)
+                Rules.Show(Rules.Kind, to);
+        }
 
         private static TargetToggle Toggle(ChartDifficulty difficulty, bool charted) => new(
             difficulty,
             charted ? string.Format(CultureInfo.CurrentCulture, Strings.ReduceChartedFormat, ChartLabels.DifficultyName(difficulty)) : ChartLabels.DifficultyName(difficulty),
             !charted);
-
-        private static string FretName(int fret) => fret switch
-        {
-            0 => Strings.FretGreen,
-            1 => Strings.FretRed,
-            2 => Strings.FretYellow,
-            3 => Strings.FretBlue,
-            _ => Strings.FretOrange,
-        };
 
         // The difficulties above the target to reduce from, those with notes first in mind: the highest with notes is picked.
         private void RefreshFrom(Func<ChartDifficulty, bool>? hasNotes)
@@ -465,64 +349,6 @@ namespace ChartBuilder.ViewModels
             var pick = above.FirstOrDefault(d => hasNotes?.Invoke(d) == true, above.FirstOrDefault());
             SelectedFrom = FromChoices.FirstOrDefault(c => c.Difficulty == pick);
             _loading = loading;
-        }
-
-        // The rules for the family and target, into the fields.
-        private void LoadRules()
-        {
-            if (RulesTarget is not { } to)
-                return;
-            _loading = true;
-            if (Kind == ChartInstrumentKind.Drums)
-            {
-                var rules = _defaults.DrumsFor(to);
-                PadsPerHit = rules.PadsPerHit;
-                Thinning = DivisionChoices.FirstOrDefault(c => c.Division == rules.ThinningDivision) ?? DivisionChoices[0];
-                MinGapMs = rules.MinGapMs ?? 0;
-                KickThinning = KickChoices.FirstOrDefault(c => c.Division == rules.KickDivision) ?? KickChoices[0];
-            }
-            else
-            {
-                var rules = _defaults.FretsFor(Kind, to);
-                MaxChordSize = rules.MaxChordSize;
-                HighestLane = LaneLimitChoices.FirstOrDefault(c => c.Lane == rules.HighestLane) ?? LaneLimitChoices[^1];
-                Thinning = DivisionChoices.FirstOrDefault(c => c.Division == rules.ThinningDivision) ?? DivisionChoices[0];
-                MinGapMs = rules.MinGapMs ?? 0;
-                KeepForcedHopoAndTap = rules.KeepForcedHopoAndTap;
-                KeepShortSustains = rules.KeepShortSustains;
-            }
-
-            _loading = false;
-        }
-
-        private FretReductionRules FretRules() => new FretReductionRules
-        {
-            MaxChordSize = (int)(MaxChordSize ?? 1),
-            HighestLane = HighestLane?.Lane ?? 4,
-            ThinningDivision = Thinning?.Division ?? 0,
-            MinGapMs = (int)(MinGapMs ?? 0),
-            KeepForcedHopoAndTap = KeepForcedHopoAndTap,
-            KeepShortSustains = KeepShortSustains,
-        }.Normalized(Kind);
-
-        private DrumReductionRules DrumRules() => new DrumReductionRules
-        {
-            PadsPerHit = (int)(PadsPerHit ?? 1),
-            ThinningDivision = Thinning?.Division ?? 0,
-            MinGapMs = (int)(MinGapMs ?? 0),
-            KickDivision = KickThinning?.Division ?? 0,
-        }.Normalized();
-
-        // The fields, into the rules being edited, for the family and target they were shown for.
-        private void Store() => Store(Kind, RulesTarget);
-
-        private void Store(ChartInstrumentKind kind, ChartDifficulty? to)
-        {
-            if (to is not { } target)
-                return;
-            _defaults = kind == ChartInstrumentKind.Drums
-                ? _defaults.WithDrums(target, DrumRules())
-                : _defaults.WithFrets(kind, target, FretRules() with { });
         }
 
         private void ScheduleRedraw()
@@ -550,7 +376,7 @@ namespace ChartBuilder.ViewModels
             bool started;
             if (IsAll)
             {
-                Store();
+                var defaults = Rules.Defaults;
                 var targets = Toggles.Where(static t => t.IsChecked).Select(static t => t.Difficulty).ToList();
                 if (targets.Count == 0)
                 {
@@ -561,15 +387,15 @@ namespace ChartBuilder.ViewModels
                     return;
                 }
 
-                started = Kind == ChartInstrumentKind.Drums
-                    ? reduce.StartAll(targets.ToDictionary(t => t, _defaults.DrumsFor), range)
-                    : reduce.StartAll(_part, targets.ToDictionary(t => t, t => _defaults.FretsFor(Kind, t)), range);
+                started = Rules.IsDrums
+                    ? reduce.StartAll(targets.ToDictionary(t => t, defaults.DrumsFor), range)
+                    : reduce.StartAll(_part, targets.ToDictionary(t => t, t => defaults.FretsFor(Rules.Kind, t)), range);
             }
             else if (SelectedFrom is { } from && to.Difficulty is { } target)
             {
-                started = Kind == ChartInstrumentKind.Drums
-                    ? reduce.Start(from.Difficulty, target, DrumRules(), range)
-                    : reduce.Start(_part, from.Difficulty, target, FretRules(), range);
+                started = Rules.IsDrums
+                    ? reduce.Start(from.Difficulty, target, Rules.DrumRules(), range)
+                    : reduce.Start(_part, from.Difficulty, target, Rules.FretRules(), range);
             }
             else
             {
@@ -591,7 +417,7 @@ namespace ChartBuilder.ViewModels
                 ChartLabels.DifficultyName(d.Target.Difficulty),
                 d.Result.Notes.Count,
                 d.Result.Removed))];
-            Preview?.OnDrafted(reduce);
+            Preview?.OnDrafted(RunOf(editor.Session, reduce));
             _ = CheckAsync(editor, reduce);
         }
 
@@ -615,19 +441,7 @@ namespace ChartBuilder.ViewModels
             if (result is null || check != _checks || _done)
                 return;
 
-            double highest = result.Estimates.Values.Select(static e => e.Basis.PeakNps).DefaultIfEmpty(0).Max();
-            Ratings = [.. Enum.GetValues<ChartDifficulty>().OrderDescending()
-                .Where(result.Estimates.ContainsKey)
-                .Select(d => new ReduceRatingRow(
-                    ChartLabels.DifficultyName(d),
-                    result.Estimates[d].Tier.ToString(CultureInfo.CurrentCulture),
-                    string.Format(CultureInfo.CurrentCulture, Strings.ReducePeakFormat, result.Estimates[d].Basis.PeakNps),
-                    highest > 0 ? result.Estimates[d].Basis.PeakNps / highest : 0,
-                    targets.Contains(d),
-                    result.OutOfOrder.Contains(d)))];
-            OrderWarning = result.OutOfOrder.Count == 0
-                ? ""
-                : string.Format(CultureInfo.CurrentCulture, Strings.ReduceOrderWarningFormat, string.Join(", ", result.OutOfOrder.Select(ChartLabels.DifficultyName)));
+            Ladder = DifficultyLadder.Of(result, targets);
             var map = editor.Session.TempoMap;
             _allFindings = [.. result.Findings.Select(f => Row(f, map))];
             ListFindings();
@@ -635,6 +449,10 @@ namespace ChartBuilder.ViewModels
             HasCheck = true;
             OnPropertyChanged(nameof(HasNoFindings));
         }
+
+        // What the preview shows of the run: the part, its range and the chart's timing, and the drafts' diffs.
+        private static ReductionPreviewRun RunOf(EditorSession session, ReduceProposals reduce) =>
+            new(reduce.Part!.Value, reduce.Range, session.TempoMap, session.Delay, session.IsFiveLaneDrums, reduce.DiffAsync);
 
         private static ReduceFindingRow Row(Finding finding, TempoMap map)
         {
@@ -656,8 +474,7 @@ namespace ChartBuilder.ViewModels
         {
             _checks++;
             HasCheck = false;
-            Ratings = [];
-            OrderWarning = "";
+            Ladder = DifficultyLadder.Empty;
             MoreFindings = "";
             _allFindings = [];
             Findings = [];

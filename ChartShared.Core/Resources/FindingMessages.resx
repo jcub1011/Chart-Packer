@@ -453,6 +453,10 @@
     <value>The part has notes but {0} is unset or -1.</value>
     <comment>{0} is the song.ini key, e.g. diff_guitar.</comment>
   </data>
+  <data name="ChrMissingDifficultyFormat" xml:space="preserve">
+    <value>{0} has no notes, though {1} is charted.</value>
+    <comment>{0} is the missing difficulty; {1} is the part's highest charted difficulty.</comment>
+  </data>
   <data name="ChrSongLengthFormat" xml:space="preserve">
     <value>song_length ({0} ms) doesn't match the audio's length ({1} ms).</value>
     <comment>{0} is song.ini's value; {1} is the audio's length.</comment>

@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using ChartBuilder.ViewModels;
 using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
@@ -18,8 +19,8 @@ namespace ChartBuilder.Views
     /// </summary>
     /// <remarks>
     /// Showing the preview widens the window by as much as the preview takes, as far as the screen allows, and hiding it
-    /// narrows it again. While it's shown, Space plays or pauses and N goes to the next change (Shift+N the one before),
-    /// tunnelled so a focused button or box takes them as that, but not while typing in a field.
+    /// narrows it again. While it's shown, Space plays or pauses and N goes to the next change (Shift+N the one before)
+    /// (<see cref="ReductionPreviewKeys"/>).
     /// </remarks>
     public partial class ReduceWindow : Window
     {
@@ -33,9 +34,8 @@ namespace ChartBuilder.Views
         private const double SummaryWidth = 360;
         private const double MinPreviewWidth = 360;
 
-        private ReducePreviewViewModel? _preview;
+        private ReductionPreviewViewModel? _preview;
         private bool _isOpen;
-        private bool _isSpaceHeld;
 
         // Whether the window's size allows for the preview, and how much wider it was made for it, or the preview took.
         private bool _isSizedForPreview;
@@ -55,11 +55,7 @@ namespace ChartBuilder.Views
                 Dispatcher.UIThread.Post(() => FitOnScreen(null), DispatcherPriority.Loaded);
             };
             Closed += (_, _) => (DataContext as ReduceViewModel)?.Cancel();
-            Highway.Scrubbed += (_, e) => _preview?.SeekTo(e.Seconds);
-
-            AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
-            AddHandler(KeyUpEvent, OnPreviewKeyUp, RoutingStrategies.Tunnel);
-            Deactivated += (_, _) => _isSpaceHeld = false;
+            ReductionPreviewKeys.Attach(this, () => _preview);
         }
 
         protected override void OnDataContextChanged(EventArgs e)
@@ -92,7 +88,7 @@ namespace ChartBuilder.Views
 
         private void OnPreviewChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ReducePreviewViewModel.IsExpanded))
+            if (e.PropertyName == nameof(ReductionPreviewViewModel.IsExpanded))
                 ApplyPreview();
         }
 
@@ -190,42 +186,5 @@ namespace ChartBuilder.Views
             Height = size.Height / scaling;
             Position = WindowPlacement.Centered(middle, size, area);
         }
-
-        private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
-        {
-            if (_preview is not { IsExpanded: true } preview || IsTyping(e))
-                return;
-
-            if (e.Key == Key.N && e.KeyModifiers is KeyModifiers.None or KeyModifiers.Shift)
-            {
-                e.Handled = true;
-                if (e.KeyModifiers == KeyModifiers.Shift)
-                    preview.PreviousChangeCommand.Execute(null);
-                else
-                    preview.NextChangeCommand.Execute(null);
-                return;
-            }
-
-            if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None)
-                return;
-            e.Handled = true;
-            if (_isSpaceHeld)
-                return;
-            _isSpaceHeld = true;
-            preview.PlayPauseCommand.Execute(null);
-        }
-
-        // The key-up of a Space taken as playback is taken too: a focused button clicks as Space is let go.
-        private void OnPreviewKeyUp(object? sender, KeyEventArgs e)
-        {
-            if (e.Key != Key.Space || !_isSpaceHeld)
-                return;
-
-            _isSpaceHeld = false;
-            e.Handled = true;
-        }
-
-        // A field takes what's typed: a text box, or a number box's.
-        private bool IsTyping(KeyEventArgs e) => e.Source is TextBox || FocusManager?.GetFocusedElement() is TextBox;
     }
 }

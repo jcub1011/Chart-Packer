@@ -199,11 +199,7 @@ namespace ChartBuilder.Services
                         Actions =
                         [
                             new SettingAction(Strings.ReductionRulesEditButton, editReductionRules),
-                            new SettingAction(Strings.ReductionRulesResetButton, () =>
-                            {
-                                settings.Settings.ReductionRules = ReductionDefaults.Shipped;
-                                settings.Save();
-                            }),
+                            new SettingAction(Strings.ReductionRulesResetButton, () => settings.ReductionRules.Save(ReductionDefaults.Shipped)),
                         ],
                     },
                     new ChoiceSetting<int>

@@ -1,0 +1,101 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ChartShared.UI.ViewModels"
+             xmlns:res="using:ChartShared.UI.Resources"
+             mc:Ignorable="d" d:DesignWidth="308" d:DesignHeight="240"
+             x:Class="ChartShared.UI.Views.ReductionRulesView"
+             x:DataType="vm:ReductionRulesViewModel">
+    <!-- The reduction rules for one family and target (ReductionRulesViewModel), grouped as a settings row is. Chart
+         Builder's Reduce dialog and Chart Packer's Generate difficulties dialog show it, each with its own pickers above. -->
+    <UserControl.Styles>
+        <!-- A rule's name: wrapped rather than cut short, beside its control. -->
+        <Style Selector="Grid.fields > TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="Grid.fields > ComboBox, Grid.fields > NumericUpDown">
+            <Setter Property="Width" Value="132" />
+        </Style>
+        <Style Selector="CheckBox.rule">
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+        <Style Selector="CheckBox.rule > TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource ToolbarGroupBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- 5-fret and GHL. -->
+        <Border Classes="card" IsVisible="{Binding IsFrets}">
+            <StackPanel Spacing="8">
+                <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0" Text="{x:Static res:SharedStrings.ReductionChordSizeLabel}" />
+                    <NumericUpDown Grid.Row="0" Grid.Column="1"
+                                   Value="{Binding MaxChordSize}" Minimum="1" Maximum="{Binding ChordSizeMaximum}"
+                                   Increment="1" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
+                                   AutomationProperties.Name="{x:Static res:SharedStrings.ReductionChordSizeLabel}" />
+                    <TextBlock Grid.Row="1" Text="{Binding LaneLimitLabel}" />
+                    <ComboBox Grid.Row="1" Grid.Column="1"
+                              ItemsSource="{Binding LaneLimitChoices}"
+                              SelectedItem="{Binding HighestLane}"
+                              DisplayMemberBinding="{Binding Label, x:DataType=vm:LaneLimitChoice}"
+                              AutomationProperties.Name="{Binding LaneLimitLabel}" />
+                    <TextBlock Grid.Row="2" Text="{x:Static res:SharedStrings.ReductionThinningLabel}" />
+                    <ComboBox Grid.Row="2" Grid.Column="1"
+                              ItemsSource="{Binding DivisionChoices}"
+                              SelectedItem="{Binding Thinning}"
+                              DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                              AutomationProperties.Name="{x:Static res:SharedStrings.ReductionThinningLabel}" />
+                    <TextBlock Grid.Row="3" Text="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
+                    <NumericUpDown Grid.Row="3" Grid.Column="1"
+                                   Value="{Binding MinGapMs}" Minimum="0" Maximum="{Binding MinGapMaximum}"
+                                   Increment="10" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
+                                   AutomationProperties.Name="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
+                </Grid>
+                <CheckBox Classes="rule" IsChecked="{Binding KeepForcedHopoAndTap}">
+                    <TextBlock Text="{x:Static res:SharedStrings.ReductionKeepForcing}" />
+                </CheckBox>
+                <CheckBox Classes="rule" IsChecked="{Binding KeepShortSustains}">
+                    <TextBlock Text="{x:Static res:SharedStrings.ReductionKeepShortSustains}" />
+                </CheckBox>
+            </StackPanel>
+        </Border>
+
+        <!-- Drums. -->
+        <Border Classes="card" IsVisible="{Binding IsDrums}">
+            <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                <TextBlock Grid.Row="0" Text="{x:Static res:SharedStrings.ReductionPadsLabel}" />
+                <NumericUpDown Grid.Row="0" Grid.Column="1"
+                               Value="{Binding PadsPerHit}" Minimum="1" Maximum="5"
+                               Increment="1" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
+                               AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPadsLabel}" />
+                <TextBlock Grid.Row="1" Text="{x:Static res:SharedStrings.ReductionThinningLabel}" />
+                <ComboBox Grid.Row="1" Grid.Column="1"
+                          ItemsSource="{Binding DivisionChoices}"
+                          SelectedItem="{Binding Thinning}"
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                          AutomationProperties.Name="{x:Static res:SharedStrings.ReductionThinningLabel}" />
+                <TextBlock Grid.Row="2" Text="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
+                <NumericUpDown Grid.Row="2" Grid.Column="1"
+                               Value="{Binding MinGapMs}" Minimum="0" Maximum="{Binding MinGapMaximum}"
+                               Increment="10" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
+                               AutomationProperties.Name="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
+                <TextBlock Grid.Row="3" Text="{x:Static res:SharedStrings.ReductionKickLabel}" />
+                <ComboBox Grid.Row="3" Grid.Column="1"
+                          ItemsSource="{Binding KickChoices}"
+                          SelectedItem="{Binding KickThinning}"
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                          AutomationProperties.Name="{x:Static res:SharedStrings.ReductionKickLabel}" />
+            </Grid>
+        </Border>
+    </Panel>
+</UserControl>

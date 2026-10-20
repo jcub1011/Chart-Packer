@@ -461,6 +461,21 @@ same song at once, and Chart Packer re-reads the songs Chart Builder may have ch
 the current folder as they're read (`BuilderArgs.Parse`). Arguments that can't be used (an unknown
 option, a second song path, an empty argument, a missing path) open the home screen and say why.
 
+**Difficulty report.** `--difficulty-report <songs folder> [--out <file.csv>] [--depth <levels>]`
+opens no window. It rates every song under the folder with the difficulty model
+([difficulty-model.md](difficulty-model.md)) and writes a CSV (`DifficultyReport`). The CSV has a
+row for each song, with its path and then, for guitar, bass, rhythm and guitar co-op:
+
+- the `diff_*` rating `song.ini` reports;
+- the model's rank for the part's highest charted difficulty;
+- each of the five attributes' scores.
+
+Values are to a tenth. A last column says why a song couldn't be read. Without `--out`, the CSV is
+`difficulty-report.csv` in the current folder; `--depth` defaults to 10 folder levels. Songs are only
+read, and neither the settings nor the log are touched. Progress goes to the console it was run from
+(`DifficultyReportArgs.Parse`; exit code 0 when written, 1 for bad arguments, 2 when the CSV can't be
+written).
+
 **Finding Chart Builder.** Chart Packer runs the `ChartBuilder` executable that sits next to its
 own (`Environment.ProcessPath`). If it isn't there, Chart Packer says Chart Builder isn't installed
 and goes on without it. In Debug builds each app keeps its own output folder. Building Chart Packer
@@ -2169,11 +2184,17 @@ Acceptance criteria:
      Nothing is written to disk.
 2. **Practice preview**: the preview over the loop region at the chosen speed.
 3. **Suggested difficulty.**
-   - For each part and difficulty, a suggested `diff_*` tier from 0 to 6.
-   - It is based on peak and average notes per second, chord density, and HOPO/tap density
-     (and, for drums, independence between hands and kick).
+   - For each part and difficulty, a suggested `diff_*` tier: 0 to 6 for charts written to be
+     played, and 7 and up for overcharts.
+   - Five-fret parts are rated by the difficulty model ([difficulty-model.md](difficulty-model.md)).
+     It measures strum, note, rhythm, pattern and endurance difficulty moment by moment, and scores
+     the chart by its hardest stretches.
+   - Drums and six-fret, which the model doesn't cover, are rated from peak and average notes per
+     second, chord density, HOPO/tap density, and (for drums) independence between hands and kick.
    - It is shown with what it was based on, and is only a suggestion.
-   - The weights are fixed in v1 and will be tuned against rated charts.
+   - The parameters are fixed in v1 and will be tuned against rated charts.
+4. **Difficulty analysis.** For a five-fret part and difficulty, the model's rank, a spider graph of
+   its five attributes, and its difficulty over the song with the sections and the rank lines.
 
 *Settled in CM5:*
 
@@ -2190,7 +2211,19 @@ Acceptance criteria:
   whole part. It's shown in the preview's header, with what it was worked out from and each
   difficulty's own tier in its tooltip. **Use as diff_…** sets the part's keys that `song.ini`
   rates otherwise, as pending changes Revert takes back; it's never written otherwise. It's also
-  CHR083's fix. Peak density is over any two seconds; the weights are `DifficultyWeights`.
+  CHR083's fix. Five-fret parts are rated by `DifficultyAnalyzer`, and an overchart is suggested as
+  7 or more. For drums and six-fret, peak density is over any two seconds, and the weights are
+  `DifficultyWeights`. The suggestion is worked out off the UI thread.
+- **The difficulty analysis** is a **Difficulty** tab in the Editor's right panel, and a window of
+  its own. It follows the lane in focus, or a part and difficulty picked. It shows:
+  - the rank;
+  - a spider graph for the whole chart, the selection (in the song, or alone) or the playhead,
+    with the whole chart's shape behind;
+  - the peak envelope over the song, with lines for each attribute that can be shown;
+  - the rank lines, the sections and solos, and the windows that count most toward the score.
+
+  A click on the graph moves playback there. After an edit that touches the track, the whole track
+  is read again a moment later, off the UI thread, and only while the analysis is shown.
 
 Acceptance criteria:
 
@@ -2390,13 +2423,14 @@ merges the group into its first phrase.
 
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
-| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is fine. | — |
+| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is CHR087's. | — |
 | CHR081 | Info | A lower difficulty has more chords per second than the one above it | — |
 | CHR082 | Info | The chart has no sections | — |
-| CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating |
+| CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating (Chart Builder and the library) |
 | CHR084 | Warning | `song_length` doesn't match the audio's length within 1 s. A charter save corrects it, so this mostly appears in the library. | Update `song_length` |
 | CHR085 | Info | `[end]` is missing or before the last note. Chart Builder places it on save, so it runs this rule only in the library, not in the editor | — |
 | CHR086 | Info | Something in the chart file couldn't be loaded as written, and was left out, as the games leave it out ([§4.1](#editable-model)). Saving writes the file without it. | — |
+| CHR087 | Warning | A 5-fret, GHL or drum part has no notes on a difficulty below its highest charted one, so the games don't offer it. One finding per difficulty. | Generate with Reduce (Chart Builder); Generate missing difficulties (library) |
 
 ### Vocals
 
@@ -2801,9 +2835,10 @@ isn't written.
 | File | Owner | Holds |
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
-| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
+| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency and the reduction rules, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
 | `audio-latency.json` | The calibration tool, which both apps open | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when the tool closes and when its window is activated ([§4.8](#48-launching-and-coordination)). |
 | `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
+| `reduction-rules.json` | Both apps | The default difficulty reduction rules ([C9](#c9-difficulty-authoring)): Chart Builder's Reduce dialog and Settings, and Chart Packer's Validator, which generates a song's missing difficulties by them ([C16](#c16-chart-lint)). Each saves only the sets it changed. Until it's first saved, they're read from `builder-settings.json`'s `ReductionRules`, where an older Chart Builder kept them. |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
 and the Core `SettingDefinition` catalog that Chart Packer's uses. The catalog can express Toggle,
@@ -2912,8 +2947,10 @@ fails the run if anything there changes anyway.
 - MIDI devices on macOS and Linux.
 - Keeping and replaying a playtest performance, judged again against the chart as it changes.
 - Rebindable editor shortcuts (instrument bindings are in C19).
-- Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
-  library and inspector as well as Chart Builder.
+- The difficulty model's parameters and rank thresholds fitted to a set of rated charts, and the
+  suggestion shown in the library and inspector as well as Chart Builder.
+- The difficulty model for drums and six-fret, and its values used by other tools, such as finding
+  solos or placing star power.
 
 ## 15. Open questions
 
@@ -2954,13 +2991,13 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   ([§4.2](#lossless-passthrough)).
 - **Chart lint in the library:** shown as findings, never blocks packing
   ([C16](#c16-chart-lint)).
-- **Reduction rules:** set per run in the Reduce dialog, starting from defaults in Settings. Nothing
-  is stored per song ([C9](#c9-difficulty-authoring)).
+- **Reduction rules:** set per run in the Reduce dialog, or Chart Packer's Generate difficulties
+  dialog, starting from the defaults both apps share. Nothing is stored per song ([C9](#c9-difficulty-authoring)).
 - **Calibration device key:** a stable OS device ID where there is one, then the device name, then
   the global fallback ([C11](#c11-calibration-tool)).
 - **`.chart` after import:** removed on the first save, after a confirmation. No backup is kept
   ([C2](#c2-open-and-import)).
-- **Suggested difficulty:** shown in Chart Builder only, with fixed hand-set weights in v1. Tuning and
+- **Suggested difficulty:** shown in Chart Builder only, with fixed parameters in v1. Tuning and
   showing it in the library are future work ([C18](#c18-preview)).
 - **Generated drum fills:** the author picks the spacing, length and ending note on each run
   ([C6](#c6-drums-4-lane-pro-and-5-lane)).

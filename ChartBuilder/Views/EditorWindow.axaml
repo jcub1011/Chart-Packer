@@ -553,6 +553,10 @@
                 <TabItem Header="{x:Static res:Strings.PreviewTab}">
                     <views:PreviewView DataContext="{Binding Editor.Preview}" />
                 </TabItem>
+                <!-- The difficulty analysis of a five-fret lane, docked; it also opens in a window of its own. -->
+                <TabItem Header="{x:Static res:Strings.DifficultyTab}">
+                    <views:DifficultyView DataContext="{Binding Editor.Difficulty}" />
+                </TabItem>
             </bctl:EditorSidePanel>
         </Grid>
 

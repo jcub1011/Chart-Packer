@@ -1038,30 +1038,6 @@ namespace ChartBuilder.Controls.Editing
             _overlay.Redraw();
         }
 
-        /// <summary>Takes at most one notch out of the wheel turn carried in <paramref name="carry"/>, adding <paramref name="delta"/> first, so a mouse reporting several units per physical notch still moves a single step. A turn the other way starts over, and fractions add up across events.</summary>
-        internal static int TakeZoomStep(ref double carry, double delta)
-        {
-            if (Math.Sign(delta) != Math.Sign(carry))
-                carry = 0;
-            carry += delta;
-            int notches = (int)Math.Truncate(carry);
-            carry -= notches;
-            return Math.Clamp(notches, -1, 1);
-        }
-
-        /// <summary>How many grid steps one notch of the wheel scrolls while Shift is held.</summary>
-        internal const int FastScrollSteps = 4;
-
-        /// <summary>Takes at most one notch out of the wheel turn carried in <paramref name="carry"/>, as grid steps: one step a notch, or <see cref="FastScrollSteps"/> while Shift is held (<paramref name="fast"/>).</summary>
-        internal static int TakeScrollStep(ref double carry, double delta, bool fast)
-        {
-            int notch = TakeZoomStep(ref carry, delta);
-            return notch * (fast ? FastScrollSteps : 1);
-        }
-
-        /// <summary>A wheel turn, up for more than none, as a turn later for more than none: as it is when <paramref name="wheelUpIsLater"/>, otherwise the other way.</summary>
-        internal static double TowardLater(double delta, bool wheelUpIsLater) => wheelUpIsLater ? delta : -delta;
-
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
@@ -1072,7 +1048,7 @@ namespace ChartBuilder.Controls.Editing
             if ((e.KeyModifiers & KeyModifiers.Control) != 0)
             {
                 // Turned up, the lane looks less far ahead, so the notes are further apart: half a second a notch, at most one notch per wheel event.
-                int zoomStep = TakeZoomStep(ref _zoomWheel, delta);
+                int zoomStep = WheelSteps.TakeZoomStep(ref _zoomWheel, delta);
                 if (zoomStep != 0)
                     lane.StepLookAhead(-zoomStep);
             }
@@ -1085,7 +1061,7 @@ namespace ChartBuilder.Controls.Editing
                 // Some platforms report Shift+wheel as a sideways scroll, so that counts too.
                 bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
                 double raw = delta != 0 ? delta : (fast ? e.Delta.X : 0);
-                int steps = TakeScrollStep(ref _wheel, TowardLater(raw, WheelUpIsLater), fast);
+                int steps = WheelSteps.TakeScrollStep(ref _wheel, WheelSteps.TowardLater(raw, WheelUpIsLater), fast);
                 if (steps != 0)
                     session.Tools.StepCursor(steps);
             }

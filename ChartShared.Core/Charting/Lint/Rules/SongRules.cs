@@ -7,7 +7,7 @@ namespace ChartShared.Core.Charting.Lint.Rules;
 
 /// <summary>
 /// CHR080: a part is in the chart but has no notes on any difficulty. One finding for each empty part, at its start. A
-/// part charted on some difficulties and not others is fine: the games offer only those it has.
+/// part charted on some difficulties and not others is CHR087's (<see cref="MissingDifficultyRule"/>).
 /// </summary>
 public sealed class EmptyPartRule : IChartLintRule
 {
@@ -131,6 +131,39 @@ public sealed class UnratedPartRule : IChartLintRule
                     string message = string.Format(CultureInfo.CurrentCulture, FindingMessages.ChrUnratedFormat, key);
                     findings.Add(new Finding(RuleId, Severity, message, Key: key, Location: new ChartLocation(part.Instrument, null, 0, 0)));
                 }
+            }
+        }
+
+        return findings;
+    }
+}
+
+/// <summary>
+/// CHR087: a difficulty below a part's highest charted one has no notes, so the games don't offer it. One finding for
+/// each such difficulty. Only 5-fret, GHL and drum parts, the ones Reduce can fill
+/// (<see cref="Authoring.DifficultyGenerator"/>); a difficulty above the highest charted one isn't asked for.
+/// </summary>
+public sealed class MissingDifficultyRule : IChartLintRule
+{
+    public string RuleId => ChrRules.Chr087;
+
+    public Severity Severity => Severity.Warning;
+
+    public LintScope Scope => LintScope.Part;
+
+    public int Reach => 0;
+
+    public IEnumerable<Finding> Check(ChartLintContext context)
+    {
+        var findings = new List<Finding>();
+        foreach (var part in context.Parts)
+        {
+            if (Authoring.DifficultyGenerator.HighestCharted(part) is not { } highest)
+                continue;
+            foreach (var missing in Authoring.DifficultyGenerator.MissingBelow(part, highest))
+            {
+                string message = string.Format(CultureInfo.CurrentCulture, FindingMessages.ChrMissingDifficultyFormat, missing, highest);
+                findings.Add(new Finding(RuleId, Severity, message, Location: new ChartLocation(part.Instrument, missing, 0, 0)));
             }
         }
 

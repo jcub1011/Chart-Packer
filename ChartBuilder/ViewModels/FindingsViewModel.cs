@@ -290,13 +290,21 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>
         /// The ways to fix <paramref name="finding"/> now, for its menu: CHR084's reverted change restored, CHR083's suggested
-        /// rating used (charter-spec C18 item 3), or the chart's fixes, each of which Fix All can apply to every finding of
-        /// its rule, in its part or everywhere.
+        /// rating used (charter-spec C18 item 3), CHR087's missing difficulties generated in the Reduce dialog, or the
+        /// chart's fixes, each of which Fix All can apply to every finding of its rule, in its part or everywhere.
         /// </summary>
         private IReadOnlyList<FindingFix> FixesOf(Finding finding)
         {
             if (PendingSongIniFixes.KeyToRestore(finding, _song) is { } key)
                 return [new FindingFix(null, () => _song.Restore(key), null, null)];
+
+            // Reduce all, the part's empty difficulties ticked: the drafts are the charter's to look over before Apply.
+            if (finding.RuleId == ChrRules.Chr087)
+            {
+                return finding.Location is { Difficulty: { } difficulty } missing
+                    ? [new FindingFix(null, () => _ = _editor.ReduceAsync(new ChartTrackKey(missing.Part, difficulty), all: true), null, null)]
+                    : [];
+            }
 
             var session = _editor.Session;
             if (finding.RuleId == ChrRules.Chr083)

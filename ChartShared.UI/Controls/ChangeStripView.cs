@@ -8,8 +8,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using ChartShared.Core.Charting;
-
-namespace ChartBuilder.Controls
+namespace ChartShared.UI.Controls
 {
     /// <summary>What a mark on the <see cref="ChangeStripView"/> stands for, which gives its colour.</summary>
     public enum ChangeStripKind
@@ -463,8 +462,8 @@ namespace ChartBuilder.Controls
             // A bar a notch, later the way WheelUpIsLater says, as along the lanes; four with Shift held, as on the timeline.
             bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
             double raw = e.Delta.Y != 0 ? e.Delta.Y : (fast ? e.Delta.X : 0);
-            int bars = Editing.EditorCanvas.TakeScrollStep(ref _wheel, Editing.EditorCanvas.TowardLater(raw, WheelUpIsLater), fast);
-            if (bars != 0 && Beats is { } beats && TimelineView.StepBars(beats, Position, bars) is { } seconds)
+            int bars = WheelSteps.TakeScrollStep(ref _wheel, WheelSteps.TowardLater(raw, WheelUpIsLater), fast);
+            if (bars != 0 && Beats is { } beats && TimelineBeats.StepBars(beats, Position, bars) is { } seconds)
                 Position = Math.Max(0, seconds);
 
             e.Handled = true;

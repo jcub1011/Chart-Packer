@@ -22,6 +22,12 @@ namespace ChartBuilder.Services
         /// one at a time, so showing it again brings it to the front.
         /// </summary>
         void ShowPreview(PreviewViewModel viewModel);
+
+        /// <summary>
+        /// Shows the difficulty analysis in a window of its own beside the Editor; one at a time, so showing it again brings
+        /// it to the front.
+        /// </summary>
+        void ShowDifficulty(DifficultyViewModel viewModel);
     }
 
     /// <summary>Shows the authoring dialogs over the owner window.</summary>
@@ -54,6 +60,36 @@ namespace ChartBuilder.Services
         public void Follow(PreviewViewModel viewModel)
         {
             if (_preview is { } open)
+                open.DataContext = viewModel;
+        }
+
+        // The difficulty analysis's window, while it's open.
+        private DifficultyWindow? _difficulty;
+
+        public void ShowDifficulty(DifficultyViewModel viewModel)
+        {
+            if (_difficulty is { } open)
+            {
+                open.Activate();
+                return;
+            }
+
+            if (owner() is not { } window)
+                return;
+            var difficulty = new DifficultyWindow { DataContext = viewModel };
+            WindowChrome.UseOwnerIcon(difficulty, window);
+            difficulty.Closed += (_, _) => _difficulty = null;
+            _difficulty = difficulty;
+            difficulty.Show(window);
+        }
+
+        /// <summary>
+        /// Moves the difficulty analysis's window, if it's open, on to <paramref name="viewModel"/>, the analysis of the song
+        /// just opened in the Editor, so it stays open showing that song.
+        /// </summary>
+        public void Follow(DifficultyViewModel viewModel)
+        {
+            if (_difficulty is { } open)
                 open.DataContext = viewModel;
         }
 

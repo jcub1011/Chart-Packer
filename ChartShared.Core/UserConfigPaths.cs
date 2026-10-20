@@ -29,6 +29,12 @@ public static class UserConfigPaths
     public static string BuilderSettingsFile => Path.Combine(ConfigFolder, "builder-settings.json");
 
     /// <summary>
+    /// The default reduction rules (charter-spec C9 item 2, §10), read and written by both apps: Chart Builder's Reduce,
+    /// and Chart Packer's quick fix for missing difficulties.
+    /// </summary>
+    public static string ReductionRulesFile => Path.Combine(ConfigFolder, "reduction-rules.json");
+
+    /// <summary>
     /// The audio/visual latency per output device, written by Chart Builder's calibration tool and read
     /// by both apps (charter-spec C11, §10).
     /// </summary>

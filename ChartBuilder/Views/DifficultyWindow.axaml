@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChartBuilder.ViewModels"
+        xmlns:res="using:ChartBuilder.Resources"
+        xmlns:views="using:ChartBuilder.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="640"
+        x:Class="ChartBuilder.Views.DifficultyWindow"
+        x:DataType="vm:DifficultyViewModel"
+        Icon="/Assets/ChartBuilder.ico"
+        Title="{x:Static res:Strings.DifficultyWindowTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterOwner"
+        Width="900"
+        Height="640">
+
+    <!-- The difficulty analysis in a window of its own, wide enough for the graph to show the song in detail. Space plays
+         or pauses. -->
+    <views:DifficultyView />
+</Window>

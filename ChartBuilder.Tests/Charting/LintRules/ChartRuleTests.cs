@@ -60,6 +60,7 @@ public sealed class ChartRuleTests
         [ChrRules.Chr083, 1],
         [ChrRules.Chr084, 1],
         [ChrRules.Chr085, 1],
+        [ChrRules.Chr087, 1],
         [ChrRules.Chr090, 1],
         [ChrRules.Chr091, 1],
         [ChrRules.Chr092, 1],
@@ -109,16 +110,42 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
-    public void APartChartedOnOnlySomeDifficultiesIsFine()
+    public void EachDifficultyEmptyBelowAPartsHighestIsWarned()
     {
-        // GitHub issue #53: a difficulty left empty isn't an issue; only a part with no notes at all is (CHR080).
+        // Once fine (GitHub issue #53); now CHR087, which Reduce, or the library's quick fix, fills.
         var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2")]);
         new AddPart(ChartInstrument.Bass).Apply(chart);
         new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0)]).Apply(chart);
 
         var findings = new ChartLinter().LintAll(Snapshot(chart, input)).Findings;
 
-        Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+        Assert.IsTrue(findings.All(f => f.RuleId == ChrRules.Chr087 && f.Severity == Severity.Warning), string.Join("; ", findings.Select(Describe)));
+        Assert.AreSequenceEqual(
+            [ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy],
+            [.. findings.Select(f => f.Location!).Where(l => l.Part == ChartInstrument.Bass).Select(l => l.Difficulty!.Value)],
+            Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
+    }
+
+    [TestMethod]
+    public void ADifficultyAboveAPartsHighestIsntAskedFor()
+    {
+        // Charted up to Hard: Expert can't be made from what's below it, so only Easy is missing.
+        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2")]);
+        new AddPart(ChartInstrument.Bass).Apply(chart);
+        new AddNotes(ChartInstrument.Bass, ChartDifficulty.Hard, [new EditableNote(0, 1, 0), new EditableNote(2 * Beat, 1, 1)]).Apply(chart);
+        new AddNotes(ChartInstrument.Bass, ChartDifficulty.Medium, [new EditableNote(0, 1, 0)]).Apply(chart);
+
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr087);
+
+        Assert.AreEqual(ChartDifficulty.Easy, findings.Single().Location!.Difficulty);
+    }
+
+    [TestMethod]
+    public void AnEmptyPartIsCHR080sNotCHR087s()
+    {
+        var findings = new ChartLinter().LintAll(Triggered(ChrRules.Chr080).Input).Findings;
+
+        Assert.DoesNotContain(f => f.RuleId == ChrRules.Chr087, findings);
     }
 
     [TestMethod]
@@ -445,6 +472,9 @@ public sealed class ChartRuleTests
                 break;
             case ChrRules.Chr082:
                 new RemoveTextEvent(null, TextEvent.Of(0, "[section Intro]")).Apply(chart);
+                break;
+            case ChrRules.Chr087:
+                new ReplaceTrack(Guitar, ChartDifficulty.Hard, [], [], null).Apply(chart);
                 break;
             case ChrRules.Chr090:
                 AddVocals(chart, VocalTrack.Vocals, [new(0, Beat + 10, 60), new(Beat, 240, 62)], CleanVocalLyrics, CleanVocalPhrases);

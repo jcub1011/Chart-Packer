@@ -1,4 +1,5 @@
 using ChartBuilder.Controls.Editing;
+using ChartShared.UI.Controls;
 
 namespace ChartBuilder.Tests.Editing;
 
@@ -10,9 +11,9 @@ public sealed class EditorWheelZoomTests
     public void OneNotchStepsEachWay()
     {
         double carry = 0;
-        Assert.AreEqual(1, EditorCanvas.TakeZoomStep(ref carry, 1));
+        Assert.AreEqual(1, WheelSteps.TakeZoomStep(ref carry, 1));
         Assert.AreEqual(0, carry, 1e-9);
-        Assert.AreEqual(-1, EditorCanvas.TakeZoomStep(ref carry, -1));
+        Assert.AreEqual(-1, WheelSteps.TakeZoomStep(ref carry, -1));
         Assert.AreEqual(0, carry, 1e-9);
     }
 
@@ -20,9 +21,9 @@ public sealed class EditorWheelZoomTests
     public void AMouseThatReportsSeveralUnitsPerNotchStillStepsOnce()
     {
         double carry = 0;
-        Assert.AreEqual(1, EditorCanvas.TakeZoomStep(ref carry, 3));
+        Assert.AreEqual(1, WheelSteps.TakeZoomStep(ref carry, 3));
         Assert.AreEqual(0, carry, 1e-9, "Whole notches are consumed.");
-        Assert.AreEqual(-1, EditorCanvas.TakeZoomStep(ref carry, -4));
+        Assert.AreEqual(-1, WheelSteps.TakeZoomStep(ref carry, -4));
         Assert.AreEqual(0, carry, 1e-9);
     }
 
@@ -30,9 +31,9 @@ public sealed class EditorWheelZoomTests
     public void FractionalTouchpadTurnsAddUpToSteps()
     {
         double carry = 0;
-        Assert.AreEqual(0, EditorCanvas.TakeZoomStep(ref carry, 0.4));
-        Assert.AreEqual(0, EditorCanvas.TakeZoomStep(ref carry, 0.4));
-        Assert.AreEqual(1, EditorCanvas.TakeZoomStep(ref carry, 0.4));
+        Assert.AreEqual(0, WheelSteps.TakeZoomStep(ref carry, 0.4));
+        Assert.AreEqual(0, WheelSteps.TakeZoomStep(ref carry, 0.4));
+        Assert.AreEqual(1, WheelSteps.TakeZoomStep(ref carry, 0.4));
         Assert.AreEqual(0.2, carry, 1e-9);
     }
 
@@ -40,7 +41,7 @@ public sealed class EditorWheelZoomTests
     public void TurningBackStartsOver()
     {
         double carry = 0.6;
-        Assert.AreEqual(-1, EditorCanvas.TakeZoomStep(ref carry, -1));
+        Assert.AreEqual(-1, WheelSteps.TakeZoomStep(ref carry, -1));
         Assert.AreEqual(0, carry, 1e-9);
     }
 
@@ -48,6 +49,6 @@ public sealed class EditorWheelZoomTests
     public void NoTurnTakesNoStep()
     {
         double carry = 0;
-        Assert.AreEqual(0, EditorCanvas.TakeZoomStep(ref carry, 0));
+        Assert.AreEqual(0, WheelSteps.TakeZoomStep(ref carry, 0));
     }
 }

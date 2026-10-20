@@ -14,6 +14,7 @@ using ChartPacker.ViewModels;
 using ChartPacker.Views;
 using ChartShared.Audio.Playback;
 using ChartShared.Core;
+using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
 using ChartShared.Ffmpeg;
@@ -77,8 +78,23 @@ namespace ChartPacker
                 var detail = new SongDetailViewModel(
                     drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, locks: locks,
                     chartIssuesWindow: new AvaloniaChartIssuesWindowService(() => window));
+                // The Validator's quick fix for missing difficulties keeps the charts it makes here until their songs are
+                // saved; one an app that didn't close cleanly left is no use a day on. The rules it makes them by are
+                // shared with Chart Builder's Reduce (charter-spec C9 item 2).
+                GeneratedChartStash.SweepStale(TimeSpan.FromDays(1));
+                GeneratedChartStash? generated = null;
+                try
+                {
+                    generated = GeneratedChartStash.Create();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Trace.TraceWarning($"No folder for generated charts, so the Validator can't generate difficulties: {ex.Message}");
+                }
+
+                var reductionRules = new ReductionRulesFile(UserConfigPaths.ReductionRulesFile, UserConfigPaths.BuilderSettingsFile);
                 var validatorWindow = new AvaloniaValidatorWindowService(
-                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, locks, latency);
+                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, locks, latency, generated, reductionRules);
                 var chartBuilder = new ChartBuilderLauncher();
                 var library = new LibraryViewModel(
                     folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice);
@@ -149,6 +165,7 @@ namespace ChartPacker
                 {
                     player.Dispose();
                     audio.Dispose();
+                    generated?.Dispose();
                 };
 
                 desktop.MainWindow = window;

@@ -12,6 +12,7 @@
   <Project Path="ChartShared.Video/ChartShared.Video.csproj" />
   <Folder Name="/tools/">
     <Project Path="tools/DecodeBench/DecodeBench.csproj" />
+    <Project Path="tools/DifficultyCalibration/DifficultyCalibration.csproj" />
     <Project Path="tools/IconGen/IconGen.csproj" />
     <Project Path="tools/ScanBench/ScanBench.csproj" />
   </Folder>

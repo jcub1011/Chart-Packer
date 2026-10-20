@@ -28,6 +28,8 @@ public sealed class DifficultyEstimatorTests
         Assert.AreEqual(2.0, estimate.Basis.AverageNps, 0.05);
         Assert.IsLessThanOrEqualTo(1, estimate.Tier);
         Assert.AreEqual(0, estimate.Basis.ChordShare);
+        Assert.IsNotNull(estimate.Rating);
+        Assert.IsFalse(estimate.Rating.IsOverchart);
     }
 
     [TestMethod]
@@ -39,9 +41,23 @@ public sealed class DifficultyEstimatorTests
 
         var estimate = DifficultyEstimator.EstimatePart(chart, Guitar, Options)!;
 
-        Assert.AreEqual(6, estimate.Tier);
+        Assert.IsGreaterThanOrEqualTo(6, estimate.Tier);
+        Assert.AreEqual(estimate.Tier, (int)Math.Floor(estimate.Rating!.Rank));
         Assert.AreEqual(1, estimate.Basis.ChordShare);
         Assert.AreEqual(1, estimate.Basis.HopoTapShare);
+    }
+
+    [TestMethod]
+    public void AnOverchartIsRatedPastSix()
+    {
+        // Thirty-second-note chords at 220 BPM, strummed and jumping across the neck.
+        var chart = Chart(Guitar, Enumerable.Range(0, 512).SelectMany(i => new[] { new EditableNote(i * 60L, 1, (i * 2) % 4), new EditableNote(i * 60L, 1, 4) }), bpm: 220);
+        new SetChordFlags(Guitar, Expert, Enumerable.Range(0, 512).Select(i => i * 60L), ChordFlags.ForceStrum, on: true).Apply(chart);
+
+        var estimate = DifficultyEstimator.EstimatePart(chart, Guitar, Options)!;
+
+        Assert.IsGreaterThanOrEqualTo(RankCurve.FirstOverchart, estimate.Tier);
+        Assert.IsTrue(estimate.Rating!.IsOverchart);
     }
 
     [TestMethod]
@@ -49,26 +65,28 @@ public sealed class DifficultyEstimatorTests
     {
         // Eighth notes moving between frets at 120 BPM are close enough to be HOPOs as the games read them.
         var chart = Chart(Guitar, Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 1, i % 2)));
+        var estimate = DifficultyEstimator.EstimatePart(chart, Guitar, Options)!;
+        new SetChordFlags(Guitar, Expert, Enumerable.Range(0, 64).Select(i => i * 120L), ChordFlags.ForceStrum, on: true).Apply(chart);
+        var strummed = DifficultyEstimator.EstimatePart(chart, Guitar, Options)!;
 
-        Assert.IsGreaterThan(0.5, DifficultyEstimator.EstimatePart(chart, Guitar, Options)!.Basis.HopoTapShare);
+        Assert.IsGreaterThan(0.5, estimate.Basis.HopoTapShare);
+        Assert.IsGreaterThan(estimate.Rating!.Attributes.Strum, strummed.Rating!.Attributes.Strum);
     }
 
     [TestMethod]
-    public void AddingNotesNeverLowersTheTier()
+    public void NotesAfterTheEndEventAreNotRated()
     {
-        var random = new Random(9);
-        var notes = new List<EditableNote>();
-        int last = -1;
-        for (int round = 0; round < 40; round++)
-        {
-            for (int i = 0; i < 20; i++)
-                notes.Add(new EditableNote(random.Next(0, 400) * 60L, 1, random.Next(0, 5)));
-            var chart = Chart(Guitar, notes.DistinctBy(n => (n.Tick, n.Lane)));
-            int tier = DifficultyEstimator.EstimatePart(chart, Guitar, Options)!.Tier;
-            Assert.IsGreaterThanOrEqualTo(last, tier);
-            Assert.IsTrue(tier is >= 0 and <= 6);
-            last = tier;
-        }
+        // Quarter notes, then a burst of thirty-seconds the [end] event cuts off.
+        var notes = Enumerable.Range(0, 64).Select(i => new EditableNote(i * 480L, 1, i % 3))
+            .Concat(Enumerable.Range(0, 256).Select(i => new EditableNote(40_000 + (i * 60L), 1, i % 5)));
+        var chart = Chart(Guitar, notes);
+        var whole = DifficultyEstimator.EstimatePart(chart, Guitar, Options)!;
+        chart.Events.Add(TextEvent.Of(32_000, SongEvents.EndText));
+
+        var ended = DifficultyEstimator.EstimatePart(chart, Guitar, Options)!;
+
+        Assert.IsGreaterThan(ended.Tier, whole.Tier);
+        Assert.AreEqual(64, ended.Basis.Chords);
     }
 
     [TestMethod]

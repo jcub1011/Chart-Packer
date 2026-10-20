@@ -351,17 +351,21 @@ namespace ChartBuilder.ViewModels
         /// Opens the Reduce dialog over <paramref name="lane"/>'s part (charter-spec C9 item 2): its draft is drawn over the
         /// target difficulty as the rules change, and Apply adds it as one undoable step.
         /// </summary>
-        public async Task ReduceAsync(ChartTrackKey lane)
+        /// <param name="all">Whether it opens on Reduce all, over the whole part, as CHR087's fix opens it.</param>
+        public async Task ReduceAsync(ChartTrackKey lane, bool all = false)
         {
             if (_dialogs is null || Session.Chart.PartOf(lane.Instrument) is null)
                 return;
             Session.Tools.Cancel();
-            var reduce = ReduceViewModel.ForRun(this, _settings, lane);
+            var reduce = ReduceViewModel.ForRun(this, _settings, lane, all);
             await _dialogs.ShowReduceAsync(reduce);
         }
 
         /// <summary>Opens the highway preview in a window of its own (charter-spec C18).</summary>
         public void ShowPreviewWindow(PreviewViewModel preview) => _dialogs?.ShowPreview(preview);
+
+        /// <summary>Opens the difficulty analysis in a window of its own.</summary>
+        public void ShowDifficultyWindow(DifficultyViewModel difficulty) => _dialogs?.ShowDifficulty(difficulty);
 
         /// <summary>Copies the selected notes, or the range selected across lanes, to the clipboard (Ctrl+C, charter-spec C15 item 3).</summary>
         public void Copy()

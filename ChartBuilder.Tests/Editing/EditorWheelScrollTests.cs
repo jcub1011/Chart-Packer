@@ -1,6 +1,7 @@
 using ChartBuilder.Controls;
 using ChartBuilder.Controls.Editing;
 using ChartBuilder.Services;
+using ChartShared.UI.Controls;
 
 namespace ChartBuilder.Tests.Editing;
 
@@ -12,9 +13,9 @@ public sealed class EditorWheelScrollTests
     public void OneNotchStepsOneGridStepEachWay()
     {
         double carry = 0;
-        Assert.AreEqual(1, EditorCanvas.TakeScrollStep(ref carry, 1, fast: false));
+        Assert.AreEqual(1, WheelSteps.TakeScrollStep(ref carry, 1, fast: false));
         Assert.AreEqual(0, carry, 1e-9);
-        Assert.AreEqual(-1, EditorCanvas.TakeScrollStep(ref carry, -1, fast: false));
+        Assert.AreEqual(-1, WheelSteps.TakeScrollStep(ref carry, -1, fast: false));
         Assert.AreEqual(0, carry, 1e-9);
     }
 
@@ -22,9 +23,9 @@ public sealed class EditorWheelScrollTests
     public void ShiftNotchStepsFourGridStepsEachWay()
     {
         double carry = 0;
-        Assert.AreEqual(4, EditorCanvas.TakeScrollStep(ref carry, 1, fast: true));
+        Assert.AreEqual(4, WheelSteps.TakeScrollStep(ref carry, 1, fast: true));
         Assert.AreEqual(0, carry, 1e-9);
-        Assert.AreEqual(-4, EditorCanvas.TakeScrollStep(ref carry, -1, fast: true));
+        Assert.AreEqual(-4, WheelSteps.TakeScrollStep(ref carry, -1, fast: true));
         Assert.AreEqual(0, carry, 1e-9);
     }
 
@@ -32,9 +33,9 @@ public sealed class EditorWheelScrollTests
     public void AMouseThatReportsSeveralUnitsPerNotchStillStepsOnce()
     {
         double carry = 0;
-        Assert.AreEqual(1, EditorCanvas.TakeScrollStep(ref carry, 3, fast: false));
+        Assert.AreEqual(1, WheelSteps.TakeScrollStep(ref carry, 3, fast: false));
         Assert.AreEqual(0, carry, 1e-9, "Whole notches are consumed.");
-        Assert.AreEqual(-4, EditorCanvas.TakeScrollStep(ref carry, -4, fast: true));
+        Assert.AreEqual(-4, WheelSteps.TakeScrollStep(ref carry, -4, fast: true));
         Assert.AreEqual(0, carry, 1e-9, "Shift multiplies the single notch taken, not the raw turn.");
     }
 
@@ -42,15 +43,15 @@ public sealed class EditorWheelScrollTests
     public void FractionalTouchpadTurnsAddUpToSteps()
     {
         double carry = 0;
-        Assert.AreEqual(0, EditorCanvas.TakeScrollStep(ref carry, 0.4, fast: false));
-        Assert.AreEqual(0, EditorCanvas.TakeScrollStep(ref carry, 0.4, fast: false));
-        Assert.AreEqual(1, EditorCanvas.TakeScrollStep(ref carry, 0.4, fast: false));
+        Assert.AreEqual(0, WheelSteps.TakeScrollStep(ref carry, 0.4, fast: false));
+        Assert.AreEqual(0, WheelSteps.TakeScrollStep(ref carry, 0.4, fast: false));
+        Assert.AreEqual(1, WheelSteps.TakeScrollStep(ref carry, 0.4, fast: false));
         Assert.AreEqual(0.2, carry, 1e-9);
 
         carry = 0;
-        Assert.AreEqual(0, EditorCanvas.TakeScrollStep(ref carry, 0.4, fast: true));
-        Assert.AreEqual(0, EditorCanvas.TakeScrollStep(ref carry, 0.4, fast: true));
-        Assert.AreEqual(4, EditorCanvas.TakeScrollStep(ref carry, 0.4, fast: true));
+        Assert.AreEqual(0, WheelSteps.TakeScrollStep(ref carry, 0.4, fast: true));
+        Assert.AreEqual(0, WheelSteps.TakeScrollStep(ref carry, 0.4, fast: true));
+        Assert.AreEqual(4, WheelSteps.TakeScrollStep(ref carry, 0.4, fast: true));
         Assert.AreEqual(0.2, carry, 1e-9);
     }
 
@@ -58,19 +59,19 @@ public sealed class EditorWheelScrollTests
     public void TurningBackStartsOver()
     {
         double carry = 0.6;
-        Assert.AreEqual(-1, EditorCanvas.TakeScrollStep(ref carry, -1, fast: false));
+        Assert.AreEqual(-1, WheelSteps.TakeScrollStep(ref carry, -1, fast: false));
         Assert.AreEqual(0, carry, 1e-9);
 
         carry = 0.6;
-        Assert.AreEqual(-4, EditorCanvas.TakeScrollStep(ref carry, -1, fast: true));
+        Assert.AreEqual(-4, WheelSteps.TakeScrollStep(ref carry, -1, fast: true));
         Assert.AreEqual(0, carry, 1e-9);
     }
 
     [TestMethod]
     public void WheelUpIsLaterKeepsTheTurn()
     {
-        Assert.AreEqual(1, EditorCanvas.TowardLater(1, wheelUpIsLater: true));
-        Assert.AreEqual(-1, EditorCanvas.TowardLater(-1, wheelUpIsLater: true));
+        Assert.AreEqual(1, WheelSteps.TowardLater(1, wheelUpIsLater: true));
+        Assert.AreEqual(-1, WheelSteps.TowardLater(-1, wheelUpIsLater: true));
     }
 
     [TestMethod]
@@ -85,18 +86,18 @@ public sealed class EditorWheelScrollTests
     [TestMethod]
     public void FlippedWheelDownIsLater()
     {
-        Assert.AreEqual(-1, EditorCanvas.TowardLater(1, wheelUpIsLater: false));
-        Assert.AreEqual(1, EditorCanvas.TowardLater(-1, wheelUpIsLater: false));
+        Assert.AreEqual(-1, WheelSteps.TowardLater(1, wheelUpIsLater: false));
+        Assert.AreEqual(1, WheelSteps.TowardLater(-1, wheelUpIsLater: false));
 
         double carry = 0;
-        Assert.AreEqual(4, EditorCanvas.TakeScrollStep(ref carry, EditorCanvas.TowardLater(-1, wheelUpIsLater: false), fast: true));
+        Assert.AreEqual(4, WheelSteps.TakeScrollStep(ref carry, WheelSteps.TowardLater(-1, wheelUpIsLater: false), fast: true));
     }
 
     [TestMethod]
     public void NoTurnTakesNoStep()
     {
         double carry = 0;
-        Assert.AreEqual(0, EditorCanvas.TakeScrollStep(ref carry, 0, fast: false));
-        Assert.AreEqual(0, EditorCanvas.TakeScrollStep(ref carry, 0, fast: true));
+        Assert.AreEqual(0, WheelSteps.TakeScrollStep(ref carry, 0, fast: false));
+        Assert.AreEqual(0, WheelSteps.TakeScrollStep(ref carry, 0, fast: true));
     }
 }

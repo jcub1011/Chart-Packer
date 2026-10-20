@@ -13,9 +13,6 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ChartBuilder.ViewModels
 {
-    /// <summary>A difficulty a roll or trill can reach down to, as Properties offers it.</summary>
-    public sealed record DifficultyChoice(ChartDifficulty Difficulty, string Label);
-
     /// <summary>
     /// The Properties panel (charter-spec C3 item 4): the selected notes, phrases, disco flip sections, tempo markers and
     /// span, or a vocal part's notes and phrases (C3 item 7). A field shows <see cref="Multiple"/> when the items differ,
