@@ -12,12 +12,26 @@ namespace ChartShared.Core.Charting.Difficulty;
 /// <param name="KickIndependence">For drums, the share of kicks with no pad on their tick; null for frets, or no kicks.</param>
 public sealed record DifficultyBasis(int Chords, double Seconds, double PeakNps, double AverageNps, double ChordShare, double HopoTapShare, double? KickIndependence);
 
-/// <summary>A suggested <c>diff_*</c> tier, from 0 to 6, the score it came from, and what that was worked out from.</summary>
-public sealed record DifficultyEstimate(int Tier, double Score, DifficultyBasis Basis);
+/// <summary>What the difficulty model (docs/difficulty-model.md) made of a five-fret track.</summary>
+/// <param name="Rank">Its rank, continuous: 0 to 6 for charts written to be played, 7 and up for overcharts.</param>
+/// <param name="Attributes">Each attribute's score over the whole track.</param>
+public sealed record DifficultyRating(double Rank, DifficultyAttributes Attributes)
+{
+    /// <summary>Whether it's beyond realistic play: rank 7 or more.</summary>
+    public bool IsOverchart => Rank >= RankCurve.FirstOverchart;
+}
 
 /// <summary>
-/// The weights a suggested rating is scored by (charter-spec C18 item 3). They're set by hand in v1, to be tuned against
-/// rated charts later (§14).
+/// A suggested <c>diff_*</c> tier, the score it came from, and what that was worked out from. For five-fret parts the tier
+/// is the difficulty model's rank, 0 and up, and <see cref="Rating"/> says more; for drums and six-fret, it's from 0 to 6.
+/// </summary>
+/// <remarks>Scores are comparable between the difficulties of one part, not between kinds of part.</remarks>
+public sealed record DifficultyEstimate(int Tier, double Score, DifficultyBasis Basis, DifficultyRating? Rating = null);
+
+/// <summary>
+/// The weights a drums or six-fret rating is scored by (charter-spec C18 item 3). They're set by hand in v1, to be tuned
+/// against rated charts later (§14). Five-fret parts are rated by the difficulty model's own parameters
+/// (<see cref="DifficultyParameters"/>).
 /// </summary>
 public static class DifficultyWeights
 {
@@ -39,19 +53,28 @@ public static class DifficultyWeights
 }
 
 /// <summary>
-/// Suggests a <c>diff_*</c> tier for a part (charter-spec C18 item 3), from peak and average notes per second, how many
-/// chords there are, how many HOPOs and taps, and for drums how often the kick is played apart from the hands. It reads
-/// the game view, so natural HOPOs count as the games play them. It's only a suggestion, shown with what it was based on.
+/// Suggests a <c>diff_*</c> tier for a part (charter-spec C18 item 3). It reads the game view, so natural HOPOs count as
+/// the games play them. It's only a suggestion, shown with what it was based on.
 /// </summary>
-/// <remarks>One <c>diff_*</c> key rates a whole part, so the part's rating is its highest charted difficulty's.</remarks>
+/// <remarks>
+/// <para>Five-fret parts are rated by the difficulty model (<see cref="DifficultyAnalyzer"/>): how hard the strumming,
+/// fretting, rhythm and patterns are moment by moment, and how long that goes on, scored by the hardest stretches.
+/// Overcharts are rated 7 and up.</para>
+/// <para>Drums and six-fret, which the model doesn't cover, are rated from peak and average notes per second, how many
+/// chords there are, how many HOPOs and taps, and for drums how often the kick is played apart from the hands.</para>
+/// <para>One <c>diff_*</c> key rates a whole part, so the part's rating is its highest charted difficulty's.</para>
+/// </remarks>
 public static class DifficultyEstimator
 {
-    /// <summary>The tier of one track as the games read it, or null when it has fewer than two chords, or none apart in time.</summary>
-    public static DifficultyEstimate? Estimate(NoteTrack track, TempoMap tempo, ChartInstrumentKind kind)
+    /// <summary>
+    /// The tier of one track as the games read it, or null when it has fewer than two chords, or none apart in time. Notes
+    /// after <paramref name="endTick"/>, the <c>[end]</c> event, aren't rated.
+    /// </summary>
+    public static DifficultyEstimate? Estimate(NoteTrack track, TempoMap tempo, ChartInstrumentKind kind, long? endTick = null)
     {
         ArgumentNullException.ThrowIfNull(track);
         ArgumentNullException.ThrowIfNull(tempo);
-        var chords = track.Notes.GroupBy(static n => n.Tick).OrderBy(static g => g.Key).Select(static g => g.ToList()).ToList();
+        var chords = track.Notes.Where(n => endTick is not { } end || n.Tick <= end).GroupBy(static n => n.Tick).OrderBy(static g => g.Key).Select(static g => g.ToList()).ToList();
         if (chords.Count < 2)
             return null;
         double[] times = [.. chords.Select(c => tempo.SecondsAt(c[0].Tick))];
@@ -81,11 +104,18 @@ public static class DifficultyEstimator
             kick = kicks > 0 ? (double)alone / kicks : null;
         }
 
+        var basis = new DifficultyBasis(chords.Count, seconds, peak, average, chordShare, hopoTap, kick);
+        if (kind == ChartInstrumentKind.FiveFret)
+        {
+            var profile = DifficultyAnalyzer.Analyze(track, tempo, endTick);
+            return new DifficultyEstimate(profile.Tier, profile.ChartScore, basis, new DifficultyRating(profile.Rank, profile.ChartAttributes));
+        }
+
         double score = drums
             ? (DifficultyWeights.DrumPeak * peak) + (DifficultyWeights.DrumAverage * average) + (DifficultyWeights.DrumChords * chordShare) + (DifficultyWeights.DrumKickIndependence * (kick ?? 0))
             : (DifficultyWeights.FretPeak * peak) + (DifficultyWeights.FretAverage * average) + (DifficultyWeights.FretChords * chordShare) + (DifficultyWeights.FretHopoTap * hopoTap);
         int tier = DifficultyWeights.TierThresholds.Count(t => score >= t);
-        return new DifficultyEstimate(tier, score, new DifficultyBasis(chords.Count, seconds, peak, average, chordShare, hopoTap, kick));
+        return new DifficultyEstimate(tier, score, basis);
     }
 
     /// <summary>Each charted difficulty's tier of <paramref name="part"/>, as the games read it with <paramref name="options"/>.</summary>
@@ -97,12 +127,13 @@ public static class DifficultyEstimator
         if (chart.PartOf(part) is not { } editable)
             return estimates;
         var tempo = chart.TempoMap.ToTempoMap();
+        long? end = DifficultyNotes.EndTickOf(chart);
         foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
         {
             if (editable[difficulty].Notes.Count == 0)
                 continue;
             var game = GameView.Project(chart, new ChartTrackKey(part, difficulty), options);
-            if (Estimate(game, tempo, editable.Kind) is { } estimate)
+            if (Estimate(game, tempo, editable.Kind, end) is { } estimate)
                 estimates[difficulty] = estimate;
         }
 

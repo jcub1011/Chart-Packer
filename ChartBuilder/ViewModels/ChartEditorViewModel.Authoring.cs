@@ -363,6 +363,9 @@ namespace ChartBuilder.ViewModels
         /// <summary>Opens the highway preview in a window of its own (charter-spec C18).</summary>
         public void ShowPreviewWindow(PreviewViewModel preview) => _dialogs?.ShowPreview(preview);
 
+        /// <summary>Opens the difficulty analysis in a window of its own.</summary>
+        public void ShowDifficultyWindow(DifficultyViewModel difficulty) => _dialogs?.ShowDifficulty(difficulty);
+
         /// <summary>Copies the selected notes, or the range selected across lanes, to the clipboard (Ctrl+C, charter-spec C15 item 3).</summary>
         public void Copy()
         {

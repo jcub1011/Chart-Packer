@@ -205,6 +205,7 @@ namespace ChartBuilder.Services
             try
             {
                 _authoring?.Follow(viewModel.Editor.Preview);
+                _authoring?.Follow(viewModel.Editor.Difficulty);
                 long bound = time.ElapsedMilliseconds;
                 previous?.Dispose();
                 long disposed = time.ElapsedMilliseconds;

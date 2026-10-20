@@ -98,6 +98,7 @@ namespace ChartBuilder.ViewModels
             Session.VisibleTracks = () => [.. Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>()];
             AudioAssist = new AudioAssistViewModel(this);
             Preview = new PreviewViewModel(this, settings);
+            Difficulty = new DifficultyViewModel(this);
             Playtest = new PlaytestViewModel(this, settings, input?.Settings.Settings, Devices);
 
             _refresh = new DispatcherTimer(DispatcherPriority.Background) { Interval = RefreshDelay };
@@ -134,6 +135,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The highway preview, docked in the side panel or in a window of its own (charter-spec C18).</summary>
         public PreviewViewModel Preview { get; }
+
+        /// <summary>The difficulty analysis of a five-fret lane, docked in the side panel or in a window of its own.</summary>
+        public DifficultyViewModel Difficulty { get; }
 
         /// <summary>Playtest: the focused lane played with the keyboard and the instrument devices (charter-spec C19).</summary>
         public PlaytestViewModel Playtest { get; }
@@ -512,6 +516,7 @@ namespace ChartBuilder.ViewModels
             Playback.Scrubbed -= OnScrubbed;
             Lanes.LayoutChanged -= OnLayoutChanged;
             Preview.Dispose();
+            Difficulty.Dispose();
             Playtest.Dispose();
             _devices?.Dispose();
             _devices = null;

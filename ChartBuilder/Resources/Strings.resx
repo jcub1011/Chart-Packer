@@ -2423,7 +2423,7 @@ Saving also makes these changes to song.ini:
     <value>The most notes a second over any two seconds, the draft in place</value>
   </data>
   <data name="ReduceTierToolTip" xml:space="preserve">
-    <value>Suggested rating, from 0 to 6</value>
+    <value>Suggested rating: 0 to 6 for charts written to be played, 7 and up for overcharts</value>
   </data>
   <data name="ReduceRulesHeading" xml:space="preserve">
     <value>Rules</value>
@@ -2791,6 +2791,114 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="SuggestedRatingUsedFormat" xml:space="preserve">
     <value>Rating {0} will be saved as {1}.</value>
+  </data>
+  <data name="SuggestedRatingRankFormat" xml:space="preserve">
+    <value>Rank {0:0.00}, 0 to 6 for charts written to be played</value>
+  </data>
+  <data name="SuggestedRatingOverchartFormat" xml:space="preserve">
+    <value>Rank {0:0.00}: an overchart, beyond realistic play</value>
+  </data>
+  <data name="SuggestedRatingAttributesFormat" xml:space="preserve">
+    <value>Strum {0:0}, note {1:0}, rhythm {2:0}, pattern {3:0}, endurance {4:0} (100 is the limit of realistic play)</value>
+  </data>
+  <data name="SuggestedRatingModelSuggestion" xml:space="preserve">
+    <value>Only a suggestion, from a difficulty model not yet tuned against rated charts.</value>
+  </data>
+  <data name="DifficultyTab" xml:space="preserve">
+    <value>Difficulty</value>
+  </data>
+  <data name="DifficultyWindowTitle" xml:space="preserve">
+    <value>Difficulty</value>
+  </data>
+  <data name="DifficultyTrackToolTip" xml:space="preserve">
+    <value>The part and difficulty analyzed: the lane in focus, or one picked</value>
+  </data>
+  <data name="DifficultyOpenWindowToolTip" xml:space="preserve">
+    <value>Show the analysis in a window of its own, with room for the graph</value>
+  </data>
+  <data name="DifficultyNothing" xml:space="preserve">
+    <value>Nothing to analyze: focus a five-fret lane with notes, or pick one.</value>
+  </data>
+  <data name="DifficultyNotFiveFret" xml:space="preserve">
+    <value>The difficulty analysis covers five-fret parts. Drums and six-fret are rated from note density, in the Preview tab.</value>
+  </data>
+  <data name="DifficultyFailed" xml:space="preserve">
+    <value>The difficulty couldn't be worked out. The log says why.</value>
+  </data>
+  <data name="DifficultyRankFormat" xml:space="preserve">
+    <value>Rank {0:0.0}</value>
+  </data>
+  <data name="DifficultyOverchartFormat" xml:space="preserve">
+    <value>Rank {0:0.0} · overchart</value>
+  </data>
+  <data name="DifficultyRankToolTipFormat" xml:space="preserve">
+    <value>The chart's rank: 0 to 6 for charts written to be played, 7 and up for overcharts. From its score, {0:0.0}, which weighs its hardest stretches the most.</value>
+  </data>
+  <data name="DifficultyScopeChart" xml:space="preserve">
+    <value>Whole chart</value>
+  </data>
+  <data name="DifficultyScopeSelection" xml:space="preserve">
+    <value>Selection</value>
+  </data>
+  <data name="DifficultyScopePlayhead" xml:space="preserve">
+    <value>Playhead</value>
+  </data>
+  <data name="DifficultyScopeToolTip" xml:space="preserve">
+    <value>What the spider graph shows: the whole chart, the selection, or the moment at the playhead</value>
+  </data>
+  <data name="DifficultyIsolated" xml:space="preserve">
+    <value>Alone</value>
+  </data>
+  <data name="DifficultyIsolatedToolTip" xml:space="preserve">
+    <value>Rate the selection as if practised on its own, with nothing built up before it; off, as it's played in the song</value>
+  </data>
+  <data name="DifficultyNoSelection" xml:space="preserve">
+    <value>Select a range in the lanes to rate it.</value>
+  </data>
+  <data name="DifficultyScoreFormat" xml:space="preserve">
+    <value>Score {0:0.0} · rank {1:0.0}</value>
+  </data>
+  <data name="DifficultyAttributeStrum" xml:space="preserve">
+    <value>Strum</value>
+  </data>
+  <data name="DifficultyAttributeNote" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="DifficultyAttributeRhythm" xml:space="preserve">
+    <value>Rhythm</value>
+  </data>
+  <data name="DifficultyAttributePattern" xml:space="preserve">
+    <value>Pattern</value>
+  </data>
+  <data name="DifficultyAttributeEndurance" xml:space="preserve">
+    <value>Endurance</value>
+  </data>
+  <data name="DifficultyLinesLabel" xml:space="preserve">
+    <value>Lines</value>
+  </data>
+  <data name="DifficultyLineToolTip" xml:space="preserve">
+    <value>Show this attribute on the graph, beside the overall difficulty</value>
+  </data>
+  <data name="DifficultySpiderName" xml:space="preserve">
+    <value>Difficulty by attribute</value>
+  </data>
+  <data name="DifficultySpiderToolTip" xml:space="preserve">
+    <value>Each attribute's difficulty: the ring is 100, the limit of realistic clean play. The dashed shape is the whole chart.</value>
+  </data>
+  <data name="DifficultyGraphName" xml:space="preserve">
+    <value>Difficulty over the song</value>
+  </data>
+  <data name="DifficultyAtFormat" xml:space="preserve">
+    <value>Difficulty {0:0.0}, rank {1:0.0}</value>
+  </data>
+  <data name="DifficultyHardestFormat" xml:space="preserve">
+    <value>Hardest: {0}</value>
+  </data>
+  <data name="DifficultyAtSectionFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="DifficultyLegend" xml:space="preserve">
+    <value>Dashed lines are where each rank starts; shaded stretches count the most towards the score; blue is a solo. Click to move the playhead.</value>
   </data>
   <data name="ArtTab" xml:space="preserve">
     <value>Art</value>

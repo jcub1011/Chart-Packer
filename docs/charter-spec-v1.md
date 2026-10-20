@@ -2169,11 +2169,17 @@ Acceptance criteria:
      Nothing is written to disk.
 2. **Practice preview**: the preview over the loop region at the chosen speed.
 3. **Suggested difficulty.**
-   - For each part and difficulty, a suggested `diff_*` tier from 0 to 6.
-   - It is based on peak and average notes per second, chord density, and HOPO/tap density
-     (and, for drums, independence between hands and kick).
+   - For each part and difficulty, a suggested `diff_*` tier: 0 to 6 for charts written to be
+     played, and 7 and up for overcharts.
+   - Five-fret parts are rated by the difficulty model ([difficulty-model.md](difficulty-model.md)).
+     It measures strum, note, rhythm, pattern and endurance difficulty moment by moment, and scores
+     the chart by its hardest stretches.
+   - Drums and six-fret, which the model doesn't cover, are rated from peak and average notes per
+     second, chord density, HOPO/tap density, and (for drums) independence between hands and kick.
    - It is shown with what it was based on, and is only a suggestion.
-   - The weights are fixed in v1 and will be tuned against rated charts.
+   - The parameters are fixed in v1 and will be tuned against rated charts.
+4. **Difficulty analysis.** For a five-fret part and difficulty, the model's rank, a spider graph of
+   its five attributes, and its difficulty over the song with the sections and the rank lines.
 
 *Settled in CM5:*
 
@@ -2190,7 +2196,19 @@ Acceptance criteria:
   whole part. It's shown in the preview's header, with what it was worked out from and each
   difficulty's own tier in its tooltip. **Use as diff_…** sets the part's keys that `song.ini`
   rates otherwise, as pending changes Revert takes back; it's never written otherwise. It's also
-  CHR083's fix. Peak density is over any two seconds; the weights are `DifficultyWeights`.
+  CHR083's fix. Five-fret parts are rated by `DifficultyAnalyzer`, and an overchart is suggested as
+  7 or more. For drums and six-fret, peak density is over any two seconds, and the weights are
+  `DifficultyWeights`. The suggestion is worked out off the UI thread.
+- **The difficulty analysis** is a **Difficulty** tab in the Editor's right panel, and a window of
+  its own. It follows the lane in focus, or a part and difficulty picked. It shows:
+  - the rank;
+  - a spider graph for the whole chart, the selection (in the song, or alone) or the playhead,
+    with the whole chart's shape behind;
+  - the peak envelope over the song, with lines for each attribute that can be shown;
+  - the rank lines, the sections and solos, and the windows that count most toward the score.
+
+  A click on the graph moves playback there. After an edit that touches the track, the whole track
+  is read again a moment later, off the UI thread, and only while the analysis is shown.
 
 Acceptance criteria:
 
@@ -2912,8 +2930,10 @@ fails the run if anything there changes anyway.
 - MIDI devices on macOS and Linux.
 - Keeping and replaying a playtest performance, judged again against the chart as it changes.
 - Rebindable editor shortcuts (instrument bindings are in C19).
-- Suggested difficulty weights fitted to a set of rated charts, and the suggestion shown in the
-  library and inspector as well as Chart Builder.
+- The difficulty model's parameters and rank thresholds fitted to a set of rated charts, and the
+  suggestion shown in the library and inspector as well as Chart Builder.
+- The difficulty model for drums and six-fret, and its values used by other tools, such as finding
+  solos or placing star power.
 
 ## 15. Open questions
 
@@ -2960,7 +2980,7 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   the global fallback ([C11](#c11-calibration-tool)).
 - **`.chart` after import:** removed on the first save, after a confirmation. No backup is kept
   ([C2](#c2-open-and-import)).
-- **Suggested difficulty:** shown in Chart Builder only, with fixed hand-set weights in v1. Tuning and
+- **Suggested difficulty:** shown in Chart Builder only, with fixed parameters in v1. Tuning and
   showing it in the library are future work ([C18](#c18-preview)).
 - **Generated drum fills:** the author picks the spacing, length and ending note on each run
   ([C6](#c6-drums-4-lane-pro-and-5-lane)).
