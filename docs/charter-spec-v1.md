@@ -461,6 +461,21 @@ same song at once, and Chart Packer re-reads the songs Chart Builder may have ch
 the current folder as they're read (`BuilderArgs.Parse`). Arguments that can't be used (an unknown
 option, a second song path, an empty argument, a missing path) open the home screen and say why.
 
+**Difficulty report.** `--difficulty-report <songs folder> [--out <file.csv>] [--depth <levels>]`
+opens no window. It rates every song under the folder with the difficulty model
+([difficulty-model.md](difficulty-model.md)) and writes a CSV (`DifficultyReport`). The CSV has a
+row for each song, with its path and then, for guitar, bass, rhythm and guitar co-op:
+
+- the `diff_*` rating `song.ini` reports;
+- the model's rank for the part's highest charted difficulty;
+- each of the five attributes' scores.
+
+Values are to a tenth. A last column says why a song couldn't be read. Without `--out`, the CSV is
+`difficulty-report.csv` in the current folder; `--depth` defaults to 10 folder levels. Songs are only
+read, and neither the settings nor the log are touched. Progress goes to the console it was run from
+(`DifficultyReportArgs.Parse`; exit code 0 when written, 1 for bad arguments, 2 when the CSV can't be
+written).
+
 **Finding Chart Builder.** Chart Packer runs the `ChartBuilder` executable that sits next to its
 own (`Environment.ProcessPath`). If it isn't there, Chart Packer says Chart Builder isn't installed
 and goes on without it. In Debug builds each app keeps its own output folder. Building Chart Packer
