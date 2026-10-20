@@ -1,8 +1,5 @@
 using System;
-using System.Collections.Generic;
 using Avalonia.Input;
-using ChartShared.Core;
-using ChartShared.Core.Input;
 using ChartShared.UI.Services;
 
 namespace ChartBuilder.Services
@@ -14,31 +11,11 @@ namespace ChartBuilder.Services
     /// <param name="input">The app's instrument devices and their settings.</param>
     public sealed class CalibrationTapInput(InputService input) : ICalibrationTaps
     {
-        /// <summary>Runs the devices while it listens, and hands on each press of any of them (<see cref="PressDetector"/>).</summary>
+        /// <summary>Runs the devices while it listens, and hands on each press of any of them (<see cref="InputService.ListenPresses"/>).</summary>
         public IDisposable Listen(Action<double, int> tapped)
         {
             ArgumentNullException.ThrowIfNull(tapped);
-
-            var lease = input.Hub.Acquire();
-            var presses = new Dictionary<InputDeviceId, PressDetector>();
-            void OnReceived(IReadOnlyList<RawInputEvent> batch)
-            {
-                foreach (var e in batch)
-                {
-                    var tuning = input.Settings.Settings.TuningOf(e.Device);
-                    if (!presses.TryGetValue(e.Device, out var detector))
-                        presses[e.Device] = detector = new PressDetector(e.Device, tuning.MinVelocity);
-                    if (detector.Feed(e))
-                        tapped(e.Time, tuning.OffsetMs);
-                }
-            }
-
-            input.Hub.Received += OnReceived;
-            return new DisposeAction(() =>
-            {
-                input.Hub.Received -= OnReceived;
-                lease.Dispose();
-            });
+            return input.ListenPresses(_ => true, (e, tuning) => tapped(e.Time, tuning.OffsetMs));
         }
 
         public void Key(PhysicalKey key, bool down) => input.PostKey(key, down);

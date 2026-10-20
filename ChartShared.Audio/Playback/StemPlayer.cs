@@ -71,6 +71,10 @@ public sealed class StemPlayer : IDisposable
     private long _regionEnd = -1;
     private bool _regionLoops;
 
+    // Whether the mix has turned back to the loop's start since the last seek, so what's heard just after its start may
+    // still be its end.
+    private bool _looped;
+
     // Frames written to the output since it was opened: what's been played is this less what's still queued.
     private long _writtenFrames;
 
@@ -236,7 +240,8 @@ public sealed class StemPlayer : IDisposable
     /// nothing from there is heard for the latency, so it's held where playing started until what's heard gets there,
     /// rather than stepping back by the latency and coming on again. With <see cref="PauseWhereDrawn"/> it never jumps,
     /// starting or stopping. A negative latency, where the screen is later than the audio, still steps forward as playing
-    /// starts: what's to come can't be shown before it's played.
+    /// starts, and back as it stops: what's to come can't be shown before it's played. A loop that has just turned back
+    /// to its start is drawn at its end until what's heard gets there.
     /// </remarks>
     public TimeSpan DrawnPosition(int latencyMilliseconds)
     {
@@ -245,13 +250,22 @@ public sealed class StemPlayer : IDisposable
             if (!_playing)
                 return Position;
 
-            var drawn = LatencyCompensation.Drawn(Smooth(), latencyMilliseconds, _speed);
+            var smooth = Smooth();
+            var drawn = LatencyCompensation.Drawn(smooth, latencyMilliseconds, _speed);
             if (_holdFrame is { } hold)
             {
                 var held = FramesToTime(hold);
                 if (drawn < held)
                     return held;
                 _holdFrame = null;
+            }
+
+            // Played back from the loop's start, what's heard is still the end of the loop, from before it turned.
+            if (_looped && _regionEnd >= 0 && _regionLoops)
+            {
+                var start = FramesToTime(_regionStart);
+                if (drawn < start && smooth >= start)
+                    return TimeSpan.FromTicks(Math.Max(start.Ticks, (FramesToTime(_regionEnd) - (start - drawn)).Ticks));
             }
 
             return drawn;
@@ -467,7 +481,9 @@ public sealed class StemPlayer : IDisposable
     /// <summary>
     /// Pauses where <see cref="DrawnPosition"/> is, for a latency of <paramref name="latencyMilliseconds"/>, rather than
     /// where the audio is: what's seen stays where it was, and playing again starts from there, so the audio that was
-    /// still to be heard is heard again. A region goes on as with <see cref="Pause"/>.
+    /// still to be heard is heard again. A region goes on as with <see cref="Pause"/>. With a latency of 0 or less, what's
+    /// drawn is no later than what's heard, so it pauses where the audio is, as <see cref="Pause"/> does, rather than
+    /// skipping audio that was never heard.
     /// </summary>
     public void PauseWhereDrawn(int latencyMilliseconds)
     {
@@ -476,7 +492,7 @@ public sealed class StemPlayer : IDisposable
             if (_disposed)
                 return;
 
-            bool seeks = _playing && _error is null;
+            bool seeks = _playing && _error is null && latencyMilliseconds > 0;
             var drawn = DrawnPosition(latencyMilliseconds);
             _playing = false;
             _holdFrame = null;
@@ -679,6 +695,7 @@ public sealed class StemPlayer : IDisposable
                         _nominal.Reset(_writtenFrames, _mixer.PositionFrames);
                         _tap.Clear();
                         _retune = false;
+                        _looped = false;
                         if (_pendingSeek == seek)
                             _pendingSeek = null;
 
@@ -813,6 +830,8 @@ public sealed class StemPlayer : IDisposable
         if (_stretching)
             _stretcher.Reset(_mixer.PositionFrames);
         _soundsFrom = start;
+        lock (_lock)
+            _looped = true;
         return RegionEnd.Wrapped;
     }
 

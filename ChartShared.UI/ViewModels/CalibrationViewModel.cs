@@ -44,6 +44,11 @@ namespace ChartShared.UI.ViewModels
     /// a click on the highway, with no offset.
     /// </para>
     /// <para>
+    /// Keys and clicks are timed when they're handled (charter-spec C15 item 5): Avalonia's key events carry no timestamp,
+    /// and a click's is the OS's message time, only as fine as its 15.6 ms tick on Windows. Through the app's devices, the
+    /// keyboard's offset was measured the same way, so the time taken to handle a key comes off with it.
+    /// </para>
+    /// <para>
     /// Nothing is stored until <see cref="SaveCommand"/>; closing the tool any other way leaves the stored latency as
     /// it was (AC C11.5).
     /// </para>
@@ -69,11 +74,10 @@ namespace ChartShared.UI.ViewModels
         private readonly Func<double> _inputClock;
         private readonly DispatcherTimer _timer;
 
-        // The tap test's clicks and taps, in seconds of song, and the keys held down, when the window times them itself.
+        // The tap test's clicks and taps, and when it started, in seconds of song.
         private readonly List<double> _taps = [];
-        private readonly HashSet<PhysicalKey> _keysDown = [];
         private double[] _clicks = [];
-        private double _countIn;
+        private double _tapStart;
 
         private StemPlayer? _player;
         private MetronomeSchedule? _metronome;
@@ -100,7 +104,7 @@ namespace ChartShared.UI.ViewModels
             DeviceName = DeviceNameOf(device.Name);
             Scene = SceneOf(CalibrationChart.Notes(CalibrationChart.BeatsIn(MixLength - Lead)), Lead);
 
-            _timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TickInterval };
+            _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TickInterval };
             _timer.Tick += (_, _) => Tick();
         }
 
@@ -190,6 +194,7 @@ namespace ChartShared.UI.ViewModels
                 _player = new StemPlayer(mixer, output, _clock) { MinimumLength = MixLength };
                 _metronome = new MetronomeSchedule(CalibrationChart.Tempo, Lead, MixLength, SampleRate);
                 _player.Sounds = _metronome;
+                _player.Stopped += OnPlayerStopped;
                 _latency.Changed += OnLatencyChanged;
                 _following = _latency.Follow(output);
                 _player.Play();
@@ -237,9 +242,8 @@ namespace ChartShared.UI.ViewModels
                 return;
 
             _taps.Clear();
-            _keysDown.Clear();
             var from = player.Position;
-            _countIn = AudioTapTest.CountInStart(from);
+            _tapStart = from.TotalSeconds;
             _clicks = AudioTapTest.ClickTimes(from);
             player.Sounds = TapClicks(from, SampleRate);
             IsTapStatusWarning = false;
@@ -253,19 +257,18 @@ namespace ChartShared.UI.ViewModels
         private bool CanBeginTaps() => _player is { IsPlaying: true } && TapState != DeviceTestState.Running;
 
         /// <summary>
-        /// A key went down or up in the window while the tap test runs: handed on to the app's keyboard device when there is
-        /// one, or else timed now, a key held down tapping once.
+        /// A key went down in the window while the tap test runs, the window handing on only its first press, or a key it
+        /// handed on went up, which may be after the test: handed on to the app's keyboard device when there is one, so it's
+        /// never left held there, or else a key down is timed now.
         /// </summary>
         public void Key(PhysicalKey key, bool down)
         {
-            if (!IsTapping)
+            if (down && !IsTapping)
                 return;
 
             if (_tapInput is { } input)
                 input.Key(key, down);
-            else if (!down)
-                _keysDown.Remove(key);
-            else if (_keysDown.Add(key))
+            else if (down)
                 OnTapped(_inputClock(), 0);
         }
 
@@ -298,32 +301,34 @@ namespace ChartShared.UI.ViewModels
             if (_player is not { } player || _clicks.Length == 0)
                 return;
 
-            if (player.Position.TotalSeconds >= AudioTapTest.EndSeconds(_clicks))
+            double at = player.Position.TotalSeconds;
+            if (at >= AudioTapTest.EndSeconds(_clicks))
             {
                 FinishTaps();
                 return;
             }
 
             // Counted on the clicks' beat with no latency, so the latency being measured never moves the count, and the
-            // first click comes on the beat after 1.
-            double at = player.Position.TotalSeconds;
-            double beat = (at - _countIn) / CalibrationChart.BeatSeconds;
-            if (beat < 0)
+            // first click comes on the beat after 1; each click from half a beat before it.
+            var step = CalibrationCountIn.At(
+                (at - _tapStart) / CalibrationChart.BeatSeconds,
+                AudioTapTest.ReadyBeats,
+                AudioTapTest.ReadyBeats + AudioTapTest.CountInBeats,
+                AudioTapTest.ClickCount);
+            switch (step.Phase)
             {
-                CountIn = SharedStrings.CalibrationGetReady;
-                TapStatus = SharedStrings.CalibrationGetReady;
-            }
-            else if (beat < AudioTapTest.CountInBeats)
-            {
-                CountIn = (AudioTapTest.CountInBeats - (int)Math.Floor(beat)).ToString(CultureInfo.CurrentCulture);
-                TapStatus = SharedStrings.CalibrationGetReady;
-            }
-            else
-            {
-                // Each click from half a beat before it.
-                CountIn = SharedStrings.CalibrationTapNow;
-                int click = Math.Clamp((int)Math.Floor(beat - AudioTapTest.CountInBeats + 0.5) + 1, 1, AudioTapTest.ClickCount);
-                TapStatus = string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationTapProgressFormat, click, AudioTapTest.ClickCount);
+                case CountInPhase.GetReady:
+                    CountIn = SharedStrings.CalibrationGetReady;
+                    TapStatus = SharedStrings.CalibrationGetReady;
+                    break;
+                case CountInPhase.CountIn:
+                    CountIn = step.Number.ToString(CultureInfo.CurrentCulture);
+                    TapStatus = SharedStrings.CalibrationGetReady;
+                    break;
+                default:
+                    CountIn = SharedStrings.CalibrationTapNow;
+                    TapStatus = string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationTapProgressFormat, step.Number, AudioTapTest.ClickCount);
+                    break;
             }
         }
 
@@ -373,7 +378,6 @@ namespace ChartShared.UI.ViewModels
                 player.Sounds = _metronome;
             _listening?.Dispose();
             _listening = null;
-            _keysDown.Clear();
             CountIn = null;
             HidesNotes = false;
         }
@@ -421,8 +425,30 @@ namespace ChartShared.UI.ViewModels
             _listening = null;
             _latency.Changed -= OnLatencyChanged;
             _following?.Dispose();
-            _player?.Dispose();
-            _player = null;
+            if (_player is { } player)
+            {
+                player.Stopped -= OnPlayerStopped;
+                player.Dispose();
+                _player = null;
+            }
+        }
+
+        // On the playback thread.
+        private void OnPlayerStopped(object? sender, EventArgs e) => Dispatcher.UIThread.Post(OnPlaybackStopped);
+
+        /// <summary>
+        /// The clicks stopped by themselves, as the output failed: a tap test running can't finish, as the player's position
+        /// no longer moves, so it's stopped, and the test can't be started again.
+        /// </summary>
+        private void OnPlaybackStopped()
+        {
+            if (_disposed || _player is not { } player)
+                return;
+
+            CancelTaps();
+            if (player.Error is { } error)
+                Message = string.Format(CultureInfo.CurrentCulture, SharedStrings.CalibrationAudioUnavailableFormat, error);
+            BeginTapsCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>The output moved to another device: its stored latency is loaded in place of this one's (AC C11.3).</summary>

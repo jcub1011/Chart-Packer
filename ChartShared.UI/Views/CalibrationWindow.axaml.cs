@@ -62,10 +62,11 @@ namespace ChartShared.UI.Views
                     e.Handled = true;
                     break;
 
-                // Every key is a tap, before a button or the latency's box has it, so none moves the latency.
+                // Every key is a tap, before a button or the latency's box has it, so none moves the latency. A key held
+                // down taps once; so does none for a Space held from before the test, holding calibration off.
                 case CalibrationViewModel { IsTapping: true } audio when e.Key != Key.Escape:
-                    _keysDown.Add(e.PhysicalKey);
-                    audio.Key(e.PhysicalKey, down: true);
+                    if (!(e.Key == Key.Space && audio.IsHeldBySpace) && _keysDown.Add(e.PhysicalKey))
+                        audio.Key(e.PhysicalKey, down: true);
                     e.Handled = true;
                     break;
 
@@ -84,12 +85,15 @@ namespace ChartShared.UI.Views
                     device.Key(e.PhysicalKey, down: false);
                     e.Handled = true;
                     break;
-                case CalibrationViewModel audio when _keysDown.Remove(e.PhysicalKey):
-                    audio.Key(e.PhysicalKey, down: false);
-                    e.Handled = true;
-                    break;
+                // First, so letting go of Space always lets calibration back on, whatever it was taken for since.
                 case CalibrationViewModel { IsHeldBySpace: true } audio when e.Key == Key.Space:
                     audio.IsHeldBySpace = false;
+                    if (_keysDown.Remove(e.PhysicalKey))
+                        audio.Key(e.PhysicalKey, down: false);
+                    e.Handled = true;
+                    break;
+                case CalibrationViewModel audio when _keysDown.Remove(e.PhysicalKey):
+                    audio.Key(e.PhysicalKey, down: false);
                     e.Handled = true;
                     break;
             }

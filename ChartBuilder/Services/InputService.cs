@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Input;
 using Avalonia.Threading;
 using ChartBuilder.Instruments;
+using ChartShared.Core;
 using ChartShared.Core.Input;
 
 namespace ChartBuilder.Services
@@ -53,6 +54,40 @@ namespace ChartBuilder.Services
                 return false;
             Hub.Drain();
             return true;
+        }
+
+        /// <summary>
+        /// Runs the devices until it's disposed, and hands on each press (<see cref="PressDetector"/>) of the devices
+        /// <paramref name="includes"/> says, at the time the device reported it, with the device's settings.
+        /// </summary>
+        public IDisposable ListenPresses(Func<InputDeviceId, bool> includes, Action<RawInputEvent, DeviceTuning> pressed)
+        {
+            ArgumentNullException.ThrowIfNull(includes);
+            ArgumentNullException.ThrowIfNull(pressed);
+
+            var lease = Hub.Acquire();
+            var presses = new Dictionary<InputDeviceId, PressDetector>();
+            void OnReceived(IReadOnlyList<RawInputEvent> batch)
+            {
+                foreach (var e in batch)
+                {
+                    if (!includes(e.Device))
+                        continue;
+
+                    var tuning = Settings.Settings.TuningOf(e.Device);
+                    if (!presses.TryGetValue(e.Device, out var detector))
+                        presses[e.Device] = detector = new PressDetector(e.Device, tuning.MinVelocity);
+                    if (detector.Feed(e))
+                        pressed(e, tuning);
+                }
+            }
+
+            Hub.Received += OnReceived;
+            return new DisposeAction(() =>
+            {
+                Hub.Received -= OnReceived;
+                lease.Dispose();
+            });
         }
 
         /// <summary>Has the hub see <paramref name="key"/> pressed or let go, without playing it (<see cref="InputHub.Observe"/>).</summary>
