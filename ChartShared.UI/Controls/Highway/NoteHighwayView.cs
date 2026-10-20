@@ -669,7 +669,7 @@ namespace ChartShared.UI.Controls.Highway
                 return;
 
             if (lane != _hoveredLane)
-                Cursor = lane >= 0 ? LaneScrub.HandCursor : null;
+                Cursor = lane >= 0 ? LaneScrub.UpDownCursor : null;
             _hoveredLane = lane;
             _hoverY = y;
             if (lane >= 0)
