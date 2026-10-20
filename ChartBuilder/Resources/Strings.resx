@@ -826,6 +826,26 @@ Open it anyway?</value>
     <value>speed zoom hyperspeed scroll note</value>
     <comment>Search words for the highway speed setting, separated by spaces.</comment>
   </data>
+  <data name="WheelDirectionLabel" xml:space="preserve">
+    <value>Wheel scroll direction</value>
+    <comment>A setting: which way the mouse wheel moves through the song in the editor.</comment>
+  </data>
+  <data name="WheelDirectionDescription" xml:space="preserve">
+    <value>Which way the mouse wheel moves the cursor through the song: the same on the highway, in the timeline view and on the timeline along the bottom. Shift+wheel moves four times as far.</value>
+    <comment>The wheel scroll direction setting's description.</comment>
+  </data>
+  <data name="WheelDirectionKeywords" xml:space="preserve">
+    <value>wheel scroll mouse direction invert reverse natural</value>
+    <comment>Search words for the wheel scroll direction setting, separated by spaces.</comment>
+  </data>
+  <data name="WheelDirectionUpIsLater" xml:space="preserve">
+    <value>Wheel up moves later</value>
+    <comment>A wheel scroll direction: turning the wheel up moves later in the song.</comment>
+  </data>
+  <data name="WheelDirectionDownIsLater" xml:space="preserve">
+    <value>Wheel down moves later</value>
+    <comment>A wheel scroll direction: turning the wheel down moves later in the song.</comment>
+  </data>
   <data name="MetronomeVolumeLabel" xml:space="preserve">
     <value>Metronome volume</value>
     <comment>A setting: how loud the metronome is.</comment>

@@ -2691,6 +2691,7 @@ These are the defaults. Rebinding is future work.
 | `Shift`+`O` | Nudge the selected notes to their onsets |
 | `B` | Tap tempo |
 | `Ctrl`+wheel, `+` / `−` | Zoom |
+| Wheel | Move the cursor one grid step later or earlier, the way the **Wheel scroll direction** setting says, in either view |
 | `Shift`+wheel | Move the cursor four grid steps later or earlier |
 | `Ctrl`+`1`–`4` | Easy to Expert |
 | `V` | Switch between Highway and Timeline |
@@ -2763,6 +2764,7 @@ tool.
 | Default snap | 1/16 |
 | Default editor view | Highway |
 | Editor highway speed | The inspector's default `HighwayNoteSpeed` |
+| Wheel scroll direction | Wheel up moves later, in both lane views and on the timeline along the bottom |
 | Notes keep ticks or times when the tempo changes | Keep ticks |
 | Waveform or spectrogram behind the lanes (**Lanes show**, under Audio assist) | Waveform |
 | Spectrogram memory budget (under Audio assist) | 256 MB (64 to 4096) |

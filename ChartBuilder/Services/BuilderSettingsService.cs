@@ -72,6 +72,8 @@ namespace ChartBuilder.Services
                 settings.QuantizeDivision = SnapGrid.Default.Division;
             if (!Enum.IsDefined(settings.DefaultEditorView))
                 settings.DefaultEditorView = LaneView.Highway;
+            if (!Enum.IsDefined(settings.WheelScrollDirection))
+                settings.WheelScrollDirection = WheelScrollDirection.UpIsLater;
             settings.EditorHighwaySpeed = double.IsFinite(settings.EditorHighwaySpeed)
                 ? Math.Clamp(settings.EditorHighwaySpeed, BuilderSettings.MinEditorHighwaySpeed, BuilderSettings.MaxEditorHighwaySpeed)
                 : 1;

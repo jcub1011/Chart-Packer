@@ -91,6 +91,9 @@ namespace ChartBuilder.Controls
         public static readonly StyledProperty<Func<TimeSpan>?> ClockProperty =
             AvaloniaProperty.Register<TimelineView, Func<TimeSpan>?>(nameof(Clock));
 
+        public static readonly StyledProperty<bool> WheelUpIsLaterProperty =
+            AvaloniaProperty.Register<TimelineView, bool>(nameof(WheelUpIsLater), true);
+
         public static readonly StyledProperty<Waveform?> WaveformProperty =
             AvaloniaProperty.Register<TimelineView, Waveform?>(nameof(Waveform));
 
@@ -172,6 +175,13 @@ namespace ChartBuilder.Controls
         {
             get => GetValue(ClockProperty);
             set => SetValue(ClockProperty, value);
+        }
+
+        /// <summary>Whether the wheel turned up moves the playhead later, as along the lanes; otherwise turned down does.</summary>
+        public bool WheelUpIsLater
+        {
+            get => GetValue(WheelUpIsLaterProperty);
+            set => SetValue(WheelUpIsLaterProperty, value);
         }
 
         /// <summary>The mix's waveform, as much as has been read; none until there's audio.</summary>
@@ -585,11 +595,11 @@ namespace ChartBuilder.Controls
         {
             base.OnPointerWheelChanged(e);
 
-            // A bar a notch, later with the wheel turned down, as along the lanes' timeline; four with Shift held, which
-            // some platforms report as a sideways scroll. At most one notch per wheel event.
+            // A bar a notch, later the way WheelUpIsLater says, as along the lanes; four with Shift held, which some
+            // platforms report as a sideways scroll. At most one notch per wheel event.
             bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
             double raw = e.Delta.Y != 0 ? e.Delta.Y : (fast ? e.Delta.X : 0);
-            int bars = Editing.EditorCanvas.TakeScrollStep(ref _wheel, -raw, fast);
+            int bars = Editing.EditorCanvas.TakeScrollStep(ref _wheel, Editing.EditorCanvas.TowardLater(raw, WheelUpIsLater), fast);
             if (bars != 0 && Beats is { } beats && StepBars(beats, Position, bars) is { } seconds)
                 Position = Math.Clamp(seconds, 0, Length);
 

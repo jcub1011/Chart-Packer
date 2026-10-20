@@ -275,6 +275,22 @@ namespace ChartBuilder.Services
                         Get = () => settings.Settings.EditorHighwaySpeed,
                         Set = speed => settings.Settings.EditorHighwaySpeed = speed,
                     },
+                    new ChoiceSetting<WheelScrollDirection>
+                    {
+                        Id = "charter.wheelDirection",
+                        Category = editing,
+                        Label = Strings.WheelDirectionLabel,
+                        Description = Strings.WheelDirectionDescription,
+                        Keywords = SettingKeywords.Split(Strings.WheelDirectionKeywords),
+                        DefaultValue = WheelScrollDirection.UpIsLater,
+                        Choices =
+                        [
+                            new SettingChoice<WheelScrollDirection>(WheelScrollDirection.UpIsLater, Strings.WheelDirectionUpIsLater),
+                            new SettingChoice<WheelScrollDirection>(WheelScrollDirection.DownIsLater, Strings.WheelDirectionDownIsLater),
+                        ],
+                        Get = () => settings.Settings.WheelScrollDirection,
+                        Set = direction => settings.Settings.WheelScrollDirection = direction,
+                    },
                     new ChoiceSetting<LaneBackdrop>
                     {
                         Id = "charter.laneBackdrop",

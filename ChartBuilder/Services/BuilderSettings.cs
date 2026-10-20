@@ -20,6 +20,16 @@ namespace ChartBuilder.Services
         KeepTimes,
     }
 
+    /// <summary>Which way the mouse wheel moves through the song, along the lanes in either view and the timeline alike.</summary>
+    public enum WheelScrollDirection
+    {
+        /// <summary>The wheel turned up is later, as up the highway.</summary>
+        UpIsLater,
+
+        /// <summary>The wheel turned down is later.</summary>
+        DownIsLater,
+    }
+
     /// <summary>What Chart Builder opens with when it starts with nothing on its command line.</summary>
     public enum StartupAction
     {
@@ -78,6 +88,9 @@ namespace ChartBuilder.Services
 
         /// <summary>How fast notes go by in a lane whose look-ahead hasn't been set: 1 shows <see cref="LookAheadAtSpeedOne"/> seconds beyond the strike line.</summary>
         public double EditorHighwaySpeed { get; set; } = 1;
+
+        /// <summary>Which way the mouse wheel moves the cursor, in both lane views and on the timeline along the bottom.</summary>
+        public WheelScrollDirection WheelScrollDirection { get; set; } = WheelScrollDirection.UpIsLater;
 
         /// <summary>What a lane draws its audio as, until it's switched (<c>W</c>): the waveform or the spectrogram (charter-spec C12, C13).</summary>
         public LaneBackdrop DefaultLaneBackdrop { get; set; } = LaneBackdrop.Waveform;

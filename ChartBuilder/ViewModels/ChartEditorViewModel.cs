@@ -91,6 +91,7 @@ namespace ChartBuilder.ViewModels
             SelectedRecordMode = RecordModeChoices[0];
             SelectedQuantize = SnapChoices.FirstOrDefault(c => c.Division == saved.QuantizeDivision) ?? SnapChoices.First(c => c.Division == SnapGrid.Default.Division);
             IsRecordQuantized = saved.RecordQuantize;
+            WheelUpIsLater = IsWheelUpLater(saved);
             Lanes = new LaneDockViewModel(layout, this);
             Properties = new PropertiesViewModel(this);
             Session.Onsets = new LaneOnsetSource(this);
@@ -336,10 +337,18 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial double VisibleEnd { get; private set; }
 
-        /// <summary>Takes up what may have changed in Settings: whether tempo edits keep times, and what lanes draw their audio as.</summary>
+        /// <summary>Whether the mouse wheel turned up moves later, along the lanes in either view and the timeline alike: the setting's.</summary>
+        [ObservableProperty]
+        public partial bool WheelUpIsLater { get; private set; }
+
+        // Whether the wheel turned up is later, as the settings say.
+        private static bool IsWheelUpLater(BuilderSettings settings) => settings.WheelScrollDirection == WheelScrollDirection.UpIsLater;
+
+        /// <summary>Takes up what may have changed in Settings: whether tempo edits keep times, what lanes draw their audio as, and which way the wheel scrolls.</summary>
         public void ReloadSettings()
         {
             Session.KeepTimes = _settings.Settings.TempoEdits == TempoEditMode.KeepTimes;
+            WheelUpIsLater = IsWheelUpLater(_settings.Settings);
             Audio.ReloadSettings(_settings.Settings);
             foreach (var lane in Lanes.All)
                 lane.Audio.Refresh();

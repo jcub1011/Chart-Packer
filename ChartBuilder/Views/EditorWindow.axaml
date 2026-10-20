@@ -707,6 +707,7 @@
                                Length="{Binding Playback.LengthSeconds}"
                                IsPlaying="{Binding Playback.IsPlaying}"
                                Clock="{Binding Playback.Clock}"
+                               WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                Waveform="{Binding Playback.Waveform}"
                                Beats="{Binding Playback.Beats}"
                                Overview="{Binding Editor.Overview}"
