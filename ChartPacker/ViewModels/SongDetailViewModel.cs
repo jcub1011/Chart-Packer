@@ -1846,8 +1846,8 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Lints the song's chart with its <c>song.ini</c> as drafted (charter-spec C16 item 5), off the UI thread, and counts
-        /// what it finds, for View issues to list. A newer load or lint takes its place.
+        /// Lints the song's chart with its <c>song.ini</c> as drafted, and the chart itself as drafted (charter-spec C16 item
+        /// 5), off the UI thread, and counts what it finds, for View issues to list. A newer load or lint takes its place.
         /// </summary>
         private async Task LoadChartFindingsAsync(EditableSong song)
         {
@@ -1857,9 +1857,10 @@ namespace ChartPacker.ViewModels
             try
             {
                 var pairs = song.Item.Draft.ApplyTo(song.Item.Original);
+                var draft = song.Item.Draft.Clone();
                 var entry = song.Entry;
                 var (report, chartName) = await Task.Run(
-                    async () => (await SongChartLint.LintAsync(entry, pairs, null, LibraryChartLint.Cache, cts.Token), ChartNameOf(entry, cts.Token)),
+                    async () => (await SongChartLint.LintAsync(entry, pairs, draft, LibraryChartLint.Cache, cts.Token), ChartNameOf(entry, draft, cts.Token)),
                     cts.Token);
                 if (_chartLintCts != cts || _songs.Count != 1 || !ReferenceEquals(_songs[0], song))
                     return;
@@ -1879,12 +1880,12 @@ namespace ChartPacker.ViewModels
             }
         }
 
-        /// <summary>The chart file the song's chart is read from, as linting picks it, e.g. notes.mid; null when it can't be listed.</summary>
-        private static string? ChartNameOf(SongEntry entry, CancellationToken cancellationToken)
+        /// <summary>The chart file the song's chart is read from as drafted, as linting picks it, e.g. notes.mid; null when it can't be listed.</summary>
+        private static string? ChartNameOf(SongEntry entry, MetadataDraft draft, CancellationToken cancellationToken)
         {
             try
             {
-                return ChartReader.Pick(SongFile.ListTopLevel(entry, cancellationToken).Select(static f => f.Name));
+                return DraftedChart.Of(SongFile.ListTopLevel(entry, cancellationToken).Select(static f => f.Name), draft)?.StoredName;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
             {

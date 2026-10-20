@@ -44,6 +44,7 @@ public static class ChartLintRules
         new UnratedPartRule(),
         new SongLengthRule(),
         new EndEventRule(),
+        new MissingDifficultyRule(),
         new VocalNotesOverlapRule(),
         new VocalNoteWithoutLyricRule(),
         new VocalNoteOutsidePhraseRule(),

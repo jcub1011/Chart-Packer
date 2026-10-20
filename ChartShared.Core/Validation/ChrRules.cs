@@ -15,7 +15,7 @@ public enum ChrCategory
     /// <summary>CHR060 to CHR079: phrases and events.</summary>
     Phrases,
 
-    /// <summary>CHR080 to CHR085: the song as a whole.</summary>
+    /// <summary>CHR080 to CHR085, and CHR087 to CHR089: the song as a whole.</summary>
     Song,
 
     /// <summary>CHR086: what the chart file held that couldn't be loaded.</summary>
@@ -115,7 +115,7 @@ public static class ChrRules
     /// <summary>A star power phrase or solo with no notes in it on one charted difficulty, though another has some.</summary>
     public const string Chr065 = "CHR065";
 
-    /// <summary>A part has notes on some difficulties and none on others.</summary>
+    /// <summary>A part is in the chart but has no notes on any difficulty.</summary>
     public const string Chr080 = "CHR080";
 
     /// <summary>A lower difficulty has more notes per second than the one above it.</summary>
@@ -139,6 +139,9 @@ public static class ChrRules
     /// (<see cref="Charting.Lint.ChartLoadFindings"/>).
     /// </summary>
     public const string Chr086 = "CHR086";
+
+    /// <summary>A difficulty below a part's highest charted one has no notes, so the games don't offer it.</summary>
+    public const string Chr087 = "CHR087";
 
     /// <summary>A vocal note runs into the next one.</summary>
     public const string Chr090 = "CHR090";
@@ -165,7 +168,7 @@ public static class ChrRules
         Chr020, Chr021, Chr022, Chr023, Chr024, Chr025, Chr026,
         Chr040, Chr041, Chr042, Chr043, Chr044, Chr045, Chr046, Chr048,
         Chr060, Chr061, Chr062, Chr063, Chr065,
-        Chr080, Chr081, Chr082, Chr083, Chr084, Chr085, Chr086,
+        Chr080, Chr081, Chr082, Chr083, Chr084, Chr085, Chr086, Chr087,
         Chr090, Chr091, Chr092, Chr093, Chr094, Chr095,
     ];
 
@@ -185,6 +188,7 @@ public static class ChrRules
             < 60 => ChrCategory.Drums,
             < 80 => ChrCategory.Phrases,
             < 86 => ChrCategory.Song,
+            > 86 and < 90 => ChrCategory.Song,
             >= 90 and < 110 => ChrCategory.Vocals,
             _ => ChrCategory.Load,
         };

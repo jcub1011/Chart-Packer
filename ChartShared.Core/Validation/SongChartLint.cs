@@ -38,6 +38,14 @@ public sealed record SongChartFinding(Finding Finding, MeasureBeat? Place, Measu
 /// <param name="Detail">For <see cref="SongChartLintStatus.Unreadable"/>, what went wrong.</param>
 public sealed record SongChartLintReport(SongChartLintStatus Status, IReadOnlyList<SongChartFinding> Findings, string? Detail = null)
 {
+    private static readonly IReadOnlyDictionary<string, int> NoRatings = new Dictionary<string, int>();
+
+    /// <summary>
+    /// The suggested tier for each <c>diff_*</c> key CHR083 found unset (charter-spec C18 item 3), which the library's quick
+    /// fix sets; none for a part the estimator can't rate.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> SuggestedRatings { get; init; } = NoRatings;
+
     /// <summary>Whether any finding is a Warning or an Error.</summary>
     public bool HasProblems => Findings.Any(static f => f.Finding.Severity != Severity.Info);
 }
@@ -74,14 +82,52 @@ public static class SongChartLint
             [.. findings.Select(f => new SongChartFinding(
                 f,
                 (f.Location?.Tick ?? f.Tick) is { } tick ? MeasureBeat.At(map, tick) : null,
-                f.Location is { } location && location.EndTick > location.Tick ? MeasureBeat.At(map, location.EndTick) : null))]);
+                f.Location is { } location && location.EndTick > location.Tick ? MeasureBeat.At(map, location.EndTick) : null))])
+        {
+            SuggestedRatings = SuggestedRatingsOf(findings, load.Chart, options),
+        };
+    }
+
+    // The tier each CHR083 finding's key is suggested, while the chart is in memory: one estimate per part, as a part's
+    // keys share it. An estimate that fails leaves its part unrated rather than the lint failed.
+    private static IReadOnlyDictionary<string, int> SuggestedRatingsOf(IReadOnlyList<Finding> findings, EditableChart chart, ChartReadOptions options)
+    {
+        var ratings = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var tiers = new Dictionary<ChartInstrument, int?>();
+        foreach (var finding in findings)
+        {
+            if (finding.RuleId != ChrRules.Chr083 || finding.Key is not { } key || finding.Location is not { } location)
+                continue;
+            if (!tiers.TryGetValue(location.Part, out int? tier))
+            {
+                try
+                {
+                    tier = PendingSongIniFixes.SuggestedRating(finding, chart, options)?.Tier;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+                {
+                    Logger.Warning(ex, "Estimating the rating of {Part} failed", location.Part);
+                    tier = null;
+                }
+
+                tiers[location.Part] = tier;
+            }
+
+            if (tier is { } suggested)
+                ratings[key] = suggested;
+        }
+
+        return ratings;
     }
 
     /// <summary>
-    /// Lints <paramref name="entry"/>'s chart as stored, with <paramref name="pairs"/>, its <c>song.ini</c> as drafted, or
+    /// Lints <paramref name="entry"/>'s chart as drafted, with <paramref name="pairs"/>, its <c>song.ini</c> as drafted, or
     /// gives the cached result when nothing it depends on has changed.
     /// </summary>
-    /// <param name="draft">The song's draft, whose staged audio is measured in place of the song's; null for none.</param>
+    /// <param name="draft">
+    /// The song's draft, whose staged chart (<see cref="DraftedChart"/>) is linted and whose staged audio is measured in
+    /// place of the song's; null for none.
+    /// </param>
     /// <param name="cache">Where results are kept for the session; null to lint every time.</param>
     /// <exception cref="OperationCanceledException">Linting was cancelled.</exception>
     public static Task<SongChartLintReport> LintAsync(
@@ -141,23 +187,23 @@ public static class SongChartLint
     {
         var entry = files.Entry;
         IReadOnlyList<string> stored = [.. files.TopLevel.Select(static f => f.Name)];
-        if (ChartReader.Pick(stored) is not { } chartName)
+        if (DraftedChart.Of(stored, draft) is not { } chart)
             return new SongChartLintReport(SongChartLintStatus.NoChart, []);
 
         var tracks = SongTracks.Resolve(stored, draft);
         var audio = AudioStamps(entry, tracks);
-        var key = new SongChartLintKey(entry.FullPath, ChartFileStamp.Of(entry, chartName), pairs, audio, CultureInfo.CurrentUICulture.Name);
+        var key = new SongChartLintKey(entry.FullPath, StampOf(entry, chart), pairs, audio, CultureInfo.CurrentUICulture.Name);
         if (cache?.TryGet(key) is { } known)
             return known;
 
-        var report = await LintStoredAsync(files, chartName, pairs, tracks, audio, cache, cancellationToken).ConfigureAwait(false);
+        var report = await LintStoredAsync(files, chart, pairs, tracks, audio, cache, cancellationToken).ConfigureAwait(false);
         cache?.Add(key, report);
         return report;
     }
 
     private static async Task<SongChartLintReport> LintStoredAsync(
         SongFileReader files,
-        string chartName,
+        DraftedChart drafted,
         IReadOnlyList<KeyValuePair<string, string>> pairs,
         IReadOnlyList<SongTrack> tracks,
         IReadOnlyList<AudioStamp> audio,
@@ -165,10 +211,10 @@ public static class SongChartLint
         CancellationToken cancellationToken)
     {
         var entry = files.Entry;
-        byte[]? bytes = await files.ReadAsync(chartName, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false);
+        byte[]? bytes = await drafted.ReadAsync(files, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false);
         if (bytes is null)
             return new SongChartLintReport(SongChartLintStatus.ChartTooLarge, []);
-        var chart = SongOpener.LoadChart(chartName, bytes, pairs);
+        var chart = SongOpener.LoadChart(drafted.StoredName, bytes, pairs);
         long? audioMs = cache is not null && cache.TryGetAudioLength(entry.FullPath, audio, out long? measured)
             ? measured
             : SongAudioLength.LongestMs(files, tracks, cancellationToken);
@@ -183,6 +229,16 @@ public static class SongChartLint
             Logger.Warning(ex, "Chart lint failed on {Song}", entry.FullPath);
             return new SongChartLintReport(SongChartLintStatus.Failed, [], ex.Message);
         }
+    }
+
+    // The chart file as it is, so a changed one is linted again: the song's, or the staged one, named by its path so it's
+    // never taken for the song's own.
+    private static ChartFileStamp? StampOf(SongEntry entry, DraftedChart chart)
+    {
+        if (chart.StagedPath is not { } path)
+            return ChartFileStamp.Of(entry, chart.StoredName);
+        var file = new FileInfo(path);
+        return file.Exists ? new ChartFileStamp(path, file.Length, file.LastWriteTimeUtc) : null;
     }
 
     // The song's audio files as they are, so a changed one is measured again; none for a .sng, whose own stamp covers them.

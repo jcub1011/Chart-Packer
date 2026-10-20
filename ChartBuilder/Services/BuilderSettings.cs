@@ -7,6 +7,7 @@ using ChartShared.Core.Charting.Playtest;
 using ChartShared.Core.Jobs;
 using ChartShared.Core.Launching;
 using ChartShared.UI.Services;
+using ChartShared.UI.ViewModels;
 
 namespace ChartBuilder.Services
 {
@@ -18,31 +19,6 @@ namespace ChartBuilder.Services
 
         /// <summary>Notes keep their times, so they're re-ticked to stay where they were in the audio.</summary>
         KeepTimes,
-    }
-
-    /// <summary>The kinds of change the Reduce dialog's preview can mark and stop at, each a filter it shows.</summary>
-    [System.Flags]
-    public enum ReduceChangeCategories
-    {
-        None = 0,
-
-        /// <summary>Chords left out, and 2x kicks dropped.</summary>
-        Removals = 1,
-
-        /// <summary>Chords with other frets or pads, and chords added.</summary>
-        Reshapes = 2,
-
-        /// <summary>Notes held shorter, or no longer held.</summary>
-        Sustains = 4,
-
-        /// <summary>Chords read as a strum, HOPO or tap other than before, forced or natural.</summary>
-        Forcing = 8,
-
-        /// <summary>The draft's lint findings.</summary>
-        Findings = 16,
-
-        All = Removals | Reshapes | Sustains | Forcing | Findings,
-        Default = All & ~Removals,
     }
 
     /// <summary>Which way the mouse wheel moves through the song, along the lanes in either view and the timeline alike.</summary>
@@ -63,6 +39,28 @@ namespace ChartBuilder.Services
 
         /// <summary>The song opened most recently.</summary>
         ReopenRecent,
+    }
+
+    /// <summary>The Reduce dialog's preview's settings, as Chart Builder keeps them in <see cref="BuilderSettings"/>.</summary>
+    public sealed class BuilderReductionPreviewSettings(BuilderSettings settings) : IReductionPreviewSettings
+    {
+        public bool IsShown
+        {
+            get => settings.ReducePreviewShown;
+            set => settings.ReducePreviewShown = value;
+        }
+
+        public double LookAhead
+        {
+            get => settings.ReducePreviewLookAhead;
+            set => settings.ReducePreviewLookAhead = value;
+        }
+
+        public ReductionChangeCategories Categories
+        {
+            get => settings.ReducePreviewCategories;
+            set => settings.ReducePreviewCategories = value;
+        }
     }
 
     /// <summary>Chart Builder's settings, persisted to <c>builder-settings.json</c> (charter-spec §10).</summary>
@@ -217,10 +215,11 @@ namespace ChartBuilder.Services
         public List<string> CalibrationPrompted { get; set; } = [];
 
         /// <summary>
-        /// The default rules Reduce starts from, per family and target difficulty (charter-spec C9 item 2, §10). The Reduce
-        /// dialog's changes apply to one run; its Settings mode changes these.
+        /// The default rules Reduce started from before both apps shared them in <c>reduction-rules.json</c>
+        /// (<see cref="BuilderSettingsService.ReductionRules"/>), which reads them from here until it's first saved. Never
+        /// written now; kept so a file an older Chart Builder saved still has them.
         /// </summary>
-        public ReductionDefaults ReductionRules { get; set; } = ReductionDefaults.Shipped;
+        public ReductionDefaults? ReductionRules { get; set; }
 
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = 1.4;
@@ -235,22 +234,20 @@ namespace ChartBuilder.Services
         public double ReducePreviewLookAhead { get; set; } = 1.5;
 
         /// <summary>The shortest and longest look-ahead the Reduce dialog's preview gives, and the steps its slider takes.</summary>
-        public const double MinReducePreviewLookAhead = 0.5;
+        public const double MinReducePreviewLookAhead = ReductionPreviewViewModel.MinLookAhead;
 
-        public const double MaxReducePreviewLookAhead = 10;
+        public const double MaxReducePreviewLookAhead = ReductionPreviewViewModel.MaxLookAhead;
 
-        public const double ReducePreviewLookAheadStep = 0.5;
+        public const double ReducePreviewLookAheadStep = ReductionPreviewViewModel.LookAheadStep;
 
         /// <summary><paramref name="seconds"/> as the Reduce dialog's preview takes a look-ahead: on its steps, in its range.</summary>
-        public static double SnapReducePreviewLookAhead(double seconds) => double.IsFinite(seconds)
-            ? System.Math.Clamp(System.Math.Round(seconds / ReducePreviewLookAheadStep) * ReducePreviewLookAheadStep, MinReducePreviewLookAhead, MaxReducePreviewLookAhead)
-            : 1.5;
+        public static double SnapReducePreviewLookAhead(double seconds) => ReductionPreviewViewModel.SnapLookAhead(seconds);
 
         /// <summary>
         /// Which kinds of change the Reduce dialog's preview marks and stops at, as its filters were last left: all but the
         /// removals at first, as a reduction is mostly those.
         /// </summary>
-        public ReduceChangeCategories ReducePreviewCategories { get; set; } = ReduceChangeCategories.Default;
+        public ReductionChangeCategories ReducePreviewCategories { get; set; } = ReductionChangeCategories.Default;
 
         /// <summary>How long before a note a playtest takes a hit for it, in real milliseconds (charter-spec C19).</summary>
         public int PlaytestEarlyMs { get; set; } = (int)HitWindow.DefaultMs;

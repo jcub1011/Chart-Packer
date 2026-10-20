@@ -351,12 +351,13 @@ namespace ChartBuilder.ViewModels
         /// Opens the Reduce dialog over <paramref name="lane"/>'s part (charter-spec C9 item 2): its draft is drawn over the
         /// target difficulty as the rules change, and Apply adds it as one undoable step.
         /// </summary>
-        public async Task ReduceAsync(ChartTrackKey lane)
+        /// <param name="all">Whether it opens on Reduce all, over the whole part, as CHR087's fix opens it.</param>
+        public async Task ReduceAsync(ChartTrackKey lane, bool all = false)
         {
             if (_dialogs is null || Session.Chart.PartOf(lane.Instrument) is null)
                 return;
             Session.Tools.Cancel();
-            var reduce = ReduceViewModel.ForRun(this, _settings, lane);
+            var reduce = ReduceViewModel.ForRun(this, _settings, lane, all);
             await _dialogs.ShowReduceAsync(reduce);
         }
 

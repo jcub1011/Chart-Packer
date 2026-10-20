@@ -861,4 +861,219 @@
   <data name="CalibrationTapDevicesNote" xml:space="preserve">
     <value>Any instrument device counts too. A device calibrated in Input devices has its own offset taken off, which makes the result more accurate.</value>
   </data>
+  <data name="ReductionRulesHeading" xml:space="preserve">
+    <value>Rules</value>
+  </data>
+  <data name="ReductionFamilyLabel" xml:space="preserve">
+    <value>Part</value>
+  </data>
+  <data name="ReductionFamilyFiveFret" xml:space="preserve">
+    <value>5-fret</value>
+  </data>
+  <data name="ReductionFamilyGhl" xml:space="preserve">
+    <value>GHL (6-fret)</value>
+  </data>
+  <data name="ReductionFamilyDrums" xml:space="preserve">
+    <value>Drums</value>
+  </data>
+  <data name="ReductionRulesForLabel" xml:space="preserve">
+    <value>Rules for</value>
+  </data>
+  <data name="ReductionChordSizeLabel" xml:space="preserve">
+    <value>Max chord size</value>
+  </data>
+  <data name="ReductionThinningLabel" xml:space="preserve">
+    <value>No closer than</value>
+  </data>
+  <data name="ReductionMinGapLabel" xml:space="preserve">
+    <value>And no closer than (ms)</value>
+  </data>
+  <data name="ReductionKeepForcing" xml:space="preserve">
+    <value>Keep forced HOPOs and taps</value>
+  </data>
+  <data name="ReductionKeepShortSustains" xml:space="preserve">
+    <value>Keep sustains shorter than a beat</value>
+  </data>
+  <data name="ReductionPadsLabel" xml:space="preserve">
+    <value>Pads per hit (plus kick)</value>
+  </data>
+  <data name="ReductionKickLabel" xml:space="preserve">
+    <value>Kick no closer than</value>
+  </data>
+  <data name="ReductionColumnsLabel" xml:space="preserve">
+    <value>Columns used</value>
+  </data>
+  <data name="ReductionFretsLabel" xml:space="preserve">
+    <value>Frets used</value>
+  </data>
+  <data name="ReductionColumnsFormat" xml:space="preserve">
+    <value>1 to {0}</value>
+    <comment>{0} is the highest column a reduced chord may use, from 1.</comment>
+  </data>
+  <data name="ReductionFretsFormat" xml:space="preserve">
+    <value>Green to {0}</value>
+    <comment>{0} is the highest fret a reduced chord may use, e.g. "yellow".</comment>
+  </data>
+  <data name="ReductionNoThinning" xml:space="preserve">
+    <value>No thinning</value>
+  </data>
+  <data name="ReductionKickKept" xml:space="preserve">
+    <value>Kept</value>
+  </data>
+  <data name="ReductionSnapFormat" xml:space="preserve">
+    <value>1/{0}</value>
+    <comment>A snap, as a fraction of a whole note, e.g. "1/16".</comment>
+  </data>
+  <data name="ReductionFretGreen" xml:space="preserve">
+    <value>green</value>
+  </data>
+  <data name="ReductionFretRed" xml:space="preserve">
+    <value>red</value>
+  </data>
+  <data name="ReductionFretYellow" xml:space="preserve">
+    <value>yellow</value>
+  </data>
+  <data name="ReductionFretBlue" xml:space="preserve">
+    <value>blue</value>
+  </data>
+  <data name="ReductionFretOrange" xml:space="preserve">
+    <value>orange</value>
+  </data>
+  <data name="ReductionResetButton" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="ReductionResetToolTip" xml:space="preserve">
+    <value>Put back the shipped rules for this part and difficulty</value>
+  </data>
+  <data name="DifficultyLadderHeading" xml:space="preserve">
+    <value>Difficulties</value>
+  </data>
+  <data name="DifficultyLadderPeakFormat" xml:space="preserve">
+    <value>{0:0.0} notes/s</value>
+    <comment>{0} is the most notes a second over any two seconds.</comment>
+  </data>
+  <data name="DifficultyLadderPeakToolTip" xml:space="preserve">
+    <value>The most notes a second over any two seconds, the draft in place</value>
+  </data>
+  <data name="DifficultyLadderTierToolTip" xml:space="preserve">
+    <value>Suggested rating: 0 to 6 for charts written to be played, 7 and up for overcharts</value>
+  </data>
+  <data name="DifficultyLadderOrderWarningFormat" xml:space="preserve">
+    <value>Not easier than the difficulty above: {0}.</value>
+    <comment>{0} lists the difficulties, e.g. "Hard, Easy".</comment>
+  </data>
+  <data name="ReductionPreviewPlayToolTip" xml:space="preserve">
+    <value>Play or pause (Space)</value>
+  </data>
+  <data name="ReductionPreviewPlayPauseButton" xml:space="preserve">
+    <value>Play or pause</value>
+  </data>
+  <data name="ReductionPreviewPreviousToolTip" xml:space="preserve">
+    <value>Previous change (Shift+N)</value>
+  </data>
+  <data name="ReductionPreviewNextToolTip" xml:space="preserve">
+    <value>Next change (N)</value>
+  </data>
+  <data name="ReductionPreviewSpeedToolTip" xml:space="preserve">
+    <value>How fast the song plays</value>
+  </data>
+  <data name="ReductionPreviewSpeedPercentFormat" xml:space="preserve">
+    <value>{0}%</value>
+    <comment>A playback speed, e.g. "75%".</comment>
+  </data>
+  <data name="ReductionPreviewLaneLookAheadToolTip" xml:space="preserve">
+    <value>Look-ahead: how many seconds the lane shows beyond the strike line. Ctrl+wheel, + and − change it too.</value>
+    <comment>The lane header's look-ahead button's tooltip.</comment>
+  </data>
+  <data name="ReductionPreviewLaneLookAheadLabel" xml:space="preserve">
+    <value>Look-ahead</value>
+    <comment>The lane header's look-ahead slider's label.</comment>
+  </data>
+  <data name="ReductionPreviewStripToolTip" xml:space="preserve">
+    <value>Where each draft changed, and its findings. Click a mark to go to it; click or drag elsewhere to move through the song.</value>
+  </data>
+  <data name="ReductionPreviewFilterCountFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="ReductionPreviewLookAheadFormat" xml:space="preserve">
+    <value>{0:0.0} s</value>
+  </data>
+  <data name="ReductionPreviewWorking" xml:space="preserve">
+    <value>Comparing the draft with what it's reduced from…</value>
+  </data>
+  <data name="ReductionPreviewFailed" xml:space="preserve">
+    <value>The draft couldn't be compared with what it's reduced from.</value>
+  </data>
+  <data name="ReductionPreviewDraftLaneFormat" xml:space="preserve">
+    <value>{0} (draft)</value>
+  </data>
+  <data name="ReductionPreviewFilterFindings" xml:space="preserve">
+    <value>Findings</value>
+  </data>
+  <data name="ReductionPreviewNoStops" xml:space="preserve">
+    <value>No changes shown</value>
+  </data>
+  <data name="ReductionPreviewStopFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="ReductionPreviewChangeFormat" xml:space="preserve">
+    <value>{0} · {1}: {2}</value>
+  </data>
+  <data name="ReductionPreviewChangeRemoved" xml:space="preserve">
+    <value>chord left out</value>
+  </data>
+  <data name="ReductionPreviewChangeDoubleKick" xml:space="preserve">
+    <value>2x kick left out</value>
+  </data>
+  <data name="ReductionPreviewChangeReshaped" xml:space="preserve">
+    <value>chord changed</value>
+  </data>
+  <data name="ReductionPreviewChangeAdded" xml:space="preserve">
+    <value>chord added</value>
+  </data>
+  <data name="ReductionPreviewChangeSustain" xml:space="preserve">
+    <value>held shorter</value>
+  </data>
+  <data name="ReductionPreviewChangeHopoFlip" xml:space="preserve">
+    <value>natural HOPO turned</value>
+  </data>
+  <data name="ReductionPreviewChangeForcing" xml:space="preserve">
+    <value>forcing changed</value>
+  </data>
+  <data name="ReductionPreviewChangeBoundaryFormat" xml:space="preserve">
+    <value>{0}, beside the range</value>
+  </data>
+  <data name="ReductionPreviewFilterRemovals" xml:space="preserve">
+    <value>Removals</value>
+  </data>
+  <data name="ReductionPreviewFilterReshapes" xml:space="preserve">
+    <value>Reshapes</value>
+  </data>
+  <data name="ReductionPreviewFilterSustains" xml:space="preserve">
+    <value>Sustains</value>
+  </data>
+  <data name="ReductionPreviewFilterForcing" xml:space="preserve">
+    <value>HOPOs and forcing</value>
+  </data>
+  <data name="ReductionPreviewFilterRemovalsToolTip" xml:space="preserve">
+    <value>Chords left out, and 2x kicks dropped: faded on the difficulty above</value>
+  </data>
+  <data name="ReductionPreviewFilterReshapesToolTip" xml:space="preserve">
+    <value>Chords with other frets or pads, or added: ringed on the draft</value>
+  </data>
+  <data name="ReductionPreviewFilterSustainsToolTip" xml:space="preserve">
+    <value>Notes held shorter, or no longer held</value>
+  </data>
+  <data name="ReductionPreviewFilterForcingToolTip" xml:space="preserve">
+    <value>Chords that now read as a strum, HOPO or tap other than before: a natural HOPO turned, or the forcing changed</value>
+  </data>
+  <data name="ReductionPreviewFilterFindingsToolTip" xml:space="preserve">
+    <value>The draft's lint findings</value>
+  </data>
+  <data name="ReductionPreviewButton" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="ReductionPreviewToolTip" xml:space="preserve">
+    <value>Show the draft against what it's reduced from, with the song, and mark where it changed</value>
+  </data>
 </root>

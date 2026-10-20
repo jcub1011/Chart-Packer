@@ -2423,13 +2423,14 @@ merges the group into its first phrase.
 
 | ID | Sev. | Rule | Fix |
 | --- | --- | --- | --- |
-| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is fine. | — |
+| CHR080 | Warning | A part is in the chart but has no notes on any difficulty. A part charted on only some difficulties is CHR087's. | — |
 | CHR081 | Info | A lower difficulty has more chords per second than the one above it | — |
 | CHR082 | Info | The chart has no sections | — |
-| CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating |
+| CHR083 | Warning | A part with notes has no `diff_*` value, or `-1` | Use suggested rating (Chart Builder and the library) |
 | CHR084 | Warning | `song_length` doesn't match the audio's length within 1 s. A charter save corrects it, so this mostly appears in the library. | Update `song_length` |
 | CHR085 | Info | `[end]` is missing or before the last note. Chart Builder places it on save, so it runs this rule only in the library, not in the editor | — |
 | CHR086 | Info | Something in the chart file couldn't be loaded as written, and was left out, as the games leave it out ([§4.1](#editable-model)). Saving writes the file without it. | — |
+| CHR087 | Warning | A 5-fret, GHL or drum part has no notes on a difficulty below its highest charted one, so the games don't offer it. One finding per difficulty. | Generate with Reduce (Chart Builder); Generate missing difficulties (library) |
 
 ### Vocals
 
@@ -2834,9 +2835,10 @@ isn't written.
 | File | Owner | Holds |
 | ---- | ----- | ----- |
 | `settings.json` | Chart Packer (`AppSettings`) | Chart Packer's settings, as now. Chart Builder reads the output folder and overwrite policy from it for **Save and pack** ([C17](#c17-save-and-export)), and never writes it. |
-| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
+| `builder-settings.json` | Chart Builder (`BuilderSettings`) | Every setting in the table below except the latency and the reduction rules, plus the Editor window's layout (each side panel's width and whether it's collapsed, and the timeline's height), the recent songs, the last parent folder used for a new chart, and how far ahead the preview looks |
 | `audio-latency.json` | The calibration tool, which both apps open | The audio/visual latency. Chart Packer reads it for the inspector ([C11](#c11-calibration-tool)), and re-reads it when the tool closes and when its window is activated ([§4.8](#48-launching-and-coordination)). |
 | `input-bindings.json` | Chart Builder's Input devices window | Each instrument profile's bindings, and each device's input offset and MIDI settings ([C19](#c19-playtest-and-instrument-input)). Enums are saved by name. |
+| `reduction-rules.json` | Both apps | The default difficulty reduction rules ([C9](#c9-difficulty-authoring)): Chart Builder's Reduce dialog and Settings, and Chart Packer's Validator, which generates a song's missing difficulties by them ([C16](#c16-chart-lint)). Each saves only the sets it changed. Until it's first saved, they're read from `builder-settings.json`'s `ReductionRules`, where an older Chart Builder kept them. |
 
 Settings are edited in Chart Builder's own Settings window, which uses the shared settings window
 and the Core `SettingDefinition` catalog that Chart Packer's uses. The catalog can express Toggle,
@@ -2989,8 +2991,8 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   ([§4.2](#lossless-passthrough)).
 - **Chart lint in the library:** shown as findings, never blocks packing
   ([C16](#c16-chart-lint)).
-- **Reduction rules:** set per run in the Reduce dialog, starting from defaults in Settings. Nothing
-  is stored per song ([C9](#c9-difficulty-authoring)).
+- **Reduction rules:** set per run in the Reduce dialog, or Chart Packer's Generate difficulties
+  dialog, starting from the defaults both apps share. Nothing is stored per song ([C9](#c9-difficulty-authoring)).
 - **Calibration device key:** a stable OS device ID where there is one, then the device name, then
   the global fallback ([C11](#c11-calibration-tool)).
 - **`.chart` after import:** removed on the first save, after a confirmation. No backup is kept

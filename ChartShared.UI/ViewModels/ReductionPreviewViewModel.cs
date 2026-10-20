@@ -5,24 +5,118 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media;
-using ChartBuilder.Controls;
-using ChartBuilder.Resources;
-using ChartBuilder.Services;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Validation;
+using ChartShared.UI.Controls;
 using ChartShared.UI.Controls.Highway;
-using ChartShared.UI.ViewModels;
+using ChartShared.UI.Resources;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 
-namespace ChartBuilder.ViewModels
+namespace ChartShared.UI.ViewModels
 {
-    /// <summary>A kind of change the Reduce dialog's preview can mark and stop at, ticked to: a filter, with how many there are.</summary>
-    public sealed partial class ReduceChangeFilter(ReduceChangeCategories category, string name, string toolTip, IBrush swatch, bool isChecked) : ObservableObject
+    /// <summary>The kinds of change a reduction's preview can mark and stop at, each a filter it shows.</summary>
+    [Flags]
+    public enum ReductionChangeCategories
     {
-        public ReduceChangeCategories Category { get; } = category;
+        None = 0,
+
+        /// <summary>Chords left out, and 2x kicks dropped.</summary>
+        Removals = 1,
+
+        /// <summary>Chords with other frets or pads, and chords added.</summary>
+        Reshapes = 2,
+
+        /// <summary>Notes held shorter, or no longer held.</summary>
+        Sustains = 4,
+
+        /// <summary>Chords read as a strum, HOPO or tap other than before, forced or natural.</summary>
+        Forcing = 8,
+
+        /// <summary>The draft's lint findings.</summary>
+        Findings = 16,
+
+        All = Removals | Reshapes | Sustains | Forcing | Findings,
+        Default = All & ~Removals,
+    }
+
+    /// <summary>
+    /// The song a reduction's preview plays (<see cref="ReductionPreviewViewModel"/>): Chart Builder's Editor's playback,
+    /// lent to its Reduce dialog, or Chart Packer's player in its Generate difficulties dialog.
+    /// </summary>
+    public interface IReductionPreviewPlayback : INotifyPropertyChanged
+    {
+        /// <summary>Whether the song can be played.</summary>
+        bool IsReady { get; }
+
+        bool IsPlaying { get; }
+
+        /// <summary>Where the song is, in seconds of audio; set, as the change strip is scrubbed, it moves the song there.</summary>
+        double PositionSeconds { get; set; }
+
+        /// <summary>How long the song is, in seconds of audio.</summary>
+        double LengthSeconds { get; }
+
+        /// <summary>Where the song is and how long it is, e.g. "0:42.0 / 3:00.0".</summary>
+        string PositionText { get; }
+
+        /// <summary>The chart's beat lines in audio time, which the change strip draws and steps along.</summary>
+        IReadOnlyList<TimelineBeat> Beats { get; }
+
+        /// <summary>The time to draw at, moving smoothly while it plays, allowing for the latency and the speed.</summary>
+        Func<TimeSpan> Clock { get; }
+
+        /// <summary>The speeds it plays at, as percents.</summary>
+        IReadOnlyList<int> SpeedPercents { get; }
+
+        int SpeedPercent { get; set; }
+
+        /// <summary>Plays from where the song is, or pauses.</summary>
+        void PlayPause();
+
+        /// <summary>Moves the song to <paramref name="seconds"/>.</summary>
+        void SeekTo(double seconds);
+    }
+
+    /// <summary>What a reduction's preview remembers from one run to the next: whether it's shown, its look-ahead, and its filters.</summary>
+    public interface IReductionPreviewSettings
+    {
+        bool IsShown { get; set; }
+
+        double LookAhead { get; set; }
+
+        ReductionChangeCategories Categories { get; set; }
+    }
+
+    /// <summary>A preview's settings kept for as long as the app runs, for an app that doesn't keep them in its settings file.</summary>
+    public sealed class ReductionPreviewMemory : IReductionPreviewSettings
+    {
+        public bool IsShown { get; set; } = true;
+
+        public double LookAhead { get; set; } = 1.5;
+
+        public ReductionChangeCategories Categories { get; set; } = ReductionChangeCategories.Default;
+    }
+
+    /// <summary>
+    /// A reduction for the preview to show (<see cref="ReductionPreviewViewModel.OnDrafted"/>): the part, the ticks it covers
+    /// or null for all of it, the chart's tempo map and audio delay, whether its drums are 5-lane, and how to work out how
+    /// each draft differs from its source (<see cref="ReductionDiff"/>), off the calling thread.
+    /// </summary>
+    public sealed record ReductionPreviewRun(
+        ChartInstrument Part,
+        (long From, long To)? Range,
+        TempoMap Tempo,
+        TimeSpan Delay,
+        bool FiveLaneDrums,
+        Func<Task<IReadOnlyList<ReductionDiff>>> DiffAsync);
+
+    /// <summary>A kind of change a reduction's preview can mark and stop at, ticked to: a filter, with how many there are.</summary>
+    public sealed partial class ReductionChangeFilter(ReductionChangeCategories category, string name, string toolTip, IBrush swatch, bool isChecked) : ObservableObject
+    {
+        public ReductionChangeCategories Category { get; } = category;
 
         public string Name { get; } = name;
 
@@ -40,37 +134,43 @@ namespace ChartBuilder.ViewModels
         public partial bool IsChecked { get; set; } = isChecked;
 
         /// <summary>Its name and how many there are, e.g. "Reshapes (12)".</summary>
-        public string Label => string.Format(CultureInfo.CurrentCulture, Strings.ReduceFilterCountFormat, Name, Count);
+        public string Label => string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionPreviewFilterCountFormat, Name, Count);
     }
 
     /// <summary>
-    /// The Reduce dialog's preview (charter-spec C9 item 2): the source and each draft as highways, as the games read them,
-    /// played with the song; a strip marking where each draft changed and the draft's lint findings; and a way to go from
-    /// change to change. Each change is shown as the filters ticked say: on the strip, as a stop, and on the highways, the
-    /// notes a draft lost faded on its source and the chords it changed ringed.
+    /// A reduction's preview (charter-spec C9 item 2): the source and each draft as highways, as the games read them, played
+    /// with the song; a strip marking where each draft changed and the drafts' lint findings; and a way to go from change
+    /// to change. Each change is shown as the filters ticked say: on the strip, as a stop, and on the highways, the notes a
+    /// draft lost faded on its source and the chords it changed ringed. Chart Builder's Reduce dialog and Chart Packer's
+    /// Generate difficulties dialog show it (<c>ReductionPreviewView</c>).
     /// </summary>
     /// <remarks>
-    /// The playback is the Editor's, lent for as long as the dialog is open (<see cref="ChartEditorViewModel.BorrowPlayback"/>),
-    /// so playing here records no pass and playtests nothing. The diff of each draft (<see cref="ReductionDiff"/>) is worked
-    /// out off the UI thread after each redraw while the preview is shown, a newer one replacing it.
+    /// The diff of each draft (<see cref="ReductionDiff"/>) is worked out off the UI thread after each draft while the
+    /// preview is shown, a newer one replacing it.
     /// </remarks>
-    public sealed partial class ReducePreviewViewModel : ViewModelBase, IDisposable
+    public sealed partial class ReductionPreviewViewModel : ViewModelBase, IDisposable
     {
+        /// <summary>The shortest and longest look-ahead the preview gives, and the steps its slider takes.</summary>
+        public const double MinLookAhead = 0.5;
+
+        public const double MaxLookAhead = 10;
+
+        public const double LookAheadStep = 0.5;
+
         // How far above the strike line a change gone to is, as a share of the look-ahead, so it can be seen coming.
         private const double LeadShare = 0.3;
 
         // How near a stop the playhead counts as on it, in seconds, so going to the next doesn't stick on it.
         private const double StopTolerance = 0.005;
 
-        private static readonly ReduceChangeCategories[] Categories =
-            [ReduceChangeCategories.Reshapes, ReduceChangeCategories.Forcing, ReduceChangeCategories.Sustains, ReduceChangeCategories.Removals, ReduceChangeCategories.Findings];
+        private static readonly ReductionChangeCategories[] Categories =
+            [ReductionChangeCategories.Reshapes, ReductionChangeCategories.Forcing, ReductionChangeCategories.Sustains, ReductionChangeCategories.Removals, ReductionChangeCategories.Findings];
 
-        private readonly ChartEditorViewModel _editor;
-        private readonly BuilderSettingsService _settings;
-        private readonly IDisposable _borrow;
+        private readonly IReductionPreviewSettings _settings;
+        private readonly IDisposable? _lease;
 
-        // The run last drafted, its diffs and findings, and what they were worked out with.
-        private ReduceProposals? _reduce;
+        // The run last drafted; its diffs and findings, and what they were worked out with.
+        private ReductionPreviewRun? _run;
         private IReadOnlyList<ReductionDiff> _diffs = [];
         private IReadOnlyList<Finding> _findings = [];
         private ChartInstrument _part;
@@ -90,29 +190,34 @@ namespace ChartBuilder.ViewModels
         private string[] _stopTexts = [];
         private int _stop = -1;
 
-        public ReducePreviewViewModel(ChartEditorViewModel editor, BuilderSettingsService settings)
+        /// <param name="playback">The song it plays.</param>
+        /// <param name="settings">What it remembers for the next run.</param>
+        /// <param name="wheelUpIsLater">Whether the wheel turned up moves the playhead later.</param>
+        /// <param name="lease">Let go of as it's disposed: the playback lent to it, if it was.</param>
+        public ReductionPreviewViewModel(IReductionPreviewPlayback playback, IReductionPreviewSettings settings, bool wheelUpIsLater, IDisposable? lease = null)
         {
-            _editor = editor;
+            ArgumentNullException.ThrowIfNull(playback);
+            ArgumentNullException.ThrowIfNull(settings);
+            Playback = playback;
             _settings = settings;
-            _borrow = editor.BorrowPlayback();
-            LookAhead = BuilderSettings.SnapReducePreviewLookAhead(settings.Settings.ReducePreviewLookAhead);
-            IsExpanded = settings.Settings.ReducePreviewShown;
+            _lease = lease;
+            WheelUpIsLater = wheelUpIsLater;
+            LookAhead = SnapLookAhead(settings.LookAhead);
+            IsExpanded = settings.IsShown;
 
-            var shown = settings.Settings.ReducePreviewCategories;
-            Filters = [.. Categories.Select(c => new ReduceChangeFilter(c, NameOf(c), ToolTipOf(c), SwatchOf(c), shown.HasFlag(c)))];
+            var shown = settings.Categories;
+            Filters = [.. Categories.Select(c => new ReductionChangeFilter(c, NameOf(c), ToolTipOf(c), SwatchOf(c), shown.HasFlag(c)))];
             foreach (var filter in Filters)
                 filter.PropertyChanged += OnFilterChanged;
         }
 
-        private EditorSession Session => _editor.Session;
+        public IReductionPreviewPlayback Playback { get; }
 
-        public PlaybackViewModel Playback => _editor.Playback;
-
-        /// <summary>The time to draw at: the Editor's clock, allowing for the latency and the speed.</summary>
+        /// <summary>The time to draw at: the playback's clock, allowing for the latency and the speed.</summary>
         public Func<TimeSpan> Clock => Playback.Clock;
 
-        /// <summary>Whether the wheel turned up moves the playhead later, as Settings says.</summary>
-        public bool WheelUpIsLater => _editor.WheelUpIsLater;
+        /// <summary>Whether the wheel turned up moves the playhead later.</summary>
+        public bool WheelUpIsLater { get; }
 
         /// <summary>Whether the preview is shown; remembered for the next run.</summary>
         [ObservableProperty]
@@ -126,14 +231,8 @@ namespace ChartBuilder.ViewModels
         [NotifyPropertyChangedFor(nameof(Lead), nameof(LookAheadText))]
         public partial double LookAhead { get; set; }
 
-        public const double MinLookAhead = BuilderSettings.MinReducePreviewLookAhead;
-
-        public const double MaxLookAhead = BuilderSettings.MaxReducePreviewLookAhead;
-
-        public const double LookAheadStep = BuilderSettings.ReducePreviewLookAheadStep;
-
         /// <summary>The look-ahead in seconds, as the slider's readout shows it, e.g. "1.5 s".</summary>
-        public string LookAheadText => string.Format(CultureInfo.CurrentCulture, Strings.ReducePreviewLookAheadFormat, LookAhead);
+        public string LookAheadText => string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionPreviewLookAheadFormat, LookAhead);
 
         /// <summary>How far before a change going to it puts the playhead, in seconds, so it's seen coming down the highway.</summary>
         public double Lead => LookAhead * LeadShare;
@@ -150,7 +249,7 @@ namespace ChartBuilder.ViewModels
         public partial string EmptyText { get; private set; } = "";
 
         /// <summary>The kinds of change, each ticked to be marked and stopped at.</summary>
-        public IReadOnlyList<ReduceChangeFilter> Filters { get; }
+        public IReadOnlyList<ReductionChangeFilter> Filters { get; }
 
         /// <summary>The change strip's marks: each draft's changes on its row, then the findings on the last.</summary>
         [ObservableProperty]
@@ -180,13 +279,18 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial string CurrentText { get; private set; } = "";
 
+        /// <summary><paramref name="seconds"/> as the preview takes a look-ahead: on its steps, in its range.</summary>
+        public static double SnapLookAhead(double seconds) => double.IsFinite(seconds)
+            ? Math.Clamp(Math.Round(seconds / LookAheadStep) * LookAheadStep, MinLookAhead, MaxLookAhead)
+            : 1.5;
+
         /// <summary>Plays from where the song is, or from a bar before the run's range when it's outside it; or pauses.</summary>
         [RelayCommand]
         private void PlayPause()
         {
             if (!Playback.IsPlaying)
                 SeekIntoRange();
-            Playback.PlayPauseCommand.Execute(null);
+            Playback.PlayPause();
         }
 
         /// <summary>Goes to the next change, or finding, of those ticked.</summary>
@@ -203,8 +307,10 @@ namespace ChartBuilder.ViewModels
         /// <summary>Shows the preview, with the song just before <paramref name="tick"/>, as a finding is clicked.</summary>
         public void GoTo(long tick)
         {
+            if ((_tempo ?? _run?.Tempo) is not { } tempo)
+                return;
             IsExpanded = true;
-            double seconds = Session.AudioAt(tick);
+            double seconds = tempo.SecondsAt(tick) + (_tempo is null ? _run!.Delay : _delay).TotalSeconds;
             int stop = Array.FindIndex(_stops, s => Math.Abs(s - seconds) <= StopTolerance);
             if (stop >= 0)
             {
@@ -216,9 +322,10 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>The run was drafted again: its diff is worked out, now or when the preview is next shown.</summary>
-        internal void OnDrafted(ReduceProposals reduce)
+        public void OnDrafted(ReductionPreviewRun run)
         {
-            _reduce = reduce;
+            ArgumentNullException.ThrowIfNull(run);
+            _run = run;
             _findings = [];
             if (!IsExpanded)
             {
@@ -229,19 +336,20 @@ namespace ChartBuilder.ViewModels
             _ = DiffAsync();
         }
 
-        /// <summary>The draft's lint findings came in, to be marked and stopped at.</summary>
-        internal void OnFindings(IReadOnlyList<Finding> findings)
+        /// <summary>The drafts' lint findings came in, to be marked and stopped at.</summary>
+        public void OnFindings(IReadOnlyList<Finding> findings)
         {
+            ArgumentNullException.ThrowIfNull(findings);
             _findings = findings;
             if (_diffs.Count > 0)
                 RefreshMarks();
         }
 
         /// <summary>There's no draft, for <paramref name="reason"/>: nothing is shown.</summary>
-        internal void Clear(string reason)
+        public void Clear(string reason)
         {
             _diffing++;
-            _reduce = null;
+            _run = null;
             _isStale = false;
             _diffs = [];
             _findings = [];
@@ -258,7 +366,7 @@ namespace ChartBuilder.ViewModels
             _diffing++;
             foreach (var filter in Filters)
                 filter.PropertyChanged -= OnFilterChanged;
-            _borrow.Dispose();
+            _lease?.Dispose();
         }
 
         /// <summary>The index of the first of <paramref name="stops"/>, which are in order, after <paramref name="at"/>; -1 for none.</summary>
@@ -286,16 +394,16 @@ namespace ChartBuilder.ViewModels
         }
 
         /// <summary>The kinds of change the ticked <paramref name="shown"/> stand for.</summary>
-        internal static ReductionChanges MaskOf(ReduceChangeCategories shown)
+        internal static ReductionChanges MaskOf(ReductionChangeCategories shown)
         {
             var mask = ReductionChanges.None;
-            if (shown.HasFlag(ReduceChangeCategories.Removals))
+            if (shown.HasFlag(ReductionChangeCategories.Removals))
                 mask |= ReductionChanges.Removed | ReductionChanges.DoubleKickDropped;
-            if (shown.HasFlag(ReduceChangeCategories.Reshapes))
+            if (shown.HasFlag(ReductionChangeCategories.Reshapes))
                 mask |= ReductionChanges.Reshaped | ReductionChanges.Added;
-            if (shown.HasFlag(ReduceChangeCategories.Sustains))
+            if (shown.HasFlag(ReductionChangeCategories.Sustains))
                 mask |= ReductionChanges.SustainTrimmed;
-            if (shown.HasFlag(ReduceChangeCategories.Forcing))
+            if (shown.HasFlag(ReductionChangeCategories.Forcing))
                 mask |= ReductionChanges.HopoFlipped | ReductionChanges.ForcingChanged;
             return mask;
         }
@@ -330,7 +438,7 @@ namespace ChartBuilder.ViewModels
 
         partial void OnIsExpandedChanged(bool value)
         {
-            _settings.Settings.ReducePreviewShown = value;
+            _settings.IsShown = value;
             if (!value)
                 return;
             if (_isStale)
@@ -341,63 +449,62 @@ namespace ChartBuilder.ViewModels
 
         partial void OnLookAheadChanged(double value)
         {
-            double snapped = BuilderSettings.SnapReducePreviewLookAhead(value);
+            double snapped = SnapLookAhead(value);
             if (snapped != value)
             {
                 LookAhead = snapped;
                 return;
             }
 
-            _settings.Settings.ReducePreviewLookAhead = snapped;
+            _settings.LookAhead = snapped;
         }
 
         private void OnFilterChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(ReduceChangeFilter.IsChecked))
+            if (e.PropertyName != nameof(ReductionChangeFilter.IsChecked))
                 return;
-            _settings.Settings.ReducePreviewCategories = Shown;
+            _settings.Categories = Shown;
             RefreshScene();
             RefreshMarks();
         }
 
-        private ReduceChangeCategories Shown => Filters.Where(static f => f.IsChecked).Aggregate(ReduceChangeCategories.None, static (all, f) => all | f.Category);
+        private ReductionChangeCategories Shown => Filters.Where(static f => f.IsChecked).Aggregate(ReductionChangeCategories.None, static (all, f) => all | f.Category);
 
-        // How each draft differs from its source, worked out off the UI thread from what the run is now.
+        // How each draft differs from its source, worked out off the UI thread from the run as it is now.
         private async Task DiffAsync()
         {
             _isStale = false;
-            if (_reduce is not { Drafted: not null, Part: { } part } reduce)
+            if (_run is not { } run)
                 return;
 
-            int run = ++_diffing;
-            var range = reduce.Range;
+            int diffing = ++_diffing;
             if (Scene is null)
-                EmptyText = Strings.ReducePreviewWorking;
+                EmptyText = SharedStrings.ReductionPreviewWorking;
 
             IReadOnlyList<ReductionDiff> diffs;
             try
             {
-                diffs = await reduce.DiffAsync();
+                diffs = await run.DiffAsync();
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 // The preview is a help, not the draft: a diff that fails leaves the draft to add as it is.
-                Log.ForContext<ReducePreviewViewModel>().Error(ex, "Comparing the reduced draft failed");
-                if (run == _diffing && !_disposed)
-                    Clear(Strings.ReducePreviewFailed);
+                Log.ForContext<ReductionPreviewViewModel>().Error(ex, "Comparing the reduced draft failed");
+                if (diffing == _diffing && !_disposed)
+                    Clear(SharedStrings.ReductionPreviewFailed);
                 return;
             }
 
-            if (run != _diffing || _disposed)
+            if (diffing != _diffing || _disposed)
                 return;
 
-            bool moved = range != _range || _tempo is null;
+            bool moved = run.Range != _range || _tempo is null;
             _diffs = diffs;
-            _part = part;
-            _range = range;
-            _tempo = Session.TempoMap;
-            _delay = Session.Delay;
-            _fiveLane = Session.IsFiveLaneDrums;
+            _part = run.Part;
+            _range = run.Range;
+            _tempo = run.Tempo;
+            _delay = run.Delay;
+            _fiveLane = run.FiveLaneDrums;
             EmptyText = "";
             RefreshScene();
             RefreshMarks();
@@ -424,7 +531,7 @@ namespace ChartBuilder.ViewModels
                 var asDraft = _diffs.FirstOrDefault(d => d.Target == difficulty);
                 var track = asDraft?.DraftTrack ?? asSource!.SourceTrack;
                 string name = ChartLabels.DifficultyName(difficulty);
-                string label = asDraft is null ? name : string.Format(CultureInfo.CurrentCulture, Strings.ReducePreviewDraftLaneFormat, name);
+                string label = asDraft is null ? name : string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionPreviewDraftLaneFormat, name);
                 lanes.Add(new HighwayLane(kind, laneCount, label, track.Notes, tempo, _delay, LaneMarks(track.Notes.Count, asSource?.SourceMarks, asDraft?.DraftMarks, mask)));
             }
 
@@ -438,7 +545,7 @@ namespace ChartBuilder.ViewModels
             var mask = MaskOf(shown);
             foreach (var filter in Filters)
             {
-                filter.Count = filter.Category == ReduceChangeCategories.Findings
+                filter.Count = filter.Category == ReductionChangeCategories.Findings
                     ? _findings.Count
                     : _diffs.Sum(d => d.CountOf(MaskOf(filter.Category)));
             }
@@ -463,7 +570,7 @@ namespace ChartBuilder.ViewModels
                     }
                 }
 
-                if (shown.HasFlag(ReduceChangeCategories.Findings))
+                if (shown.HasFlag(ReductionChangeCategories.Findings))
                 {
                     foreach (var finding in _findings)
                     {
@@ -493,7 +600,7 @@ namespace ChartBuilder.ViewModels
             _stop = current is { } was ? Array.FindIndex(_stops, s => Math.Abs(s - was) <= StopTolerance) : -1;
 
             Marks = marks;
-            RowLabels = _diffs.Count == 0 ? [] : [.. _diffs.Select(static d => ChartLabels.DifficultyName(d.Target)), Strings.ReduceFilterFindings];
+            RowLabels = _diffs.Count == 0 ? [] : [.. _diffs.Select(static d => ChartLabels.DifficultyName(d.Target)), SharedStrings.ReductionPreviewFilterFindings];
             (StripStart, StripEnd) = Window();
             RefreshStop();
         }
@@ -513,8 +620,8 @@ namespace ChartBuilder.ViewModels
             Current = has ? _stops[_stop] : double.NaN;
             CurrentText = has ? _stopTexts[_stop] : "";
             StopText = _stops.Length == 0
-                ? Strings.ReducePreviewNoStops
-                : string.Format(CultureInfo.CurrentCulture, Strings.ReducePreviewStopFormat, has ? (_stop + 1).ToString(CultureInfo.CurrentCulture) : "–", _stops.Length);
+                ? SharedStrings.ReductionPreviewNoStops
+                : string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionPreviewStopFormat, has ? (_stop + 1).ToString(CultureInfo.CurrentCulture) : "–", _stops.Length);
         }
 
         // Where the strike line is now, less the lead, so the change gone to last counts as where the playhead is.
@@ -528,8 +635,8 @@ namespace ChartBuilder.ViewModels
                 return (0, length);
             double from = tempo.SecondsAt(range.From) + _delay.TotalSeconds;
             double to = tempo.SecondsAt(range.To) + _delay.TotalSeconds;
-            double start = TimelineView.StepBars(Playback.Beats, from, -1) ?? Math.Max(0, from - 2);
-            double end = TimelineView.StepBars(Playback.Beats, to, 1) ?? to + 2;
+            double start = TimelineBeats.StepBars(Playback.Beats, from, -1) ?? Math.Max(0, from - 2);
+            double end = TimelineBeats.StepBars(Playback.Beats, to, 1) ?? to + 2;
             return (Math.Max(0, start), Math.Max(end, start + 1));
         }
 
@@ -544,53 +651,53 @@ namespace ChartBuilder.ViewModels
         }
 
         private static string Describe(TempoMap tempo, long tick, string difficulty, string what) =>
-            string.Format(CultureInfo.CurrentCulture, Strings.ReducePreviewChangeFormat, ChartLabels.PlaceText(MeasureBeat.At(tempo, tick)), difficulty, what);
+            string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionPreviewChangeFormat, ChartLabels.PlaceText(MeasureBeat.At(tempo, tick)), difficulty, what);
 
         private static string ChangeText(ReductionChanges kinds, bool isBoundary)
         {
             var parts = new List<string>();
             if (kinds.HasFlag(ReductionChanges.Removed))
-                parts.Add(Strings.ReduceChangeRemoved);
+                parts.Add(SharedStrings.ReductionPreviewChangeRemoved);
             if (kinds.HasFlag(ReductionChanges.DoubleKickDropped))
-                parts.Add(Strings.ReduceChangeDoubleKick);
+                parts.Add(SharedStrings.ReductionPreviewChangeDoubleKick);
             if (kinds.HasFlag(ReductionChanges.Reshaped))
-                parts.Add(Strings.ReduceChangeReshaped);
+                parts.Add(SharedStrings.ReductionPreviewChangeReshaped);
             if (kinds.HasFlag(ReductionChanges.Added))
-                parts.Add(Strings.ReduceChangeAdded);
+                parts.Add(SharedStrings.ReductionPreviewChangeAdded);
             if (kinds.HasFlag(ReductionChanges.SustainTrimmed))
-                parts.Add(Strings.ReduceChangeSustain);
+                parts.Add(SharedStrings.ReductionPreviewChangeSustain);
             if (kinds.HasFlag(ReductionChanges.HopoFlipped))
-                parts.Add(Strings.ReduceChangeHopoFlip);
+                parts.Add(SharedStrings.ReductionPreviewChangeHopoFlip);
             if (kinds.HasFlag(ReductionChanges.ForcingChanged))
-                parts.Add(Strings.ReduceChangeForcing);
+                parts.Add(SharedStrings.ReductionPreviewChangeForcing);
             string text = string.Join(", ", parts);
-            return isBoundary ? string.Format(CultureInfo.CurrentCulture, Strings.ReduceChangeBoundaryFormat, text) : text;
+            return isBoundary ? string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionPreviewChangeBoundaryFormat, text) : text;
         }
 
-        private static string NameOf(ReduceChangeCategories category) => category switch
+        private static string NameOf(ReductionChangeCategories category) => category switch
         {
-            ReduceChangeCategories.Removals => Strings.ReduceFilterRemovals,
-            ReduceChangeCategories.Reshapes => Strings.ReduceFilterReshapes,
-            ReduceChangeCategories.Sustains => Strings.ReduceFilterSustains,
-            ReduceChangeCategories.Forcing => Strings.ReduceFilterForcing,
-            _ => Strings.ReduceFilterFindings,
+            ReductionChangeCategories.Removals => SharedStrings.ReductionPreviewFilterRemovals,
+            ReductionChangeCategories.Reshapes => SharedStrings.ReductionPreviewFilterReshapes,
+            ReductionChangeCategories.Sustains => SharedStrings.ReductionPreviewFilterSustains,
+            ReductionChangeCategories.Forcing => SharedStrings.ReductionPreviewFilterForcing,
+            _ => SharedStrings.ReductionPreviewFilterFindings,
         };
 
-        private static string ToolTipOf(ReduceChangeCategories category) => category switch
+        private static string ToolTipOf(ReductionChangeCategories category) => category switch
         {
-            ReduceChangeCategories.Removals => Strings.ReduceFilterRemovalsToolTip,
-            ReduceChangeCategories.Reshapes => Strings.ReduceFilterReshapesToolTip,
-            ReduceChangeCategories.Sustains => Strings.ReduceFilterSustainsToolTip,
-            ReduceChangeCategories.Forcing => Strings.ReduceFilterForcingToolTip,
-            _ => Strings.ReduceFilterFindingsToolTip,
+            ReductionChangeCategories.Removals => SharedStrings.ReductionPreviewFilterRemovalsToolTip,
+            ReductionChangeCategories.Reshapes => SharedStrings.ReductionPreviewFilterReshapesToolTip,
+            ReductionChangeCategories.Sustains => SharedStrings.ReductionPreviewFilterSustainsToolTip,
+            ReductionChangeCategories.Forcing => SharedStrings.ReductionPreviewFilterForcingToolTip,
+            _ => SharedStrings.ReductionPreviewFilterFindingsToolTip,
         };
 
-        private static IBrush SwatchOf(ReduceChangeCategories category) => category switch
+        private static IBrush SwatchOf(ReductionChangeCategories category) => category switch
         {
-            ReduceChangeCategories.Removals => ChangeStripPalette.Removal,
-            ReduceChangeCategories.Reshapes => ChangeStripPalette.Reshape,
-            ReduceChangeCategories.Sustains => ChangeStripPalette.Sustain,
-            ReduceChangeCategories.Forcing => ChangeStripPalette.Forcing,
+            ReductionChangeCategories.Removals => ChangeStripPalette.Removal,
+            ReductionChangeCategories.Reshapes => ChangeStripPalette.Reshape,
+            ReductionChangeCategories.Sustains => ChangeStripPalette.Sustain,
+            ReductionChangeCategories.Forcing => ChangeStripPalette.Forcing,
             _ => ChangeStripPalette.FindingWarning,
         };
     }

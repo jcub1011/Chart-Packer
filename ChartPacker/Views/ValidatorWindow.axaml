@@ -473,20 +473,23 @@
             </Panel>
         </Grid>
 
-        <!-- Why the last save failed; then one line, how far the check has got or what it found, and the actions: Fix
-             selected puts the ticked quick fixes into the drafts, Save all changes writes every listed song's, Close
-             keeps the drafts. -->
+        <!-- Why the last save failed, and which songs' difficulties weren't generated; then one line, how far the check
+             or the generating has got or what it found, and the actions: Fix selected puts the ticked quick fixes into
+             the drafts, Save all changes writes every listed song's, Close keeps the drafts. -->
         <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
             <StackPanel Spacing="8">
                 <Border Classes="banner error" IsVisible="{Binding HasSaveError}">
                     <SelectableTextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding SaveError}" />
                 </Border>
+                <Border Classes="banner error" IsVisible="{Binding HasFixError}">
+                    <SelectableTextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding FixError}" />
+                </Border>
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <Grid Grid.Column="0" ColumnDefinitions="16,*" ColumnSpacing="8" VerticalAlignment="Center" Margin="4,0,0,0">
                         <Panel Grid.Column="0" VerticalAlignment="Center">
                             <Arc Classes="spinner"
-                                 Classes.active="{Binding IsChecking}"
-                                 IsVisible="{Binding IsChecking}"
+                                 Classes.active="{Binding IsBusy}"
+                                 IsVisible="{Binding IsBusy}"
                                  Width="14" Height="14" StrokeThickness="2" />
                             <ui:LineIcon Classes="warn" Data="{StaticResource WarningStroke}" IsVisible="{Binding HasFailing}" />
                             <ui:LineIcon Classes="done" Data="{StaticResource CheckStroke}" IsVisible="{Binding AllPass}" />
