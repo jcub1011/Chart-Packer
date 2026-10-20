@@ -334,9 +334,10 @@ namespace ChartBuilder.ViewModels
         {
             if (_editor is { } editor)
             {
-                _redraw?.Stop();
-                Redraw();
+                // The draft as shown is the rules' as they are, unless a change is still to be drawn or the run was dropped.
                 var reduce = editor.Session.Reduce;
+                if (_redraw is { IsEnabled: true } || !reduce.IsActive)
+                    Redraw();
                 if (!reduce.IsActive)
                     return;
                 if (IsAll && reduce.Overwrites is { Count: > 0 } replaced && Confirmations is { } confirmations
@@ -398,8 +399,8 @@ namespace ChartBuilder.ViewModels
         {
             if (_loading || newValue is null)
                 return;
-            if (IsDefaults && oldValue is not null)
-                Store(Kind, oldValue.Difficulty);
+            if (oldValue is not null)
+                Store(Kind, oldValue.Difficulty ?? SelectedRulesFor?.Difficulty);
             if (_editor?.Session.Chart.PartOf(_part) is { } part)
                 RefreshFrom(d => part[d].Notes.Count > 0);
             LoadRules();
@@ -597,15 +598,12 @@ namespace ChartBuilder.ViewModels
         // The draft's findings and ratings, worked out off the UI thread; a newer draft's check replaces it.
         private async Task CheckAsync(ChartEditorViewModel editor, ReduceProposals reduce)
         {
-            if (reduce.Drafted is not { } drafted || reduce.Part is not { } part)
-                return;
             int check = ++_checks;
             var targets = reduce.Drafts.Select(static d => d.Target.Difficulty).ToList();
-            var options = editor.Session.ReadOptions;
-            ReductionCheck result;
+            ReductionCheck? result;
             try
             {
-                result = await Task.Run(() => ReductionCheck.Of(drafted, part, targets, options));
+                result = await reduce.CheckAsync();
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
@@ -614,7 +612,7 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            if (check != _checks || _done)
+            if (result is null || check != _checks || _done)
                 return;
 
             double highest = result.Estimates.Values.Select(static e => e.Basis.PeakNps).DefaultIfEmpty(0).Max();

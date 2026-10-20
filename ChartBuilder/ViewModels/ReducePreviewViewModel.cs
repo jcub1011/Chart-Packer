@@ -366,21 +366,18 @@ namespace ChartBuilder.ViewModels
         private async Task DiffAsync()
         {
             _isStale = false;
-            if (_reduce is not { Drafted: { } drafted, Part: { } part } reduce)
+            if (_reduce is not { Drafted: not null, Part: { } part } reduce)
                 return;
 
             int run = ++_diffing;
-            var steps = reduce.Steps;
             var range = reduce.Range;
-            var options = Session.ReadOptions;
-            var before = range is null ? null : steps.ToDictionary(s => s.Target, s => Session.GameTrack(new ChartTrackKey(part, s.Target)));
             if (Scene is null)
                 EmptyText = Strings.ReducePreviewWorking;
 
             IReadOnlyList<ReductionDiff> diffs;
             try
             {
-                diffs = await Task.Run(() => ReductionDiff.Of(drafted, part, steps, range, options, before));
+                diffs = await reduce.DiffAsync();
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {

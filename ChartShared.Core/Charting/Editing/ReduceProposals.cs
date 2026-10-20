@@ -92,20 +92,33 @@ public sealed class ReduceProposals
         return Start(ChartInstrument.Drums, range, [.. targets.Keys.Select(static t => ((ChartDifficulty?)null, t))], (chart, f, t) => Reducer.Reduce(chart, f, t, targets[t], variant, range));
     }
 
-    /// <summary>The drafts' lint findings, suggested ratings and order, with the chart's read options; null with no run.</summary>
-    public ReductionCheck? Check() =>
-        Drafted is { } drafted && Part is { } part ? ReductionCheck.Of(drafted, part, [.. Drafts.Select(static d => d.Target.Difficulty)], _session.ReadOptions) : null;
+    /// <summary>
+    /// The drafts' lint findings, suggested ratings and order, with the chart's read options; null with no run. What it
+    /// needs is read now, and it's worked out off the calling thread.
+    /// </summary>
+    public Task<ReductionCheck?> CheckAsync()
+    {
+        if (Drafted is not { } drafted || Part is not { } part)
+            return Task.FromResult<ReductionCheck?>(null);
+        List<ChartDifficulty> targets = [.. Drafts.Select(static d => d.Target.Difficulty)];
+        var options = _session.ReadOptions;
+        return Task.Run<ReductionCheck?>(() => ReductionCheck.Of(drafted, part, targets, options));
+    }
 
     /// <summary>
     /// How each draft differs from its source as the games read them (<see cref="ReductionDiff"/>), highest first, with the
-    /// chart's read options; empty with no run. Outside the range each is compared with its target as charted.
+    /// chart's read options; empty with no run. Outside the range each is compared with its target as charted. What it
+    /// needs is read now, and it's worked out off the calling thread.
     /// </summary>
-    public IReadOnlyList<ReductionDiff> Diff()
+    public Task<IReadOnlyList<ReductionDiff>> DiffAsync()
     {
         if (Drafted is not { } drafted || Part is not { } part)
-            return [];
-        var before = Range is null ? null : Drafts.ToDictionary(static d => d.Target.Difficulty, d => _session.GameTrack(d.Target));
-        return ReductionDiff.Of(drafted, part, Steps, Range, _session.ReadOptions, before);
+            return Task.FromResult<IReadOnlyList<ReductionDiff>>([]);
+        var steps = Steps;
+        var range = Range;
+        var options = _session.ReadOptions;
+        var before = range is null ? null : Drafts.ToDictionary(static d => d.Target.Difficulty, d => _session.GameTrack(d.Target));
+        return Task.Run(() => ReductionDiff.Of(drafted, part, steps, range, options, before));
     }
 
     /// <summary>Each draft's source and target, highest first.</summary>
@@ -175,8 +188,8 @@ public sealed class ReduceProposals
             foreach (var (given, to) in steps.OrderByDescending(static s => s.To))
             {
                 var whole = drafted.PartOf(part)!;
-                var from = given ?? Enum.GetValues<ChartDifficulty>().Where(d => d > to && whole[d].Notes.Count > 0).Order().Cast<ChartDifficulty?>().FirstOrDefault();
-                if (from is not { } source || whole[source].Notes.Count == 0)
+                var from = given ?? Enum.GetValues<ChartDifficulty>().Where(d => d > to && HasNotes(whole[d], range)).Order().Cast<ChartDifficulty?>().FirstOrDefault();
+                if (from is not { } source || !HasNotes(whole[source], range))
                     continue;
                 var draft = new ReductionDraft(source, new ChartTrackKey(part, to), reduce(drafted, source, to), whole[to]);
                 Replace(draft).Apply(drafted);
@@ -203,6 +216,10 @@ public sealed class ReduceProposals
         _session.RaiseState();
         return true;
     }
+
+    // Whether a source has notes to reduce: in the range, or anywhere for the whole part.
+    private static bool HasNotes(EditableTrack track, (long From, long To)? range) =>
+        range is { } r ? !track.Notes.Between(r.From, r.To).IsEmpty : track.Notes.Count > 0;
 
     private void End()
     {

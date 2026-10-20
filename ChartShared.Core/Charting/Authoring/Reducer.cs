@@ -55,7 +55,7 @@ internal readonly record struct ThinningGap(long Ticks, double Seconds)
 /// with more for a sustain, a chord, the first chord after a rest, a turn of the melody, and a phrase's first or last chord
 /// (<see cref="ThinningWeights"/>). Chords are taken best first where no chord taken already is closer than the gap, on
 /// either side: the grid's step, or the rules' milliseconds, whichever is larger. Before them, each star power phrase and
-/// solo takes its best chord, so none is left empty.</para>
+/// solo takes its best chord the gap allows, so none is left empty unless the gap leaves it none.</para>
 /// <para><b>Chords</b> keep their outermost columns, or their lowest alone when only one is kept. A phrase past the highest
 /// column moves down as a whole when it fits, so a trill stays a trill; one wider than the range is fitted to it with each
 /// step kept going up, down or the same where it can be. Only notes a chord would push below green are pressed together.
@@ -64,7 +64,8 @@ internal readonly record struct ThinningGap(long Ticks, double Seconds)
 /// player is likeliest to be asked for first: red, then cymbals, then toms, by the pads as shown inside a disco flip. The
 /// source's mixes, which hold disco flip, are carried over. 2× kicks are left out, as only Expert has them.</para>
 /// <para><b>A range</b> reduces only the source's notes inside it; the target keeps what it has outside, and the gap holds
-/// against its notes either side.</para>
+/// against its notes either side. The source's drum mixes in the range are spliced in, with a mix at either end of it where
+/// needed, so disco flip and the stems are as each had them.</para>
 /// </remarks>
 public static class Reducer
 {
@@ -106,10 +107,18 @@ public static class Reducer
                 columns[i] = chosen;
         }
 
+        // The phrases cover the chords in order, so one walk through the kept chords, which are in order too, splits them.
         var placedAnchor = new Dictionary<int, int>();
-        foreach (var (start, end) in phrases)
+        int next = 0;
+        foreach (var (_, end) in phrases)
         {
-            var frets = kept.Where(i => i >= start && i <= end && columns.ContainsKey(i)).ToList();
+            var frets = new List<int>();
+            for (; next < kept.Count && kept[next] <= end; next++)
+            {
+                if (columns.ContainsKey(kept[next]))
+                    frets.Add(kept[next]);
+            }
+
             var mapped = MapPhrase([.. frets.Select(i => columns[i][0])], [.. frets.Select(i => columns[i][^1] - columns[i][0])], highest);
             for (int k = 0; k < frets.Count; k++)
                 placedAnchor[frets[k]] = mapped[k];
@@ -196,8 +205,7 @@ public static class Reducer
         if (range is { } r)
         {
             result.AddRange(target.Notes.AsSpan().ToArray().Where(n => n.Tick < r.From || n.Tick > r.To));
-            mixes = [.. target.Mixes.AsSpan().ToArray().Where(m => m.Tick < r.From || m.Tick > r.To), .. mixes.Where(m => m.Tick >= r.From && m.Tick <= r.To)];
-            mixes.Sort(static (a, b) => a.Tick.CompareTo(b.Tick));
+            mixes = SpliceMixes(source.Mixes, target.Mixes, r);
         }
 
         result.Sort(EditableNote.Order);
@@ -252,33 +260,42 @@ public static class Reducer
     }
 
     /// <summary>
-    /// The indexes of <paramref name="ticks"/> (in tick order, one per chord) kept by thinning: <paramref name="first"/>'s
-    /// first, then the rest by <paramref name="scores"/>, best first and the earlier on a tie, each where no tick kept or in
+    /// The indexes of <paramref name="ticks"/> (in tick order, one per chord) kept by thinning: one of each of
+    /// <paramref name="first"/>'s groups first, the earliest in it the gap allows, unless one is kept already; then the rest
+    /// by <paramref name="scores"/>, best first and the earlier on a tie. Each is kept where no tick kept or in
     /// <paramref name="fixedTicks"/> is closer than <paramref name="gap"/>. In tick order.
     /// </summary>
-    internal static List<int> Thin(IReadOnlyList<long> ticks, IReadOnlyList<double> scores, ThinningGap gap, TempoMap map, IEnumerable<int> first, IEnumerable<long> fixedTicks)
+    internal static List<int> Thin(IReadOnlyList<long> ticks, IReadOnlyList<double> scores, ThinningGap gap, TempoMap map, IEnumerable<IReadOnlyList<int>> first, IEnumerable<long> fixedTicks)
     {
         if (gap.IsNone)
             return [.. Enumerable.Range(0, ticks.Count)];
 
         var taken = new SortedSet<long>(fixedTicks);
-        var kept = new List<int>();
+        var kept = new HashSet<int>();
         var tried = new HashSet<int>();
-        void Try(int i)
+        bool Try(int i)
         {
-            if (tried.Add(i) && !taken.Contains(ticks[i]) && IsClear(taken, ticks[i], gap, map))
+            if (!tried.Add(i) || taken.Contains(ticks[i]) || !IsClear(taken, ticks[i], gap, map))
+                return false;
+            taken.Add(ticks[i]);
+            kept.Add(i);
+            return true;
+        }
+
+        foreach (var group in first)
+        {
+            if (group.Any(kept.Contains))
+                continue;
+            foreach (int i in group)
             {
-                taken.Add(ticks[i]);
-                kept.Add(i);
+                if (Try(i))
+                    break;
             }
         }
 
-        foreach (int i in first)
-            Try(i);
         foreach (int i in Enumerable.Range(0, ticks.Count).OrderByDescending(i => scores[i]).ThenBy(i => ticks[i]))
             Try(i);
-        kept.Sort();
-        return kept;
+        return [.. kept.Order()];
     }
 
     /// <summary>The fewest ticks two chords are apart on the grid of <paramref name="division"/>; 0 for none.</summary>
@@ -299,8 +316,7 @@ public static class Reducer
             bool split = i == chords.Count;
             if (!split)
             {
-                long end = chords[i - 1].Tick + chords[i - 1].Notes.Max(static n => Math.Max(1, n.Length));
-                split = chords[i].Tick - end >= resolution;
+                split = RestsBefore(chords, i, resolution);
                 while (section < sections.Count && sections[section] <= chords[i - 1].Tick)
                     section++;
                 if (section < sections.Count && sections[section] <= chords[i].Tick)
@@ -412,6 +428,41 @@ public static class Reducer
 
     private static long[] SectionTicks(EditableChart chart) => [.. SectionEvents.All(chart).Select(static e => e.Tick)];
 
+    // Whether chord i starts a beat (resolution) or more after the one before it ends.
+    private static bool RestsBefore(IReadOnlyList<(long Tick, EditableNote[] Notes)> chords, int i, int resolution) =>
+        chords[i].Tick - (chords[i - 1].Tick + chords[i - 1].Notes.Max(static n => Math.Max(1, n.Length))) >= resolution;
+
+    // A range's mixes: the target's outside it and the source's inside, with a mix at the range's start where what the
+    // source has in effect there isn't what the target has, and one after its end back to the target's, so disco flip and
+    // the stems are as each had them on either side.
+    private static List<DrumMix> SpliceMixes(TickList<DrumMix> source, TickList<DrumMix> target, (long From, long To) range)
+    {
+        var mixes = target.AsSpan().ToArray().Where(m => m.Tick < range.From).ToList();
+        var inside = source.Between(range.From, range.To).ToArray();
+        var wanted = InEffect(source, range.From);
+        if ((inside.Length == 0 || inside[0].Tick != range.From) && !SameMix(wanted, mixes.Count > 0 ? mixes[^1] : null))
+            mixes.Add(new DrumMix(range.From, wanted?.Configuration ?? 0, wanted?.Setting ?? string.Empty));
+        mixes.AddRange(inside);
+
+        long after = range.To + 1;
+        var restored = InEffect(target, after);
+        if (target.At(after).IsEmpty && !SameMix(restored, mixes.Count > 0 ? mixes[^1] : null))
+            mixes.Add(new DrumMix(after, restored?.Configuration ?? 0, restored?.Setting ?? string.Empty));
+        mixes.AddRange(target.AsSpan().ToArray().Where(m => m.Tick > range.To));
+        return mixes;
+
+        // The mix in effect at tick: the last at or before it.
+        static DrumMix? InEffect(TickList<DrumMix> track, long tick)
+        {
+            int index = track.FirstAfter(tick) - 1;
+            return index >= 0 ? track[index] : null;
+        }
+
+        // Whether two mixes, wherever they are, read the same; no mix reads as the games' default, drums0 with no setting.
+        static bool SameMix(DrumMix? a, DrumMix? b) =>
+            (a?.Configuration ?? 0) == (b?.Configuration ?? 0) && (a?.Setting ?? string.Empty) == (b?.Setting ?? string.Empty);
+    }
+
     // A chord's lowest column, or null for one of opens alone.
     private static int? Anchor(EditableNote[] chord, Func<EditableNote, int> column)
     {
@@ -420,7 +471,7 @@ public static class Reducer
     }
 
     // How readily each chord is kept (ThinningWeights); anchors give the melody's turns, and are null for drums.
-    private static double[] Scores(List<(long Tick, EditableNote[] Notes)> chords, List<(int Start, int End)> phrases, int?[]? anchors, TempoMap map, int resolution, Func<(long Tick, EditableNote[] Notes), int, bool> isChord)
+    internal static double[] Scores(List<(long Tick, EditableNote[] Notes)> chords, List<(int Start, int End)> phrases, int?[]? anchors, TempoMap map, int resolution, Func<(long Tick, EditableNote[] Notes), int, bool> isChord)
     {
         var scores = new double[chords.Count];
         for (int i = 0; i < chords.Count; i++)
@@ -435,7 +486,7 @@ public static class Reducer
         for (int p = 0; p < phrases.Count; p++)
         {
             var (start, end) = phrases[p];
-            if (p > 0)
+            if (p > 0 && RestsBefore(chords, start, resolution))
                 scores[start] += ThinningWeights.AfterRest;
             scores[start] += ThinningWeights.PhraseEdge;
             if (end != start)
@@ -457,11 +508,11 @@ public static class Reducer
         return scores;
     }
 
-    // The chords kept: each star power phrase and solo's best first, then the rest by score.
+    // The chords kept: the best of each star power phrase and solo the gap allows first, then the rest by score.
     private static List<int> Thin(List<(long Tick, EditableNote[] Notes)> chords, double[] scores, ThinningGap gap, TempoMap map, TickList<Phrase>? phrases, IEnumerable<long> fixedTicks)
     {
         var ticks = chords.Select(static c => c.Tick).ToArray();
-        var first = new List<int>();
+        var first = new List<IReadOnlyList<int>>();
         if (phrases is not null)
         {
             foreach (var phrase in phrases.AsSpan())
@@ -470,15 +521,11 @@ public static class Reducer
                     continue;
                 int lo = Array.BinarySearch(ticks, phrase.Tick);
                 lo = lo < 0 ? ~lo : lo;
-                int best = -1;
-                for (int i = lo; i < ticks.Length && phrase.Covers(ticks[i]); i++)
-                {
-                    if (best < 0 || scores[i] > scores[best])
-                        best = i;
-                }
-
-                if (best >= 0)
-                    first.Add(best);
+                int hi = lo;
+                while (hi < ticks.Length && phrase.Covers(ticks[hi]))
+                    hi++;
+                if (hi > lo)
+                    first.Add([.. Enumerable.Range(lo, hi - lo).OrderByDescending(i => scores[i]).ThenBy(i => ticks[i])]);
             }
         }
 

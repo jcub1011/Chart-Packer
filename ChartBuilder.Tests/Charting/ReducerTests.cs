@@ -360,6 +360,40 @@ public sealed class ReducerTests
     }
 
     [TestMethod]
+    public void AStarPowerPhraseWhoseBestChordIsTooNearTheTargetKeepsAnother()
+    {
+        // Easy's note at 900 leaves no room for the phrase's chord at 960, and ranked by score alone 1440 took the place of
+        // the one at 1400.
+        var chart = Frets(Chord(960, G), Chord(1400, R), Chord(1440, G), Chord(1920, G));
+        Add(chart, Guitar, Easy, Note(900, G));
+        new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 960, 460)).Apply(chart);
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy), (960, 2880)).Notes;
+
+        Assert.Contains(n => n.Tick == 1400, notes);
+        AssertGapsAtLeast(480, notes);
+    }
+
+    [TestMethod]
+    public void OnlyARestCountsTowardsTheFirstChordAfterIt()
+    {
+        // The chord at 960 starts a phrase both times: after a section, with eighths running up to it, and after a rest.
+        var chart = Frets(Chord(0, G));
+        var map = chart.TempoMap.ToTempoMap();
+        double ScoreAt960(long[] ticks, long[] sections)
+        {
+            var chords = ticks.Select(t => (t, new[] { Note(t, G) })).ToList();
+            var scores = Reducer.Scores(chords, Reducer.Phrases(chords, sections, 480), null, map, 480, static (_, _) => false);
+            return scores[Array.IndexOf(ticks, 960L)];
+        }
+
+        double afterSection = ScoreAt960([0, 240, 480, 720, 960], [960]);
+        double afterRest = ScoreAt960([0, 240, 960], []);
+
+        Assert.AreEqual(ThinningWeights.AfterRest, afterRest - afterSection);
+    }
+
+    [TestMethod]
     public void EveryStarPowerPhraseKeepsAHitOnDrums()
     {
         var chart = DrumsChart(DrumsVariant.FourLane);
@@ -454,6 +488,47 @@ public sealed class ReducerTests
         Assert.DoesNotContain(n => n.DoubleKick, result.Notes);
         Assert.AreSequenceEqual(chart.PartOf(Drums)![Expert].Mixes.ToList(), [.. result.Mixes]);
         Assert.AreEqual(1, result.Removed);
+    }
+
+    [TestMethod]
+    public void ARangeStartingInsideADiscoFlipTurnsItOnAtItsStart()
+    {
+        // Expert's flip starts before the range and ends inside it; Hard has no mixes.
+        var chart = DrumsChart(DrumsVariant.Pro);
+        Add(chart, Drums, Expert, Note(0, 1), Note(480, 1), Note(960, 1), Note(1440, 1));
+        new AddDiscoFlip(Expert, 0, 1200).Apply(chart);
+
+        var result = Reducer.Reduce(chart, Expert, Hard, DrumReductionRules.Default(Hard), DrumsVariant.Pro, (960, 1920));
+
+        Assert.AreSequenceEqual([new DrumMix(960, 0, DrumMix.DiscoFlipSetting), new DrumMix(1200, 0, "")], [.. result.Mixes]);
+    }
+
+    [TestMethod]
+    public void ARangeEndingInsideADiscoFlipTurnsItOffAfterItsEnd()
+    {
+        // Expert's flip starts inside the range and runs past it; Hard has no mixes, so its notes after the range aren't flipped.
+        var chart = DrumsChart(DrumsVariant.Pro);
+        Add(chart, Drums, Expert, Note(480, 1), Note(960, 1), Note(1440, 1), Note(2400, 1));
+        new AddDiscoFlip(Expert, 960, 2400).Apply(chart);
+
+        var result = Reducer.Reduce(chart, Expert, Hard, DrumReductionRules.Default(Hard), DrumsVariant.Pro, (480, 1920));
+
+        Assert.AreSequenceEqual([new DrumMix(960, 0, DrumMix.DiscoFlipSetting), new DrumMix(1921, 0, "")], [.. result.Mixes]);
+    }
+
+    [TestMethod]
+    public void ARangeLeavesTheTargetsMixesAloneWhenTheyAgree()
+    {
+        // Both have the same flip; the draft's mixes are the target's.
+        var chart = DrumsChart(DrumsVariant.Pro);
+        Add(chart, Drums, Expert, Note(0, 1), Note(960, 1), Note(1920, 1));
+        Add(chart, Drums, Hard, Note(0, 1), Note(1920, 1));
+        new AddDiscoFlip(Expert, 0, 2400).Apply(chart);
+        new AddDiscoFlip(Hard, 0, 2400).Apply(chart);
+
+        var result = Reducer.Reduce(chart, Expert, Hard, DrumReductionRules.Default(Hard), DrumsVariant.Pro, (480, 1440));
+
+        Assert.AreSequenceEqual(chart.PartOf(Drums)![Hard].Mixes.ToList(), [.. result.Mixes]);
     }
 
     [TestMethod]
