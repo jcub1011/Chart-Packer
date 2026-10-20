@@ -730,7 +730,7 @@ namespace ChartPacker.Controls
                 return;
 
             if (double.IsNaN(x) != double.IsNaN(_hoverX))
-                Cursor = double.IsNaN(x) ? null : LaneScrub.HandCursor;
+                Cursor = double.IsNaN(x) ? null : LaneScrub.SidewaysCursor;
             _hoverX = x;
             if (!double.IsNaN(x))
                 _fade.PointerAt = x;

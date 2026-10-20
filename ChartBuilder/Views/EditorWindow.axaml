@@ -702,7 +702,7 @@
                 </Grid>
             </Border>
             <bctl:TimelineView Margin="8,4,8,8"
-                               Cursor="Hand"
+                               Cursor="SizeWestEast"
                                Position="{Binding Playback.PositionSeconds}"
                                Length="{Binding Playback.LengthSeconds}"
                                IsPlaying="{Binding Playback.IsPlaying}"
