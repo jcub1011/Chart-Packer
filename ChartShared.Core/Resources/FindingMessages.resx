@@ -424,6 +424,12 @@
   <data name="ChrEmptySolo" xml:space="preserve">
     <value>The solo has no notes in it.</value>
   </data>
+  <data name="ChrStarPowerEmptyOnDifficultyFormat" xml:space="preserve">
+    <value>The star power phrase has no notes in it on {0}, though other difficulties have some.</value>
+  </data>
+  <data name="ChrSoloEmptyOnDifficultyFormat" xml:space="preserve">
+    <value>The solo has no notes in it on {0}, though other difficulties have some.</value>
+  </data>
   <data name="ChrOverlappingStarPower" xml:space="preserve">
     <value>Two star power phrases overlap; saving merges them.</value>
   </data>

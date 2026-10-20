@@ -3,6 +3,7 @@ using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
 using static ChartBuilder.Tests.Charting.CommandChecks;
 using static ChartBuilder.Tests.Editing.EditorSessions;
 
@@ -13,6 +14,8 @@ namespace ChartBuilder.Tests.Editing;
 public sealed class ReduceProposalsTests
 {
     private const ChartDifficulty Expert = ChartDifficulty.Expert;
+    private const ChartDifficulty Hard = ChartDifficulty.Hard;
+    private const ChartDifficulty Medium = ChartDifficulty.Medium;
     private const ChartDifficulty Easy = ChartDifficulty.Easy;
 
     [TestMethod]
@@ -110,6 +113,132 @@ public sealed class ReduceProposalsTests
     }
 
     [TestMethod]
+    [DataRow(1)]
+    [DataRow(2)]
+    public void ReduceAllFillsEachFromTheOneAboveItAndIsUndoneInOneStep(int seed)
+    {
+        // AC C9.2: Hard from Expert, Medium from Hard's draft, Easy from Medium's, so each rhythm is the one above's, thinned.
+        var chart = Guitar();
+        DenseGuitar(chart, new Random(seed));
+        var start = chart.Clone();
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Hard, Medium, Easy)));
+        Assert.AreSequenceEqual([(Expert, Hard), (Hard, Medium), (Medium, Easy)], session.Reduce.Drafts.Select(d => (d.Source, d.Target.Difficulty)).ToList());
+        foreach (var difficulty in new[] { Hard, Medium, Easy })
+            Assert.IsNotNull(session.GhostTrack(new ChartTrackKey(ChartInstrument.Guitar, difficulty)), $"No ghost over {difficulty}.");
+        Assert.IsEmpty(session.Reduce.Overwrites);
+        AssertSame(start, chart, "while the drafts are shown");
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var part = chart.PartOf(ChartInstrument.Guitar)!;
+        Assert.IsNotEmpty(part[Easy].Notes);
+        CollectionAssert.IsSubsetOf(Ticks(part[Hard]), Ticks(part[Expert]));
+        CollectionAssert.IsSubsetOf(Ticks(part[Medium]), Ticks(part[Hard]));
+        CollectionAssert.IsSubsetOf(Ticks(part[Easy]), Ticks(part[Medium]));
+
+        session.Undo();
+        AssertSame(start, chart, "after one undo");
+    }
+
+    [TestMethod]
+    public void AHandChartedHardFeedsMedium()
+    {
+        // Hard is charted on beats Expert's sixteenths don't have, and isn't in the run: Medium is made from it.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Hard, [.. Enumerable.Range(0, 8).Select(i => new EditableNote((i * 960L) + 60, 1, i % 4))]).Apply(chart);
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Medium, Easy)));
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var part = chart.PartOf(ChartInstrument.Guitar)!;
+        Assert.IsNotEmpty(part[Medium].Notes);
+        CollectionAssert.IsSubsetOf(Ticks(part[Medium]), Ticks(part[Hard]));
+    }
+
+    [TestMethod]
+    public void ReduceAllSaysWhichTargetsItReplaces()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 240L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.StartAll(ChartInstrument.Guitar, FretTargets(Hard, Medium)));
+
+        Assert.AreSequenceEqual([Hard], session.Reduce.Overwrites.ToList());
+    }
+
+    [TestMethod]
+    public void ReducingDrumsAllFillsEachFromTheOneAboveIt()
+    {
+        var chart = Drums(DrumsVariant.Pro);
+        DenseDrums(chart, DrumsVariant.Pro, new Random(3));
+        var session = Of(chart, focused: DrumsExpert);
+        var targets = new[] { Hard, Medium, Easy }.ToDictionary(d => d, DrumReductionRules.Default);
+
+        Assert.IsTrue(session.Reduce.StartAll(targets));
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var part = chart.PartOf(ChartInstrument.Drums)!;
+        CollectionAssert.IsSubsetOf(Ticks(part[Medium]), Ticks(part[Hard]));
+        CollectionAssert.IsSubsetOf(Ticks(part[Easy]), Ticks(part[Medium]));
+    }
+
+    [TestMethod]
+    public void TheCheckShowsTheDraftsFindingsAndRatings()
+    {
+        // Sixteenths held under the sustain cutoff, which Medium keeps: CHR021 on the draft, as well as on Expert.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 150, i % 5))]).Apply(chart);
+        var session = Of(chart);
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Medium, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Medium));
+
+        var check = session.Reduce.Check()!;
+
+        Assert.Contains(f => f.RuleId == ChrRules.Chr021, check.Findings);
+        Assert.IsTrue(check.Findings.All(f => f.Location!.Difficulty == Medium || (f.RuleId == ChrRules.Chr081 && f.Location.Difficulty == Easy)));
+        Assert.IsTrue(check.Estimates.ContainsKey(Expert));
+        Assert.IsTrue(check.Estimates.ContainsKey(Medium));
+        Assert.IsLessThan(check.Estimates[Expert].Basis.PeakNps, check.Estimates[Medium].Basis.PeakNps);
+        Assert.IsEmpty(check.OutOfOrder);
+    }
+
+    [TestMethod]
+    public void TheCheckSaysWhereADifficultyIsNoEasierThanTheOneAbove()
+    {
+        // Hard is charted denser than Expert; the Easy draft is in order, but Hard isn't.
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 480L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Hard, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 120L, 1, i % 5))]).Apply(chart);
+        var session = Of(chart);
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy));
+
+        var check = session.Reduce.Check()!;
+
+        Assert.Contains(Hard, check.OutOfOrder);
+    }
+
+    [TestMethod]
+    public void ReducingTheSelectionKeepsEditsElsewhere()
+    {
+        var chart = Guitar();
+        new AddNotes(ChartInstrument.Guitar, Expert, [.. Enumerable.Range(0, 32).Select(i => new EditableNote(i * 240L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Guitar, Easy, [new EditableNote(0, 1, 2), new EditableNote(7200, 1, 1)]).Apply(chart);
+        var session = Of(chart);
+
+        Assert.IsTrue(session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy), (1920, 3840)));
+        Assert.AreEqual((1920L, 3840L), session.Reduce.Range);
+        Assert.IsTrue(session.Reduce.Accept());
+
+        var easy = chart.PartOf(ChartInstrument.Guitar)![Easy].Notes.AsSpan().ToArray();
+        Assert.AreSequenceEqual([new EditableNote(0, 1, 2), new EditableNote(7200, 1, 1)], easy.Where(n => n.Tick is < 1920 or > 3840).ToList());
+        Assert.IsNotEmpty(easy.Where(n => n.Tick is >= 1920 and <= 3840));
+    }
+
+    [TestMethod]
     public void NothingToReduceSaysSo()
     {
         var session = Of(Guitar());
@@ -117,6 +246,11 @@ public sealed class ReduceProposalsTests
         Assert.IsFalse(session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy)));
         Assert.IsNotNull(session.Status);
     }
+
+    private static Dictionary<ChartDifficulty, FretReductionRules> FretTargets(params ChartDifficulty[] targets) =>
+        targets.ToDictionary(t => t, t => FretReductionRules.Default(ChartInstrumentKind.FiveFret, t));
+
+    private static List<long> Ticks(EditableTrack track) => [.. track.Notes.AsSpan().ToArray().Select(n => n.Tick).Distinct()];
 
     private static void DenseGuitar(EditableChart chart, Random random)
     {

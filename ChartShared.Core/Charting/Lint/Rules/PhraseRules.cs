@@ -1,3 +1,4 @@
+using System.Globalization;
 using ChartShared.Core.Resources;
 using ChartShared.Core.Validation;
 
@@ -158,5 +159,48 @@ public sealed class NotesInBigRockEndingRule : IChartLintRule
         }
 
         return findings;
+    }
+}
+
+/// <summary>
+/// CHR065: a star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some, as
+/// a reduction can leave one. One finding for each such difficulty; a phrase empty on every difficulty is CHR060's or
+/// CHR061's.
+/// </summary>
+public sealed class PhraseEmptyOnDifficultyRule : IChartLintRule
+{
+    public string RuleId => ChrRules.Chr065;
+
+    public Severity Severity => Severity.Warning;
+
+    // Part, not range: a difficulty getting its first note, or losing its last, changes its findings anywhere.
+    public LintScope Scope => LintScope.Part;
+
+    public int Reach => 0;
+
+    public IEnumerable<Finding> Check(ChartLintContext context)
+    {
+        var findings = new List<Finding>();
+        foreach (var part in context.Parts)
+        {
+            Add(part, PhraseKind.StarPower, FindingMessages.ChrStarPowerEmptyOnDifficultyFormat);
+            Add(part, PhraseKind.Solo, FindingMessages.ChrSoloEmptyOnDifficultyFormat);
+        }
+
+        return findings;
+
+        void Add(EditablePart part, PhraseKind kind, string format)
+        {
+            foreach (var phrase in PhraseSpans.PhrasesIn(context, part, kind))
+            {
+                if (EmptyStarPowerRule.IsEmpty(part, phrase))
+                    continue;
+                foreach (var track in part.Tracks)
+                {
+                    if (track.Notes.Count > 0 && PhraseSpans.Covered(track, phrase).IsEmpty)
+                        findings.Add(new Finding(RuleId, Severity, string.Format(CultureInfo.CurrentCulture, format, track.Difficulty), Location: PhraseSpans.Span(part, track, phrase)));
+                }
+            }
+        }
     }
 }

@@ -227,11 +227,11 @@ public sealed class EditorSession
     public SyncRegion Sync { get; }
 
     /// <summary>
-    /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a Reduce run's, or null for
-    /// none.
+    /// The notes drawn faintly over <paramref name="key"/>'s lane as a draft not yet added: a recording pass's, a Reduce
+    /// run's, or null for none.
     /// </summary>
     public EditableTrack? GhostTrack(ChartTrackKey key) =>
-        Recording?.Track == key ? Recording.Ghost : Reduce.Target == key ? Reduce.Ghost : null;
+        Recording?.Track == key ? Recording.Ghost : Reduce.DraftFor(key)?.Ghost;
 
     /// <summary>The pass of record mode going on, if there's one (charter-spec C15 item 5).</summary>
     public RecordPass? Recording { get; private set; }

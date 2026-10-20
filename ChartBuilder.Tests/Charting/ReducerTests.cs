@@ -142,13 +142,271 @@ public sealed class ReducerTests
     [TestMethod]
     public void ASustainPressedIntoTheNextNoteOnItsLaneEndsThere()
     {
-        // On Easy blue and orange both move down to yellow, so the blue sustain runs into the note after it.
+        // With green alone allowed, the green sustain runs into the red after it, pressed down to green.
         var chart = NewChart(Guitar);
-        Add(chart, Guitar, Expert, new EditableNote(0, 960, B), new EditableNote(480, 1, O));
+        Add(chart, Guitar, Expert, new EditableNote(0, 960, G), new EditableNote(480, 1, R));
 
-        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { ThinningDivision = 0 }).Notes;
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Free(Easy) with { HighestLane = 0 }).Notes;
 
         Assert.AreEqual(480, notes.First(n => n.Tick == 0).Length);
+    }
+
+    [TestMethod]
+    public void ThinningKeepsTheMinimumGapInMsAtFastTempos()
+    {
+        // At 240 BPM a beat is 250 ms, so Easy's 1/4 grid alone keeps every beat; 400 ms keeps no two closer than 768 ticks.
+        var chart = Frets(240, [.. Enumerable.Range(0, 8).Select(i => Chord(i * 480L, G))]);
+
+        var byGrid = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 0 }).Notes;
+        var byTime = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 400 }).Notes;
+
+        Assert.HasCount(8, byGrid);
+        Assert.IsLessThan(8, byTime.Count);
+        AssertGapsAtLeast(768, byTime);
+    }
+
+    [TestMethod]
+    public void TheLargerOfTheGridAndTheGapInMsHolds()
+    {
+        // At 120 BPM a beat is 500 ms: past 400 ms, so the grid holds; 600 ms is past the beat, so it holds.
+        var chart = Frets(120, [.. Enumerable.Range(0, 8).Select(i => Chord(i * 480L, G))]);
+
+        var byGrid = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 400 }).Notes;
+        var byTime = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 600 }).Notes;
+
+        Assert.HasCount(8, byGrid);
+        AssertGapsAtLeast(576, byTime);
+    }
+
+    [TestMethod]
+    public void AGapInMsFollowsATempoChange()
+    {
+        // 120 BPM for a measure, then 240: each beat is kept before the change, and no two closer than 400 ms after it.
+        var chart = Frets(120, [.. Enumerable.Range(0, 16).Select(i => Chord(i * 480L, G))]);
+        new AddTempo(new TempoChange(1920, 250_000)).Apply(chart);
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 400 }).Notes;
+
+        Assert.AreSequenceEqual([0L, 480L, 960L, 1440L, 1920L], notes.Select(n => n.Tick).Where(t => t <= 1920).ToList());
+        AssertGapsAtLeast(768, [.. notes.Where(n => n.Tick >= 1920)]);
+    }
+
+    [TestMethod]
+    public void ATrillPastTheRangeMovesDownAsAWholeAndStaysATrill()
+    {
+        // On Medium an orange–blue trill was blue–blue–blue–blue; moved down as a phrase, it's blue–yellow.
+        var chart = Frets(Chord(0, O), Chord(240, B), Chord(480, O), Chord(720, B));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Medium, Free(Medium)).Notes;
+
+        Assert.AreSequenceEqual([B, Y, B, Y], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void ARunWiderThanTheRangeKeepsRising()
+    {
+        // On Easy green to orange was green–red–yellow–yellow–yellow; fitted to the range, it rises over all three frets.
+        var chart = Frets(Chord(0, G), Chord(240, R), Chord(480, Y), Chord(720, B), Chord(960, O));
+
+        var lanes = Lanes(Reducer.Reduce(chart, Guitar, Expert, Easy, Free(Easy)).Notes);
+
+        Assert.HasCount(5, lanes);
+        for (int i = 1; i < lanes.Count; i++)
+            Assert.IsGreaterThanOrEqualTo(lanes[i - 1], lanes[i], $"Note {i} goes down.");
+        Assert.AreSequenceEqual([G, R, Y], lanes.Distinct().ToList());
+        Assert.AreNotEqual("0,1,2,2,2", string.Join(",", lanes));
+    }
+
+    [TestMethod]
+    public void APhraseInsideTheRangeDoesNotMove()
+    {
+        var chart = Frets(Chord(0, G), Chord(240, R), Chord(480, Y), Chord(720, R), Chord(960, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Medium, Free(Medium)).Notes;
+
+        Assert.AreSequenceEqual([G, R, Y, R, G], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void ARestSplitsPhrases()
+    {
+        // A trill past blue, a rest of a measure, then a green–red trill: the second phrase isn't moved with the first.
+        var chart = Frets(Chord(0, O), Chord(240, B), Chord(480, O), Chord(720, B), Chord(1920, G), Chord(2160, R), Chord(2400, G), Chord(2640, R));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Medium, Free(Medium)).Notes;
+
+        Assert.AreSequenceEqual([B, Y, B, Y, G, R, G, R], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void ASectionSplitsPhrases()
+    {
+        // As one phrase, green to orange is wider than Medium's range and every note would move; a section between them
+        // leaves the green–red trill where it is.
+        var chart = Frets(Chord(0, O), Chord(240, B), Chord(480, O), Chord(720, B), Chord(960, G), Chord(1200, R), Chord(1440, G), Chord(1680, R));
+        new AddTextEvent(null, TextEvent.Of(960, "[section Verse]")).Apply(chart);
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Medium, Free(Medium)).Notes;
+
+        Assert.AreSequenceEqual([B, Y, B, Y, G, R, G, R], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void ChordsKeepTheirShapeInAPhraseMovedDown()
+    {
+        // Yellow–orange then red–blue: past blue on Medium, both move down one, still a fret apart.
+        var chart = Frets(Chord(0, Y, O), Chord(240, R, B));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Medium, Free(Medium)).Notes;
+
+        Assert.AreSequenceEqual([R, B], LanesAt(notes, 0));
+        Assert.AreSequenceEqual([G, Y], LanesAt(notes, 240));
+    }
+
+    [TestMethod]
+    public void OnGhlAPhraseMovedDownKeepsItsColours()
+    {
+        // W2 then B3 (lane 5): past column 2 on Easy, both move down a column, a white and a black still.
+        var chart = NewChart(ChartInstrument.GhlGuitar);
+        Add(chart, ChartInstrument.GhlGuitar, Expert, Note(0, 1), Note(240, 5));
+        var rules = FretReductionRules.Default(ChartInstrumentKind.SixFret, Easy) with { ThinningDivision = 0, MinGapMs = 0 };
+
+        var notes = Reducer.Reduce(chart, ChartInstrument.GhlGuitar, Expert, Easy, rules).Notes;
+
+        Assert.AreSequenceEqual([0, 4], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void ALongSustainOnTheAndBeatsAShortNoteOnTheBeat()
+    {
+        // Ranked by position alone, the plain green on beat 2 took the place of the red sustain an eighth after it.
+        var chart = NewChart(Guitar);
+        Add(chart, Guitar, Expert, Note(0, G), Note(480, G), new EditableNote(720, 960, R), Note(1920, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 0 }).Notes;
+
+        Assert.AreSequenceEqual([0L, 720L, 1920L], notes.Select(n => n.Tick).ToList());
+    }
+
+    [TestMethod]
+    public void AChordBeatsASingleNoteOnAsStrongABeat()
+    {
+        // Sixteenths a quarter's grid apart: the chord is kept over the green before it.
+        var chart = Frets(Chord(600, G), Chord(1080, G), Chord(1320, G, Y), Chord(1800, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 0 }).Notes;
+
+        Assert.AreSequenceEqual([600L, 1320L, 1800L], notes.Select(n => n.Tick).ToList());
+    }
+
+    [TestMethod]
+    public void TheFirstNoteAfterARestIsKept()
+    {
+        // A rest after the first green, then red on beat 4 and yellow on the next measure: red is kept, as it starts a phrase.
+        var chart = Frets(Chord(0, G), Chord(1440, R), Chord(1920, Y), Chord(2880, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { ThinningDivision = 2, MinGapMs = 0 }).Notes;
+
+        Assert.AreSequenceEqual([0L, 1440L, 2880L], notes.Select(n => n.Tick).ToList());
+    }
+
+    [TestMethod]
+    public void WhereTheMelodyTurnsIsKept()
+    {
+        // Sixteenths green, red, yellow, red: yellow, where it turns, is kept over the red before it.
+        var chart = Frets(Chord(600, G), Chord(1080, R), Chord(1320, Y), Chord(1800, R));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Hard, Rules(Hard) with { ThinningDivision = 4, MinGapMs = 0 }).Notes;
+
+        Assert.AreSequenceEqual([600L, 1320L, 1800L], notes.Select(n => n.Tick).ToList());
+    }
+
+    [TestMethod]
+    public void APhrasesLastNoteIsKept()
+    {
+        // Sixteenths a quarter's grid apart before a rest: the second, which ends the phrase, is kept.
+        var chart = Frets(Chord(600, G), Chord(1080, R), Chord(1320, Y), Chord(3000, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { MinGapMs = 0 }).Notes;
+
+        Assert.AreSequenceEqual([600L, 1320L, 3000L], notes.Select(n => n.Tick).ToList());
+    }
+
+    [TestMethod]
+    public void EveryStarPowerPhraseAndSoloKeepsANote()
+    {
+        // Each phrase covers a sixteenth only, which thinning to quarters drops beside the beats either side of it (AC C9.3).
+        var chart = Frets(Chord(0, G), Chord(120, R), Chord(480, G), Chord(960, G), Chord(1440, G), Chord(1560, Y), Chord(1920, G));
+        new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 100, 40)).Apply(chart);
+        new AddPhrase(Guitar, new Phrase(PhraseKind.Solo, 1500, 100)).Apply(chart);
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy)).Notes;
+
+        Assert.Contains(n => n.Tick == 120, notes);
+        Assert.Contains(n => n.Tick == 1560, notes);
+        AssertGapsAtLeast(480, notes);
+    }
+
+    [TestMethod]
+    public void PhrasesCloserThanTheGridStillLeaveNoTwoChordsCloser()
+    {
+        var chart = Frets(Chord(0, G), Chord(120, R), Chord(480, Y));
+        new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 0, 60)).Apply(chart);
+        new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 100, 60)).Apply(chart);
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy)).Notes;
+
+        AssertGapsAtLeast(480, notes);
+    }
+
+    [TestMethod]
+    public void EveryStarPowerPhraseKeepsAHitOnDrums()
+    {
+        var chart = DrumsChart(DrumsVariant.FourLane);
+        Add(chart, Drums, Expert, Note(0, 0), Note(0, 1), Note(120, 2), Note(480, 1), Note(960, 1));
+        new AddPhrase(Drums, new Phrase(PhraseKind.StarPower, 100, 40)).Apply(chart);
+
+        var notes = Reducer.Reduce(chart, Expert, Easy, DrumReductionRules.Default(Easy), DrumsVariant.FourLane).Notes;
+
+        Assert.Contains(n => n.Tick == 120, notes);
+        AssertGapsAtLeast(480, notes);
+    }
+
+    [TestMethod]
+    public void ARangeLeavesTheTargetOutsideItAlone()
+    {
+        var chart = Frets([.. Enumerable.Range(0, 17).Select(i => Chord(i * 240L, i % 5))]);
+        Add(chart, Guitar, Easy, Note(0, Y), Note(3840, R));
+
+        var result = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy), (960, 2880));
+
+        Assert.AreSequenceEqual([new EditableNote(0, 1, Y), new EditableNote(3840, 1, R)], result.Notes.Where(n => n.Tick is < 960 or > 2880).ToList());
+        Assert.IsNotEmpty(result.Notes.Where(n => n.Tick is >= 960 and <= 2880));
+        Assert.AreEqual(Expert9To24().Length - result.Notes.Count(n => n.Tick is >= 960 and <= 2880), result.Removed);
+
+        static long[] Expert9To24() => [.. Enumerable.Range(4, 9).Select(i => i * 240L)];
+    }
+
+    [TestMethod]
+    public void ARangeKeepsTheGapAgainstTheTargetEitherSide()
+    {
+        var chart = Frets([.. Enumerable.Range(0, 17).Select(i => Chord(i * 240L, G))]);
+        Add(chart, Guitar, Easy, Note(900, G), Note(3000, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy), (960, 2880)).Notes;
+
+        AssertGapsAtLeast(480, notes);
+    }
+
+    [TestMethod]
+    public void ATargetsSustainRunningIntoTheRangeEndsAtItsFirstNoteOnTheLane()
+    {
+        var chart = Frets(Chord(960, G), Chord(1440, R));
+        Add(chart, Guitar, Easy, new EditableNote(0, 1920, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy), (960, 2000)).Notes;
+
+        Assert.AreEqual(960, notes.First(n => n.Tick == 0).Length);
     }
 
     [TestMethod]
@@ -224,7 +482,8 @@ public sealed class ReducerTests
     {
         var bad = new ReductionDefaults
         {
-            FiveFretEasy = new FretReductionRules { MaxChordSize = 9, HighestLane = -2, ThinningDivision = 15 },
+            FiveFretEasy = new FretReductionRules { MaxChordSize = 9, HighestLane = -2, ThinningDivision = 15, MinGapMs = 5000 },
+            FiveFretMedium = new FretReductionRules { MinGapMs = null },
             SixFretHard = new FretReductionRules { MaxChordSize = 5, HighestLane = 4 },
             DrumsMedium = new DrumReductionRules { PadsPerHit = 0, ThinningDivision = -1, KickDivision = 9, KeepDoubleKick = true },
             FiveFretHard = null!,
@@ -235,6 +494,9 @@ public sealed class ReducerTests
         Assert.AreEqual(5, fixedUp.FiveFretEasy.MaxChordSize);
         Assert.AreEqual(0, fixedUp.FiveFretEasy.HighestLane);
         Assert.AreEqual(16, fixedUp.FiveFretEasy.ThinningDivision);
+        Assert.AreEqual(ReductionDefaults.MaxGapMs, fixedUp.FiveFretEasy.MinGapMs);
+        Assert.AreEqual(ReductionDefaults.Shipped.FiveFretMedium.MinGapMs, fixedUp.FiveFretMedium.MinGapMs);
+        Assert.AreEqual(ReductionDefaults.Shipped.DrumsMedium.MinGapMs, fixedUp.DrumsMedium.MinGapMs);
         Assert.AreEqual(3, fixedUp.SixFretHard.MaxChordSize);
         Assert.AreEqual(2, fixedUp.SixFretHard.HighestLane);
         Assert.AreEqual(1, fixedUp.DrumsMedium.PadsPerHit);
@@ -253,6 +515,9 @@ public sealed class ReducerTests
         Assert.AreSequenceEqual([4, 3, 2], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.HighestLane).ToList());
         Assert.AreSequenceEqual([2, 2, 1], new[] { shipped.SixFretHard, shipped.SixFretMedium, shipped.SixFretEasy }.Select(r => r.HighestLane).ToList());
         Assert.AreSequenceEqual([16, 8, 4], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.ThinningDivision).ToList());
+        Assert.AreSequenceEqual([100, 200, 400], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.MinGapMs ?? 0).ToList());
+        Assert.AreSequenceEqual([100, 200, 400], new[] { shipped.SixFretHard, shipped.SixFretMedium, shipped.SixFretEasy }.Select(r => r.MinGapMs ?? 0).ToList());
+        Assert.AreSequenceEqual([100, 200, 400], new[] { shipped.DrumsHard, shipped.DrumsMedium, shipped.DrumsEasy }.Select(r => r.MinGapMs ?? 0).ToList());
         Assert.AreSequenceEqual([true, false, false], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.KeepForcedHopoAndTap).ToList());
         Assert.AreSequenceEqual([true, true, false], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.KeepShortSustains).ToList());
         Assert.AreSequenceEqual([2, 2, 1], new[] { shipped.DrumsHard, shipped.DrumsMedium, shipped.DrumsEasy }.Select(r => r.PadsPerHit).ToList());
@@ -261,13 +526,28 @@ public sealed class ReducerTests
 
     private static FretReductionRules Rules(ChartDifficulty target) => FretReductionRules.Default(ChartInstrumentKind.FiveFret, target);
 
+    // The rules for target with no thinning, by grid or by time.
+    private static FretReductionRules Free(ChartDifficulty target) => Rules(target) with { ThinningDivision = 0, MinGapMs = 0 };
+
     private static (long Tick, int[] Lanes) Chord(long tick, params int[] lanes) => (tick, lanes);
 
-    private static EditableChart Frets(params (long Tick, int[] Lanes)[] chords)
+    private static EditableChart Frets(params (long Tick, int[] Lanes)[] chords) => Frets(120, chords);
+
+    private static EditableChart Frets(int bpm, params (long Tick, int[] Lanes)[] chords)
     {
-        var chart = NewChart(Guitar);
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, bpm, 4, 4, new HashSet<ChartInstrument> { Guitar }, DrumsVariant.FourLane));
         Add(chart, Guitar, Expert, [.. chords.SelectMany(c => c.Lanes.Select(l => Note(c.Tick, l)))]);
         return chart;
+    }
+
+    // Each note's lane, in tick order.
+    private static List<int> Lanes(IReadOnlyList<EditableNote> notes) => [.. notes.OrderBy(n => n.Tick).ThenBy(n => n.Lane).Select(n => n.Lane)];
+
+    private static void AssertGapsAtLeast(long ticks, IReadOnlyList<EditableNote> notes)
+    {
+        var chords = notes.Select(n => n.Tick).Distinct().Order().ToList();
+        for (int i = 1; i < chords.Count; i++)
+            Assert.IsGreaterThanOrEqualTo(ticks, chords[i] - chords[i - 1], $"Chords at {chords[i - 1]} and {chords[i]}.");
     }
 
     private static EditableChart DrumsChart(DrumsVariant variant) =>

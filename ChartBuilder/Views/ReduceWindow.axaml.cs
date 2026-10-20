@@ -1,19 +1,22 @@
 using System;
 using Avalonia.Controls;
 using ChartBuilder.ViewModels;
+using ChartShared.UI.Services;
 using ChartShared.UI.Views;
 
 namespace ChartBuilder.Views
 {
     /// <summary>
     /// The Reduce dialog (charter-spec C9 item 2). It closes once its view model is done; closed any other way, a run is
-    /// cancelled, adding nothing.
+    /// cancelled, adding nothing. It asks, over itself, before Reduce all replaces a difficulty with notes. On the defaults
+    /// in Settings there's no draft to show, so it's the rules alone, narrower.
     /// </summary>
     public partial class ReduceWindow : Window
     {
         public ReduceWindow()
         {
             InitializeComponent();
+            WindowChrome.ShowIcon(this, WindowTitleBar);
             Opened += (_, _) => WindowChrome.UseDarkTitleBar(this);
             Closed += (_, _) => (DataContext as ReduceViewModel)?.Cancel();
         }
@@ -22,7 +25,18 @@ namespace ChartBuilder.Views
         {
             base.OnDataContextChanged(e);
             if (DataContext is ReduceViewModel vm)
+            {
                 vm.Done += (_, _) => Close();
+                vm.Confirmations = new AvaloniaConfirmationService(() => this);
+                if (vm.IsDefaults)
+                {
+                    Body.ColumnDefinitions[0].Width = GridLength.Star;
+                    SetupPane.BorderThickness = default;
+                    MinWidth = 380;
+                    Width = 420;
+                    Height = 560;
+                }
+            }
         }
     }
 }
