@@ -408,9 +408,11 @@
 
         <Panel>
             <edit:HighwayEditorCanvas IsVisible="{Binding ShowsHighway}"
+                                      WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                       AccentBrush="{DynamicResource AccentTextBrush}"
                                       LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <edit:TimelineEditorCanvas IsVisible="{Binding ShowsTimeline}"
+                                       WheelUpIsLater="{Binding Editor.WheelUpIsLater}"
                                        AccentBrush="{DynamicResource AccentTextBrush}"
                                        LabelBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
             <StackPanel Classes="placeholder" IsVisible="{Binding HasPlaceholder}">

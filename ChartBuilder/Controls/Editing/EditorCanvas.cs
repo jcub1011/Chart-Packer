@@ -49,6 +49,9 @@ namespace ChartBuilder.Controls.Editing
         public static readonly StyledProperty<IBrush?> LabelBrushProperty =
             AvaloniaProperty.Register<EditorCanvas, IBrush?>(nameof(LabelBrush));
 
+        public static readonly StyledProperty<bool> WheelUpIsLaterProperty =
+            AvaloniaProperty.Register<EditorCanvas, bool>(nameof(WheelUpIsLater), true);
+
         // How near a note's start, or a phrase bar's end in the rail, the pointer hits it, in pixels.
         private const double HitPixels = 7;
 
@@ -283,6 +286,13 @@ namespace ChartBuilder.Controls.Editing
         {
             get => GetValue(LabelBrushProperty);
             set => SetValue(LabelBrushProperty, value);
+        }
+
+        /// <summary>Whether the wheel turned up moves the cursor later, as up the highway; otherwise turned down does.</summary>
+        public bool WheelUpIsLater
+        {
+            get => GetValue(WheelUpIsLaterProperty);
+            set => SetValue(WheelUpIsLaterProperty, value);
         }
 
         /// <summary>How the lane draws the song.</summary>
@@ -1049,6 +1059,9 @@ namespace ChartBuilder.Controls.Editing
             return notch * (fast ? FastScrollSteps : 1);
         }
 
+        /// <summary>A wheel turn, up for more than none, as a turn later for more than none: as it is when <paramref name="wheelUpIsLater"/>, otherwise the other way.</summary>
+        internal static double TowardLater(double delta, bool wheelUpIsLater) => wheelUpIsLater ? delta : -delta;
+
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
@@ -1066,14 +1079,13 @@ namespace ChartBuilder.Controls.Editing
             else
             {
                 // The song moves past the strike line a grid step a notch, through the tempo map, so the strike line stays
-                // on the grid across tempo and time-signature changes. Up the highway is later; along a timeline, the
-                // wheel turned down is. At most one notch per wheel event, so a mouse reporting several units per
-                // physical notch still moves a single step; with Shift held, a notch moves four grid steps instead.
+                // on the grid across tempo and time-signature changes. Which way is later is the setting's, the same in
+                // either view and on the timeline. At most one notch per wheel event, so a mouse reporting several units
+                // per physical notch still moves a single step; with Shift held, a notch moves four grid steps instead.
                 // Some platforms report Shift+wheel as a sideways scroll, so that counts too.
                 bool fast = (e.KeyModifiers & KeyModifiers.Shift) != 0;
                 double raw = delta != 0 ? delta : (fast ? e.Delta.X : 0);
-                double sign = View == LaneView.Highway ? 1 : -1;
-                int steps = TakeScrollStep(ref _wheel, sign * raw, fast);
+                int steps = TakeScrollStep(ref _wheel, TowardLater(raw, WheelUpIsLater), fast);
                 if (steps != 0)
                     session.Tools.StepCursor(steps);
             }
