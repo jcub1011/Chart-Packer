@@ -24,15 +24,21 @@ public sealed record FretReductionRules
     /// <summary>Whether sustains shorter than a beat are kept, rather than made plain notes.</summary>
     public bool KeepShortSustains { get; init; } = true;
 
+    /// <summary>
+    /// The fewest milliseconds two chords are apart, beside the thinning grid: whichever gap is larger holds. 0 for none;
+    /// null in settings saved before it was added, which <see cref="ReductionDefaults.Normalized"/> fills from the shipped.
+    /// </summary>
+    public int? MinGapMs { get; init; }
+
     /// <summary>The shipped defaults for reducing a <paramref name="kind"/> part to <paramref name="target"/> (the C9 table).</summary>
     public static FretReductionRules Default(ChartInstrumentKind kind, ChartDifficulty target)
     {
         bool ghl = kind == ChartInstrumentKind.SixFret;
         return target switch
         {
-            ChartDifficulty.Hard => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 4, ThinningDivision = 16, KeepForcedHopoAndTap = true, KeepShortSustains = true },
-            ChartDifficulty.Medium => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 3, ThinningDivision = 8, KeepForcedHopoAndTap = false, KeepShortSustains = true },
-            _ => new() { MaxChordSize = 1, HighestLane = ghl ? 1 : 2, ThinningDivision = 4, KeepForcedHopoAndTap = false, KeepShortSustains = false },
+            ChartDifficulty.Hard => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 4, ThinningDivision = 16, MinGapMs = 100, KeepForcedHopoAndTap = true, KeepShortSustains = true },
+            ChartDifficulty.Medium => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 3, ThinningDivision = 8, MinGapMs = 200, KeepForcedHopoAndTap = false, KeepShortSustains = true },
+            _ => new() { MaxChordSize = 1, HighestLane = ghl ? 1 : 2, ThinningDivision = 4, MinGapMs = 400, KeepForcedHopoAndTap = false, KeepShortSustains = false },
         };
     }
 
@@ -45,6 +51,7 @@ public sealed record FretReductionRules
             MaxChordSize = Math.Clamp(MaxChordSize, 1, columns),
             HighestLane = Math.Clamp(HighestLane, 0, columns - 1),
             ThinningDivision = ReductionDefaults.NormalizedDivision(ThinningDivision),
+            MinGapMs = ReductionDefaults.NormalizedGap(MinGapMs),
         };
     }
 }
@@ -64,12 +71,18 @@ public sealed record DrumReductionRules
     /// <summary>Whether 2× kicks are kept; only Expert can have them, so Reduce never keeps them.</summary>
     public bool KeepDoubleKick { get; init; }
 
+    /// <summary>
+    /// The fewest milliseconds two hits are apart, beside the thinning grid (not the kick's own): whichever gap is larger
+    /// holds. 0 for none; null in settings saved before it was added.
+    /// </summary>
+    public int? MinGapMs { get; init; }
+
     /// <summary>The shipped defaults for reducing drums to <paramref name="target"/> (the C9 table).</summary>
     public static DrumReductionRules Default(ChartDifficulty target) => target switch
     {
-        ChartDifficulty.Hard => new() { PadsPerHit = 2, ThinningDivision = 16, KickDivision = 0 },
-        ChartDifficulty.Medium => new() { PadsPerHit = 2, ThinningDivision = 8, KickDivision = 8 },
-        _ => new() { PadsPerHit = 1, ThinningDivision = 4, KickDivision = 4 },
+        ChartDifficulty.Hard => new() { PadsPerHit = 2, ThinningDivision = 16, MinGapMs = 100, KickDivision = 0 },
+        ChartDifficulty.Medium => new() { PadsPerHit = 2, ThinningDivision = 8, MinGapMs = 200, KickDivision = 8 },
+        _ => new() { PadsPerHit = 1, ThinningDivision = 4, MinGapMs = 400, KickDivision = 4 },
     };
 
     /// <summary>These rules with every value kept to what it can be.</summary>
@@ -77,6 +90,7 @@ public sealed record DrumReductionRules
     {
         PadsPerHit = Math.Clamp(PadsPerHit, 1, 5),
         ThinningDivision = ReductionDefaults.NormalizedDivision(ThinningDivision),
+        MinGapMs = ReductionDefaults.NormalizedGap(MinGapMs),
         KickDivision = ReductionDefaults.NormalizedDivision(KickDivision),
         KeepDoubleKick = false,
     };
@@ -159,27 +173,42 @@ public sealed class ReductionDefaults
         return copy;
     }
 
-    /// <summary>A copy with every value kept to what it can be, and the shipped rules for any set the file lacks.</summary>
+    /// <summary>
+    /// A copy with every value kept to what it can be, and the shipped rules for any set the file lacks, or any value: a
+    /// set saved before its minimum gap was added gets the shipped one.
+    /// </summary>
     public ReductionDefaults Normalized()
     {
         var shipped = Shipped;
         return new ReductionDefaults
         {
-            FiveFretHard = (FiveFretHard ?? shipped.FiveFretHard).Normalized(ChartInstrumentKind.FiveFret),
-            FiveFretMedium = (FiveFretMedium ?? shipped.FiveFretMedium).Normalized(ChartInstrumentKind.FiveFret),
-            FiveFretEasy = (FiveFretEasy ?? shipped.FiveFretEasy).Normalized(ChartInstrumentKind.FiveFret),
-            SixFretHard = (SixFretHard ?? shipped.SixFretHard).Normalized(ChartInstrumentKind.SixFret),
-            SixFretMedium = (SixFretMedium ?? shipped.SixFretMedium).Normalized(ChartInstrumentKind.SixFret),
-            SixFretEasy = (SixFretEasy ?? shipped.SixFretEasy).Normalized(ChartInstrumentKind.SixFret),
-            DrumsHard = (DrumsHard ?? shipped.DrumsHard).Normalized(),
-            DrumsMedium = (DrumsMedium ?? shipped.DrumsMedium).Normalized(),
-            DrumsEasy = (DrumsEasy ?? shipped.DrumsEasy).Normalized(),
+            FiveFretHard = Filled(FiveFretHard, shipped.FiveFretHard).Normalized(ChartInstrumentKind.FiveFret),
+            FiveFretMedium = Filled(FiveFretMedium, shipped.FiveFretMedium).Normalized(ChartInstrumentKind.FiveFret),
+            FiveFretEasy = Filled(FiveFretEasy, shipped.FiveFretEasy).Normalized(ChartInstrumentKind.FiveFret),
+            SixFretHard = Filled(SixFretHard, shipped.SixFretHard).Normalized(ChartInstrumentKind.SixFret),
+            SixFretMedium = Filled(SixFretMedium, shipped.SixFretMedium).Normalized(ChartInstrumentKind.SixFret),
+            SixFretEasy = Filled(SixFretEasy, shipped.SixFretEasy).Normalized(ChartInstrumentKind.SixFret),
+            DrumsHard = Filled(DrumsHard, shipped.DrumsHard).Normalized(),
+            DrumsMedium = Filled(DrumsMedium, shipped.DrumsMedium).Normalized(),
+            DrumsEasy = Filled(DrumsEasy, shipped.DrumsEasy).Normalized(),
         };
     }
 
     /// <summary><paramref name="division"/> as a thinning grid: 0 for none, otherwise the nearest of the common snaps.</summary>
     internal static int NormalizedDivision(int division) =>
         division <= 0 ? 0 : SnapGrid.CommonDivisions.MinBy(d => Math.Abs(d - division));
+
+    /// <summary>The most milliseconds a minimum gap can be.</summary>
+    public const int MaxGapMs = 2000;
+
+    /// <summary><paramref name="ms"/> as a minimum gap: from 0 (none) to <see cref="MaxGapMs"/>, or null when it isn't set.</summary>
+    internal static int? NormalizedGap(int? ms) => ms is { } value ? Math.Clamp(value, 0, MaxGapMs) : null;
+
+    private static FretReductionRules Filled(FretReductionRules? rules, FretReductionRules shipped) =>
+        rules is null ? shipped : rules.MinGapMs is null ? rules with { MinGapMs = shipped.MinGapMs } : rules;
+
+    private static DrumReductionRules Filled(DrumReductionRules? rules, DrumReductionRules shipped) =>
+        rules is null ? shipped : rules.MinGapMs is null ? rules with { MinGapMs = shipped.MinGapMs } : rules;
 
     private ReductionDefaults Copy() => new()
     {

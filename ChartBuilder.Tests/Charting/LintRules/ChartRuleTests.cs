@@ -53,6 +53,7 @@ public sealed class ChartRuleTests
         [ChrRules.Chr061, 1],
         [ChrRules.Chr062, 1],
         [ChrRules.Chr063, 4],
+        [ChrRules.Chr065, 1],
         [ChrRules.Chr080, 1],
         [ChrRules.Chr081, 1],
         [ChrRules.Chr082, 1],
@@ -425,11 +426,16 @@ public sealed class ChartRuleTests
                 new AddPhrase(Guitar, new Phrase(PhraseKind.Solo, Beat / 2, 10)).Apply(chart);
                 break;
             case ChrRules.Chr062:
-                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 0, 2 * Beat)).Apply(chart);
-                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, Beat, 2 * Beat)).Apply(chart);
+                // Both over the note every difficulty has at the ninth beat, so neither is empty on one (CHR065).
+                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 7 * Beat, 2 * Beat)).Apply(chart);
+                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 8 * Beat, 2 * Beat)).Apply(chart);
                 break;
             case ChrRules.Chr063:
                 new AddPhrase(Guitar, new Phrase(PhraseKind.BigRockEnding, 0, 8 * Beat)).Apply(chart);
+                break;
+            case ChrRules.Chr065:
+                // Over the fifth beat, which Expert, Hard and Medium have a note on, and Easy doesn't.
+                new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 4 * Beat, 10)).Apply(chart);
                 break;
             case ChrRules.Chr080:
                 new AddPart(ChartInstrument.Bass).Apply(chart);

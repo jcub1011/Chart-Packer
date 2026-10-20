@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Current as of 2026-10-08 |
+| **Status** | Current as of 2026-10-20 |
 | **Companion docs** | [charter-spec-v1.md](charter-spec-v1.md) (what each milestone contains, and its exit criteria) |
 | **Next up** | v1 is built: the manual checks of CM5, then the release |
 
@@ -270,7 +270,8 @@ recorded in the spec, as *Settled in CM5*.
   and `Reducer` with the rules of `ReductionRules`: thinning by strong beats, chords kept to their
   outer columns and moved into range, forcing and short sustains, drums' pads, kick and 2× kick. A
   run (`ReduceProposals`) is drawn as a ghost over the target from the Reduce dialog and added as
-  one `ReplaceTrack`. The defaults are in Settings (`BuilderSettings.ReductionRules`).
+  one `ReplaceTrack`. The defaults are in Settings (`BuilderSettings.ReductionRules`). Improved
+  after v1; see [Improved Reduce](#improved-reduce-90).
 - **Selection across lanes** ([C15](charter-spec-v1.md#c15-editing-ergonomics) item 2). A range over
   the lanes shown (Alt+drag), a section (Ctrl+Shift+A), a whole lane; delete, moves, H/G/T and the
   transforms act on every track a range covers (`EditorSelection.NotesByTrack`).
@@ -314,6 +315,39 @@ It comes last because these tools build on the rest:
 - reduction needs every instrument family (CM3);
 - record mode and snap to onset need the onsets (CM4);
 - lint in the library needs the full rule catalogue.
+
+---
+
+## Improved Reduce (#90)
+
+**Status: done.** The fixtures pass; the manual checks of the dialog are to do.
+
+[Issue #90](https://github.com/jcub1011/Chart-Packer/issues/90) improves C9's Reduce
+([C9](charter-spec-v1.md#c9-difficulty-authoring), *Improved after v1*). `Reducer` stays a static
+class, rules in and a `ReductionResult` out.
+
+- **Reduce all.** `ReduceProposals.StartAll` drafts Hard, Medium and Easy, each from the one above
+  it as it will be, on a copy of the chart, and `Accept` adds them as one step
+  (`EditorSession.ExecuteAsOne`). A run holds `ReductionDraft`s.
+- **The melody's shape.** `Reducer.Phrases` splits the chords at rests and sections, and
+  `Reducer.MapPhrase` fits each phrase to the range as a whole, keeping each step's direction.
+- **Thinning by time.** `MinGapMs` in both rule sets (100, 200 and 400 ms); the larger of it and the
+  grid holds (`ThinningGap`). Settings saved before it get the shipped values.
+- **A score per chord.** `ThinningWeights`: beat strength, sustains, chords, after a rest, turns of
+  the melody, and phrase ends.
+- **Star power and solos.** Each keeps its best chord, seeded before thinning. CHR065 flags a phrase
+  empty on one charted difficulty.
+- **The check.** `ReductionCheck`: the draft's findings, suggested ratings and peak notes per
+  second, and difficulties out of order, worked out off the UI thread.
+- **A range.** The Reduce dialog's **Over**: the whole part, the selection or the section at the
+  cursor.
+
+AC C9.1 still passes; AC C9.2 and C9.3 are new, with fixtures in `ReducerTests` and
+`ReduceProposalsTests`.
+
+**Left for later:** the scoring weights and the contour's step costs are set by hand, like the
+suggested rating's; an order warning shows when a draft is rated the same as the difficulty above,
+which a slow song's Hard can be.
 
 ---
 

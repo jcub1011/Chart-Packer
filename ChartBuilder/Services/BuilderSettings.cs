@@ -20,6 +20,31 @@ namespace ChartBuilder.Services
         KeepTimes,
     }
 
+    /// <summary>The kinds of change the Reduce dialog's preview can mark and stop at, each a filter it shows.</summary>
+    [System.Flags]
+    public enum ReduceChangeCategories
+    {
+        None = 0,
+
+        /// <summary>Chords left out, and 2x kicks dropped.</summary>
+        Removals = 1,
+
+        /// <summary>Chords with other frets or pads, and chords added.</summary>
+        Reshapes = 2,
+
+        /// <summary>Notes held shorter, or no longer held.</summary>
+        Sustains = 4,
+
+        /// <summary>Chords read as a strum, HOPO or tap other than before, forced or natural.</summary>
+        Forcing = 8,
+
+        /// <summary>The draft's lint findings.</summary>
+        Findings = 16,
+
+        All = Removals | Reshapes | Sustains | Forcing | Findings,
+        Default = All & ~Removals,
+    }
+
     /// <summary>Which way the mouse wheel moves through the song, along the lanes in either view and the timeline alike.</summary>
     public enum WheelScrollDirection
     {
@@ -199,6 +224,33 @@ namespace ChartBuilder.Services
 
         /// <summary>How many seconds ahead the highway preview shows (charter-spec C18), as its slider last left it.</summary>
         public double PreviewLookAhead { get; set; } = 1.4;
+
+        /// <summary>Whether the Reduce dialog shows its preview, as it was last left.</summary>
+        public bool ReducePreviewShown { get; set; }
+
+        /// <summary>
+        /// How many seconds ahead the Reduce dialog's preview shows, as its slider last left it: its own, as it goes further
+        /// than the highway preview's, to see a stretch of changes at once.
+        /// </summary>
+        public double ReducePreviewLookAhead { get; set; } = 1.5;
+
+        /// <summary>The shortest and longest look-ahead the Reduce dialog's preview gives, and the steps its slider takes.</summary>
+        public const double MinReducePreviewLookAhead = 0.5;
+
+        public const double MaxReducePreviewLookAhead = 10;
+
+        public const double ReducePreviewLookAheadStep = 0.5;
+
+        /// <summary><paramref name="seconds"/> as the Reduce dialog's preview takes a look-ahead: on its steps, in its range.</summary>
+        public static double SnapReducePreviewLookAhead(double seconds) => double.IsFinite(seconds)
+            ? System.Math.Clamp(System.Math.Round(seconds / ReducePreviewLookAheadStep) * ReducePreviewLookAheadStep, MinReducePreviewLookAhead, MaxReducePreviewLookAhead)
+            : 1.5;
+
+        /// <summary>
+        /// Which kinds of change the Reduce dialog's preview marks and stops at, as its filters were last left: all but the
+        /// removals at first, as a reduction is mostly those.
+        /// </summary>
+        public ReduceChangeCategories ReducePreviewCategories { get; set; } = ReduceChangeCategories.Default;
 
         /// <summary>How long before a note a playtest takes a hit for it, in real milliseconds (charter-spec C19).</summary>
         public int PlaytestEarlyMs { get; set; } = (int)HitWindow.DefaultMs;

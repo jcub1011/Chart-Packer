@@ -82,6 +82,8 @@ namespace ChartBuilder.Services
             settings.HitSoundVolume = Math.Clamp(settings.HitSoundVolume, 0, 100);
             settings.ReductionRules = (settings.ReductionRules ?? ReductionDefaults.Shipped).Normalized();
             settings.PreviewLookAhead = double.IsFinite(settings.PreviewLookAhead) ? Math.Clamp(settings.PreviewLookAhead, 0.5, 4) : 1.4;
+            settings.ReducePreviewCategories &= ReduceChangeCategories.All;
+            settings.ReducePreviewLookAhead = BuilderSettings.SnapReducePreviewLookAhead(settings.ReducePreviewLookAhead);
             settings.PlaytestEarlyMs = Math.Clamp(settings.PlaytestEarlyMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             settings.PlaytestLateMs = Math.Clamp(settings.PlaytestLateMs, (int)HitWindow.MinMs, (int)HitWindow.MaxMs);
             if (!Enum.IsDefined(settings.GuitarRecordStyle))

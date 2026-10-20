@@ -1344,6 +1344,7 @@ Acceptance criteria:
      | Frets used (5-fret) | all | G–B | G–Y |
      | Columns used (GHL) | all | 1–3 | 1–2 |
      | Thinning grid (no closer than) | 1/16 | 1/8 | 1/4 |
+     | And no closer than (frets and drums) | 100 ms | 200 ms | 400 ms |
      | Forced HOPOs and taps | kept | removed | removed |
      | Sustains shorter than a beat | kept | kept | removed |
      | Drums: pads per hit (plus kick) | 2 | 2 | 1 |
@@ -1351,9 +1352,21 @@ Acceptance criteria:
      | Drums: 2× kick | removed | removed | removed |
 
    - Chord reduction keeps the outermost frets. Reducing to a single note keeps the lowest fret.
-     Frets outside the allowed range are moved inward, with their shape kept as far as possible.
-     For GHL, a white and a black on one column count as one column.
-   - Thinning keeps notes on strong beats first.
+     Frets outside the allowed range are moved inward, with the melody's shape kept as far as
+     possible. For GHL, a white and a black on one column count as one column.
+   - Thinning keeps the chords that matter most first: strong beats, sustains, chords, the first
+     note after a rest, turns in the melody, and the ends of phrases. No two chords are closer than
+     the thinning grid or the minimum gap, whichever is larger. Every star power phrase and solo
+     keeps at least one note.
+   - The lane limits apply only to what Reduce makes. The editor still lets the charter place notes
+     on any lane on any difficulty.
+   - **Reduce all** fills Hard, Medium and Easy in one run, each from the difficulty above it, so
+     each lower rhythm is a subset of the one above.
+   - Reduce can cover the whole part, the selection, or the section at the cursor, leaving the
+     target's notes elsewhere as they are.
+   - The dialog checks the draft: its lint findings, each difficulty's suggested rating and peak
+     notes per second ([C18](#c18-preview)), and a warning where a difficulty isn't easier
+     than the one above it.
    - The result is shown as a ghost over the target difficulty, then applied as one undoable
      command.
 3. **Difficulty letters** in the part picker show which difficulties have notes
@@ -1381,10 +1394,50 @@ Acceptance criteria:
 - **GHL's columns.** The table's Hard "all" and Medium "1–3" are the same, as GHL has three
   columns; the table ships as written.
 
+*Improved after v1 ([#90](https://github.com/jcub1011/Chart-Packer/issues/90)):*
+
+- **Phrases.** A phrase is a run of chords split at a rest of a beat or longer, from one chord's
+  end to the next chord, and at sections. Open notes split none and take no part in the melody.
+- **Thinning** scores each chord: −1 for each step down from a measure's first beat (a beat, then
+  each halving, triplets just after the halving they're nearest), +1.5 for a sustain of a beat or
+  longer, +0.5 for a chord of two columns or more (on drums, two notes or more), +1 for the first
+  chord after a rest, +0.5 for a turn of the melody (by each chord's lowest column; not drums),
+  and +1 for a phrase's first or last chord. So a long sustain on the "and" beats a plain note on
+  the beat. Chords are taken best first, the earlier on a tie, where no chord taken is closer
+  than the grid's step or the minimum gap in milliseconds, on either side. Before them, each star
+  power phrase and solo takes its best chord, where that keeps the gap. The drums' kick pass keeps
+  its own grid only.
+- **Chords** keep their lowest and highest columns, then inner ones up to the limit, as before.
+  Then each phrase is fitted to the range as a whole:
+  - a phrase inside the range doesn't move;
+  - a phrase that fits the range moves down as a whole, so an orange–blue trill on Medium becomes
+    blue–yellow, not blue–blue;
+  - a phrase wider than the range is fitted to it with each step kept going up, down or the same
+    where it can be, near the phrase scaled into the range. So green to orange on Easy still rises
+    over green, red and yellow, rather than ending yellow–yellow–yellow.
+
+  Only notes a chord would push below green are pressed together, the longer sustain kept.
+- **Reduce all** is the last choice of **To**: Hard, Medium and Easy. Each one ticked is made from
+  the nearest difficulty above it with notes, as it will be: Medium from Hard's draft, or from
+  Hard as charted when Hard isn't ticked. Those with notes start unticked, and Apply asks before
+  replacing one. **Rules for** picks which difficulty's rules the fields show. The whole run is
+  one undo step.
+- **Over** picks what the run covers: the whole part, the selection, or the section at the cursor.
+  It starts on the selection when there's one. The target keeps its notes, forcing and mixes
+  outside the range, and the gap holds against its notes on either side.
+- **The check** under the summary lists each difficulty's suggested rating and peak notes per
+  second with the draft in place, where a difficulty is rated as hard as the one above it or
+  harder, and the draft's findings: the 5-fret, drum and phrase rules on its difficulties, and
+  CHR081 against the difficulty above. CHR065 flags a phrase a draft left empty.
+
 Acceptance criteria:
 
 - **AC C9.1** Reducing Expert to Easy never makes a chord or a note closer than the Easy thinning
   grid, and is undone in one step.
+- **AC C9.2** Reduce all fills Hard, Medium and Easy as one undo step, and each one's chords are on
+  ticks of the difficulty above it.
+- **AC C9.3** Every star power phrase and solo with notes on the source keeps at least one note on
+  the draft.
 
 ### C10. Playback
 
@@ -2328,6 +2381,7 @@ covers a note.
 | CHR062 | Warning | Two star power phrases, or two solos, overlap | Merge |
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
 | CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
+| CHR065 | Warning | A star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some. A phrase empty on every difficulty is CHR060's or CHR061's. | — |
 
 *Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
 merges the group into its first phrase.
