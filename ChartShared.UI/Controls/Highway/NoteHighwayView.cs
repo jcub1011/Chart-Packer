@@ -14,16 +14,34 @@ using ChartShared.UI.Controls;
 
 namespace ChartShared.UI.Controls.Highway
 {
+    /// <summary>How a note on a highway is marked out from the rest, as the Reduce dialog's preview marks what a draft changed.</summary>
+    [Flags]
+    public enum HighwayNoteMark : byte
+    {
+        None = 0,
+
+        /// <summary>Drawn faint: a note left out of what's compared with it.</summary>
+        Faded = 1,
+
+        /// <summary>Ringed in <see cref="HighwayPalette.ChangeMark"/>: a note that changed.</summary>
+        Flagged = 2,
+    }
+
     /// <summary>One highway: an instrument difficulty's notes with their song times worked out.</summary>
     public sealed class HighwayLane
     {
         /// <param name="delay">How much later than its ticks say the chart plays against the audio.</param>
-        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay)
+        /// <param name="marks">How each of <paramref name="notes"/> is marked out, in their order, or null for none.</param>
+        public HighwayLane(ChartInstrumentKind kind, int laneCount, string label, IReadOnlyList<ChartNote> notes, TempoMap tempo, TimeSpan delay, IReadOnlyList<HighwayNoteMark>? marks = null)
         {
+            if (marks is not null && marks.Count != notes.Count)
+                throw new ArgumentException("There must be a mark for each note.", nameof(marks));
+
             Kind = kind;
             LaneCount = laneCount;
             Label = label;
             Notes = [.. notes];
+            Marks = marks is null ? null : [.. marks];
             Starts = new double[Notes.Length];
             Ends = new double[Notes.Length];
             for (int i = 0; i < Notes.Length; i++)
@@ -57,6 +75,9 @@ namespace ChartShared.UI.Controls.Highway
         public string Label { get; }
 
         public ChartNote[] Notes { get; }
+
+        /// <summary>How each note is marked out, in the order of <see cref="Notes"/>; null when none is.</summary>
+        public HighwayNoteMark[]? Marks { get; }
 
         /// <summary>Each note's song time, in seconds.</summary>
         public double[] Starts { get; }
@@ -165,6 +186,10 @@ namespace ChartShared.UI.Controls.Highway
         private static readonly IBrush StrikeBandBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x00, 0x00, 0x00));
         private static readonly IPen StrikeEdgePen = new ImmutablePen(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
         private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
+
+        // How opaque a faded note is (HighwayNoteMark.Faded), on the highway and in its whole chart.
+        private const double FadedOpacity = 0.28;
+        private const byte FadedOverviewAlpha = 0x50;
 
         // The track's waveform behind the notes: faint, so the gems stand out in front of it.
         private static readonly IBrush WaveformPeakBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x24, 0xC8, 0xD2, 0xFF));
@@ -506,12 +531,18 @@ namespace ChartShared.UI.Controls.Highway
                 var note = lane.Notes[i];
                 int column = note.Lane == ChartNote.OpenLane ? -1 : Column(lane, note.Lane);
 
-                // A black fret's own colour would be lost on the dark highway.
-                var color = IsBlackFret(lane, note) ? HighwayPalette.BlackFretEdge : NoteColor(lane, note);
+                // A black fret's own colour would be lost on the dark highway. A flagged note is in the mark's colour, so the
+                // whole chart is a map of what changed, and a faded one faint.
+                var mark = MarkOf(lane, i);
+                var color = (mark & HighwayNoteMark.Flagged) != 0 ? HighwayPalette.ChangeMark
+                    : IsBlackFret(lane, note) ? HighwayPalette.BlackFretEdge
+                    : NoteColor(lane, note);
+                if (mark == HighwayNoteMark.Faded)
+                    color = HighwayPalette.WithAlpha(color, FadedOverviewAlpha);
                 double bottom = Y(lane.Starts[i]);
                 Add(gemRuns, column < 0 ? bars : gems, GemMark, column, bottom - GemHeight, bottom, color);
                 if (column >= 0 && lane.Ends[i] > lane.Starts[i])
-                    Add(tailRuns, tails, TailMark, column, Y(lane.Ends[i]), bottom, HighwayPalette.WithAlpha(color, 0xA0));
+                    Add(tailRuns, tails, TailMark, column, Y(lane.Ends[i]), bottom, HighwayPalette.WithAlpha(color, Math.Min(color.A, (byte)0xA0)));
             }
 
             foreach (var (column, run) in tailRuns)
@@ -772,10 +803,13 @@ namespace ChartShared.UI.Controls.Highway
                     if (open != wide || lane.Ends[i] <= lane.Starts[i] || lane.Ends[i] <= now || (open && lane.Kind == ChartInstrumentKind.Drums))
                         continue;
                     double top = y(Math.Min(lane.Ends[i], to)), bottom = y(Math.Max(lane.Starts[i], now));
-                    if (!open)
-                        DrawTail(context, lane, note, NoteColor(lane, note), bounds, laneWidth, top, bottom, outlined);
-                    else if (bottom > top)
-                        _gems.DrawWideTail(context, NoteColor(lane, note), new Rect(bounds.X + 4, top, bounds.Width - 8, bottom - top), outlined);
+                    using (PushFaded(context, lane, i))
+                    {
+                        if (!open)
+                            DrawTail(context, lane, note, NoteColor(lane, note), bounds, laneWidth, top, bottom, outlined);
+                        else if (bottom > top)
+                            _gems.DrawWideTail(context, NoteColor(lane, note), new Rect(bounds.X + 4, top, bounds.Width - 8, bottom - top), outlined);
+                    }
                 }
             }
 
@@ -788,10 +822,20 @@ namespace ChartShared.UI.Controls.Highway
                     if (lane.Starts[i] < now || (note.Lane == ChartNote.OpenLane) != bars)
                         continue;
 
-                    DrawGem(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(lane.Starts[i]), gem, outlined);
+                    Rect rect;
+                    using (PushFaded(context, lane, i))
+                        rect = DrawGem(context, lane, note, NoteColor(lane, note), bounds, laneWidth, y(lane.Starts[i]), gem, outlined);
+                    if ((MarkOf(lane, i) & HighwayNoteMark.Flagged) != 0)
+                        _gems.DrawRing(context, note, rect, HighwayPalette.ChangeMark);
                 }
             }
         }
+
+        private static HighwayNoteMark MarkOf(HighwayLane lane, int index) => lane.Marks is { } marks ? marks[index] : HighwayNoteMark.None;
+
+        // Draws what follows faint when the note is faded.
+        private static DrawingContext.PushedState? PushFaded(DrawingContext context, HighwayLane lane, int index) =>
+            (MarkOf(lane, index) & HighwayNoteMark.Faded) != 0 ? context.PushOpacity(FadedOpacity) : null;
 
         private void DrawTail(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double top, double bottom, bool outlined)
         {
@@ -803,14 +847,16 @@ namespace ChartShared.UI.Controls.Highway
             _gems.DrawTail(context, lane.Kind, note, color, new Rect(center - (width / 2), top, width, bottom - top), outlined);
         }
 
-        private void DrawGem(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double at, double gem, bool outlined)
+        /// <returns>Where the gem was drawn.</returns>
+        private Rect DrawGem(DrawingContext context, HighwayLane lane, ChartNote note, Color color, Rect bounds, double laneWidth, double at, double gem, bool outlined)
         {
             if (note.Lane == ChartNote.OpenLane)
             {
                 // An open note or a kick: a flat bar across the highway.
                 double barHeight = Math.Max(4, gem * 0.45);
-                _gems.DrawBar(context, note, color, new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight), outlined);
-                return;
+                var bar = new Rect(bounds.X + 4, at - (barHeight / 2), bounds.Width - 8, barHeight);
+                _gems.DrawBar(context, note, color, bar, outlined);
+                return bar;
             }
 
             var rect = GemRect(bounds, laneWidth, Column(lane, note.Lane), at, gem);
@@ -820,6 +866,7 @@ namespace ChartShared.UI.Controls.Highway
                 rect = rect.WithHeight(rect.Height / 2);
 
             _gems.DrawGem(context, lane.Kind, note, color, rect, outlined);
+            return rect;
         }
 
         private void DrawLabel(DrawingContext context, string label, Rect bounds, double top)

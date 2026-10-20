@@ -703,7 +703,8 @@ namespace ChartBuilder.ViewModels
         {
             _refresh.Stop();
             var shown = Lanes.Layout.Lanes.Select(l => l.Part.Track).OfType<ChartTrackKey>().Where(k => Session.Chart.PartOf(k.Instrument) is not null).ToList();
-            Playback.SetHits([.. shown.SelectMany(HitsOf)]);
+            // Lent to a dialog, the hit sounds stay quiet until it's given back.
+            Playback.SetHits(_playbackBorrows > 0 ? [] : [.. shown.SelectMany(HitsOf)]);
             Overview = OverviewOf(Session.Focused is { } focused && Session.Chart.PartOf(focused.Instrument) is not null ? focused : shown.Cast<ChartTrackKey?>().FirstOrDefault());
         }
 

@@ -36,6 +36,27 @@ public sealed class GameViewTests
     }
 
     [TestMethod]
+    [DynamicData(nameof(FixtureNames))]
+    public void APartProjectedAtOnceIsEachOfItsTracksProjectedAlone(string name)
+    {
+        var fixture = MidiFixtures.Named(name);
+        var chart = MidiChartLoader.Load(fixture.Midi, fixture.Options).Chart;
+
+        foreach (var instrument in GameView.Instruments)
+        {
+            var part = GameView.ProjectPart(chart, instrument, fixture.Options);
+
+            Assert.HasCount(4, part);
+            foreach (var (difficulty, track) in part)
+            {
+                var alone = GameView.Project(chart, new ChartTrackKey(instrument, difficulty), fixture.Options);
+                Assert.AreSequenceEqual(alone.Notes.ToList(), track.Notes.ToList(), $"{instrument} {difficulty}");
+                Assert.AreSequenceEqual(alone.StarPower.ToList(), track.StarPower.ToList(), $"{instrument} {difficulty}");
+            }
+        }
+    }
+
+    [TestMethod]
     public void EachReadAtEveryHopoThresholdHasListsOfItsOwn()
     {
         // The drum notes are worked out once for every threshold, but no two reads may share a list.

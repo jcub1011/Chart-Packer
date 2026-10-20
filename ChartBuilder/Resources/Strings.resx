@@ -2444,7 +2444,7 @@ Saving also makes these changes to song.ini:
     <value>Not easier than the difficulty above: {0}.</value>
   </data>
   <data name="ReduceMoreFindingsFormat" xml:space="preserve">
-    <value>and {0} more.</value>
+    <value>Show {0} more</value>
   </data>
   <data name="ReduceOverwriteTitle" xml:space="preserve">
     <value>Replace Charted Difficulties?</value>
@@ -2454,6 +2454,111 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="ReduceOverwriteButton" xml:space="preserve">
     <value>Replace</value>
+  </data>
+  <data name="ReduceFindingPlaceFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="ReduceFindingGoToToolTip" xml:space="preserve">
+    <value>Show it in the preview</value>
+  </data>
+  <data name="ReducePreviewButton" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="ReducePreviewToolTip" xml:space="preserve">
+    <value>Show the draft against what it's reduced from, with the song, and mark where it changed</value>
+  </data>
+  <data name="ReducePreviewWorking" xml:space="preserve">
+    <value>Comparing the draft with what it's reduced from…</value>
+  </data>
+  <data name="ReducePreviewFailed" xml:space="preserve">
+    <value>The draft couldn't be compared with what it's reduced from.</value>
+  </data>
+  <data name="ReducePreviewDraftLaneFormat" xml:space="preserve">
+    <value>{0} (draft)</value>
+  </data>
+  <data name="ReducePreviewPlayToolTip" xml:space="preserve">
+    <value>Play or pause (Space)</value>
+  </data>
+  <data name="ReducePreviewNextToolTip" xml:space="preserve">
+    <value>Next change (N)</value>
+  </data>
+  <data name="ReducePreviewPreviousToolTip" xml:space="preserve">
+    <value>Previous change (Shift+N)</value>
+  </data>
+  <data name="ReducePreviewLookAheadFormat" xml:space="preserve">
+    <value>{0:0.0} s</value>
+  </data>
+  <data name="ReducePreviewNoStops" xml:space="preserve">
+    <value>No changes shown</value>
+  </data>
+  <data name="ReducePreviewStopFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="ReducePreviewChangeFormat" xml:space="preserve">
+    <value>{0} · {1}: {2}</value>
+  </data>
+  <data name="ReducePreviewStripToolTip" xml:space="preserve">
+    <value>Where each draft changed, and its findings. Click a mark to go to it; click or drag elsewhere to move through the song.</value>
+  </data>
+  <data name="ReducePreviewFiltersLabel" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="ReduceFilterCountFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="ReduceFilterRemovals" xml:space="preserve">
+    <value>Removals</value>
+  </data>
+  <data name="ReduceFilterReshapes" xml:space="preserve">
+    <value>Reshapes</value>
+  </data>
+  <data name="ReduceFilterSustains" xml:space="preserve">
+    <value>Sustains</value>
+  </data>
+  <data name="ReduceFilterForcing" xml:space="preserve">
+    <value>HOPOs and forcing</value>
+  </data>
+  <data name="ReduceFilterFindings" xml:space="preserve">
+    <value>Findings</value>
+  </data>
+  <data name="ReduceFilterRemovalsToolTip" xml:space="preserve">
+    <value>Chords left out, and 2x kicks dropped: faded on the difficulty above</value>
+  </data>
+  <data name="ReduceFilterReshapesToolTip" xml:space="preserve">
+    <value>Chords with other frets or pads, or added: ringed on the draft</value>
+  </data>
+  <data name="ReduceFilterSustainsToolTip" xml:space="preserve">
+    <value>Notes held shorter, or no longer held</value>
+  </data>
+  <data name="ReduceFilterForcingToolTip" xml:space="preserve">
+    <value>Chords that now read as a strum, HOPO or tap other than before: a natural HOPO turned, or the forcing changed</value>
+  </data>
+  <data name="ReduceFilterFindingsToolTip" xml:space="preserve">
+    <value>The draft's lint findings</value>
+  </data>
+  <data name="ReduceChangeRemoved" xml:space="preserve">
+    <value>chord left out</value>
+  </data>
+  <data name="ReduceChangeDoubleKick" xml:space="preserve">
+    <value>2x kick left out</value>
+  </data>
+  <data name="ReduceChangeReshaped" xml:space="preserve">
+    <value>chord changed</value>
+  </data>
+  <data name="ReduceChangeAdded" xml:space="preserve">
+    <value>chord added</value>
+  </data>
+  <data name="ReduceChangeSustain" xml:space="preserve">
+    <value>held shorter</value>
+  </data>
+  <data name="ReduceChangeHopoFlip" xml:space="preserve">
+    <value>natural HOPO turned</value>
+  </data>
+  <data name="ReduceChangeForcing" xml:space="preserve">
+    <value>forcing changed</value>
+  </data>
+  <data name="ReduceChangeBoundaryFormat" xml:space="preserve">
+    <value>{0}, beside the range</value>
   </data>
   <data name="FretGreen" xml:space="preserve">
     <value>green</value>

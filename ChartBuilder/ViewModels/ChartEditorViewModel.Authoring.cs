@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -28,6 +29,10 @@ namespace ChartBuilder.ViewModels
         // mode.
         private InputPlayer? _devices;
         private RecordInput? _recordSink;
+
+        // How many dialogs have the playback lent to them (BorrowPlayback), and whether it looped before the first.
+        private int _playbackBorrows;
+        private bool _loopedBeforeBorrow;
 
         /// <summary>The ways record mode can put a pass in: merged with what's there, or over it.</summary>
         public IReadOnlyList<RecordModeChoice> RecordModeChoices { get; } =
@@ -172,9 +177,38 @@ namespace ChartBuilder.ViewModels
                 : Strings.PlaytestOnNoLane, RecordMessageKey);
         }
 
+        /// <summary>
+        /// Lends the song's playback to a dialog over the Editor, as the Reduce dialog's preview has it: until it's given back,
+        /// playing starts no pass of record mode or playtest, which would change the chart under the dialog, the loop is off
+        /// and the hit sounds are quiet. Given back, it's paused and they're as they were.
+        /// </summary>
+        public IDisposable BorrowPlayback()
+        {
+            if (_playbackBorrows++ == 0)
+            {
+                Playback.Pause();
+                _loopedBeforeBorrow = Playback.IsLooping;
+                Playback.IsLooping = false;
+                Playback.SetHits([]);
+            }
+
+            return new PlaybackBorrow(this);
+        }
+
+        private void GiveBackPlayback()
+        {
+            if (--_playbackBorrows > 0)
+                return;
+            Playback.Pause();
+            Playback.IsLooping = _loopedBeforeBorrow;
+            ScheduleRefresh();
+        }
+
         /// <summary>The song started playing: a pass of record mode, or a playtest of the focused lane, if either is on.</summary>
         private void StartPlaying()
         {
+            if (_playbackBorrows > 0)
+                return;
             if (IsRecordArmed)
                 StartRecordingPass();
             else if (Playtest.IsArmed && !Playtest.Begin())
@@ -408,6 +442,18 @@ namespace ChartBuilder.ViewModels
                 Session.Selection.SelectRange(at, at + paste.Placed.Max(p => p.Notes.Count == 0 ? 0 : p.Notes.Max(n => n.Tick + n.Length) - at), paste.Placed.Select(p => p.Track));
             if (paste.DroppedDoubleKicks > 0)
                 Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.PasteDroppedKicksFormat, paste.DroppedDoubleKicks));
+        }
+
+        /// <summary>The playback lent by <see cref="BorrowPlayback"/>, given back once when disposed.</summary>
+        private sealed class PlaybackBorrow(ChartEditorViewModel owner) : IDisposable
+        {
+            private ChartEditorViewModel? _owner = owner;
+
+            public void Dispose()
+            {
+                _owner?.GiveBackPlayback();
+                _owner = null;
+            }
         }
     }
 }

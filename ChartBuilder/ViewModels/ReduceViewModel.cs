@@ -10,6 +10,7 @@ using ChartBuilder.Services;
 using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Validation;
 using ChartShared.UI.Services;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -42,7 +43,9 @@ namespace ChartBuilder.ViewModels
     public sealed record ReduceRatingRow(string Difficulty, string Tier, string Peak, double Share, bool IsDraft, bool IsOutOfOrder);
 
     /// <summary>A lint finding on the Reduce dialog's draft: the rule, the difficulty it's on, and what it says.</summary>
-    public sealed record ReduceFindingRow(string RuleId, string Difficulty, string Message);
+    /// <param name="Tick">Where it is, which clicking it goes to in the preview.</param>
+    /// <param name="Place">The difficulty and where in measures and beats, e.g. "Hard · m. 12.3".</param>
+    public sealed record ReduceFindingRow(string RuleId, string Difficulty, string Message, long Tick, string Place);
 
     /// <summary>A difficulty Reduce all can fill, ticked to fill it.</summary>
     public sealed partial class TargetToggle(ChartDifficulty difficulty, string label, bool isChecked) : ObservableObject
@@ -135,6 +138,9 @@ namespace ChartBuilder.ViewModels
             vm.RefreshFrom(part is null ? null : d => part[d].Notes.Count > 0);
             vm._loading = false;
             vm.LoadRules();
+
+            // Before the first draft, so the playback is lent, and any pass of record mode ended, before it's made.
+            vm.Preview = new ReducePreviewViewModel(editor, settings);
             vm.Redraw();
             return vm;
         }
@@ -154,6 +160,9 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Asks before Reduce all replaces a difficulty that has notes; the dialog's window sets it, to be its owner.</summary>
         public IConfirmationService? Confirmations { get; set; }
+
+        /// <summary>The preview of the draft against its source, with the song; null on the defaults in Settings.</summary>
+        public ReducePreviewViewModel? Preview { get; private set; }
 
         /// <summary>Whether this is a run over a lane, rather than the defaults in Settings.</summary>
         public bool IsRun => _editor is not null;
@@ -279,7 +288,7 @@ namespace ChartBuilder.ViewModels
 
         public bool HasOrderWarning => OrderWarning.Length > 0;
 
-        /// <summary>The draft's lint findings, the first few of them.</summary>
+        /// <summary>The draft's lint findings, the first few of them until all are asked for.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasFindings), nameof(HasNoFindings))]
         public partial IReadOnlyList<ReduceFindingRow> Findings { get; private set; } = [];
@@ -295,6 +304,26 @@ namespace ChartBuilder.ViewModels
         public partial string MoreFindings { get; private set; } = "";
 
         public bool HasMoreFindings => MoreFindings.Length > 0;
+
+        // Every finding of the last check, and whether they're all listed rather than the first few.
+        private IReadOnlyList<ReduceFindingRow> _allFindings = [];
+        private bool _showsAllFindings;
+
+        /// <summary>Lists every finding, not only the first few.</summary>
+        [RelayCommand]
+        private void ShowAllFindings()
+        {
+            _showsAllFindings = true;
+            ListFindings();
+        }
+
+        /// <summary>Shows the preview at <paramref name="row"/>'s finding.</summary>
+        [RelayCommand]
+        private void GoToFinding(ReduceFindingRow? row)
+        {
+            if (row is not null)
+                Preview?.GoTo(row.Tick);
+        }
 
         // The difficulty whose rules the fields show.
         private ChartDifficulty? RulesTarget => IsAll ? SelectedRulesFor?.Difficulty : SelectedTo?.Difficulty;
@@ -511,6 +540,7 @@ namespace ChartBuilder.ViewModels
             {
                 ClearCheck();
                 SummaryLines = [Strings.ReduceNothingToReduce];
+                Preview?.Clear(Strings.ReduceNothingToReduce);
                 return;
             }
 
@@ -526,6 +556,7 @@ namespace ChartBuilder.ViewModels
                     reduce.Cancel();
                     ClearCheck();
                     SummaryLines = [Strings.ReduceNoTargets];
+                    Preview?.Clear(Strings.ReduceNoTargets);
                     return;
                 }
 
@@ -548,6 +579,7 @@ namespace ChartBuilder.ViewModels
             {
                 ClearCheck();
                 SummaryLines = [editor.Session.Status ?? Strings.ReduceNothingToReduce];
+                Preview?.Clear(SummaryLines[0]);
                 return;
             }
 
@@ -558,6 +590,7 @@ namespace ChartBuilder.ViewModels
                 ChartLabels.DifficultyName(d.Target.Difficulty),
                 d.Result.Notes.Count,
                 d.Result.Removed))];
+            Preview?.OnDrafted(reduce);
             _ = CheckAsync(editor, reduce);
         }
 
@@ -597,13 +630,28 @@ namespace ChartBuilder.ViewModels
             OrderWarning = result.OutOfOrder.Count == 0
                 ? ""
                 : string.Format(CultureInfo.CurrentCulture, Strings.ReduceOrderWarningFormat, string.Join(", ", result.OutOfOrder.Select(ChartLabels.DifficultyName)));
-            MoreFindings = result.Findings.Count > MostFindingsShown
-                ? string.Format(CultureInfo.CurrentCulture, Strings.ReduceMoreFindingsFormat, result.Findings.Count - MostFindingsShown)
-                : "";
-            Findings = [.. result.Findings.Take(MostFindingsShown)
-                .Select(f => new ReduceFindingRow(f.RuleId, ChartLabels.DifficultyName(f.Location!.Difficulty!.Value), f.Message))];
+            var map = editor.Session.TempoMap;
+            _allFindings = [.. result.Findings.Select(f => Row(f, map))];
+            ListFindings();
+            Preview?.OnFindings(result.Findings);
             HasCheck = true;
             OnPropertyChanged(nameof(HasNoFindings));
+        }
+
+        private static ReduceFindingRow Row(Finding finding, TempoMap map)
+        {
+            var at = finding.Location!;
+            string difficulty = ChartLabels.DifficultyName(at.Difficulty!.Value);
+            string place = string.Format(CultureInfo.CurrentCulture, Strings.ReduceFindingPlaceFormat, difficulty, ChartLabels.PlaceText(MeasureBeat.At(map, at.Tick)));
+            return new ReduceFindingRow(finding.RuleId, difficulty, finding.Message, at.Tick, place);
+        }
+
+        // The findings, the first few unless all are asked for, and how many more there are.
+        private void ListFindings()
+        {
+            bool all = _showsAllFindings || _allFindings.Count <= MostFindingsShown;
+            MoreFindings = all ? "" : string.Format(CultureInfo.CurrentCulture, Strings.ReduceMoreFindingsFormat, _allFindings.Count - MostFindingsShown);
+            Findings = all ? _allFindings : [.. _allFindings.Take(MostFindingsShown)];
         }
 
         private void ClearCheck()
@@ -613,6 +661,7 @@ namespace ChartBuilder.ViewModels
             Ratings = [];
             OrderWarning = "";
             MoreFindings = "";
+            _allFindings = [];
             Findings = [];
         }
 
@@ -620,6 +669,7 @@ namespace ChartBuilder.ViewModels
         {
             _done = true;
             _redraw?.Stop();
+            Preview?.Dispose();
             Done?.Invoke(this, EventArgs.Empty);
         }
     }

@@ -96,6 +96,21 @@ public sealed class ReduceProposals
     public ReductionCheck? Check() =>
         Drafted is { } drafted && Part is { } part ? ReductionCheck.Of(drafted, part, [.. Drafts.Select(static d => d.Target.Difficulty)], _session.ReadOptions) : null;
 
+    /// <summary>
+    /// How each draft differs from its source as the games read them (<see cref="ReductionDiff"/>), highest first, with the
+    /// chart's read options; empty with no run. Outside the range each is compared with its target as charted.
+    /// </summary>
+    public IReadOnlyList<ReductionDiff> Diff()
+    {
+        if (Drafted is not { } drafted || Part is not { } part)
+            return [];
+        var before = Range is null ? null : Drafts.ToDictionary(static d => d.Target.Difficulty, d => _session.GameTrack(d.Target));
+        return ReductionDiff.Of(drafted, part, Steps, Range, _session.ReadOptions, before);
+    }
+
+    /// <summary>Each draft's source and target, highest first.</summary>
+    public IReadOnlyList<(ChartDifficulty Source, ChartDifficulty Target)> Steps => [.. Drafts.Select(static d => (d.Source, d.Target.Difficulty))];
+
     /// <summary>Adds the drafts as one undoable step, each in place of what its target had, and ends the run.</summary>
     /// <returns>Whether they were added.</returns>
     public bool Accept()

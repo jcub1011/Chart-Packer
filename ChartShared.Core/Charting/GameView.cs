@@ -50,8 +50,7 @@ public static class GameView
             if (part.Instrument == ChartInstrument.Keys)
                 continue;
 
-            // The model's star power is always star power: the writer writes it on 116, and solos never become it.
-            var starPower = GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
+            var starPower = StarPowerOf(part);
             if (part.Kind == ChartInstrumentKind.Drums)
             {
                 var markers = SavedTomMarkers(chart, part);
@@ -85,17 +84,58 @@ public static class GameView
         if (part is null || part.Instrument == ChartInstrument.Keys)
             return new NoteTrack([], []);
 
-        var starPower = GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
+        var starPower = StarPowerOf(part);
         List<ChartNote>? notes;
         if (part.Kind == ChartInstrumentKind.Drums)
-        {
-            var markers = SavedTomMarkers(chart, part);
-            Drums(part, markers, DrumsLayoutOf(part, markers, options), starPower).TryGetValue(key.Difficulty, out notes);
-        }
+            DrumsOf(chart, part, options, starPower).TryGetValue(key.Difficulty, out notes);
         else
             notes = Frets(part[key.Difficulty], chart.Resolution, options, starPower);
         notes ??= [];
         return new NoteTrack(notes, starPower);
+    }
+
+    /// <summary>
+    /// Every difficulty of <paramref name="instrument"/> as <see cref="Project(EditableChart, ChartTrackKey, ChartReadOptions)"/>
+    /// works each out, the drums worked out once for them all.
+    /// </summary>
+    /// <returns>A track for each difficulty; empty where the chart hasn't the part or the difficulty has no notes.</returns>
+    public static IReadOnlyDictionary<ChartDifficulty, NoteTrack> ProjectPart(EditableChart chart, ChartInstrument instrument, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var tracks = new Dictionary<ChartDifficulty, NoteTrack>();
+        var part = chart.PartOf(instrument);
+        if (part is null || part.Instrument == ChartInstrument.Keys)
+        {
+            foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+                tracks[difficulty] = new NoteTrack([], []);
+            return tracks;
+        }
+
+        var starPower = StarPowerOf(part);
+        var drums = part.Kind == ChartInstrumentKind.Drums ? DrumsOf(chart, part, options, starPower) : null;
+        foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
+        {
+            List<ChartNote>? notes = null;
+            if (drums is not null)
+                drums.TryGetValue(difficulty, out notes);
+            else
+                notes = Frets(part[difficulty], chart.Resolution, options, starPower);
+            tracks[difficulty] = new NoteTrack(notes ?? [], starPower);
+        }
+
+        return tracks;
+    }
+
+    // The model's star power is always star power: the writer writes it on 116, and solos never become it.
+    private static IReadOnlyList<StarPowerPhrase> StarPowerOf(EditablePart part) =>
+        GameNotes.StarPower(part.Phrases.Where(p => p.Kind == PhraseKind.StarPower).Select(p => new TickSpan(p.Tick, p.Tick + p.Length)));
+
+    private static Dictionary<ChartDifficulty, List<ChartNote>> DrumsOf(EditableChart chart, EditablePart part, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower)
+    {
+        var markers = SavedTomMarkers(chart, part);
+        return Drums(part, markers, DrumsLayoutOf(part, markers, options), starPower);
     }
 
     /// <summary>Whether the games read <paramref name="chart"/>'s drums as five-lane, given <paramref name="options"/>.</summary>

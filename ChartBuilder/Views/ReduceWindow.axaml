@@ -4,6 +4,8 @@
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:sres="using:ChartShared.UI.Resources"
         xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:hw="using:ChartShared.UI.Controls.Highway"
+        xmlns:bctl="using:ChartBuilder.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="780" d:DesignHeight="600"
@@ -120,7 +122,9 @@
                        Text="{Binding Title}" />
         </ui:TitleBar>
 
-        <Grid x:Name="Body" Grid.Row="1" ColumnDefinitions="340,*">
+        <!-- The rules, the draft as it stands, and, when it's shown, a splitter and the preview; the code-behind sizes the
+             last three as the preview is shown or hidden. -->
+        <Grid x:Name="Body" Grid.Row="1" ColumnDefinitions="340,*,Auto,0">
             <!-- What to reduce, and the rules. -->
             <Border x:Name="SetupPane"
                     Grid.Column="0"
@@ -258,7 +262,7 @@
             </Border>
 
             <!-- The draft as it stands: what it holds, its difficulties against each other, and its findings. -->
-            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsRun}">
+            <ScrollViewer Grid.Column="1" MinWidth="260" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsRun}">
                 <StackPanel Margin="20,14,20,16" Spacing="8">
                     <TextBlock Classes="heading" Text="{x:Static res:Strings.ReduceDraftHeading}" />
                     <ItemsControl ItemsSource="{Binding SummaryLines}">
@@ -311,36 +315,198 @@
                                     <StackPanel Spacing="8" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
+                            <!-- Each goes to where it is in the preview, as the Editor's playtest problems do. -->
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ReduceFindingRow">
-                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                                        <Border Grid.Column="0" Classes="chip large" VerticalAlignment="Top" Margin="0,1,0,0">
-                                            <TextBlock Text="{Binding RuleId}" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1" Spacing="1">
-                                            <TextBlock Classes="caption" Text="{Binding Difficulty}" />
-                                            <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding Message}" />
-                                        </StackPanel>
-                                    </Grid>
+                                    <Button HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Background="Transparent"
+                                            Padding="6,4"
+                                            CornerRadius="4"
+                                            Command="{Binding $parent[ItemsControl].((vm:ReduceViewModel)DataContext).GoToFindingCommand}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip.Tip="{x:Static res:Strings.ReduceFindingGoToToolTip}"
+                                            AutomationProperties.Name="{Binding Message}">
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                            <Border Grid.Column="0" Classes="chip large" VerticalAlignment="Top" Margin="0,1,0,0">
+                                                <TextBlock Text="{Binding RuleId}" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="1">
+                                                <TextBlock Classes="caption" Text="{Binding Place}" />
+                                                <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding Message}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Classes="note" Text="{Binding MoreFindings}" IsVisible="{Binding HasMoreFindings}" />
+                        <Button Classes="labelled"
+                                HorizontalAlignment="Left"
+                                Content="{Binding MoreFindings}"
+                                Command="{Binding ShowAllFindingsCommand}"
+                                IsVisible="{Binding HasMoreFindings}" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
+
+            <GridSplitter x:Name="PreviewSplitter"
+                          Grid.Column="2"
+                          Width="4"
+                          IsVisible="False"
+                          ResizeDirection="Columns"
+                          Background="{DynamicResource SubtleBorderBrush}" />
+
+            <!-- The preview: the source and the drafts as highways, played with the song, and the strip of where they changed. -->
+            <DockPanel x:Name="PreviewPane"
+                       Grid.Column="3"
+                       IsVisible="False"
+                       DataContext="{Binding Preview}"
+                       x:DataType="vm:ReducePreviewViewModel">
+                <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1" Padding="10,2">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <WrapPanel Grid.Column="0" ItemSpacing="6" VerticalAlignment="Center">
+                            <Button Classes="tool"
+                                    Command="{Binding PlayPauseCommand}"
+                                    IsEnabled="{Binding Playback.IsReady}"
+                                    ToolTip.Tip="{x:Static res:Strings.ReducePreviewPlayToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.PlayPauseButton}">
+                                <Panel>
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Playback.IsPlaying}" />
+                                    <PathIcon Width="12" Height="12" Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Playback.IsPlaying}" />
+                                </Panel>
+                            </Button>
+                            <Button Classes="tool"
+                                    Command="{Binding PreviousChangeCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ReducePreviewPreviousToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.ReducePreviewPreviousToolTip}">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource SkipPreviousIconGeometry}" />
+                            </Button>
+                            <TextBlock FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" MinWidth="48" TextAlignment="Center" Text="{Binding StopText}" />
+                            <Button Classes="tool"
+                                    Command="{Binding NextChangeCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ReducePreviewNextToolTip}"
+                                    AutomationProperties.Name="{x:Static res:Strings.ReducePreviewNextToolTip}">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource SkipNextIconGeometry}" />
+                            </Button>
+                            <ComboBox ItemsSource="{Binding Playback.SpeedPercents}"
+                                      SelectedItem="{Binding Playback.SpeedPercent}"
+                                      IsEnabled="{Binding Playback.IsReady}"
+                                      MinWidth="80"
+                                      VerticalAlignment="Center"
+                                      ToolTip.Tip="{x:Static res:Strings.SpeedToolTip}"
+                                      AutomationProperties.Name="{x:Static res:Strings.SpeedToolTip}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="x:Int32">
+                                        <TextBlock Text="{Binding StringFormat={x:Static res:Strings.SpeedPercentFormat}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <!-- The look-ahead, in half-second steps, with the seconds it's at beside it; kept together as the bar wraps. -->
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                        ToolTip.Tip="{x:Static res:Strings.LaneLookAheadToolTip}">
+                                <Slider Width="160"
+                                        Minimum="{x:Static vm:ReducePreviewViewModel.MinLookAhead}"
+                                        Maximum="{x:Static vm:ReducePreviewViewModel.MaxLookAhead}"
+                                        TickFrequency="{x:Static vm:ReducePreviewViewModel.LookAheadStep}"
+                                        IsSnapToTickEnabled="True"
+                                        SmallChange="{x:Static vm:ReducePreviewViewModel.LookAheadStep}"
+                                        LargeChange="2"
+                                        Value="{Binding LookAhead}"
+                                        VerticalAlignment="Center"
+                                        AutomationProperties.Name="{x:Static res:Strings.LaneLookAheadLabel}" />
+                                <TextBlock FontSize="12" FontFeatures="tnum" MinWidth="40" VerticalAlignment="Center" Text="{Binding LookAheadText}" />
+                            </StackPanel>
+                        </WrapPanel>
+                        <!-- Figures all one width, so the bar isn't laid out again each time the position changes while it plays. -->
+                        <TextBlock Grid.Column="1" FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
+                    </Grid>
+                </Border>
+
+                <!-- The kinds of change to mark and stop at, then the strip of where they are. -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="10,6,10,10" Spacing="6">
+                    <ItemsControl ItemsSource="{Binding Filters}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel ItemSpacing="14" LineSpacing="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ReduceChangeFilter">
+                                <CheckBox IsChecked="{Binding IsChecked}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="{Binding Name}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Border Width="10" Height="10" CornerRadius="2" VerticalAlignment="Center" Background="{Binding Swatch}" />
+                                        <TextBlock VerticalAlignment="Center" Text="{Binding Label}" />
+                                    </StackPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <bctl:ChangeStripView Cursor="Hand"
+                                          Start="{Binding StripStart}"
+                                          End="{Binding StripEnd}"
+                                          Position="{Binding Playback.PositionSeconds}"
+                                          IsPlaying="{Binding Playback.IsPlaying}"
+                                          Clock="{Binding Clock}"
+                                          WheelUpIsLater="{Binding WheelUpIsLater}"
+                                          Beats="{Binding Playback.Beats}"
+                                          Marks="{Binding Marks}"
+                                          RowLabels="{Binding RowLabels}"
+                                          Current="{Binding Current}"
+                                          Lead="{Binding Lead}"
+                                          RowBrush="{DynamicResource ToolbarGroupBrush}"
+                                          MeasureBrush="#4A4D66"
+                                          TickBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                          PlayheadBrush="{DynamicResource AccentTextBrush}"
+                                          ToolTip.Tip="{x:Static res:Strings.ReducePreviewStripToolTip}"
+                                          AutomationProperties.Name="{x:Static res:Strings.ReducePreviewStripToolTip}" />
+                </StackPanel>
+
+                <!-- What changed at the stop last gone to, and where. -->
+                <TextBlock DockPanel.Dock="Bottom"
+                           Margin="12,6,12,0"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           MaxLines="3"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding CurrentText}"
+                           IsVisible="{Binding CurrentText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <Panel>
+                    <hw:NoteHighwayView x:Name="Highway"
+                                        Scene="{Binding Scene}"
+                                        Clock="{Binding Clock}"
+                                        LookAhead="{Binding LookAhead}"
+                                        LengthSeconds="{Binding Playback.LengthSeconds}" />
+                    <TextBlock Classes="muted centered"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"
+                               Margin="16"
+                               Text="{Binding EmptyText}"
+                               IsVisible="{Binding !HasScene}" />
+                </Panel>
+            </DockPanel>
         </Grid>
 
-        <!-- Reset at the left; Cancel and Apply (or Save) at the right, as the other dialogs have them. -->
+        <!-- Reset and the preview at the left; Cancel and Apply (or Save) at the right, as the other dialogs have them. -->
         <Border Grid.Row="2" Classes="toolbar" BorderThickness="0,1,0,0">
             <Grid ColumnDefinitions="Auto,*,Auto">
-                <Button Grid.Column="0"
-                        MinWidth="80"
-                        HorizontalContentAlignment="Center"
-                        Content="{x:Static res:Strings.ReduceResetButton}"
-                        Command="{Binding ResetCommand}"
-                        ToolTip.Tip="{x:Static res:Strings.ReduceResetToolTip}"
-                        AutomationProperties.Name="{x:Static res:Strings.ReduceResetButton}" />
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:Strings.ReduceResetButton}"
+                            Command="{Binding ResetCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.ReduceResetToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.ReduceResetButton}" />
+                    <ToggleButton IsVisible="{Binding IsRun}"
+                                  IsChecked="{Binding Preview.IsExpanded, FallbackValue=False}"
+                                  ToolTip.Tip="{x:Static res:Strings.ReducePreviewToolTip}"
+                                  AutomationProperties.Name="{x:Static res:Strings.ReducePreviewButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" />
+                            <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.ReducePreviewButton}" />
+                        </StackPanel>
+                    </ToggleButton>
+                </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                     <Button MinWidth="80"
                             HorizontalContentAlignment="Center"
