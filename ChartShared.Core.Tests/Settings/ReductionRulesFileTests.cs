@@ -80,4 +80,18 @@ public sealed class ReductionRulesFileTests
         Assert.AreEqual(1, read.DrumsHard.PadsPerHit);
         Assert.AreEqual(1, read.SixFretMedium.MaxChordSize);
     }
+
+    [TestMethod]
+    public void AResetPutsBackTheSetsAnotherProcessChanged()
+    {
+        var mine = new ReductionRulesFile(_path, null);
+        var theirs = new ReductionRulesFile(_path, null);
+        mine.Load();
+        var other = theirs.Load();
+        theirs.Save(other.WithFrets(ChartInstrumentKind.FiveFret, ChartDifficulty.Hard, other.FiveFretHard with { MaxChordSize = 1 }));
+
+        Assert.IsTrue(mine.Reset());
+
+        Assert.AreEqual(ReductionDefaults.Shipped.FiveFretHard, new ReductionRulesFile(_path, null).Load().FiveFretHard);
+    }
 }

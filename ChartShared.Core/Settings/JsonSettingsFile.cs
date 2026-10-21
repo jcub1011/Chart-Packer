@@ -94,6 +94,29 @@ public sealed class JsonSettingsFile<T>
         return saved;
     }
 
+    /// <summary>
+    /// Writes every setting of <paramref name="settings"/> onto what the file holds now, those another process changed
+    /// meanwhile too, as a reset to defaults must. Properties this version doesn't know are kept. Failures are traced.
+    /// </summary>
+    /// <returns>Whether the file was written.</returns>
+    public bool Replace(T settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var current = ToJson(settings);
+
+        bool saved = JsonFiles.Update(_path, file =>
+        {
+            var merged = file ?? [];
+            foreach (var (name, value) in current)
+                merged[name] = value?.DeepClone();
+            return merged;
+        });
+
+        if (saved)
+            _baseline = current;
+        return saved;
+    }
+
     private JsonObject ToJson(T settings) => JsonSerializer.SerializeToNode(settings, _typeInfo) as JsonObject ?? [];
 
     private JsonObject? Read(bool warn) => JsonFiles.ReadObject(_path, warn);

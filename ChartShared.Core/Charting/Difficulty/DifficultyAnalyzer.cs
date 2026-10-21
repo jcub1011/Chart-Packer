@@ -64,7 +64,9 @@ public static class DifficultyAnalyzer
                 samples.Add(SampleAt(model, state, next * window));
         }
 
-        return new DifficultyProfile(model, [.. samples], endMs);
+        // The whole chart is scored from the window its first note is in: silence before it isn't easy playing.
+        double startMs = notes.Count == 0 ? 0 : Math.Floor(notes[0].TimeMs / window) * window;
+        return new DifficultyProfile(model, [.. samples], startMs, endMs);
     }
 
     private static DifficultySample SampleAt(DifficultyModel model, DifficultyState state, double timeMs)

@@ -53,20 +53,17 @@ public sealed record SongChartRead(ChartLoadResult Load, ChartReadOptions Option
 /// <param name="SongIniChanges">What saving it changes in <c>song.ini</c> (<see cref="SongGeneration.SongIniChanges"/>).</param>
 public sealed record GeneratedChart(string StagedPath, long Length, string? RemoveChart, IReadOnlyList<PendingSongIniChange> SongIniChanges)
 {
-    /// <summary>Stages the chart, the removal of the one it replaces, and its <c>song.ini</c> changes in <paramref name="draft"/>.</summary>
+    /// <summary>
+    /// Stages the chart, the removal of the one it replaces, and its <c>song.ini</c> changes in <paramref name="draft"/>,
+    /// all as one add: reverting the chart brings back the one it replaced and puts the keys back.
+    /// </summary>
     public void ApplyTo(MetadataDraft draft)
     {
         ArgumentNullException.ThrowIfNull(draft);
-        draft.AddFile(new AddedFile(ChartFiles.MidiName, StagedPath, Length));
-        if (RemoveChart is { } removed)
-            draft.RemoveFile(removed);
-        foreach (var change in SongIniChanges)
-        {
-            if (change.Value is { } value)
-                draft.Set(change.Key, value);
-            else
-                draft.Remove(change.Key);
-        }
+        draft.AddFile(
+            new AddedFile(ChartFiles.MidiName, StagedPath, Length),
+            RemoveChart is { } removed ? [removed] : [],
+            SongIniChanges.Select(static c => new MetadataChange(c.Key, c.Value)));
     }
 }
 

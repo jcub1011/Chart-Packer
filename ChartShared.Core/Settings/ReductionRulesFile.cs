@@ -56,6 +56,10 @@ public sealed class ReductionRulesFile
         return _file.Save(rules.Normalized());
     }
 
+    /// <summary>Writes the shipped rules for every family and target, those another process changed meanwhile too.</summary>
+    /// <returns>Whether the file was written.</returns>
+    public bool Reset() => _file.Replace(ReductionDefaults.Shipped.Normalized());
+
     // The rules Chart Builder's settings file holds, or null when it holds none it can read.
     private static ReductionDefaults? Legacy(string path)
     {

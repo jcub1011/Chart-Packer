@@ -420,6 +420,64 @@ public sealed class MetadataDraftTests
     }
 
     [TestMethod]
+    public void RevertingAnAddPutsBackTheKeysItChanged()
+    {
+        var draft = new MetadataDraft();
+        draft.Set("delay", "100");
+        draft.AddFile(new AddedFile("notes.mid", "n.mid", 1), ["notes.chart"], [new MetadataChange("delay", "500"), new MetadataChange("pro_drums", null)]);
+        Assert.AreEqual("500", Change(draft, "delay"));
+        Assert.IsTrue(draft.TryGetChange("pro_drums", out _));
+
+        draft.RevertFile("notes.mid");
+
+        Assert.AreEqual("100", Change(draft, "delay"));
+        Assert.IsFalse(draft.TryGetChange("pro_drums", out _));
+        Assert.IsFalse(draft.IsFileRemoved("notes.chart"));
+    }
+
+    [TestMethod]
+    public void RevertingAnAddLeavesAKeyChangedSince()
+    {
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("notes.mid", "n.mid", 1), [], [new MetadataChange("delay", "500")]);
+        draft.Set("DELAY", "250");
+
+        draft.RevertFile("notes.mid");
+
+        Assert.AreEqual("250", Change(draft, "delay"));
+    }
+
+    [TestMethod]
+    public void AddingAgainKeepsWhatTheKeysWereBeforeTheFirstAdd()
+    {
+        var draft = new MetadataDraft();
+        draft.Set("delay", "100");
+        draft.AddFile(new AddedFile("notes.mid", "a.mid", 1), [], [new MetadataChange("delay", "500")]);
+        draft.AddFile(new AddedFile("notes.mid", "b.mid", 1), [], [new MetadataChange("delay", "600"), new MetadataChange("five_lane_drums", "True")]);
+
+        draft.RevertFile("notes.mid");
+
+        Assert.AreEqual("100", Change(draft, "delay"));
+        Assert.IsFalse(draft.TryGetChange("five_lane_drums", out _));
+    }
+
+    [TestMethod]
+    public void ACloneRevertsTheKeysOfAnAddOnItsOwn()
+    {
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile("notes.mid", "n.mid", 1), [], [new MetadataChange("delay", "500")]);
+        var copy = draft.Clone();
+
+        copy.RevertFile("notes.mid");
+
+        Assert.IsTrue(copy.IsEmpty);
+        Assert.AreEqual("500", Change(draft, "delay"));
+    }
+
+    private static string? Change(MetadataDraft draft, string key) =>
+        draft.TryGetChange(key, out var change) ? change.Value : throw new AssertFailedException($"{key} has no change.");
+
+    [TestMethod]
     public void RevertingAReplacingAddKeepsARemovalMadeBeforeIt()
     {
         var draft = new MetadataDraft();

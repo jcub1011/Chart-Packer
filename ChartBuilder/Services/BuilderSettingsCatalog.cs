@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Linq;
 using ChartBuilder.Resources;
 using ChartShared.Core.Charting;
-using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
 using ChartShared.Core.Charting.Playtest;
@@ -199,7 +198,7 @@ namespace ChartBuilder.Services
                         Actions =
                         [
                             new SettingAction(Strings.ReductionRulesEditButton, editReductionRules),
-                            new SettingAction(Strings.ReductionRulesResetButton, () => settings.ReductionRules.Save(ReductionDefaults.Shipped)),
+                            new SettingAction(Strings.ReductionRulesResetButton, () => settings.ReductionRules.Reset()),
                         ],
                     },
                     new ChoiceSetting<int>

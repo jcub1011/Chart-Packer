@@ -75,7 +75,7 @@ namespace ChartPacker.ViewModels
             _player = player;
             _playback = new PlayerPreviewPlayback(player);
             Preview = new ReductionPreviewViewModel(_playback, PreviewSettings, wheelUpIsLater: true);
-            Songs = [.. songs.Select(s => new GenerateDifficultiesSongRow(s, s.Title, MissingText(s)))];
+            Songs = [.. songs.Select(s => new GenerateDifficultiesSongRow(s, s.Title, GenerateDifficultiesSong.DescribeTargets(s.Targets)))];
 
             // The rules first shown are those of the first part to generate.
             var first = songs.SelectMany(static s => s.Targets).FirstOrDefault();
@@ -238,7 +238,7 @@ namespace ChartPacker.ViewModels
             var token = _closing.Token;
             try
             {
-                var read = await ReadOf(song);
+                var read = await ReadOf(song, token);
                 if (redraw != _previews || token.IsCancellationRequested)
                     return;
                 LoadPlayer(song, read);
@@ -312,10 +312,11 @@ namespace ChartPacker.ViewModels
             _playback.SetChart(read.Chart.Load.Chart.TempoMap.ToTempoMap(), read.Chart.Delay);
         }
 
-        private Task<SongRead> ReadOf(GenerateDifficultiesSong song)
+        // The song as read once; read again when that failed or was cancelled, so picking it again tries again.
+        private Task<SongRead> ReadOf(GenerateDifficultiesSong song, CancellationToken token)
         {
-            if (!_reads.TryGetValue(song, out var read))
-                _reads[song] = read = Task.Run(() => SongRead.Of(song, _closing.Token));
+            if (!_reads.TryGetValue(song, out var read) || read.IsFaulted || read.IsCanceled)
+                _reads[song] = read = Task.Run(() => SongRead.Of(song, token), token);
             return read;
         }
 
@@ -349,16 +350,6 @@ namespace ChartPacker.ViewModels
             _closing.Cancel();
             Done?.Invoke(this, EventArgs.Empty);
         }
-
-        // Each part's missing difficulties, e.g. "Guitar Hard, Medium; Drums Easy".
-        private static string MissingText(GenerateDifficultiesSong song) =>
-            string.Join(
-                Strings.ValidatorMissingPartSeparator,
-                song.Targets.Select(t => string.Format(
-                    CultureInfo.CurrentCulture,
-                    Strings.ValidatorMissingPartFormat,
-                    ChartLabels.InstrumentName(t.Key),
-                    string.Join(", ", t.Value.Select(ChartLabels.DifficultyName)))));
 
         /// <summary>A song as the dialog reads it once: its chart, its tracks as drafted, and how long it plays.</summary>
         private sealed record SongRead(SongChartRead Chart, IReadOnlyList<SongTrack> Tracks, double LengthSeconds)

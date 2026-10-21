@@ -196,4 +196,28 @@ public sealed class DifficultySanityTests
         Assert.IsGreaterThan(alone.Score(span.FromMs, span.ToMs), profile.Score(span.FromMs, span.ToMs));
         Assert.IsGreaterThan(alone.AttributeScores(span.FromMs, span.ToMs).Endurance, profile.AttributeScores(span.FromMs, span.ToMs).Endurance);
     }
+
+    [TestMethod]
+    public void SilenceBeforeTheFirstNoteChangesNoScore()
+    {
+        var notes = Notes(Chart(Varied(8, 24, 480, Mixed), bpm: 150));
+        var plain = DifficultyAnalyzer.Analyze(notes);
+        double silence = 50 * plain.Parameters.WindowMs;
+        var late = DifficultyAnalyzer.Analyze([.. notes.Select(n => n with { TimeMs = n.TimeMs + silence })]);
+
+        Assert.AreEqual(plain.ChartScore, late.ChartScore, 1e-9 * plain.ChartScore);
+        Assert.AreEqual(plain.ChartAttributes.Strum, late.ChartAttributes.Strum, 1e-9 * plain.ChartAttributes.Strum);
+        Assert.AreEqual(plain.ChartAttributes.Endurance, late.ChartAttributes.Endurance, 1e-6 + (1e-6 * plain.ChartAttributes.Endurance));
+    }
+
+    [TestMethod]
+    public void AStretchAlonesChartScoreIsItsOwn()
+    {
+        var notes = Notes(Chart(Enumerable.Range(0, 640).Select(i => new EditableNote(i * 120L, 1, (i * 3) % 5)), bpm: 200));
+        var span = new DifficultySpan(notes[600].TimeMs, notes[^1].TimeMs + 1);
+
+        var alone = DifficultyAnalyzer.Analyze(notes, span);
+
+        Assert.AreEqual(alone.Score(span.FromMs, span.ToMs), alone.ChartScore, 1e-9);
+    }
 }

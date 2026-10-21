@@ -96,6 +96,23 @@ public sealed class SongDifficultyGenerationTests
     }
 
     [TestMethod]
+    public async Task RevertingTheNotesMidBringsBackTheNotesChartAndItsSongIni()
+    {
+        const string chart = "[Song]\n{\n  Resolution = 192\n  Offset = 0.5\n}\n[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n[ExpertSingle]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 2 0\n  576 = N 3 0\n  768 = N 4 0\n  960 = N 0 0\n}\n";
+        var entry = Folder(("notes.chart", Encoding.UTF8.GetBytes(chart)));
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, await PairsOf(entry), null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
+        Assert.IsNotNull(generated);
+        Assert.IsNotEmpty(generated.SongIniChanges);
+        var draft = new MetadataDraft();
+        generated.ApplyTo(draft);
+
+        draft.RevertFile(ChartFiles.MidiName);
+
+        Assert.IsFalse(draft.IsFileRemoved(ChartFiles.ChartName));
+        Assert.IsTrue(draft.IsEmpty, $"Left: {string.Join(", ", draft.Keys)}.");
+    }
+
+    [TestMethod]
     public async Task ThePreviewShowsEachDraftAgainstItsSource()
     {
         var entry = Folder(("notes.mid", MidiChartWriter.Write(ExpertOnly())));
@@ -134,7 +151,7 @@ public sealed class SongDifficultyGenerationTests
         var generated = await SongDifficultyGeneration.GenerateAsync(entry, await PairsOf(entry), null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
 
         Assert.IsNull(generated);
-        Assert.IsEmpty(Directory.GetFiles(_stash.Folder, "*", SearchOption.AllDirectories));
+        Assert.IsEmpty(Directory.GetFiles(_stash.Folder, ChartFiles.MidiName, SearchOption.AllDirectories));
     }
 
     [TestMethod]

@@ -23,8 +23,9 @@ public sealed record DifficultyCurve(double FromMs, double ToMs, IReadOnlyList<D
 /// <remarks>
 /// <para>Scores take the peak of each window of a fixed grid from the chart's start, clipped to the stretch, and average
 /// them hardest first, each counting <see cref="DifficultyParameters.PeakWeight"/> times the one before. A difficulty that
-/// stays the same scores itself.</para>
-/// <para>Immutable once made, so it's read from any thread.</para>
+/// stays the same scores itself. The whole chart is scored from the window its first note is in, so silence before it
+/// doesn't count.</para>
+/// <para>Immutable once made, so it's read from any thread. The whole chart's scores are worked out when first read.</para>
 /// </remarks>
 public sealed class DifficultyProfile
 {
@@ -40,12 +41,16 @@ public sealed class DifficultyProfile
     // The peak of each series in each whole window of the grid.
     private readonly double[][] _peaks;
 
-    internal DifficultyProfile(DifficultyModel model, DifficultySample[] samples, double endMs)
+    private readonly Lazy<double> _chartScore;
+    private readonly Lazy<DifficultyAttributes> _chartAttributes;
+
+    internal DifficultyProfile(DifficultyModel model, DifficultySample[] samples, double startMs, double endMs)
     {
         _model = model;
         _samples = samples;
         _times = [.. samples.Select(static s => s.TimeMs)];
         _window = model.Parameters.WindowMs;
+        StartMs = startMs;
         EndMs = endMs;
         int windows = Math.Max(1, (int)Math.Ceiling(endMs / _window));
         _peaks = [.. Enumerable.Range(0, SeriesCount).Select(_ => new double[windows])];
@@ -58,13 +63,16 @@ public sealed class DifficultyProfile
                 _peaks[series][j] = Math.Max(_peaks[series][j], ValueOf(sample.Attributes, sample.Overall, series));
         }
 
-        ChartScore = Score(0, endMs);
-        ChartAttributes = AttributeScores(0, endMs);
+        _chartScore = new Lazy<double>(() => Score(StartMs, EndMs));
+        _chartAttributes = new Lazy<DifficultyAttributes>(() => AttributeScores(StartMs, EndMs));
     }
 
     public DifficultyParameters Parameters => _model.Parameters;
 
     public DifficultyReferences References => _model.References;
+
+    /// <summary>Where the chart is scored from: the start of the window its first note is in, or 0 with no notes.</summary>
+    public double StartMs { get; }
 
     /// <summary>Where the chart is scored to: a window past its last note, or the end of the stretch analyzed alone.</summary>
     public double EndMs { get; }
@@ -72,11 +80,11 @@ public sealed class DifficultyProfile
     /// <summary>What the pass found just after each note and at the start of each window, in time order.</summary>
     public IReadOnlyList<DifficultySample> Samples => _samples;
 
-    /// <summary>The score of the whole chart (§6.2).</summary>
-    public double ChartScore { get; }
+    /// <summary>The score of the whole chart (§6.2), from <see cref="StartMs"/> to <see cref="EndMs"/>.</summary>
+    public double ChartScore => _chartScore.Value;
 
     /// <summary>Each attribute's score over the whole chart, for the spider graph (§6.3).</summary>
-    public DifficultyAttributes ChartAttributes { get; }
+    public DifficultyAttributes ChartAttributes => _chartAttributes.Value;
 
     /// <summary>The chart's rank, continuous (§6.2).</summary>
     public double Rank => RankCurve.Continuous(ChartScore, Parameters);

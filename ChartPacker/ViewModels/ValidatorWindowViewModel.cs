@@ -64,6 +64,11 @@ namespace ChartPacker.ViewModels
         private readonly IGenerateDifficultiesDialog? _generate;
         private readonly GeneratedChartStash? _stash;
 
+        // The songs whose difficulties are being generated and not yet staged, and those of them whose drafts changed
+        // meanwhile, here or anywhere: what was generated for those was worked out from drafts that are gone.
+        private readonly HashSet<string> _generating = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _changedWhileGenerating = new(StringComparer.Ordinal);
+
         // Holds the songs saved, so none another Chart Builder or Chart Packer has open is written over (charter-spec §4.8).
         private readonly SongLocks? _locks;
         private readonly SettingsService _settings;
@@ -422,7 +427,7 @@ namespace ChartPacker.ViewModels
 
                                 // A song without a draft is checked here too. Drafts live on the UI thread, so the check
                                 // of a song with one is made there, against it.
-                                check = ValidatorSongViewModel.Evaluate(report, lint, null);
+                                check = ValidatorSongViewModel.Evaluate(report, lint, null, CanGenerateDifficulties);
                             }
                             finally
                             {
@@ -570,16 +575,19 @@ namespace ChartPacker.ViewModels
                     return new GenerateDifficultiesSong(w.Song.Entry, w.Song.Title, w.Song.DraftedPairs(draft), draft?.Clone(), w.Fix.Targets);
                 })
                 .ToList();
-            if (await _generate.ShowAsync(requests) is not { } rules || _closing.IsCancellationRequested)
-                return;
 
-            FixError = null;
-            FixedCount = 0;
-            ToFixCount = requests.Count;
-            IsFixing = true;
+            // From here: the main window can still edit them while the dialog's open.
+            _generating.UnionWith(requests.Select(r => r.Entry.FullPath));
             var failures = new ConcurrentQueue<string>();
             try
             {
+                if (await _generate.ShowAsync(requests) is not { } rules || _closing.IsCancellationRequested)
+                    return;
+
+                FixError = null;
+                FixedCount = 0;
+                ToFixCount = requests.Count;
+                IsFixing = true;
                 var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(Environment.ProcessorCount - 1, 1), CancellationToken = _closing.Token };
                 await Parallel.ForEachAsync(requests, options, async (request, token) =>
                 {
@@ -609,6 +617,8 @@ namespace ChartPacker.ViewModels
             finally
             {
                 IsFixing = false;
+                _generating.Clear();
+                _changedWhileGenerating.Clear();
             }
 
             if (!failures.IsEmpty)
@@ -621,6 +631,11 @@ namespace ChartPacker.ViewModels
             if (chart is null || _closing.IsCancellationRequested)
                 return null;
             string path = request.Entry.FullPath;
+
+            // Out of the set first, so staging it doesn't count as a change made meanwhile.
+            _generating.Remove(path);
+            if (_changedWhileGenerating.Contains(path))
+                return Strings.ValidatorGenerateEditedMeanwhile;
             var draft = _drafts.Get(path);
             if (!SongDifficultyGeneration.CanGenerate(draft))
                 return Strings.ValidatorGenerateChangedMeanwhile;
@@ -746,13 +761,13 @@ namespace ChartPacker.ViewModels
                 if (check.IsFixed)
                     return null;
 
-                var checkedSong = new ValidatorSongViewModel(read.Index, report, OnIssueSelectionChanged, IsIssueShown);
+                var checkedSong = new ValidatorSongViewModel(read.Index, report, CanGenerateDifficulties, OnIssueSelectionChanged, IsIssueShown);
                 checkedSong.SetChartLint(read.Lint);
                 checkedSong.Apply(check);
                 return checkedSong;
             }
 
-            var song = new ValidatorSongViewModel(read.Index, report, OnIssueSelectionChanged, IsIssueShown);
+            var song = new ValidatorSongViewModel(read.Index, report, CanGenerateDifficulties, OnIssueSelectionChanged, IsIssueShown);
             song.SetChartLint(read.Lint);
             song.Check(DraftOf(report.Entry));
             if (report.ReadError is null)
@@ -1107,6 +1122,9 @@ namespace ChartPacker.ViewModels
         /// <summary>A listed song's draft changed, here or anywhere: it's checked again, from disk once the draft is gone.</summary>
         private void OnDraftsChanged(string path, DraftChange change)
         {
+            if (_generating.Contains(path))
+                _changedWhileGenerating.Add(path);
+
             if (!_byPath.TryGetValue(path, out var song))
                 return;
 
@@ -1199,6 +1217,9 @@ namespace ChartPacker.ViewModels
                 RefreshSelection();
         }
 
+        // Missing difficulties are offered as a quick fix only when they can be generated and kept.
+        private bool CanGenerateDifficulties => _generate is not null && _stash is not null;
+
         private MetadataDraft? DraftOf(SongEntry entry) => _drafts.HasDrafts(entry.FullPath) ? _drafts.Get(entry.FullPath) : null;
 
         /// <summary>
@@ -1275,10 +1296,12 @@ namespace ChartPacker.ViewModels
     /// A song in the Validator's list: what it's called and who it's by, how many of its keys fail with and without a
     /// quick fix, and, once opened, each of them and why.
     /// </summary>
+    /// <param name="canGenerate">Whether the window can generate missing difficulties, so CHR087 has a quick fix.</param>
     /// <param name="selectionChanged">Called when one of the song's issues is ticked or cleared.</param>
     /// <param name="isShown">Whether the window's filter shows an issue.</param>
-    public sealed partial class ValidatorSongViewModel(int index, SongMetadataReport report, Action selectionChanged, Func<ValidatorIssueViewModel, bool> isShown) : ObservableObject
+    public sealed partial class ValidatorSongViewModel(int index, SongMetadataReport report, bool canGenerate, Action selectionChanged, Func<ValidatorIssueViewModel, bool> isShown) : ObservableObject
     {
+        private readonly bool _canGenerate = canGenerate;
         private readonly Action _selectionChanged = selectionChanged;
         private readonly Func<ValidatorIssueViewModel, bool> _isShown = isShown;
         private SongMetadataReport _report = report;
@@ -1466,7 +1489,7 @@ namespace ChartPacker.ViewModels
         /// Checks the metadata as <paramref name="draft"/> would save it. Issues ticked before stay ticked while they're
         /// still fixable. A song that can't be edited, such as a <c>.sng</c> with structural errors, has no fixes.
         /// </summary>
-        public void Check(MetadataDraft? draft) => Apply(Evaluate(_report, _chartLint, draft));
+        public void Check(MetadataDraft? draft) => Apply(Evaluate(_report, _chartLint, draft, _canGenerate));
 
         /// <summary>
         /// Takes in what checking the song found: its headline and issues. Issues ticked before stay ticked while
@@ -1498,7 +1521,8 @@ namespace ChartPacker.ViewModels
         /// <paramref name="lint"/>'s chart findings. It touches nothing of the window's, so a song read without a draft
         /// is checked on the worker that read it.
         /// </summary>
-        public static ValidatorSongCheck Evaluate(SongMetadataReport report, SongChartLintReport? lint, MetadataDraft? draft)
+        /// <param name="canGenerate">Whether missing difficulties (CHR087) can be generated, so they have a quick fix.</param>
+        public static ValidatorSongCheck Evaluate(SongMetadataReport report, SongChartLintReport? lint, MetadataDraft? draft, bool canGenerate)
         {
             var item = new MetadataItem(report.Pairs, draft ?? new MetadataDraft(), report.DuplicateKeys);
             var pairs = item.Draft.ApplyTo(item.Original);
@@ -1589,12 +1613,12 @@ namespace ChartPacker.ViewModels
                     .GroupBy(static f => f.Finding.Location!.Part)
                     .OrderBy(static g => g.Key)
                     .ToDictionary(static g => g.Key, static g => (IReadOnlyList<ChartDifficulty>)[.. g.Select(static f => f.Finding.Location!.Difficulty!.Value).Distinct().OrderDescending()]);
-                bool canFix = report.CanEdit && SongDifficultyGeneration.CanGenerate(draft);
+                bool canFix = canGenerate && report.CanEdit && SongDifficultyGeneration.CanGenerate(draft);
                 string message = string.Format(
                     CultureInfo.CurrentCulture,
                     Strings.ChartFindingFormat,
                     ChrRules.Chr087,
-                    string.Format(CultureInfo.CurrentCulture, Strings.ValidatorMissingDifficultiesFormat, MissingText(targets)));
+                    string.Format(CultureInfo.CurrentCulture, Strings.ValidatorMissingDifficultiesFormat, GenerateDifficultiesSong.DescribeTargets(targets)));
                 chartProblems++;
                 if (canFix)
                     chartFixable++;
@@ -1615,16 +1639,6 @@ namespace ChartPacker.ViewModels
                 FailsMetadata: byKey.Count > 0,
                 IsFixed: byKey.Count == 0 && chartProblems == 0);
         }
-
-        // Each part's missing difficulties, e.g. "Guitar Hard, Medium; Drums Easy".
-        private static string MissingText(IReadOnlyDictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>> targets) =>
-            string.Join(
-                Strings.ValidatorMissingPartSeparator,
-                targets.Select(t => string.Format(
-                    CultureInfo.CurrentCulture,
-                    Strings.ValidatorMissingPartFormat,
-                    ChartLabels.InstrumentName(t.Key),
-                    string.Join(", ", t.Value.Select(ChartLabels.DifficultyName)))));
 
         private void SetIssues(IReadOnlyList<ValidatorIssueViewModel> issues, int fixable, int manual)
         {

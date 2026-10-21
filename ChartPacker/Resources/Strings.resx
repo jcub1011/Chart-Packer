@@ -2444,6 +2444,9 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorGenerateChangedMeanwhile" xml:space="preserve">
     <value>its draft changed the chart meanwhile.</value>
   </data>
+  <data name="ValidatorGenerateEditedMeanwhile" xml:space="preserve">
+    <value>it was edited or saved while its difficulties were generated. Fix it again to generate them from it as it is now.</value>
+  </data>
   <data name="GenerateDifficultiesTitle" xml:space="preserve">
     <value>Generate missing difficulties</value>
   </data>

@@ -438,7 +438,9 @@ This implements the principle that **difficulty lives in the hardest part of the
 
 The **chart score** is the score of the whole song, and the **chart rank** comes from passing it through the rank curve:
 
-$$\text{ChartScore} = \text{Score}(0,\, t_{\text{end}}), \qquad \text{Rank} = \big\lfloor \mathcal{R}(\text{ChartScore}) \big\rfloor$$
+$$\text{ChartScore} = \text{Score}(t_{\text{start}},\, t_{\text{end}}), \qquad \text{Rank} = \big\lfloor \mathcal{R}(\text{ChartScore}) \big\rfloor$$
+
+Here $t_{\text{start}}$ is the start of the grid window the first note is in. Silence before the first note isn't easy playing, so its windows don't count. Scored from 0, a song with a 20-second silent intro would average in 50 empty windows and rate lower than the same notes without it.
 
 The rank has no upper bound (section 7).
 
@@ -619,6 +621,7 @@ These should hold for any tuning:
 | Test | Expected behavior |
 |---|---|
 | Speed up a chart by 10% | Strum, note, and rhythm scores increase or stay the same. Pattern irregularity, endurance, and the chart score normally increase, but can dip slightly because novelty and fatigue depend on elapsed real time |
+| Add silence before the first note (a whole number of windows) | Every score stays the same |
 | Add a long, easy intro | Endurance does not increase. The chart score drops by less than $\varepsilon$ (relative) when the chart already spans at least $K$ windows (about 275 s at $\omega = 0.99$); shorter charts can drop more |
 | Duplicate the hardest section back to back | Endurance increases; other attribute scores rise only modestly |
 | Shift all notes up one lane (where possible) | Scores stay similar, apart from open-note and hand-position effects |

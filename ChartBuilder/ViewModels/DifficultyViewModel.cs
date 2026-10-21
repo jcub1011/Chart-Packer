@@ -62,9 +62,14 @@ namespace ChartBuilder.ViewModels
         private readonly ChartEditorViewModel _editor;
         private readonly DispatcherTimer _timer;
         private readonly DispatcherTimer _playhead;
+        private readonly DispatcherTimer _isolate;
         private int _shownCount;
         private int _runs;
+        private int _isolations;
         private Analysis? _analysis;
+
+        // The selection as last scored alone, and what it scored, shown until the selection or the analysis changes.
+        private (Analysis Analysis, DifficultySpan Span, DifficultyAttributes Values, double Score)? _isolated;
 
         // The track the last run was for, so a change of focus elsewhere doesn't run it again.
         private ChartTrackKey? _ranFor;
@@ -84,6 +89,8 @@ namespace ChartBuilder.ViewModels
             _timer.Tick += (_, _) => _ = RunAsync();
             _playhead = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(100) };
             _playhead.Tick += (_, _) => RefreshScope();
+            _isolate = new DispatcherTimer(DispatcherPriority.Background) { Interval = Delay };
+            _isolate.Tick += (_, _) => _ = IsolateAsync();
             Scopes =
             [
                 new DifficultyScopeChoice(DifficultyScope.Chart, Strings.DifficultyScopeChart),
@@ -222,6 +229,7 @@ namespace ChartBuilder.ViewModels
         {
             _timer.Stop();
             _playhead.Stop();
+            _isolate.Stop();
             Session.ChartChanged -= OnChartChanged;
             Session.StateChanged -= OnSessionState;
             Session.SongSettingsChanged -= OnSongSettingsChanged;
@@ -434,10 +442,25 @@ namespace ChartBuilder.ViewModels
                     ScopeText = ScoreText(profile.ChartScore, profile);
                     break;
                 case DifficultyScope.Selection when Session.Selection.Range is { } range:
-                    var span = new DifficultySpan(analysis.Tempo.SecondsAt(range.From) * 1000, (analysis.Tempo.SecondsAt(range.To) * 1000) + 1);
-                    var scored = IsIsolated ? DifficultyAnalyzer.Analyze(analysis.Notes, span, profile.Parameters) : profile;
-                    (SpiderValues, SpiderComparison) = (scored.AttributeScores(span.FromMs, span.ToMs), profile.ChartAttributes);
-                    ScopeText = ScoreText(scored.Score(span.FromMs, span.ToMs), profile);
+                    var span = SpanOf(analysis, range);
+                    if (!IsIsolated)
+                    {
+                        (SpiderValues, SpiderComparison) = (profile.AttributeScores(span.FromMs, span.ToMs), profile.ChartAttributes);
+                        ScopeText = ScoreText(profile.Score(span.FromMs, span.ToMs), profile);
+                    }
+                    else if (_isolated is { } isolated && ReferenceEquals(isolated.Analysis, analysis) && isolated.Span == span)
+                    {
+                        (SpiderValues, SpiderComparison) = (isolated.Values, profile.ChartAttributes);
+                        ScopeText = ScoreText(isolated.Score, profile);
+                    }
+                    else
+                    {
+                        // Scored alone, the stretch is read again from its first note: off the UI thread, once the
+                        // selection settles. What's shown stays until then.
+                        _isolate.Stop();
+                        _isolate.Start();
+                    }
+
                     break;
                 case DifficultyScope.Selection:
                     (SpiderValues, SpiderComparison, ScopeText) = (null, profile.ChartAttributes, Strings.DifficultyNoSelection);
@@ -448,6 +471,37 @@ namespace ChartBuilder.ViewModels
                     (SpiderValues, SpiderComparison) = (moment.Attributes, profile.ChartAttributes);
                     ScopeText = ScoreText(moment.Overall, profile);
                     break;
+            }
+        }
+
+        // The selection's stretch, in milliseconds of the chart; the last note selected included.
+        private static DifficultySpan SpanOf(Analysis analysis, (long From, long To) range) =>
+            new(analysis.Tempo.SecondsAt(range.From) * 1000, (analysis.Tempo.SecondsAt(range.To) * 1000) + 1);
+
+        // Scores the selection alone, off the UI thread; a newer selection or analysis replaces it.
+        private async Task IsolateAsync()
+        {
+            _isolate.Stop();
+            if (_analysis is not { } analysis || !IsIsolated || !IsSelectionScope || Session.Selection.Range is not { } range)
+                return;
+
+            int run = ++_isolations;
+            var span = SpanOf(analysis, range);
+            try
+            {
+                var (values, score) = await Task.Run(() =>
+                {
+                    var alone = DifficultyAnalyzer.Analyze(analysis.Notes, span, analysis.Profile.Parameters);
+                    return (alone.AttributeScores(span.FromMs, span.ToMs), alone.Score(span.FromMs, span.ToMs));
+                });
+                if (run != _isolations || !ReferenceEquals(_analysis, analysis))
+                    return;
+                _isolated = (analysis, span, values, score);
+                RefreshScope();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Scoring the selection of {Track} alone failed", analysis.Track);
             }
         }
 
