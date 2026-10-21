@@ -2425,9 +2425,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>; </value>
     <comment>Between parts in the list of missing difficulties.</comment>
   </data>
-  <data name="ValidatorGenerateFix" xml:space="preserve">
-    <value>Generate them from the difficulties above</value>
-  </data>
   <data name="ValidatorNoStarPowerFormat" xml:space="preserve">
     <value>No star power: {0}</value>
     <comment>{0} lists the parts without star power phrases, e.g. "Guitar; Bass".</comment>
@@ -2454,21 +2451,6 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorGenerateEditedMeanwhile" xml:space="preserve">
     <value>it was edited or saved while its difficulties were generated. Fix it again to generate them from it as it is now.</value>
   </data>
-  <data name="GenerateDifficultiesTitle" xml:space="preserve">
-    <value>Generate missing difficulties</value>
-  </data>
-  <data name="GenerateDifficultiesIntro" xml:space="preserve">
-    <value>Each missing difficulty is made from the one above it by these rules, as Chart Builder's Reduce makes it. The new charts go into the songs' drafts; nothing is written until they're saved.</value>
-  </data>
-  <data name="GenerateDifficultiesSongsHeading" xml:space="preserve">
-    <value>Songs</value>
-  </data>
-  <data name="GenerateDifficultiesPreviewHeading" xml:space="preserve">
-    <value>Preview</value>
-  </data>
-  <data name="GenerateDifficultiesPickSong" xml:space="preserve">
-    <value>Pick a song to see its difficulties as they'd be generated.</value>
-  </data>
   <data name="GenerateDifficultiesWorking" xml:space="preserve">
     <value>Working out the difficulties…</value>
   </data>
@@ -2476,18 +2458,12 @@ Each one is checked first. Anything that has changed since it was compared, or w
     <value>Couldn't preview this song: {0}</value>
     <comment>{0} is why.</comment>
   </data>
-  <data name="GenerateDifficultiesNothing" xml:space="preserve">
-    <value>Nothing to generate: the song has no missing difficulties now.</value>
-  </data>
   <data name="GenerateDifficultiesFindingsFormat" xml:space="preserve">
     <value>Findings on the new difficulties: {0}</value>
     <comment>{0} is how many chart lint findings the generated difficulties have.</comment>
   </data>
   <data name="GenerateDifficultiesNoFindings" xml:space="preserve">
     <value>No findings on the new difficulties.</value>
-  </data>
-  <data name="GenerateDifficultiesGenerateButton" xml:space="preserve">
-    <value>Generate</value>
   </data>
   <data name="GenerateDifficultiesSaveDefaultsButton" xml:space="preserve">
     <value>Save as defaults</value>
@@ -2508,5 +2484,247 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="GenerateDifficultiesPreviewPartLabel" xml:space="preserve">
     <value>Part</value>
     <comment>Which part of the song picked the preview's highways show.</comment>
+  </data>
+  <data name="MenuGenerateLowerDifficulties" xml:space="preserve">
+    <value>_Generate Lower Difficulties…</value>
+  </data>
+  <data name="MenuGenerateLowerDifficultiesContext" xml:space="preserve">
+    <value>Generate Lower Difficulties…</value>
+    <comment>Library right-click menu: opens the Generate lower difficulties window for the selected songs.</comment>
+  </data>
+  <data name="GenerateLowerDifficultiesToolTip" xml:space="preserve">
+    <value>Fill in Hard, Medium and Easy for the selected songs, each from the difficulty above it, skipping what's already charted. The new charts go into the songs' drafts until they're saved.</value>
+  </data>
+  <data name="LowerDifficultiesTitle" xml:space="preserve">
+    <value>Generate Lower Difficulties</value>
+  </data>
+  <data name="LowerDifficultiesDifficultiesHeading" xml:space="preserve">
+    <value>Difficulties</value>
+  </data>
+  <data name="LowerDifficultiesPartsHeading" xml:space="preserve">
+    <value>Parts</value>
+  </data>
+  <data name="LowerDifficultiesPartsPending" xml:space="preserve">
+    <value>The songs' parts show here as their charts are read.</value>
+  </data>
+  <data name="LowerDifficultiesChartedHeading" xml:space="preserve">
+    <value>Already charted</value>
+    <comment>Heading over the Skip / Replace switch: what happens to a difficulty that already has notes.</comment>
+  </data>
+  <data name="LowerDifficultiesSkip" xml:space="preserve">
+    <value>Skip</value>
+  </data>
+  <data name="LowerDifficultiesReplace" xml:space="preserve">
+    <value>Replace</value>
+  </data>
+  <data name="LowerDifficultiesSkipNote" xml:space="preserve">
+    <value>A difficulty that already has notes is left as it is.</value>
+  </data>
+  <data name="LowerDifficultiesReplaceNote" xml:space="preserve">
+    <value>A difficulty that already has notes is made again from the one above it, in place of what it has.</value>
+  </data>
+  <data name="LowerDifficultiesRulesNote" xml:space="preserve">
+    <value>Each difficulty is made from the one above it by these rules, as Chart Builder's Reduce makes it.</value>
+  </data>
+  <data name="LowerDifficultiesSearchWatermark" xml:space="preserve">
+    <value>Search songs</value>
+  </data>
+  <data name="LowerDifficultiesTabToGenerate" xml:space="preserve">
+    <value>To generate</value>
+  </data>
+  <data name="LowerDifficultiesTabSkipped" xml:space="preserve">
+    <value>Skipped</value>
+  </data>
+  <data name="LowerDifficultiesTabProblems" xml:space="preserve">
+    <value>Problems</value>
+  </data>
+  <data name="LowerDifficultiesTabDone" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="LowerDifficultiesTabAll" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="LowerDifficultiesTabFormat" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{0} is the tab's name, e.g. Skipped; {1} how many songs it lists.</comment>
+  </data>
+  <data name="LowerDifficultiesReading" xml:space="preserve">
+    <value>Reading…</value>
+    <comment>A song whose chart hasn't been read yet.</comment>
+  </data>
+  <data name="LowerDifficultiesNewFormat" xml:space="preserve">
+    <value>{0} new</value>
+    <comment>{0} is how many of the song's difficulties would be generated, counting every part.</comment>
+  </data>
+  <data name="LowerDifficultiesReplacedFormat" xml:space="preserve">
+    <value>{0} replaced</value>
+    <comment>{0} is how many of the song's charted difficulties would be made again.</comment>
+  </data>
+  <data name="LowerDifficultiesNewReplacedFormat" xml:space="preserve">
+    <value>{0} new, {1} replaced</value>
+    <comment>{0} is how many difficulties would be generated, {1} how many charted ones made again.</comment>
+  </data>
+  <data name="LowerDifficultiesSkippedCharted" xml:space="preserve">
+    <value>Already charted</value>
+    <comment>A song skipped because every difficulty picked already has notes.</comment>
+  </data>
+  <data name="LowerDifficultiesSkippedNoParts" xml:space="preserve">
+    <value>No part to make difficulties from</value>
+    <comment>A song skipped because none of its parts can be reduced, e.g. vocals only.</comment>
+  </data>
+  <data name="LowerDifficultiesSkippedFiltered" xml:space="preserve">
+    <value>None of the parts picked</value>
+    <comment>A song skipped because it has none of the parts picked.</comment>
+  </data>
+  <data name="LowerDifficultiesChartEdits" xml:space="preserve">
+    <value>Has unsaved chart changes; save them first</value>
+  </data>
+  <data name="LowerDifficultiesNoChart" xml:space="preserve">
+    <value>No chart</value>
+  </data>
+  <data name="LowerDifficultiesChartTooLarge" xml:space="preserve">
+    <value>The chart is too large to read</value>
+  </data>
+  <data name="LowerDifficultiesUnreadableFormat" xml:space="preserve">
+    <value>Can't be read: {0}</value>
+    <comment>{0} is why.</comment>
+  </data>
+  <data name="LowerDifficultiesUnreadable" xml:space="preserve">
+    <value>Can't be read</value>
+  </data>
+  <data name="LowerDifficultiesCantSave" xml:space="preserve">
+    <value>Can't be saved by Chart Packer</value>
+    <comment>A song whose metadata can't be rewritten, e.g. a .sng with errors.</comment>
+  </data>
+  <data name="LowerDifficultiesFailedFormat" xml:space="preserve">
+    <value>Not generated: {0}</value>
+    <comment>{0} is why.</comment>
+  </data>
+  <data name="LowerDifficultiesNothingGenerated" xml:space="preserve">
+    <value>Nothing was generated</value>
+  </data>
+  <data name="LowerDifficultiesChangedMeanwhile" xml:space="preserve">
+    <value>Its chart was changed meanwhile; nothing was added</value>
+  </data>
+  <data name="LowerDifficultiesRefused" xml:space="preserve">
+    <value>Another app has this song open; nothing was added</value>
+  </data>
+  <data name="LowerDifficultiesGenerated" xml:space="preserve">
+    <value>Generated, not saved yet</value>
+  </data>
+  <data name="LowerDifficultiesSaved" xml:space="preserve">
+    <value>Saved</value>
+  </data>
+  <data name="LowerDifficultiesPipFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment>A line of a part's tooltip: {0} is the difficulty, {1} what happens to it, e.g. To generate.</comment>
+  </data>
+  <data name="LowerDifficultiesPipCharted" xml:space="preserve">
+    <value>Charted</value>
+  </data>
+  <data name="LowerDifficultiesPipEmpty" xml:space="preserve">
+    <value>Empty</value>
+  </data>
+  <data name="LowerDifficultiesPipTarget" xml:space="preserve">
+    <value>To generate</value>
+  </data>
+  <data name="LowerDifficultiesPipReplace" xml:space="preserve">
+    <value>To be made again</value>
+  </data>
+  <data name="LowerDifficultiesPipGenerated" xml:space="preserve">
+    <value>Generated</value>
+  </data>
+  <data name="LowerDifficultiesReadingFormat" xml:space="preserve">
+    <value>Reading charts: {0} of {1}</value>
+    <comment>{0} is how many songs have been read, {1} how many there are.</comment>
+  </data>
+  <data name="LowerDifficultiesGeneratingFormat" xml:space="preserve">
+    <value>Generating: {0} of {1}</value>
+    <comment>{0} is how many songs are done, {1} how many there are.</comment>
+  </data>
+  <data name="LowerDifficultiesSaving" xml:space="preserve">
+    <value>Saving…</value>
+  </data>
+  <data name="LowerDifficultiesReadyFormat" xml:space="preserve">
+    <value>{0} songs read</value>
+    <comment>{0} is how many songs were read.</comment>
+  </data>
+  <data name="LowerDifficultiesUnsavedFormat" xml:space="preserve">
+    <value>{0} generated, not saved yet</value>
+    <comment>{0} is how many songs have new difficulties in their drafts.</comment>
+  </data>
+  <data name="LowerDifficultiesSavedFormat" xml:space="preserve">
+    <value>{0} saved</value>
+    <comment>{0} is how many songs were saved.</comment>
+  </data>
+  <data name="LowerDifficultiesFailedCountFormat" xml:space="preserve">
+    <value>{0} with problems</value>
+    <comment>A link to the Problems tab; {0} is how many songs it lists.</comment>
+  </data>
+  <data name="LowerDifficultiesGenerateOne" xml:space="preserve">
+    <value>Generate 1 song</value>
+  </data>
+  <data name="LowerDifficultiesGenerateFormat" xml:space="preserve">
+    <value>Generate {0} songs</value>
+    <comment>{0} is how many songs, more than one.</comment>
+  </data>
+  <data name="LowerDifficultiesGenerateNone" xml:space="preserve">
+    <value>Generate</value>
+    <comment>The Generate button when no song has anything to generate.</comment>
+  </data>
+  <data name="LowerDifficultiesStop" xml:space="preserve">
+    <value>Stop</value>
+    <comment>Stops generating; songs already done keep their new difficulties.</comment>
+  </data>
+  <data name="LowerDifficultiesSaveOne" xml:space="preserve">
+    <value>Save 1 song</value>
+  </data>
+  <data name="LowerDifficultiesSaveFormat" xml:space="preserve">
+    <value>Save {0} songs</value>
+    <comment>{0} is how many songs, more than one.</comment>
+  </data>
+  <data name="LowerDifficultiesSaveToolTip" xml:space="preserve">
+    <value>Write the generated songs to disk, with any other unsaved changes they have.</value>
+  </data>
+  <data name="LowerDifficultiesCloseToolTip" xml:space="preserve">
+    <value>Songs generated and not saved keep their new difficulties as unsaved changes, to save from the library.</value>
+  </data>
+  <data name="LowerDifficultiesNothing" xml:space="preserve">
+    <value>Nothing to generate for this song with these settings.</value>
+  </data>
+  <data name="LowerDifficultiesPickSong" xml:space="preserve">
+    <value>Pick a song to see its difficulties as they'd be generated.</value>
+  </data>
+  <data name="LowerDifficultiesDoneDetail" xml:space="preserve">
+    <value>This song's new difficulties are in its draft.</value>
+  </data>
+  <data name="LowerDifficultiesProblemDetail" xml:space="preserve">
+    <value>This song can't be generated:</value>
+    <comment>Followed by why, on the next line.</comment>
+  </data>
+  <data name="LowerDifficultiesEmptyReading" xml:space="preserve">
+    <value>Reading the songs' charts…</value>
+  </data>
+  <data name="LowerDifficultiesEmptyToGenerate" xml:space="preserve">
+    <value>Nothing to generate with these settings. Pick more difficulties or parts, or switch to Replace.</value>
+  </data>
+  <data name="LowerDifficultiesEmptySearch" xml:space="preserve">
+    <value>No songs here match the search.</value>
+  </data>
+  <data name="LowerDifficultiesEmptyTab" xml:space="preserve">
+    <value>No songs here.</value>
+  </data>
+  <data name="LowerDifficultiesGridToolTip" xml:space="preserve">
+    <value>Each part's difficulties, Expert at the top: a ring is to be generated, a faint dot is charted and kept, a ring around a faint dot is made again.</value>
+  </data>
+  <data name="LowerDifficultiesIncludeToolTip" xml:space="preserve">
+    <value>Generate this song's new difficulties. Untick it to leave the song as it is.</value>
+  </data>
+  <data name="LowerDifficultiesIncludeAll" xml:space="preserve">
+    <value>All listed</value>
+    <comment>Ticks or unticks every song listed that has something to generate.</comment>
+  </data>
+  <data name="LowerDifficultiesIncludeAllToolTip" xml:space="preserve">
+    <value>Tick or untick every song listed here that has something to generate.</value>
   </data>
 </root>

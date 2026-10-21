@@ -372,7 +372,9 @@
                         <MenuItem Header="{x:Static res:Strings.EditChartButton}"
                                   Command="{Binding EditChartCommand}"
                                   IsVisible="{Binding IsSingleSelection}" />
-                        <Separator IsVisible="{Binding IsSingleSelection}" />
+                        <MenuItem Header="{x:Static res:Strings.MenuGenerateLowerDifficultiesContext}"
+                                  Command="{Binding GenerateLowerDifficultiesCommand}" />
+                        <Separator />
                         <MenuItem Header="{x:Static vm:LibraryViewModel.RevealLabel}" Command="{Binding RevealCommand}" />
                         <MenuItem Header="{x:Static res:Strings.MenuDownloadAllFiles}" Command="{Binding DownloadAllCommand}" />
                     </ContextMenu>

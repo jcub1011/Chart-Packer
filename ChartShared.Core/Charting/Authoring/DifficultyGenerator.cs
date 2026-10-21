@@ -10,7 +10,7 @@ public sealed record GeneratedDifficulties(EditableChart Drafted, IReadOnlyList<
 
 /// <summary>
 /// Fills a part's lower difficulties from those above them (charter-spec C9 item 2), without an editing session: what
-/// Reduce all does in the editor (<see cref="ReduceProposals"/>), and what the library's quick fix for CHR087 does.
+/// Reduce all does in the editor (<see cref="ReduceProposals"/>), and what the library's Generate Lower Difficulties does.
 /// </summary>
 /// <remarks>
 /// Each target is reduced from the nearest difficulty above it with notes, as it will be once the targets above it are
@@ -52,25 +52,30 @@ public static class DifficultyGenerator
         return null;
     }
 
-    /// <summary>The difficulties of <paramref name="part"/> below <paramref name="highest"/> with no notes, highest first.</summary>
-    public static IReadOnlyList<ChartDifficulty> MissingBelow(EditablePart part, ChartDifficulty highest)
+    /// <summary>The difficulties of <paramref name="part"/> with notes.</summary>
+    public static IReadOnlySet<ChartDifficulty> Charted(EditablePart part)
     {
         ArgumentNullException.ThrowIfNull(part);
-        return [.. Enum.GetValues<ChartDifficulty>().Where(d => d < highest && part[d].Notes.Count == 0).OrderDescending()];
+        return part.Tracks.Where(static t => t.Notes.Count > 0).Select(static t => t.Difficulty).ToHashSet();
     }
 
     /// <summary>Each part of <paramref name="chart"/> with a difficulty to fill, and those difficulties, highest first.</summary>
-    public static IReadOnlyDictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>> MissingTargets(EditableChart chart)
+    public static IReadOnlyDictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>> MissingTargets(EditableChart chart) =>
+        TargetsFor(chart, LowerDifficultyScope.Missing);
+
+    /// <summary>Each part of <paramref name="chart"/> with a difficulty <paramref name="scope"/> fills, and those difficulties, highest first.</summary>
+    public static IReadOnlyDictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>> TargetsFor(EditableChart chart, LowerDifficultyScope scope)
     {
         ArgumentNullException.ThrowIfNull(chart);
-        var missing = new Dictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>>();
+        ArgumentNullException.ThrowIfNull(scope);
+        var targets = new Dictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>>();
         foreach (var part in chart.Parts)
         {
-            if (HighestCharted(part) is { } highest && MissingBelow(part, highest) is { Count: > 0 } targets)
-                missing[part.Instrument] = targets;
+            if (scope.TargetsOf(part.Instrument, Charted(part)) is { Count: > 0 } found)
+                targets[part.Instrument] = found;
         }
 
-        return missing;
+        return targets;
     }
 
     /// <summary>

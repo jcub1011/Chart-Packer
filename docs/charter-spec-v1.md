@@ -2239,16 +2239,15 @@ Acceptance criteria:
   isn't measured again when only `song.ini` changed. Nothing is written to disk.
 - **In the Validator,** a song's chart findings follow its metadata issues, one line per rule and
   key with how many and where the first is, coloured by severity, and filtered by six chart types,
-  one per group of the catalogue. CHR083's, CHR087's and CHR066's have fixes there (a suggested
-  rating, missing difficulties and star power generated into the draft); the rest have none. A
+  one per group of the catalogue. CHR083's and CHR066's have fixes there (a suggested rating, and
+  star power generated into the draft); the rest have none. A song's missing difficulties
+  (CHR087) are a note there, filled by Generate Lower Difficulties instead. A
   song is listed for a chart Warning or Error, not for Info alone, and counts as failing until both
   its metadata and its chart pass. A song whose only chart finding to fix is CHR066 is listed too,
   so Fix selected can generate its star power, but doesn't count as failing. Ticking a song, or
   every song, ticks its CHR066 fix only when it's the song's only fix; otherwise it's ticked on its
-  own, as it rewrites the chart though nothing fails. Fix selected generates
-  a song's star power and missing difficulties as one chart, star power first, so the difficulties
-  reduced after keep a note in each phrase; the Generate difficulties dialog is shown only when some
-  song has difficulties to generate.
+  own, as it rewrites the chart though nothing fails. Fix selected generates a song's star power
+  with its defaults, with no dialog.
   Save all asks only about metadata that still fails. A drafted song is linted again a moment after
   its draft changes.
 - **In the detail panel,** the chart findings of the one song shown follow its own, with where
@@ -2598,7 +2597,7 @@ merges the group into its first phrase.
 | CHR084 | Warning | `song_length` doesn't match the audio's length within 1 s. A charter save corrects it, so this mostly appears in the library. | Update `song_length` |
 | CHR085 | Info | `[end]` is missing or before the last note. Chart Builder places it on save, so it runs this rule only in the library, not in the editor | — |
 | CHR086 | Info | Something in the chart file couldn't be loaded as written, and was left out, as the games leave it out ([§4.1](#editable-model)). Saving writes the file without it. | — |
-| CHR087 | Warning | A 5-fret, GHL or drum part has no notes on a difficulty below its highest charted one, so the games don't offer it. One finding per difficulty. | Generate with Reduce (Chart Builder); Generate missing difficulties (library) |
+| CHR087 | Info | A 5-fret, GHL or drum part has no notes on a difficulty below its highest charted one, so the games don't offer it. One finding per difficulty. | Generate with Reduce (Chart Builder); Generate Lower Difficulties (library) |
 
 ### Vocals
 
@@ -3156,8 +3155,8 @@ Decisions already made for v1, recorded here so they aren't reopened by accident
   ([§4.2](#lossless-passthrough)).
 - **Chart lint in the library:** shown as findings, never blocks packing
   ([C16](#c16-chart-lint)).
-- **Reduction rules:** set per run in the Reduce dialog, or Chart Packer's Generate difficulties
-  dialog, starting from the defaults both apps share. Nothing is stored per song ([C9](#c9-difficulty-authoring)).
+- **Reduction rules:** set per run in the Reduce dialog, or Chart Packer's Generate Lower
+  Difficulties window, starting from the defaults both apps share. Nothing is stored per song ([C9](#c9-difficulty-authoring)).
 - **Calibration device key:** a stable OS device ID where there is one, then the device name, then
   the global fallback ([C11](#c11-calibration-tool)).
 - **`.chart` after import:** removed on the first save, after a confirmation. No backup is kept

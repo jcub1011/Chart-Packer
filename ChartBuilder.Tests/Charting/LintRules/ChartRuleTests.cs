@@ -115,16 +115,16 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
-    public void EachDifficultyEmptyBelowAPartsHighestIsWarned()
+    public void EachDifficultyEmptyBelowAPartsHighestIsNoted()
     {
-        // Once fine (GitHub issue #53); now CHR087, which Reduce, or the library's quick fix, fills.
+        // Once fine (GitHub issue #53); now CHR087, a note, which Reduce, or the library's Generate Lower Difficulties, fills.
         var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2")]);
         new AddPart(ChartInstrument.Bass).Apply(chart);
         new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0)]).Apply(chart);
 
         var findings = new ChartLinter().LintAll(Snapshot(chart, input)).Findings;
 
-        Assert.IsTrue(findings.All(f => f.RuleId == ChrRules.Chr087 && f.Severity == Severity.Warning), string.Join("; ", findings.Select(Describe)));
+        Assert.IsTrue(findings.All(f => f.RuleId == ChrRules.Chr087 && f.Severity == Severity.Info), string.Join("; ", findings.Select(Describe)));
         Assert.AreSequenceEqual(
             [ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy],
             [.. findings.Select(f => f.Location!).Where(l => l.Part == ChartInstrument.Bass).Select(l => l.Difficulty!.Value)],

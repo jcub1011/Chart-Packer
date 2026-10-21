@@ -143,6 +143,31 @@ namespace ChartPacker.Services
             return null;
         }
 
+        /// <summary>Holds every one of <paramref name="songs"/> for a write, or none of them, and says why not.</summary>
+        /// <param name="inUse">
+        /// Why they can't all be held, as a sentence: which are held elsewhere, as <c>Describe</c> says it,
+        /// or why a lock can't be taken; null once they're held.
+        /// </param>
+        /// <returns>The holds, until disposed; <see langword="null"/> when they can't all be held.</returns>
+        public IDisposable? TryHold(IReadOnlyList<SongEntry> songs, out string? inUse)
+        {
+            ArgumentNullException.ThrowIfNull(songs);
+            IDisposable? held;
+            IReadOnlyList<(string Path, SongLockHolder Holder)> refused;
+            try
+            {
+                held = TryHold(songs.Select(static s => s.FullPath), out refused);
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                inUse = ex.Message;
+                return null;
+            }
+
+            inUse = held is null ? Describe(refused, path => songs.First(s => s.FullPath == path).DisplayName) : null;
+            return held;
+        }
+
         /// <summary>Says who holds <paramref name="name"/>, as a sentence.</summary>
         public static string Describe(string name, SongLockHolder holder)
         {

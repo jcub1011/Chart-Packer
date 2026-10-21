@@ -30,7 +30,7 @@ public static class UserConfigPaths
 
     /// <summary>
     /// The default reduction rules (charter-spec C9 item 2, §10), read and written by both apps: Chart Builder's Reduce,
-    /// and Chart Packer's quick fix for missing difficulties.
+    /// and Chart Packer's Generate Lower Difficulties.
     /// </summary>
     public static string ReductionRulesFile => Path.Combine(ConfigFolder, "reduction-rules.json");
 

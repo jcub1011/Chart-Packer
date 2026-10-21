@@ -1,0 +1,611 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:ChartPacker.ViewModels"
+        xmlns:svm="using:ChartShared.UI.ViewModels"
+        xmlns:sv="using:ChartShared.UI.Views"
+        xmlns:res="using:ChartPacker.Resources"
+        xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:ui="using:ChartShared.UI.Controls"
+        xmlns:uiconv="using:ChartShared.UI.Converters"
+        mc:Ignorable="d" d:DesignWidth="1440" d:DesignHeight="860"
+        x:Class="ChartPacker.Views.LowerDifficultiesWindow"
+        x:DataType="vm:LowerDifficultiesViewModel"
+        Title="{x:Static res:Strings.LowerDifficultiesTitle}"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="1440" Height="860"
+        MinWidth="900" MinHeight="520"
+        ShowInTaskbar="False"
+        CanMinimize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
+        WindowStartupLocation="CenterOwner">
+
+    <!-- Generate lower difficulties (issue #120), opened from the library for the songs selected. On the left, what the
+         batch fills: which difficulties and parts, whether those already charted are made again, and, folded away, the
+         reduction rules. In the middle, above, the songs, a tab per state, so a batch of hundreds lists only what's to
+         look at; each row's tick says whether it's generated, and its grid shows its parts' difficulties at a glance, a
+         ring for each to be generated. Below them, the song picked as it'd be generated, a ladder per part. On the right,
+         when it's shown, the preview of the part picked. It can't be minimized: a modal window with no taskbar entry
+         would have nothing to restore it from. -->
+    <Window.Resources>
+        <uiconv:DifficultyGlyphConverter x:Key="Glyph"
+                                         Guitar="{StaticResource InstrumentGuitarGeometry}"
+                                         Bass="{StaticResource InstrumentBassGeometry}"
+                                         Rhythm="{StaticResource InstrumentRhythmGeometry}"
+                                         Drums="{StaticResource InstrumentDrumsGeometry}"
+                                         Keys="{StaticResource InstrumentKeysGeometry}" />
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- Pane headings, as the inspector's sections look; notes under them, quieter still. -->
+        <Style Selector="TextBlock.heading">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <!-- The Skip | Replace switch: radio buttons, so one is always picked, drawn as the library's small toggles. -->
+        <Style Selector="RadioButton.match">
+            <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="12,3" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <!-- The list's tabs: plain text with its count, the one picked in the accent, underlined by its bar. -->
+        <Style Selector="RadioButton.tab">
+            <Setter Property="Theme" Value="{StaticResource {x:Type ToggleButton}}" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="RadioButton.tab /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="RadioButton.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="RadioButton.tab:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+        <Style Selector="RadioButton.tab:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+
+        <!-- Rows as the library's: tinted, not filled, when selected, with the accent's bar on the left, always there
+             (transparent) so selecting doesn't shift the row. -->
+        <Style Selector="ListBox#SongList ListBoxItem">
+            <Setter Property="Padding" Value="10,5,8,5" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox#SongList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox#SongList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+        <Style Selector="ListBox#SongList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintStrongBrush}" />
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="TextBlock.status.problem">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.status.done">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+        </Style>
+
+        <!-- A song with something to generate that's left out: drawn faint, all but its tick. -->
+        <Style Selector="Grid.songRow.leftOut > StackPanel, Grid.songRow.leftOut > ItemsControl, Grid.songRow.leftOut > TextBlock">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+
+        <!-- The parts of the song picked, picked as the library's rows are: tinted, with the accent's bar on the left. -->
+        <Style Selector="ListBox#PartList ListBoxItem">
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        <Style Selector="ListBox#PartList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+        </Style>
+        <Style Selector="ListBox#PartList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintFaintBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="ListBox#PartList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTintBrush}" />
+        </Style>
+
+        <!-- A difficulty's pip, coloured as the games colour it: a faint dot charted and kept, a ring to be generated, a
+             ring round a faint dot to be made again, a full dot generated, and a speck for none. -->
+        <Style Selector="Panel.pip">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="7" />
+        </Style>
+        <Style Selector="Panel.pip Ellipse">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Panel.pip Ellipse.ring">
+            <Setter Property="StrokeThickness" Value="1.5" />
+        </Style>
+        <Style Selector="Panel.pip.expert Ellipse.fill">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyExpertBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.expert Ellipse.ring">
+            <Setter Property="Stroke" Value="{DynamicResource DifficultyExpertBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.hard Ellipse.fill">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyHardBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.hard Ellipse.ring">
+            <Setter Property="Stroke" Value="{DynamicResource DifficultyHardBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.medium Ellipse.fill">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyMediumBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.medium Ellipse.ring">
+            <Setter Property="Stroke" Value="{DynamicResource DifficultyMediumBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.easy Ellipse.fill">
+            <Setter Property="Fill" Value="{DynamicResource DifficultyEasyBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.easy Ellipse.ring">
+            <Setter Property="Stroke" Value="{DynamicResource DifficultyEasyBrush}" />
+        </Style>
+        <Style Selector="Panel.pip.charted Ellipse.fill, Panel.pip.replace Ellipse.fill">
+            <Setter Property="IsVisible" Value="True" />
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="Panel.pip.replace Ellipse.fill">
+            <Setter Property="Margin" Value="2" />
+        </Style>
+        <Style Selector="Panel.pip.target Ellipse.ring, Panel.pip.replace Ellipse.ring">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="Panel.pip.generated Ellipse.fill">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="Panel.pip.empty Ellipse.fill">
+            <Setter Property="IsVisible" Value="True" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="Fill" Value="{DynamicResource SubtleBorderBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
+        <!-- The title bar, as the main window's is: the icon (the owner's, set in code) and the title. -->
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     Grid.Row="0"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}"
+                     AppName="{x:Static res:Strings.AppName}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.LowerDifficultiesTitle}" />
+        </ui:TitleBar>
+
+        <!-- What's filled, the songs over the song picked, and the preview; the code-behind gives the preview the width
+             the songs leave while it's shown. -->
+        <Grid x:Name="Body" Grid.Row="1" ColumnDefinitions="300,*,Auto,0">
+            <!-- What the batch fills. -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="16,14,16,16" Spacing="8" IsEnabled="{Binding CanChange}">
+                        <TextBlock Classes="heading" Text="{x:Static res:Strings.LowerDifficultiesDifficultiesHeading}" />
+                        <ItemsControl ItemsSource="{Binding Targets}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LowerDifficultiesTarget">
+                                    <ToggleButton Classes="filterChip"
+                                                  IsChecked="{Binding IsIncluded}"
+                                                  AutomationProperties.Name="{Binding Name}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Panel Classes="pip target"
+                                                   Classes.hard="{Binding IsHard}"
+                                                   Classes.medium="{Binding IsMedium}"
+                                                   Classes.easy="{Binding IsEasy}"
+                                                   VerticalAlignment="Center">
+                                                <Ellipse Classes="fill" />
+                                                <Ellipse Classes="ring" />
+                                            </Panel>
+                                            <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
+                                        </StackPanel>
+                                    </ToggleButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Classes="heading" Margin="0,14,0,0" Text="{x:Static res:Strings.LowerDifficultiesPartsHeading}" />
+                        <TextBlock Classes="note" Text="{x:Static res:Strings.LowerDifficultiesPartsPending}" IsVisible="{Binding !HasParts}" />
+                        <ItemsControl ItemsSource="{Binding Parts}" IsVisible="{Binding HasParts}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LowerDifficultiesPart">
+                                    <ToggleButton Classes="filterChip"
+                                                  IsChecked="{Binding IsIncluded}"
+                                                  AutomationProperties.Name="{Binding Name}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <PathIcon Width="12" Height="12"
+                                                      VerticalAlignment="Center"
+                                                      Data="{Binding Glyph, Converter={StaticResource Glyph}}" />
+                                            <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
+                                        </StackPanel>
+                                    </ToggleButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Classes="heading" Margin="0,14,0,0" Text="{x:Static res:Strings.LowerDifficultiesChartedHeading}" />
+                        <StackPanel Orientation="Horizontal" Spacing="2"
+                                    AutomationProperties.Name="{x:Static res:Strings.LowerDifficultiesChartedHeading}">
+                            <RadioButton Classes="match"
+                                         Content="{x:Static res:Strings.LowerDifficultiesSkip}"
+                                         IsChecked="{Binding IsSkip}" />
+                            <RadioButton Classes="match"
+                                         Content="{x:Static res:Strings.LowerDifficultiesReplace}"
+                                         IsChecked="{Binding IsReplace}" />
+                        </StackPanel>
+                        <TextBlock Classes="note" Text="{Binding ChartedNote}" />
+
+                        <TextBlock Classes="heading" Margin="0,14,0,0" Text="{x:Static sres:SharedStrings.ReductionRulesHeading}" />
+                        <TextBlock Classes="note" Text="{x:Static res:Strings.LowerDifficultiesRulesNote}" />
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                                       Text="{x:Static sres:SharedStrings.ReductionFamilyLabel}" />
+                            <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding FamilyChoices}"
+                                      SelectedItem="{Binding SelectedFamily}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=svm:FamilyChoice}"
+                                      AutomationProperties.Name="{x:Static sres:SharedStrings.ReductionFamilyLabel}" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                                       Text="{x:Static sres:SharedStrings.ReductionRulesForLabel}" />
+                            <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding TargetChoices}"
+                                      SelectedItem="{Binding SelectedTarget}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=svm:DifficultyChoice}"
+                                      AutomationProperties.Name="{x:Static sres:SharedStrings.ReductionRulesForLabel}" />
+                        </Grid>
+                        <sv:ReductionRulesView DataContext="{Binding Rules}" />
+                        <WrapPanel ItemSpacing="8" LineSpacing="8">
+                            <Button Content="{x:Static sres:SharedStrings.ReductionResetButton}"
+                                    Command="{Binding ResetRulesCommand}"
+                                    ToolTip.Tip="{x:Static sres:SharedStrings.ReductionResetToolTip}" />
+                            <Button Content="{x:Static res:Strings.GenerateDifficultiesSaveDefaultsButton}"
+                                    Command="{Binding SaveRulesAsDefaultsCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.GenerateDifficultiesSaveDefaultsToolTip}" />
+                        </WrapPanel>
+                        <TextBlock Classes="note" Text="{Binding RulesSaveStatus}" IsVisible="{Binding HasRulesSaveStatus}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Above, the songs: a search, the tabs, and the songs the tab picked lists. Below, the song picked. -->
+            <Grid Grid.Column="1" RowDefinitions="3*,Auto,2*" MinWidth="440">
+                <DockPanel Grid.Row="0">
+                    <Border DockPanel.Dock="Top"
+                            Padding="10,8,10,0"
+                            BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource SubtleBorderBrush}">
+                        <StackPanel Spacing="6">
+                            <TextBox Classes="clearButton"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding SearchText}"
+                                     PlaceholderText="{x:Static res:Strings.LowerDifficultiesSearchWatermark}"
+                                     AutomationProperties.Name="{x:Static res:Strings.LowerDifficultiesSearchWatermark}">
+                                <TextBox.InnerLeftContent>
+                                    <ui:LineIcon Data="{StaticResource SearchStroke}" Margin="8,0,0,0" Opacity="0.6" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+                            <DockPanel>
+                                <!-- Ticks or leaves out every song listed with something to generate. -->
+                                <CheckBox DockPanel.Dock="Right"
+                                          VerticalAlignment="Center"
+                                          FontSize="12"
+                                          Content="{x:Static res:Strings.LowerDifficultiesIncludeAll}"
+                                          IsChecked="{Binding AllShownIncluded}"
+                                          IsEnabled="{Binding CanIncludeShown}"
+                                          ToolTip.Tip="{x:Static res:Strings.LowerDifficultiesIncludeAllToolTip}"
+                                          AutomationProperties.Name="{x:Static res:Strings.LowerDifficultiesIncludeAllToolTip}" />
+                                <ItemsControl ItemsSource="{Binding Tabs}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LowerDifficultiesTab">
+                                            <RadioButton Classes="tab"
+                                                         GroupName="LowerDifficultiesTabs"
+                                                         IsChecked="{Binding IsSelected}"
+                                                         Content="{Binding Label}"
+                                                         AutomationProperties.Name="{Binding Label}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Panel>
+                        <ListBox x:Name="SongList"
+                                 Background="Transparent"
+                                 ItemsSource="{Binding ShownRows}"
+                                 SelectedItem="{Binding SelectedRow}"
+                                 SelectionMode="Single"
+                                 AutomationProperties.Name="{x:Static res:Strings.LowerDifficultiesTitle}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LowerDifficultiesSongRow">
+                                    <Grid Classes="songRow"
+                                          Classes.leftOut="{Binding IsLeftOut}"
+                                          ColumnDefinitions="24,*,Auto,170"
+                                          ColumnSpacing="12"
+                                          ToolTip.Tip="{Binding Entry.FullPath}">
+                                        <!-- Whether the song is generated; only a song with something to generate has one. -->
+                                        <CheckBox Grid.Column="0"
+                                                  MinWidth="0"
+                                                  Padding="0"
+                                                  VerticalAlignment="Center"
+                                                  IsChecked="{Binding IsIncluded}"
+                                                  IsVisible="{Binding CanInclude}"
+                                                  ToolTip.Tip="{x:Static res:Strings.LowerDifficultiesIncludeToolTip}"
+                                                  AutomationProperties.Name="{Binding Title}" />
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                            <TextBlock Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Text="{Binding Artist}" />
+                                        </StackPanel>
+
+                                        <!-- Each part: its icon, and its difficulties, Expert at the top. -->
+                                        <ItemsControl Grid.Column="2"
+                                                      VerticalAlignment="Center"
+                                                      ItemsSource="{Binding Parts}"
+                                                      ToolTip.Tip="{x:Static res:Strings.LowerDifficultiesGridToolTip}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="12" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:PartPips">
+                                                    <StackPanel Orientation="Horizontal" Spacing="4" Background="Transparent"
+                                                                ToolTip.Tip="{Binding ToolTip}">
+                                                        <PathIcon Width="12" Height="12"
+                                                                  Opacity="0.7"
+                                                                  VerticalAlignment="Center"
+                                                                  Data="{Binding Glyph, Converter={StaticResource Glyph}}" />
+                                                        <ItemsControl ItemsSource="{Binding Pips}" VerticalAlignment="Center">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Spacing="2" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="vm:DifficultyPip">
+                                                                    <Panel Classes="pip"
+                                                                           Classes.expert="{Binding IsExpert}"
+                                                                           Classes.hard="{Binding IsHard}"
+                                                                           Classes.medium="{Binding IsMedium}"
+                                                                           Classes.easy="{Binding IsEasy}"
+                                                                           Classes.charted="{Binding IsCharted}"
+                                                                           Classes.target="{Binding IsTarget}"
+                                                                           Classes.replace="{Binding IsReplace}"
+                                                                           Classes.generated="{Binding IsGenerated}"
+                                                                           Classes.empty="{Binding IsEmpty}">
+                                                                        <Ellipse Classes="fill" />
+                                                                        <Ellipse Classes="ring" />
+                                                                    </Panel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock Grid.Column="3"
+                                                   Classes="status"
+                                                   Classes.problem="{Binding IsProblem}"
+                                                   Classes.done="{Binding IsDone}"
+                                                   TextAlignment="Right"
+                                                   Text="{Binding StatusText}"
+                                                   ToolTip.Tip="{Binding StatusText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <TextBlock Classes="muted centered"
+                                   VerticalAlignment="Center"
+                                   Margin="24"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding EmptyText}"
+                                   IsVisible="{Binding IsListEmpty}" />
+                    </Panel>
+                </DockPanel>
+
+                <GridSplitter Grid.Row="1"
+                              Height="4"
+                              ResizeDirection="Rows"
+                              Background="{DynamicResource SubtleBorderBrush}" />
+
+                <!-- The song picked: its name, the preview's switch, and each part on the estimator's ladder, side by side
+                     as far as they fit; the part picked is the one the preview shows. -->
+                <DockPanel Grid.Row="2" Background="{DynamicResource SurfaceBrush}">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="14,10,10,6">
+                        <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center" IsVisible="{Binding HasSelection}">
+                            <TextBlock FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                       Text="{Binding SelectedRow.Title, FallbackValue={x:Null}}" />
+                            <TextBlock Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis"
+                                       Text="{Binding SelectedRow.Artist, FallbackValue={x:Null}}" />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding Preview.IsExpanded}"
+                                      ToolTip.Tip="{x:Static sres:SharedStrings.ReductionPreviewToolTip}"
+                                      AutomationProperties.Name="{x:Static sres:SharedStrings.ReductionPreviewButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static sres:SharedStrings.ReductionPreviewButton}" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </Grid>
+
+                    <Panel Margin="10,0,2,0">
+                        <TextBlock Classes="note" Margin="4,4,8,0" Text="{Binding Generation.LaddersStatus}" IsVisible="{Binding Generation.HasLaddersStatus}" />
+                        <!-- Each part: Expert down to Easy, the new difficulties marked, each a little easier than the one
+                             above it, if all's well; then how many findings the new ones have. -->
+                        <ListBox x:Name="PartList"
+                                 ItemsSource="{Binding Generation.Ladders}"
+                                 SelectedItem="{Binding Generation.SelectedPart}"
+                                 SelectionMode="Single"
+                                 Background="Transparent"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 IsVisible="{Binding Generation.HasLadders}"
+                                 ToolTip.Tip="{x:Static res:Strings.GenerateDifficultiesPreviewPartLabel}"
+                                 AutomationProperties.Name="{x:Static res:Strings.GenerateDifficultiesPreviewPartLabel}">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:GenerateDifficultiesPartPreview">
+                                    <StackPanel Width="240" Spacing="4">
+                                        <TextBlock Classes="caption" Text="{Binding Name}" />
+                                        <sv:DifficultyLadderView Classes="compact" DataContext="{Binding Ladder}" />
+                                        <TextBlock Classes="note" Text="{Binding Findings}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Panel>
+                </DockPanel>
+            </Grid>
+
+            <GridSplitter x:Name="PreviewSplitter"
+                          Grid.Column="2"
+                          Width="4"
+                          ResizeDirection="Columns"
+                          Background="{DynamicResource SubtleBorderBrush}" />
+
+            <!-- The picked part's drafts against what they're made from, played with the song, as Reduce shows them. -->
+            <sv:ReductionPreviewView x:Name="PreviewPane"
+                                     Grid.Column="3"
+                                     MinWidth="360"
+                                     DataContext="{Binding Preview}" />
+        </Grid>
+
+        <!-- Why songs weren't saved, until the next save. -->
+        <Border Grid.Row="2"
+                Classes="banner error"
+                Margin="10,0,10,8"
+                IsVisible="{Binding HasSaveError}">
+            <SelectableTextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding SaveError}" />
+        </Border>
+
+        <!-- How the run going on is doing, or how the songs stand; Close, Save and Generate at the right. -->
+        <Border Grid.Row="3" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <ProgressBar Width="140"
+                                 MinWidth="0"
+                                 Height="4"
+                                 MinHeight="0"
+                                 VerticalAlignment="Center"
+                                 Minimum="0"
+                                 Maximum="{Binding ProgressTotal}"
+                                 Value="{Binding ProgressDone}"
+                                 IsVisible="{Binding IsBusy}" />
+                    <TextBlock Classes="muted"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding StatusText}" />
+                    <Button Classes="tool"
+                            Padding="6,2"
+                            VerticalAlignment="Center"
+                            Command="{Binding ShowProblemsCommand}"
+                            IsVisible="{Binding HasProblems}">
+                        <TextBlock FontSize="12"
+                                   Foreground="{DynamicResource WarningTextBrush}"
+                                   Text="{Binding ProblemsText}" />
+                    </Button>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:Strings.CloseButton}"
+                            Command="{Binding CloseCommand}"
+                            IsCancel="True"
+                            ToolTip.Tip="{x:Static res:Strings.LowerDifficultiesCloseToolTip}"
+                            AutomationProperties.Name="{x:Static res:Strings.CloseButton}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Classes.accent="{Binding IsSavePrimary}"
+                            Content="{Binding SaveText}"
+                            Command="{Binding SaveCommand}"
+                            IsVisible="{Binding ShowSave}"
+                            ToolTip.Tip="{x:Static res:Strings.LowerDifficultiesSaveToolTip}"
+                            AutomationProperties.Name="{Binding SaveText}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Classes="accent"
+                            Content="{Binding GenerateText}"
+                            Command="{Binding GenerateCommand}"
+                            IsVisible="{Binding ShowGenerate}"
+                            AutomationProperties.Name="{Binding GenerateText}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static res:Strings.LowerDifficultiesStop}"
+                            Command="{Binding StopCommand}"
+                            IsVisible="{Binding IsGenerating}"
+                            AutomationProperties.Name="{x:Static res:Strings.LowerDifficultiesStop}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

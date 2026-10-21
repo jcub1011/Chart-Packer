@@ -1377,21 +1377,10 @@ namespace ChartPacker.ViewModels
             IDisposable? held = null;
             if (_locks is not null)
             {
-                IReadOnlyList<(string Path, SongLockHolder Holder)> refused;
-                try
-                {
-                    held = _locks.TryHold([.. dirty.Select(s => s.Entry.FullPath)], out refused);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    SaveError = string.Format(CultureInfo.CurrentCulture, Strings.NotSavedInUseFormat, ex.Message);
-                    return;
-                }
-
+                held = _locks.TryHold([.. dirty.Select(s => s.Entry)], out string? inUse);
                 if (held is null)
                 {
-                    string NameOf(string path) => dirty.First(s => s.Entry.FullPath == path).Entry.DisplayName;
-                    SaveError = string.Format(CultureInfo.CurrentCulture, Strings.NotSavedInUseFormat, SongLocks.Describe(refused, NameOf));
+                    SaveError = string.Format(CultureInfo.CurrentCulture, Strings.NotSavedInUseFormat, inUse);
                     return;
                 }
             }

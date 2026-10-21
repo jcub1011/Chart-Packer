@@ -78,9 +78,9 @@ namespace ChartPacker
                 var detail = new SongDetailViewModel(
                     drafts, job, imagePicker, filePicker, player, highway, videoProbe, downloads, reveal, songFiles, confirmation, locks: locks,
                     chartIssuesWindow: new AvaloniaChartIssuesWindowService(() => window));
-                // The Validator's quick fix for missing difficulties keeps the charts it makes here until their songs are
-                // saved; one an app that didn't close cleanly left is no use a day on. The rules it makes them by are
-                // shared with Chart Builder's Reduce (charter-spec C9 item 2).
+                // Generate Lower Difficulties, and the Validator's quick fix for star power, keep the charts they make here
+                // until their songs are saved; one an app that didn't close cleanly left is no use a day on. The rules the
+                // difficulties are made by are shared with Chart Builder's Reduce (charter-spec C9 item 2).
                 GeneratedChartStash.SweepStale(TimeSpan.FromDays(1));
                 GeneratedChartStash? generated = null;
                 try
@@ -89,15 +89,18 @@ namespace ChartPacker
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    Trace.TraceWarning($"No folder for generated charts, so the Validator can't generate difficulties: {ex.Message}");
+                    Trace.TraceWarning($"No folder for generated charts, so the library can't generate charts: {ex.Message}");
                 }
 
                 var reductionRules = new ReductionRulesFile(UserConfigPaths.ReductionRulesFile, UserConfigPaths.BuilderSettingsFile);
                 var validatorWindow = new AvaloniaValidatorWindowService(
-                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, locks, latency, generated, reductionRules);
+                    () => window, drafts, job, settings, audio.Open, detail, videoProbe, notice, songFiles, locks, latency, generated);
+                var lowerDifficultiesWindow = new AvaloniaLowerDifficultiesWindowService(
+                    () => window, drafts, settings, audio.Open, detail, songFiles, generated, reductionRules, locks, latency);
                 var chartBuilder = new ChartBuilderLauncher();
                 var library = new LibraryViewModel(
-                    folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice);
+                    folderPicker, settings, drafts, job, player, mergeWindowFor(() => window), dedupWindow, validatorWindow, reveal, downloads, chartBuilder, notice,
+                    lowerDifficultiesWindow);
 
                 // Settings' Calibrate… opens the calibration tool (charter-spec C11) over the window in front, pausing the
                 // song; the latency it saves is read again once it closes. The tool starts on the device the song plays on,

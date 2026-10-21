@@ -1,4 +1,5 @@
 using ChartShared.Core.Ini;
+using ChartShared.Core.Metadata;
 using ChartShared.Core.Resources;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Sng;
@@ -44,6 +45,13 @@ public sealed record SongMetadataReport(
 {
     /// <summary>Whether the metadata can be edited and saved.</summary>
     public bool CanEdit => Status is SongMetadataStatus.Ok or SongMetadataStatus.NoSongIni or SongMetadataStatus.NoSongSection;
+
+    /// <summary>The song's metadata as <paramref name="draft"/> would save it.</summary>
+    public IReadOnlyList<KeyValuePair<string, string>> DraftedPairs(MetadataDraft? draft)
+    {
+        var item = new MetadataItem(Pairs, draft ?? new MetadataDraft(), DuplicateKeys);
+        return item.Draft.ApplyTo(item.Original);
+    }
 }
 
 /// <summary>Reads a song's stored metadata, for the detail panel and the Validator alike, so the two agree on what's checked.</summary>

@@ -141,13 +141,14 @@ public sealed class UnratedPartRule : IChartLintRule
 /// <summary>
 /// CHR087: a difficulty below a part's highest charted one has no notes, so the games don't offer it. One finding for
 /// each such difficulty. Only 5-fret (keys too), GHL and drum parts, the ones Reduce can fill
-/// (<see cref="Authoring.DifficultyGenerator"/>); a difficulty above the highest charted one isn't asked for.
+/// (<see cref="Authoring.DifficultyGenerator"/>); a difficulty above the highest charted one isn't asked for. A note, not
+/// a problem: Reduce in Chart Builder, or Generate Lower Difficulties in the library, fills them when they're wanted.
 /// </summary>
 public sealed class MissingDifficultyRule : IChartLintRule
 {
     public string RuleId => ChrRules.Chr087;
 
-    public Severity Severity => Severity.Warning;
+    public Severity Severity => Severity.Info;
 
     public LintScope Scope => LintScope.Part;
 
@@ -158,9 +159,13 @@ public sealed class MissingDifficultyRule : IChartLintRule
         var findings = new List<Finding>();
         foreach (var part in context.Parts)
         {
-            if (Authoring.DifficultyGenerator.HighestCharted(part) is not { } highest)
+            // What Generate Lower Difficulties fills (LowerDifficultyScope.Missing), so the two never disagree.
+            var charted = Authoring.DifficultyGenerator.Charted(part);
+            var missingBelow = Authoring.LowerDifficultyScope.Missing.TargetsOf(part.Instrument, charted);
+            if (missingBelow.Count == 0)
                 continue;
-            foreach (var missing in Authoring.DifficultyGenerator.MissingBelow(part, highest))
+            var highest = charted.Max();
+            foreach (var missing in missingBelow)
             {
                 string message = string.Format(CultureInfo.CurrentCulture, FindingMessages.ChrMissingDifficultyFormat, missing, highest);
                 findings.Add(new Finding(RuleId, Severity, message, Location: new ChartLocation(part.Instrument, missing, 0, 0)));
