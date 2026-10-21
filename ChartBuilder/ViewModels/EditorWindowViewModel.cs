@@ -65,7 +65,7 @@ namespace ChartBuilder.ViewModels
             Playback = new PlaybackViewModel(song, services.OpenOutput, services.Latency, () => (settings.Settings.MetronomeVolume, settings.Settings.HitSoundVolume), services.Calibrate, Audio);
             _undo = new ChartUndoStack(song.Chart, startsSaved);
             _undo.Changed += OnChartChanged;
-            ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song, ApplyChartSettings, () => Editor?.AudioAssist);
+            ChartSettings = new ChartSettingsViewModel(settings, services.Confirmations, song, ApplyChartSettings, () => Editor?.AudioAssist, () => Editor?.Session.ReadOptions);
             Metadata = new ChartMetadataViewModel(song, ApplyChartSettings);
             Tracks = new EditorTracksViewModel(song, Playback, services.FilePicker, ApplyChartSettings);
             Art = new ArtViewModel(song, services.ImagePicker, services.FilePicker, ApplyChartSettings, Playback.Clock);

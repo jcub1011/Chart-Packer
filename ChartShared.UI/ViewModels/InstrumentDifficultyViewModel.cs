@@ -111,9 +111,18 @@ namespace ChartShared.UI.ViewModels
         [NotifyPropertyChangedFor(nameof(HasNoteCounts))]
         public partial IReadOnlyList<NoteCountRow> NoteCounts { get; private set; } = [];
 
+        /// <summary>The tier the difficulty model suggests for the key, from the one song's chart; null when there's none, or it isn't known.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(SuggestionText), nameof(HasSuggestion))]
+        public partial int? SuggestedTier { get; private set; }
+
         public bool HasLetters => Letters.Count > 0;
 
         public bool HasNoteCounts => NoteCounts.Count > 0;
+
+        public string? SuggestionText => SuggestedTier is { } tier ? string.Format(CultureInfo.CurrentCulture, SharedStrings.DifficultySuggestedFormat, tier) : null;
+
+        public bool HasSuggestion => SuggestedTier is not null;
 
         /// <summary>The songs shown don't all share one value, and not all of them leave it unset.</summary>
         public bool IsDistinct => Row is { IsDistinct: true } && !IsAllUnset;
@@ -145,10 +154,12 @@ namespace ChartShared.UI.ViewModels
         /// Takes the merged state after the drafts or the chart changed. <paramref name="parts"/> is
         /// <see langword="null"/> when what the chart has isn't known, as for several songs.
         /// </summary>
-        public void Update(BulkMetadataRow? row, bool isAllUnset, IReadOnlyDictionary<string, ChartPart>? parts)
+        /// <param name="suggested">The tier the difficulty model suggests for the key, or null for none.</param>
+        public void Update(BulkMetadataRow? row, bool isAllUnset, IReadOnlyDictionary<string, ChartPart>? parts, int? suggested)
         {
             Row = row;
             IsAllUnset = isAllUnset;
+            SuggestedTier = suggested;
             if (parts is null)
             {
                 IsCharted = true;
@@ -182,6 +193,11 @@ namespace ChartShared.UI.ViewModels
             OtherValue = Tier;
             foreach (var preset in Presets)
                 preset.IsCurrent = preset.Tier is { } tier ? tier == Tier : IsAllUnset;
+        }
+
+        /// <summary>Nothing to do: the host works the suggestions out with the chart, and <see cref="Update"/> brings them.</summary>
+        public void RefreshSuggestion()
+        {
         }
 
         /// <summary>Shows or hides the icon after Show all was toggled.</summary>

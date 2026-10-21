@@ -66,8 +66,10 @@ namespace ChartBuilder.ViewModels
 
         IReadOnlyList<MetadataItem> IMetadataEditorHost.Items => _items;
 
-        // The difficulties are Parts', so their icons aren't shown and need no note counts.
+        // The difficulties are Parts', so their icons aren't shown and need no note counts or suggestions.
         IReadOnlyDictionary<string, ChartPart>? IMetadataEditorHost.ChartParts => null;
+
+        IReadOnlyDictionary<string, int>? IMetadataEditorHost.SuggestedRatings => null;
 
         string? IMetadataEditorHost.LoadNote => null;
 

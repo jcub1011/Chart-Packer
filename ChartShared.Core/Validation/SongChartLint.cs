@@ -47,6 +47,13 @@ public sealed record SongChartLintReport(SongChartLintStatus Status, IReadOnlyLi
     /// </summary>
     public IReadOnlyDictionary<string, int> SuggestedRatings { get; init; } = NoRatings;
 
+    /// <summary>
+    /// The suggested tier of every <c>diff_*</c> key the chart can be rated for (<see cref="DifficultyEstimator.EstimateSong"/>),
+    /// ignoring case, for the inspector's difficulty flyouts: only when asked for (<see cref="SongChartLint.LintAndRateAsync"/>),
+    /// so a library's validation doesn't rate every part of every song; null otherwise, or when the chart wasn't linted.
+    /// </summary>
+    public IReadOnlyDictionary<string, int>? AllSuggestedRatings { get; init; }
+
     /// <summary>Whether any finding is a Warning or an Error.</summary>
     public bool HasProblems => Findings.Any(static f => f.Finding.Severity != Severity.Info);
 }
@@ -66,11 +73,15 @@ public static class SongChartLint
 {
     private static readonly ChartLinter Linter = new();
 
+    private static readonly IReadOnlyDictionary<string, int> NoRatings = new Dictionary<string, int>();
+
     private static ILogger Logger => Log.ForContext(typeof(SongChartLint));
 
     /// <summary>Lints a chart already loaded, with the song's <paramref name="pairs"/>.</summary>
     /// <param name="audioMs">How long the song's audio is, or null when it's not known, which leaves out CHR003 and CHR084.</param>
-    public static SongChartLintReport Lint(ChartLoadResult load, IReadOnlyList<KeyValuePair<string, string>> pairs, ChartReadOptions options, TimeSpan delay, long? audioMs)
+    /// <param name="rateAllKeys">Whether to rate every key, for <see cref="SongChartLintReport.AllSuggestedRatings"/>.</param>
+    public static SongChartLintReport Lint(
+        ChartLoadResult load, IReadOnlyList<KeyValuePair<string, string>> pairs, ChartReadOptions options, TimeSpan delay, long? audioMs, bool rateAllKeys = false)
     {
         ArgumentNullException.ThrowIfNull(load);
         ArgumentNullException.ThrowIfNull(pairs);
@@ -86,7 +97,22 @@ public static class SongChartLint
                 f.Location is { } location && location.EndTick > location.Tick ? MeasureBeat.At(map, location.EndTick) : null))])
         {
             SuggestedRatings = SuggestedRatingsOf(findings, load.Chart, options),
+            AllSuggestedRatings = rateAllKeys ? AllRatingsOf(load.Chart, options) : null,
         };
+    }
+
+    // Every key's suggested tier. An estimate that fails leaves the keys unrated rather than the lint failed.
+    private static IReadOnlyDictionary<string, int> AllRatingsOf(EditableChart chart, ChartReadOptions options)
+    {
+        try
+        {
+            return DifficultyEstimator.EstimateSong(chart, options);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            Logger.Warning(ex, "Estimating the song's ratings failed");
+            return NoRatings;
+        }
     }
 
     // The tier each CHR083 finding's key is suggested, while the chart is in memory: one estimate per part and model, as
@@ -145,7 +171,29 @@ public static class SongChartLint
         return OrUnreadableAsync(async () =>
         {
             using var files = SongFileReader.Open(entry, cancellationToken);
-            return await LintOpenAsync(files, pairs, draft, cache, cancellationToken).ConfigureAwait(false);
+            return await LintOpenAsync(files, pairs, draft, cache, rateAllKeys: false, cancellationToken).ConfigureAwait(false);
+        });
+    }
+
+    /// <summary>
+    /// As <see cref="LintAsync(SongEntry, IReadOnlyList{KeyValuePair{string, string}}, MetadataDraft?, SongChartLintCache?, CancellationToken)"/>,
+    /// also rating every <c>diff_*</c> key the chart can be rated for (<see cref="SongChartLintReport.AllSuggestedRatings"/>),
+    /// for the inspector's difficulty flyouts, from the one read of the chart. A cached result without them is linted again.
+    /// </summary>
+    /// <exception cref="OperationCanceledException">Linting was cancelled.</exception>
+    public static Task<SongChartLintReport> LintAndRateAsync(
+        SongEntry entry,
+        IReadOnlyList<KeyValuePair<string, string>> pairs,
+        MetadataDraft? draft,
+        SongChartLintCache? cache,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(pairs);
+        return OrUnreadableAsync(async () =>
+        {
+            using var files = SongFileReader.Open(entry, cancellationToken);
+            return await LintOpenAsync(files, pairs, draft, cache, rateAllKeys: true, cancellationToken).ConfigureAwait(false);
         });
     }
 
@@ -164,7 +212,7 @@ public static class SongChartLint
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(pairs);
-        return OrUnreadableAsync(() => LintOpenAsync(files, pairs, draft, cache, cancellationToken));
+        return OrUnreadableAsync(() => LintOpenAsync(files, pairs, draft, cache, rateAllKeys: false, cancellationToken));
     }
 
     // A song or chart that can't be read is reported as unreadable, not thrown. A malformed chart is a
@@ -186,6 +234,7 @@ public static class SongChartLint
         IReadOnlyList<KeyValuePair<string, string>> pairs,
         MetadataDraft? draft,
         SongChartLintCache? cache,
+        bool rateAllKeys,
         CancellationToken cancellationToken)
     {
         var entry = files.Entry;
@@ -196,10 +245,10 @@ public static class SongChartLint
         var tracks = SongTracks.Resolve(stored, draft);
         var audio = AudioStamps(entry, tracks);
         var key = new SongChartLintKey(entry.FullPath, StampOf(entry, chart), pairs, audio, CultureInfo.CurrentUICulture.Name);
-        if (cache?.TryGet(key) is { } known)
+        if (cache?.TryGet(key, rateAllKeys) is { } known)
             return known;
 
-        var report = await LintStoredAsync(files, chart, pairs, tracks, audio, cache, cancellationToken).ConfigureAwait(false);
+        var report = await LintStoredAsync(files, chart, pairs, tracks, audio, cache, rateAllKeys, cancellationToken).ConfigureAwait(false);
         cache?.Add(key, report);
         return report;
     }
@@ -211,6 +260,7 @@ public static class SongChartLint
         IReadOnlyList<SongTrack> tracks,
         IReadOnlyList<AudioStamp> audio,
         SongChartLintCache? cache,
+        bool rateAllKeys,
         CancellationToken cancellationToken)
     {
         var entry = files.Entry;
@@ -225,7 +275,7 @@ public static class SongChartLint
 
         try
         {
-            return Lint(chart.Load, pairs, chart.Options, chart.Delay, audioMs);
+            return Lint(chart.Load, pairs, chart.Options, chart.Delay, audioMs, rateAllKeys);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -358,9 +408,11 @@ public sealed class SongChartLintCache
     /// <summary>How many results it holds.</summary>
     public int Count => _reports.Count;
 
-    internal SongChartLintReport? TryGet(SongChartLintKey key)
+    // A linted result without every key rated doesn't answer a lint that rates them; one that rates them answers any.
+    internal SongChartLintReport? TryGet(SongChartLintKey key, bool rateAllKeys = false)
     {
-        if (!_reports.TryGetValue(key, out var report))
+        if (!_reports.TryGetValue(key, out var report)
+            || (rateAllKeys && report is { Status: SongChartLintStatus.Linted, AllSuggestedRatings: null }))
             return null;
         Interlocked.Increment(ref _hits);
         return report;

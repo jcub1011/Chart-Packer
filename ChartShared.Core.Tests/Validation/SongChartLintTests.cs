@@ -2,7 +2,9 @@ using System.Buffers.Binary;
 using System.Text;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Difficulty;
 using ChartShared.Core.Charts;
+using ChartShared.Core.Metadata;
 using ChartShared.Core.Packing;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Sng;
@@ -117,6 +119,94 @@ public sealed class SongChartLintTests
     }
 
     [TestMethod]
+    public async Task EachChartedPartIsRatedAsTheEstimatorRatesIt()
+    {
+        var chart = ExpertOnly();
+        var entry = Folder(chart, "[song]\nname = Song\n");
+        var pairs = await PairsOf(entry);
+
+        var report = await SongChartLint.LintAndRateAsync(entry, pairs, null, null, TestContext.CancellationToken);
+
+        var options = ChartReadOptions.From(pairs);
+        var read = MidiChartLoader.Load(MidiChartWriter.Write(chart), options).Chart;
+        Assert.IsNotNull(report.AllSuggestedRatings);
+        Assert.AreSequenceEqual(["diff_guitar"], report.AllSuggestedRatings.Keys.ToList());
+        Assert.AreEqual(DifficultyEstimator.EstimatePart(read, ChartInstrument.Guitar, options)!.Tier, report.AllSuggestedRatings["diff_guitar"]);
+    }
+
+    [TestMethod]
+    public async Task OnlyALintAskedToRatesEveryKey()
+    {
+        var entry = Folder(ExpertOnly(), "[song]\nname = Song\ndiff_guitar = 2\n");
+
+        var report = await SongChartLint.LintAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
+
+        Assert.IsNull(report.AllSuggestedRatings);
+    }
+
+    [TestMethod]
+    public async Task TheDraftsStagedChartIsRatedInPlaceOfTheSongs()
+    {
+        var entry = Entry(CreateFolder(("song.ini", Encoding.UTF8.GetBytes("[song]\nname = Song\n"))));
+        string staged = Path.Combine(_root.FullName, "staged.mid");
+        await File.WriteAllBytesAsync(staged, MidiChartWriter.Write(ExpertOnly()), TestContext.CancellationToken);
+        var draft = new MetadataDraft();
+        draft.AddFile(new AddedFile(ChartFiles.MidiName, staged, new FileInfo(staged).Length));
+
+        var stored = await SongChartLint.LintAndRateAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
+        var drafted = await SongChartLint.LintAndRateAsync(entry, await PairsOf(entry), draft, null, TestContext.CancellationToken);
+
+        Assert.IsNull(stored.AllSuggestedRatings);
+        Assert.IsNotNull(drafted.AllSuggestedRatings);
+        Assert.IsTrue(drafted.AllSuggestedRatings.ContainsKey("diff_guitar"));
+    }
+
+    [TestMethod]
+    public async Task AChartThatCantBeReadIsntRated()
+    {
+        var entry = Entry(CreateFolder(("notes.mid", Encoding.ASCII.GetBytes("not a MIDI file")), ("song.ini", Encoding.UTF8.GetBytes("[song]\nname = Song\n"))));
+
+        var report = await SongChartLint.LintAndRateAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
+
+        Assert.AreEqual(SongChartLintStatus.Unreadable, report.Status);
+        Assert.IsNull(report.AllSuggestedRatings);
+    }
+
+    [TestMethod]
+    public async Task ACachedLintWithoutRatingsIsLintedAgainToRateAndThatAnswersEither()
+    {
+        var entry = Folder(ExpertOnly(), "[song]\nname = Song\n");
+        var pairs = await PairsOf(entry);
+        var cache = new SongChartLintCache();
+
+        var plain = await SongChartLint.LintAsync(entry, pairs, null, cache, TestContext.CancellationToken);
+        var rated = await SongChartLint.LintAndRateAsync(entry, pairs, null, cache, TestContext.CancellationToken);
+        Assert.AreNotSame(plain, rated);
+        Assert.IsNotNull(rated.AllSuggestedRatings);
+        Assert.AreEqual(0, cache.Hits);
+
+        Assert.AreSame(rated, await SongChartLint.LintAsync(entry, pairs, null, cache, TestContext.CancellationToken));
+        Assert.AreSame(rated, await SongChartLint.LintAndRateAsync(entry, pairs, null, cache, TestContext.CancellationToken));
+        Assert.AreEqual(2, cache.Hits);
+    }
+
+    [TestMethod]
+    public async Task AnUnreadableChartIsAnsweredFromTheCacheWhenRatingToo()
+    {
+        var entry = Entry(CreateFolder(("song.ini", Encoding.UTF8.GetBytes("[song]\nname = Song\n"))));
+        using (var chart = File.Create(Path.Combine(entry.FullPath, "notes.mid")))
+            chart.SetLength(ChartReader.MaxBytes + 1);
+        var pairs = await PairsOf(entry);
+        var cache = new SongChartLintCache();
+
+        var first = await SongChartLint.LintAndRateAsync(entry, pairs, null, cache, TestContext.CancellationToken);
+        Assert.AreEqual(SongChartLintStatus.ChartTooLarge, first.Status);
+
+        Assert.AreSame(first, await SongChartLint.LintAndRateAsync(entry, pairs, null, cache, TestContext.CancellationToken));
+        Assert.AreEqual(1, cache.Hits);
+    }
+
+    [TestMethod]
     public async Task ChartLintNeverBlocksPacking()
     {
         // charter-spec C16 item 5: a song with a chart Error still plans and packs as it did.
@@ -152,6 +242,14 @@ public sealed class SongChartLintTests
     {
         var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
         new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Expert, [new(0, 1, 0), new(480, 1, 1), new(960, 1, ChartNote.OpenLane), new(960, 1, 2)]).Apply(chart);
+        return chart;
+    }
+
+    // A guitar chart with 64 Expert notes, enough to rate.
+    private static EditableChart ExpertOnly()
+    {
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Expert, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, i % 4))]).Apply(chart);
         return chart;
     }
 

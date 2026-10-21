@@ -159,6 +159,29 @@ public sealed class DifficultyEstimatorTests
     }
 
     [TestMethod]
+    public void ASongIsRatedForEachKeyOfEachChartedPart()
+    {
+        var chart = Chart(Drums, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, (i % 3) + 1)));
+        new AddPart(Guitar).Apply(chart);
+        new AddNotes(Guitar, Expert, [.. Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, i % 4))]).Apply(chart);
+        new AddPart(ChartInstrument.Bass).Apply(chart);
+
+        var tiers = DifficultyEstimator.EstimateSong(chart, Options);
+
+        Assert.AreSequenceEqual(["diff_drums", "diff_drums_real", "diff_guitar"], tiers.Keys.Order(StringComparer.Ordinal).ToList());
+        Assert.AreEqual(DifficultyEstimator.EstimatePart(chart, Guitar, Options)!.Tier, tiers["DIFF_Guitar"]);
+        Assert.AreEqual(DifficultyEstimator.EstimatePart(chart, Drums, Options, DifficultyInstrument.ProDrums)!.Tier, tiers["diff_drums_real"]);
+    }
+
+    [TestMethod]
+    public void ASongWhoseDrumsTheGamesDontReadAsProIsRatedForDiffDrumsAlone()
+    {
+        var chart = Chart(Drums, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, (i % 4) + 1)));
+
+        Assert.AreSequenceEqual(["diff_drums"], DifficultyEstimator.EstimateSong(chart, new ChartReadOptions(ProDrums: false)).Keys.ToList());
+    }
+
+    [TestMethod]
     public void ExpertPlusKicksArentCountedInWhatTheRatingWasWorkedOutFrom()
     {
         // Snare and kick on the beat, and Expert+ kicks between them.

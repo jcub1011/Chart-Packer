@@ -161,6 +161,25 @@ public static class DifficultyEstimator
     }
 
     /// <summary>
+    /// The suggested tier of every <c>diff_*</c> key <paramref name="chart"/>'s parts can be rated for
+    /// (<see cref="EstimateKeys"/>), as the games read it with <paramref name="options"/>, ignoring case. A key whose part
+    /// has no difficulty to rate is left out.
+    /// </summary>
+    public static IReadOnlyDictionary<string, int> EstimateSong(EditableChart chart, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        var tiers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var part in chart.Parts)
+        {
+            foreach (var keyed in EstimateKeys(chart, part.Instrument, options))
+                tiers[keyed.Key] = keyed.Estimate.Tier;
+        }
+
+        return tiers;
+    }
+
+    /// <summary>
     /// The rating of the highest of <paramref name="tracks"/> that has one, rated as <paramref name="instrument"/>, and
     /// its difficulty; null when none has. Each is a difficulty's game view and its roll and trill lanes
     /// (<see cref="DifficultyNotes.FreeLanesOf"/>), in any order; those below the one rated aren't rated.
@@ -178,9 +197,21 @@ public static class DifficultyEstimator
         return null;
     }
 
+    /// <summary>
+    /// What <see cref="EstimateHighest(IEnumerable{ValueTuple{ChartDifficulty, NoteTrack, IReadOnlyList{Phrase}}}, TempoMap, DifficultyInstrument, long?)"/>
+    /// rates of <paramref name="part"/>: each difficulty it has notes for, with its game view from <paramref name="gameTrack"/>
+    /// and its roll and trill lanes. Read on the thread the chart is edited on, so they can be rated on another.
+    /// </summary>
+    public static List<(ChartDifficulty Difficulty, NoteTrack Track, IReadOnlyList<Phrase> FreeLanes)> ChartedTracks(EditablePart part, Func<ChartDifficulty, NoteTrack> gameTrack)
+    {
+        ArgumentNullException.ThrowIfNull(part);
+        ArgumentNullException.ThrowIfNull(gameTrack);
+        return [.. Enum.GetValues<ChartDifficulty>().Where(d => part[d].Notes.Count > 0).Select(d => (d, gameTrack(d), DifficultyNotes.FreeLanesOf(part, d)))];
+    }
+
     private static DifficultyEstimate? EstimateHighest(EditableChart chart, EditablePart editable, IReadOnlyDictionary<ChartDifficulty, NoteTrack> tracks, DifficultyInstrument instrument) =>
         EstimateHighest(
-            Enum.GetValues<ChartDifficulty>().Where(d => editable[d].Notes.Count > 0).Select(d => (d, tracks[d], DifficultyNotes.FreeLanesOf(editable, d))),
+            ChartedTracks(editable, d => tracks[d]),
             chart.TempoMap.ToTempoMap(),
             instrument,
             DifficultyNotes.EndTickOf(chart))?.Estimate;
