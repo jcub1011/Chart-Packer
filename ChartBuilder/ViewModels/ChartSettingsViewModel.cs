@@ -12,6 +12,7 @@ using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Core.Charting;
 using ChartShared.Core.Charting.Commands;
+using ChartShared.Core.Charting.Difficulty;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Metadata;
 using ChartShared.UI.Resources;
@@ -101,6 +102,15 @@ namespace ChartBuilder.ViewModels
 
         public bool HasNoteCounts => false;
 
+        /// <summary>The tier the difficulty model suggests for the key, worked out as the flyout opens; null for none.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(SuggestionText), nameof(HasSuggestion))]
+        public partial int? SuggestedTier { get; internal set; }
+
+        public string? SuggestionText => SuggestedTier is { } tier ? string.Format(CultureInfo.CurrentCulture, SharedStrings.DifficultySuggestedFormat, tier) : null;
+
+        public bool HasSuggestion => SuggestedTier is not null;
+
         public IReadOnlyList<DifficultyPresetViewModel> Presets { get; }
 
         [ObservableProperty]
@@ -128,6 +138,9 @@ namespace ChartBuilder.ViewModels
                 preset.IsCurrent = preset.Tier == tier;
         }
 
+        /// <summary>Works out the suggested tier from the chart as it is now.</summary>
+        public void RefreshSuggestion() => _owner.RefreshSuggestion(this);
+
         [RelayCommand]
         private void ApplyOther()
         {
@@ -154,7 +167,11 @@ namespace ChartBuilder.ViewModels
         private readonly EditableChart _chart;
         private readonly Action<IChartCommand> _apply;
         private readonly Func<ITempoDetector?>? _detector;
+        private readonly Func<ChartReadOptions?>? _readOptions;
         private readonly DispatcherTimer _typingTimer;
+
+        // The suggestions started, so only the latest is shown.
+        private int _suggestions;
         private readonly DispatcherTimer _songTypingTimer;
 
         // Whether the delay is being typed: applied once the typing pauses, and not shown over meanwhile.
@@ -175,7 +192,13 @@ namespace ChartBuilder.ViewModels
         /// <param name="song">The song open in the Editor, whose chart and ratings these are.</param>
         /// <param name="apply">Applies a change to the song, as one undo step.</param>
         /// <param name="detector">Finds the tempo in the song's audio, for Detect from audio; asked each time, as the editor comes after.</param>
-        public ChartSettingsViewModel(BuilderSettingsService settings, IConfirmationService confirmations, EditorSong song, Action<IChartCommand> apply, Func<ITempoDetector?>? detector = null)
+        /// <param name="readOptions">
+        /// The settings the games read the chart with, for the ratings' suggestions; asked each time, as the editor comes
+        /// after. Without them, the song's <c>song.ini</c> as the next save leaves it.
+        /// </param>
+        public ChartSettingsViewModel(
+            BuilderSettingsService settings, IConfirmationService confirmations, EditorSong song, Action<IChartCommand> apply,
+            Func<ITempoDetector?>? detector = null, Func<ChartReadOptions?>? readOptions = null)
         {
             ArgumentNullException.ThrowIfNull(song);
             ArgumentNullException.ThrowIfNull(apply);
@@ -185,6 +208,7 @@ namespace ChartBuilder.ViewModels
             _chart = song.Chart;
             _apply = apply;
             _detector = detector;
+            _readOptions = readOptions;
             _typingTimer = new DispatcherTimer(TypingDelay, DispatcherPriority.Background, (_, _) => ApplyNow());
             _typingTimer.Stop();
             _songTypingTimer = new DispatcherTimer(TypingDelay, DispatcherPriority.Background, (_, _) => ApplyTyped());
@@ -366,6 +390,46 @@ namespace ChartBuilder.ViewModels
             }
             else if (SongCommands.SetDifficulty(_song, key, tier) is { } command)
                 _apply(command);
+        }
+
+        /// <summary>
+        /// Works out <paramref name="rating"/>'s suggested tier (charter-spec C18 item 3), as its flyout opens: its part's
+        /// highest charted difficulty as the games read it, rated by the model that rates its key, as the Preview's
+        /// suggestion is. The tracks are read on the UI thread and rated off it, as the difficulty model takes a few
+        /// milliseconds a track. None when the chart lacks the part, or the key can't be rated now, as Pro drums' while the
+        /// games don't read the drums as Pro. The tier last worked out isn't shown meanwhile, as the chart may have changed.
+        /// </summary>
+        internal void RefreshSuggestion(ChartRatingViewModel rating)
+        {
+            int run = ++_suggestions;
+            rating.SuggestedTier = null;
+            var options = _readOptions?.Invoke() ?? ChartReadOptions.From(_song.EffectivePairs());
+            if (PartChips.FirstOrDefault(c => c.Rating == rating) is not { } chip
+                || _chart.PartOf(chip.Instrument) is not { } part
+                || DifficultyEstimator.KeyModelsOf(_chart, chip.Instrument, options)
+                    .FirstOrDefault(m => m.Key.Equals(rating.Key, StringComparison.OrdinalIgnoreCase)) is not { Key: not null } model)
+                return;
+
+            var tracks = GameView.ProjectPart(_chart, chip.Instrument, options);
+            var charted = DifficultyEstimator.ChartedTracks(part, d => tracks[d]);
+            _ = SuggestAsync(run, rating, charted, _chart.TempoMap.ToTempoMap(), model.Instrument, DifficultyNotes.EndTickOf(_chart));
+        }
+
+        private async Task SuggestAsync(
+            int run, ChartRatingViewModel rating, List<(ChartDifficulty Difficulty, NoteTrack Track, IReadOnlyList<Phrase> FreeLanes)> tracks,
+            TempoMap tempo, DifficultyInstrument instrument, long? end)
+        {
+            try
+            {
+                var highest = await Task.Run(() => DifficultyEstimator.EstimateHighest(tracks, tempo, instrument, end));
+                if (run == _suggestions)
+                    rating.SuggestedTier = highest?.Estimate.Tier;
+            }
+            catch (Exception ex)
+            {
+                // Nothing awaits this, so anything not caught here would take the app down.
+                Trace.TraceError($"The suggested rating of {rating.Key} couldn't be worked out: {ex}");
+            }
         }
 
         /// <summary>Applies the delay typed, as one undo step.</summary>

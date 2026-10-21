@@ -336,6 +336,10 @@
     <value>Stored as "{0}", which isn't a difficulty.</value>
     <comment>{0} is the value in song.ini.</comment>
   </data>
+  <data name="DifficultySuggestedFormat" xml:space="preserve">
+    <value>Suggested rating: {0}</value>
+    <comment>In a difficulty's flyout. {0} is the tier the difficulty model suggests for the part.</comment>
+  </data>
   <data name="DifficultyUnsetBadge" xml:space="preserve">
     <value>?</value>
     <comment>The badge of an instrument with no difficulty set.</comment>

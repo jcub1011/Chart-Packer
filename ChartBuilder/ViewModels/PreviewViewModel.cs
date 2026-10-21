@@ -159,10 +159,7 @@ namespace ChartBuilder.ViewModels
             var tempo = Session.TempoMap;
             long? end = DifficultyNotes.EndTickOf(Session.Chart);
             var models = DifficultyEstimator.KeyModelsOf(Session.Chart, key.Instrument, Session.ReadOptions);
-            var tracks = Enum.GetValues<ChartDifficulty>()
-                .Where(d => part[d].Notes.Count > 0)
-                .Select(d => (Difficulty: d, Track: Session.GameTrack(new ChartTrackKey(key.Instrument, d)), FreeLanes: DifficultyNotes.FreeLanesOf(part, d)))
-                .ToList();
+            var tracks = DifficultyEstimator.ChartedTracks(part, d => Session.GameTrack(new ChartTrackKey(key.Instrument, d)));
             _ = EstimateAsync(run, key, models, tracks, tempo, end);
         }
 

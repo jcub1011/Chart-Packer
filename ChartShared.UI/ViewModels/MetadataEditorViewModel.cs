@@ -188,8 +188,16 @@ namespace ChartShared.UI.ViewModels
         {
             var items = _host.Items;
             var parts = _host.IsBulk ? null : _host.ChartParts;
+            var suggested = _host.IsBulk ? null : _host.SuggestedRatings;
             foreach (var instrument in Instruments)
-                instrument.Update(BulkMetadata.RowOf(items, instrument.Key), MetadataDifficulty.IsUnsetIn(items, instrument.Key), parts);
+            {
+                instrument.Update(
+                    BulkMetadata.RowOf(items, instrument.Key),
+                    MetadataDifficulty.IsUnsetIn(items, instrument.Key),
+                    parts,
+                    suggested is not null && suggested.TryGetValue(instrument.Key, out int tier) ? tier : null);
+            }
+
             OnPropertyChanged(nameof(HasHiddenInstruments));
             OnPropertyChanged(nameof(InstrumentsToggleText));
         }

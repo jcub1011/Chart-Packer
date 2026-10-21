@@ -105,6 +105,10 @@ namespace ChartPacker.ViewModels
         private CancellationTokenSource? _chartLintCts;
         private readonly IChartIssuesWindowService? _chartIssuesWindow;
 
+        // The one song's suggested rating of each diff_* key, for the instruments' flyouts, from its chart lint. Null while
+        // they aren't known.
+        private IReadOnlyDictionary<string, int>? _suggestedRatings;
+
         // This panel is telling the draft store about its own change, which it needn't hear back.
         private bool _notifyingDrafts;
 
@@ -535,6 +539,8 @@ namespace ChartPacker.ViewModels
 
         IReadOnlyDictionary<string, ChartPart>? IMetadataEditorHost.ChartParts => Highway.ChartParts;
 
+        IReadOnlyDictionary<string, int>? IMetadataEditorHost.SuggestedRatings => _suggestedRatings;
+
         string? IMetadataEditorHost.LoadNote => _loadNote;
 
         IRelayCommand? IMetadataEditorHost.AutoSetSongLengthCommand => AutoSetSongLengthCommand;
@@ -685,6 +691,9 @@ namespace ChartPacker.ViewModels
             Findings.Clear();
             ChartIssues.Clear();
             HasChartIssues = false;
+            _chartLintCts?.Cancel();
+            _chartLintCts = null;
+            _suggestedRatings = null;
             OnPropertyChanged(nameof(FailingFieldCount));
             OnPropertyChanged(nameof(HasValidationIssues));
             Title = entries.Count switch
@@ -1744,6 +1753,9 @@ namespace ChartPacker.ViewModels
             RebuildRows();
             SyncTimingOffsets();
             RebuildFiles();
+
+            // The song.ini staged may read the chart differently, as with pro_drums.
+            _ = LoadChartFindingsAsync(_songs[0]);
         }
 
         /// <summary>Shows the one selected song's audio and video offsets, as its draft has its timing keys.</summary>
@@ -1836,7 +1848,8 @@ namespace ChartPacker.ViewModels
 
         /// <summary>
         /// Lints the song's chart with its <c>song.ini</c> as drafted, and the chart itself as drafted (charter-spec C16 item
-        /// 5), off the UI thread, and counts what it finds, for View issues to list. A newer load or lint takes its place.
+        /// 5), off the UI thread, and counts what it finds, for View issues to list. It rates each <c>diff_*</c> key from the
+        /// same read, for the instruments' flyouts (charter-spec C18 item 3). A newer load or lint takes its place.
         /// </summary>
         private async Task LoadChartFindingsAsync(EditableSong song)
         {
@@ -1849,18 +1862,27 @@ namespace ChartPacker.ViewModels
                 var draft = song.Item.Draft.Clone();
                 var entry = song.Entry;
                 var (report, chartName) = await Task.Run(
-                    async () => (await SongChartLint.LintAsync(entry, pairs, draft, LibraryChartLint.Cache, cts.Token), ChartNameOf(entry, draft, cts.Token)),
+                    async () => (await SongChartLint.LintAndRateAsync(entry, pairs, draft, LibraryChartLint.Cache, cts.Token), ChartNameOf(entry, draft, cts.Token)),
                     cts.Token);
-                if (_chartLintCts != cts || _songs.Count != 1 || !ReferenceEquals(_songs[0], song))
+
+                // The song shown is rebuilt in place when its song.ini is read again, so it's matched by its path.
+                if (_chartLintCts != cts || _songs is not [var shown] || shown.Entry.FullPath != entry.FullPath)
                     return;
 
                 ChartIssues.FileName = chartName ?? "";
                 ChartIssues.Title = string.Format(CultureInfo.CurrentCulture, SharedStrings.ChartIssuesWindowTitleFormat, Title);
                 ChartIssues.Show(report.Findings, static f => f.Finding, static f => new FindingItem(f.Finding, _ => LibraryChartLint.PlaceOf(f)));
                 HasChartIssues = report.Status == SongChartLintStatus.Linted;
+                _suggestedRatings = report.AllSuggestedRatings;
+                MetadataEditor.RefreshInstruments();
             }
             catch (OperationCanceledException)
             {
+            }
+            catch (Exception ex)
+            {
+                // Nothing awaits this, so it's logged here rather than lost.
+                Log.ForContext<SongDetailViewModel>().Warning(ex, "Linting the chart of {Song} failed", song.Entry.FullPath);
             }
             finally
             {
