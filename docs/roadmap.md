@@ -289,11 +289,13 @@ recorded in the spec, as *Settled in CM5*.
 - **Preview** ([C18](charter-spec-v1.md#c18-preview)). `NoteHighwayView` moved to `ChartShared.UI`;
   the Preview tab and window, practice over the loop, and the suggested rating
   (`DifficultyEstimator`), used through a pending change (`EditorSong.SetRating`) or CHR083's fix.
-- **Difficulty analysis** (#108, [difficulty-model.md](difficulty-model.md)). Five-fret parts are
-  rated by `DifficultyAnalyzer`, an online strain model. It has strum, note, rhythm, pattern and
-  endurance attributes, window-peak scores, and ranks 0 to 6 with overcharts at 7 and up. The
-  Difficulty tab and window show the rank, a spider graph (chart, selection or playhead) and the
-  difficulty over the song.
+- **Difficulty analysis** (#108, [difficulty-model.md](difficulty-model.md)). Every part is rated
+  by `DifficultyAnalyzer`, an online strain model. It has strum, note, rhythm, pattern and
+  endurance attributes, with kick and hands in place of strum and note for drums. It uses
+  window-peak scores, and ranks 0 to 6 with overcharts at 7 and up. Five-fret, keys, six-fret,
+  drums and Pro drums each have their own costs and rank curve, fitted to official charts' ratings
+  (§13 and §14.4). The Difficulty tab and window show the rank, a spider graph (chart, selection or
+  playhead) and the difficulty over the song.
 
 **Left for later:**
 
@@ -305,10 +307,12 @@ recorded in the spec, as *Settled in CM5*.
 - **The clipboard** doesn't copy phrases or disco flip sections; a stretch always changes the
   tempos, never only the ticks.
 - **Sections tab.** Select section is on Ctrl+Shift+A and the lane's Edit menu, not on the tab's rows.
-- **The suggested rating's weights** are set by hand, to be fitted to rated charts (spec §14). So are
-  the difficulty model's parameters, reference patterns and rank thresholds.
+- **The difficulty model's** cost constants and reference patterns are mostly starting points.
+  Calibration fitted its weights, peak weight and rank thresholds, and a few drums constants
+  (difficulty-model.md §14.4). Six-fret has too few rated charts to fit its own, and vocals aren't
+  rated.
 - **The difficulty analysis** reads the whole track again after an edit, rather than from a
-  snapshot before it (difficulty-model.md §8). Drums and six-fret aren't analyzed.
+  snapshot before it (difficulty-model.md §8).
 - **The preview** rebuilds the whole track after an edit, not only the range it touched.
 
 It covered:

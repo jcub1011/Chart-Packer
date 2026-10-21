@@ -2352,15 +2352,16 @@ Acceptance criteria:
 3. **Suggested difficulty.**
    - For each part and difficulty, a suggested `diff_*` tier: 0 to 6 for charts written to be
      played, and 7 and up for overcharts.
-   - Five-fret parts are rated by the difficulty model ([difficulty-model.md](difficulty-model.md)).
-     It measures strum, note, rhythm, pattern and endurance difficulty moment by moment, and scores
-     the chart by its hardest stretches.
-   - Drums and six-fret, which the model doesn't cover, are rated from peak and average notes per
-     second, chord density, HOPO/tap density, and (for drums) independence between hands and kick.
+   - Every part is rated by the difficulty model ([difficulty-model.md](difficulty-model.md)), with
+     its instrument's costs. It measures strum (for drums, kick), note (hands), rhythm, pattern and
+     endurance difficulty moment by moment, and scores the chart by its hardest stretches.
+   - Pro drums are rated for each of their keys: `diff_drums` as 4-lane drums play them, and
+     `diff_drums_real` with the cymbals.
    - It is shown with what it was based on, and is only a suggestion.
-   - The parameters are fixed in v1 and will be tuned against rated charts.
-4. **Difficulty analysis.** For a five-fret part and difficulty, the model's rank, a spider graph of
-   its five attributes, and its difficulty over the song with the sections and the rank lines.
+   - The parameters are fixed in v1, fitted to the ratings of official charts (difficulty-model.md
+     §13 and §14.4).
+4. **Difficulty analysis.** For any part and difficulty, the model's rank, a spider graph of its
+   five attributes, and its difficulty over the song with the sections and the rank lines.
 
 *Settled in CM5:*
 
@@ -2377,9 +2378,9 @@ Acceptance criteria:
   whole part. It's shown in the preview's header, with what it was worked out from and each
   difficulty's own tier in its tooltip. **Use as diff_…** sets the part's keys that `song.ini`
   rates otherwise, as pending changes Revert takes back; it's never written otherwise. It's also
-  CHR083's fix. Five-fret parts are rated by `DifficultyAnalyzer`, and an overchart is suggested as
-  7 or more. For drums and six-fret, peak density is over any two seconds, and the weights are
-  `DifficultyWeights`. The suggestion is worked out off the UI thread.
+  CHR083's fix. Every part is rated by `DifficultyAnalyzer`, with `DifficultyParameters.For` its
+  instrument, and an overchart is suggested as 7 or more. Each of Pro drums' keys is set to its own
+  tier. The suggestion is worked out off the UI thread.
 - **The difficulty analysis** is a **Difficulty** tab in the Editor's right panel, and a window of
   its own. It follows the lane in focus, or a part and difficulty picked. It shows:
   - the rank;
@@ -3112,10 +3113,9 @@ fails the run if anything there changes anyway.
 - MIDI devices on macOS and Linux.
 - Keeping and replaying a playtest performance, judged again against the chart as it changes.
 - Rebindable editor shortcuts (instrument bindings are in C19).
-- The difficulty model's parameters and rank thresholds fitted to a set of rated charts, and the
-  suggestion shown in the library and inspector as well as Chart Builder.
-- The difficulty model for drums and six-fret, and its values used by other tools, such as finding
-  solos or placing star power.
+- The suggested rating shown in the library and inspector as well as Chart Builder.
+- The difficulty model's values used by other tools for drums and six-fret, such as finding solos
+  or placing star power.
 
 ## 15. Open questions
 

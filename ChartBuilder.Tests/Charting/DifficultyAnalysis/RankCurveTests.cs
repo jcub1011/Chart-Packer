@@ -28,6 +28,23 @@ public sealed class RankCurveTests
     }
 
     [TestMethod]
+    [DataRow(DifficultyInstrument.FiveFret)]
+    [DataRow(DifficultyInstrument.Keys)]
+    [DataRow(DifficultyInstrument.SixFret)]
+    [DataRow(DifficultyInstrument.Drums)]
+    [DataRow(DifficultyInstrument.ProDrums)]
+    public void EachInstrumentsThresholdsRiseFromZeroToBelowTheSoftCap(DifficultyInstrument instrument)
+    {
+        var p = DifficultyParameters.For(instrument);
+        Assert.HasCount(7, p.RankThresholds);
+        Assert.AreEqual(0, p.RankThresholds[0]);
+        for (int rank = 1; rank < p.RankThresholds.Count; rank++)
+            Assert.IsGreaterThan(p.RankThresholds[rank - 1], p.RankThresholds[rank]);
+        Assert.IsLessThan(p.SoftCap, p.RankThresholds[^1]);
+        Assert.AreEqual(7, RankCurve.Tier(p.SoftCap, p));
+    }
+
+    [TestMethod]
     public void RanksPastTheSoftCapAreAsWideAsRankSix()
     {
         Assert.AreEqual(53, RankCurve.ThresholdOf(6));

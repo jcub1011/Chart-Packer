@@ -30,11 +30,19 @@ namespace ChartBuilder.ViewModels
     public sealed record DifficultyScopeChoice(DifficultyScope Scope, string Label);
 
     /// <summary>An attribute's line on the difficulty graph, which can be shown or hidden.</summary>
-    public sealed partial class DifficultyLineToggle(DifficultyAttribute attribute, string label) : ObservableObject
+    public sealed partial class DifficultyLineToggle : ObservableObject
     {
-        public DifficultyAttribute Attribute { get; } = attribute;
+        public DifficultyLineToggle(DifficultyAttribute attribute, string label)
+        {
+            Attribute = attribute;
+            Label = label;
+        }
 
-        public string Label { get; } = label;
+        public DifficultyAttribute Attribute { get; }
+
+        /// <summary>The attribute's name for the instrument analyzed: drums' first two are the kick and the hands.</summary>
+        [ObservableProperty]
+        public partial string Label { get; set; }
 
         public Avalonia.Media.IBrush Brush => DifficultyPalette.Of(Attribute);
 
@@ -43,9 +51,10 @@ namespace ChartBuilder.ViewModels
     }
 
     /// <summary>
-    /// The difficulty analysis of a five-fret track (docs/difficulty-model.md §9): its rank, a spider graph of its five
+    /// The difficulty analysis of a track (docs/difficulty-model.md §9 and §14): its rank, a spider graph of its five
     /// attributes for the whole chart, the selection or the playhead, and its difficulty over the song. It follows the lane
-    /// in focus, or a part and difficulty picked, docked in the Editor's side panel or in a window of its own.
+    /// in focus, or a part and difficulty picked, docked in the Editor's side panel or in a window of its own. Pro drums
+    /// are analyzed as Pro drums, or as 4-lane drums play them.
     /// </summary>
     /// <remarks>
     /// The track is read again a moment after an edit that touches it, off the UI thread, and only while something shows
@@ -65,6 +74,9 @@ namespace ChartBuilder.ViewModels
         private readonly DispatcherTimer _isolate;
         private int _shownCount;
         private int _runs;
+
+        // The instrument the attributes are named for.
+        private DifficultyInstrument _labelled = DifficultyInstrument.FiveFret;
         private int _isolations;
         private Analysis? _analysis;
 
@@ -77,6 +89,8 @@ namespace ChartBuilder.ViewModels
         // What a pass read: the track, its notes and what was made of them, and how its times map to the audio.
         private sealed record Analysis(ChartTrackKey Track, IReadOnlyList<DifficultyNote> Notes, DifficultyProfile Profile, TempoMap Tempo, double DelaySeconds, IReadOnlyList<OverviewSection> Sections)
         {
+            public DifficultyInstrument Instrument => Profile.Parameters.Instrument;
+
             public double MsAt(double audioSeconds) => (audioSeconds - DelaySeconds) * 1000;
 
             public double AudioAt(double ms) => (ms / 1000) + DelaySeconds;
@@ -98,10 +112,10 @@ namespace ChartBuilder.ViewModels
                 new DifficultyScopeChoice(DifficultyScope.Playhead, Strings.DifficultyScopePlayhead),
             ];
             SelectedScope = Scopes[0];
-            Lines = [.. DifficultyAttributes.All.Select(a => new DifficultyLineToggle(a, LabelOf(a)))];
+            Lines = [.. DifficultyAttributes.All.Select(a => new DifficultyLineToggle(a, LabelOf(a, _labelled)))];
             foreach (var line in Lines)
                 line.PropertyChanged += OnLineToggled;
-            AxisLabels = [.. DifficultySpiderView.AxisOrder.Select(LabelOf)];
+            AxisLabels = [.. DifficultySpiderView.AxisOrder.Select(a => LabelOf(a, _labelled))];
             Describe = DescribeAt;
             RefreshChoices();
             SelectedTrack = TrackChoices[0];
@@ -118,7 +132,7 @@ namespace ChartBuilder.ViewModels
 
         public PlaybackViewModel Playback => _editor.Playback;
 
-        /// <summary>The lane in focus, then each five-fret part and difficulty the chart has.</summary>
+        /// <summary>The lane in focus, then each part and difficulty the chart has.</summary>
         [ObservableProperty]
         public partial IReadOnlyList<PreviewTrackChoice> TrackChoices { get; private set; } = [];
 
@@ -128,6 +142,14 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>The part and difficulty analyzed, or null when there's none.</summary>
         public ChartTrackKey? Track => SelectedTrack?.Track ?? Session.Focused;
+
+        /// <summary>Whether Pro drums are analyzed as Pro drums, with the cymbals, rather than as 4-lane drums play them.</summary>
+        [ObservableProperty]
+        public partial bool IsProView { get; set; } = true;
+
+        /// <summary>Whether the track is Pro drums, which can be analyzed either way.</summary>
+        [ObservableProperty]
+        public partial bool ShowsProToggle { get; private set; }
 
         /// <summary>Why there's nothing to show; null when there's an analysis.</summary>
         [ObservableProperty]
@@ -170,8 +192,9 @@ namespace ChartBuilder.ViewModels
         [ObservableProperty]
         public partial string? ScopeText { get; private set; }
 
-        /// <summary>The spider graph's axis names, in its fixed order.</summary>
-        public IReadOnlyList<string> AxisLabels { get; }
+        /// <summary>The spider graph's axis names, in its fixed order, for the instrument analyzed.</summary>
+        [ObservableProperty]
+        public partial IReadOnlyList<string> AxisLabels { get; private set; }
 
         /// <summary>The attributes' lines, to show or hide on the graph.</summary>
         public IReadOnlyList<DifficultyLineToggle> Lines { get; }
@@ -213,6 +236,8 @@ namespace ChartBuilder.ViewModels
         private void OpenWindow() => _editor.ShowDifficultyWindow(this);
 
         partial void OnSelectedTrackChanged(PreviewTrackChoice? value) => Schedule(immediately: true);
+
+        partial void OnIsProViewChanged(bool value) => Schedule(immediately: true);
 
         partial void OnPlaceholderChanged(string? value) => OnPropertyChanged(nameof(HasAnalysis));
 
@@ -293,7 +318,7 @@ namespace ChartBuilder.ViewModels
         {
             var keep = SelectedTrack?.Track;
             var choices = new List<PreviewTrackChoice> { new(null, Strings.PreviewFollowLane) };
-            foreach (var part in Session.Chart.Parts.Where(p => p.Kind == ChartInstrumentKind.FiveFret))
+            foreach (var part in Session.Chart.Parts)
             {
                 foreach (var difficulty in Enum.GetValues<ChartDifficulty>().OrderDescending())
                 {
@@ -334,19 +359,17 @@ namespace ChartBuilder.ViewModels
 
             int run = ++_runs;
             _ranFor = Track;
+            bool pro = Track is { Instrument: ChartInstrument.Drums } && Session.Chart.DrumsVariant == DrumsVariant.Pro;
+            ShowsProToggle = pro;
             if (Track is not { } key || Session.Chart.PartOf(key.Instrument) is not { } part || part[key.Difficulty].Notes.Count == 0)
             {
                 Show(null, Strings.DifficultyNothing);
                 return;
             }
 
-            if (part.Kind != ChartInstrumentKind.FiveFret)
-            {
-                Show(null, Strings.DifficultyNotFiveFret);
-                return;
-            }
-
             // Read on the UI thread, which the session belongs to; worked out off it.
+            var parameters = DifficultyParameters.For(DifficultyInstruments.Of(key.Instrument, proView: pro && IsProView));
+            var freeLanes = DifficultyNotes.FreeLanesOf(part, key.Difficulty);
             var game = Session.GameTrack(key);
             var tempo = Session.TempoMap;
             long? end = DifficultyNotes.EndTickOf(Session.Chart);
@@ -361,8 +384,8 @@ namespace ChartBuilder.ViewModels
             {
                 var (analysis, graph) = await Task.Run(() =>
                 {
-                    var notes = DifficultyNotes.Of(game, tempo, end);
-                    var profile = DifficultyAnalyzer.Analyze(notes);
+                    var notes = DifficultyNotes.Of(game, tempo, end, parameters, freeLanes);
+                    var profile = DifficultyAnalyzer.Analyze(notes, parameters);
                     var result = new Analysis(key, notes, profile, tempo, delay, sections);
                     return (result, GraphOf(result, length, solos));
                 });
@@ -409,6 +432,7 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
+            Relabel(analysis.Instrument);
             var profile = analysis.Profile;
             Tier = profile.Tier;
             RankText = string.Format(CultureInfo.CurrentCulture, profile.Tier >= RankCurve.FirstOverchart ? Strings.DifficultyOverchartFormat : Strings.DifficultyRankFormat, profile.Rank);
@@ -522,14 +546,25 @@ namespace ChartBuilder.ViewModels
                 Environment.NewLine,
                 time,
                 string.Format(CultureInfo.CurrentCulture, Strings.DifficultyAtFormat, moment.Overall, analysis.Profile.RankAt(ms)),
-                string.Format(CultureInfo.CurrentCulture, Strings.DifficultyHardestFormat, LabelOf(analysis.Profile.DominantAt(ms))));
+                string.Format(CultureInfo.CurrentCulture, Strings.DifficultyHardestFormat, LabelOf(analysis.Profile.DominantAt(ms), analysis.Instrument)));
         }
 
-        /// <summary>An attribute's name, as the graphs label it.</summary>
-        public static string LabelOf(DifficultyAttribute attribute) => attribute switch
+        // Names the attributes for instrument, when they aren't already.
+        private void Relabel(DifficultyInstrument instrument)
         {
-            DifficultyAttribute.Strum => Strings.DifficultyAttributeStrum,
-            DifficultyAttribute.Note => Strings.DifficultyAttributeNote,
+            if (instrument.IsDrums() == _labelled.IsDrums())
+                return;
+            _labelled = instrument;
+            foreach (var line in Lines)
+                line.Label = LabelOf(line.Attribute, instrument);
+            AxisLabels = [.. DifficultySpiderView.AxisOrder.Select(a => LabelOf(a, instrument))];
+        }
+
+        /// <summary>An attribute's name for <paramref name="instrument"/>, as the graphs label it: drums' first two are the kick and the hands.</summary>
+        public static string LabelOf(DifficultyAttribute attribute, DifficultyInstrument instrument) => attribute switch
+        {
+            DifficultyAttribute.Strum => instrument.IsDrums() ? Strings.DifficultyAttributeKick : Strings.DifficultyAttributeStrum,
+            DifficultyAttribute.Note => instrument.IsDrums() ? Strings.DifficultyAttributeHands : Strings.DifficultyAttributeNote,
             DifficultyAttribute.Rhythm => Strings.DifficultyAttributeRhythm,
             DifficultyAttribute.Pattern => Strings.DifficultyAttributePattern,
             _ => Strings.DifficultyAttributeEndurance,

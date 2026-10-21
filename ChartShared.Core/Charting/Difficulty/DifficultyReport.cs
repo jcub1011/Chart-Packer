@@ -4,43 +4,62 @@ using ChartShared.Core.Scanning;
 
 namespace ChartShared.Core.Charting.Difficulty;
 
-/// <summary>One part of a song in the difficulty report: its <c>song.ini</c> rating, and what the model made of it.</summary>
+/// <summary>One part of a song in the difficulty report: one of its <c>song.ini</c> ratings, and what the model made of it.</summary>
 /// <param name="Instrument">The part.</param>
+/// <param name="Key">The <c>diff_*</c> key: Pro drums have <c>diff_drums_real</c> beside <c>diff_drums</c>.</param>
 /// <param name="Reported">Its <c>diff_*</c> value as <c>song.ini</c> has it (-1 for unrated); null with no value.</param>
-/// <param name="Analyzed">What the model made of its highest charted difficulty; null when the song hasn't the part.</param>
-public sealed record DifficultyReportPart(ChartInstrument Instrument, int? Reported, DifficultyRating? Analyzed);
+/// <param name="Analyzed">
+/// What the model that rates the key made of the part's highest charted difficulty; null when the song hasn't the part,
+/// or for <c>diff_drums_real</c>, drums that aren't Pro.
+/// </param>
+public sealed record DifficultyReportPart(ChartInstrument Instrument, string Key, int? Reported, DifficultyRating? Analyzed);
+
+/// <summary>A part of the difficulty report: its <c>diff_*</c> key, the model that rates it, and its name in the heading.</summary>
+public sealed record DifficultyReportColumn(ChartInstrument Instrument, string Key, DifficultyInstrument Model, string Name);
 
 /// <summary>A song in the difficulty report.</summary>
 /// <param name="SongPath">The song folder or <c>.sng</c>, as a full path.</param>
-/// <param name="Parts">Each of <see cref="DifficultyReport.Instruments"/>, in that order.</param>
+/// <param name="Parts">Each of <see cref="DifficultyReport.Columns"/>, in that order.</param>
 /// <param name="Problem">Why the song couldn't be read, or null when it was.</param>
 public sealed record DifficultyReportRow(string SongPath, IReadOnlyList<DifficultyReportPart> Parts, string? Problem);
 
 /// <summary>
 /// Rates every song under a folder with the difficulty model, beside the ratings their <c>song.ini</c> gives, and writes
-/// the result as CSV: for each part the model covers, the reported rating, the model's rank and each attribute's score,
-/// to a tenth. For checking and tuning the model against charts already rated.
+/// the result as CSV: for each part and <c>diff_*</c> key, the reported rating, the model's rank and each attribute's
+/// score, to a tenth. For checking and tuning the model against charts already rated.
 /// </summary>
 /// <remarks>Songs are only read, never written.</remarks>
 public static class DifficultyReport
 {
-    /// <summary>The parts reported: the five-fret ones the difficulty model rates and the games read.</summary>
-    public static IReadOnlyList<ChartInstrument> Instruments { get; } =
-        [ChartInstrument.Guitar, ChartInstrument.Bass, ChartInstrument.Rhythm, ChartInstrument.GuitarCoop];
+    /// <summary>The ratings reported: every part's, and Pro drums' own beside the drums'.</summary>
+    public static IReadOnlyList<DifficultyReportColumn> Columns { get; } =
+    [
+        Column(ChartInstrument.Guitar, "Guitar"),
+        Column(ChartInstrument.Bass, "Bass"),
+        Column(ChartInstrument.Rhythm, "Rhythm"),
+        Column(ChartInstrument.GuitarCoop, "Guitar Coop"),
+        Column(ChartInstrument.Keys, "Keys"),
+        Column(ChartInstrument.Drums, "Drums"),
+        new(ChartInstrument.Drums, SongIniPartKeys.ProDrumsDifficulty, DifficultyInstrument.ProDrums, "Pro Drums"),
+        Column(ChartInstrument.GhlGuitar, "GHL Guitar"),
+        Column(ChartInstrument.GhlBass, "GHL Bass"),
+        Column(ChartInstrument.GhlRhythm, "GHL Rhythm"),
+        Column(ChartInstrument.GhlCoop, "GHL Coop"),
+    ];
 
-    /// <summary>Each column's heading, in order.</summary>
+    /// <summary>Each column's heading, in order. Drums' first two attributes are the kick and the hands.</summary>
     public static IReadOnlyList<string> Header { get; } =
     [
         "Song",
-        .. Instruments.SelectMany(i => new[]
+        .. Columns.SelectMany(c => new[]
         {
-            $"{NameOf(i)} reported",
-            $"{NameOf(i)} analyzed",
-            $"{NameOf(i)} strum",
-            $"{NameOf(i)} note",
-            $"{NameOf(i)} rhythm",
-            $"{NameOf(i)} pattern",
-            $"{NameOf(i)} endurance",
+            $"{c.Name} reported",
+            $"{c.Name} analyzed",
+            $"{c.Name} {(c.Model.IsDrums() ? "kick" : "strum")}",
+            $"{c.Name} {(c.Model.IsDrums() ? "hands" : "note")}",
+            $"{c.Name} rhythm",
+            $"{c.Name} pattern",
+            $"{c.Name} endurance",
         }),
         "Problem",
     ];
@@ -90,10 +109,13 @@ public static class DifficultyReport
 
         try
         {
-            var parts = Instruments.Select(instrument => new DifficultyReportPart(
-                instrument,
-                ReportedOf(song.Pairs, instrument),
-                DifficultyEstimator.EstimatePart(song.Chart, instrument, song.Options)?.Rating)).ToList();
+            var parts = Columns.Select(column => new DifficultyReportPart(
+                column.Instrument,
+                column.Key,
+                ReportedOf(song.Pairs, column.Key),
+                column.Model == DifficultyInstrument.ProDrums && song.Chart.DrumsVariant != DrumsVariant.Pro
+                    ? null
+                    : DifficultyEstimator.EstimatePart(song.Chart, column.Instrument, song.Options, column.Model)?.Rating)).ToList();
             return new DifficultyReportRow(entry.FullPath, parts, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -111,9 +133,9 @@ public static class DifficultyReport
         foreach (var row in rows)
         {
             var fields = new List<string> { Field(row.SongPath) };
-            foreach (var instrument in Instruments)
+            foreach (var column in Columns)
             {
-                var part = row.Parts.FirstOrDefault(p => p.Instrument == instrument);
+                var part = row.Parts.FirstOrDefault(p => p.Instrument == column.Instrument && string.Equals(p.Key, column.Key, StringComparison.OrdinalIgnoreCase));
                 fields.Add(part?.Reported is { } reported ? reported.ToString(CultureInfo.InvariantCulture) : "");
                 var rating = part?.Analyzed;
                 fields.Add(Tenth(rating?.Rank));
@@ -129,15 +151,16 @@ public static class DifficultyReport
         }
     }
 
-    // The part's own diff_* value, the last if song.ini has it twice; null when it has none, or not a number.
-    private static int? ReportedOf(IReadOnlyList<KeyValuePair<string, string>> pairs, ChartInstrument instrument)
+    // The diff_* value, the last if song.ini has it twice; null when it has none, or not a number.
+    private static int? ReportedOf(IReadOnlyList<KeyValuePair<string, string>> pairs, string key)
     {
-        string key = SongIniPartKeys.DifficultyKeysOf(instrument, null)[0];
         string? value = pairs.LastOrDefault(p => string.Equals(p.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
         return int.TryParse(value?.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int tier) ? tier : null;
     }
 
-    private static string NameOf(ChartInstrument instrument) => instrument == ChartInstrument.GuitarCoop ? "Guitar Coop" : instrument.ToString();
+    // A part's column for its own diff_* key, rated by its own model.
+    private static DifficultyReportColumn Column(ChartInstrument instrument, string name) =>
+        new(instrument, SongIniPartKeys.DifficultyKeysOf(instrument, null)[0], DifficultyInstruments.Of(instrument), name);
 
     private static string Tenth(double? value) =>
         value is { } v ? Math.Round(v, 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture) : "";

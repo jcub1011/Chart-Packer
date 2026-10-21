@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Difficulty;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Lint;
 using ChartShared.Core.Charts;
@@ -88,17 +89,19 @@ public static class SongChartLint
         };
     }
 
-    // The tier each CHR083 finding's key is suggested, while the chart is in memory: one estimate per part, as a part's
-    // keys share it. An estimate that fails leaves its part unrated rather than the lint failed.
+    // The tier each CHR083 finding's key is suggested, while the chart is in memory: one estimate per part and model, as
+    // keys rated by one model share it (Pro drums' diff_drums_real has its own). An estimate that fails leaves its key
+    // unrated rather than the lint failed.
     private static IReadOnlyDictionary<string, int> SuggestedRatingsOf(IReadOnlyList<Finding> findings, EditableChart chart, ChartReadOptions options)
     {
         var ratings = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var tiers = new Dictionary<ChartInstrument, int?>();
+        var tiers = new Dictionary<(ChartInstrument, DifficultyInstrument), int?>();
         foreach (var finding in findings)
         {
             if (finding.RuleId != ChrRules.Chr083 || finding.Key is not { } key || finding.Location is not { } location)
                 continue;
-            if (!tiers.TryGetValue(location.Part, out int? tier))
+            var model = (location.Part, DifficultyInstruments.OfKey(location.Part, key));
+            if (!tiers.TryGetValue(model, out int? tier))
             {
                 try
                 {
@@ -110,7 +113,7 @@ public static class SongChartLint
                     tier = null;
                 }
 
-                tiers[location.Part] = tier;
+                tiers[model] = tier;
             }
 
             if (tier is { } suggested)

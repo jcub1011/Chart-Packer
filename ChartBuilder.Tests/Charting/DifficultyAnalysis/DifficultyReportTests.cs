@@ -48,26 +48,45 @@ public sealed class DifficultyReportTests
     }
 
     [TestMethod]
+    public async Task ProDrumsAreReportedForDiffDrumsAndDiffDrumsReal()
+    {
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 140, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Drums }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Drums, Expert, [.. Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, i % 4))]).Apply(chart);
+        Song("Drums", chart, "diff_drums = 3", "diff_drums_real = 4", "pro_drums = True");
+
+        var rows = await DifficultyReport.BuildAsync(_root, 10, 2, cancellationToken: TestContext.CancellationToken);
+
+        var drums = rows.Single().Parts.Where(p => p.Instrument == ChartInstrument.Drums).ToList();
+        Assert.AreSequenceEqual(["diff_drums", "diff_drums_real"], drums.Select(p => p.Key).ToList());
+        Assert.AreSequenceEqual([3, 4], drums.Select(p => p.Reported ?? -9).ToList());
+        Assert.AreEqual(DifficultyInstrument.Drums, drums[0].Analyzed!.Instrument);
+        Assert.AreEqual(DifficultyInstrument.ProDrums, drums[1].Analyzed!.Instrument);
+    }
+
+    [TestMethod]
     public void TheCsvHasAColumnForEachValueOfEachPartToATenth()
     {
         var rating = new DifficultyRating(5.4321, new DifficultyAttributes(12.25, 0.04, 99.95, 33.3333, 7));
         var row = new DifficultyReportRow(
             @"C:\Songs\Artist, The - Song",
-            [new DifficultyReportPart(ChartInstrument.Guitar, 5, rating), new DifficultyReportPart(ChartInstrument.Bass, null, null)],
+            [new DifficultyReportPart(ChartInstrument.Guitar, "diff_guitar", 5, rating), new DifficultyReportPart(ChartInstrument.Bass, "diff_bass", null, null)],
             null);
 
         var lines = Csv([row]);
 
         Assert.HasCount(2, lines);
         var header = lines[0].Split(',');
-        Assert.HasCount(1 + (DifficultyReport.Instruments.Count * 7) + 1, header);
+        Assert.HasCount(1 + (DifficultyReport.Columns.Count * 7) + 1, header);
         Assert.AreSequenceEqual(
             ["Song", "Guitar reported", "Guitar analyzed", "Guitar strum", "Guitar note", "Guitar rhythm", "Guitar pattern", "Guitar endurance", "Bass reported"],
             [.. header.Take(9)]);
         Assert.AreEqual("Problem", header[^1]);
+        Assert.Contains("Drums kick", header);
+        Assert.Contains("Pro Drums hands", header);
+        Assert.Contains("GHL Guitar strum", header);
 
         // The path has a comma, so it's quoted; the bass and the parts after it are empty.
-        string expected = "\"C:\\Songs\\Artist, The - Song\",5,5.4,12.3,0.0,100.0,33.3,7.0" + string.Concat(Enumerable.Repeat(",", (3 * 7) + 1));
+        string expected = "\"C:\\Songs\\Artist, The - Song\",5,5.4,12.3,0.0,100.0,33.3,7.0" + string.Concat(Enumerable.Repeat(",", ((DifficultyReport.Columns.Count - 1) * 7) + 1));
         Assert.AreEqual(expected, lines[1]);
     }
 

@@ -6,13 +6,65 @@ namespace ChartShared.Core.Charting.Difficulty;
 /// points. <see cref="Default"/> is what the program uses.
 /// </summary>
 /// <remarks>
-/// Times are in milliseconds and half-lives in seconds. The references each attribute is normalized against are worked
-/// out from the reference patterns here (<see cref="DifficultyReferences"/>), once for each set of parameters.
+/// <para>Times are in milliseconds and half-lives in seconds. The references each attribute is normalized against are
+/// worked out from the reference patterns here (<see cref="DifficultyReferences"/>), once for each set of parameters.</para>
+/// <para>Each <see cref="DifficultyInstrument"/> has its own set (<see cref="For"/>). The first two attributes are the
+/// hands' for frets, strum and note, and for drums the kick and the hands (§14): the <c>Strum</c> and <c>Note</c>
+/// parameters that aren't about strumming or fretting, their weights, half-lives, scales, speed powers and reference
+/// tempos, are the kick's and the hands' there.</para>
 /// </remarks>
 public sealed record DifficultyParameters
 {
-    /// <summary>The parameters the program uses.</summary>
+    /// <summary>The parameters five-fret parts are rated with, and those the program uses where no instrument is said.</summary>
     public static DifficultyParameters Default { get; } = new();
+
+    // Keys play as five-fret does, but official keys charts are rated a tier or so higher at the same score (§14.4).
+    private static readonly DifficultyParameters KeysParameters = Default with
+    {
+        Instrument = DifficultyInstrument.Keys,
+        RankThresholds = [0, 1.0, 7.0, 8.9, 16.7, 22.9, 47.8],
+    };
+
+    // Too few six-fret charts are rated to fit anything of their own, so only the geometry is six-fret's (§14.4).
+    private static readonly DifficultyParameters SixFretParameters = Default with
+    {
+        Instrument = DifficultyInstrument.SixFret,
+        OpenPosition = 1,
+    };
+
+    private static readonly DifficultyParameters DrumsParameters = Default with
+    {
+        Instrument = DifficultyInstrument.Drums,
+        StrumWeight = 0.20,
+        NoteWeight = 0.35,
+        RhythmWeight = 0,
+        PatternWeight = 0.30,
+        EnduranceWeight = 0.05,
+        EnduranceThreshold = 40,
+        StrumHalfLife = 0.4,
+        NoteSpeedPower = 1.0,
+        StrumReferenceBpm = 110,
+        NoteReferenceBpm = 240,
+        EnduranceReferenceBpm = 150,
+        RankThresholds = [0, 11.7, 13.7, 19.8, 28.0, 35.2, 53.4],
+    };
+
+    // Pro drums' own fit put every threshold within 0.3 of the drums' (§14.4), so they share them.
+    private static readonly DifficultyParameters ProDrumsParameters = DrumsParameters with { Instrument = DifficultyInstrument.ProDrums };
+
+    /// <summary>The parameters <paramref name="instrument"/> is rated with: one instance for each, so its references are worked out once.</summary>
+    public static DifficultyParameters For(DifficultyInstrument instrument) => instrument switch
+    {
+        DifficultyInstrument.FiveFret => Default,
+        DifficultyInstrument.Keys => KeysParameters,
+        DifficultyInstrument.SixFret => SixFretParameters,
+        DifficultyInstrument.Drums => DrumsParameters,
+        DifficultyInstrument.ProDrums => ProDrumsParameters,
+        _ => throw new ArgumentOutOfRangeException(nameof(instrument), instrument, null),
+    };
+
+    /// <summary>The model these parameters are for: which costs the notes have, and how the lanes are read (§14).</summary>
+    public DifficultyInstrument Instrument { get; init; }
 
     // Timing and scores (§2, §5, §6).
 
@@ -103,8 +155,64 @@ public sealed record DifficultyParameters
     /// <summary>The cost of each lane a chord spans past three (w_s).</summary>
     public double ChordStretchCost { get; init; } = 0.2;
 
-    /// <summary>Where an open note puts the hand's centre, as a lane (μ_open).</summary>
+    /// <summary>Where an open note puts the hand's centre, as a lane (μ_open); for six-fret, as a column.</summary>
     public double OpenPosition { get; init; } = 2;
+
+    /// <summary>
+    /// Whether a note is read as strummed, a HOPO or a tap as the chart has it; when not, every note is read as strummed,
+    /// pressed as a key is (§14).
+    /// </summary>
+    public bool ReadsNoteKinds { get; init; } = true;
+
+    // Six-fret (§14.2): the frets as three columns of a white and a black fret.
+
+    /// <summary>The cost of a column changing between its white and its black fret, rather than <see cref="FingerCost"/>.</summary>
+    public double GridRowCost { get; init; } = 0.3;
+
+    /// <summary>The cost of each column of a chord with both its frets: a barre, one finger across both.</summary>
+    public double BarreCost { get; init; } = 0.2;
+
+    /// <summary>The cost of a chord with white frets alone in one column and black ones alone in another.</summary>
+    public double MixedRowCost { get; init; } = 0.4;
+
+    // Drums (§14.1): the kick, then the hands.
+
+    /// <summary>The kick interval double-kick footwork starts below (T_dk).</summary>
+    public double DoubleKickMs { get; init; } = 100;
+
+    public double DoubleKickPower { get; init; } = 1.5;
+
+    /// <summary>How much harder a kick is played between the hands' hits than with one (w_ind).</summary>
+    public double KickIndependenceCost { get; init; } = 0.5;
+
+    /// <summary>How soon after a hand's hit a kick alone counts as between the hands' hits (T_ind).</summary>
+    public double IndependenceWindowMs { get; init; } = 200;
+
+    /// <summary>The interval between one hand's hits under which it's at its limit (T_h).</summary>
+    public double HandLimitMs { get; init; } = 110;
+
+    public double HandLimitPower { get; init; } = 1.5;
+
+    /// <summary>The cost of each pad's width a hand moves across the kit (w_mv).</summary>
+    public double PadMoveCost { get; init; } = 0.25;
+
+    /// <summary>The cost of a hand going to another pad (w_pad).</summary>
+    public double PadChangeCost { get; init; } = 0.3;
+
+    /// <summary>The cost of a hand going between a tom and a cymbal (w_row): Pro drums only.</summary>
+    public double CymbalRowCost { get; init; } = 0.3;
+
+    /// <summary>
+    /// The cost of each pad past two hit at once, at the hands' rate. Two pads cost only what each hand pays: a cost for
+    /// the pair as well ordered official charts worse.
+    /// </summary>
+    public double ExtraPadCost { get; init; } = 1.0;
+
+    /// <summary>
+    /// The shortest interval counted in a roll or trill lane, where the player hits as fast as they like and the game
+    /// counts whatever they hit (Δ_lane).
+    /// </summary>
+    public double LaneIntervalMs { get; init; } = 125;
 
     // Rhythmic complexity (§4.3).
 

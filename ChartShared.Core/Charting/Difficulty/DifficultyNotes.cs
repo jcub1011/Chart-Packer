@@ -3,52 +3,66 @@ using ChartShared.Core.Charts;
 
 namespace ChartShared.Core.Charting.Difficulty;
 
-/// <summary>How a note is played: strummed, a hammer-on or pull-off, or tapped (docs/difficulty-model.md §2.3).</summary>
+/// <summary>
+/// How a note is played: strummed, a hammer-on or pull-off, or tapped (docs/difficulty-model.md §2.3); for drums, hit,
+/// or hit in a roll or trill lane.
+/// </summary>
 public enum NoteKind : byte
 {
+    /// <summary>Strummed; for drums, any hit outside a roll or trill lane.</summary>
     Strum,
     Hopo,
     Tap,
+
+    /// <summary>A drum hit in a roll or trill lane, where the game counts what's hit however fast (§14.1).</summary>
+    Roll,
 }
 
 /// <summary>
-/// One note event of a five-fret track as the difficulty model reads it: a chord is one event (docs/difficulty-model.md
-/// §2).
+/// One note event of a track as the difficulty model reads it: a chord is one event (docs/difficulty-model.md §2).
 /// </summary>
 /// <param name="TimeMs">Its onset, in milliseconds from the chart's start.</param>
 /// <param name="Beat">Its onset in beats (quarter notes), fractional.</param>
-/// <param name="Lanes">Its frets as bits, green the lowest; 0 for an open note.</param>
+/// <param name="Lanes">
+/// Its frets as bits, green (six-fret: the first white fret) the lowest; 0 for an open note. For drums, its pads as
+/// <see cref="DrumPads"/> lays them out, the kick among them.
+/// </param>
 /// <param name="Kind">How it's played.</param>
-/// <param name="Held">How many lanes not in it are still sustaining at its onset (χ).</param>
+/// <param name="Held">How many lanes not in it are still sustaining at its onset (χ); 0 for drums.</param>
 public readonly record struct DifficultyNote(double TimeMs, double Beat, byte Lanes, NoteKind Kind, int Held)
 {
-    /// <summary>How many frets it has: 0 for an open note.</summary>
+    /// <summary>How many frets or pads it has: 0 for an open note.</summary>
     public int Count => BitOperations.PopCount(Lanes);
 }
 
-/// <summary>A five-fret track read into the difficulty model's note events (docs/difficulty-model.md §2).</summary>
+/// <summary>A track read into the difficulty model's note events (docs/difficulty-model.md §2 and §14).</summary>
 public static class DifficultyNotes
 {
     /// <summary>
-    /// The note events of <paramref name="track"/>, read from the game view so natural HOPOs, forced flags, taps and the
-    /// sustain cutoff are as the games play them; notes after <paramref name="endTick"/> (the <c>[end]</c> event) are
-    /// left out.
+    /// The note events of <paramref name="track"/>, read from the game view so natural HOPOs, forced flags, taps, the
+    /// sustain cutoff and the drums' layout are as the games play them; notes after <paramref name="endTick"/> (the
+    /// <c>[end]</c> event) are left out. <paramref name="parameters"/>' instrument says how the lanes are read.
     /// </summary>
     /// <remarks>
-    /// A chord with an open note and frets is read as its frets. A tap anywhere in a chord makes it a tap, then a HOPO a
-    /// HOPO, as the flags are the chord's. Notes less than <see cref="DifficultyParameters.ChordMergeMs"/> after a chord
-    /// are read as part of it, played as it is: a rolled or unquantized chord is played as one.
+    /// <para>A chord with an open note and frets is read as its frets. A tap anywhere in a chord makes it a tap, then a
+    /// HOPO a HOPO, as the flags are the chord's. Notes less than <see cref="DifficultyParameters.ChordMergeMs"/> after a
+    /// chord are read as part of it, played as it is: a rolled or unquantized chord, or a flam, is played as one.</para>
+    /// <para>For drums, Expert+ kicks aren't read, as <c>diff_drums</c> rates Expert, and a note in one of
+    /// <paramref name="freeLanes"/>, the part's roll and trill lanes, is a <see cref="NoteKind.Roll"/>.</para>
     /// </remarks>
-    public static IReadOnlyList<DifficultyNote> Of(NoteTrack track, TempoMap tempo, long? endTick = null, DifficultyParameters? parameters = null)
+    public static IReadOnlyList<DifficultyNote> Of(NoteTrack track, TempoMap tempo, long? endTick = null, DifficultyParameters? parameters = null, IReadOnlyList<Phrase>? freeLanes = null)
     {
         ArgumentNullException.ThrowIfNull(track);
         ArgumentNullException.ThrowIfNull(tempo);
         var p = parameters ?? DifficultyParameters.Default;
+        var instrument = p.Instrument;
+        bool drums = instrument.IsDrums();
+        int laneCount = instrument == DifficultyInstrument.SixFret ? 6 : 5;
         var notes = new List<DifficultyNote>();
         double resolution = tempo.Resolution;
 
         // Where each lane's sustain ends, in ticks; long.MinValue for none.
-        Span<long> holds = stackalloc long[5];
+        Span<long> holds = stackalloc long[6];
         holds.Fill(long.MinValue);
         var source = track.Notes;
         for (int i = 0; i < source.Count;)
@@ -65,12 +79,23 @@ public static class DifficultyNotes
                 var note = source[j];
                 if (note.Tick == tick)
                     flags |= note.Flags;
-                if (note.Lane is >= 0 and < 5)
+                if (drums)
+                    lanes |= DrumPads.BitOf(note, instrument);
+                else if (note.Lane >= 0 && note.Lane < laneCount)
                     lanes |= (byte)(1 << note.Lane);
             }
 
+            if (drums)
+            {
+                // A tick of Expert+ kicks alone isn't played on Expert.
+                if (lanes != 0)
+                    notes.Add(new DifficultyNote(timeMs, tick / resolution, lanes, InFreeLane(tick) ? NoteKind.Roll : NoteKind.Strum, 0));
+                i = j;
+                continue;
+            }
+
             int held = 0;
-            for (int lane = 0; lane < 5; lane++)
+            for (int lane = 0; lane < laneCount; lane++)
             {
                 if ((lanes & (1 << lane)) == 0 && holds[lane] > tick)
                     held++;
@@ -79,16 +104,29 @@ public static class DifficultyNotes
             for (int k = i; k < j; k++)
             {
                 var note = source[k];
-                if (note.Length > 0 && note.Lane is >= 0 and < 5 && (lanes & (1 << note.Lane)) != 0)
+                if (note.Length > 0 && note.Lane >= 0 && note.Lane < laneCount && (lanes & (1 << note.Lane)) != 0)
                     holds[note.Lane] = Math.Max(holds[note.Lane], note.Tick + note.Length);
             }
 
-            var kind = (flags & NoteFlags.Tap) != 0 ? NoteKind.Tap : (flags & NoteFlags.Hopo) != 0 ? NoteKind.Hopo : NoteKind.Strum;
+            var kind = !p.ReadsNoteKinds ? NoteKind.Strum : (flags & NoteFlags.Tap) != 0 ? NoteKind.Tap : (flags & NoteFlags.Hopo) != 0 ? NoteKind.Hopo : NoteKind.Strum;
             notes.Add(new DifficultyNote(timeMs, tick / resolution, lanes, kind, held));
             i = j;
 
             // A later note close enough to the chord's to be played with it, and not past the end.
             bool IsRolled(long at) => p.ChordMergeMs > 0 && !(endTick is { } last && at > last) && (tempo.SecondsAt(at) * 1000) - timeMs < p.ChordMergeMs;
+        }
+
+        bool InFreeLane(long at)
+        {
+            if (freeLanes is null)
+                return false;
+            foreach (var lane in freeLanes)
+            {
+                if (lane.Covers(at))
+                    return true;
+            }
+
+            return false;
         }
 
         double offset = GridOffset(notes.Select(static n => n.Beat).ToList(), p.BeatTolerance);
@@ -150,6 +188,18 @@ public static class DifficultyNotes
             return 0;
         double offset = off[bestStart + (best / 2)];
         return Math.Abs(offset) <= MaxGridOffset ? offset : 0;
+    }
+
+    /// <summary>
+    /// The roll and trill lanes of <paramref name="part"/> that reach <paramref name="difficulty"/>, as
+    /// <see cref="Of"/> takes them; none for a part that isn't drums.
+    /// </summary>
+    public static IReadOnlyList<Phrase> FreeLanesOf(EditablePart part, ChartDifficulty difficulty)
+    {
+        ArgumentNullException.ThrowIfNull(part);
+        if (part.Kind != ChartInstrumentKind.Drums)
+            return [];
+        return [.. part.Phrases.Where(p => p.Kind is PhraseKind.Roll or PhraseKind.Trill && (p.LowestDifficulty ?? ChartDifficulty.Expert) <= difficulty)];
     }
 
     /// <summary>The tick of <paramref name="chart"/>'s <c>[end]</c> event, which the games stop reading at; null for none.</summary>

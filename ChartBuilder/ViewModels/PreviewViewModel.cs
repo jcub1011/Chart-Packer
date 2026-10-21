@@ -116,12 +116,12 @@ namespace ChartBuilder.ViewModels
 
         public bool HasSuggestion => SuggestionText is not null;
 
-        // The keys the suggestion would set, and its tier.
-        private (IReadOnlyList<string> Keys, int Tier)? _suggestion;
+        // The keys the suggestion would set, each with its tier.
+        private IReadOnlyList<(string Key, int Tier)>? _suggestion;
 
-        // The track last rated and each of its difficulties' estimates, lowest first; and the runs started, so only the
-        // latest is shown.
-        private (ChartTrackKey Track, List<(ChartDifficulty Difficulty, DifficultyEstimate Estimate)> Estimates)? _estimated;
+        // The track last rated, and for each of its part's diff_* keys the model that rates it and each difficulty's
+        // estimate, lowest first, the part's own key first; and the runs started, so only the latest is shown.
+        private (ChartTrackKey Track, List<KeyedEstimates> Keys)? _estimated;
         private int _suggestions;
 
         private static ILogger Logger => Log.ForContext<PreviewViewModel>();
@@ -130,11 +130,13 @@ namespace ChartBuilder.ViewModels
         [RelayCommand(CanExecute = nameof(CanUseSuggestion))]
         private void UseSuggestion()
         {
-            if (_suggestion is not { } suggestion)
+            if (_suggestion is not { Count: > 0 } suggestion)
                 return;
-            foreach (string key in suggestion.Keys)
-                _editor.Song.SetRating(key, suggestion.Tier);
-            _editor.Messages.Info(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUsedFormat, suggestion.Tier, string.Join(", ", suggestion.Keys)));
+            foreach (var (key, tier) in suggestion)
+                _editor.Song.SetRating(key, tier);
+            _editor.Messages.Info(suggestion.Select(static s => s.Tier).Distinct().Count() == 1
+                ? string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUsedFormat, suggestion[0].Tier, string.Join(", ", suggestion.Select(static s => s.Key)))
+                : string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingsUsedFormat, string.Join(", ", suggestion.Select(static s => string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingPairFormat, s.Key, s.Tier)))));
             ShowSuggestion();
         }
 
@@ -156,26 +158,30 @@ namespace ChartBuilder.ViewModels
 
             var tempo = Session.TempoMap;
             long? end = DifficultyNotes.EndTickOf(Session.Chart);
-            var kind = part.Kind;
+            var models = DifficultyInstruments.KeysOf(key.Instrument, Session.Chart.DrumsVariant);
             var tracks = Enum.GetValues<ChartDifficulty>()
                 .Where(d => part[d].Notes.Count > 0)
-                .Select(d => (Difficulty: d, Game: Session.GameTrack(new ChartTrackKey(key.Instrument, d))))
+                .Select(d => (Difficulty: d, Game: Session.GameTrack(new ChartTrackKey(key.Instrument, d)), FreeLanes: DifficultyNotes.FreeLanesOf(part, d)))
                 .ToList();
-            _ = EstimateAsync(run, key, tracks, tempo, kind, end);
+            _ = EstimateAsync(run, key, models, tracks, tempo, end);
         }
 
-        private async Task EstimateAsync(int run, ChartTrackKey key, List<(ChartDifficulty Difficulty, NoteTrack Game)> tracks, TempoMap tempo, ChartInstrumentKind kind, long? end)
+        private async Task EstimateAsync(
+            int run, ChartTrackKey key, IReadOnlyList<(string Key, DifficultyInstrument Instrument)> models,
+            List<(ChartDifficulty Difficulty, NoteTrack Game, IReadOnlyList<Phrase> FreeLanes)> tracks, TempoMap tempo, long? end)
         {
             try
             {
-                var estimates = await Task.Run(() => tracks
-                    .Select(t => (t.Difficulty, Estimate: DifficultyEstimator.Estimate(t.Game, tempo, kind, end)))
-                    .Where(e => e.Estimate is not null)
-                    .Select(e => (e.Difficulty, e.Estimate!))
+                var keyed = await Task.Run(() => models
+                    .Select(m => new KeyedEstimates(m.Key, m.Instrument, [.. tracks
+                        .Select(t => (t.Difficulty, Estimate: DifficultyEstimator.Estimate(t.Game, tempo, m.Instrument, end, t.FreeLanes)))
+                        .Where(e => e.Estimate is not null)
+                        .Select(e => (e.Difficulty, e.Estimate!))]))
+                    .Where(k => k.Estimates.Count > 0)
                     .ToList());
                 if (run != _suggestions)
                     return;
-                _estimated = (key, estimates);
+                _estimated = (key, keyed);
                 ShowSuggestion();
             }
             catch (Exception ex)
@@ -188,46 +194,53 @@ namespace ChartBuilder.ViewModels
         private void ShowSuggestion()
         {
             _suggestion = null;
-            if (_estimated is not { Estimates.Count: > 0 } estimated || Track != estimated.Track || Session.Chart.PartOf(estimated.Track.Instrument) is null)
+            if (_estimated is not { Keys.Count: > 0 } estimated || Track != estimated.Track || Session.Chart.PartOf(estimated.Track.Instrument) is null)
             {
                 (SuggestionText, SuggestionBasis, UseSuggestionText) = (null, null, null);
                 return;
             }
 
             var key = estimated.Track;
-            var estimates = estimated.Estimates;
-            var (top, estimate) = estimates[^1];
+            var own = estimated.Keys[0];
+            var (top, estimate) = own.Estimates[^1];
             var basis = estimate.Basis;
-            var lines = new List<string> { string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingFromFormat, ChartLabels.DifficultyName(top)) };
+            var rating = estimate.Rating;
+            var a = rating.Attributes;
+            var lines = new List<string>
+            {
+                string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingFromFormat, ChartLabels.DifficultyName(top)),
+                string.Format(CultureInfo.CurrentCulture, rating.IsOverchart ? Strings.SuggestedRatingOverchartFormat : Strings.SuggestedRatingRankFormat, rating.Rank),
+                string.Format(CultureInfo.CurrentCulture, rating.Instrument.IsDrums() ? Strings.SuggestedRatingDrumAttributesFormat : Strings.SuggestedRatingAttributesFormat, a.Strum, a.Note, a.Rhythm, a.Pattern, a.Endurance),
+            };
 
-            // Five-fret parts are rated by the difficulty model; drums and six-fret from note density.
-            if (estimate.Rating is { } rating)
+            // Pro drums' own rating, with the cymbals, for diff_drums_real.
+            var others = estimated.Keys.Skip(1).ToList();
+            foreach (var other in others)
             {
-                var a = rating.Attributes;
-                lines.Add(string.Format(CultureInfo.CurrentCulture, rating.IsOverchart ? Strings.SuggestedRatingOverchartFormat : Strings.SuggestedRatingRankFormat, rating.Rank));
-                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingAttributesFormat, a.Strum, a.Note, a.Rhythm, a.Pattern, a.Endurance));
-                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingNpsFormat, basis.PeakNps, basis.AverageNps));
-            }
-            else
-            {
-                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingNpsFormat, basis.PeakNps, basis.AverageNps));
-                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingChordsFormat, basis.ChordShare));
-                lines.Add(basis.KickIndependence is { } kick
-                    ? string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingKickFormat, kick)
-                    : string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingHopoFormat, basis.HopoTapShare));
+                var proRating = other.Estimates[^1].Estimate;
+                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingProDrumsFormat, proRating.Tier, proRating.Rating.Rank));
             }
 
-            lines.AddRange(estimates.OrderByDescending(e => e.Difficulty).Select(e =>
+            lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingNpsFormat, basis.PeakNps, basis.AverageNps));
+            if (basis.KickIndependence is { } kick)
+                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingKickFormat, kick));
+            lines.AddRange(own.Estimates.OrderByDescending(e => e.Difficulty).Select(e =>
                 string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingDifficultyFormat, ChartLabels.DifficultyName(e.Difficulty), e.Estimate.Tier)));
-            lines.Add(estimate.Rating is null ? Strings.SuggestedRatingOnlySuggestion : Strings.SuggestedRatingModelSuggestion);
+            lines.Add(Strings.SuggestedRatingModelSuggestion);
 
-            SuggestionText = string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingFormat, estimate.Tier);
+            int? proTier = others.Count > 0 ? others[0].Estimates[^1].Estimate.Tier : null;
+            SuggestionText = proTier is { } pro && pro != estimate.Tier
+                ? string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingWithProFormat, estimate.Tier, pro)
+                : string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingFormat, estimate.Tier);
             SuggestionBasis = string.Join(Environment.NewLine, lines);
             var pairs = _editor.Song.EffectivePairs();
-            var keys = PendingSongIniFixes.RatingKeysToSet(Session.Chart, key.Instrument, pairs, estimate.Tier);
-            _suggestion = keys.Count > 0 ? (keys, estimate.Tier) : null;
-            UseSuggestionText = keys.Count > 0 ? string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUseFormat, string.Join(", ", keys)) : null;
+            var ratings = PendingSongIniFixes.RatingsToSet(key.Instrument, pairs, [.. estimated.Keys.Select(static k => new KeyedEstimate(k.Key, k.Instrument, k.Estimates[^1].Estimate))]);
+            _suggestion = ratings.Count > 0 ? ratings : null;
+            UseSuggestionText = ratings.Count > 0 ? string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUseFormat, string.Join(", ", ratings.Select(static r => r.Key))) : null;
         }
+
+        // One diff_* key's estimates: the model that rates it, and each charted difficulty's, lowest first.
+        private sealed record KeyedEstimates(string Key, DifficultyInstrument Instrument, List<(ChartDifficulty Difficulty, DifficultyEstimate Estimate)> Estimates);
 
         /// <summary>How many seconds ahead of the strike line the highway shows: the further, the slower notes fall.</summary>
         [ObservableProperty]

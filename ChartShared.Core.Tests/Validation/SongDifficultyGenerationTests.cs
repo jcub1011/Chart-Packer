@@ -181,6 +181,22 @@ public sealed class SongDifficultyGenerationTests
         Assert.IsTrue(tier is >= 0 and <= 9, $"Tier {tier}.");
     }
 
+    [TestMethod]
+    public async Task AnUnratedProDrumsPartIsGivenARatingForEachKey()
+    {
+        // Sixteenths around the kit, cymbals among them, at 150 BPM.
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 150, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Drums }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Drums, ChartDifficulty.Expert, [.. Enumerable.Range(0, 256).Select(i => new EditableNote(i * 120L, 1, i % 5))]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)), songIni: "[song]\nname = Song\npro_drums = True\n");
+
+        var report = await SongChartLint.LintAsync(entry, await PairsOf(entry), null, null, TestContext.CancellationToken);
+
+        Assert.IsTrue(report.SuggestedRatings.TryGetValue("diff_drums", out int drums));
+        Assert.IsTrue(report.SuggestedRatings.TryGetValue("diff_drums_real", out int pro));
+        Assert.IsTrue(drums is >= 0 and <= 9, $"Tier {drums}.");
+        Assert.IsGreaterThanOrEqualTo(drums, pro);
+    }
+
     // Lead guitar on Expert alone: a note a beat for 32 beats, up and down the frets.
     private static EditableChart ExpertOnly()
     {

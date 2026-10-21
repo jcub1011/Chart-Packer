@@ -3,9 +3,9 @@ using ChartShared.Core.Charts;
 namespace ChartShared.Core.Charting.Difficulty;
 
 /// <summary>
-/// Measures how hard a five-fret track is to play cleanly, moment by moment and as a whole (docs/difficulty-model.md):
-/// strum, note, rhythm and pattern strain, built up by each note's cost and decaying between them, and endurance, which
-/// builds while the four are high.
+/// Measures how hard a track is to play cleanly, moment by moment and as a whole (docs/difficulty-model.md): strum, note,
+/// rhythm and pattern strain (for drums, kick, hands, rhythm and pattern, §14), built up by each note's cost and decaying
+/// between them, and endurance, which builds while the four are high. The parameters' instrument says which costs.
 /// </summary>
 /// <remarks>
 /// <para>The strain model is adapted, as an idea, from the one osu!'s star rating uses; no code is taken from it.</para>
@@ -37,9 +37,12 @@ public static class DifficultyAnalyzer
         return Run(model, within, isolate.ToMs);
     }
 
-    /// <summary>The difficulty of <paramref name="track"/> as the games read it (see <see cref="DifficultyNotes.Of"/>).</summary>
-    public static DifficultyProfile Analyze(NoteTrack track, TempoMap tempo, long? endTick = null, DifficultyParameters? parameters = null) =>
-        Analyze(DifficultyNotes.Of(track, tempo, endTick, parameters), parameters);
+    /// <summary>
+    /// The difficulty of <paramref name="track"/> as the games read it, its roll and trill lanes <paramref name="freeLanes"/>
+    /// (see <see cref="DifficultyNotes.Of"/>).
+    /// </summary>
+    public static DifficultyProfile Analyze(NoteTrack track, TempoMap tempo, long? endTick = null, DifficultyParameters? parameters = null, IReadOnlyList<Phrase>? freeLanes = null) =>
+        Analyze(DifficultyNotes.Of(track, tempo, endTick, parameters, freeLanes), parameters);
 
     // One pass: a sample just after each note, and at the start of each window from the first note to endMs.
     private static DifficultyProfile Run(DifficultyModel model, IReadOnlyList<DifficultyNote> notes, double endMs)
