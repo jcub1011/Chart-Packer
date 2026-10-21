@@ -11,8 +11,8 @@ namespace ChartShared.UI.Controls
     /// follows its button through hover, pressed and disabled the way text does.
     /// </summary>
     /// <remarks>
-    /// The geometry is authored on a 16×16 grid. Given a <c>Width</c> and <c>Height</c>, the icon is scaled to fit,
-    /// stroke and all, so a smaller icon keeps its proportions.
+    /// The geometry is authored on a 16×16 grid. Given a <c>Width</c> and <c>Height</c>, the shape is scaled to fit and
+    /// centred, but the line keeps its <see cref="StrokeThickness"/>, so icons of every size have the same weight.
     /// </remarks>
     /// <example><c>&lt;ctl:LineIcon Data="{StaticResource SaveStroke}" /&gt;</c></example>
     public sealed class LineIcon : Control
@@ -52,6 +52,16 @@ namespace ChartShared.UI.Controls
             set => SetValue(StrokeThicknessProperty, value);
         }
 
+        /// <summary>The line icon in the app's resources keyed <paramref name="key"/>, or null if there's none.</summary>
+        public static Geometry? Find(string? key) =>
+            key is not null && Application.Current?.TryFindResource(key, out object? found) == true ? found as Geometry : null;
+
+        /// <summary>
+        /// A new icon for the line icon keyed <paramref name="key"/>, or null if there's none. A control can be in one place
+        /// only, so each menu item needs its own.
+        /// </summary>
+        public static LineIcon? For(string? key) => Find(key) is { } data ? new LineIcon { Data = data } : null;
+
         protected override Size MeasureOverride(Size availableSize) => new(Size, Size);
 
         public override void Render(DrawingContext context)
@@ -59,9 +69,15 @@ namespace ChartShared.UI.Controls
             if (Data is not { } data || Foreground is not { } brush)
                 return;
 
-            var pen = new Pen(brush, StrokeThickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
             double scale = Math.Min(Bounds.Width, Bounds.Height) / Size;
-            using (context.PushTransform(Matrix.CreateScale(scale, scale)))
+            if (scale <= 0)
+                return;
+
+            // The pen is under the scale too, so it's thinned by as much as the shape is grown.
+            var pen = new Pen(brush, StrokeThickness / scale, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+            var fit = Matrix.CreateScale(scale, scale)
+                * Matrix.CreateTranslation((Bounds.Width - Size * scale) / 2, (Bounds.Height - Size * scale) / 2);
+            using (context.PushTransform(fit))
                 context.DrawGeometry(null, pen, data);
         }
     }

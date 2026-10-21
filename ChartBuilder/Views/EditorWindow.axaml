@@ -107,6 +107,7 @@
                                 <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
                                      the logical tree ($parent), as the submenu's popup isn't under the menu in the visual tree. -->
                                 <MenuItem Header="{x:Static res:Strings.MenuOpenRecent}" ItemsSource="{Binding Recent}" IsEnabled="{Binding HasRecent}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource RecentStroke}" /></MenuItem.Icon>
                                     <MenuItem.ItemTemplate>
                                         <DataTemplate x:DataType="vm:RecentSongItem">
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" MinWidth="240">

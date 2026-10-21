@@ -130,6 +130,7 @@ specifications; no code from any implementation of them is used.
 | [arrow-up-narrow-wide](https://lucide.dev/icons/arrow-up-narrow-wide) | Sort first to last |
 | [audio-lines](https://lucide.dev/icons/audio-lines) | Audio, in the Merge window |
 | [check](https://lucide.dev/icons/check) | Validate; ticks |
+| [check-check](https://lucide.dev/icons/check-check) | Fix all of a finding |
 | [chevron-down](https://lucide.dev/icons/chevron-down) | Opens a menu |
 | [clipboard-paste](https://lucide.dev/icons/clipboard-paste) | Paste |
 | [clipboard-plus](https://lucide.dev/icons/clipboard-plus) | Paste and merge |
@@ -152,6 +153,7 @@ specifications; no code from any implementation of them is used.
 | [funnel](https://lucide.dev/icons/funnel) | Filter |
 | [image](https://lucide.dev/icons/image) | An image |
 | [info](https://lucide.dev/icons/info) | More information |
+| [list-checks](https://lucide.dev/icons/list-checks) | Fix all of a finding in a part |
 | [magnet](https://lucide.dev/icons/magnet) | Quantize |
 | [merge](https://lucide.dev/icons/merge) | Merge |
 | [midi-port](https://lucide.dev/icons/midi-port) | A MIDI chart |

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
@@ -34,12 +33,7 @@ namespace ChartBuilder.Controls
             Command = item.Command,
             IsEnabled = item.IsEnabled,
             ItemsSource = item.Items is { } inner ? MenuItems(inner) : null,
-            Icon = item.IsChecked ? new LineIcon { Data = Check } : IconOf(item.Icon),
+            Icon = item.IsChecked ? new LineIcon { Data = Check } : LineIcon.For(item.Icon),
         })];
-
-        private static LineIcon? IconOf(string? key) =>
-            key is not null && Application.Current?.TryGetResource(key, null, out var data) == true && data is Geometry geometry
-                ? new LineIcon { Data = geometry }
-                : null;
     }
 }

@@ -258,6 +258,16 @@ namespace ChartBuilder.ViewModels
             _ => Strings.SongEventEnd,
         };
 
+        /// <summary>The key of a song event's line icon, for the insert menu; null for one without.</summary>
+        internal static string? SongEventIcon(SongEvent songEvent) => songEvent switch
+        {
+            SongEvent.Coda => "CodaStroke",
+            SongEvent.MusicStart => "PlayStroke",
+            SongEvent.MusicEnd => "StopStroke",
+            SongEvent.End => "SkipNextStroke",
+            _ => null,
+        };
+
         public void Dispose()
         {
             _disposed = true;
@@ -325,7 +335,7 @@ namespace ChartBuilder.ViewModels
                     SongEventName(kind),
                     isEnabled: true,
                     () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind)),
-                    kind == SongEvent.Coda ? "CodaStroke" : null))
+                    SongEventIcon(kind)))
                 .ToList();
             items.Add(LaneMenuItem.Action(Strings.SectionsTextEvent, true, () => InsertTextEvent(null), "TextEventStroke"));
             if (part is { } instrument)

@@ -66,7 +66,7 @@
                                        Band="{StaticResource InstrumentBandGeometry}" />
         <!-- A row's fixed icon: audio, an art placeholder, or MIDI. -->
         <conv:MergeRowIconConverter x:Key="MergeRowIcon"
-                                    Waveform="{StaticResource AudioStroke}"
+                                    Audio="{StaticResource AudioStroke}"
                                     Midi="{StaticResource MidiStroke}"
                                     AlbumArt="{StaticResource AlbumArtStroke}"
                                     Background="{StaticResource BackgroundStroke}"
