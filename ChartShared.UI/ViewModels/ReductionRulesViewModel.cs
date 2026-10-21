@@ -134,6 +134,10 @@ namespace ChartShared.UI.ViewModels
         [ObservableProperty]
         public partial bool KeepExtendedSustains { get; set; }
 
+        /// <summary>Whether open notes are kept in a phrase that has pressed notes too.</summary>
+        [ObservableProperty]
+        public partial bool KeepOpenNotes { get; set; }
+
         [ObservableProperty]
         public partial decimal? PadsPerHit { get; set; }
 
@@ -195,6 +199,7 @@ namespace ChartShared.UI.ViewModels
             KeepForcedHopoAndTap = KeepForcedHopoAndTap,
             KeepShortSustains = KeepShortSustains,
             KeepExtendedSustains = KeepExtendedSustains,
+            KeepOpenNotes = KeepOpenNotes,
         }.Normalized(Kind);
 
         /// <summary>The fields, as rules for drums.</summary>
@@ -240,6 +245,8 @@ namespace ChartShared.UI.ViewModels
 
         partial void OnKeepExtendedSustainsChanged(bool value) => OnFieldChanged();
 
+        partial void OnKeepOpenNotesChanged(bool value) => OnFieldChanged();
+
         partial void OnPadsPerHitChanged(decimal? value) => OnFieldChanged();
 
         partial void OnKickThinningChanged(DivisionChoice? value) => OnFieldChanged();
@@ -283,6 +290,7 @@ namespace ChartShared.UI.ViewModels
                     KeepForcedHopoAndTap = rules.KeepForcedHopoAndTap;
                     KeepShortSustains = rules.KeepShortSustains;
                     KeepExtendedSustains = rules.KeepExtendedSustains ?? true;
+                    KeepOpenNotes = rules.KeepOpenNotes ?? true;
                 }
             }
             finally

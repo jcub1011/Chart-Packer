@@ -17,7 +17,7 @@ public sealed class ReducerTests
     private const ChartDifficulty Hard = ChartDifficulty.Hard;
     private const ChartDifficulty Medium = ChartDifficulty.Medium;
     private const ChartDifficulty Easy = ChartDifficulty.Easy;
-    private const int G = 0, R = 1, Y = 2, B = 3, O = 4;
+    private const int G = 0, R = 1, Y = 2, B = 3, O = 4, Open = ChartNote.OpenLane;
 
     private static readonly FretReductionRules NoThinning = FretReductionRules.Default(ChartInstrumentKind.FiveFret, Hard) with { ThinningDivision = 0, MaxChordSize = 5 };
 
@@ -111,6 +111,69 @@ public sealed class ReducerTests
 
         Assert.AreSequenceEqual([0, 2, 3], LanesAt(notes, 0));
         Assert.AreSequenceEqual([0, 3], LanesAt(easy, 0));
+    }
+
+    [TestMethod]
+    public void OpensBetweenPressedNotesAreGreenWithTheFretsOneUp()
+    {
+        // Eighths going between a fret and an open, as in Bloom's bars 20 and 21: on Hard each open is green and each fret
+        // one up, so going between them is still a move, as the song's own Hard has it.
+        var notes = Reducer.Reduce(OpensBetweenFrets(), Guitar, Expert, Hard, Free(Hard)).Notes;
+
+        Assert.AreSequenceEqual([Y, G, Y, G, R, G, R, G, Y, G, Y, G, B, G, B, G], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void APhraseWhoseOpensAreThinnedOutKeepsItsFretsOneUp()
+    {
+        // Thinned to the beats, no open is left, but the phrase had them: its frets are one up, as on Hard.
+        var notes = Reducer.Reduce(OpensBetweenFrets(), Guitar, Expert, Medium, Rules(Medium) with { ThinningDivision = 4 }).Notes;
+
+        Assert.AreSequenceEqual([Y, Y, R, R, Y, Y, B, B], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void APhraseOfOpensAloneKeepsThem()
+    {
+        // Opens, a rest, then frets: two phrases, neither with both, so nothing is fretted or moved.
+        var chart = Frets(Chord(0, Open), Chord(240, Open), Chord(480, Open), Chord(1920, R), Chord(2160, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Hard, Free(Hard)).Notes;
+
+        Assert.AreSequenceEqual([Open, Open, Open, R, G], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void WithTheRuleOffOpensBetweenPressedNotesAreKept()
+    {
+        var notes = Reducer.Reduce(OpensBetweenFrets(), Guitar, Expert, Hard, Free(Hard) with { KeepOpenNotes = true }).Notes;
+
+        Assert.AreSequenceEqual([R, Open, R, Open, G, Open, G, Open, R, Open, R, Open, Y, Open, Y, Open], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void AnOpenSustainFrettedIsAGreenSustain()
+    {
+        var chart = Frets(Chord(960, R));
+        Add(chart, Guitar, Expert, new EditableNote(0, 900, Open));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Hard, Free(Hard)).Notes;
+
+        Assert.AreEqual(new EditableNote(0, 900, G), notes.Single(n => n.Tick == 0));
+        Assert.AreEqual(Y, notes.Single(n => n.Tick == 960).Lane);
+    }
+
+    [TestMethod]
+    public void OnGhlAnOpenBetweenPressedNotesIsTheFirstWhite()
+    {
+        // W1, open, W2, open, B1: the opens are W1, and each fret a column up, a black staying black.
+        var chart = NewChart(ChartInstrument.GhlGuitar);
+        Add(chart, ChartInstrument.GhlGuitar, Expert, Note(0, 0), Note(240, Open), Note(480, 1), Note(720, Open), Note(960, 3));
+        var rules = FretReductionRules.Default(ChartInstrumentKind.SixFret, Hard) with { ThinningDivision = 0 };
+
+        var notes = Reducer.Reduce(chart, ChartInstrument.GhlGuitar, Expert, Hard, rules).Notes;
+
+        Assert.AreSequenceEqual([1, 0, 2, 0, 4], Lanes(notes));
     }
 
     [TestMethod]
@@ -987,6 +1050,7 @@ public sealed class ReducerTests
         Assert.AreEqual(ReductionDefaults.Shipped.FiveFretMedium.MaxBurst, fixedUp.FiveFretMedium.MaxBurst);
         Assert.IsTrue(fixedUp.FiveFretMedium.KeepForcedHopoAndTap, "A set saved before bursts takes the shipped HOPOs and taps with them.");
         Assert.IsFalse(fixedUp.FiveFretMedium.KeepExtendedSustains, "A set saved before it takes the shipped.");
+        Assert.IsFalse(fixedUp.FiveFretMedium.KeepOpenNotes, "A set saved before it takes the shipped.");
         Assert.AreEqual(3, fixedUp.SixFretHard.MaxChordSize);
         Assert.AreEqual(2, fixedUp.SixFretHard.HighestLane);
         Assert.AreEqual(1, fixedUp.DrumsMedium.PadsPerHit);
@@ -1017,6 +1081,8 @@ public sealed class ReducerTests
         Assert.AreSequenceEqual([true, true, true], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.KeepForcedHopoAndTap).ToList());
         Assert.AreSequenceEqual([true, true, false], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.KeepShortSustains).ToList());
         Assert.AreSequenceEqual([false, false, false], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.KeepExtendedSustains ?? true).ToList());
+        Assert.AreSequenceEqual([false, false, false], new[] { shipped.FiveFretHard, shipped.FiveFretMedium, shipped.FiveFretEasy }.Select(r => r.KeepOpenNotes ?? true).ToList());
+        Assert.AreSequenceEqual([false, false, false], new[] { shipped.SixFretHard, shipped.SixFretMedium, shipped.SixFretEasy }.Select(r => r.KeepOpenNotes ?? true).ToList());
         Assert.AreSequenceEqual([2, 2, 1], new[] { shipped.DrumsHard, shipped.DrumsMedium, shipped.DrumsEasy }.Select(r => r.PadsPerHit).ToList());
         Assert.AreSequenceEqual([0, 8, 4], new[] { shipped.DrumsHard, shipped.DrumsMedium, shipped.DrumsEasy }.Select(r => r.KickDivision).ToList());
     }
@@ -1041,6 +1107,13 @@ public sealed class ReducerTests
         var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, bpm, 4, 4, new HashSet<ChartInstrument> { Guitar }, DrumsVariant.FourLane));
         Add(chart, Guitar, Expert, [.. chords.SelectMany(c => c.Lanes.Select(l => Note(c.Tick, l)))]);
         return chart;
+    }
+
+    // Two measures of eighths going between a fret and an open: R o R o G o G o, then R o R o Y o Y o.
+    private static EditableChart OpensBetweenFrets()
+    {
+        int[] frets = [R, R, G, G, R, R, Y, Y];
+        return Frets([.. Enumerable.Range(0, 16).Select(i => Chord(i * 240L, i % 2 == 0 ? frets[i / 2] : Open))]);
     }
 
     // Each note's lane, in tick order.

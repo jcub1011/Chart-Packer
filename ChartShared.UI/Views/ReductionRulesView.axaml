@@ -76,6 +76,9 @@
                 <CheckBox Classes="rule" IsChecked="{Binding KeepExtendedSustains}">
                     <TextBlock Text="{x:Static res:SharedStrings.ReductionKeepExtendedSustains}" />
                 </CheckBox>
+                <CheckBox Classes="rule" IsChecked="{Binding KeepOpenNotes}">
+                    <TextBlock Text="{x:Static res:SharedStrings.ReductionKeepOpenNotes}" />
+                </CheckBox>
             </StackPanel>
         </Border>
 

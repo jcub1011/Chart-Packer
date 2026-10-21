@@ -90,7 +90,9 @@ internal sealed record Riff(int Length, IReadOnlyList<int> Starts);
 /// <para><b>Chords</b> keep their outermost columns, or their lowest alone when only one is kept. A phrase past the highest
 /// column moves down as a whole when it fits, so a trill stays a trill; one wider than the range is fitted to it with each
 /// step kept going up, down or the same where it can be. Only notes a chord would push below green are pressed together.
-/// On GHL a column is a white and a black fret together, and a note keeps its colour.</para>
+/// On GHL a column is a white and a black fret together, and a note keeps its colour. Where the rules fret opens, a phrase
+/// with opens and pressed notes both, which is hard to play, has each open made green, and each fret next to one lifted a
+/// column and kept off green, so going between them is still a move; a phrase of opens alone keeps them.</para>
 /// <para><b>Drums</b> are thinned kick and pads together, then the kicks again on their own grid. Each hit keeps the pads a
 /// player is likeliest to be asked for first: red, then cymbals, then toms, by the pads as shown inside a disco flip. The
 /// source's mixes, which hold disco flip, are carried over. 2× kicks are left out, as only Expert has them.</para>
@@ -132,6 +134,30 @@ public static class Reducer
         var spacing = SpacingOf(rules.ThinningDivision, rules.BurstDivision, rules.MaxBurst, chart.Resolution);
         var kept = Thin(chords, scores, spacing, whole.Phrases, Outside(target.Notes, range), riffs);
 
+        // Where the rules fret opens, each phrase of the source with opens and pressed notes both: there each open is green,
+        // and each fret next to an open, with the same chord repeated beside it, is lifted a column, so going between them
+        // is still a move. Frets further from an open keep their place, so a fill keeps its top.
+        bool OpenOnly(int i) => chords[i].Notes.All(static n => n.Lane == ChartNote.OpenLane);
+        string Shape(int i) => string.Join(",", chords[i].Notes.Where(static n => n.Lane != ChartNote.OpenLane).Select(Column).Distinct().Order());
+        var mixed = new bool[chords.Count];
+        var lifted = new bool[chords.Count];
+        if (rules.KeepOpenNotes is false)
+        {
+            foreach (var (start, end) in phrases)
+            {
+                var played = chords.Skip(start).Take(end - start + 1).SelectMany(static c => c.Notes).ToList();
+                if (!played.Any(static n => n.Lane == ChartNote.OpenLane) || !played.Any(static n => n.Lane != ChartNote.OpenLane))
+                    continue;
+                Array.Fill(mixed, true, start, end - start + 1);
+                for (int i = start; i <= end; i++)
+                    lifted[i] = !OpenOnly(i) && ((i > start && OpenOnly(i - 1)) || (i < end && OpenOnly(i + 1)));
+                for (int i = start + 1; i <= end; i++)
+                    lifted[i] |= lifted[i - 1] && !OpenOnly(i) && Shape(i) == Shape(i - 1);
+                for (int i = end - 1; i >= start; i--)
+                    lifted[i] |= lifted[i + 1] && !OpenOnly(i) && Shape(i) == Shape(i + 1);
+            }
+        }
+
         // Each kept chord's columns, then each phrase fitted to the range as a whole.
         int highest = rules.HighestLane;
         var columns = new Dictionary<int, List<int>>();
@@ -144,17 +170,28 @@ public static class Reducer
         // The phrases cover the chords in order, so one walk through the kept chords, which are in order too, splits them.
         var placedAt = new Dictionary<int, (int Anchor, int Width)>();
         int next = 0;
-        foreach (var (_, end) in phrases)
+        foreach (var (start, end) in phrases)
         {
-            var frets = new List<int>();
+            var inPhrase = new List<int>();
             for (; next < kept.Count && kept[next] <= end; next++)
+                inPhrase.Add(kept[next]);
+
+            // A fret is lifted by the source's opens, so each difficulty has it alike, but kept off green only beside an
+            // open the draft keeps, which is green: thinned out, green is free again.
+            bool BesideOpen(int k) => mixed[start] && ((k > 0 && OpenOnly(inPhrase[k - 1])) || (k + 1 < inPhrase.Count && OpenOnly(inPhrase[k + 1])));
+            var frets = new List<int>();
+            var floors = new List<int>();
+            for (int k = 0; k < inPhrase.Count; k++)
             {
-                if (columns.ContainsKey(kept[next]))
-                    frets.Add(kept[next]);
+                if (!columns.ContainsKey(inPhrase[k]))
+                    continue;
+                frets.Add(inPhrase[k]);
+                floors.Add(BesideOpen(k) ? 1 : 0);
             }
 
+            int[] anchorsOf = [.. frets.Select(i => columns[i][0])];
             var tops = frets.Select(i => chords[i].Notes.Where(static n => n.Lane != ChartNote.OpenLane).Max(Column)).ToArray();
-            var fitted = FitPhrase([.. frets.Select(i => columns[i][0])], [.. frets.Select(i => columns[i][^1] - columns[i][0])], highest, tops);
+            var fitted = FitPhrase(anchorsOf, [.. frets.Select(i => columns[i][^1] - columns[i][0])], highest, tops, [.. frets.Select((i, k) => anchorsOf[k] + (lifted[i] ? 1 : 0))], floors);
             for (int k = 0; k < frets.Count; k++)
                 placedAt[frets[k]] = fitted[k];
         }
@@ -164,9 +201,15 @@ public static class Reducer
         foreach (int i in kept)
         {
             var (tick, chord) = chords[i];
-            var placed = chord.Where(static n => n.Lane == ChartNote.OpenLane).ToList();
+
+            // In a phrase whose opens are fretted, an open is the chord's longest on green (on GHL, the first white); one in a
+            // chord with frets is left out.
+            List<EditableNote> placed = !mixed[i] ? [.. chord.Where(static n => n.Lane == ChartNote.OpenLane)]
+                : OpenOnly(i) ? [chord.MaxBy(static n => n.Length)! with { Lane = 0 }]
+                : [];
             if (columns.TryGetValue(i, out var chosen))
                 placed.AddRange(Place(chord, chosen, placedAt[i].Anchor, placedAt[i].Width, highest, ghl, Column));
+
             foreach (var note in placed)
             {
                 long length = note.Length;
@@ -547,17 +590,25 @@ public static class Reducer
     /// wide as the range has nowhere to go, so green–blue then red–orange on Medium is green–blue then red–blue, not
     /// green–blue twice. A chord stays a chord. Chords repeated one after another are one step of the melody, so a long
     /// run of one counts no more than a short one.
+    /// <para>Each chord can be put somewhere other than its source columns before fitting (<paramref name="places"/>, the
+    /// anchors when null), with its steps still those of the source, and kept no lower than a floor
+    /// (<paramref name="floors"/>, none when null) where the range leaves room: so frets lifted off green for the opens
+    /// beside them stay off it.</para>
     /// </remarks>
-    internal static (int Anchor, int Width)[] FitPhrase(IReadOnlyList<int> anchors, IReadOnlyList<int> widths, int highest, IReadOnlyList<int>? tops = null)
+    internal static (int Anchor, int Width)[] FitPhrase(IReadOnlyList<int> anchors, IReadOnlyList<int> widths, int highest, IReadOnlyList<int>? tops = null, IReadOnlyList<int>? places = null, IReadOnlyList<int>? floors = null)
     {
         int n = anchors.Count;
         if (n == 0)
             return [];
         var width = widths.Select(w => Math.Min(w, highest)).ToArray();
         tops ??= anchors;
-        int top = Enumerable.Range(0, n).Max(i => anchors[i] + width[i]);
-        int bottom = anchors.Min();
-        int[]? fitted = top <= highest ? [.. anchors] : top - bottom <= highest ? [.. anchors.Select(a => a - (top - highest))] : null;
+        places ??= anchors;
+        int Floor(int i, int w) => Math.Min(floors?[i] ?? 0, highest - w);
+        int top = Enumerable.Range(0, n).Max(i => places[i] + width[i]);
+        int bottom = places.Min();
+        int[]? fitted = top <= highest ? [.. places] : top - bottom <= highest ? [.. places.Select(a => a - (top - highest))] : null;
+        if (fitted is not null && Enumerable.Range(0, n).Any(i => fitted[i] < Floor(i, width[i])))
+            fitted = null;
 
         // The runs of one chord repeated, each one step of the melody.
         var starts = Enumerable.Range(0, n).Where(i => i == 0 || anchors[i] != anchors[i - 1] || width[i] != width[i - 1] || tops[i] != tops[i - 1]).ToList();
@@ -579,10 +630,10 @@ public static class Reducer
         for (int k = 0; k < m; k++)
         {
             int w = width[starts[k]];
-            states[k] = [.. Enumerable.Range(w > 0 ? 1 : 0, w > 0 ? w : 1).SelectMany(x => Enumerable.Range(0, highest - x + 1).Select(v => (v, x)))];
+            states[k] = [.. Enumerable.Range(w > 0 ? 1 : 0, w > 0 ? w : 1).SelectMany(x => Enumerable.Range(0, highest - x + 1).Where(v => v >= Floor(starts[k], x)).Select(v => (v, x)))];
             cost[k] = new double[states[k].Length];
             back[k] = new int[states[k].Length];
-            double ideal = fitted?[starts[k]] ?? (A(k) - bottom) * scale;
+            double ideal = fitted?[starts[k]] ?? (places[starts[k]] - bottom) * scale;
             for (int s = 0; s < states[k].Length; s++)
             {
                 var (v, x) = states[k][s];

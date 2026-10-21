@@ -38,6 +38,14 @@ public sealed record FretReductionRules
     public bool? KeepExtendedSustains { get; init; }
 
     /// <summary>
+    /// Whether open notes are kept in a phrase that has pressed notes too, rather than each made a fret: the open green and
+    /// the phrase's frets one up, so going between an open and a fret is still a move. A phrase of opens alone keeps them.
+    /// Null keeps them; null too in settings saved before it was added, which <see cref="ReductionDefaults.Normalized"/>
+    /// fills from the shipped.
+    /// </summary>
+    public bool? KeepOpenNotes { get; init; }
+
+    /// <summary>
     /// The grid a burst's chords can be as close as, as a snap's division; no coarser than the thinning grid. Null for the
     /// thinning grid, so no burst is closer than it; null too in settings saved before it was added, which
     /// <see cref="ReductionDefaults.Normalized"/> fills from the shipped.
@@ -56,9 +64,9 @@ public sealed record FretReductionRules
         bool ghl = kind == ChartInstrumentKind.SixFret;
         return target switch
         {
-            ChartDifficulty.Hard => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 4, ThinningDivision = 16, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = true, KeepExtendedSustains = false },
-            ChartDifficulty.Medium => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 3, ThinningDivision = 8, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = true, KeepExtendedSustains = false },
-            _ => new() { MaxChordSize = 1, HighestLane = ghl ? 1 : 2, ThinningDivision = 4, BurstDivision = 8, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = false, KeepExtendedSustains = false },
+            ChartDifficulty.Hard => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 4, ThinningDivision = 16, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = true, KeepExtendedSustains = false, KeepOpenNotes = false },
+            ChartDifficulty.Medium => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 3, ThinningDivision = 8, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = true, KeepExtendedSustains = false, KeepOpenNotes = false },
+            _ => new() { MaxChordSize = 1, HighestLane = ghl ? 1 : 2, ThinningDivision = 4, BurstDivision = 8, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = false, KeepExtendedSustains = false, KeepOpenNotes = false },
         };
     }
 
@@ -253,7 +261,11 @@ public sealed class ReductionDefaults
     {
         if (rules is null)
             return shipped;
-        rules = rules with { KeepExtendedSustains = rules.KeepExtendedSustains ?? shipped.KeepExtendedSustains };
+        rules = rules with
+        {
+            KeepExtendedSustains = rules.KeepExtendedSustains ?? shipped.KeepExtendedSustains,
+            KeepOpenNotes = rules.KeepOpenNotes ?? shipped.KeepOpenNotes,
+        };
         if (!BeforeBursts(rules.BurstDivision, rules.MaxBurst) || NormalizedDivision(rules.ThinningDivision) != shipped.ThinningDivision)
             return rules;
         return rules with { BurstDivision = shipped.BurstDivision, MaxBurst = shipped.MaxBurst, KeepForcedHopoAndTap = shipped.KeepForcedHopoAndTap };
