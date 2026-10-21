@@ -1364,7 +1364,7 @@ Acceptance criteria:
      | HOPOs and taps, as played | kept | kept | kept |
      | Sustains shorter than a beat | kept | kept | removed |
      | Sustains held while other notes are played | removed | removed | removed |
-     | Open notes between pressed ones | fretted | fretted | fretted |
+     | Open notes in phrases with pressed notes | fretted | fretted | fretted |
      | Drums: pads per hit (plus kick) | 2 | 2 | 1 |
      | Drums: kick | kept | thinned to 1/8 | thinned to 1/4 |
      | Drums: 2× kick | removed | removed | removed |
@@ -1494,14 +1494,19 @@ rhythm.
   most kept is then added to the rest where the spacing allows.
 - **Sustains.** On a difficulty that removes sustains shorter than a beat, a sustain a burst cuts
   short of a beat is a plain note.
-- **Open notes between pressed ones.** Going between an open and a fret is hard to play, so Hard,
-  Medium and Easy fret the opens of a phrase that has both. Each open becomes green. Each fret next
-  to an open, with the same chord repeated beside it, moves up one and is kept off green, so the
-  change is still a move. An Expert `R o R o G o G o` is `Y G Y G R G R G` on Hard. Frets further
-  from an open keep their place, so a fill in the same phrase keeps its orange. The phrase is then
-  fitted to the range as a whole, its steps judged on the source's frets. The lift follows the
-  source, so Medium keeps it where its opens are thinned out. A phrase of opens alone keeps them.
-  On GHL an open becomes the first white fret.
+- **Open notes in phrases with pressed notes.** Going between an open and a fret is hard to play,
+  so Hard, Medium and Easy fret the opens of a phrase that has opens played alone and pressed notes
+  both. Every open in the phrase becomes green, those before and after its frets as well as those
+  between them. An open in a chord with frets becomes green pressed with them, so `o+R` is `G R`,
+  and Easy keeps only the green. Each fret next to an open alone, with the same chord repeated
+  beside it, moves up one and is kept off green, so the change is still a move. An Expert
+  `R o R o G o G o` is `Y G Y G R G R G` on Hard. Frets further from an open keep their place, so a
+  fill in the same phrase keeps its orange. The phrase is then fitted to the range as a whole, its
+  steps judged on the source's frets. The lift follows the source, so Medium keeps it where its
+  opens are thinned out. A fret next to an open only once thinning has left them side by side
+  moves up one too. A phrase without an open alone keeps its opens, such as one of opens alone, or
+  of `o+R` chords and frets. So does every phrase where green is the highest fret, since no fret
+  can move off it. On GHL an open becomes the first white fret.
 - **A chord change over one fret.** A step of the melody goes the way the chord's lowest fret goes,
   or, where that stays, the way its highest goes. Easy keeps a chord's lowest fret alone, so
   green–red then green–yellow was green twice, and the change was lost. Where a phrase loses a

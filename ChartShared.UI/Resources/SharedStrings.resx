@@ -904,7 +904,7 @@
     <value>Keep sustains held while other notes are played</value>
   </data>
   <data name="ReductionKeepOpenNotes" xml:space="preserve">
-    <value>Keep open notes between pressed ones</value>
+    <value>Keep open notes in phrases that have pressed notes too</value>
   </data>
   <data name="ReductionPadsLabel" xml:space="preserve">
     <value>Pads per hit (plus kick)</value>

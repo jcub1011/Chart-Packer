@@ -177,6 +177,65 @@ public sealed class ReducerTests
     }
 
     [TestMethod]
+    public void APhraseOfOpensOnlyWithFretsKeepsThem()
+    {
+        // No open is played alone, so nothing goes between an open and a fret: the opens are kept.
+        var chart = Frets(Chord(0, Open, R), Chord(240, Open, R), Chord(480, Y));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Hard, Free(Hard)).Notes;
+
+        Assert.AreSequenceEqual([Open, R, Open, R, Y], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void AnOpenWithFretsIsGreenPressedWithThem()
+    {
+        var chart = Frets(Chord(0, Open), Chord(240, R), Chord(480, Open, R), Chord(720, Open));
+
+        Assert.AreSequenceEqual([G, Y, G, R, G], Lanes(Reducer.Reduce(chart, Guitar, Expert, Hard, Free(Hard)).Notes));
+        Assert.AreSequenceEqual([G, Y, G, G], Lanes(Reducer.Reduce(chart, Guitar, Expert, Easy, Free(Easy)).Notes), "Easy keeps the chord's lowest, the green.");
+    }
+
+    [TestMethod]
+    public void WithGreenTheHighestOpensAreKept()
+    {
+        // No fret can be lifted off green, so fretting the opens would leave nothing but green.
+        var chart = Frets(Chord(0, R), Chord(240, Open), Chord(480, R), Chord(720, Open));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Medium, Free(Medium) with { HighestLane = 0 }).Notes;
+
+        Assert.AreSequenceEqual([G, Open, G, Open], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void AFretBesideAnOpenOnlyOnceThinnedIsLiftedToo()
+    {
+        // Sixteenths open, yellow, green: thinned to eighths, green is beside the open, now green, so it's lifted off it,
+        // not stretched over the range.
+        var chart = Frets(Chord(0, Open), Chord(120, Y), Chord(240, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Medium, Rules(Medium) with { ThinningDivision = 8 }).Notes;
+
+        Assert.AreSequenceEqual([G, R], Lanes(notes));
+    }
+
+    [TestMethod]
+    public void AFloorIsRaisedToRatherThanStretchingThePhrase()
+    {
+        // Green beside a green open, then red: it fits, so green is raised to its floor, not spread over the range.
+        Assert.AreSequenceEqual([1, 2], Reducer.FitPhrase([0, 1], [0, 0], 3, places: [0, 1], floors: [1, 0]).Select(p => p.Anchor).ToList());
+        Assert.AreSequenceEqual([1], Reducer.FitPhrase([0], [0], 2, places: [0], floors: [1]).Select(p => p.Anchor).ToList(), "One note under its floor.");
+    }
+
+    [TestMethod]
+    public void ARunTakesItsHighestFloor()
+    {
+        // Green twice, the second beside an open: placed as one, both are off green, whether the phrase fits or is scaled.
+        Assert.AreSequenceEqual([1, 1], Reducer.FitPhrase([0, 0], [0, 0], 3, places: [0, 1], floors: [0, 1]).Select(p => p.Anchor).ToList());
+        Assert.AreSequenceEqual([1, 1, 3], Reducer.FitPhrase([0, 0, 4], [0, 0, 0], 3, places: [0, 1, 4], floors: [0, 1, 0]).Select(p => p.Anchor).ToList());
+    }
+
+    [TestMethod]
     public void ForcingAndTapsAreKeptOnEveryDifficultyByDefault()
     {
         var chart = Frets(Chord(0, G), Chord(480, R), Chord(960, Y));

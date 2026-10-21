@@ -38,8 +38,10 @@ public sealed record FretReductionRules
     public bool? KeepExtendedSustains { get; init; }
 
     /// <summary>
-    /// Whether open notes are kept in a phrase that has pressed notes too, rather than each made a fret: the open green and
-    /// the phrase's frets one up, so going between an open and a fret is still a move. A phrase of opens alone keeps them.
+    /// Whether open notes are kept in a phrase that has opens played alone and pressed notes both, rather than made frets.
+    /// Made frets, every open in the phrase is green, those before, after and between its pressed notes, and one in a
+    /// chord with frets pressed with them; each fret next to an open alone is one up, so going between them is still a
+    /// move. A phrase without an open alone keeps its opens, as does every phrase where green is the highest lane.
     /// Null keeps them; null too in settings saved before it was added, which <see cref="ReductionDefaults.Normalized"/>
     /// fills from the shipped.
     /// </summary>

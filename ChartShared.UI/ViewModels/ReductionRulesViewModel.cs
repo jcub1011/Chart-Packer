@@ -134,7 +134,7 @@ namespace ChartShared.UI.ViewModels
         [ObservableProperty]
         public partial bool KeepExtendedSustains { get; set; }
 
-        /// <summary>Whether open notes are kept in a phrase that has pressed notes too.</summary>
+        /// <summary>Whether open notes are kept in a phrase that has pressed notes too, rather than made frets.</summary>
         [ObservableProperty]
         public partial bool KeepOpenNotes { get; set; }
 
