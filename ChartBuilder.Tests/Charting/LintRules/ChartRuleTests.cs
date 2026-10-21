@@ -1,5 +1,6 @@
 using System.Globalization;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -225,10 +226,14 @@ public sealed class ChartRuleTests
     [TestMethod]
     public void APartWithoutStarPowerIsNotedOnlyWhereStarPowerCanBeGenerated()
     {
-        // Drums and GHL have none and aren't noted; neither is a 5-fret part with too few chords for a phrase.
-        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2"), KeyValuePair.Create("diff_guitarghl", "2")], drums: true);
+        // Drums and GHL have none and aren't noted; neither is a 5-fret part with too few chords for a phrase, nor keys whose
+        // six chords all come too near its end for a phrase's star power to be used.
+        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2"), KeyValuePair.Create("diff_keys", "2"), KeyValuePair.Create("diff_guitarghl", "2")], drums: true);
         new AddPart(ChartInstrument.Bass).Apply(chart);
         new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0), new EditableNote(Beat, 1, 1), new EditableNote(2 * Beat, 1, 2)]).Apply(chart);
+        new AddPart(ChartInstrument.Keys).Apply(chart);
+        new AddNotes(ChartInstrument.Keys, Expert, [.. Enumerable.Range(0, 6).Select(i => new EditableNote((long)i * Beat, 1, i % 5))]).Apply(chart);
+        Assert.IsFalse(StarPowerGenerator.HasSpot(chart, chart.PartOf(ChartInstrument.Keys)!));
         new AddPart(ChartInstrument.GhlGuitar).Apply(chart);
         new AddNotes(ChartInstrument.GhlGuitar, Expert, [.. Enumerable.Range(0, Notes).Select(i => new EditableNote((long)i * Beat, 1, 0))]).Apply(chart);
 
@@ -238,23 +243,19 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
-    public void EachPartWithoutStarPowerIsNotedAndFixAllGeneratesForEveryOneAsOneStep()
+    public void EachPartWithoutStarPowerIsNotedAndGeneratingItProposesSome()
     {
         var (chart, input) = Triggered(ChrRules.Chr066);
         new AddPart(ChartInstrument.Keys).Apply(chart);
         new AddNotes(ChartInstrument.Keys, Expert, [.. Enumerable.Range(0, Notes).Select(i => new EditableNote((long)i * Beat, 1, i % 5))]).Apply(chart);
-        var linter = new ChartLinter();
-        var findings = linter.LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
-        var session = new EditorSession(new ChartUndoStack(chart), default, input.SongIni);
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
 
-        int? fixes = session.FixAll(findings, ChartFixOption.Only);
-
+        // The fix is a run of Generate star power, whose ghosts the author keeps or drops: there's no quick fix to apply.
         Assert.AreSequenceEqual([Guitar, ChartInstrument.Keys], [.. findings.Select(f => f.Location!.Part)]);
         Assert.IsTrue(findings.All(f => f.Severity == Severity.Info));
-        Assert.AreEqual(2, fixes);
-        Assert.AreEqual(1, session.UndoStack.UndoCount, "One step.");
-        Assert.IsEmpty(linter.LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066));
-        Assert.IsEmpty(linter.LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr065));
+        Assert.IsEmpty(QuickFixRegistry.ProposeChartFixes(findings[0], chart, input.Options));
+        foreach (var finding in findings)
+            Assert.IsNotEmpty(StarPowerGenerator.Propose(chart, finding.Location!.Part, StarPowerOptions.Default, input.Options).Proposals);
     }
 
     [TestMethod]

@@ -33,6 +33,7 @@ internal sealed class StarPowerScheduler
     private readonly List<Placed> _fixed;
     private readonly int _target;
     private readonly int _fixedInRegion;
+    private readonly double _spacing;
 
     public StarPowerScheduler(StarPowerContext context, List<StarPowerCandidate> candidates, StarPowerOptions options)
     {
@@ -55,6 +56,7 @@ internal sealed class StarPowerScheduler
         double active = timeline.ActiveSecondsAt(context.To) - timeline.ActiveSecondsAt(context.From);
         int count = (int)Math.Round(active / options.SpacingSeconds, MidpointRounding.AwayFromZero);
         _target = context.Span is null ? Math.Max(_p.MinPhrases, count) : Math.Max(1, count);
+        _spacing = options.SpacingSeconds;
     }
 
     /// <summary>The phrases to propose, in order, charging for <paramref name="spikes"/> (most prominent first) where they can.</summary>
@@ -83,6 +85,15 @@ internal sealed class StarPowerScheduler
 
         Spread(picks, activations, remaining - picks.Count);
         Close(picks, activations);
+
+        // Where any spot fits, one is proposed, wherever the shares fell: the best of them.
+        if (picks.Count == 0 && remaining > 0 && Best(_fixed) is { } only)
+        {
+            var pick = Placed.Of(only, null);
+            if (activations.Count == 0 || StarPowerMeter.AllFire(Completions([pick]), activations, _p))
+                picks.Add(pick);
+        }
+
         return [.. picks.OrderBy(static p => p.Tick).Select(static p => new StarPowerProposal(p.Candidate!.Value.Phrase, p.Spike is null ? StarPowerRole.Filler : StarPowerRole.SpikeLeadIn, p.Spike))];
     }
 
@@ -248,11 +259,26 @@ internal sealed class StarPowerScheduler
         return false;
     }
 
-    // The stretches of playing, in seconds, between the counted region's ends and the phrases placed in it.
+    // The stretches of playing, in seconds, between the counted region's ends and the phrases placed in it. Over a span, its
+    // first stretch reaches back to the end of the phrase there before it, and its last on to the start of the one after,
+    // up to a spacing each way, so the phrases proposed are spaced from those too.
     private List<(double From, double To)> Gaps(List<Placed> picks)
     {
         var timeline = _c.Timeline;
         double start = timeline.ActiveSecondsAt(_c.From), end = timeline.ActiveSecondsAt(_c.To);
+        double before = double.NegativeInfinity, after = double.PositiveInfinity;
+        foreach (var placed in _fixed)
+        {
+            if (placed.CoverEnd <= _c.From)
+                before = Math.Max(before, placed.EndSeconds);
+            else if (placed.Tick > _c.To)
+                after = Math.Min(after, placed.StartSeconds);
+        }
+
+        if (!double.IsNegativeInfinity(before))
+            start = Math.Max(before, start - _spacing);
+        if (!double.IsPositiveInfinity(after))
+            end = Math.Min(after, end + _spacing);
         var gaps = new List<(double, double)>();
         double from = start;
         foreach (var placed in _fixed.Concat(picks).Where(p => p.Tick <= _c.To && p.CoverEnd > _c.From).OrderBy(static p => p.Tick))
@@ -280,6 +306,19 @@ internal sealed class StarPowerScheduler
         }
 
         return true;
+    }
+
+    // The best spot clear of the phrases placed, the earlier of two as good; null for none.
+    private StarPowerCandidate? Best(List<Placed> placed)
+    {
+        StarPowerCandidate? best = null;
+        foreach (var c in _candidates)
+        {
+            if ((best is null || c.Quality > best.Value.Quality + 1e-9) && Clear(c, placed))
+                best = c;
+        }
+
+        return best;
     }
 
     // Where every phrase there and picked is completed, as measure positions.

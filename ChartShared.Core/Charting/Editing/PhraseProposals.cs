@@ -71,6 +71,14 @@ public abstract class PhraseProposals
         return null;
     }
 
+    /// <summary>Moves the cursor to the start of the first proposal after it, which scrolls the lanes there.</summary>
+    /// <returns>Whether there was one.</returns>
+    public bool GoToNext() => GoTo(NextAfter(CursorTick()));
+
+    /// <summary>Moves the cursor to the start of the last proposal before it, which scrolls the lanes there.</summary>
+    /// <returns>Whether there was one.</returns>
+    public bool GoToPrevious() => GoTo(PreviousBefore(CursorTick()));
+
     /// <summary>Keeps the proposal at <paramref name="index"/> if it's dropped, or drops it if it's kept.</summary>
     public void Toggle(int index)
     {
@@ -184,6 +192,18 @@ public abstract class PhraseProposals
         _kept.Clear();
         Forget();
         Session.RaiseState();
+    }
+
+    // The cursor's tick as it is, not snapped: a coarse grid would round it off the proposal it was moved to, which would be
+    // found again.
+    private long CursorTick() => (long)Math.Round(Session.TickAt(Session.Viewport.Cursor));
+
+    private bool GoTo(int? index)
+    {
+        if (index is not { } i)
+            return false;
+        Session.MoveCursorTo(_phrases[i].Tick);
+        return true;
     }
 
     private void SetAll(bool kept)

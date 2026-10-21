@@ -1288,13 +1288,15 @@ Acceptance criteria:
      (default 22, as the official charts are), and whether they're **charged for the hard passages**
      (default on) or only spread
      evenly. As with Generate fills, the proposals are ghosts the author keeps or drops, and the
-     accepted ones are added as one undoable command. CHR066's quick fix adds what a run with the
-     defaults proposes, all at once, in Chart Builder and the library.
+     accepted ones are added as one undoable command. CHR066's fix in Chart Builder starts a run with
+     the defaults over the whole part, whose ghosts the author keeps or drops as any other run's; it has
+     no Fix All. The library's adds what that run proposes, all at once.
    - *Settled:* phrases are placed against the part's highest difficulty with notes, and each
      covers a note on every difficulty with notes, so none is empty on one (CHR065). The count is
      the part's playing, in seconds with its rests left out (a gap between notes of 4 measures or
      8 s), over the spacing, and at least four, a full meter, for the whole part; over a selection,
-     at least one. Fewer are proposed where fewer fit.
+     at least one. Fewer are proposed where fewer fit, but one wherever any fits. Over a selection,
+     they're spaced from the star power just before and after it too, up to a spacing away.
    - *Settled:* a phrase starts on a measure line, or on a run's first chord where it's on a beat,
      and ends at a run's end or on the last chord before a measure line. A run is chords between
      rests of a beat and sections, as Reduce splits them ([C9](#c9-difficulty-authoring)). As the
@@ -2241,7 +2243,9 @@ Acceptance criteria:
   rating, missing difficulties and star power generated into the draft); the rest have none. A
   song is listed for a chart Warning or Error, not for Info alone, and counts as failing until both
   its metadata and its chart pass. A song whose only chart finding to fix is CHR066 is listed too,
-  so Fix selected can generate its star power, but doesn't count as failing. Fix selected generates
+  so Fix selected can generate its star power, but doesn't count as failing. Ticking a song, or
+  every song, ticks its CHR066 fix only when it's the song's only fix; otherwise it's ticked on its
+  own, as it rewrites the chart though nothing fails. Fix selected generates
   a song's star power and missing difficulties as one chart, star power first, so the difficulties
   reduced after keep a note in each phrase; the Generate difficulties dialog is shown only when some
   song has difficulties to generate.
@@ -2577,7 +2581,7 @@ covers a note.
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
 | CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
 | CHR065 | Warning | A star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some. A phrase empty on every difficulty is CHR060's or CHR061's. | — |
-| CHR066 | Info | A 5-fret or keys part has no star power phrases, so a player never earns star power on it. Only where its highest difficulty with notes has 4 chords or more, enough for a phrase; drums and GHL aren't checked. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1), in Chart Builder and the library |
+| CHR066 | Info | A 5-fret or keys part has no star power phrases, so a player never earns star power on it. Only where a phrase fits, so generating it always proposes some; drums and GHL aren't checked. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1): a run to keep or drop in Chart Builder, added at once in the library |
 
 *Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
 merges the group into its first phrase.

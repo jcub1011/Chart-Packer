@@ -540,20 +540,18 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Moves the cursor to the start of the run's proposal before it, which scrolls the lanes there.</summary>
         [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void PreviousProposal() => GoToProposal(static (run, tick) => run.PreviousBefore(tick), Strings.ProposalRunNoneBefore);
+        private void PreviousProposal()
+        {
+            if (Session.Proposals is { } run && !run.GoToPrevious())
+                Session.Status = Strings.ProposalRunNoneBefore;
+        }
 
         /// <summary>Moves the cursor to the start of the run's proposal after it, which scrolls the lanes there.</summary>
         [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
-        private void NextProposal() => GoToProposal(static (run, tick) => run.NextAfter(tick), Strings.ProposalRunNoneAfter);
-
-        private void GoToProposal(Func<PhraseProposals, long, int?> find, string none)
+        private void NextProposal()
         {
-            if (Session.Proposals is not { } run)
-                return;
-            if (find(run, Session.CursorTick) is { } index)
-                Session.MoveCursorTo(run.Phrases[index].Tick);
-            else
-                Session.Status = none;
+            if (Session.Proposals is { } run && !run.GoToNext())
+                Session.Status = Strings.ProposalRunNoneAfter;
         }
 
         [RelayCommand]

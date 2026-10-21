@@ -80,7 +80,6 @@ public sealed class StarPowerGeneratorTests
         Assert.AreEqual(2, timeline.MeasureAt(2 * Measure), 1e-9);
         Assert.AreEqual(3, timeline.MeasureAt((2 * Measure) + 1440), 1e-9);
         Assert.AreEqual(2.5, timeline.MeasureAt((2 * Measure) + 720), 1e-9);
-        Assert.AreEqual((2 * Measure) + 1440, timeline.TickAt(3));
     }
 
     [TestMethod]
@@ -292,6 +291,33 @@ public sealed class StarPowerGeneratorTests
 
         Assert.IsNotEmpty(generated.Proposals);
         Assert.IsTrue(generated.Proposals.All(p => p.Phrase.Tick >= 16 * Measure && p.Phrase.CoverEnd <= 40 * Measure));
+    }
+
+    [TestMethod]
+    public void OverASpanThePhrasesAreSpacedFromTheOneBeforeItToo()
+    {
+        // A phrase over measure 4, then a span from measure 6: the first proposal isn't put early in the span, as if the
+        // part started there, but about as far from that phrase as the proposals are from each other.
+        var chart = Chart(Steady(0, 64));
+        var earlier = new Phrase(PhraseKind.StarPower, 4 * Measure, Measure);
+        new AddPhrase(Guitar, earlier).Apply(chart);
+
+        var proposals = Propose(chart, span: (6 * Measure, (40 * Measure) - 1)).Proposals.Select(p => p.Phrase).ToList();
+
+        Assert.IsGreaterThan(1, proposals.Count);
+        List<Phrase> phrases = [earlier, .. proposals];
+        var gaps = phrases.Zip(phrases.Skip(1), static (a, b) => (double)(b.Tick - a.CoverEnd) / Measure).ToList();
+        Assert.IsTrue(gaps[0] >= gaps.Skip(1).Min() - 1, $"Measures between phrases: {string.Join(", ", gaps)}.");
+    }
+
+    [TestMethod]
+    public void WhereAnySpotFitsAPhraseIsProposed()
+    {
+        // Measures 0 to 2 only: one spot fits, early enough to be used, and the meter's count is no reason to leave it out.
+        var chart = Chart(Steady(0, 3));
+
+        Assert.IsTrue(StarPowerGenerator.HasSpot(chart, chart.PartOf(Guitar)!));
+        Assert.IsNotEmpty(Propose(chart).Proposals);
     }
 
     [TestMethod]

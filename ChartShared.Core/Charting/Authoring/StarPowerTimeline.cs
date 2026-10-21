@@ -82,14 +82,6 @@ internal sealed class StarPowerTimeline
         return m + ((double)(tick - MeasureLines[m]) / Math.Max(1, length));
     }
 
-    /// <summary>The tick at the measure position <paramref name="measure"/>, rounded up.</summary>
-    public long TickAt(double measure)
-    {
-        int m = Math.Clamp((int)Math.Floor(measure), 0, MeasureLines.Length - 2);
-        long length = MeasureLines[m + 1] - MeasureLines[m];
-        return MeasureLines[m] + (long)Math.Ceiling((measure - m) * length - 1e-9);
-    }
-
     /// <summary>The song time at <paramref name="tick"/> less the rests before it, in seconds: the part's playing up to it.</summary>
     public double ActiveSecondsAt(long tick) => Active(_map.SecondsAt(tick), _restSeconds);
 

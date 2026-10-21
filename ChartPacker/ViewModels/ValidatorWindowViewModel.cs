@@ -152,10 +152,13 @@ namespace ChartPacker.ViewModels
         /// <summary>A song a worker read, with its chart's findings and, when it had no draft, what checking it found.</summary>
         private sealed record ReadSong(int Index, SongMetadataReport Report, SongChartLintReport? Lint, ValidatorSongCheck? Check);
 
-        // The counts, as last worked out: the listed songs that still fail, their issues with a quick fix, and how many of those are ticked.
+        // The counts, as last worked out: the listed songs that still fail, their issues with a quick fix, and how many of those are
+        // ticked; and of those ticking all ticks (ValidatorSongViewModel.BulkIssues), how many there are and are ticked.
         private int _failingCount;
         private int _fixableCount;
         private int _selectedFixCount;
+        private int _bulkCount;
+        private int _bulkSelectedCount;
 
         /// <param name="entries">The songs to check, in the order they're listed.</param>
         /// <param name="drafts">The main window's drafts, which the songs are checked as.</param>
@@ -349,13 +352,14 @@ namespace ChartPacker.ViewModels
         public string FixSelectedText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorFixSelectedFormat, SelectedFixCount);
 
         /// <summary>
-        /// Whether every issue shown with a quick fix is ticked: <see langword="null"/> when only some are. Setting it
-        /// ticks or clears them all; clearing it while only some are ticked ticks them all, so a click on the partly
-        /// ticked box selects everything first.
+        /// Whether every issue shown with a quick fix is ticked, but a song's suggested fix where it has others
+        /// (<see cref="ValidatorSongViewModel.BulkIssues"/>): <see langword="null"/> when only some are. Setting it ticks
+        /// them, or clears every one; clearing it while only some are ticked ticks them, so a click on the partly ticked
+        /// box selects everything first.
         /// </summary>
         public bool? AllFixesSelected
         {
-            get => _selectedFixCount == 0 ? false : _selectedFixCount == _fixableCount ? true : null;
+            get => _selectedFixCount == 0 ? false : _bulkSelectedCount == _bulkCount ? true : null;
             set
             {
                 bool select = value ?? true;
@@ -365,7 +369,7 @@ namespace ChartPacker.ViewModels
                 _selectingAll = true;
                 try
                 {
-                    foreach (var issue in FixableIssues)
+                    foreach (var issue in (select ? ShownSongs.SelectMany(static s => s.BulkIssues) : FixableIssues).ToList())
                         issue.IsSelected = select;
                 }
                 finally
@@ -1301,8 +1305,18 @@ namespace ChartPacker.ViewModels
                     selected++;
             }
 
+            int bulk = 0, bulkSelected = 0;
+            foreach (var issue in ShownSongs.SelectMany(static s => s.BulkIssues))
+            {
+                bulk++;
+                if (issue.IsSelected)
+                    bulkSelected++;
+            }
+
             _fixableCount = fixable;
             _selectedFixCount = selected;
+            _bulkCount = bulk;
+            _bulkSelectedCount = bulkSelected;
             OnPropertyChanged(nameof(HasFixes));
             OnPropertyChanged(nameof(SelectedFixCount));
             OnPropertyChanged(nameof(FixSelectedText));
@@ -1462,26 +1476,31 @@ namespace ChartPacker.ViewModels
         public string SelectFixesName => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorSelectSongFixesFormat, Title);
 
         /// <summary>
-        /// Whether every issue shown of the song with a quick fix is ticked: <see langword="null"/> when only some are.
-        /// Setting it ticks or clears them all; clearing it while only some are ticked ticks them all, so a click on
-        /// the partly ticked box selects everything first.
+        /// The issues shown that ticking the song, or every song, ticks: those with a quick fix, but a suggested one, such
+        /// as star power to generate (CHR066), only when it's the song's only fix. A suggestion, which no failure asks
+        /// for and which rewrites the chart, is otherwise ticked on its own.
+        /// </summary>
+        public IEnumerable<ValidatorIssueViewModel> BulkIssues
+        {
+            get
+            {
+                bool others = ShownIssues.Any(static i => i.IsFixable && !i.IsSuggestion);
+                return ShownIssues.Where(i => i.IsFixable && (!i.IsSuggestion || !others));
+            }
+        }
+
+        /// <summary>
+        /// Whether every issue of <see cref="BulkIssues"/> is ticked: <see langword="null"/> when only some issues with a
+        /// quick fix are. Setting it ticks them, or clears every issue; clearing it while only some are ticked ticks them,
+        /// so a click on the partly ticked box selects everything first.
         /// </summary>
         public bool? AllSelected
         {
             get
             {
-                int fixable = 0, selected = 0;
-                foreach (var issue in ShownIssues)
-                {
-                    if (!issue.IsFixable)
-                        continue;
-
-                    fixable++;
-                    if (issue.IsSelected)
-                        selected++;
-                }
-
-                return selected == 0 ? false : selected == fixable ? true : null;
+                if (!ShownIssues.Any(static i => i.IsFixable && i.IsSelected))
+                    return false;
+                return BulkIssues.All(static i => i.IsSelected) ? true : null;
             }
             set
             {
@@ -1492,11 +1511,8 @@ namespace ChartPacker.ViewModels
                 _settingAll = true;
                 try
                 {
-                    foreach (var issue in ShownIssues)
-                    {
-                        if (issue.IsFixable)
-                            issue.IsSelected = select;
-                    }
+                    foreach (var issue in (select ? BulkIssues : ShownIssues.Where(static i => i.IsFixable)).ToList())
+                        issue.IsSelected = select;
                 }
                 finally
                 {
@@ -1539,6 +1555,7 @@ namespace ChartPacker.ViewModels
                     Id = line.Id,
                     ChartSeverity = line.ChartSeverity,
                     ChartFix = line.ChartFix,
+                    IsSuggestion = line.IsSuggestion,
                 })
                 .ToList();
 
@@ -1684,6 +1701,7 @@ namespace ChartPacker.ViewModels
                 {
                     Id = ValidatorIssueLine.ChartId(ChrRules.Chr066, ""),
                     ChartFix = canFix ? new ValidatorStarPowerFix(noStarPower) : null,
+                    IsSuggestion = true,
                 });
             }
 
@@ -1768,6 +1786,9 @@ namespace ChartPacker.ViewModels
         /// <summary>What fixes a chart finding: its suggested rating, or its missing difficulties generated; null for the metadata's.</summary>
         public ValidatorChartFix? ChartFix { get; init; }
 
+        /// <summary>Its fix is for a note that fails nothing, such as star power to generate (CHR066), so it's ticked on its own.</summary>
+        public bool IsSuggestion { get; init; }
+
         /// <summary>The <see cref="Id"/> of a chart finding's line.</summary>
         public static string ChartId(string ruleId, string key) => ruleId + ":" + key;
     }
@@ -1802,6 +1823,9 @@ namespace ChartPacker.ViewModels
 
         /// <summary>What fixes a chart finding (<see cref="ValidatorIssueLine.ChartFix"/>); null for a metadata issue.</summary>
         public ValidatorChartFix? ChartFix { get; init; }
+
+        /// <summary>Its fix is suggested, not asked for by a failure (<see cref="ValidatorIssueLine.IsSuggestion"/>).</summary>
+        public bool IsSuggestion { get; init; }
 
         /// <summary>The key is shown as a chip before the message; a note about the whole song has none.</summary>
         public bool HasKey => Key.Length > 0;

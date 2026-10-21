@@ -208,8 +208,8 @@ public sealed class PhraseEmptyOnDifficultyRule : IChartLintRule
 
 /// <summary>
 /// CHR066: a 5-fret or keys part with notes has no star power phrases, so a player never earns star power on it. One
-/// finding for each such part, whose highest difficulty with notes has enough chords for a phrase
-/// (<see cref="StarPowerParameters.MinChords"/>). Its fix generates them (<see cref="StarPowerGenerator"/>).
+/// finding for each such part where a phrase fits (<see cref="StarPowerGenerator.HasSpot"/>), so generating it
+/// (<see cref="StarPowerGenerator"/>) always proposes some.
 /// </summary>
 public sealed class NoStarPowerRule : IChartLintRule
 {
@@ -229,7 +229,9 @@ public sealed class NoStarPowerRule : IChartLintRule
         {
             if (!StarPowerGenerator.CanGenerate(part.Kind) || StarPowerGenerator.HasStarPower(part) || DifficultyGenerator.HighestCharted(part) is not { } highest)
                 continue;
-            if (ChordCount(part[highest]) >= StarPowerParameters.Default.MinChords)
+
+            // Too few chords for a phrase is the common case, told without looking for a spot.
+            if (ChordCount(part[highest]) >= StarPowerParameters.Default.MinChords && StarPowerGenerator.HasSpot(context.Chart, part))
                 findings.Add(new Finding(RuleId, Severity, FindingMessages.ChrNoStarPower, Location: new ChartLocation(part.Instrument, null, 0, 0)));
         }
 

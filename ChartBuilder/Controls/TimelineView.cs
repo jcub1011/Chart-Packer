@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
@@ -49,6 +48,9 @@ namespace ChartBuilder.Controls
         private const double DensityFraction = 0.3;
         private const byte BandAlpha = 0xC0;
         private static readonly IBrush DensityBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xB0, 0x40));
+
+        // Each phrase rail row's band, made the first time it's drawn: rendering is on the UI thread only.
+        private static readonly Dictionary<RailKind, IBrush> BandBrushes = [];
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
         // The synchronized region, outlined, and the passages synced with it, filled, behind the other marks.
@@ -418,14 +420,13 @@ namespace ChartBuilder.Controls
                 context.FillRectangle(DensityBrush, new Rect(x, bounds.Bottom - height, Math.Max(1, width / columns), height));
             }
 
-            var bandBrushes = overview.Rows.Select(static row => (IBrush)new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Of(row), BandAlpha))).ToList();
             foreach (var phrase in overview.Phrases)
             {
                 int row = IndexOf(overview.Rows, phrase.Row);
                 if (row < 0)
                     continue;
                 double y = top + (row * (BandHeight + BandGap));
-                context.FillRectangle(bandBrushes[row], new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
+                context.FillRectangle(BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
             }
 
             var labelBrush = TickBrush ?? Brushes.Gray;
@@ -463,6 +464,17 @@ namespace ChartBuilder.Controls
                     }
                 }
             }
+        }
+
+        private static IBrush BandBrush(RailKind row)
+        {
+            if (!BandBrushes.TryGetValue(row, out var brush))
+            {
+                brush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Of(row), BandAlpha));
+                BandBrushes[row] = brush;
+            }
+
+            return brush;
         }
 
         private static int IndexOf(IReadOnlyList<RailKind> rows, RailKind row)

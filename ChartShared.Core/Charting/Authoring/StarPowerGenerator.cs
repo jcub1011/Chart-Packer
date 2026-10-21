@@ -146,8 +146,8 @@ public sealed record StarPowerGeneration(IReadOnlyList<StarPowerProposal> Propos
 
 /// <summary>
 /// Generate star power (charter-spec C8 item 1): proposes star power phrases for a 5-fret or keys part, over a span of it
-/// or all of it, which the author then keeps or drops (<see cref="Editing.StarPowerProposals"/>), or a quick fix adds
-/// (CHR066). It changes nothing.
+/// or all of it, which the author then keeps or drops (<see cref="Editing.StarPowerProposals"/>), or the library adds for
+/// CHR066's fix (<see cref="Validation.SongDifficultyGeneration"/>). It changes nothing.
 /// </summary>
 /// <remarks>
 /// <para>Phrases are placed against the part's highest difficulty with notes, and each covers a note on every difficulty
@@ -182,6 +182,22 @@ public static class StarPowerGenerator
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Whether a star power phrase fits anywhere in <paramref name="part"/> of <paramref name="chart"/>, so
+    /// <see cref="Propose"/> over the whole part proposes at least one: a spot with enough chords, clear of sections,
+    /// solos' edges and the star power there, early enough to be used. It doesn't score the part's difficulty, so it's
+    /// cheap enough for lint (CHR066).
+    /// </summary>
+    public static bool HasSpot(EditableChart chart, EditablePart part, StarPowerParameters? parameters = null)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(part);
+        if (!CanGenerate(part.Kind) || DifficultyGenerator.HighestCharted(part) is not { } highest)
+            return false;
+        var context = StarPowerContext.Of(chart, part, highest, null, parameters ?? StarPowerParameters.Default);
+        return StarPowerCandidates.Find(context).Count > 0;
     }
 
     /// <summary>

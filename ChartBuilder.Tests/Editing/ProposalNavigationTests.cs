@@ -13,8 +13,6 @@ namespace ChartBuilder.Tests.Editing;
 [TestClass]
 public sealed class ProposalNavigationTests
 {
-    private const long Measure = 1920;
-
     [TestMethod]
     public void NextIsTheFirstProposalStartingAfterTheTick()
     {
@@ -46,22 +44,51 @@ public sealed class ProposalNavigationTests
 
         Assert.IsNull(session.StarPower.NextAfter(0));
         Assert.IsNull(session.StarPower.PreviousBefore(long.MaxValue));
+        Assert.IsFalse(session.StarPower.GoToNext());
+        Assert.IsFalse(session.StarPower.GoToPrevious());
+    }
+
+    [TestMethod]
+    public void NextAndPreviousReachEveryProposalWhateverTheSnap()
+    {
+        // In 3/4 a whole-note grid misses most measure lines, where the proposals start, so the snapped cursor would sit
+        // before or after the one it was moved to.
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 3, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar }, DrumsVariant.Pro));
+        var session = Of(chart);
+        var run = Start(session, 3);
+        session.Snap = SnapGrid.Of(1);
+        var starts = run.Phrases.Select(static p => p.Tick).ToList();
+        Assert.Contains(t => t % (4 * 480) != 0, starts, "Some proposal is off the grid.");
+
+        // Bounded, so one found again fails the test rather than going on forever.
+        session.MoveCursorTo(0);
+        var forward = new List<long>();
+        while (forward.Count <= starts.Count && run.GoToNext())
+            forward.Add(CursorAt(session));
+        var back = new List<long>();
+        while (back.Count <= starts.Count && run.GoToPrevious())
+            back.Add(CursorAt(session));
+
+        Assert.AreSequenceEqual(starts, forward);
+        Assert.AreSequenceEqual(starts.AsEnumerable().Reverse().Skip(1).ToList(), back);
     }
 
     // A run of Generate star power over 64 measures of quarter notes: several proposals.
-    private static StarPowerProposals Run()
+    private static StarPowerProposals Run() => Start(Of(Guitar()), 4);
+
+    private static StarPowerProposals Start(EditorSession session, int beatsPerMeasure)
     {
-        var chart = Guitar();
-        var expert = chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert];
+        var expert = session.Chart.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Expert];
         for (long m = 0; m < 64; m++)
         {
-            for (int q = 0; q < 4; q++)
-                expert.Notes.Add(new EditableNote((m * Measure) + (q * 480), 1, q % 3));
+            for (int q = 0; q < beatsPerMeasure; q++)
+                expert.Notes.Add(new EditableNote((m * beatsPerMeasure * 480) + (q * 480), 1, q % 3));
         }
 
-        var session = Of(chart);
         Assert.IsTrue(session.StarPower.Start(ChartInstrument.Guitar, StarPowerOptions.Default, null));
         Assert.IsGreaterThan(2, session.StarPower.Phrases.Count);
         return session.StarPower;
     }
+
+    private static long CursorAt(EditorSession session) => (long)Math.Round(session.TickAt(session.Viewport.Cursor));
 }
