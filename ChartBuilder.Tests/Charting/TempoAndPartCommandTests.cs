@@ -264,13 +264,25 @@ public sealed class TempoAndPartCommandTests
     }
 
     [TestMethod]
-    public void AddPartRefusesAPartTheChartHasOrThatIsNotEdited()
+    public void AddPartRefusesAPartTheChartHasOrThatIsNotAnInstrument()
     {
         var chart = EditableChartSamples.Full();
 
         Refuses<InvalidOperationException>(chart, new AddPart(Guitar));
-        Assert.ThrowsExactly<ArgumentException>(() => new AddPart(ChartInstrument.Keys));
+        Assert.ThrowsExactly<ArgumentException>(() => new AddPart((ChartInstrument)99));
         Assert.ThrowsExactly<ArgumentException>(() => new AddPart(Guitar, DrumsVariant.Pro));
+    }
+
+    [TestMethod]
+    public void AddPartAddsKeysAsAFiveFretPart()
+    {
+        var chart = EditableChartSamples.Full();
+
+        var after = AppliesRevertsAndRedoes(chart, new AddPart(ChartInstrument.Keys));
+
+        var keys = after.PartOf(ChartInstrument.Keys);
+        Assert.IsNotNull(keys);
+        Assert.AreEqual(ChartInstrumentKind.FiveFret, keys.Kind);
     }
 
     [TestMethod]
@@ -328,15 +340,15 @@ public sealed class TempoAndPartCommandTests
             .Track("PART BASS").Note(0, 96)
             .Track("PART VOCALS").Note(0, 60)
             .Track("PART BASS").Note(480, 97)
-            .Track("PART KEYS").Note(0, 96)
+            .Track("VENUE").Text(0, "[lighting (verse)]")
             .Track("PART GUITAR").Note(0, 96)
             .Build();
         var chart = MidiChartLoader.Load(midi, ChartReadOptions.Default).Chart;
-        Assert.AreSequenceEqual(["PART VOCALS", "PART BASS", "PART KEYS"], chart.Passthrough.Select(t => t.Name).ToList());
+        Assert.AreSequenceEqual(["PART VOCALS", "PART BASS", "VENUE"], chart.Passthrough.Select(t => t.Name).ToList());
 
         var after = AppliesRevertsAndRedoes(chart, new RemovePart(ChartInstrument.Bass));
 
-        Assert.AreSequenceEqual(["PART VOCALS", "PART KEYS"], after.Passthrough.Select(t => t.Name).ToList());
+        Assert.AreSequenceEqual(["PART VOCALS", "VENUE"], after.Passthrough.Select(t => t.Name).ToList());
         var result = MidiChartWriter.WriteChecked(after, MidiChartWriter.SettingsAfterSave(after, ChartReadOptions.Default));
         Assert.IsTrue(result.IsValid, $"{DescribeModel(result.ModelDifferences)} {GameViewTests.Describe(result.GameDifferences)} {string.Join("; ", result.ReloadIssues)}");
     }

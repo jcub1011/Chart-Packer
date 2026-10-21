@@ -18,6 +18,7 @@ public static class SongIniPartKeys
         [ChartInstrument.Bass] = "diff_bass",
         [ChartInstrument.Rhythm] = "diff_rhythm",
         [ChartInstrument.GuitarCoop] = "diff_guitar_coop",
+        [ChartInstrument.Keys] = "diff_keys",
         [ChartInstrument.GhlGuitar] = "diff_guitarghl",
         [ChartInstrument.GhlBass] = "diff_bassghl",
         [ChartInstrument.GhlRhythm] = "diff_rhythm_ghl",

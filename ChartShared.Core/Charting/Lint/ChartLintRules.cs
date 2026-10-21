@@ -38,6 +38,7 @@ public static class ChartLintRules
         new OverlappingPhrasesRule(),
         new NotesInBigRockEndingRule(),
         new PhraseEmptyOnDifficultyRule(),
+        new NoStarPowerRule(),
         new EmptyPartRule(),
         new LowerDifficultyDenserRule(),
         new NoSectionsRule(),

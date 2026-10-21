@@ -8,11 +8,14 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Media.Immutable;
+using ChartBuilder.Controls.Editing;
 using ChartBuilder.ViewModels;
 using ChartShared.Audio.Waveforms;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Validation;
 using ChartShared.UI.Controls;
+using ChartShared.UI.Controls.Highway;
 
 namespace ChartBuilder.Controls
 {
@@ -38,18 +41,30 @@ namespace ChartBuilder.Controls
         private const double MinBeatSpacing = 6;
         private const double MinMeasureSpacing = 3;
 
-        // The overview's marks: star power and solo bands under the ruler, and the note density along the bottom.
+        // The overview's marks: a band under the ruler for each row of the phrase rail, in the rail's colours, and the note
+        // density along the bottom.
         private const double BandHeight = 3;
+        private const double BandGap = 1;
         private const double DensityFraction = 0.3;
-        private static readonly IBrush StarPowerBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0x7F, 0xE9, 0xFF));
-        private static readonly IBrush SoloBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xC0, 0x84, 0xFC));
+        private const byte BandAlpha = 0xC0;
         private static readonly IBrush DensityBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xB0, 0x40));
+
+        // Each phrase rail row's band, made the first time it's drawn: rendering is on the UI thread only.
+        private static readonly Dictionary<RailKind, IBrush> BandBrushes = [];
         private static readonly IPen SectionPen = new ImmutablePen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF).ToUInt32(), 1);
 
         // The synchronized region, outlined, and the passages synced with it, filled, behind the other marks.
         private static readonly IBrush SyncedBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x60, 0xFF, 0x7A, 0x1A));
         private static readonly IBrush SyncRegionBrush = new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0xFF, 0x7A, 0x1A));
         private static readonly IPen SyncRegionPen = new ImmutablePen(Color.FromArgb(0xE0, 0xFF, 0x7A, 0x1A).ToUInt32(), 1);
+
+        // The ghosts of a run of Generate fills or Generate star power, over everything else, so they're easy to find: a kept
+        // one's a faint amber column the height of the overview, capped solid; a dropped one's only a faint outline.
+        private const double ProposalCap = 4;
+        private const double ProposalMinWidth = 2;
+        private static readonly IBrush KeptProposalBrush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x40));
+        private static readonly IBrush ProposalCapBrush = new ImmutableSolidColorBrush(PhraseColors.Proposal);
+        private static readonly IPen DroppedProposalPen = new ImmutablePen(HighwayPalette.WithAlpha(PhraseColors.Proposal, 0x60).ToUInt32(), 1);
 
         // The lint marks: a short tick up from the ruler's foot, coloured by severity, errors drawn last so they show.
         private const double MarkHeight = 6;
@@ -373,8 +388,9 @@ namespace ChartBuilder.Controls
         }
 
         /// <summary>
-        /// The lane in focus over the whole song: its note density, star power and solos, and the song's sections; and the
-        /// synchronized region and the passages synced with it.
+        /// The lane in focus over the whole song: its note density, a band of its phrases for each row of its phrase rail, and
+        /// the song's sections; the synchronized region and the passages synced with it; and over them all, the ghosts of a
+        /// run of Generate fills or Generate star power.
         /// </summary>
         private void DrawOverview(DrawingContext context, Rect bounds)
         {
@@ -404,12 +420,17 @@ namespace ChartBuilder.Controls
                 context.FillRectangle(DensityBrush, new Rect(x, bounds.Bottom - height, Math.Max(1, width / columns), height));
             }
 
-            foreach (var (start, end) in overview.StarPower)
-                context.FillRectangle(StarPowerBrush, new Rect(XOf(start, width), top, Math.Max(1, XOf(end, width) - XOf(start, width)), BandHeight));
-            foreach (var (start, end) in overview.Solos)
-                context.FillRectangle(SoloBrush, new Rect(XOf(start, width), top + BandHeight + 1, Math.Max(1, XOf(end, width) - XOf(start, width)), BandHeight));
+            foreach (var phrase in overview.Phrases)
+            {
+                int row = IndexOf(overview.Rows, phrase.Row);
+                if (row < 0)
+                    continue;
+                double y = top + (row * (BandHeight + BandGap));
+                context.FillRectangle(BandBrush(phrase.Row), new Rect(XOf(phrase.Start, width), y, Math.Max(1, XOf(phrase.End, width) - XOf(phrase.Start, width)), BandHeight));
+            }
 
             var labelBrush = TickBrush ?? Brushes.Gray;
+            double labelTop = top + (overview.Rows.Count * (BandHeight + BandGap)) + 1;
             double lastLabelEnd = double.MinValue;
             foreach (var section in overview.Sections)
             {
@@ -418,9 +439,53 @@ namespace ChartBuilder.Controls
                 if (x < lastLabelEnd)
                     continue;
                 var text = new FormattedText(section.Name, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 10, labelBrush);
-                context.DrawText(text, new Point(x + 3, top + (2 * BandHeight) + 2));
+                context.DrawText(text, new Point(x + 3, labelTop));
                 lastLabelEnd = x + text.Width + 6;
             }
+
+            // The ghosts last, kept ones over the dropped, each wide enough to see on a long song.
+            foreach (bool kept in new[] { false, true })
+            {
+                foreach (var proposal in overview.Proposals)
+                {
+                    if (proposal.Kept != kept)
+                        continue;
+                    double x = XOf(proposal.Start, width);
+                    double w = Math.Max(ProposalMinWidth, XOf(proposal.End, width) - x);
+                    var column = new Rect(x, top, w, bounds.Bottom - top);
+                    if (kept)
+                    {
+                        context.FillRectangle(KeptProposalBrush, column);
+                        context.FillRectangle(ProposalCapBrush, new Rect(x, top, w, ProposalCap));
+                    }
+                    else
+                    {
+                        context.DrawRectangle(null, DroppedProposalPen, column.Deflate(0.5));
+                    }
+                }
+            }
+        }
+
+        private static IBrush BandBrush(RailKind row)
+        {
+            if (!BandBrushes.TryGetValue(row, out var brush))
+            {
+                brush = new ImmutableSolidColorBrush(HighwayPalette.WithAlpha(PhraseColors.Of(row), BandAlpha));
+                BandBrushes[row] = brush;
+            }
+
+            return brush;
+        }
+
+        private static int IndexOf(IReadOnlyList<RailKind> rows, RailKind row)
+        {
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (rows[i] == row)
+                    return i;
+            }
+
+            return -1;
         }
 
         /// <summary>Each pixel column's lowest and highest level, and how loud it is, scaled so the loudest fills the height.</summary>

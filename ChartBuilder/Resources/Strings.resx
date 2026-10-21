@@ -1938,6 +1938,69 @@ Saving also makes these changes to song.ini:
     <value>Generate</value>
     <comment>Proposes the fills, shown as ghosts to keep or drop.</comment>
   </data>
+  <data name="GenerateStarPowerButton" xml:space="preserve">
+    <value>Generate star power…</value>
+    <comment>The toolbar button, beside Generate fills, that opens Generate star power's options.</comment>
+  </data>
+  <data name="GenerateStarPowerToolTip" xml:space="preserve">
+    <value>Propose star power phrases over the selection, or the whole part, to keep or drop before they're added. For a 5-fret or keys lane with notes.</value>
+    <comment>The Generate star power button's tooltip.</comment>
+  </data>
+  <data name="GenerateStarPowerHeading" xml:space="preserve">
+    <value>Generate Star Power</value>
+  </data>
+  <data name="GenerateStarPowerSpacingLabel" xml:space="preserve">
+    <value>Spacing (seconds)</value>
+    <comment>About how many seconds apart generated star power phrases are.</comment>
+  </data>
+  <data name="GenerateStarPowerSpacingToolTip" xml:space="preserve">
+    <value>About how far apart phrases are, in seconds of the part's playing: its long rests don't count. A whole part gets at least four.</value>
+  </data>
+  <data name="GenerateStarPowerSpikesLabel" xml:space="preserve">
+    <value>Charge for hard passages</value>
+    <comment>A check box: place phrases so a player has enough star power to activate going into each hard passage.</comment>
+  </data>
+  <data name="GenerateStarPowerSpikesToolTip" xml:space="preserve">
+    <value>Place phrases so a player has half a meter, enough to activate, just before each of the hardest passages the difficulty graph finds. Off, they're only spread evenly.</value>
+  </data>
+  <data name="StarPowerRunFormat" xml:space="preserve">
+    <value>{0} of {1} proposed star power phrases kept</value>
+    <comment>The bar over the lanes while Generate star power runs. {0} is how many are kept, {1} how many were proposed.</comment>
+  </data>
+  <data name="StarPowerRunHint" xml:space="preserve">
+    <value>Click a ghost in the rail's star power row to keep or drop it. Esc cancels.</value>
+  </data>
+  <data name="StarPowerRunAdd" xml:space="preserve">
+    <value>Add star power</value>
+    <comment>Adds the kept star power phrases, as one step to undo.</comment>
+  </data>
+  <data name="StarPowerRunAddToolTip" xml:space="preserve">
+    <value>Add the kept star power phrases, as one step to undo</value>
+  </data>
+  <data name="ProposalRunPrevious" xml:space="preserve">
+    <value>◀ Previous</value>
+    <comment>The bar over the lanes while Generate fills or Generate star power runs: goes to the proposal before the cursor.</comment>
+  </data>
+  <data name="ProposalRunPreviousToolTip" xml:space="preserve">
+    <value>Go to the proposal before the cursor</value>
+  </data>
+  <data name="ProposalRunNext" xml:space="preserve">
+    <value>Next ▶</value>
+    <comment>The bar over the lanes while Generate fills or Generate star power runs: goes to the proposal after the cursor.</comment>
+  </data>
+  <data name="ProposalRunNextToolTip" xml:space="preserve">
+    <value>Go to the proposal after the cursor</value>
+  </data>
+  <data name="ProposalRunNoneBefore" xml:space="preserve">
+    <value>No proposal before the cursor.</value>
+  </data>
+  <data name="ProposalRunNoneAfter" xml:space="preserve">
+    <value>No proposal after the cursor.</value>
+  </data>
+  <data name="ProposalGhostToolTipFormat" xml:space="preserve">
+    <value>Proposed {0}: click to keep or drop it</value>
+    <comment>A proposed phrase's ghost in the phrase rail. {0} is its kind in lower case, e.g. "star power" or "drum fill".</comment>
+  </data>
   <data name="FillRunFormat" xml:space="preserve">
     <value>{0} of {1} proposed fills kept</value>
     <comment>The bar over the lanes while Generate fills runs. {0} is how many are kept, {1} how many were proposed.</comment>

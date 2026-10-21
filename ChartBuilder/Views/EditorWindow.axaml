@@ -252,6 +252,48 @@
                                     </Flyout>
                                 </Button.Flyout>
                             </Button>
+                            <Button x:Name="GenerateStarPowerButton"
+                                    Classes="labelled"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Content="{x:Static res:Strings.GenerateStarPowerButton}"
+                                    IsEnabled="{Binding Editor.CanGenerateStarPower}"
+                                    ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerToolTip}"
+                                    ToolTip.ShowOnDisabled="True">
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedLeft">
+                                        <StackPanel Spacing="10" MinWidth="260">
+                                            <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.GenerateStarPowerHeading}" />
+                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
+                                                <NumericUpDown Grid.Row="0"
+                                                               Grid.Column="1"
+                                                               Value="{Binding Editor.StarPowerSpacing}"
+                                                               Minimum="10"
+                                                               Maximum="60"
+                                                               Increment="5"
+                                                               FormatString="0"
+                                                               ParsingNumberStyle="Integer"
+                                                               ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpacingToolTip}"
+                                                               AutomationProperties.Name="{x:Static res:Strings.GenerateStarPowerSpacingLabel}" />
+                                                <CheckBox Grid.Row="1"
+                                                          Grid.Column="0"
+                                                          Grid.ColumnSpan="2"
+                                                          Content="{x:Static res:Strings.GenerateStarPowerSpikesLabel}"
+                                                          IsChecked="{Binding Editor.StarPowerPlanForSpikes}"
+                                                          ToolTip.Tip="{x:Static res:Strings.GenerateStarPowerSpikesToolTip}" />
+                                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{x:Static res:Strings.GenerateFillsScopeLabel}" />
+                                                <TextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Editor.FillScopeText}" />
+                                            </Grid>
+                                            <Button Classes="accent"
+                                                    HorizontalAlignment="Right"
+                                                    Content="{x:Static res:Strings.GenerateFillsGenerate}"
+                                                    Command="{Binding Editor.GenerateStarPowerCommand}"
+                                                    Click="OnGenerateStarPowerClick" />
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolTempo}" IsChecked="{Binding Editor.IsTempoTool}" ToolTip.Tip="{x:Static res:Strings.ToolTempoToolTip}" />
                             <ToggleButton Classes="labelled" Content="{x:Static res:Strings.ToolSync}" IsChecked="{Binding Editor.IsSyncTool}" ToolTip.Tip="{x:Static res:Strings.ToolSyncToolTip}" />
                         </StackPanel>
@@ -351,30 +393,39 @@
                           IsVisible="{Binding !IsLeftPanelCollapsed}" />
 
             <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. Over them,
-                 while Generate fills runs (charter-spec C6 item 5), a bar to keep, drop, add or cancel its proposals. -->
+                 while Generate fills or Generate star power runs (charter-spec C6 item 5, C8 item 1), a bar to keep, drop,
+                 add or cancel its proposals. -->
             <DockPanel Grid.Column="2">
                 <Border DockPanel.Dock="Top"
-                        IsVisible="{Binding Editor.IsFillRunActive}"
+                        IsVisible="{Binding Editor.IsProposalRunActive}"
                         Background="{DynamicResource ToolbarBrush}"
                         BorderBrush="{DynamicResource SubtleBorderBrush}"
                         BorderThickness="0,0,0,1"
                         Padding="12,4">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Editor.FillRunText}" />
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Editor.ProposalRunText}" />
                         <TextBlock Grid.Column="1"
                                    Classes="muted"
                                    FontSize="12"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
-                                   Text="{x:Static res:Strings.FillRunHint}" />
+                                   Text="{Binding Editor.ProposalRunHint}" />
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunKeepAll}" Command="{Binding Editor.KeepAllFillsCommand}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunDropAll}" Command="{Binding Editor.DropAllFillsCommand}" />
+                            <Button Classes="labelled"
+                                    Content="{x:Static res:Strings.ProposalRunPrevious}"
+                                    Command="{Binding Editor.PreviousProposalCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunPreviousToolTip}" />
+                            <Button Classes="labelled"
+                                    Content="{x:Static res:Strings.ProposalRunNext}"
+                                    Command="{Binding Editor.NextProposalCommand}"
+                                    ToolTip.Tip="{x:Static res:Strings.ProposalRunNextToolTip}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunKeepAll}" Command="{Binding Editor.KeepAllProposalsCommand}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunDropAll}" Command="{Binding Editor.DropAllProposalsCommand}" />
                             <Button Classes="labelled accent"
-                                    Content="{x:Static res:Strings.FillRunAdd}"
-                                    Command="{Binding Editor.AddFillsCommand}"
-                                    ToolTip.Tip="{x:Static res:Strings.FillRunAddToolTip}" />
-                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunCancel}" Command="{Binding Editor.CancelFillsCommand}" />
+                                    Content="{Binding Editor.ProposalRunAdd}"
+                                    Command="{Binding Editor.AddProposalsCommand}"
+                                    ToolTip.Tip="{Binding Editor.ProposalRunAddToolTip}" />
+                            <Button Classes="labelled" Content="{x:Static res:Strings.FillRunCancel}" Command="{Binding Editor.CancelProposalsCommand}" />
                         </StackPanel>
                     </Grid>
                 </Border>

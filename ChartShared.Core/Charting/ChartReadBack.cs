@@ -60,7 +60,7 @@ public sealed record ReadBackDifference(
 /// </summary>
 /// <remarks>
 /// Only <c>instruments</c> are compared, which for a save are the model's (<see cref="GameView.Instruments"/>): tracks
-/// the model passes through, such as <c>PART KEYS</c>, are checked byte for byte instead. There's at most one difference
+/// the model passes through, such as <c>PART VOCALS</c>, are checked byte for byte instead. There's at most one difference
 /// of each kind for each track, each giving its first <see cref="MaxTicks"/> places, so the list stays short however
 /// much differs.
 /// </remarks>

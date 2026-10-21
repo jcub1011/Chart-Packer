@@ -10,6 +10,7 @@ using Avalonia.Collections;
 using Avalonia.Threading;
 using ChartPacker.Resources;
 using ChartPacker.Services;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Saving;
 using ChartShared.Core.Charts;
 using ChartShared.Core.Metadata;
@@ -151,10 +152,13 @@ namespace ChartPacker.ViewModels
         /// <summary>A song a worker read, with its chart's findings and, when it had no draft, what checking it found.</summary>
         private sealed record ReadSong(int Index, SongMetadataReport Report, SongChartLintReport? Lint, ValidatorSongCheck? Check);
 
-        // The counts, as last worked out: the listed songs that still fail, their issues with a quick fix, and how many of those are ticked.
+        // The counts, as last worked out: the listed songs that still fail, their issues with a quick fix, and how many of those are
+        // ticked; and of those ticking all ticks (ValidatorSongViewModel.BulkIssues), how many there are and are ticked.
         private int _failingCount;
         private int _fixableCount;
         private int _selectedFixCount;
+        private int _bulkCount;
+        private int _bulkSelectedCount;
 
         /// <param name="entries">The songs to check, in the order they're listed.</param>
         /// <param name="drafts">The main window's drafts, which the songs are checked as.</param>
@@ -348,13 +352,14 @@ namespace ChartPacker.ViewModels
         public string FixSelectedText => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorFixSelectedFormat, SelectedFixCount);
 
         /// <summary>
-        /// Whether every issue shown with a quick fix is ticked: <see langword="null"/> when only some are. Setting it
-        /// ticks or clears them all; clearing it while only some are ticked ticks them all, so a click on the partly
-        /// ticked box selects everything first.
+        /// Whether every issue shown with a quick fix is ticked, but a song's suggested fix where it has others
+        /// (<see cref="ValidatorSongViewModel.BulkIssues"/>): <see langword="null"/> when only some are. Setting it ticks
+        /// them, or clears every one; clearing it while only some are ticked ticks them, so a click on the partly ticked
+        /// box selects everything first.
         /// </summary>
         public bool? AllFixesSelected
         {
-            get => _selectedFixCount == 0 ? false : _selectedFixCount == _fixableCount ? true : null;
+            get => _selectedFixCount == 0 ? false : _bulkSelectedCount == _bulkCount ? true : null;
             set
             {
                 bool select = value ?? true;
@@ -364,7 +369,7 @@ namespace ChartPacker.ViewModels
                 _selectingAll = true;
                 try
                 {
-                    foreach (var issue in FixableIssues)
+                    foreach (var issue in (select ? ShownSongs.SelectMany(static s => s.BulkIssues) : FixableIssues).ToList())
                         issue.IsSelected = select;
                 }
                 finally
@@ -524,11 +529,13 @@ namespace ChartPacker.ViewModels
                 .Where(w => w.Issues.Count > 0)
                 .ToList();
 
-            var generate = new List<(ValidatorSongViewModel Song, ValidatorGenerateFix Fix)>();
+            var generate = new List<(ValidatorSongViewModel Song, ValidatorGenerateFix? Missing, ValidatorStarPowerFix? StarPower)>();
             foreach (var (song, issues) in work)
             {
                 MetadataItem? item = null;
                 bool changed = false;
+                ValidatorGenerateFix? missing = null;
+                ValidatorStarPowerFix? starPower = null;
                 foreach (var issue in issues)
                 {
                     switch (issue.ChartFix)
@@ -542,11 +549,18 @@ namespace ChartPacker.ViewModels
                             _drafts.Get(song.Path).Set(rating.Key, rating.Tier.ToString(CultureInfo.InvariantCulture));
                             changed = true;
                             break;
-                        case ValidatorGenerateFix missing:
-                            generate.Add((song, missing));
+                        case ValidatorGenerateFix difficulties:
+                            missing = difficulties;
+                            break;
+                        case ValidatorStarPowerFix parts:
+                            starPower = parts;
                             break;
                     }
                 }
+
+                // A song's star power and missing difficulties are one chart, so they're generated together.
+                if (missing is not null || starPower is not null)
+                    generate.Add((song, missing, starPower));
 
                 // Checks the song again, here and in any inspector showing it, which only has its rows to rebuild.
                 if (changed)
@@ -558,11 +572,12 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Generates the missing difficulties of <paramref name="songs"/> into their drafts, by the rules the Generate
-        /// difficulties dialog is left with: as many at once as there are cores but one, the footer counting them done.
-        /// Songs that can't be generated are listed in <see cref="FixError"/>, and keep their drafts as they were.
+        /// Generates the star power and missing difficulties of <paramref name="songs"/> into their drafts, the difficulties
+        /// by the rules the Generate difficulties dialog is left with, and star power with its defaults: as many at once as
+        /// there are cores but one, the footer counting them done. The dialog is shown only when some song has difficulties
+        /// to generate. Songs that can't be generated are listed in <see cref="FixError"/>, and keep their drafts as they were.
         /// </summary>
-        private async Task GenerateAsync(IReadOnlyList<(ValidatorSongViewModel Song, ValidatorGenerateFix Fix)> songs)
+        private async Task GenerateAsync(IReadOnlyList<(ValidatorSongViewModel Song, ValidatorGenerateFix? Missing, ValidatorStarPowerFix? StarPower)> songs)
         {
             if (_generate is null || _stash is not { } stash)
                 return;
@@ -572,7 +587,11 @@ namespace ChartPacker.ViewModels
                 .Select(w =>
                 {
                     var draft = DraftOf(w.Song.Entry);
-                    return new GenerateDifficultiesSong(w.Song.Entry, w.Song.Title, w.Song.DraftedPairs(draft), draft?.Clone(), w.Fix.Targets);
+                    var targets = w.Missing?.Targets ?? new Dictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>>();
+                    return new GenerateDifficultiesSong(w.Song.Entry, w.Song.Title, w.Song.DraftedPairs(draft), draft?.Clone(), targets)
+                    {
+                        StarPower = w.StarPower?.Parts ?? [],
+                    };
                 })
                 .ToList();
 
@@ -581,7 +600,10 @@ namespace ChartPacker.ViewModels
             var failures = new ConcurrentQueue<string>();
             try
             {
-                if (await _generate.ShowAsync(requests) is not { } rules || _closing.IsCancellationRequested)
+                // Star power alone has no rules to pick, so it needs no dialog.
+                var withTargets = requests.Where(static r => r.Targets.Count > 0).ToList();
+                var rules = withTargets.Count == 0 ? ReductionDefaults.Shipped : await _generate.ShowAsync(withTargets);
+                if (rules is null || _closing.IsCancellationRequested)
                     return;
 
                 FixError = null;
@@ -595,7 +617,7 @@ namespace ChartPacker.ViewModels
                     string? failure = null;
                     try
                     {
-                        chart = await SongDifficultyGeneration.GenerateAsync(request.Entry, request.Pairs, request.Draft, rules, stash, token).ConfigureAwait(false);
+                        chart = await SongDifficultyGeneration.GenerateAsync(request.Entry, request.Pairs, request.Draft, rules, request.Work, stash, token).ConfigureAwait(false);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
                     {
@@ -749,16 +771,17 @@ namespace ChartPacker.ViewModels
         }
 
         /// <summary>
-        /// Checks a song read against its draft, if it has one now; returns it if it fails, to be listed. A song with a
-        /// draft has its chart linted again, with the draft: it was linted with the song.ini as read, if at all.
+        /// Checks a song read against its draft, if it has one now; returns it if it fails, or has a suggested fix, to be
+        /// listed. A song with a draft has its chart linted again, with the draft: it was linted with the song.ini as read,
+        /// if at all.
         /// </summary>
         private ValidatorSongViewModel? Add(ReadSong read)
         {
             var report = read.Report;
-            // Checked by its worker, and still without a draft: one that passes is done with.
+            // Checked by its worker, and still without a draft: one that passes, with nothing to suggest, is done with.
             if (read.Check is { } check && !_drafts.HasDrafts(report.Entry.FullPath))
             {
-                if (check.IsFixed)
+                if (!check.IsListed)
                     return null;
 
                 var checkedSong = new ValidatorSongViewModel(read.Index, report, CanGenerateDifficulties, OnIssueSelectionChanged, IsIssueShown);
@@ -772,7 +795,7 @@ namespace ChartPacker.ViewModels
             song.Check(DraftOf(report.Entry));
             if (report.ReadError is null)
                 _ = RelintAsync(song, delay: false);
-            return song.IsFixed ? null : song;
+            return song.IsListed ? song : null;
         }
 
         /// <summary>Lists <paramref name="song"/>, which fails, in its place.</summary>
@@ -1166,7 +1189,7 @@ namespace ChartPacker.ViewModels
                     return;
                 song.SetChartLint(lint);
                 song.Check(DraftOf(song.Entry));
-                if (!song.IsFixed)
+                if (song.IsListed)
                     List(song);
                 ShowIfMatching(song);
                 ScheduleRefreshCounts();
@@ -1282,8 +1305,18 @@ namespace ChartPacker.ViewModels
                     selected++;
             }
 
+            int bulk = 0, bulkSelected = 0;
+            foreach (var issue in ShownSongs.SelectMany(static s => s.BulkIssues))
+            {
+                bulk++;
+                if (issue.IsSelected)
+                    bulkSelected++;
+            }
+
             _fixableCount = fixable;
             _selectedFixCount = selected;
+            _bulkCount = bulk;
+            _bulkSelectedCount = bulkSelected;
             OnPropertyChanged(nameof(HasFixes));
             OnPropertyChanged(nameof(SelectedFixCount));
             OnPropertyChanged(nameof(FixSelectedText));
@@ -1398,9 +1431,21 @@ namespace ChartPacker.ViewModels
 
         public bool HasManual => ManualCount > 0;
 
-        /// <summary>The song passes now: it was fixed since it was listed.</summary>
+        /// <summary>The song passes now: nothing fails, though it may have a suggested fix still (<see cref="HasSuggestions"/>).</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsListed), nameof(IsDone))]
         public partial bool IsFixed { get; set; }
+
+        /// <summary>The song has a fix for a note that doesn't fail it, such as star power to generate (CHR066).</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsListed), nameof(IsDone))]
+        public partial bool HasSuggestions { get; set; }
+
+        /// <summary>The song is listed: it fails, or has a suggested fix.</summary>
+        public bool IsListed => !IsFixed || HasSuggestions;
+
+        /// <summary>The song has nothing left to do: it passes and has no suggested fix, so it's shown as fixed.</summary>
+        public bool IsDone => IsFixed && !HasSuggestions;
 
         /// <summary>Whether a metadata key still fails, rather than only the chart.</summary>
         public bool FailsMetadata { get; private set; }
@@ -1431,26 +1476,31 @@ namespace ChartPacker.ViewModels
         public string SelectFixesName => string.Format(CultureInfo.CurrentCulture, Strings.ValidatorSelectSongFixesFormat, Title);
 
         /// <summary>
-        /// Whether every issue shown of the song with a quick fix is ticked: <see langword="null"/> when only some are.
-        /// Setting it ticks or clears them all; clearing it while only some are ticked ticks them all, so a click on
-        /// the partly ticked box selects everything first.
+        /// The issues shown that ticking the song, or every song, ticks: those with a quick fix, but a suggested one, such
+        /// as star power to generate (CHR066), only when it's the song's only fix. A suggestion, which no failure asks
+        /// for and which rewrites the chart, is otherwise ticked on its own.
+        /// </summary>
+        public IEnumerable<ValidatorIssueViewModel> BulkIssues
+        {
+            get
+            {
+                bool others = ShownIssues.Any(static i => i.IsFixable && !i.IsSuggestion);
+                return ShownIssues.Where(i => i.IsFixable && (!i.IsSuggestion || !others));
+            }
+        }
+
+        /// <summary>
+        /// Whether every issue of <see cref="BulkIssues"/> is ticked: <see langword="null"/> when only some issues with a
+        /// quick fix are. Setting it ticks them, or clears every issue; clearing it while only some are ticked ticks them,
+        /// so a click on the partly ticked box selects everything first.
         /// </summary>
         public bool? AllSelected
         {
             get
             {
-                int fixable = 0, selected = 0;
-                foreach (var issue in ShownIssues)
-                {
-                    if (!issue.IsFixable)
-                        continue;
-
-                    fixable++;
-                    if (issue.IsSelected)
-                        selected++;
-                }
-
-                return selected == 0 ? false : selected == fixable ? true : null;
+                if (!ShownIssues.Any(static i => i.IsFixable && i.IsSelected))
+                    return false;
+                return BulkIssues.All(static i => i.IsSelected) ? true : null;
             }
             set
             {
@@ -1461,11 +1511,8 @@ namespace ChartPacker.ViewModels
                 _settingAll = true;
                 try
                 {
-                    foreach (var issue in ShownIssues)
-                    {
-                        if (issue.IsFixable)
-                            issue.IsSelected = select;
-                    }
+                    foreach (var issue in (select ? BulkIssues : ShownIssues.Where(static i => i.IsFixable)).ToList())
+                        issue.IsSelected = select;
                 }
                 finally
                 {
@@ -1508,11 +1555,13 @@ namespace ChartPacker.ViewModels
                     Id = line.Id,
                     ChartSeverity = line.ChartSeverity,
                     ChartFix = line.ChartFix,
+                    IsSuggestion = line.IsSuggestion,
                 })
                 .ToList();
 
             FailsMetadata = check.FailsMetadata;
             IsFixed = check.IsFixed;
+            HasSuggestions = check.Suggests;
             SetIssues(issues, check.Fixable, check.Manual);
         }
 
@@ -1571,7 +1620,7 @@ namespace ChartPacker.ViewModels
             // estimator's rating, when it has one; the rest are Chart Builder's to fix.
             int chartProblems = 0, chartFixable = 0;
             var findings = lint?.Findings ?? [];
-            foreach (var group in findings.Where(static f => f.Finding.RuleId != ChrRules.Chr087).GroupBy(f => (f.Finding.RuleId, Key: f.Finding.Key ?? "")))
+            foreach (var group in findings.Where(static f => f.Finding.RuleId is not (ChrRules.Chr087 or ChrRules.Chr066)).GroupBy(f => (f.Finding.RuleId, Key: f.Finding.Key ?? "")))
             {
                 var first = group.First();
                 bool problem = group.Any(f => f.Finding.Severity != Severity.Info);
@@ -1629,15 +1678,45 @@ namespace ChartPacker.ViewModels
                 });
             }
 
+            // The parts without star power (CHR066), as one line: a note, which fails nothing, but whose fix lists the song
+            // so Fix selected can generate it, with the missing difficulties when there are any.
+            var noStarPower = findings
+                .Where(static f => f.Finding.RuleId == ChrRules.Chr066 && f.Finding.Location is not null)
+                .Select(static f => f.Finding.Location!.Part)
+                .Distinct()
+                .Order()
+                .ToList();
+            int suggested = 0;
+            if (noStarPower.Count > 0)
+            {
+                bool canFix = canGenerate && report.CanEdit && SongDifficultyGeneration.CanGenerate(draft);
+                string message = string.Format(
+                    CultureInfo.CurrentCulture,
+                    Strings.ChartFindingFormat,
+                    ChrRules.Chr066,
+                    string.Format(CultureInfo.CurrentCulture, Strings.ValidatorNoStarPowerFormat, string.Join(Strings.ValidatorMissingPartSeparator, noStarPower.Select(ChartLabels.InstrumentName))));
+                if (canFix)
+                    suggested++;
+                lines.Add(new ValidatorIssueLine("", message, [LibraryChartLint.TypeOf(ChrRules.Chr066)], canFix ? Strings.ValidatorGenerateStarPowerFix : null, Severity.Info)
+                {
+                    Id = ValidatorIssueLine.ChartId(ChrRules.Chr066, ""),
+                    ChartFix = canFix ? new ValidatorStarPowerFix(noStarPower) : null,
+                    IsSuggestion = true,
+                });
+            }
+
             return new ValidatorSongCheck(
                 title,
                 headline.Artist,
                 charter,
                 lines,
-                fixable + chartFixable,
+                fixable + chartFixable + suggested,
                 byKey.Count - fixable + chartProblems - chartFixable,
                 FailsMetadata: byKey.Count > 0,
-                IsFixed: byKey.Count == 0 && chartProblems == 0);
+                IsFixed: byKey.Count == 0 && chartProblems == 0)
+            {
+                Suggests = suggested > 0,
+            };
         }
 
         private void SetIssues(IReadOnlyList<ValidatorIssueViewModel> issues, int fixable, int manual)
@@ -1673,7 +1752,7 @@ namespace ChartPacker.ViewModels
     /// <param name="Fixable">How many failing keys have a quick fix.</param>
     /// <param name="Manual">How many issues, metadata or chart, don't.</param>
     /// <param name="FailsMetadata">Some of its metadata fails, which saving asks about.</param>
-    /// <param name="IsFixed">Nothing fails, so it isn't listed.</param>
+    /// <param name="IsFixed">Nothing fails, so it isn't listed unless it <see cref="Suggests"/> a fix.</param>
     public sealed record ValidatorSongCheck(
         string Title,
         string? Artist,
@@ -1682,7 +1761,14 @@ namespace ChartPacker.ViewModels
         int Fixable,
         int Manual,
         bool FailsMetadata,
-        bool IsFixed);
+        bool IsFixed)
+    {
+        /// <summary>It has a fix for a note that fails nothing, such as star power to generate (CHR066), so it's listed though it passes.</summary>
+        public bool Suggests { get; init; }
+
+        /// <summary>It's listed: it fails, or suggests a fix.</summary>
+        public bool IsListed => !IsFixed || Suggests;
+    }
 
     /// <summary>One of a song's issues as found, before it's shown and can be ticked.</summary>
     /// <param name="Key">The failing key, or empty for a note about the song as a whole.</param>
@@ -1700,6 +1786,9 @@ namespace ChartPacker.ViewModels
         /// <summary>What fixes a chart finding: its suggested rating, or its missing difficulties generated; null for the metadata's.</summary>
         public ValidatorChartFix? ChartFix { get; init; }
 
+        /// <summary>Its fix is for a note that fails nothing, such as star power to generate (CHR066), so it's ticked on its own.</summary>
+        public bool IsSuggestion { get; init; }
+
         /// <summary>The <see cref="Id"/> of a chart finding's line.</summary>
         public static string ChartId(string ruleId, string key) => ruleId + ":" + key;
     }
@@ -1712,6 +1801,9 @@ namespace ChartPacker.ViewModels
 
     /// <summary>CHR087's fix: each part's missing difficulties, highest first, generated from those above them.</summary>
     public sealed record ValidatorGenerateFix(IReadOnlyDictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>> Targets) : ValidatorChartFix;
+
+    /// <summary>CHR066's fix: star power generated for each of the parts without any.</summary>
+    public sealed record ValidatorStarPowerFix(IReadOnlyList<ChartInstrument> Parts) : ValidatorChartFix;
 
     /// <summary>A failing key of a song in the Validator's list, which can be ticked for Fix selected when it has a quick fix.</summary>
     /// <param name="key">The failing key, or empty for a note about the song as a whole.</param>
@@ -1731,6 +1823,9 @@ namespace ChartPacker.ViewModels
 
         /// <summary>What fixes a chart finding (<see cref="ValidatorIssueLine.ChartFix"/>); null for a metadata issue.</summary>
         public ValidatorChartFix? ChartFix { get; init; }
+
+        /// <summary>Its fix is suggested, not asked for by a failure (<see cref="ValidatorIssueLine.IsSuggestion"/>).</summary>
+        public bool IsSuggestion { get; init; }
 
         /// <summary>The key is shown as a chip before the message; a note about the whole song has none.</summary>
         public bool HasKey => Key.Length > 0;

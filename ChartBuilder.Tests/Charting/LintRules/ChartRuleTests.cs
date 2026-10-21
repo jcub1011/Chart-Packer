@@ -1,5 +1,6 @@
 using System.Globalization;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -25,6 +26,9 @@ public sealed class ChartRuleTests
     private const ChartDifficulty Expert = ChartDifficulty.Expert;
 
     private static readonly TimeSpan AudioLength = TimeSpan.FromSeconds(60);
+
+    // The clean chart's star power: over the first note, which every difficulty has.
+    private static readonly Phrase CleanStarPower = new(PhraseKind.StarPower, 0, Beat / 4);
 
     /// <summary>Each rule, and what it's given to trigger it.</summary>
     public static IEnumerable<object[]> Triggers =>
@@ -54,6 +58,7 @@ public sealed class ChartRuleTests
         [ChrRules.Chr062, 1],
         [ChrRules.Chr063, 4],
         [ChrRules.Chr065, 1],
+        [ChrRules.Chr066, 1],
         [ChrRules.Chr080, 1],
         [ChrRules.Chr081, 1],
         [ChrRules.Chr082, 1],
@@ -219,6 +224,41 @@ public sealed class ChartRuleTests
     }
 
     [TestMethod]
+    public void APartWithoutStarPowerIsNotedOnlyWhereStarPowerCanBeGenerated()
+    {
+        // Drums and GHL have none and aren't noted; neither is a 5-fret part with too few chords for a phrase, nor keys whose
+        // six chords all come too near its end for a phrase's star power to be used.
+        var (chart, input) = Clean([KeyValuePair.Create("diff_bass", "2"), KeyValuePair.Create("diff_keys", "2"), KeyValuePair.Create("diff_guitarghl", "2")], drums: true);
+        new AddPart(ChartInstrument.Bass).Apply(chart);
+        new AddNotes(ChartInstrument.Bass, Expert, [new EditableNote(0, 1, 0), new EditableNote(Beat, 1, 1), new EditableNote(2 * Beat, 1, 2)]).Apply(chart);
+        new AddPart(ChartInstrument.Keys).Apply(chart);
+        new AddNotes(ChartInstrument.Keys, Expert, [.. Enumerable.Range(0, 6).Select(i => new EditableNote((long)i * Beat, 1, i % 5))]).Apply(chart);
+        Assert.IsFalse(StarPowerGenerator.HasSpot(chart, chart.PartOf(ChartInstrument.Keys)!));
+        new AddPart(ChartInstrument.GhlGuitar).Apply(chart);
+        new AddNotes(ChartInstrument.GhlGuitar, Expert, [.. Enumerable.Range(0, Notes).Select(i => new EditableNote((long)i * Beat, 1, 0))]).Apply(chart);
+
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
+
+        Assert.IsEmpty(findings, string.Join("; ", findings.Select(Describe)));
+    }
+
+    [TestMethod]
+    public void EachPartWithoutStarPowerIsNotedAndGeneratingItProposesSome()
+    {
+        var (chart, input) = Triggered(ChrRules.Chr066);
+        new AddPart(ChartInstrument.Keys).Apply(chart);
+        new AddNotes(ChartInstrument.Keys, Expert, [.. Enumerable.Range(0, Notes).Select(i => new EditableNote((long)i * Beat, 1, i % 5))]).Apply(chart);
+        var findings = new ChartLinter().LintAll(Snapshot(chart, input)).FindingsOf(ChrRules.Chr066);
+
+        // The fix is a run of Generate star power, whose ghosts the author keeps or drops: there's no quick fix to apply.
+        Assert.AreSequenceEqual([Guitar, ChartInstrument.Keys], [.. findings.Select(f => f.Location!.Part)]);
+        Assert.IsTrue(findings.All(f => f.Severity == Severity.Info));
+        Assert.IsEmpty(QuickFixRegistry.ProposeChartFixes(findings[0], chart, input.Options));
+        foreach (var finding in findings)
+            Assert.IsNotEmpty(StarPowerGenerator.Propose(chart, finding.Location!.Part, StarPowerOptions.Default, input.Options).Proposals);
+    }
+
+    [TestMethod]
     public void FixAllFixesEveryFindingOfARuleInAPartAsOneStep()
     {
         // Strums forced where they're strums anyway, in two difficulties.
@@ -325,8 +365,8 @@ public sealed class ChartRuleTests
     }
 
     /// <summary>
-    /// A chart that triggers no rule: Lead guitar at 120 BPM in 4/4, each difficulty sparser than the one above it, a
-    /// section, <c>[end]</c> after the last note, rated, and its <c>song_length</c> the audio's. With
+    /// A chart that triggers no rule: Lead guitar at 120 BPM in 4/4, each difficulty sparser than the one above it, star
+    /// power over the first note, a section, <c>[end]</c> after the last note, rated, and its <c>song_length</c> the audio's. With
     /// <paramref name="drums"/>, Pro drums too: red notes spaced as the guitar's, rated.
     /// </summary>
     private static (EditableChart Chart, ChartLintInput Input) Clean() => Clean([]);
@@ -348,6 +388,7 @@ public sealed class ChartRuleTests
             }
         }
 
+        new AddPhrase(Guitar, CleanStarPower).Apply(chart);
         new AddTextEvent(null, TextEvent.Of(0, "[section Intro]")).Apply(chart);
         new AddTextEvent(null, TextEvent.Of(SongEventPlacement.Place(chart, null, TimeSpan.Zero).End, SongEvents.EndText)).Apply(chart);
         return (chart, Snapshot(chart, IniWith(extraIni, drums), audio ?? AudioLength));
@@ -463,6 +504,9 @@ public sealed class ChartRuleTests
             case ChrRules.Chr065:
                 // Over the fifth beat, which Expert, Hard and Medium have a note on, and Easy doesn't.
                 new AddPhrase(Guitar, new Phrase(PhraseKind.StarPower, 4 * Beat, 10)).Apply(chart);
+                break;
+            case ChrRules.Chr066:
+                new RemovePhrase(Guitar, CleanStarPower).Apply(chart);
                 break;
             case ChrRules.Chr080:
                 new AddPart(ChartInstrument.Bass).Apply(chart);

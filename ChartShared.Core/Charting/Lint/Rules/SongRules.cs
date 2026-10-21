@@ -140,7 +140,7 @@ public sealed class UnratedPartRule : IChartLintRule
 
 /// <summary>
 /// CHR087: a difficulty below a part's highest charted one has no notes, so the games don't offer it. One finding for
-/// each such difficulty. Only 5-fret, GHL and drum parts, the ones Reduce can fill
+/// each such difficulty. Only 5-fret (keys too), GHL and drum parts, the ones Reduce can fill
 /// (<see cref="Authoring.DifficultyGenerator"/>); a difficulty above the highest charted one isn't asked for.
 /// </summary>
 public sealed class MissingDifficultyRule : IChartLintRule

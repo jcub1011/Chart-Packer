@@ -290,7 +290,10 @@ internal static class MidiFixtures
         .Track("PART BASS").Note(0, 99)
         .Build();
 
-    /// <summary>Tracks the model passes through: <c>PART VOCALS</c>, <c>PART KEYS</c> (which the reader reads), <c>VENUE</c>; and <c>BEAT</c>, which it makes again.</summary>
+    /// <summary>
+    /// Tracks the model passes through, <c>PART VOCALS</c> and <c>VENUE</c>, between parts it edits, <c>PART KEYS</c>
+    /// among them; and <c>BEAT</c>, which it makes again.
+    /// </summary>
     public static byte[] Passthrough() => Song()
         .Track("PART VOCALS").Note(0, 60, 240).Meta(0, 0x05, "Hel-"u8.ToArray()).Note(240, 62, 240).Meta(240, 0x05, "lo"u8.ToArray())
         .Track("PART GUITAR").Note(0, 96).Note(480, 98)

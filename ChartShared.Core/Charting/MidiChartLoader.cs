@@ -16,10 +16,9 @@ namespace ChartShared.Core.Charting;
 /// and the anchors; a marker or anchor the model can't hold is left out, with a <see cref="ChartLoadIssue"/>, and its
 /// other events are kept as raw events.</item>
 /// <item><c>EVENTS</c> gives the global text events; its other events are kept as raw events.</item>
-/// <item>Each part track <see cref="MidiChartReader"/> reads gives a part, but <c>PART KEYS</c>, which v1 doesn't edit
-/// (§7.4). What the model holds elsewhere (notes, markers, phrases and the part's settings) is taken from it; what the
-/// games don't read and could start reading once rewritten is left out, with a <see cref="ChartLoadIssue"/>; and the
-/// rest is kept as text and raw events.</item>
+/// <item>Each part track <see cref="MidiChartReader"/> reads gives a part (§7.4). What the model holds elsewhere (notes,
+/// markers, phrases and the part's settings) is taken from it; what the games don't read and could start reading once
+/// rewritten is left out, with a <see cref="ChartLoadIssue"/>; and the rest is kept as text and raw events.</item>
 /// <item><c>BEAT</c> is left out, as it's made again from the tempo map on every save (§4.2). Every other chunk is
 /// kept byte for byte, in its order.</item>
 /// </list>
@@ -73,8 +72,7 @@ public static class MidiChartLoader
         var issues = new List<ChartLoadIssue>();
         LoadTempoTrack(midi, tempoEvents, chart, issues);
 
-        // Keys pass through: v1 doesn't edit them.
-        var edited = parts.Where(p => p.Key != ChartInstrument.Keys).ToDictionary(p => p.Value.Chunk, p => p.Key);
+        var edited = parts.ToDictionary(p => p.Value.Chunk, p => p.Key);
         int? events = null;
         for (int i = 1; i < chunks.Count; i++)
         {
@@ -107,7 +105,7 @@ public static class MidiChartLoader
             ListPool<MidiEvent>.Return(eventsTrack);
         }
 
-        foreach (var (instrument, part) in parts.Where(p => p.Key != ChartInstrument.Keys).OrderBy(p => p.Key))
+        foreach (var (instrument, part) in parts.OrderBy(p => p.Key))
         {
             var loader = new PartLoader(midi, part.Events, chart.AddPart(instrument), options, issues);
             try

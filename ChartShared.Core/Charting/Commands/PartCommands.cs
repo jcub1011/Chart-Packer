@@ -4,7 +4,7 @@ using ChartShared.Core.Validation;
 namespace ChartShared.Core.Charting.Commands;
 
 /// <summary>
-/// Adds an empty part for one of the instruments v1 edits (charter-spec C2 item 5): any of
+/// Adds an empty part for one of the instruments Chart Builder edits (charter-spec C2 item 5): any of
 /// <see cref="NewChartSettings.Instruments"/> the chart hasn't.
 /// </summary>
 /// <remarks>

@@ -105,16 +105,16 @@ namespace ChartBuilder.Views
         }
 
         /// <summary>
-        /// Esc ends a run of Generate fills (charter-spec C6 item 5) when nothing focused took it first: a lane takes back
-        /// its drag before it ends the run (EditorKeys), and a field or a list keeps its own Esc. Not a key binding, which
-        /// would run before the focused control saw the key.
+        /// Esc ends a run of Generate fills or Generate star power (charter-spec C6 item 5, C8 item 1) when nothing focused
+        /// took it first: a lane takes back its drag before it ends the run (EditorKeys), and a field or a list keeps its own
+        /// Esc. Not a key binding, which would run before the focused control saw the key.
         /// </summary>
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
-            if (e.Handled || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None || _viewModel?.Editor.Session.Fills is not { IsActive: true } fills)
+            if (e.Handled || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None || _viewModel?.Editor.Session.Proposals is not { } run)
                 return;
-            fills.Cancel();
+            run.Cancel();
             e.Handled = true;
         }
 
@@ -187,6 +187,8 @@ namespace ChartBuilder.Views
 
         /// <summary>Generate fills' options close once the fills are proposed, so the ghosts can be seen. Posted, as closing the flyout clears the button's bound command before it runs.</summary>
         private void OnGenerateFillsClick(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() => GenerateFillsButton.Flyout?.Hide());
+
+        private void OnGenerateStarPowerClick(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() => GenerateStarPowerButton.Flyout?.Hide());
 
         private void OnDragOver(object? sender, DragEventArgs e) =>
             e.DragEffects = DroppedFiles.SongOf(e) is not null || DroppedFiles.AudioOf(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;

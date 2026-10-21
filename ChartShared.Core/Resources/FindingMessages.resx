@@ -427,6 +427,9 @@
   <data name="ChrStarPowerEmptyOnDifficultyFormat" xml:space="preserve">
     <value>The star power phrase has no notes in it on {0}, though other difficulties have some.</value>
   </data>
+  <data name="ChrNoStarPower" xml:space="preserve">
+    <value>The part has no star power phrases, so a player never earns star power on it.</value>
+  </data>
   <data name="ChrSoloEmptyOnDifficultyFormat" xml:space="preserve">
     <value>The solo has no notes in it on {0}, though other difficulties have some.</value>
   </data>

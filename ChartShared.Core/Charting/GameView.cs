@@ -16,10 +16,6 @@ namespace ChartShared.Core.Charting;
 /// each flagged chord as a marker over its tick, the part's star-power phrases, tom markers and mixes.
 /// </para>
 /// <para>
-/// The game view has only the instruments the model edits (<see cref="Instruments"/>). <c>PART KEYS</c>, which the
-/// reader reads, passes through byte for byte, and is checked that way rather than here.
-/// </para>
-/// <para>
 /// It holds for a file written in <see cref="PartEventOrder"/>, which the writer follows: the order of a part
 /// track's events at one tick decides which of two notes on a pad is kept, which mix is in effect, and whether a
 /// fifth-pad note or a tom marker settles the drums' layout.
@@ -27,9 +23,8 @@ namespace ChartShared.Core.Charting;
 /// </remarks>
 public static class GameView
 {
-    /// <summary>The instruments the model edits, and so the game view has: all but <c>PART KEYS</c> (charter-spec §7.4).</summary>
-    public static IReadOnlyList<ChartInstrument> Instruments { get; } =
-        [.. Enum.GetValues<ChartInstrument>().Where(i => i != ChartInstrument.Keys)];
+    /// <summary>The instruments the model edits, and so the game view has: every one the reader reads (charter-spec §7.4).</summary>
+    public static IReadOnlyList<ChartInstrument> Instruments { get; } = Enum.GetValues<ChartInstrument>();
 
     /// <summary>The chart the games read from the file <paramref name="chart"/> saves to.</summary>
     /// <param name="options">
@@ -47,9 +42,6 @@ public static class GameView
         DrumsLayout? drumsLayout = null;
         foreach (var part in chart.Parts)
         {
-            if (part.Instrument == ChartInstrument.Keys)
-                continue;
-
             var starPower = StarPowerOf(part);
             if (part.Kind == ChartInstrumentKind.Drums)
             {
@@ -81,7 +73,7 @@ public static class GameView
         ArgumentNullException.ThrowIfNull(options);
 
         var part = chart.PartOf(key.Instrument);
-        if (part is null || part.Instrument == ChartInstrument.Keys)
+        if (part is null)
             return new NoteTrack([], []);
 
         var starPower = StarPowerOf(part);
@@ -106,7 +98,7 @@ public static class GameView
 
         var tracks = new Dictionary<ChartDifficulty, NoteTrack>();
         var part = chart.PartOf(instrument);
-        if (part is null || part.Instrument == ChartInstrument.Keys)
+        if (part is null)
         {
             foreach (var difficulty in Enum.GetValues<ChartDifficulty>())
                 tracks[difficulty] = new NoteTrack([], []);

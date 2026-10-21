@@ -9,6 +9,7 @@ using ChartBuilder.Resources;
 using ChartBuilder.Services;
 using ChartShared.Audio.Synthesis;
 using ChartShared.Core.Charting;
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Editing;
 using ChartShared.Core.Charting.Layout;
@@ -323,11 +324,40 @@ namespace ChartBuilder.ViewModels
         /// <summary>Where Generate fills proposes: over the selection's span when there's one, else the whole part.</summary>
         public string FillScopeText => Session.Selection.Span is null ? Strings.GenerateFillsScopeWholePart : Strings.GenerateFillsScopeSelection;
 
-        /// <summary>Whether a run of Generate fills is going on, with its proposals shown as ghosts to keep or drop.</summary>
-        public bool IsFillRunActive => Session.Fills.IsActive;
+        /// <summary>
+        /// Whether Generate star power can run (charter-spec C8 item 1): the lane in focus is a 5-fret or keys part with
+        /// notes.
+        /// </summary>
+        public bool CanGenerateStarPower =>
+            Session.Focused is { } key && StarPowerGenerator.CanGenerate(ChartInstruments.KindOf(key.Instrument)) && Session.Chart.PartOf(key.Instrument) is { HasNotes: true };
+
+        /// <summary>
+        /// About how many seconds of the part's playing apart generated star power phrases are. Generate star power's
+        /// options are kept while the editor is open, so the next run starts from the last one's.
+        /// </summary>
+        [ObservableProperty]
+        public partial decimal? StarPowerSpacing { get; set; } = (decimal)StarPowerOptions.Default.SpacingSeconds;
+
+        /// <summary>Whether generated star power is charged for the part's hard passages, rather than only spread evenly.</summary>
+        [ObservableProperty]
+        public partial bool StarPowerPlanForSpikes { get; set; } = StarPowerOptions.Default.PlanForSpikes;
+
+        /// <summary>Whether a run of Generate fills or Generate star power is going on, with its proposals shown as ghosts to keep or drop.</summary>
+        public bool IsProposalRunActive => Session.Proposals is not null;
 
         /// <summary>How many of the run's proposals are kept, of how many.</summary>
-        public string FillRunText => string.Format(CultureInfo.CurrentCulture, Strings.FillRunFormat, Session.Fills.KeptCount, Session.Fills.Proposals.Count);
+        public string ProposalRunText => Session.Proposals is { } run
+            ? string.Format(CultureInfo.CurrentCulture, run is StarPowerProposals ? Strings.StarPowerRunFormat : Strings.FillRunFormat, run.KeptCount, run.Phrases.Count)
+            : string.Empty;
+
+        /// <summary>How the run's proposals are kept or dropped.</summary>
+        public string ProposalRunHint => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunHint : Strings.FillRunHint;
+
+        /// <summary>What adding the run's kept proposals is called.</summary>
+        public string ProposalRunAdd => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAdd : Strings.FillRunAdd;
+
+        /// <summary>What adding the run's kept proposals does.</summary>
+        public string ProposalRunAddToolTip => Session.Proposals is StarPowerProposals ? Strings.StarPowerRunAddToolTip : Strings.FillRunAddToolTip;
 
         /// <summary>What the bottom timeline shows of the whole song for the lane in focus (charter-spec C3 item 2).</summary>
         [ObservableProperty]
@@ -482,21 +512,47 @@ namespace ChartBuilder.ViewModels
             Session.Fills.Start(options, Session.Selection.Span);
         }
 
-        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
-        private void KeepAllFills() => Session.Fills.KeepAll();
+        /// <summary>Proposes star power for the part in focus with the options picked, over the selection's span or the whole part.</summary>
+        [RelayCommand]
+        private void GenerateStarPower()
+        {
+            if (Session.Focused is not { } key)
+                return;
+            double spacing = (double)Math.Clamp(StarPowerSpacing ?? (decimal)StarPowerOptions.Default.SpacingSeconds, (decimal)StarPowerOptions.MinSpacingSeconds, (decimal)StarPowerOptions.MaxSpacingSeconds);
+            Session.StarPower.Start(key.Instrument, new StarPowerOptions(spacing, StarPowerPlanForSpikes), Session.Selection.Span);
+        }
 
-        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
-        private void DropAllFills() => Session.Fills.DropAll();
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void KeepAllProposals() => Session.Proposals?.KeepAll();
 
-        /// <summary>Adds the kept fills as one undoable step, ending the run.</summary>
-        [RelayCommand(CanExecute = nameof(CanAddFills))]
-        private void AddFills() => Session.Fills.Accept();
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void DropAllProposals() => Session.Proposals?.DropAll();
 
-        private bool CanAddFills() => Session.Fills.KeptCount > 0;
+        /// <summary>Adds the run's kept proposals as one undoable step, ending the run.</summary>
+        [RelayCommand(CanExecute = nameof(CanAddProposals))]
+        private void AddProposals() => Session.Proposals?.Accept();
+
+        private bool CanAddProposals() => Session.Proposals is { KeptCount: > 0 };
 
         /// <summary>Ends the run, adding nothing (Esc).</summary>
-        [RelayCommand(CanExecute = nameof(IsFillRunActive))]
-        private void CancelFills() => Session.Fills.Cancel();
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void CancelProposals() => Session.Proposals?.Cancel();
+
+        /// <summary>Moves the cursor to the start of the run's proposal before it, which scrolls the lanes there.</summary>
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void PreviousProposal()
+        {
+            if (Session.Proposals is { } run && !run.GoToPrevious())
+                Session.Status = Strings.ProposalRunNoneBefore;
+        }
+
+        /// <summary>Moves the cursor to the start of the run's proposal after it, which scrolls the lanes there.</summary>
+        [RelayCommand(CanExecute = nameof(IsProposalRunActive))]
+        private void NextProposal()
+        {
+            if (Session.Proposals is { } run && !run.GoToNext())
+                Session.Status = Strings.ProposalRunNoneAfter;
+        }
 
         [RelayCommand]
         private void FinerSnap() => Session.Snap = Session.Snap.Finer();
@@ -555,16 +611,25 @@ namespace ChartBuilder.ViewModels
             ScheduleRefresh();
         }
 
-        /// <summary>Generate fills' button, and the bar over the lanes while a run goes on, after the focus, the chart or the run changes.</summary>
+        /// <summary>
+        /// Generate fills' and Generate star power's buttons, and the bar over the lanes while a run goes on, after the focus,
+        /// the chart or the run changes.
+        /// </summary>
         private void RefreshFills()
         {
             OnPropertyChanged(nameof(CanGenerateFills));
-            OnPropertyChanged(nameof(IsFillRunActive));
-            OnPropertyChanged(nameof(FillRunText));
-            KeepAllFillsCommand.NotifyCanExecuteChanged();
-            DropAllFillsCommand.NotifyCanExecuteChanged();
-            AddFillsCommand.NotifyCanExecuteChanged();
-            CancelFillsCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanGenerateStarPower));
+            OnPropertyChanged(nameof(IsProposalRunActive));
+            OnPropertyChanged(nameof(ProposalRunText));
+            OnPropertyChanged(nameof(ProposalRunHint));
+            OnPropertyChanged(nameof(ProposalRunAdd));
+            OnPropertyChanged(nameof(ProposalRunAddToolTip));
+            KeepAllProposalsCommand.NotifyCanExecuteChanged();
+            DropAllProposalsCommand.NotifyCanExecuteChanged();
+            AddProposalsCommand.NotifyCanExecuteChanged();
+            CancelProposalsCommand.NotifyCanExecuteChanged();
+            PreviousProposalCommand.NotifyCanExecuteChanged();
+            NextProposalCommand.NotifyCanExecuteChanged();
         }
 
         /// <summary>
@@ -610,6 +675,7 @@ namespace ChartBuilder.ViewModels
             Properties.Refresh();
             RefreshPhraseChoices();
             OnPropertyChanged(nameof(CanGenerateFills));
+            OnPropertyChanged(nameof(CanGenerateStarPower));
             foreach (var lane in Lanes.All)
                 lane.RefreshDifficulties();
         }
@@ -727,70 +793,109 @@ namespace ChartBuilder.ViewModels
             }
         }
 
-        private OverviewData? OverviewOf(ChartTrackKey? key)
+        private OverviewData? OverviewOf(ChartTrackKey? key) => OverviewData.Of(Session, key, Playback.LengthSeconds, DensityColumns);
+    }
+
+    /// <summary>A section, at its time in the audio, for the overview.</summary>
+    public sealed record OverviewSection(double Seconds, string Name);
+
+    /// <summary>A phrase of the lane in focus, in the audio, and the phrase rail's row it's drawn in, for the overview.</summary>
+    public readonly record struct OverviewPhrase(double Start, double End, RailKind Row);
+
+    /// <summary>A proposal of the run of Generate fills or Generate star power going on, in the audio, for the overview.</summary>
+    public readonly record struct OverviewProposal(double Start, double End, bool Kept);
+
+    /// <summary>
+    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the note density of the lane in
+    /// focus, from 0 to 1 in columns across the song, every one of its phrases, a row for each of the phrase rail's rows,
+    /// the ghosts of a run of Generate fills or Generate star power going on, and the synchronized region and the
+    /// passages synced with it, each as audio seconds.
+    /// </summary>
+    /// <param name="Rows">The rows of the phrase rail of the lane in focus, in order; none with no lane.</param>
+    /// <param name="Phrases">
+    /// Its phrases: star power as the games read it, overlapping phrases as one; disco flips of the difficulty shown; and
+    /// every other kind as charted.
+    /// </param>
+    /// <param name="Proposals">The run's proposals, whichever lane is in focus, so they can always be found; none without a run.</param>
+    public sealed record OverviewData(
+        IReadOnlyList<OverviewSection> Sections,
+        IReadOnlyList<float> Density,
+        IReadOnlyList<RailKind> Rows,
+        IReadOnlyList<OverviewPhrase> Phrases,
+        IReadOnlyList<OverviewProposal> Proposals,
+        IReadOnlyList<(double Start, double End, bool IsRegion)> Synced)
+    {
+        /// <summary>
+        /// The overview of <paramref name="session"/>'s song for the lane <paramref name="key"/>, the density in
+        /// <paramref name="columns"/> columns over <paramref name="length"/> seconds; null while the length isn't known.
+        /// </summary>
+        internal static OverviewData? Of(EditorSession session, ChartTrackKey? key, double length, int columns)
         {
-            double length = Playback.LengthSeconds;
             if (!(length > 0))
                 return null;
 
-            var chart = Session.Chart;
+            var chart = session.Chart;
             var sections = new List<OverviewSection>();
             foreach (var e in chart.Events)
             {
                 if (SectionEvents.NameOf(e.Text) is { } name)
-                    sections.Add(new OverviewSection(Session.AudioAt(e.Tick), name));
+                    sections.Add(new OverviewSection(session.AudioAt(e.Tick), name));
             }
 
-            var density = new float[DensityColumns];
-            var starPower = new List<(double, double)>();
-            var solos = new List<(double, double)>();
+            var density = new float[columns];
+            IReadOnlyList<RailKind> rows = [];
+            var phrases = new List<OverviewPhrase>();
             if (key is { } track && chart.PartOf(track.Instrument) is { } part)
             {
-                var game = Session.GameTrack(track);
+                var game = session.GameTrack(track);
                 foreach (var note in game.Notes)
                 {
-                    int column = (int)(Session.AudioAt(note.Tick) / length * DensityColumns);
-                    if (column >= 0 && column < DensityColumns)
+                    int column = (int)(session.AudioAt(note.Tick) / length * columns);
+                    if (column >= 0 && column < columns)
                         density[column]++;
                 }
 
-                float most = density.Max();
+                float most = density.Length > 0 ? density.Max() : 0;
                 if (most > 0)
                 {
                     for (int i = 0; i < density.Length; i++)
                         density[i] /= most;
                 }
 
+                rows = PhraseRail.RowsOf(part.Kind);
+                var starPower = new RailKind(PhraseKind.StarPower);
                 foreach (var phrase in game.StarPower)
-                    starPower.Add((Session.AudioAt(phrase.Tick), Session.AudioAt(phrase.Tick + phrase.Length)));
-                foreach (var phrase in part.Phrases.Where(p => p.Kind == PhraseKind.Solo))
-                    solos.Add((Session.AudioAt(phrase.Tick), Session.AudioAt(phrase.Tick + phrase.Length)));
+                    phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), starPower));
+                foreach (var phrase in part.Phrases)
+                {
+                    RailKind row = PhraseRail.RowOf(part.Kind, phrase.Kind);
+                    if (phrase.Kind != PhraseKind.StarPower && rows.Contains(row))
+                        phrases.Add(new OverviewPhrase(session.AudioAt(phrase.Tick), session.AudioAt(phrase.Tick + phrase.Length), row));
+                }
+
+                if (rows.Contains(RailKind.DiscoFlip))
+                {
+                    foreach (var range in session.DiscoFlipRangesOf(track))
+                        phrases.Add(new OverviewPhrase(session.AudioAt(range.Tick), range.EndTick is { } end ? session.AudioAt(end) : length, RailKind.DiscoFlip));
+                }
+            }
+
+            var proposals = new List<OverviewProposal>();
+            if (session.Proposals is { } run)
+            {
+                for (int i = 0; i < run.Phrases.Count; i++)
+                    proposals.Add(new OverviewProposal(session.AudioAt(run.Phrases[i].Tick), session.AudioAt(run.Phrases[i].CoverEnd), run.IsKept(i)));
             }
 
             var synced = new List<(double, double, bool)>();
-            if (Session.Sync is { Span: var (from, to) } sync)
+            if (session.Sync is { Span: var (from, to) } sync)
             {
-                synced.Add((Session.AudioAt(from), Session.AudioAt(to), true));
+                synced.Add((session.AudioAt(from), session.AudioAt(to), true));
                 foreach (long start in sync.Matches)
-                    synced.Add((Session.AudioAt(start), Session.AudioAt(start + to - from), false));
+                    synced.Add((session.AudioAt(start), session.AudioAt(start + to - from), false));
             }
 
-            return new OverviewData(sections, density, starPower, solos, synced);
+            return new OverviewData(sections, density, rows, phrases, proposals, synced);
         }
     }
-
-    /// <summary>A section, at its time in the audio, for the overview.</summary>
-    public sealed record OverviewSection(double Seconds, string Name);
-
-    /// <summary>
-    /// What the bottom timeline shows of the whole song (charter-spec C3 item 2): sections, the note density of the lane in
-    /// focus, from 0 to 1 in columns across the song, its star power and solos, and the synchronized region and the
-    /// passages synced with it, each as audio seconds.
-    /// </summary>
-    public sealed record OverviewData(
-        IReadOnlyList<OverviewSection> Sections,
-        IReadOnlyList<float> Density,
-        IReadOnlyList<(double Start, double End)> StarPower,
-        IReadOnlyList<(double Start, double End)> Solos,
-        IReadOnlyList<(double Start, double End, bool IsRegion)> Synced);
 }

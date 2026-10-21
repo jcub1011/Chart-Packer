@@ -98,6 +98,7 @@ public sealed class EditorSession
         Selection = new EditorSelection(Chart, VocalContentOf);
         Tools = new EditorTools(this);
         Fills = new FillProposals(this);
+        StarPower = new StarPowerProposals(this);
         TempoProposal = new TempoProposals(this);
         Reduce = new ReduceProposals(this);
         Sync = new SyncRegion(this);
@@ -147,6 +148,7 @@ public sealed class EditorSession
         _game.Clear();
         ForgetDiscoFlips();
         Fills.OnChanged();
+        StarPower.OnChanged();
         SongSettingsChanged?.Invoke(this, EventArgs.Empty);
         PlaceSongEvents();
         RaiseState();
@@ -216,6 +218,12 @@ public sealed class EditorSession
 
     /// <summary>The run of Generate fills going on, if there's one (charter-spec C6 item 5).</summary>
     public FillProposals Fills { get; }
+
+    /// <summary>The run of Generate star power going on, if there's one (charter-spec C8 item 1).</summary>
+    public StarPowerProposals StarPower { get; }
+
+    /// <summary>The run of proposed phrases going on, Generate fills' or Generate star power's; null for none.</summary>
+    public PhraseProposals? Proposals => Fills.IsActive ? Fills : StarPower.IsActive ? StarPower : null;
 
     /// <summary>The proposed tempo map being looked at, if there's one (charter-spec C14 item 4).</summary>
     public TempoProposals TempoProposal { get; }
@@ -706,6 +714,7 @@ public sealed class EditorSession
             Selection.Reconcile();
             KeepPhraseKindOffered();
             Fills.OnChanged();
+            StarPower.OnChanged();
             Reduce.OnChanged();
             Sync.OnChanged();
             PlaceSongEvents();

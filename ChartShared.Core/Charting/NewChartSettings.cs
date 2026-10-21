@@ -40,10 +40,10 @@ public sealed record NewChartSettings(
     /// <summary>The time-signature note values a chart can use.</summary>
     public static IReadOnlyList<int> Denominators { get; } = [1, 2, 4, 8, 16, 32];
 
-    /// <summary>The parts a new chart can have in v1, in the order they're offered.</summary>
+    /// <summary>The parts a chart can have, which Chart Builder edits, in the order they're offered.</summary>
     public static IReadOnlyList<ChartInstrument> Instruments { get; } =
     [
-        ChartInstrument.Guitar, ChartInstrument.Bass, ChartInstrument.Rhythm, ChartInstrument.GuitarCoop,
+        ChartInstrument.Guitar, ChartInstrument.Bass, ChartInstrument.Rhythm, ChartInstrument.GuitarCoop, ChartInstrument.Keys,
         ChartInstrument.GhlGuitar, ChartInstrument.GhlBass, ChartInstrument.GhlRhythm, ChartInstrument.GhlCoop,
         ChartInstrument.Drums,
     ];

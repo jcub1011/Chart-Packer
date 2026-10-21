@@ -80,6 +80,27 @@ public sealed class DifficultyGeneratorTests
         Assert.IsTrue(generated.Drafted.PartOf(ChartInstrument.Drums)!.Tracks.All(t => t.Notes.Count > 0));
     }
 
+    [TestMethod]
+    public void KeysAreFilledByTheFiveFretRulesAsGuitarIs()
+    {
+        var chart = EditableChart.CreateNew(new NewChartSettings("", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Keys }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Guitar, Expert, Run(64, step: 120)).Apply(chart);
+        new AddNotes(ChartInstrument.Keys, Expert, Run(64, step: 120)).Apply(chart);
+        var missing = DifficultyGenerator.MissingTargets(chart);
+
+        var guitar = DifficultyGenerator.Generate(chart, ChartInstrument.Guitar, missing[ChartInstrument.Guitar], ReductionDefaults.Shipped, DrumsVariant.Pro);
+        var keys = DifficultyGenerator.Generate(chart, ChartInstrument.Keys, missing[ChartInstrument.Keys], ReductionDefaults.Shipped, DrumsVariant.Pro);
+
+        Assert.AreSequenceEqual([Hard, Medium, Easy], [.. missing[ChartInstrument.Keys]]);
+        Assert.HasCount(3, keys.Drafts);
+        foreach (var (lead, made) in guitar.Drafts.Zip(keys.Drafts))
+        {
+            Assert.AreEqual(new ChartTrackKey(ChartInstrument.Keys, lead.Target.Difficulty), made.Target);
+            Assert.AreSequenceEqual(lead.Result.Notes.ToList(), [.. made.Result.Notes]);
+            Assert.AreSequenceEqual(lead.Result.Flags.ToList(), [.. made.Result.Flags]);
+        }
+    }
+
     // A note every `step` ticks, cycling through `lanes` lanes.
     private static List<EditableNote> Run(int count, long step = 480, int lanes = 5) =>
         [.. Enumerable.Range(0, count).Select(i => new EditableNote(i * step, 1, i % lanes))];

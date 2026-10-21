@@ -37,6 +37,17 @@ public sealed class PendingSongIniChangesTests
     }
 
     [TestMethod]
+    public void AddedKeysCallForAnUnratedDiffKeys()
+    {
+        var chart = NewChart(Guitar);
+        new AddPart(ChartInstrument.Keys).Apply(chart);
+
+        var changes = PendingSongIniChanges.Of(chart, JustGuitar, []);
+
+        Assert.AreSequenceEqual([new MetadataChange("diff_keys", "-1")], changes.ToList());
+    }
+
+    [TestMethod]
     public void AnAddedPartRatedAlreadyCallsForNothing()
     {
         var chart = NewChart(Guitar);
