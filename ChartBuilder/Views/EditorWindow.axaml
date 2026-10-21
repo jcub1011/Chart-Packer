@@ -98,11 +98,16 @@
                         <!-- Off while a song opens, as what's chosen would act on the Editor being left. -->
                         <Menu chrome:WindowDecorationProperties.ElementRole="User" IsEnabled="{Binding !IsOpening}">
                             <MenuItem Header="{x:Static res:Strings.MenuFile}">
-                                <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N" />
-                                <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O" />
+                                <MenuItem Header="{x:Static res:Strings.MenuNewChart}" Command="{Binding NewChartCommand}" InputGesture="Ctrl+N">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource NewChartStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuOpen}" Command="{Binding OpenChartCommand}" InputGesture="Ctrl+O">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                                 <!-- The songs opened lately, the latest first. Each opens with the menu's OpenRecentCommand, found up
                                      the logical tree ($parent), as the submenu's popup isn't under the menu in the visual tree. -->
                                 <MenuItem Header="{x:Static res:Strings.MenuOpenRecent}" ItemsSource="{Binding Recent}" IsEnabled="{Binding HasRecent}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource RecentStroke}" /></MenuItem.Icon>
                                     <MenuItem.ItemTemplate>
                                         <DataTemplate x:DataType="vm:RecentSongItem">
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" MinWidth="240">
@@ -120,23 +125,35 @@
                                     </MenuItem.ItemContainerTheme>
                                 </MenuItem>
                                 <Separator />
-                                <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
+                                <MenuItem Header="{x:Static res:Strings.MenuSave}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SaveStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{x:Static res:Strings.MenuSaveAndPack}"
                                           Command="{Binding SaveAndPackCommand}"
                                           ToolTip.Tip="{Binding SaveAndPackToolTip}"
-                                          ToolTip.ShowOnDisabled="True" />
+                                          ToolTip.ShowOnDisabled="True">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource PackStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{x:Static res:Strings.MenuExportCopy}"
                                           Command="{Binding ExportCopyCommand}"
                                           ToolTip.Tip="{Binding ExportCopyToolTip}"
-                                          ToolTip.ShowOnDisabled="True" />
+                                          ToolTip.ShowOnDisabled="True">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                                 <Separator />
                                 <!-- Settings is the program's, last under File as in Chart Packer; the chart's are a tab in the
                                      left panel. Its Ctrl+, isn't shown, as Avalonia would print it as Ctrl+OemComma. -->
-                                <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}" />
+                                <MenuItem Header="{x:Static res:Strings.MenuSettings}" Command="{Binding OpenProgramSettingsCommand}">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SettingsStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                             </MenuItem>
                             <MenuItem Header="{x:Static res:Strings.MenuEdit}">
-                                <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
-                                <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
+                                <MenuItem Header="{x:Static res:Strings.MenuUndo}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{x:Static res:Strings.MenuRedo}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y">
+                                    <MenuItem.Icon><ctl:LineIcon Data="{StaticResource UndoStroke}" RenderTransform="scaleX(-1)" /></MenuItem.Icon>
+                                </MenuItem>
                             </MenuItem>
                         </Menu>
                     </ctl:TitleBar.Menu>
@@ -632,8 +649,8 @@
                                 ToolTip.Tip="{Binding Playback.PlayPauseToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.PlayPauseButton}">
                             <Panel>
-                                <PathIcon Width="12" Height="12" Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Playback.IsPlaying}" />
-                                <PathIcon Width="12" Height="12" Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Playback.IsPlaying}" />
+                                <ctl:LineIcon Width="12" Height="12" Data="{StaticResource PlayStroke}" IsVisible="{Binding !Playback.IsPlaying}" />
+                                <ctl:LineIcon Width="12" Height="12" Data="{StaticResource PauseStroke}" IsVisible="{Binding Playback.IsPlaying}" />
                             </Panel>
                         </Button>
                         <ToggleButton Classes="tool"

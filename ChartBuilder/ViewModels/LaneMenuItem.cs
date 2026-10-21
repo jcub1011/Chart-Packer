@@ -17,13 +17,14 @@ namespace ChartBuilder.ViewModels
     /// </summary>
     public sealed class LaneMenuItem
     {
-        private LaneMenuItem(string header, IReadOnlyList<LaneMenuItem>? items, ICommand? command, bool isEnabled, bool isChecked)
+        private LaneMenuItem(string header, IReadOnlyList<LaneMenuItem>? items, ICommand? command, bool isEnabled, bool isChecked, string? icon = null)
         {
             Header = header;
             Items = items;
             Command = command;
             IsEnabled = isEnabled;
             IsChecked = isChecked;
+            Icon = icon;
         }
 
         public string Header { get; }
@@ -38,6 +39,12 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Whether this is the part the lane shows.</summary>
         public bool IsChecked { get; }
+
+        /// <summary>
+        /// The key of the line icon (in <c>Styles/Icons.axaml</c>) shown beside an action or a submenu; null for none, as
+        /// on a choice, whose place it is to show the tick.
+        /// </summary>
+        public string? Icon { get; }
 
         /// <summary>
         /// Every part a lane can show, grouped by instrument, then the vocals. A part <paramref name="canPick"/> refuses
@@ -62,13 +69,19 @@ namespace ChartBuilder.ViewModels
         public static LaneMenuItem Choice(string header, bool isChecked, Action run) =>
             new(header, null, new RelayCommand(run), isEnabled: true, isChecked);
 
-        /// <summary>An item that runs <paramref name="run"/>, greyed out unless <paramref name="isEnabled"/>.</summary>
-        public static LaneMenuItem Action(string header, bool isEnabled, Action run) =>
-            new(header, null, new RelayCommand(run), isEnabled, isChecked: false);
+        /// <summary>
+        /// An item that runs <paramref name="run"/>, greyed out unless <paramref name="isEnabled"/>, beside the line icon
+        /// keyed <paramref name="icon"/>.
+        /// </summary>
+        public static LaneMenuItem Action(string header, bool isEnabled, Action run, string? icon = null) =>
+            new(header, null, new RelayCommand(run), isEnabled, isChecked: false, icon);
 
-        /// <summary>A submenu of <paramref name="items"/>, greyed out when none of them can be picked.</summary>
-        public static LaneMenuItem Submenu(string header, IReadOnlyList<LaneMenuItem> items) =>
-            new(header, items, null, items.Any(static i => i.IsEnabled), isChecked: false);
+        /// <summary>
+        /// A submenu of <paramref name="items"/>, greyed out when none of them can be picked, beside the line icon keyed
+        /// <paramref name="icon"/>.
+        /// </summary>
+        public static LaneMenuItem Submenu(string header, IReadOnlyList<LaneMenuItem> items, string? icon = null) =>
+            new(header, items, null, items.Any(static i => i.IsEnabled), isChecked: false, icon);
 
         /// <summary>A line between groups of items.</summary>
         public static LaneMenuItem Separator { get; } = new(string.Empty, null, null, isEnabled: false, isChecked: false);

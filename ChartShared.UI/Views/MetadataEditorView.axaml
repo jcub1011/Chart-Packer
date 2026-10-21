@@ -256,7 +256,9 @@
                         <Border Classes="metadataRow invalid" Margin="0,1">
                             <Border.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
+                                    <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource QuickFixStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
@@ -291,15 +293,23 @@
                                 <ContextMenu>
                                     <MenuItem Header="{Binding UndoToolTip}"
                                               Command="{Binding RevertCommand}"
-                                              IsVisible="{Binding ShowUndo}" />
+                                              IsVisible="{Binding ShowUndo}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource RevertStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                     <MenuItem Header="{x:Static res:SharedStrings.RemoveRowToolTip}"
                                               Command="{Binding RemoveCommand}"
-                                              IsVisible="{Binding ShowRemove}" />
+                                              IsVisible="{Binding ShowRemove}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource TrashStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                     <Separator IsVisible="{Binding HasUndoOrRemove}" />
-                                    <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}" />
+                                    <MenuItem Header="{Binding QuickFixHeader}" Command="{Binding QuickFixCommand}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource QuickFixStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                     <MenuItem Header="{x:Static res:SharedStrings.AutoSetLengthButton}"
                                               Command="{Binding AutoSetSongLengthCommand}"
-                                              IsVisible="{Binding ShowAutoSetLength}" />
+                                              IsVisible="{Binding ShowAutoSetLength}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource OffsetStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Grid RowDefinitions="Auto,Auto,Auto">
@@ -376,7 +386,7 @@
                                             IsVisible="{Binding ShowUndo}"
                                             ToolTip.Tip="{Binding UndoToolTip}"
                                             AutomationProperties.Name="{Binding UndoToolTip}">
-                                        <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                        <ui:LineIcon Data="{StaticResource RevertStroke}" />
                                     </Button>
                                     <Button Grid.Column="1"
                                             Classes="captionAction rowAction reveal"
@@ -384,7 +394,7 @@
                                             IsVisible="{Binding ShowRemove}"
                                             ToolTip.Tip="{x:Static res:SharedStrings.RemoveRowToolTip}"
                                             AutomationProperties.Name="{x:Static res:SharedStrings.RemoveRowToolTip}">
-                                        <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                        <ui:LineIcon Data="{StaticResource TrashStroke}" />
                                     </Button>
                                 </Grid>
 
@@ -485,7 +495,7 @@
                                 Command="{Binding CancelAddCommand}"
                                 ToolTip.Tip="{x:Static res:SharedStrings.StopAddingToolTip}"
                                 AutomationProperties.Name="{x:Static res:SharedStrings.StopAddingToolTip}">
-                            <PathIcon Data="{StaticResource RemoveIconGeometry}" />
+                            <ui:LineIcon Data="{StaticResource ClearStroke}" />
                         </Button>
                     </Grid>
                 </Grid>
@@ -499,7 +509,7 @@
                     IsVisible="{Binding ShowAddRow}"
                     AutomationProperties.Name="{x:Static res:SharedStrings.AddRowButton}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource AddStroke}" />
                     <TextBlock Text="{x:Static res:SharedStrings.AddRowButton}" />
                 </StackPanel>
             </Button>

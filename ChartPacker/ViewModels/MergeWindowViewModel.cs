@@ -125,7 +125,7 @@ namespace ChartPacker.ViewModels
     {
         None,
         Instrument,
-        Waveform,
+        Audio,
         AlbumArt,
         Background,
         Video,
@@ -646,7 +646,7 @@ namespace ChartPacker.ViewModels
 
             AudioChoice = Choice(Strings.MergeAudioLabel, null, i => true, i => StemsOf(sources[i]), leaveOut: null,
                 summary: i => StemsSummaryOf(sources[i]),
-                icon: MergeRowIcon.Waveform);
+                icon: MergeRowIcon.Audio);
             Assets.Add(Choice(Strings.MergeAlbumArtLabel, "album", i => sources[i].AlbumArt is not null, i => sources[i].AlbumArt ?? Strings.MergeUnavailable, leaveOut: Strings.MergeNone,
                 icon: MergeRowIcon.AlbumArt));
             Assets.Add(Choice(Strings.MergeBackgroundLabel, "background", i => sources[i].BackgroundImage is not null, i => sources[i].BackgroundImage ?? Strings.MergeUnavailable, leaveOut: Strings.MergeNone,

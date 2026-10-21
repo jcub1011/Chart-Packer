@@ -4,10 +4,9 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
 using ChartShared.Core.Settings;
+using ChartShared.UI.Controls;
 using ChartShared.UI.Resources;
 using ChartShared.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -93,8 +92,7 @@ namespace ChartShared.UI.ViewModels.Settings
         public string Label => action.Label;
 
         /// <summary>The line icon shown instead of the text, or <see langword="null"/> for a text button.</summary>
-        public Geometry? Icon { get; } =
-            action.IconKey is { } key && Application.Current?.TryFindResource(key, out object? icon) == true ? icon as Geometry : null;
+        public Geometry? Icon { get; } = LineIcon.Find(action.IconKey);
 
         public bool HasIcon => Icon is not null;
 

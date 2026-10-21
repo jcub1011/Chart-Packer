@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using ChartShared.UI.Controls;
 using ChartShared.UI.Resources;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
@@ -42,7 +43,8 @@ namespace ChartShared.UI.Views
         /// <summary>
         /// Fills a finding's menu with its fixes as they are now: Fix, Fix All For its part and Fix All for a rule with one
         /// way to fix it; a list of the ways, each with those three under it, for one with more; or a greyed-out No Fixes
-        /// Available.
+        /// Available. A way to fix and Fix have the wrench beside them, and each Fix All its own icon; No Fixes Available has
+        /// none, as there's nothing to fix.
         /// </summary>
         private static void Fill(ContextMenu menu, FindingItem item)
         {
@@ -59,7 +61,7 @@ namespace ChartShared.UI.Views
             {
                 foreach (var fix in fixes)
                 {
-                    var option = new MenuItem { Header = fix.Label };
+                    var option = new MenuItem { Header = fix.Label, Icon = LineIcon.For("QuickFixStroke") };
                     AddActions(option.Items, item, fix);
                     menu.Items.Add(option);
                 }
@@ -68,13 +70,14 @@ namespace ChartShared.UI.Views
 
         private static void AddActions(ItemCollection items, FindingItem item, FindingFix fix)
         {
-            items.Add(Action(SharedStrings.FindingFixMenuItem, fix.Fix));
+            items.Add(Action(SharedStrings.FindingFixMenuItem, fix.Fix, "QuickFixStroke"));
             if (fix.FixAllInPart is { } inPart)
-                items.Add(Action(item.FixAllInPartText, inPart));
+                items.Add(Action(item.FixAllInPartText, inPart, "FixAllInPartStroke"));
             if (fix.FixAll is { } all)
-                items.Add(Action(SharedStrings.FindingFixAllMenuItem, all));
+                items.Add(Action(SharedStrings.FindingFixAllMenuItem, all, "FixAllStroke"));
         }
 
-        private static MenuItem Action(string header, Action action) => new() { Header = header, Command = new RelayCommand(action) };
+        private static MenuItem Action(string header, Action action, string icon) =>
+            new() { Header = header, Command = new RelayCommand(action), Icon = LineIcon.For(icon) };
     }
 }

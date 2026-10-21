@@ -14,11 +14,11 @@
         <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationDeviceCaption}" />
         <Border Classes="card">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                <PathIcon Grid.Column="0"
-                          Width="14" Height="14"
-                          Opacity="0.7"
-                          VerticalAlignment="Center"
-                          Data="{StaticResource VolumeIconGeometry}" />
+                <ui:LineIcon Grid.Column="0"
+                             Width="14" Height="14"
+                             Opacity="0.7"
+                             VerticalAlignment="Center"
+                             Data="{StaticResource VolumeStroke}" />
                 <TextBlock Grid.Column="1"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center"
@@ -34,7 +34,7 @@
         <Border Classes="card">
             <StackPanel Spacing="10">
                 <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
-                    <PathIcon Grid.Column="0" Opacity="0.7" VerticalAlignment="Center" Data="{StaticResource OffsetIconGeometry}" />
+                    <ui:LineIcon Grid.Column="0" Width="14" Height="14" Opacity="0.7" VerticalAlignment="Center" Data="{StaticResource OffsetStroke}" />
                     <NumericUpDown Grid.Column="1"
                                    ui:DragScrub.IsEnabled="True"
                                    Width="80"
@@ -62,7 +62,7 @@
                             ToolTip.Tip="{x:Static res:SharedStrings.CalibrationRevertToolTip}"
                             ToolTip.ShowOnDisabled="True"
                             AutomationProperties.Name="{x:Static res:SharedStrings.CalibrationRevertToolTip}">
-                        <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                        <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                     </Button>
                     <Border Grid.Column="5" Classes="toolbar-group">
                         <ItemsControl ItemsSource="{x:Static vm:CalibrationViewModel.Steps}">

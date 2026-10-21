@@ -13,7 +13,8 @@ namespace ChartBuilder.Controls
     /// <summary>
     /// Makes a lane menu (<see cref="LaneMenuItem"/>s) into menu items for a <c>MenuFlyout</c>'s <c>ItemsSource</c>: a
     /// submenu per group, with the lane's own part and its group ticked with <see cref="Check"/>, and a line for each
-    /// <see cref="LaneMenuItem.Separator"/>.
+    /// <see cref="LaneMenuItem.Separator"/>. An item that isn't ticked shows its <see cref="LaneMenuItem.Icon"/>, a line
+    /// icon looked up in the app's resources.
     /// </summary>
     public sealed class LaneMenuConverter : IValueConverter
     {
@@ -32,7 +33,7 @@ namespace ChartBuilder.Controls
             Command = item.Command,
             IsEnabled = item.IsEnabled,
             ItemsSource = item.Items is { } inner ? MenuItems(inner) : null,
-            Icon = item.IsChecked ? new LineIcon { Data = Check } : null,
+            Icon = item.IsChecked ? new LineIcon { Data = Check } : LineIcon.For(item.Icon),
         })];
     }
 }

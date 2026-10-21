@@ -258,6 +258,16 @@ namespace ChartBuilder.ViewModels
             _ => Strings.SongEventEnd,
         };
 
+        /// <summary>The key of a song event's line icon, for the insert menu; null for one without.</summary>
+        internal static string? SongEventIcon(SongEvent songEvent) => songEvent switch
+        {
+            SongEvent.Coda => "CodaStroke",
+            SongEvent.MusicStart => "PlayStroke",
+            SongEvent.MusicEnd => "StopStroke",
+            SongEvent.End => "SkipNextStroke",
+            _ => null,
+        };
+
         public void Dispose()
         {
             _disposed = true;
@@ -321,13 +331,17 @@ namespace ChartBuilder.ViewModels
         private IReadOnlyList<LaneMenuItem> EventMenuOf(ChartInstrument? part)
         {
             var items = SongEvents.Insertable
-                .Select(kind => LaneMenuItem.Choice(SongEventName(kind), false, () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind))))
+                .Select(kind => LaneMenuItem.Action(
+                    SongEventName(kind),
+                    isEnabled: true,
+                    () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind)),
+                    SongEventIcon(kind)))
                 .ToList();
-            items.Add(LaneMenuItem.Choice(Strings.SectionsTextEvent, false, () => InsertTextEvent(null)));
+            items.Add(LaneMenuItem.Action(Strings.SectionsTextEvent, true, () => InsertTextEvent(null), "TextEventStroke"));
             if (part is { } instrument)
             {
                 string header = string.Format(CultureInfo.CurrentCulture, Strings.SectionsPartTextEventFormat, ChartLabels.InstrumentName(instrument));
-                items.Add(LaneMenuItem.Choice(header, false, () => InsertTextEvent(instrument)));
+                items.Add(LaneMenuItem.Action(header, true, () => InsertTextEvent(instrument), "TextEventStroke"));
             }
 
             return items;

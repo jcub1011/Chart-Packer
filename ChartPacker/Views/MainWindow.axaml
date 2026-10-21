@@ -129,6 +129,7 @@
                         <MenuItem Header="{x:Static res:Strings.MenuOverwrite}"
                                   ItemsSource="{Binding Library.OverwriteOptions}"
                                   ToolTip.Tip="{x:Static res:Strings.OverwriteToolTip}">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource OverwriteStroke}" /></MenuItem.Icon>
                             <MenuItem.ItemContainerTheme>
                                 <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:OverwriteOption">
                                     <Setter Property="Header" Value="{Binding MenuLabel}" />
