@@ -2428,6 +2428,13 @@ Each one is checked first. Anything that has changed since it was compared, or w
   <data name="ValidatorGenerateFix" xml:space="preserve">
     <value>Generate them from the difficulties above</value>
   </data>
+  <data name="ValidatorNoStarPowerFormat" xml:space="preserve">
+    <value>No star power: {0}</value>
+    <comment>{0} lists the parts without star power phrases, e.g. "Guitar; Bass".</comment>
+  </data>
+  <data name="ValidatorGenerateStarPowerFix" xml:space="preserve">
+    <value>Generate star power phrases, charged for the hard passages</value>
+  </data>
   <data name="ValidatorGeneratingFormat" xml:space="preserve">
     <value>Generating difficulties for {0} of {1} songs…</value>
     <comment>{0} is how many songs are done, {1} how many are being generated.</comment>

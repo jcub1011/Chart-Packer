@@ -55,7 +55,8 @@ This spec **supersedes** the "editing charts" non-goal in
   percussion notes (96, 97), overdrive (116), lyric and range shifts and any other events are kept
   as they are ([§4.2](#lossless-passthrough)), and a `.chart`'s lyrics are imported only. The
   existing vocals tools (`VocalsEditor`, lyrics lane) are unchanged.
-- **Pro keys, keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are.
+- **Pro keys, pro guitar/bass, dance, Elite drums.** Their tracks are kept as they are. (5-lane
+  `PART KEYS` is edited as a 5-fret part, *revised for #116*.)
 - **Venue, lighting, camera and crowd events.** Kept as they are.
 - **Writing `.chart`.** `.chart` is imported only ([C2](#c2-open-and-import)).
 - **Auto-charting.** No notes are generated from audio. Onsets and beats are shown as hints, and
@@ -205,8 +206,8 @@ command.
 
 ### 4.2 Lossless passthrough
 
-When a chart is loaded, every MIDI track Chart Builder doesn't edit (vocals, harmonies, keys and pro
-keys, pro guitar, venue, unknown tracks) is kept as raw bytes, sliced from the file as
+When a chart is loaded, every MIDI track Chart Builder doesn't edit (vocals, harmonies, pro keys, pro
+guitar, venue, unknown tracks) is kept as raw bytes, sliced from the file as
 `MidiMerger` already does. On save they are written back **byte for byte**, in their original
 order.
 
@@ -231,7 +232,7 @@ lyrics, after the note-offs and before the note-ons.
 
 **When the tempo map changes in a way that keeps times.** Passthrough tracks hold ticks, so a tempo
 edit with *keep times* on ([C4](#c4-tempo-map-and-grid)), or a stretch
-([C15](#c15-editing-ergonomics)), would leave vocals, venue and keys at their old ticks while the
+([C15](#c15-editing-ergonomics)), would leave vocals, venue and pro keys at their old ticks while the
 charted notes move. Chart Builder therefore re-ticks the passthrough tracks too. It parses their
 events, moves each one to the tick that keeps its time, and writes them back with the same events
 in the same order. Byte-for-byte passthrough is promised only while the tempo map hasn't been
@@ -666,7 +667,7 @@ value at the playhead as it changes, and the value is set as one undo step once 
 
 **Parts.**
 
-- A row for each v1 part: 5-fret Lead, Bass, Rhythm and Co-op; GHL Guitar, Bass, Rhythm and Co-op;
+- A row for each v1 part: 5-fret Lead, Bass, Rhythm, Co-op and Keys; GHL Guitar, Bass, Rhythm and Co-op;
   Drums, with a choice of 4-lane, Pro or 5-lane. Each row has a tick box, ticked when the chart has
   the part, and the part's difficulty rating (`diff_<part>`), empty while it's unrated, with an ✕ that
   clears it to `-1`. Pro drums have a second rating, `diff_drums_real`. A rating typed is applied
@@ -855,6 +856,14 @@ Acceptance criteria:
    solos, lint marks and the current view, and clicking or dragging it jumps there. *Settled in
    CM2:* it's the timeline along the Editor's bottom, which already spans the song. It shows the
    lane in focus.
+   - *Settled:* it shows every phrase of the lane in focus, a thin band under the ruler for each
+     row of its phrase rail ([C8](#c8-phrases-and-events) item 1), in the rail's order and colours:
+     star power (as the games read it), solos and big rock endings on 5-fret and GHL; star power,
+     solos, fills (with a big rock ending), rolls, trills and the difficulty's disco flips on drums.
+     The sections' names are below the bands. While Generate fills or Generate star power runs, its
+     ghosts are drawn over everything, whichever lane is in focus, so they can be found: a kept one
+     as a faint amber column the height of the strip, capped in solid amber, a dropped one as a
+     faint outline; each at least 2 px wide.
 3. **Part and difficulty picker.** Every part with its four difficulties. The letters use the
    detail panel's difficulty colours from `Theme.axaml` (green, yellow, red, purple) where the
    difficulty has notes, and grey where it is empty. The detail panel shows only charted
@@ -1134,10 +1143,14 @@ Acceptance criteria:
      a note at or before its end.
    - *Settled in CM3:* **Generate fills…** is beside the Phrase tool's picker, for a drums lane with
      notes, and its options are in its flyout, kept while the editor is open. The proposals are
-     drawn as dashed ghosts in the rail's fills row, over the bars there, with a faint band across the
-     lanes; a dropped one is faint and struck through. A click on a ghost keeps or drops it, before
-     anything else under it. While they're shown, a bar over the lanes counts those kept, with
-     **Keep all**, **Drop all**, **Add fills** and **Cancel**; `Esc` cancels too, once nothing
+     drawn as ghosts in the rail's fills row, over the bars there, in amber, a colour no phrase is
+     drawn in, whatever their kind, so they stand out: a kept one is lit, a little taller than its
+     row, with a bold dashed edge, and a band across the lanes edged by dashed lines at its start
+     and end; a dropped one is a faint outline, struck through, with a fainter band. Hovering a ghost
+     names it, and a click on one keeps or drops it, before anything else under it. While they're
+     shown, a bar over the lanes counts those kept, with **◀ Previous** and **Next ▶** (the cursor
+     goes to the start of the ghost before or after it, and the status says when there's none that
+     way), **Keep all**, **Drop all**, **Add fills** and **Cancel**; `Esc` cancels too, once nothing
      focused has taken it (a drag is taken back first, and a field keeps its own `Esc`). Any change to the
      chart but the run's own, an undo included, or to the song's settings, ends the run and says so,
      as the proposals were worked out from the chart before it. When nothing fits, the message says
@@ -1269,6 +1282,67 @@ Acceptance criteria:
      sustain, so it covers every note as the games read markers. With no notes selected, it covers
      the span selected, in the focused lane's part. When a star power phrase already starts and ends
      exactly there, `S` removes it instead. With nothing selected, the status says so.
+   - **Generate star power** proposes star power phrases over the selection or the whole part of a
+     5-fret or keys lane, placed so a player has enough to activate going into the part's hardest
+     passages. The author picks, for each run, about how many **seconds apart** phrases are
+     (default 22, as the official charts are), and whether they're **charged for the hard passages**
+     (default on) or only spread
+     evenly. As with Generate fills, the proposals are ghosts the author keeps or drops, and the
+     accepted ones are added as one undoable command. CHR066's quick fix adds what a run with the
+     defaults proposes, all at once, in Chart Builder and the library.
+   - *Settled:* phrases are placed against the part's highest difficulty with notes, and each
+     covers a note on every difficulty with notes, so none is empty on one (CHR065). The count is
+     the part's playing, in seconds with its rests left out (a gap between notes of 4 measures or
+     8 s), over the spacing, and at least four, a full meter, for the whole part; over a selection,
+     at least one. Fewer are proposed where fewer fit.
+   - *Settled:* a phrase starts on a measure line, or on a run's first chord where it's on a beat,
+     and ends at a run's end or on the last chord before a measure line. A run is chords between
+     rests of a beat and sections, as Reduce splits them ([C9](#c9-difficulty-authoring)). As the
+     official charts end one, it runs on past its last chord's sustains to the measure line after
+     them, where that's within a beat, or else to the next beat line, but never over the next chord.
+     It has 4 to 40 chords, lasts no more than 10 s, and is best about a measure long (0.75 to 1.25),
+     as most official phrases are; up to 4 where the part is too sparse for shorter. It doesn't
+     cross a section, a solo's start or end (it can be inside a solo) or a big rock ending, and
+     keeps 4 measures clear of every other star power phrase, those already there too, which it
+     never removes; the official charts never have two closer than 2, and seldom closer than 5. It
+     completes at least 2 measures of playing before the part's last note, so its star power can be
+     used. Better spots start on a measure line on a chord, end a run, end on a sustain of a beat
+     or longer (to whammy), and have about 7 chords, the official charts' median on Expert.
+   - *Settled:* the meter is simulated as the games fill and drain it, for a player who hits every
+     note and never whammies: a phrase gives a quarter of the meter, activating needs a half and
+     spends it all, and a full meter lasts 8 measures, by the time signatures in force (a measure
+     of 6/8 counts as one, as YARG drains it); a phrase completed while star power is on adds 2
+     measures to it, up to a full meter's worth left.
+   - *Settled:* the hard passages are found from the difficulty model
+     ([C9](#c9-difficulty-authoring)): each stretch of 2 measures from each measure line is scored
+     on its own, so endurance built up before it doesn't rank later ones higher; stretches without a
+     note are left out; the scores are smoothed, and a peak is a hard passage when it rises above the
+     higher of the lowest points between it and a higher peak either side (with no higher peak after
+     it, the side before alone) by 15% of the part's range and 5 points at least, and is no easier
+     than the part's median. One at the very start rises from nothing, so it isn't one. It starts
+     where the scores rise halfway to its peak, and two less than 8 measures apart are one.
+   - *Settled:* passages are charged for most prominent first, each where the plan with it still
+     works, using at most three quarters of the phrases. For each, in time order, the meter is
+     simulated with a player activating at each passage planned before, and it's given the phrases
+     that bring the meter to a half: the last completing from half a measure to 4 measures of
+     playing before it (best 1), the first of two starting after the activation before has run out
+     and within 16 measures of playing before it. A passage still in the star power of the one
+     before isn't charged for. The rest are shared over the stretches of playing between the
+     phrases placed, one at a time to whichever would then have the most room, each at the best spot
+     near its even share of the stretch. The stretch the part starts with has its first phrase half
+     a share in, as the official charts give theirs early (about 10 s in). One that would put star
+     power on over a passage charged for, so it can't be activated there, is left for the next best
+     spot. Then a stretch longer than 45 s is given one more in its middle, up to two past the
+     count. Without any passage, or with
+     charging off, the phrases are spread evenly. The same chart always gets the same phrases.
+   - *Settled:* **Generate star power…** is beside Generate fills, for a 5-fret or keys lane with
+     notes, and its options are in its flyout, kept while the editor is open. Over the whole part
+     it's refused while the part has star power, as the author's phrases are theirs to keep; over a
+     selection it proposes beside them. The proposals are drawn and kept or dropped as Generate
+     fills' are, in the rail's star power row, with the same bar over the lanes (**Add star power**
+     adds them), and the same ways to end the run. One run, of fills or of star power, goes on at a
+     time: starting one ends the other. When nothing fits, the message says why: not a 5-fret or
+     keys part, no notes, star power already there, or no spot.
 2. **Solos** (pitch 103), drawn as a shaded band with a note count.
    - *Settled in CM3:* the count is drawn at the solo's start. It counts the notes the solo covers on
      the difficulty shown, a chord once.
@@ -1350,7 +1424,8 @@ Acceptance criteria:
    disco flip) to another, replacing it after a confirmation. It can be undone.
 2. **Reduce** makes a draft of a lower difficulty from a higher one, as a starting point to edit.
    - The **Reduce** dialog shows the rules for the part's family, prefilled from the defaults in
-     Settings ([§10](#10-settings)). Changes made in the dialog apply to that run only. Nothing is
+     Settings ([§10](#10-settings)). Keys is a 5-fret part and reduces by the 5-fret rules; every
+     part Chart Builder edits can be reduced (*revised for #116*). Changes made in the dialog apply to that run only. Nothing is
      stored with the song. The shipped defaults:
 
      | Rule | Hard | Medium | Easy |
@@ -2162,8 +2237,14 @@ Acceptance criteria:
   isn't measured again when only `song.ini` changed. Nothing is written to disk.
 - **In the Validator,** a song's chart findings follow its metadata issues, one line per rule and
   key with how many and where the first is, coloured by severity, and filtered by six chart types,
-  one per group of the catalogue. They have no fix there. A song is listed for a chart Warning or
-  Error, not for Info alone, and counts as failing until both its metadata and its chart pass.
+  one per group of the catalogue. CHR083's, CHR087's and CHR066's have fixes there (a suggested
+  rating, missing difficulties and star power generated into the draft); the rest have none. A
+  song is listed for a chart Warning or Error, not for Info alone, and counts as failing until both
+  its metadata and its chart pass. A song whose only chart finding to fix is CHR066 is listed too,
+  so Fix selected can generate its star power, but doesn't count as failing. Fix selected generates
+  a song's star power and missing difficulties as one chart, star power first, so the difficulties
+  reduced after keep a note in each phrase; the Generate difficulties dialog is shown only when some
+  song has difficulties to generate.
   Save all asks only about metadata that still fails. A drafted song is linted again a moment after
   its draft changes.
 - **In the detail panel,** the chart findings of the one song shown follow its own, with where
@@ -2496,6 +2577,7 @@ covers a note.
 | CHR063 | Warning | Notes inside a big rock ending, which the games skip | — |
 | CHR064 | — | *Retired in CM3.* A disco flip section that starts or ends between notes of a chord. A mix event applies to every note on its tick, so it can't. | — |
 | CHR065 | Warning | A star power phrase or solo with no notes in it on a charted difficulty, though another difficulty has some. A phrase empty on every difficulty is CHR060's or CHR061's. | — |
+| CHR066 | Info | A 5-fret or keys part has no star power phrases, so a player never earns star power on it. Only where its highest difficulty with notes has 4 chords or more, enough for a phrase; drums and GHL aren't checked. One finding per part. | Generate star power ([C8](#c8-phrases-and-events) item 1), in Chart Builder and the library |
 
 *Settled in CM3:* CHR062 gives one finding for each group of phrases that saving would merge into one, and its fix
 merges the group into its first phrase.
@@ -2608,14 +2690,11 @@ down to Easy, 31–40 down to Medium, 41–50 down to Hard. The writer uses 25, 
 ### 7.4 Tracks the writer creates
 
 The tempo track, each part (`PART GUITAR`, `PART BASS`, `PART RHYTHM`, `PART GUITAR COOP`,
-`PART DRUMS`, `PART GUITAR GHL`, `PART BASS GHL`, `PART RHYTHM GHL`, `PART GUITAR COOP GHL`),
-`EVENTS` and `BEAT` (pitch 12 on each measure's downbeat and 13 on other beats). Everything else is
-passed through ([§4.2](#lossless-passthrough)), including:
-
-- `PART KEYS`, which `MidiChartReader` reads as a 5-fret part, but which Chart Builder doesn't edit
-  in v1;
-- `PART DRUMS_2X`, which the app's reader doesn't recognise, and which doesn't follow edits to
-  `PART DRUMS` (CHR048).
+`PART KEYS`, `PART DRUMS`, `PART GUITAR GHL`, `PART BASS GHL`, `PART RHYTHM GHL`,
+`PART GUITAR COOP GHL`), `EVENTS` and `BEAT` (pitch 12 on each measure's downbeat and 13 on other
+beats). `PART KEYS` is read and written as a 5-fret part (*revised for #116*; it used to pass
+through). Everything else is passed through ([§4.2](#lossless-passthrough)), including `PART DRUMS_2X`,
+which the app's reader doesn't recognise, and which doesn't follow edits to `PART DRUMS` (CHR048).
 
 A legacy `T1 GEMS` or `PART REAL_DRUMS_PS` track is read as its part, and saved under the current
 name. If a file has two tracks for one part, the one `MidiChartReader` keeps is edited and the
@@ -2629,6 +2708,7 @@ convention `MetadataDifficulty` already uses.
 | Part | Key |
 | ---- | --- |
 | Lead, Bass, Rhythm, Co-op | `diff_guitar`, `diff_bass`, `diff_rhythm`, `diff_guitar_coop` |
+| Keys | `diff_keys` |
 | GHL Guitar, Bass, Rhythm, Co-op | `diff_guitarghl`, `diff_bassghl`, `diff_rhythm_ghl`, `diff_guitar_coop_ghl` |
 | Drums (4-lane, 5-lane) | `diff_drums` |
 | Drums (Pro) | `diff_drums` and `diff_drums_real` |
@@ -2879,7 +2959,7 @@ These are the defaults. Rebinding is future work.
 | `Ctrl`+`X` / `C` / `V` | Cut, copy, paste over the span the passage covers |
 | `Ctrl`+`Shift`+`V` | Paste, merged with what's there |
 | `Delete` | Delete the selection |
-| `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills, adding nothing; else clear the selection |
+| `Esc` | Cancel a pass of record mode; else take back a drag; else end a run of Generate fills or Generate star power, adding nothing; else clear the selection |
 | `F11` | In the preview's window, full screen on or off; Esc leaves it |
 | `Ctrl`+`S` | Save |
 
@@ -3018,7 +3098,7 @@ fails the run if anything there changes anyway.
 
 - Vocal percussion and overdrive, lyric and range shifts, and pitch detection from the vocals stem,
   building on the vocal lanes' editing ([C3](#c3-editor-layout) item 7).
-- Keys, pro keys, pro guitar/bass and Elite drums.
+- Pro keys, pro guitar/bass and Elite drums.
 - Venue, lighting and camera events.
 - `.chart` export.
 - Auto-charting drafts from audio. This would build on C14, and the result would always be

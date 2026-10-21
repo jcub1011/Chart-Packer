@@ -336,7 +336,7 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ValidatorSongViewModel">
                                     <Border Classes="song-row">
-                                        <StackPanel Classes="validator-song" Classes.fixed="{Binding IsFixed}">
+                                        <StackPanel Classes="validator-song" Classes.fixed="{Binding IsDone}">
                                             <!-- The box ticks every quick fix of the song. Clicking anywhere else on these
                                                  lines picks the song, or opens and closes its issues once it's picked
                                                  (ValidatorWindow.axaml.cs). -->
@@ -379,20 +379,20 @@
                                                 <Border Grid.Row="0" Grid.Column="2"
                                                         Classes="chip large count fixable"
                                                         Classes.zero="{Binding !HasFixes}"
-                                                        IsVisible="{Binding !IsFixed}"
+                                                        IsVisible="{Binding !IsDone}"
                                                         ToolTip.Tip="{x:Static res:Strings.ValidatorFixableCountToolTip}">
                                                     <TextBlock Text="{Binding FixableCountText}" />
                                                 </Border>
                                                 <Border Grid.Row="1" Grid.Column="2"
                                                         Classes="chip large count manual"
                                                         Classes.zero="{Binding !HasManual}"
-                                                        IsVisible="{Binding !IsFixed}"
+                                                        IsVisible="{Binding !IsDone}"
                                                         ToolTip.Tip="{x:Static res:Strings.ValidatorManualCountToolTip}">
                                                     <TextBlock Text="{Binding ManualCountText}" />
                                                 </Border>
                                                 <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
                                                         Classes="chip large count passes"
-                                                        IsVisible="{Binding IsFixed}">
+                                                        IsVisible="{Binding IsDone}">
                                                     <TextBlock Text="{x:Static res:Strings.ValidatorFixed}" />
                                                 </Border>
                                             </Grid>

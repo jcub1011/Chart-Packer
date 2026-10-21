@@ -1,3 +1,4 @@
+using ChartShared.Core.Charting.Authoring;
 using ChartShared.Core.Charting.Commands;
 using ChartShared.Core.Charting.Lint.Rules;
 using ChartShared.Core.Charts;
@@ -47,6 +48,7 @@ public static class ChartFixes
         new Fix(ChrRules.Chr060, DeleteEmptyStarPower),
         new Fix(ChrRules.Chr061, DeleteEmptySolo),
         new Fix(ChrRules.Chr062, MergePhrases),
+        new Fix(ChrRules.Chr066, GenerateStarPower),
     ];
 
     // CHR001: 4/4 at 0, which the games assume without one.
@@ -262,6 +264,14 @@ public static class ChartFixes
         }
 
         return null;
+    }
+
+    // CHR066: star power generated for the part, as Generate star power proposes it with its defaults, all added at once.
+    private static IChartCommand? GenerateStarPower(Finding finding, EditableChart chart, ChartReadOptions options)
+    {
+        if (finding.Location is not { } location || chart.PartOf(location.Part) is not { } part || StarPowerGenerator.HasStarPower(part))
+            return null;
+        return StarPowerGenerator.CommandOf(part.Instrument, StarPowerGenerator.Propose(chart, part.Instrument, StarPowerOptions.Default, options).Proposals);
     }
 
     /// <summary>The part and track a finding about one difficulty is on, and its location; null when there's none.</summary>

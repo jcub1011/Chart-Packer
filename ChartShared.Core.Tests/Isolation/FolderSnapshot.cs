@@ -34,27 +34,33 @@ internal sealed class FolderSnapshot
     }
 
     /// <summary>Describes how <paramref name="after"/> differs from this snapshot; empty when identical.</summary>
-    public IReadOnlyList<string> DiffTo(FolderSnapshot after)
+    public IReadOnlyList<string> DiffTo(FolderSnapshot after) =>
+        [.. Changes(after).Select(static c => c.Path is null ? $"folder was {c.What}" : $"'{c.Path}' was {c.What}")];
+
+    /// <summary>
+    /// The files, relative to the folder, that differ in <paramref name="after"/>: created, modified or deleted; null for
+    /// the folder itself, when it was created or deleted.
+    /// </summary>
+    public IReadOnlyList<string?> ChangedPaths(FolderSnapshot after) => [.. Changes(after).Select(static c => c.Path)];
+
+    private IEnumerable<(string? Path, string What)> Changes(FolderSnapshot after)
     {
-        var changes = new List<string>();
         if (_exists != after._exists)
-            changes.Add(after._exists ? "folder was created" : "folder was deleted");
+            yield return (null, after._exists ? "created" : "deleted");
 
         foreach (var (path, state) in _files)
         {
             if (!after._files.TryGetValue(path, out var afterState))
-                changes.Add($"'{path}' was deleted");
+                yield return (path, "deleted");
             else if (state != afterState)
-                changes.Add($"'{path}' was modified");
+                yield return (path, "modified");
         }
 
         foreach (var path in after._files.Keys)
         {
             if (!_files.ContainsKey(path))
-                changes.Add($"'{path}' was created");
+                yield return (path, "created");
         }
-
-        return changes;
     }
 
     private readonly record struct FileState(long Length, DateTime LastWriteUtc, string Sha256);

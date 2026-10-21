@@ -103,7 +103,7 @@ public sealed class MidiChartLoaderTests
     /// </summary>
     internal static void AssertNotesMatchReader(EditableChart chart, ChartDocument read)
     {
-        foreach (var instrument in read.Instruments.Where(i => i != ChartInstrument.Keys))
+        foreach (var instrument in read.Instruments)
             Assert.IsNotNull(chart.PartOf(instrument), $"The model has no {instrument} part.");
 
         foreach (var part in chart.Parts)
@@ -339,13 +339,13 @@ public sealed class MidiChartLoaderTests
 
         // Header, tempo, vocals, guitar, keys, beat, XFIH, drums 2x, venue, events, something else.
         Assert.AreSequenceEqual(
-            ["PART VOCALS", "PART KEYS", null, "PART DRUMS_2X", "VENUE", "SOMETHING ELSE"],
+            ["PART VOCALS", null, "PART DRUMS_2X", "VENUE", "SOMETHING ELSE"],
             chart.Passthrough.Select(t => t.Name).ToList());
         Assert.AreSequenceEqual(
-            [.. new[] { 2, 4, 6, 7, 8, 10 }.Select(i => Convert.ToHexString(midi[chunks[i].Start..chunks[i].End]))],
+            [.. new[] { 2, 6, 7, 8, 10 }.Select(i => Convert.ToHexString(midi[chunks[i].Start..chunks[i].End]))],
             chart.Passthrough.Select(t => Convert.ToHexString(t.Chunk.Span)).ToList());
-        Assert.IsFalse(chart.Passthrough[2].IsTrack);
-        Assert.AreSequenceEqual([ChartInstrument.Guitar], chart.Parts.Select(p => p.Instrument).ToList());
+        Assert.IsFalse(chart.Passthrough[1].IsTrack);
+        Assert.AreSequenceEqual([ChartInstrument.Guitar, ChartInstrument.Keys], chart.Parts.Select(p => p.Instrument).ToList());
         Assert.AreSequenceEqual([TextEvent.Of(0, "[music_start]")], chart.Events.ToList());
     }
 

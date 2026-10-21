@@ -14,11 +14,12 @@ public sealed record GeneratedDifficulties(EditableChart Drafted, IReadOnlyList<
 /// </summary>
 /// <remarks>
 /// Each target is reduced from the nearest difficulty above it with notes, as it will be once the targets above it are
-/// drafted, so Medium is made from Hard's draft. Only 5-fret, GHL and drum parts can be filled.
+/// drafted, so Medium is made from Hard's draft. Every part can be filled: 5-fret (keys among them, by the 5-fret rules),
+/// GHL and drums of every variant.
 /// </remarks>
 public static class DifficultyGenerator
 {
-    /// <summary>Whether a part of <paramref name="kind"/> can be filled: 5-fret, GHL and drums.</summary>
+    /// <summary>Whether a part of <paramref name="kind"/> can be filled: 5-fret (keys too), GHL and drums.</summary>
     public static bool CanGenerate(ChartInstrumentKind kind) => kind is ChartInstrumentKind.FiveFret or ChartInstrumentKind.SixFret or ChartInstrumentKind.Drums;
 
     /// <summary>
@@ -87,7 +88,7 @@ public static class DifficultyGenerator
         ArgumentNullException.ThrowIfNull(rules);
         var kind = ChartInstruments.KindOf(part);
         if (!CanGenerate(kind))
-            throw new ArgumentException("Only 5-fret, GHL and drum parts can be filled.", nameof(part));
+            throw new ArgumentException("Only 5-fret (keys too), GHL and drum parts can be filled.", nameof(part));
 
         List<(ChartDifficulty? From, ChartDifficulty To)> steps = [.. targets.Select(static t => ((ChartDifficulty?)null, t))];
         return kind == ChartInstrumentKind.Drums

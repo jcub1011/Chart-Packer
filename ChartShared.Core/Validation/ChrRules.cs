@@ -115,6 +115,9 @@ public static class ChrRules
     /// <summary>A star power phrase or solo with no notes in it on one charted difficulty, though another has some.</summary>
     public const string Chr065 = "CHR065";
 
+    /// <summary>A 5-fret or keys part with notes has no star power phrases.</summary>
+    public const string Chr066 = "CHR066";
+
     /// <summary>A part is in the chart but has no notes on any difficulty.</summary>
     public const string Chr080 = "CHR080";
 
@@ -167,7 +170,7 @@ public static class ChrRules
         Chr001, Chr002, Chr003, Chr004, Chr005,
         Chr020, Chr021, Chr022, Chr023, Chr024, Chr025, Chr026,
         Chr040, Chr041, Chr042, Chr043, Chr044, Chr045, Chr046, Chr048,
-        Chr060, Chr061, Chr062, Chr063, Chr065,
+        Chr060, Chr061, Chr062, Chr063, Chr065, Chr066,
         Chr080, Chr081, Chr082, Chr083, Chr084, Chr085, Chr086, Chr087,
         Chr090, Chr091, Chr092, Chr093, Chr094, Chr095,
     ];

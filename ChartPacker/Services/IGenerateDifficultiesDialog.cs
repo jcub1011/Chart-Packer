@@ -12,6 +12,7 @@ using ChartShared.Core.Charts;
 using ChartShared.Core.Metadata;
 using ChartShared.Core.Scanning;
 using ChartShared.Core.Settings;
+using ChartShared.Core.Validation;
 using ChartShared.UI.ViewModels;
 using ChartShared.UI.Views;
 
@@ -29,6 +30,12 @@ namespace ChartPacker.Services
         MetadataDraft? Draft,
         IReadOnlyDictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>> Targets)
     {
+        /// <summary>The parts Fix selected generates star power for too (CHR066), before the difficulties; none when it doesn't.</summary>
+        public IReadOnlyList<ChartInstrument> StarPower { get; init; } = [];
+
+        /// <summary>What generating does to the song's chart: its missing difficulties filled, with any star power first.</summary>
+        public SongGenerationWork Work => new(Targets.Count > 0, StarPower);
+
         /// <summary>Each part's missing difficulties in <paramref name="targets"/>, e.g. "Guitar Hard, Medium; Drums Easy".</summary>
         public static string DescribeTargets(IReadOnlyDictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>> targets) =>
             string.Join(

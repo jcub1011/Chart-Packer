@@ -96,6 +96,21 @@ public sealed class SongDifficultyGenerationTests
     }
 
     [TestMethod]
+    public async Task ASongsKeysAreFilledToo()
+    {
+        const string chart = "[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n[ExpertKeyboard]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 2 0\n  576 = N 3 0\n  768 = N 4 0\n  960 = N 0 0\n}\n";
+        var entry = Folder(("notes.chart", Encoding.UTF8.GetBytes(chart)), songIni: "[song]\nname = Song\ndiff_keys = 3\n");
+        var pairs = await PairsOf(entry);
+
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, pairs, null, ReductionDefaults.Shipped, _stash, TestContext.CancellationToken);
+
+        Assert.IsNotNull(generated);
+        var keys = MidiChartLoader.Load(await File.ReadAllBytesAsync(generated.StagedPath, TestContext.CancellationToken), ChartReadOptions.From(pairs)).Chart.PartOf(ChartInstrument.Keys);
+        Assert.IsNotNull(keys);
+        Assert.IsTrue(keys.Tracks.All(t => t.Notes.Count > 0));
+    }
+
+    [TestMethod]
     public async Task RevertingTheNotesMidBringsBackTheNotesChartAndItsSongIni()
     {
         const string chart = "[Song]\n{\n  Resolution = 192\n  Offset = 0.5\n}\n[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n[ExpertSingle]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 2 0\n  576 = N 3 0\n  768 = N 4 0\n  960 = N 0 0\n}\n";

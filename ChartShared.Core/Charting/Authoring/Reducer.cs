@@ -749,10 +749,10 @@ public static class Reducer
             ? [.. notes.AsSpan().ToArray().Where(n => (n.Tick < r.From || n.Tick > r.To) && (which is null || which(n))).Select(static n => n.Tick).Distinct()]
             : [];
 
-    private static List<(long Tick, EditableNote[] Notes)> ChordsOf(EditableNote[] notes) =>
+    internal static List<(long Tick, EditableNote[] Notes)> ChordsOf(EditableNote[] notes) =>
         [.. notes.GroupBy(static n => n.Tick).OrderBy(static g => g.Key).Select(static g => (g.Key, g.ToArray()))];
 
-    private static long[] SectionTicks(EditableChart chart) => [.. SectionEvents.All(chart).Select(static e => e.Tick)];
+    internal static long[] SectionTicks(EditableChart chart) => [.. SectionEvents.All(chart).Select(static e => e.Tick)];
 
     // Whether chord i starts a beat (resolution) or more after the one before it ends.
     private static bool RestsBefore(IReadOnlyList<(long Tick, EditableNote[] Notes)> chords, int i, int resolution) =>

@@ -325,7 +325,7 @@ namespace ChartPacker.ViewModels
             SongRead read,
             ReductionDefaults rules)
         {
-            var generation = SongDifficultyGeneration.Prepare(read.Chart, song.Pairs, rules);
+            var generation = SongDifficultyGeneration.Prepare(read.Chart, song.Pairs, rules, song.Work);
             var checks = new Dictionary<ChartInstrument, ReductionCheck>();
             var ladders = new List<GenerateDifficultiesPartPreview>();
             foreach (var (part, generated) in generation.Parts.OrderBy(static p => p.Key))
