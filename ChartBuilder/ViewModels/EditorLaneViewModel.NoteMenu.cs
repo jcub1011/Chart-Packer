@@ -31,7 +31,8 @@ namespace ChartBuilder.ViewModels
             var quantize = LaneMenuItem.Action(
                 string.Format(CultureInfo.CurrentCulture, Strings.NoteMenuQuantizeFormat, BuilderSettingsCatalog.SnapLabel(editor.QuantizeGrid.Division)),
                 isEnabled: true,
-                editor.QuantizeSelection);
+                editor.QuantizeSelection,
+                "QuantizeStroke");
             return items.Count == 0 ? [quantize] : [quantize, LaneMenuItem.Separator, .. items];
         }
 

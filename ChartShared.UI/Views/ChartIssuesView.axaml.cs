@@ -5,7 +5,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.VisualTree;
+using ChartShared.UI.Controls;
 using ChartShared.UI.Resources;
 using ChartShared.UI.ViewModels;
 using CommunityToolkit.Mvvm.Input;
@@ -29,7 +31,7 @@ namespace ChartShared.UI.Views
                 return;
             menu.Items.Clear();
             if (border.DataContext is FindingItem { OffersFixes: true } item)
-                Fill(menu, item);
+                Fill(menu, item, border.FindResource("QuickFixStroke") as Geometry);
         }
 
         // A menu with nothing on it, as where the list can't fix anything, isn't shown at all.
@@ -42,39 +44,43 @@ namespace ChartShared.UI.Views
         /// <summary>
         /// Fills a finding's menu with its fixes as they are now: Fix, Fix All For its part and Fix All for a rule with one
         /// way to fix it; a list of the ways, each with those three under it, for one with more; or a greyed-out No Fixes
-        /// Available.
+        /// Available. Each item has <paramref name="fixIcon"/> beside it.
         /// </summary>
-        private static void Fill(ContextMenu menu, FindingItem item)
+        private static void Fill(ContextMenu menu, FindingItem item, Geometry? fixIcon)
         {
             var fixes = item.Fixes();
             if (fixes.Count == 0)
             {
-                menu.Items.Add(new MenuItem { Header = SharedStrings.FindingNoFixesMenuItem, IsEnabled = false });
+                menu.Items.Add(new MenuItem { Header = SharedStrings.FindingNoFixesMenuItem, IsEnabled = false, Icon = Icon(fixIcon) });
             }
             else if (fixes is [{ Label: null } only])
             {
-                AddActions(menu.Items, item, only);
+                AddActions(menu.Items, item, only, fixIcon);
             }
             else
             {
                 foreach (var fix in fixes)
                 {
-                    var option = new MenuItem { Header = fix.Label };
-                    AddActions(option.Items, item, fix);
+                    var option = new MenuItem { Header = fix.Label, Icon = Icon(fixIcon) };
+                    AddActions(option.Items, item, fix, fixIcon);
                     menu.Items.Add(option);
                 }
             }
         }
 
-        private static void AddActions(ItemCollection items, FindingItem item, FindingFix fix)
+        private static void AddActions(ItemCollection items, FindingItem item, FindingFix fix, Geometry? icon)
         {
-            items.Add(Action(SharedStrings.FindingFixMenuItem, fix.Fix));
+            items.Add(Action(SharedStrings.FindingFixMenuItem, fix.Fix, icon));
             if (fix.FixAllInPart is { } inPart)
-                items.Add(Action(item.FixAllInPartText, inPart));
+                items.Add(Action(item.FixAllInPartText, inPart, icon));
             if (fix.FixAll is { } all)
-                items.Add(Action(SharedStrings.FindingFixAllMenuItem, all));
+                items.Add(Action(SharedStrings.FindingFixAllMenuItem, all, icon));
         }
 
-        private static MenuItem Action(string header, Action action) => new() { Header = header, Command = new RelayCommand(action) };
+        private static MenuItem Action(string header, Action action, Geometry? icon) =>
+            new() { Header = header, Command = new RelayCommand(action), Icon = Icon(icon) };
+
+        // A control can be in one place only, so each item has its own.
+        private static LineIcon? Icon(Geometry? data) => data is null ? null : new LineIcon { Data = data };
     }
 }

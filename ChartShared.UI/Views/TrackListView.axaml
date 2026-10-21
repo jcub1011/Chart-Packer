@@ -94,11 +94,17 @@
                     <Border Classes="trackRow kept">
                         <Border.ContextMenu>
                             <ContextMenu Opening="OnRowMenuOpening">
-                                <MenuItem Tag="replace" Header="{x:Static res:SharedStrings.ReplaceTrackToolTip}" />
-                                <MenuItem Tag="remove" Header="{x:Static res:SharedStrings.RemoveTrackToolTip}" />
+                                <MenuItem Tag="replace" Header="{x:Static res:SharedStrings.ReplaceTrackToolTip}">
+                                    <MenuItem.Icon><ui:LineIcon Data="{StaticResource ReplaceStroke}" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Tag="remove" Header="{x:Static res:SharedStrings.RemoveTrackToolTip}">
+                                    <MenuItem.Icon><ui:LineIcon Data="{StaticResource ClearStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{Binding DownloadHeader}"
                                           Command="{Binding DownloadCommand}"
-                                          IsVisible="{Binding CanDownload}" />
+                                          IsVisible="{Binding CanDownload}">
+                                    <MenuItem.Icon><ui:LineIcon Data="{StaticResource DownloadStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                             </ContextMenu>
                         </Border.ContextMenu>
                         <Grid ColumnSpacing="6" RowSpacing="2" RowDefinitions="Auto,Auto,Auto">
@@ -169,7 +175,7 @@
                                         CommandParameter="{Binding}"
                                         ToolTip.Tip="{x:Static res:SharedStrings.ReplaceTrackToolTip}"
                                         AutomationProperties.Name="{x:Static res:SharedStrings.ReplaceTrackToolTip}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource ReplaceIconGeometry}" />
+                                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource ReplaceStroke}" />
                                 </Button>
                                 <Button Classes="icon"
                                         Padding="4"
@@ -178,7 +184,7 @@
                                         CommandParameter="{Binding}"
                                         ToolTip.Tip="{x:Static res:SharedStrings.RemoveTrackToolTip}"
                                         AutomationProperties.Name="{x:Static res:SharedStrings.RemoveTrackToolTip}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource ClearStroke}" />
                                 </Button>
                             </StackPanel>
                             <!-- Below the row, so a long reason doesn't make the waveform taller. -->
@@ -203,7 +209,9 @@
                     <Border Classes="trackRow removedTrack">
                         <Border.ContextMenu>
                             <ContextMenu Opening="OnRowMenuOpening">
-                                <MenuItem Tag="restore" Header="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}" />
+                                <MenuItem Tag="restore" Header="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}">
+                                    <MenuItem.Icon><ui:LineIcon Data="{StaticResource RevertStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                             </ContextMenu>
                         </Border.ContextMenu>
                         <Grid ColumnSpacing="6" MinHeight="20">
@@ -234,7 +242,7 @@
                                     IsVisible="{Binding $parent[views:TrackListView].ShowsActionButtons}"
                                     ToolTip.Tip="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}"
                                     AutomationProperties.Name="{x:Static res:SharedStrings.UndoRemoveTrackToolTip}">
-                                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                             </Button>
                         </Grid>
                     </Border>
@@ -250,7 +258,7 @@
                 IsVisible="{Binding $parent[views:TrackListView].CanEdit}"
                 AutomationProperties.Name="{x:Static res:SharedStrings.AddTrackButton}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-                <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                <ui:LineIcon Width="12" Height="12" Data="{StaticResource AddStroke}" />
                 <TextBlock Text="{x:Static res:SharedStrings.AddTrackButton}" />
             </StackPanel>
             <Button.Flyout>

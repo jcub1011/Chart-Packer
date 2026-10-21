@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:ChartShared.UI.Controls">
     <!-- The look of a song inspector, Chart Packer's and Chart Builder's: its sections, findings, metadata rows,
          instruments and media tiles. Each inspector view includes it in its own styles rather than the app's, as
          names such as .section and .icon would restyle other windows. -->
@@ -188,7 +189,7 @@
     <Style Selector="Button.captionAction.revert:disabled">
         <Setter Property="IsVisible" Value="False" />
     </Style>
-    <Style Selector="Button.captionAction PathIcon">
+    <Style Selector="Button.captionAction ctl|LineIcon">
         <Setter Property="Width" Value="13" />
         <Setter Property="Height" Value="13" />
     </Style>

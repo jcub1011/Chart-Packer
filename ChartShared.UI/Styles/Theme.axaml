@@ -116,6 +116,38 @@
                 <Setter Property="Focusable" Value="False" />
             </Style>
         </ControlTheme>
+
+        <!-- A text box's right-click menu, and selectable text's: Fluent's own (DefaultTextBoxContextFlyout and
+             SelectableTextBlockContextFlyout, in its TextBox.xaml and SelectableTextBlock.xaml), with an icon on each item.
+             Like Fluent's, one is shared by every text box, each item finding its own through $parent. -->
+        <MenuFlyout x:Key="TextBoxContextFlyout">
+            <MenuItem Header="{DynamicResource StringTextFlyoutCutText}"
+                      Command="{Binding $parent[TextBox].Cut}"
+                      IsEnabled="{Binding $parent[TextBox].CanCut}"
+                      InputGesture="{x:Static TextBox.CutGesture}">
+                <MenuItem.Icon><ctl:LineIcon Data="{DynamicResource CutStroke}" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource StringTextFlyoutCopyText}"
+                      Command="{Binding $parent[TextBox].Copy}"
+                      IsEnabled="{Binding $parent[TextBox].CanCopy}"
+                      InputGesture="{x:Static TextBox.CopyGesture}">
+                <MenuItem.Icon><ctl:LineIcon Data="{DynamicResource CopyStroke}" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="{DynamicResource StringTextFlyoutPasteText}"
+                      Command="{Binding $parent[TextBox].Paste}"
+                      IsEnabled="{Binding $parent[TextBox].CanPaste}"
+                      InputGesture="{x:Static TextBox.PasteGesture}">
+                <MenuItem.Icon><ctl:LineIcon Data="{DynamicResource PasteStroke}" /></MenuItem.Icon>
+            </MenuItem>
+        </MenuFlyout>
+        <MenuFlyout x:Key="SelectableTextBlockContextFlyout" Placement="Bottom">
+            <MenuItem Header="{DynamicResource StringTextFlyoutCopyText}"
+                      Command="{Binding $parent[SelectableTextBlock].Copy}"
+                      IsEnabled="{Binding $parent[SelectableTextBlock].CanCopy}"
+                      InputGesture="{x:Static TextBox.CopyGesture}">
+                <MenuItem.Icon><ctl:LineIcon Data="{DynamicResource CopyStroke}" /></MenuItem.Icon>
+            </MenuItem>
+        </MenuFlyout>
     </Styles.Resources>
 
     <!-- An expanded scroll bar's thumb, in a brush DynamicTheme recolours rather than Fluent's colour. -->
@@ -251,6 +283,14 @@
         <Setter Property="Margin" Value="12,0,0,0" />
         <Setter Property="HorizontalAlignment" Value="Right" />
         <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <!-- Text boxes' and selectable text's right-click menus, with icons (see the resources above). Selectable text has
+         one only while it's enabled, as in Fluent. -->
+    <Style Selector="TextBox">
+        <Setter Property="ContextFlyout" Value="{StaticResource TextBoxContextFlyout}" />
+    </Style>
+    <Style Selector="SelectableTextBlock[IsEnabled=True]">
+        <Setter Property="ContextFlyout" Value="{StaticResource SelectableTextBlockContextFlyout}" />
     </Style>
     <!-- A link in a window's own title bar, such as Chart Builder's song title or the version: flat, lit on hover, and
          plain text while disabled. -->

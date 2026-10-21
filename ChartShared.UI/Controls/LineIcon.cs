@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
@@ -9,7 +10,10 @@ namespace ChartShared.UI.Controls
     /// A 16×16 line icon: <see cref="Data"/> is stroked, not filled, in the inherited text colour, so it
     /// follows its button through hover, pressed and disabled the way text does.
     /// </summary>
-    /// <remarks>The geometry is drawn as authored, on a 16×16 grid, without stretching.</remarks>
+    /// <remarks>
+    /// The geometry is authored on a 16×16 grid. Given a <c>Width</c> and <c>Height</c>, the icon is scaled to fit,
+    /// stroke and all, so a smaller icon keeps its proportions.
+    /// </remarks>
     /// <example><c>&lt;ctl:LineIcon Data="{StaticResource SaveStroke}" /&gt;</c></example>
     public sealed class LineIcon : Control
     {
@@ -56,7 +60,9 @@ namespace ChartShared.UI.Controls
                 return;
 
             var pen = new Pen(brush, StrokeThickness, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
-            context.DrawGeometry(null, pen, data);
+            double scale = Math.Min(Bounds.Width, Bounds.Height) / Size;
+            using (context.PushTransform(Matrix.CreateScale(scale, scale)))
+                context.DrawGeometry(null, pen, data);
         }
     }
 }

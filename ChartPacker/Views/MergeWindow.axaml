@@ -64,13 +64,13 @@
                                        Harmonies="{StaticResource InstrumentHarmoniesGeometry}"
                                        Dance="{StaticResource InstrumentDanceGeometry}"
                                        Band="{StaticResource InstrumentBandGeometry}" />
-        <!-- A row's fixed icon: the audio waveform, an art placeholder, or MIDI. -->
+        <!-- A row's fixed icon: audio, an art placeholder, or MIDI. -->
         <conv:MergeRowIconConverter x:Key="MergeRowIcon"
-                                    Waveform="{StaticResource WaveformIconGeometry}"
-                                    Midi="{StaticResource MidiIconGeometry}"
-                                    AlbumArt="{StaticResource AlbumArtIconGeometry}"
-                                    Background="{StaticResource BackgroundIconGeometry}"
-                                    Video="{StaticResource VideoIconGeometry}" />
+                                    Waveform="{StaticResource AudioStroke}"
+                                    Midi="{StaticResource MidiStroke}"
+                                    AlbumArt="{StaticResource AlbumArtStroke}"
+                                    Background="{StaticResource BackgroundStroke}"
+                                    Video="{StaticResource VideoStroke}" />
         <!-- Shortens a link's label in the middle in the drop-down, so the list stays a sensible width. -->
         <conv:MiddleTruncateConverter x:Key="MiddleTruncate" />
         <!-- Behind a row that still needs a choice, with the amber bar at its left. -->
@@ -164,7 +164,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="Border.row-icon PathIcon">
+        <Style Selector="Border.row-icon PathIcon, Border.row-icon ui|LineIcon">
             <Setter Property="Width" Value="14" />
             <Setter Property="Height" Value="14" />
         </Style>
@@ -358,7 +358,7 @@
                                     <PathIcon Data="{Binding Glyph, Converter={StaticResource DifficultyGlyph}}" />
                                 </Border>
                                 <Border Classes="row-icon" IsVisible="{Binding HasStaticIcon}">
-                                    <PathIcon Data="{Binding IconKind, Converter={StaticResource MergeRowIcon}}" />
+                                    <ui:LineIcon Data="{Binding IconKind, Converter={StaticResource MergeRowIcon}}" />
                                 </Border>
                             </Panel>
                             <!-- A row with an icon loses its label while the panel is narrow; one without, e.g. a metadata key, keeps it. -->
@@ -516,10 +516,10 @@
                                     <TextBlock Classes="caption icon-label"
                                                VerticalAlignment="Center"
                                                Text="{x:Static res:Strings.MergeSectionAlignment}" />
-                                    <PathIcon Width="12" Height="12"
-                                              Opacity="0.55"
-                                              VerticalAlignment="Center"
-                                              Data="{StaticResource InfoIconGeometry}" />
+                                    <ui:LineIcon Width="12" Height="12"
+                                                 Opacity="0.55"
+                                                 VerticalAlignment="Center"
+                                                 Data="{StaticResource InfoStroke}" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="2" Classes="icon-label" Orientation="Horizontal" Spacing="6">
@@ -540,13 +540,13 @@
                                             Command="{Binding AutoAlignCommand}"
                                             ToolTip.Tip="{x:Static res:Strings.MergeAutoAlignToolTip}"
                                             AutomationProperties.Name="{x:Static res:Strings.MergeAutoAlignButton}">
-                                        <PathIcon Width="14" Height="14" Data="{StaticResource OffsetIconGeometry}" />
+                                        <ui:LineIcon Width="14" Height="14" Data="{StaticResource OffsetStroke}" />
                                     </Button>
                                     <Button Classes="tool"
                                             Command="{Binding ResetAlignmentCommand}"
                                             ToolTip.Tip="{x:Static res:Strings.MergeAlignmentResetToolTip}"
                                             AutomationProperties.Name="{x:Static res:Strings.MergeAlignmentResetButton}">
-                                        <PathIcon Width="14" Height="14" Data="{StaticResource RevertIconGeometry}" />
+                                        <ui:LineIcon Width="14" Height="14" Data="{StaticResource RevertStroke}" />
                                     </Button>
                                 </StackPanel>
 
@@ -704,7 +704,7 @@
                                                                     <Binding Path="!HasWarning" />
                                                                 </MultiBinding>
                                                             </Panel.IsVisible>
-                                                            <PathIcon Width="12" Height="12" Opacity="0.55" Data="{StaticResource InfoIconGeometry}" />
+                                                            <ui:LineIcon Width="12" Height="12" Opacity="0.55" Data="{StaticResource InfoStroke}" />
                                                         </Panel>
                                                     </Panel>
                                                 </Grid>

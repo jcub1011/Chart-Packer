@@ -5,6 +5,7 @@
              xmlns:vm="using:ChartShared.UI.ViewModels"
              xmlns:res="using:ChartShared.UI.Resources"
              xmlns:conv="using:ChartShared.UI.Converters"
+             xmlns:ui="using:ChartShared.UI.Controls"
              mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="160"
              x:Class="ChartShared.UI.Views.DifficultyPicker"
              x:DataType="vm:IDifficultyPicker">
@@ -95,7 +96,7 @@
                     Click="OnChosen"
                     ToolTip.Tip="{x:Static res:SharedStrings.DifficultyRevertButton}"
                     AutomationProperties.Name="{x:Static res:SharedStrings.DifficultyRevertButton}">
-                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
             </Button>
         </StackPanel>
     </StackPanel>

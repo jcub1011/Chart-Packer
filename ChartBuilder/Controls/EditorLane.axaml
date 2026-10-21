@@ -333,7 +333,7 @@
                                 Flyout="{StaticResource AudioFlyout}"
                                 ToolTip.Tip="{x:Static res:Strings.LaneAudioToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.LaneAudioToolTip}">
-                            <PathIcon Width="14" Height="14" Data="{StaticResource VolumeIconGeometry}" />
+                            <ctl:LineIcon Width="14" Height="14" Data="{StaticResource VolumeStroke}" />
                         </Button>
                         <Button Classes="tool"
                                 IsVisible="{Binding ShowsEditMenu}"
@@ -376,13 +376,26 @@
                             <ctl:LineIcon Data="{StaticResource MoreStroke}" />
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                    <MenuItem Header="{x:Static res:Strings.LaneMoreAudio}" Click="OnAudioMenuClick" />
-                                    <MenuItem Header="{Binding ViewToolTip}" Command="{Binding ToggleViewCommand}" />
+                                    <MenuItem Header="{x:Static res:Strings.LaneMoreAudio}" Click="OnAudioMenuClick">
+                                        <MenuItem.Icon><ctl:LineIcon Data="{StaticResource VolumeStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="{Binding ViewToolTip}" Command="{Binding ToggleViewCommand}">
+                                        <MenuItem.Icon>
+                                            <Panel>
+                                                <PathIcon Width="14" Height="14" Data="{StaticResource WaveformIconGeometry}" IsVisible="{Binding !IsTimeline}" />
+                                                <PathIcon Width="14" Height="14" Data="{StaticResource HighwayIconGeometry}" IsVisible="{Binding IsTimeline}" />
+                                            </Panel>
+                                        </MenuItem.Icon>
+                                    </MenuItem>
                                     <MenuItem Header="{x:Static res:Strings.LaneMoreGhost}"
-                                              ItemsSource="{Binding GhostMenu, Converter={StaticResource LaneMenu}}" />
+                                              ItemsSource="{Binding GhostMenu, Converter={StaticResource LaneMenu}}">
+                                        <MenuItem.Icon><ctl:LineIcon Data="{StaticResource ViewStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                     <MenuItem Header="{x:Static res:Strings.LaneMoreEdit}"
                                               IsVisible="{Binding ShowsEditMenu}"
-                                              ItemsSource="{Binding EditMenu, Converter={StaticResource LaneMenu}}" />
+                                              ItemsSource="{Binding EditMenu, Converter={StaticResource LaneMenu}}">
+                                        <MenuItem.Icon><ctl:LineIcon Data="{StaticResource EditChartStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                 </MenuFlyout>
                             </Button.Flyout>
                         </Button>

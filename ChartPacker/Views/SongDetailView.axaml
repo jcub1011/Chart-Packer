@@ -89,7 +89,7 @@
                                         Command="{Binding RevertOffsetCommand}"
                                         ToolTip.Tip="{x:Static res:Strings.HighwayRevertOffsetToolTip}"
                                         AutomationProperties.Name="{x:Static res:Strings.HighwayRevertOffsetToolTip}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                                 </Button>
                                 <!-- The track drawn behind the instrument's notes: its own, or one picked for this song. -->
                                 <ComboBox Grid.Column="5"
@@ -171,7 +171,7 @@
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="RadioButton.backgroundKind PathIcon">
+        <Style Selector="RadioButton.backgroundKind ui|LineIcon">
             <Setter Property="Width" Value="14" />
             <Setter Property="Height" Value="14" />
         </Style>
@@ -200,7 +200,7 @@
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="Button.offset PathIcon, StackPanel.timing PathIcon">
+        <Style Selector="Button.offset ui|LineIcon, StackPanel.timing ui|LineIcon">
             <Setter Property="Width" Value="14" />
             <Setter Property="Height" Value="14" />
         </Style>
@@ -214,7 +214,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
-        <Style Selector="Button.transport PathIcon">
+        <Style Selector="Button.transport ui|LineIcon">
             <Setter Property="Width" Value="12" />
             <Setter Property="Height" Value="12" />
         </Style>
@@ -295,7 +295,9 @@
                     <StackPanel Background="Transparent">
                         <StackPanel.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="{x:Static vm:SongDetailViewModel.RevealLabel}" Command="{Binding RevealCommand}" />
+                                <MenuItem Header="{x:Static vm:SongDetailViewModel.RevealLabel}" Command="{Binding RevealCommand}">
+                                    <MenuItem.Icon><ui:LineIcon Data="{StaticResource InputFolderStroke}" /></MenuItem.Icon>
+                                </MenuItem>
                             </ContextMenu>
                         </StackPanel.ContextMenu>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -357,20 +359,20 @@
                                                     Command="{Binding ReplaceArtCommand}"
                                                     ToolTip.Tip="{x:Static res:Strings.ReplaceArtToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.ReplaceArtToolTip}">
-                                                <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
+                                                <ui:LineIcon Data="{StaticResource ReplaceStroke}" />
                                             </Button>
                                             <Button Classes="captionAction"
                                                     Command="{Binding RemoveArtCommand}"
                                                     ToolTip.Tip="{x:Static res:Strings.RemoveArtToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.RemoveArtToolTip}">
-                                                <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                                <ui:LineIcon Data="{StaticResource TrashStroke}" />
                                             </Button>
                                             <!-- Hidden by Button.captionAction.revert:disabled unless there's a change to undo. -->
                                             <Button Classes="captionAction revert"
                                                     Command="{Binding RevertArtCommand}"
                                                     ToolTip.Tip="{x:Static res:Strings.RevertArtToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.RevertArtToolTip}">
-                                                <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                                <ui:LineIcon Data="{StaticResource RevertStroke}" />
                                             </Button>
                                         </StackPanel>
                                     </Grid>
@@ -383,7 +385,9 @@
                             <Border Classes="artTile" AutomationProperties.Name="{x:Static res:Strings.AlbumArtName}">
                                 <Border.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="{Binding ArtDownloadHeader}" Command="{Binding DownloadArtCommand}" />
+                                        <MenuItem Header="{Binding ArtDownloadHeader}" Command="{Binding DownloadArtCommand}">
+                                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource DownloadStroke}" /></MenuItem.Icon>
+                                        </MenuItem>
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <Panel>
@@ -394,10 +398,10 @@
                                                 Margin="12"
                                                 Spacing="6"
                                                 IsVisible="{Binding !HasArtImage}">
-                                        <PathIcon Width="28" Height="28"
-                                                  Opacity="0.4"
-                                                  HorizontalAlignment="Center"
-                                                  Data="{StaticResource AlbumArtIconGeometry}" />
+                                        <ui:LineIcon Width="28" Height="28"
+                                                     Opacity="0.4"
+                                                     HorizontalAlignment="Center"
+                                                     Data="{StaticResource AlbumArtStroke}" />
                                         <TextBlock Classes="muted centered"
                                                    TextWrapping="Wrap"
                                                    Text="{Binding ArtNote}" />
@@ -426,19 +430,19 @@
                                                     Command="{Binding ReplaceBackgroundCommand}"
                                                     ToolTip.Tip="{x:Static res:Strings.ReplaceBackgroundToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.ReplaceBackgroundToolTip}">
-                                                <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
+                                                <ui:LineIcon Data="{StaticResource ReplaceStroke}" />
                                             </Button>
                                             <Button Classes="captionAction"
                                                     Command="{Binding RemoveBackgroundCommand}"
                                                     ToolTip.Tip="{Binding Background.RemoveToolTip}"
                                                     AutomationProperties.Name="{Binding Background.RemoveToolTip}">
-                                                <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                                <ui:LineIcon Data="{StaticResource TrashStroke}" />
                                             </Button>
                                             <Button Classes="captionAction revert"
                                                     Command="{Binding RevertBackgroundCommand}"
                                                     ToolTip.Tip="{x:Static res:Strings.RevertBackgroundToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.RevertBackgroundToolTip}">
-                                                <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                                <ui:LineIcon Data="{StaticResource RevertStroke}" />
                                             </Button>
                                         </StackPanel>
                                     </Grid>
@@ -470,7 +474,7 @@
                                             ToolTip.Tip="{x:Static res:Strings.VideoOffsetButtonToolTip}"
                                             AutomationProperties.Name="{x:Static res:Strings.VideoOffsetName}">
                                         <StackPanel Orientation="Horizontal" Spacing="3">
-                                            <PathIcon Data="{StaticResource OffsetIconGeometry}" />
+                                            <ui:LineIcon Data="{StaticResource OffsetStroke}" />
                                             <TextBlock Classes="marker" Text="{Binding VideoOffset.Marker}" IsVisible="{Binding VideoOffset.HasOffset}" />
                                         </StackPanel>
                                         <Button.Flyout>
@@ -505,7 +509,7 @@
                                                                 Command="{Binding VideoOffset.RevertOffsetCommand}"
                                                                 ToolTip.Tip="{x:Static res:Strings.VideoRevertOffsetToolTip}"
                                                                 AutomationProperties.Name="{x:Static res:Strings.VideoRevertOffsetToolTip}">
-                                                            <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                                            <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                                                         </Button>
                                                     </StackPanel>
                                                 </StackPanel>
@@ -519,14 +523,14 @@
                                                      IsEnabled="{Binding Background.HasImageKind}"
                                                      ToolTip.Tip="{x:Static res:Strings.ShowBackgroundImageToolTip}"
                                                      AutomationProperties.Name="{x:Static res:Strings.ShowBackgroundImageToolTip}">
-                                            <PathIcon Data="{StaticResource ImageIconGeometry}" />
+                                            <ui:LineIcon Data="{StaticResource ImageStroke}" />
                                         </RadioButton>
                                         <RadioButton Classes="backgroundKind"
                                                      IsChecked="{Binding Background.IsVideoSelected}"
                                                      IsEnabled="{Binding Background.HasVideoKind}"
                                                      ToolTip.Tip="{x:Static res:Strings.ShowBackgroundVideoToolTip}"
                                                      AutomationProperties.Name="{x:Static res:Strings.ShowBackgroundVideoToolTip}">
-                                            <PathIcon Data="{StaticResource VideoIconGeometry}" />
+                                            <ui:LineIcon Data="{StaticResource VideoStroke}" />
                                         </RadioButton>
                                     </StackPanel>
                                 </Grid>
@@ -536,7 +540,9 @@
                                 <!-- Saves the kind shown, image or video, as the toggle above picks it. -->
                                 <Border.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="{Binding Background.DownloadHeader}" Command="{Binding DownloadBackgroundCommand}" />
+                                        <MenuItem Header="{Binding Background.DownloadHeader}" Command="{Binding DownloadBackgroundCommand}">
+                                            <MenuItem.Icon><ui:LineIcon Data="{StaticResource DownloadStroke}" /></MenuItem.Icon>
+                                        </MenuItem>
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <Panel>
@@ -552,10 +558,10 @@
                                                 Margin="12"
                                                 Spacing="6"
                                                 IsVisible="{Binding Background.HasNote}">
-                                        <PathIcon Width="28" Height="28"
-                                                  Opacity="0.4"
-                                                  HorizontalAlignment="Center"
-                                                  Data="{StaticResource BackgroundIconGeometry}" />
+                                        <ui:LineIcon Width="28" Height="28"
+                                                     Opacity="0.4"
+                                                     HorizontalAlignment="Center"
+                                                     Data="{StaticResource BackgroundStroke}" />
                                         <TextBlock Classes="muted centered"
                                                    TextWrapping="Wrap"
                                                    Text="{Binding Background.Note}" />
@@ -601,19 +607,19 @@
                                                 Command="{Binding ReplaceLyricsCommand}"
                                                 ToolTip.Tip="{Binding Lyrics.ReplaceToolTip}"
                                                 AutomationProperties.Name="{Binding Lyrics.ReplaceToolTip}">
-                                            <PathIcon Data="{StaticResource ReplaceIconGeometry}" />
+                                            <ui:LineIcon Data="{StaticResource ReplaceStroke}" />
                                         </Button>
                                         <Button Classes="captionAction"
                                                 Command="{Binding RemoveLyricsCommand}"
                                                 ToolTip.Tip="{x:Static res:Strings.LyricsRemoveToolTip}"
                                                 AutomationProperties.Name="{x:Static res:Strings.LyricsRemoveToolTip}">
-                                            <PathIcon Data="{StaticResource TrashIconGeometry}" />
+                                            <ui:LineIcon Data="{StaticResource TrashStroke}" />
                                         </Button>
                                         <Button Classes="captionAction revert"
                                                 Command="{Binding RevertLyricsCommand}"
                                                 ToolTip.Tip="{x:Static res:Strings.LyricsRevertToolTip}"
                                                 AutomationProperties.Name="{x:Static res:Strings.LyricsRevertToolTip}">
-                                            <PathIcon Data="{StaticResource RevertIconGeometry}" />
+                                            <ui:LineIcon Data="{StaticResource RevertStroke}" />
                                         </Button>
                                     </StackPanel>
                                 </Grid>
@@ -683,7 +689,7 @@
                                             Command="{Binding Lyrics.RevertOffsetCommand}"
                                             ToolTip.Tip="{x:Static res:Strings.LyricsRevertOffsetToolTip}"
                                             AutomationProperties.Name="{x:Static res:Strings.LyricsRevertOffsetToolTip}">
-                                        <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                        <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                                     </Button>
                                 </StackPanel>
                             </Grid>
@@ -692,7 +698,9 @@
                         <Border Classes="artTile" Height="120" AutomationProperties.Name="{x:Static res:Strings.LyricsHeader}">
                             <Border.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="{x:Static res:Strings.MenuExportLyrics}" Command="{Binding ExportLyricsCommand}" />
+                                    <MenuItem Header="{x:Static res:Strings.MenuExportLyrics}" Command="{Binding ExportLyricsCommand}">
+                                        <MenuItem.Icon><ui:LineIcon Data="{StaticResource OutputFolderStroke}" /></MenuItem.Icon>
+                                    </MenuItem>
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Panel>
@@ -790,7 +798,7 @@
                                         VerticalAlignment="Center"
                                         IsVisible="{Binding Player.HasTracks}">
                                 <TextBlock Classes="marker" VerticalAlignment="Center" Text="{Binding AudioOffset.Marker}" IsVisible="{Binding AudioOffset.HasOffset}" />
-                                <PathIcon Opacity="0.7" VerticalAlignment="Center" Data="{StaticResource OffsetIconGeometry}" />
+                                <ui:LineIcon Opacity="0.7" VerticalAlignment="Center" Data="{StaticResource OffsetStroke}" />
                                 <NumericUpDown ui:DragScrub.IsEnabled="True"
                                                Width="72"
                                                ShowButtonSpinner="False"
@@ -815,15 +823,15 @@
                                         Command="{Binding AudioOffset.RevertOffsetCommand}"
                                         ToolTip.Tip="{x:Static res:Strings.AudioRevertOffsetToolTip}"
                                         AutomationProperties.Name="{x:Static res:Strings.AudioRevertOffsetToolTip}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                                 </Button>
                             </StackPanel>
-                            <PathIcon Grid.Column="2"
-                                      Width="14" Height="14"
-                                      Opacity="0.7"
-                                      VerticalAlignment="Center"
-                                      IsVisible="{Binding Player.HasTracks}"
-                                      Data="{StaticResource VolumeIconGeometry}" />
+                            <ui:LineIcon Grid.Column="2"
+                                         Width="14" Height="14"
+                                         Opacity="0.7"
+                                         VerticalAlignment="Center"
+                                         IsVisible="{Binding Player.HasTracks}"
+                                         Data="{StaticResource VolumeStroke}" />
                             <Slider Grid.Column="3"
                                     Width="90"
                                     Minimum="0"
@@ -887,8 +895,8 @@
                                     ToolTip.ShowOnDisabled="True"
                                     AutomationProperties.Name="{Binding Player.PlayPauseToolTip}">
                                 <Panel>
-                                    <PathIcon Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Player.IsPlaying}" />
-                                    <PathIcon Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Player.IsPlaying}" />
+                                    <ui:LineIcon Data="{StaticResource PlayStroke}" IsVisible="{Binding !Player.IsPlaying}" />
+                                    <ui:LineIcon Data="{StaticResource PauseStroke}" IsVisible="{Binding Player.IsPlaying}" />
                                 </Panel>
                             </Button>
                             <Button Grid.Column="1"
@@ -896,7 +904,7 @@
                                     Command="{Binding Player.StopCommand}"
                                     ToolTip.Tip="{x:Static res:Strings.StopToolTip}"
                                     AutomationProperties.Name="{x:Static res:Strings.StopToolTip}">
-                                <PathIcon Data="{StaticResource StopIconGeometry}" />
+                                <ui:LineIcon Data="{StaticResource StopStroke}" />
                             </Button>
                             <!-- A hidden copy of the length holds the column at its widest, so the waveform
                                  doesn't shift as the position gains a digit (9:59 to 10:00). -->
@@ -939,7 +947,7 @@
                                     IsVisible="{Binding Player.HasPreviewStart}"
                                     ToolTip.Tip="{x:Static res:Strings.JumpToPreviewToolTip}"
                                     AutomationProperties.Name="{x:Static res:Strings.JumpToPreviewToolTip}">
-                                <PathIcon Data="{StaticResource PreviewIconGeometry}" />
+                                <ui:LineIcon Data="{StaticResource PreviewStroke}" />
                             </Button>
                         </Grid>
                         <TextBlock Classes="muted" Text="{x:Static res:Strings.OpeningAudio}" IsVisible="{Binding Player.IsOpening}" />
@@ -971,7 +979,7 @@
                                         IsVisible="{Binding IsChartChanged}"
                                         ToolTip.Tip="{x:Static res:Strings.RevertChartToolTip}"
                                         AutomationProperties.Name="{x:Static res:Strings.RevertChartToolTip}">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                                 </Button>
                             </Panel>
                         </Grid>
@@ -984,7 +992,9 @@
                                             <ContextMenu>
                                                 <MenuItem Header="{Binding DownloadHeader}"
                                                           Command="{Binding DownloadCommand}"
-                                                          IsEnabled="{Binding DownloadCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                          IsEnabled="{Binding DownloadCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                    <MenuItem.Icon><ui:LineIcon Data="{StaticResource DownloadStroke}" /></MenuItem.Icon>
+                                                </MenuItem>
                                             </ContextMenu>
                                         </Grid.ContextMenu>
                                         <TextBlock Grid.Column="0"
@@ -1012,7 +1022,7 @@
                                                     IsVisible="{Binding IsKept}"
                                                     ToolTip.Tip="{x:Static res:Strings.ReplaceChartToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.ReplaceChartToolTip}">
-                                                <PathIcon Width="12" Height="12" Data="{StaticResource ReplaceIconGeometry}" />
+                                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource ReplaceStroke}" />
                                             </Button>
                                             <Button Classes="icon"
                                                     Padding="4"
@@ -1021,7 +1031,7 @@
                                                     IsVisible="{Binding IsKept}"
                                                     ToolTip.Tip="{x:Static res:Strings.RemoveChartToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.RemoveChartToolTip}">
-                                                <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource ClearStroke}" />
                                             </Button>
                                         </StackPanel>
                                     </Grid>
@@ -1036,7 +1046,7 @@
                                     IsVisible="{Binding CanEdit}"
                                     AutomationProperties.Name="{x:Static res:Strings.AddChartButton}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                                    <ui:LineIcon Width="12" Height="12" Data="{StaticResource AddStroke}" />
                                     <TextBlock Text="{x:Static res:Strings.AddChartButton}" />
                                 </StackPanel>
                             </Button>
@@ -1058,7 +1068,9 @@
                                             <ContextMenu>
                                                 <MenuItem Header="{Binding DownloadHeader}"
                                                           Command="{Binding DownloadCommand}"
-                                                          IsEnabled="{Binding DownloadCommand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                          IsEnabled="{Binding DownloadCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                    <MenuItem.Icon><ui:LineIcon Data="{StaticResource DownloadStroke}" /></MenuItem.Icon>
+                                                </MenuItem>
                                             </ContextMenu>
                                         </Grid.ContextMenu>
                                         <TextBlock Grid.Column="0"
@@ -1087,7 +1099,7 @@
                                                     IsVisible="{Binding CanRevert}"
                                                     ToolTip.Tip="{x:Static res:Strings.RevertFileToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.RevertFileToolTip}">
-                                                <PathIcon Width="12" Height="12" Data="{StaticResource RevertIconGeometry}" />
+                                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource RevertStroke}" />
                                             </Button>
                                             <Button Classes="icon"
                                                     Padding="4"
@@ -1097,7 +1109,7 @@
                                                     IsVisible="{Binding CanRemove}"
                                                     ToolTip.Tip="{x:Static res:Strings.RemoveFileToolTip}"
                                                     AutomationProperties.Name="{x:Static res:Strings.RemoveFileToolTip}">
-                                                <PathIcon Width="12" Height="12" Data="{StaticResource RemoveIconGeometry}" />
+                                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource ClearStroke}" />
                                             </Button>
                                         </Panel>
                                     </Grid>
@@ -1111,7 +1123,7 @@
                                 IsVisible="{Binding CanEdit}"
                                 AutomationProperties.Name="{x:Static res:Strings.AddFilesButton}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <PathIcon Width="12" Height="12" Data="{StaticResource AddIconGeometry}" />
+                                <ui:LineIcon Width="12" Height="12" Data="{StaticResource AddStroke}" />
                                 <TextBlock Text="{x:Static res:Strings.AddFilesButton}" />
                             </StackPanel>
                         </Button>

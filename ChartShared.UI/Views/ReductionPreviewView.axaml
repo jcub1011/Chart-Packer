@@ -22,22 +22,22 @@
                             ToolTip.Tip="{x:Static res:SharedStrings.ReductionPreviewPlayToolTip}"
                             AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPreviewPlayPauseButton}">
                         <Panel>
-                            <PathIcon Width="12" Height="12" Data="{StaticResource PlayIconGeometry}" IsVisible="{Binding !Playback.IsPlaying}" />
-                            <PathIcon Width="12" Height="12" Data="{StaticResource PauseIconGeometry}" IsVisible="{Binding Playback.IsPlaying}" />
+                            <ui:LineIcon Width="12" Height="12" Data="{StaticResource PlayStroke}" IsVisible="{Binding !Playback.IsPlaying}" />
+                            <ui:LineIcon Width="12" Height="12" Data="{StaticResource PauseStroke}" IsVisible="{Binding Playback.IsPlaying}" />
                         </Panel>
                     </Button>
                     <Button Classes="tool"
                             Command="{Binding PreviousChangeCommand}"
                             ToolTip.Tip="{x:Static res:SharedStrings.ReductionPreviewPreviousToolTip}"
                             AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPreviewPreviousToolTip}">
-                        <PathIcon Width="12" Height="12" Data="{StaticResource SkipPreviousIconGeometry}" />
+                        <ui:LineIcon Width="12" Height="12" Data="{StaticResource SkipPreviousStroke}" />
                     </Button>
                     <TextBlock FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" MinWidth="48" TextAlignment="Center" Text="{Binding StopText}" />
                     <Button Classes="tool"
                             Command="{Binding NextChangeCommand}"
                             ToolTip.Tip="{x:Static res:SharedStrings.ReductionPreviewNextToolTip}"
                             AutomationProperties.Name="{x:Static res:SharedStrings.ReductionPreviewNextToolTip}">
-                        <PathIcon Width="12" Height="12" Data="{StaticResource SkipNextIconGeometry}" />
+                        <ui:LineIcon Width="12" Height="12" Data="{StaticResource SkipNextStroke}" />
                     </Button>
                     <ComboBox ItemsSource="{Binding Playback.SpeedPercents}"
                               SelectedItem="{Binding Playback.SpeedPercent}"

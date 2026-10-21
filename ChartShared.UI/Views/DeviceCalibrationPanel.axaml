@@ -14,11 +14,11 @@
         <TextBlock Classes="section" Text="{x:Static res:SharedStrings.CalibrationInputDeviceCaption}" />
         <Border Classes="card">
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                <PathIcon Grid.Column="0"
-                          Width="14" Height="14"
-                          Opacity="0.7"
-                          VerticalAlignment="Center"
-                          Data="{StaticResource OffsetIconGeometry}" />
+                <ui:LineIcon Grid.Column="0"
+                             Width="14" Height="14"
+                             Opacity="0.7"
+                             VerticalAlignment="Center"
+                             Data="{StaticResource OffsetStroke}" />
                 <TextBlock Grid.Column="1"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center"

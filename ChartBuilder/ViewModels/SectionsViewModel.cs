@@ -321,13 +321,17 @@ namespace ChartBuilder.ViewModels
         private IReadOnlyList<LaneMenuItem> EventMenuOf(ChartInstrument? part)
         {
             var items = SongEvents.Insertable
-                .Select(kind => LaneMenuItem.Choice(SongEventName(kind), false, () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind))))
+                .Select(kind => LaneMenuItem.Action(
+                    SongEventName(kind),
+                    isEnabled: true,
+                    () => Session.Tools.InsertEvent(null, SongEvents.TextOf(kind)),
+                    kind == SongEvent.Coda ? "CodaStroke" : null))
                 .ToList();
-            items.Add(LaneMenuItem.Choice(Strings.SectionsTextEvent, false, () => InsertTextEvent(null)));
+            items.Add(LaneMenuItem.Action(Strings.SectionsTextEvent, true, () => InsertTextEvent(null), "TextEventStroke"));
             if (part is { } instrument)
             {
                 string header = string.Format(CultureInfo.CurrentCulture, Strings.SectionsPartTextEventFormat, ChartLabels.InstrumentName(instrument));
-                items.Add(LaneMenuItem.Choice(header, false, () => InsertTextEvent(instrument)));
+                items.Add(LaneMenuItem.Action(header, true, () => InsertTextEvent(instrument), "TextEventStroke"));
             }
 
             return items;

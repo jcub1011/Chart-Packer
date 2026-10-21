@@ -216,7 +216,7 @@
                            VerticalAlignment="Center"
                            ToolTip.Tip="{Binding Description}"
                            AutomationProperties.HelpText="{Binding Description}">
-                        <PathIcon Width="14" Height="14" Opacity="0.55" Data="{StaticResource InfoIconGeometry}" />
+                        <ui:LineIcon Width="14" Height="14" Opacity="0.55" Data="{StaticResource InfoStroke}" />
                     </Panel>
                 </StackPanel>
             </WrapPanel>
