@@ -12,7 +12,7 @@ namespace ChartPacker.ViewModels
 {
     /// <summary>
     /// A <see cref="PlayerViewModel"/> as a reduction's preview plays it (<see cref="IReductionPreviewPlayback"/>), in the
-    /// Generate difficulties dialog: the song shown, its chart's beat lines (<see cref="SetChart"/>), and its speed in
+    /// Generate Lower Difficulties window: the song shown, its chart's beat lines (<see cref="SetChart"/>), and its speed in
     /// percents.
     /// </summary>
     public sealed partial class PlayerPreviewPlayback : ObservableObject, IReductionPreviewPlayback, IDisposable

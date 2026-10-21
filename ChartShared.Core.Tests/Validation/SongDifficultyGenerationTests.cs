@@ -11,8 +11,8 @@ using ChartShared.Core.Validation;
 namespace ChartShared.Core.Tests.Validation;
 
 /// <summary>
-/// The library's quick fixes for chart findings (charter-spec C16 item 5): a song's missing difficulties (CHR087) generated
-/// into its draft, the draft's chart linted, and an unrated part's suggested rating (CHR083).
+/// The library's chart generation (charter-spec C16 item 5): a song's missing difficulties (CHR087) generated into its
+/// draft, as Generate Lower Difficulties does, the draft's chart linted, and an unrated part's suggested rating (CHR083).
 /// </summary>
 [TestClass]
 public sealed class SongDifficultyGenerationTests
@@ -170,6 +170,74 @@ public sealed class SongDifficultyGenerationTests
     }
 
     [TestMethod]
+    public async Task ReplacingMakesAChartedHardAgainFromExpert()
+    {
+        var chart = ExpertOnly();
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var scope = new LowerDifficultyScope(new HashSet<ChartDifficulty> { ChartDifficulty.Hard }, null, Replace: true);
+
+        var generated = await SongDifficultyGeneration.GenerateAsync(entry, pairs, null, ReductionDefaults.Shipped, new SongGenerationWork(true, [], scope), _stash, TestContext.CancellationToken);
+
+        Assert.IsNotNull(generated);
+        var guitar = MidiChartLoader.Load(await File.ReadAllBytesAsync(generated.StagedPath, TestContext.CancellationToken), ChartReadOptions.From(pairs)).Chart.PartOf(ChartInstrument.Guitar)!;
+        Assert.IsGreaterThan(1, guitar[ChartDifficulty.Hard].Notes.Count);
+        Assert.IsEmpty(guitar[ChartDifficulty.Medium].Notes);
+    }
+
+    [TestMethod]
+    public async Task SkippingLeavesAChartedHardAsItIs()
+    {
+        var chart = ExpertOnly();
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var read = await SongDifficultyGeneration.ReadAsync(entry, pairs, null, TestContext.CancellationToken);
+        var scope = new LowerDifficultyScope(new HashSet<ChartDifficulty> { ChartDifficulty.Hard }, null, Replace: false);
+
+        var generation = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], scope));
+
+        Assert.IsTrue(generation.IsEmpty);
+    }
+
+    [TestMethod]
+    public async Task ReplacingHardAndMediumMakesMediumFromTheNewHard()
+    {
+        var chart = ExpertOnly();
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Hard, [new EditableNote(0, 1, 0)]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var read = await SongDifficultyGeneration.ReadAsync(entry, pairs, null, TestContext.CancellationToken);
+
+        var both = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], Replacing(ChartDifficulty.Hard, ChartDifficulty.Medium)));
+        var mediumOnly = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], Replacing(ChartDifficulty.Medium)));
+
+        // Made from the single note Hard has, Medium has at most that one; made from Hard drafted again, it has more.
+        Assert.IsGreaterThan(1, both.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Medium].Notes.Count);
+        Assert.IsLessThanOrEqualTo(1, mediumOnly.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Medium].Notes.Count);
+        Assert.HasCount(1, mediumOnly.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Hard].Notes);
+    }
+
+    [TestMethod]
+    public async Task APartNotPickedIsLeftAlone()
+    {
+        var chart = EditableChart.CreateNew(new NewChartSettings("Song", 480, 120, 4, 4, new HashSet<ChartInstrument> { ChartInstrument.Guitar, ChartInstrument.Drums }, DrumsVariant.Pro));
+        new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 480L, 1, i % 5))]).Apply(chart);
+        new AddNotes(ChartInstrument.Drums, ChartDifficulty.Expert, [.. Enumerable.Range(0, 16).Select(i => new EditableNote(i * 480L, 1, i % 4))]).Apply(chart);
+        var entry = Folder(("notes.mid", MidiChartWriter.Write(chart)));
+        var pairs = await PairsOf(entry);
+        var read = await SongDifficultyGeneration.ReadAsync(entry, pairs, null, TestContext.CancellationToken);
+        var scope = new LowerDifficultyScope(new HashSet<ChartDifficulty> { ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy }, new HashSet<ChartInstrument> { ChartInstrument.Drums }, Replace: false);
+
+        var generation = SongDifficultyGeneration.Prepare(read, pairs, ReductionDefaults.Shipped, new SongGenerationWork(true, [], scope));
+
+        Assert.AreSequenceEqual([ChartInstrument.Drums], [.. generation.Parts.Keys]);
+        Assert.IsTrue(generation.Drafted.PartOf(ChartInstrument.Drums)!.Tracks.All(t => t.Notes.Count > 0));
+        Assert.IsEmpty(generation.Drafted.PartOf(ChartInstrument.Guitar)![ChartDifficulty.Hard].Notes);
+    }
+
+    [TestMethod]
     public async Task AnUnratedPartIsGivenTheEstimatorsRating()
     {
         var entry = Folder(("notes.mid", MidiChartWriter.Write(ExpertOnly())), songIni: "[song]\nname = Song\n");
@@ -204,6 +272,8 @@ public sealed class SongDifficultyGenerationTests
         new AddNotes(ChartInstrument.Guitar, ChartDifficulty.Expert, [.. Enumerable.Range(0, 32).Select(i => new EditableNote(i * 480L, 1, Math.Abs((i % 8) - 4)))]).Apply(chart);
         return chart;
     }
+
+    private static LowerDifficultyScope Replacing(params ChartDifficulty[] targets) => new(targets.ToHashSet(), null, Replace: true);
 
     private SongEntry Folder((string Name, byte[] Data) chart, string songIni = "[song]\nname = Song\ndiff_guitar = 3\n")
     {

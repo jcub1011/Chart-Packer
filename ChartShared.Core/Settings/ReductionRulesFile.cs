@@ -8,8 +8,8 @@ namespace ChartShared.Core.Settings;
 
 /// <summary>
 /// <c>reduction-rules.json</c>: the default rules Reduce starts from, per family and target difficulty (charter-spec C9
-/// item 2, §10). Both apps read and write it: Chart Builder's Reduce dialog and Settings, and Chart Packer's quick fix for
-/// missing difficulties.
+/// item 2, §10). Both apps read and write it: Chart Builder's Reduce dialog and Settings, and Chart Packer's Generate
+/// Lower Difficulties.
 /// </summary>
 /// <remarks>
 /// <para>It's read afresh by each <see cref="Load"/>, so rules one app saves are the other's next time it asks. A save

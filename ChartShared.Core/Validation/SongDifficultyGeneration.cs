@@ -14,7 +14,8 @@ namespace ChartShared.Core.Validation;
 /// </summary>
 /// <param name="Difficulties">Whether every part's missing difficulties are filled.</param>
 /// <param name="StarPower">The parts to generate star power for, each that still has none (<see cref="StarPowerGenerator"/>).</param>
-public sealed record SongGenerationWork(bool Difficulties, IReadOnlyCollection<ChartInstrument> StarPower)
+/// <param name="Scope">Which difficulties are filled; null for every missing one (<see cref="LowerDifficultyScope.Missing"/>).</param>
+public sealed record SongGenerationWork(bool Difficulties, IReadOnlyCollection<ChartInstrument> StarPower, LowerDifficultyScope? Scope = null)
 {
     /// <summary>Only the missing difficulties.</summary>
     public static SongGenerationWork DifficultiesOnly { get; } = new(true, []);
@@ -83,7 +84,7 @@ public sealed record GeneratedChart(string StagedPath, long Length, string? Remo
 }
 
 /// <summary>
-/// The library's quick fixes for CHR087 and CHR066 (charter-spec C16 item 5): a song's missing difficulties filled from
+/// The library's Generate Lower Difficulties, and its quick fix for CHR066 (charter-spec C16 item 5): a song's missing difficulties filled from
 /// those above them by the reduction rules (<see cref="DifficultyGenerator"/>), star power generated for its parts without
 /// any (<see cref="StarPowerGenerator"/>), or both, and the chart written as a <c>notes.mid</c> and read back as a Chart
 /// Builder save is, to be staged in the song's draft. Nothing in the song is written.
@@ -120,10 +121,55 @@ public static class SongDifficultyGeneration
             throw new InvalidOperationException("The song's chart has other changes to save first.");
 
         using var files = SongFileReader.Open(entry, cancellationToken);
+        return await ReadAsync(files, pairs, draft, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// As <see cref="ReadAsync(SongEntry, IReadOnlyList{KeyValuePair{string, string}}, MetadataDraft?, CancellationToken)"/>,
+    /// reading the song through <paramref name="files"/>, already open, so a song read for its metadata isn't opened again.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The draft changes the chart otherwise, or the song has no chart, or it's too large.</exception>
+    /// <exception cref="IOException">The song or its chart can't be read, or the chart is malformed.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">Reading was cancelled.</exception>
+    public static async Task<SongChartRead> ReadAsync(
+        SongFileReader files,
+        IReadOnlyList<KeyValuePair<string, string>> pairs,
+        MetadataDraft? draft,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(pairs);
+        if (!CanGenerate(draft))
+            throw new InvalidOperationException("The song's chart has other changes to save first.");
+
         var chart = DraftedChart.Of(files.TopLevel.Select(static f => f.Name), draft)
             ?? throw new InvalidOperationException("The song has no chart.");
-        byte[] bytes = await chart.ReadAsync(files, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false)
+        return await ReadChartAsync(files, chart, pairs, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The song's chart is too large to read.");
+    }
+
+    /// <summary>
+    /// Reads <paramref name="chart"/>, the chart a song open as <paramref name="files"/> plays as drafted, with
+    /// <paramref name="pairs"/>, its <c>song.ini</c> as drafted. The draft isn't checked
+    /// (<see cref="CanGenerate"/>): the caller has.
+    /// </summary>
+    /// <returns>The chart read; null when it's too large to read.</returns>
+    /// <exception cref="InvalidOperationException">The chart is malformed.</exception>
+    /// <exception cref="IOException">The song or its chart can't be read, or the chart is malformed.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access is denied.</exception>
+    /// <exception cref="OperationCanceledException">Reading was cancelled.</exception>
+    public static async Task<SongChartRead?> ReadChartAsync(
+        SongFileReader files,
+        DraftedChart chart,
+        IReadOnlyList<KeyValuePair<string, string>> pairs,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(pairs);
+        if (await chart.ReadAsync(files, ChartReader.MaxBytes, cancellationToken).ConfigureAwait(false) is not { } bytes)
+            return null;
         var loaded = SongOpener.LoadChart(chart.StoredName, bytes, pairs);
         return new SongChartRead(loaded.Load, loaded.Options, loaded.Delay, loaded.Import, chart.StoredName);
     }
@@ -141,7 +187,7 @@ public static class SongDifficultyGeneration
     /// <summary>
     /// Does <paramref name="work"/> to <paramref name="read"/>'s chart: star power generated for each of its parts that
     /// still has none, with the defaults (<see cref="StarPowerOptions.Default"/>), then, when it asks, every missing
-    /// difficulty filled (<see cref="DifficultyGenerator.MissingTargets"/>) by <paramref name="rules"/>. Nothing is written,
+    /// difficulty in its scope filled (<see cref="DifficultyGenerator.TargetsFor"/>) by <paramref name="rules"/>. Nothing is written,
     /// and the chart read is left as it was. It can run off the UI thread.
     /// </summary>
     /// <param name="pairs">The song's <c>song.ini</c> as drafted.</param>
@@ -173,7 +219,7 @@ public static class SongDifficultyGeneration
 
         var variant = DifficultyGenerator.DrumsVariantOf(chart, options);
         var parts = new Dictionary<ChartInstrument, GeneratedDifficulties>();
-        foreach (var (part, targets) in work.Difficulties ? DifficultyGenerator.MissingTargets(chart) : new Dictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>>())
+        foreach (var (part, targets) in work.Difficulties ? DifficultyGenerator.TargetsFor(chart, work.Scope ?? LowerDifficultyScope.Missing) : new Dictionary<ChartInstrument, IReadOnlyList<ChartDifficulty>>())
         {
             var generated = DifficultyGenerator.Generate(chart, part, targets, rules, variant, options);
             parts[part] = generated;

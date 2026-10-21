@@ -169,6 +169,12 @@
                                   ToolTip.ShowOnDisabled="True">
                             <MenuItem.Icon><ctl:LineIcon Data="{StaticResource CheckStroke}" /></MenuItem.Icon>
                         </MenuItem>
+                        <MenuItem Header="{x:Static res:Strings.MenuGenerateLowerDifficulties}"
+                                  Command="{Binding Library.GenerateLowerDifficultiesCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.GenerateLowerDifficultiesToolTip}"
+                                  ToolTip.ShowOnDisabled="True">
+                            <MenuItem.Icon><ctl:LineIcon Data="{StaticResource SortDescendingStroke}" /></MenuItem.Icon>
+                        </MenuItem>
                         <MenuItem Header="{x:Static res:Strings.MenuDeduplicate}"
                                   Command="{Binding Library.DeduplicateCommand}"
                                   ToolTip.Tip="{x:Static res:Strings.DedupToolTip}"

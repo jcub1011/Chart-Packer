@@ -8,16 +8,19 @@ using ChartShared.UI.Views;
 namespace ChartPacker.Views
 {
     /// <summary>
-    /// The Generate difficulties dialog (<see cref="GenerateDifficultiesViewModel"/>). It closes once Generate or Cancel is
-    /// pressed; closing it otherwise cancels it. While the preview is shown it takes the rest of the window's width, and
-    /// Space plays or pauses and N goes to the next change (Shift+N the one before) (<see cref="ReductionPreviewKeys"/>);
-    /// hidden, the songs take it.
+    /// The Generate lower difficulties window (<see cref="LowerDifficultiesViewModel"/>). It closes once Close is pressed,
+    /// and not while songs are saved. While the preview is shown it takes the width the songs leave, and Space plays or
+    /// pauses and N goes to the next change (Shift+N the one before) (<see cref="ReductionPreviewKeys"/>); hidden, the
+    /// songs take it.
     /// </summary>
-    public partial class GenerateDifficultiesWindow : Window
+    public partial class LowerDifficultiesWindow : Window
     {
-        private GenerateDifficultiesViewModel? _viewModel;
+        // How wide the songs are while the preview takes the rest.
+        private const double SongsWidthWithPreview = 600;
 
-        public GenerateDifficultiesWindow()
+        private LowerDifficultiesViewModel? _viewModel;
+
+        public LowerDifficultiesWindow()
         {
             InitializeComponent();
             WindowChrome.ShowIcon(this, WindowTitleBar);
@@ -28,12 +31,20 @@ namespace ChartPacker.Views
 
         protected override void OnDataContextChanged(EventArgs e)
         {
-            Watch(DataContext as GenerateDifficultiesViewModel);
+            Watch(DataContext as LowerDifficultiesViewModel);
             ApplyPreview();
             base.OnDataContextChanged(e);
         }
 
-        private void Watch(GenerateDifficultiesViewModel? viewModel)
+        protected override void OnClosing(WindowClosingEventArgs e)
+        {
+            // A save can't be left half done; anything else stops as the window closes.
+            if (_viewModel is { IsSaving: true })
+                e.Cancel = true;
+            base.OnClosing(e);
+        }
+
+        private void Watch(LowerDifficultiesViewModel? viewModel)
         {
             if (_viewModel is not null)
             {
@@ -57,16 +68,16 @@ namespace ChartPacker.Views
                 ApplyPreview();
         }
 
-        // The preview's columns shown or hidden, as the view model says: the songs take the width it leaves.
+        // The preview's column shown or hidden, as the view model says: shown, it takes the width the songs leave; hidden,
+        // the songs take it.
         private void ApplyPreview()
         {
             bool shown = _viewModel?.Preview.IsExpanded == true;
             var columns = Body.ColumnDefinitions;
             PreviewPane.IsVisible = shown;
             PreviewSplitter.IsVisible = shown;
-            columns[1].Width = shown ? new GridLength(360) : GridLength.Star;
+            columns[1].Width = shown ? new GridLength(SongsWidthWithPreview) : GridLength.Star;
             columns[3].Width = shown ? GridLength.Star : new GridLength(0);
-            columns[3].MinWidth = shown ? 360 : 0;
         }
     }
 }

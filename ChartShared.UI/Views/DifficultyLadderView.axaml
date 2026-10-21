@@ -8,7 +8,8 @@
              x:Class="ChartShared.UI.Views.DifficultyLadderView"
              x:DataType="vm:DifficultyLadder">
     <!-- The difficulty estimator's ladder (DifficultyLadder): Expert down to Easy, each a little easier than the one above
-         it, if all's well. Chart Builder's Reduce dialog and Chart Packer's Generate difficulties dialog show it. -->
+         it, if all's well. Chart Builder's Reduce dialog and Chart Packer's Generate difficulties dialog show it; Chart
+         Packer's Generate lower difficulties window shows it compact (class "compact"), without the peak bars. -->
     <UserControl.Styles>
         <!-- A difficulty on the ladder: a draft marked as the library marks its selection, with the accent's bar at its
              left; one no easier than the one above it marked as a failing row is. -->
@@ -47,6 +48,13 @@
         </Style>
         <Style Selector="Border.rung.outOfOrder ProgressBar.peak">
             <Setter Property="Foreground" Value="{DynamicResource InvalidBrush}" />
+        </Style>
+        <!-- Compact, where room is short: no peak bars, and closer rungs. -->
+        <Style Selector=":is(UserControl).compact ProgressBar.peak">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector=":is(UserControl).compact Border.rung">
+            <Setter Property="Padding" Value="8,3,6,3" />
         </Style>
         <Style Selector="TextBlock.warning">
             <Setter Property="FontSize" Value="12" />
