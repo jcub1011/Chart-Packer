@@ -40,6 +40,41 @@ public sealed class DifficultyModelTests
     }
 
     [TestMethod]
+    [DataRow(DifficultyInstrument.FiveFret)]
+    [DataRow(DifficultyInstrument.Keys)]
+    [DataRow(DifficultyInstrument.SixFret)]
+    [DataRow(DifficultyInstrument.Drums)]
+    [DataRow(DifficultyInstrument.ProDrums)]
+    public void EachInstrumentsReferencePatternsScoreAHundred(DifficultyInstrument instrument)
+    {
+        var p = DifficultyParameters.For(instrument);
+        var model = DifficultyModel.For(p);
+        Assert.AreEqual(100, MeanAfterNotes(model, DifficultyReferences.PatternOf(DifficultyAttribute.Strum, p, 60), 30, l => l.Strum), 0.01);
+        Assert.AreEqual(100, MeanAfterNotes(model, DifficultyReferences.PatternOf(DifficultyAttribute.Note, p, 60), 30, l => l.Note), 0.01);
+        Assert.AreEqual(100, MeanAfterNotes(model, DifficultyReferences.PatternOf(DifficultyAttribute.Rhythm, p, 60), 30, l => l.Rhythm), 0.01);
+        Assert.AreEqual(100, MeanAfterNotes(model, DifficultyReferences.PatternOf(DifficultyAttribute.Pattern, p, 180), 60, l => l.Pattern), 0.01);
+        double seconds = p.EnduranceHalfLife * 15;
+        Assert.AreEqual(100, MeanAfterNotes(model, DifficultyReferences.PatternOf(DifficultyAttribute.Endurance, p, seconds + 30), seconds, l => l.Endurance), 0.01);
+    }
+
+    [TestMethod]
+    public void TheProViewsReferencesAreTheFourLaneViews()
+    {
+        // The references are on the toms alone, so a chart without cymbals scores the same either way.
+        Assert.AreEqual(
+            DifficultyReferences.For(DifficultyParameters.For(DifficultyInstrument.Drums)),
+            DifficultyReferences.For(DifficultyParameters.For(DifficultyInstrument.ProDrums)));
+    }
+
+    [TestMethod]
+    public void FiveFretAndKeysDifferOnlyInTheirRankCurve()
+    {
+        var keys = DifficultyParameters.For(DifficultyInstrument.Keys);
+        Assert.AreSame(P, DifficultyParameters.For(DifficultyInstrument.FiveFret));
+        Assert.AreEqual(P, keys with { Instrument = P.Instrument, RankThresholds = P.RankThresholds });
+    }
+
+    [TestMethod]
     public void OneAttributeAtItsReferenceCombinesAsTheDocumentSays()
     {
         Assert.AreEqual(73.6, Model.Combine(new DifficultyAttributes(100, 0, 0, 0, 0)), 0.05);
@@ -171,9 +206,12 @@ public sealed class DifficultyModelTests
         Assert.IsTrue(contributors.All(c => c.FromMs >= 60_000 && c.FromMs < 66_400), string.Join(", ", contributors));
     }
 
-    private static double MeanAfterNotes(IEnumerable<DifficultyNote> notes, double fromSeconds, Func<DifficultyAttributes, double> pick)
+    private static double MeanAfterNotes(IEnumerable<DifficultyNote> notes, double fromSeconds, Func<DifficultyAttributes, double> pick) =>
+        MeanAfterNotes(Model, notes, fromSeconds, pick);
+
+    private static double MeanAfterNotes(DifficultyModel model, IEnumerable<DifficultyNote> notes, double fromSeconds, Func<DifficultyAttributes, double> pick)
     {
-        var state = new DifficultyState(Model);
+        var state = new DifficultyState(model);
         double sum = 0;
         int count = 0;
         foreach (var note in notes)

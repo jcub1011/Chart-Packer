@@ -41,6 +41,11 @@
                         ToolTip.Tip="{x:Static res:Strings.DifficultyOpenWindowToolTip}" />
             </Grid>
 
+            <CheckBox Content="{x:Static res:Strings.DifficultyProView}"
+                      IsChecked="{Binding IsProView}"
+                      IsVisible="{Binding ShowsProToggle}"
+                      ToolTip.Tip="{x:Static res:Strings.DifficultyProViewToolTip}" />
+
             <TextBlock Classes="muted"
                        TextWrapping="Wrap"
                        Margin="0,8"

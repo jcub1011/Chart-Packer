@@ -1,12 +1,21 @@
 namespace ChartShared.Core.Charting.Difficulty;
 
-/// <summary>One of the five things a chart's difficulty is measured by (docs/difficulty-model.md §4).</summary>
+/// <summary>
+/// One of the five things a chart's difficulty is measured by (docs/difficulty-model.md §4). For drums, the first two are
+/// the kick and the hands (§14.1).
+/// </summary>
 public enum DifficultyAttribute
 {
-    /// <summary>The strumming hand: how fast, alternate strumming, strummed chords, and switching from HOPOs (§4.1).</summary>
+    /// <summary>
+    /// The strumming hand: how fast, alternate strumming, strummed chords, and switching from HOPOs (§4.1). For drums, the
+    /// kick: how fast, double-kick footwork, and kicks between the hands' hits.
+    /// </summary>
     Strum,
 
-    /// <summary>The fretting hand: moving between lane states, chord shapes, opens, HOPOs and held lanes (§4.2).</summary>
+    /// <summary>
+    /// The fretting hand: moving between lane states, chord shapes, opens, HOPOs and held lanes (§4.2). For drums, the
+    /// hands: each hand's rate, and moving around the kit.
+    /// </summary>
     Note,
 
     /// <summary>How hard the timing is to read: changing intervals, subdivision changes and syncopation (§4.3).</summary>
@@ -15,7 +24,7 @@ public enum DifficultyAttribute
     /// <summary>How unpredictable the notes are: local variety and phrases not seen lately (§4.5).</summary>
     Pattern,
 
-    /// <summary>How long the hands have worked hard, strumming and fretting, without enough rest (§4.4).</summary>
+    /// <summary>How long the hands (and for drums the feet) have worked hard without enough rest (§4.4).</summary>
     Endurance,
 }
 

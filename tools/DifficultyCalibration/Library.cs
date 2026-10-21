@@ -6,7 +6,10 @@ using ChartShared.Core.Scanning;
 
 namespace DifficultyCalibration;
 
-/// <summary>A rated part of a song, read once: its highest charted difficulty as the games play it, and its rating.</summary>
+/// <summary>
+/// A rated part of a song, read once: its highest charted difficulty as the games play it, one of its ratings, and the
+/// model that rates it. Pro drums are a part for <c>diff_drums</c> and another for <c>diff_drums_real</c>.
+/// </summary>
 internal sealed record Part(
     string Song,
     string Artist,
@@ -15,16 +18,23 @@ internal sealed record Part(
     bool Official,
     bool HeldOut,
     ChartInstrument Instrument,
+    string Key,
+    DifficultyInstrument Model,
     ChartDifficulty Difficulty,
     int Reported,
     NoteTrack Track,
     TempoMap Tempo,
-    long? EndTick);
+    long? EndTick,
+    IReadOnlyList<Phrase> FreeLanes)
+{
+    /// <summary>A short name for the rating: the part, or "ProDrums" for <c>diff_drums_real</c>.</summary>
+    public string Name => Model == DifficultyInstrument.ProDrums ? "ProDrums" : Instrument.ToString();
+}
 
-/// <summary>Reads every rated five-fret part under a folder, without duplicates.</summary>
+/// <summary>Reads every rated part under a folder, without duplicates.</summary>
 internal static class Library
 {
-    public static readonly ChartInstrument[] Instruments = [ChartInstrument.Guitar, ChartInstrument.Bass, ChartInstrument.Rhythm, ChartInstrument.GuitarCoop];
+    public static readonly ChartInstrument[] Instruments = Enum.GetValues<ChartInstrument>();
 
     // Charters whose charts shipped in the games, matched anywhere in the charter field.
     private static readonly string[] OfficialCharters =
@@ -53,7 +63,7 @@ internal static class Library
         int duplicates = 0;
         foreach (var part in found.Where(static f => f is not null).SelectMany(static f => f!))
         {
-            if (seen.Add($"{Key(part.Artist)}|{Key(part.Title)}|{Key(part.Charter)}|{part.Instrument}"))
+            if (seen.Add($"{Key(part.Artist)}|{Key(part.Title)}|{Key(part.Charter)}|{part.Instrument}|{part.Key}"))
                 parts.Add(part);
             else
                 duplicates++;
@@ -80,23 +90,28 @@ internal static class Library
             var parts = new List<Part>();
             foreach (var instrument in Instruments)
             {
-                string key = SongIniPartKeys.DifficultyKeysOf(instrument, null)[0];
-                if (!int.TryParse(song.Value(key)?.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int reported) || reported < 0)
-                    continue;
                 if (song.Chart.PartOf(instrument) is not { } editable)
                     continue;
 
-                // As DifficultyEstimator.EstimatePart: the highest difficulty with two chords apart in time.
-                foreach (var difficulty in Enum.GetValues<ChartDifficulty>().Reverse())
+                // Pro drums are rated twice: as 4-lane drums, and with their cymbals when the games read them as Pro.
+                foreach (var (key, model) in DifficultyEstimator.KeyModelsOf(song.Chart, instrument, song.Options))
                 {
-                    if (editable[difficulty].Notes.Count == 0)
+                    if (!int.TryParse(song.Value(key)?.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int reported) || reported < 0)
                         continue;
-                    var track = GameView.Project(song.Chart, new ChartTrackKey(instrument, difficulty), song.Options);
-                    var notes = DifficultyNotes.Of(track, tempo, end);
-                    if (notes.Count < 2 || notes[^1].TimeMs <= notes[0].TimeMs)
-                        continue;
-                    parts.Add(new Part(entry.FullPath, artist, title, charter, official, heldOut, instrument, difficulty, reported, track, tempo, end));
-                    break;
+
+                    // As DifficultyEstimator.EstimatePart: the highest difficulty with two chords apart in time.
+                    foreach (var difficulty in Enum.GetValues<ChartDifficulty>().Reverse())
+                    {
+                        if (editable[difficulty].Notes.Count == 0)
+                            continue;
+                        var track = GameView.Project(song.Chart, new ChartTrackKey(instrument, difficulty), song.Options);
+                        var freeLanes = DifficultyNotes.FreeLanesOf(editable, difficulty);
+                        var notes = DifficultyNotes.Of(track, tempo, end, DifficultyParameters.For(model), freeLanes);
+                        if (notes.Count < 2 || notes[^1].TimeMs <= notes[0].TimeMs)
+                            continue;
+                        parts.Add(new Part(entry.FullPath, artist, title, charter, official, heldOut, instrument, key, model, difficulty, reported, track, tempo, end, freeLanes));
+                        break;
+                    }
                 }
             }
 

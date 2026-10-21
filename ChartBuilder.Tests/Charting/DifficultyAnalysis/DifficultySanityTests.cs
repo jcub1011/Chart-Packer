@@ -24,6 +24,69 @@ public sealed class DifficultySanityTests
     }
 
     [TestMethod]
+    [DataRow(DifficultyInstrument.FiveFret)]
+    [DataRow(DifficultyInstrument.Keys)]
+    [DataRow(DifficultyInstrument.SixFret)]
+    [DataRow(DifficultyInstrument.Drums)]
+    [DataRow(DifficultyInstrument.ProDrums)]
+    public void SpeedingAnyInstrumentUpDoesNotLowerItsPhysicalAttributesOrScore(DifficultyInstrument instrument)
+    {
+        var p = DifficultyParameters.For(instrument);
+        var notes = RandomNotes(instrument, 7, 400, 150);
+        var slow = DifficultyAnalyzer.Analyze(notes, p);
+        var fast = DifficultyAnalyzer.Analyze([.. notes.Select(n => n with { TimeMs = n.TimeMs / 1.1 })], p);
+
+        Assert.IsGreaterThanOrEqualTo(slow.ChartAttributes.Strum, fast.ChartAttributes.Strum);
+        Assert.IsGreaterThanOrEqualTo(slow.ChartAttributes.Note, fast.ChartAttributes.Note);
+        Assert.IsGreaterThan(slow.ChartScore, fast.ChartScore);
+    }
+
+    [TestMethod]
+    [DataRow(DifficultyInstrument.SixFret)]
+    [DataRow(DifficultyInstrument.Drums)]
+    [DataRow(DifficultyInstrument.ProDrums)]
+    public void AnyInstrumentsEditChangesNothingBeforeIt(DifficultyInstrument instrument)
+    {
+        var p = DifficultyParameters.For(instrument);
+        var notes = RandomNotes(instrument, 8, 200, 125);
+        var edited = notes.Take(150).Concat(RandomNotes(instrument, 9, 50, 90).Select(n => n with { TimeMs = n.TimeMs + (150 * 125), Beat = n.Beat + 150 })).ToList();
+        var before = DifficultyAnalyzer.Analyze(notes, p);
+        var after = DifficultyAnalyzer.Analyze(edited, p);
+
+        double editMs = 150 * 125;
+        var unchanged = before.Samples.TakeWhile(s => s.TimeMs < editMs).ToList();
+        Assert.IsNotEmpty(unchanged);
+        Assert.AreSequenceEqual(unchanged, after.Samples.Take(unchanged.Count).ToList());
+    }
+
+    [TestMethod]
+    [DataRow(11)]
+    [DataRow(12)]
+    [DataRow(13)]
+    public void TheProViewIsNoEasierThanTheFourLaneView(int seed)
+    {
+        // The same drums, read with their cymbals and as 4-lane drums read them: each cymbal the tom of its colour.
+        var pro = RandomNotes(DifficultyInstrument.ProDrums, seed, 400, 130);
+        var fourLane = pro.Select(n => n with { Lanes = (byte)((n.Lanes & 0b1000_1111) | ((n.Lanes >> 3) & 0b1110)) }).ToList();
+
+        var proScore = DifficultyAnalyzer.Analyze(pro, DifficultyParameters.For(DifficultyInstrument.ProDrums)).ChartScore;
+        var fourLaneScore = DifficultyAnalyzer.Analyze(fourLane, DifficultyParameters.For(DifficultyInstrument.Drums)).ChartScore;
+
+        Assert.IsGreaterThanOrEqualTo(fourLaneScore, proScore);
+    }
+
+    [TestMethod]
+    public void AProChartWithoutCymbalsScoresAsItsFourLaneView()
+    {
+        var toms = RandomNotes(DifficultyInstrument.Drums, 14, 300, 140);
+
+        Assert.AreEqual(
+            DifficultyAnalyzer.Analyze(toms, DifficultyParameters.For(DifficultyInstrument.Drums)).ChartScore,
+            DifficultyAnalyzer.Analyze(toms, DifficultyParameters.For(DifficultyInstrument.ProDrums)).ChartScore,
+            1e-9);
+    }
+
+    [TestMethod]
     public void ALongEasyIntroAddsNoEnduranceAndHardlyMovesTheScore()
     {
         // Hard sixteenths at 120 BPM for about five minutes, longer than the K windows the score reads (§10.3), then the
@@ -219,5 +282,41 @@ public sealed class DifficultySanityTests
         var alone = DifficultyAnalyzer.Analyze(notes, span);
 
         Assert.AreEqual(alone.Score(span.FromMs, span.ToMs), alone.ChartScore, 1e-9);
+    }
+
+    // Sixteenths intervalMs apart on lanes picked from seed, as instrument lays them out: frets with some chords, opens
+    // and HOPOs; drums on the pads, Pro cymbals among them, with kicks.
+    private static List<DifficultyNote> RandomNotes(DifficultyInstrument instrument, int seed, int count, double intervalMs)
+    {
+        var random = new Random(seed);
+        var notes = new List<DifficultyNote>(count);
+        for (int i = 0; i < count; i++)
+        {
+            byte lanes;
+            var kind = NoteKind.Strum;
+            if (instrument.IsDrums())
+            {
+                int pads = instrument == DifficultyInstrument.ProDrums ? 7 : 4;
+                lanes = (byte)(1 << random.Next(pads));
+                if (random.Next(4) == 0)
+                    lanes |= (byte)(1 << random.Next(pads));
+                if (random.Next(3) == 0)
+                    lanes |= DrumPads.Kick;
+            }
+            else
+            {
+                int frets = instrument == DifficultyInstrument.SixFret ? 6 : 5;
+                int roll = random.Next(10);
+                lanes = roll == 0 ? (byte)0 : (byte)(1 << random.Next(frets));
+                if (roll >= 8)
+                    lanes |= (byte)(1 << random.Next(frets));
+                if (random.Next(3) == 0)
+                    kind = NoteKind.Hopo;
+            }
+
+            notes.Add(new DifficultyNote(i * intervalMs, i * 0.25, lanes, kind, 0));
+        }
+
+        return notes;
     }
 }

@@ -4,7 +4,7 @@ namespace ChartShared.Core.Charting.Difficulty;
 
 /// <summary>
 /// What each attribute is normalized against (ρ, docs/difficulty-model.md §3.3): its raw strain under its reference
-/// pattern, which scores 100. Endurance's is the fatigue the endurance reference, a stamina limit rather than a speed one,
+/// pattern, which scores 100. Each instrument has its own patterns (§14.3). Endurance's is the fatigue the endurance reference, a stamina limit rather than a speed one,
 /// builds when played without end.
 /// </summary>
 /// <remarks>
@@ -68,24 +68,66 @@ public sealed record DifficultyReferences(double Strum, double Note, double Rhyt
         return count == 0 || sum <= 0 ? 1 : sum / count;
     }
 
-    /// <summary>The strum reference: strummed single green notes, sixteenths.</summary>
-    internal static IEnumerable<DifficultyNote> StrumPattern(DifficultyParameters parameters, double seconds) =>
-        Steady(parameters.StrumReferenceBpm, 0.25, seconds, static _ => (1, NoteKind.Strum));
+    /// <summary><paramref name="attribute"/>'s reference pattern for <paramref name="parameters"/>' instrument, <paramref name="seconds"/> long.</summary>
+    internal static IEnumerable<DifficultyNote> PatternOf(DifficultyAttribute attribute, DifficultyParameters parameters, double seconds) => attribute switch
+    {
+        DifficultyAttribute.Strum => StrumPattern(parameters, seconds),
+        DifficultyAttribute.Note => NotePattern(parameters, seconds),
+        DifficultyAttribute.Rhythm => RhythmPattern(parameters, seconds),
+        DifficultyAttribute.Pattern => PatternPattern(parameters, seconds),
+        DifficultyAttribute.Endurance => EndurancePattern(parameters, seconds),
+        _ => throw new ArgumentOutOfRangeException(nameof(attribute), attribute, null),
+    };
 
-    /// <summary>The endurance reference: strummed single green notes, sixteenths, at a pace kept up for a whole song.</summary>
-    internal static IEnumerable<DifficultyNote> EndurancePattern(DifficultyParameters parameters, double seconds) =>
-        Steady(parameters.EnduranceReferenceBpm, 0.25, seconds, static _ => (1, NoteKind.Strum));
+    /// <summary>
+    /// The strum reference: strummed single green notes (six-fret: the first white fret), sixteenths. For drums, the
+    /// kick's: kicks alone, sixteenths.
+    /// </summary>
+    internal static IEnumerable<DifficultyNote> StrumPattern(DifficultyParameters parameters, double seconds)
+    {
+        byte lanes = parameters.Instrument.IsDrums() ? DrumPads.Kick : (byte)1;
+        return Steady(parameters.StrumReferenceBpm, 0.25, seconds, _ => (lanes, NoteKind.Strum));
+    }
 
-    /// <summary>The note reference: HOPOs up and down the frets, green to orange and back, sixteenths.</summary>
-    internal static IEnumerable<DifficultyNote> NotePattern(DifficultyParameters parameters, double seconds) =>
-        Steady(parameters.NoteReferenceBpm, 0.25, seconds, static i =>
+    /// <summary>
+    /// The endurance reference: strummed single green notes, sixteenths, at a pace kept up for a whole song. For drums,
+    /// sixteenths on yellow with a kick on every eighth.
+    /// </summary>
+    internal static IEnumerable<DifficultyNote> EndurancePattern(DifficultyParameters parameters, double seconds)
+    {
+        if (parameters.Instrument.IsDrums())
+            return Steady(parameters.EnduranceReferenceBpm, 0.25, seconds, static i => ((byte)(i % 2 == 0 ? 0b10 | DrumPads.Kick : 0b10), NoteKind.Strum));
+        return Steady(parameters.EnduranceReferenceBpm, 0.25, seconds, static _ => (1, NoteKind.Strum));
+    }
+
+    /// <summary>
+    /// The note reference: HOPOs up and down the frets, green to orange and back, sixteenths; six-fret, along the white
+    /// frets and back along the black. For drums, the hands': single strokes across the toms and back, sixteenths.
+    /// </summary>
+    internal static IEnumerable<DifficultyNote> NotePattern(DifficultyParameters parameters, double seconds)
+    {
+        switch (parameters.Instrument)
         {
-            int step = i % 8;
-            int lane = step <= 4 ? step : 8 - step;
-            return ((byte)(1 << lane), i == 0 ? NoteKind.Strum : NoteKind.Hopo);
-        });
+            case DifficultyInstrument.SixFret:
+                int[] grid = [0, 1, 2, 5, 4, 3];
+                return Steady(parameters.NoteReferenceBpm, 0.25, seconds, i => ((byte)(1 << grid[i % grid.Length]), i == 0 ? NoteKind.Strum : NoteKind.Hopo));
+            case DifficultyInstrument.Drums or DifficultyInstrument.ProDrums:
+                int[] toms = [0, 1, 2, 3, 2, 1];
+                return Steady(parameters.NoteReferenceBpm, 0.25, seconds, i => ((byte)(1 << toms[i % toms.Length]), NoteKind.Strum));
+            default:
+                return Steady(parameters.NoteReferenceBpm, 0.25, seconds, static i =>
+                {
+                    int step = i % 8;
+                    int lane = step <= 4 ? step : 8 - step;
+                    return ((byte)(1 << lane), i == 0 ? NoteKind.Strum : NoteKind.Hopo);
+                });
+        }
+    }
 
-    /// <summary>The rhythm reference: strummed green notes, a beat of sixteenths then a beat of eighth triplets.</summary>
+    /// <summary>
+    /// The rhythm reference: strummed green notes (six-fret: the first white fret; drums: red), a beat of sixteenths then
+    /// a beat of eighth triplets.
+    /// </summary>
     internal static IEnumerable<DifficultyNote> RhythmPattern(DifficultyParameters parameters, double seconds)
     {
         double beatMs = 60_000 / parameters.RhythmReferenceBpm;
@@ -100,17 +142,23 @@ public sealed record DifficultyReferences(double Strum, double Note, double Rhyt
         }
     }
 
-    /// <summary>The pattern reference: strummed single notes on frets picked at random, the same each time, sixteenths.</summary>
+    /// <summary>
+    /// The pattern reference: strummed single notes on frets picked at random, the same each time, sixteenths. For drums,
+    /// on the four pads and the kick.
+    /// </summary>
     internal static IEnumerable<DifficultyNote> PatternPattern(DifficultyParameters parameters, double seconds)
     {
         // A fixed xorshift, so the reference never changes with the runtime's Random.
         uint seed = 0x9E3779B9;
+        bool drums = parameters.Instrument.IsDrums();
+        uint lanes = parameters.Instrument == DifficultyInstrument.SixFret ? 6u : 5u;
         return Steady(parameters.PatternReferenceBpm, 0.25, seconds, _ =>
         {
             seed ^= seed << 13;
             seed ^= seed >> 17;
             seed ^= seed << 5;
-            return ((byte)(1 << (int)(seed % 5)), NoteKind.Strum);
+            int lane = (int)(seed % lanes);
+            return (drums && lane == 4 ? DrumPads.Kick : (byte)(1 << lane), NoteKind.Strum);
         });
     }
 

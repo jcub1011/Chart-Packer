@@ -2666,26 +2666,20 @@ Saving also makes these changes to song.ini:
   <data name="SuggestedRatingFormat" xml:space="preserve">
     <value>Suggested rating: {0}</value>
   </data>
+  <data name="SuggestedRatingWithProFormat" xml:space="preserve">
+    <value>Suggested rating: {0}, Pro drums {1}</value>
+  </data>
   <data name="SuggestedRatingFromFormat" xml:space="preserve">
     <value>From {0}, the part's highest difficulty</value>
   </data>
   <data name="SuggestedRatingNpsFormat" xml:space="preserve">
     <value>Notes per second: {0:0.0} at peak, {1:0.0} on average</value>
   </data>
-  <data name="SuggestedRatingChordsFormat" xml:space="preserve">
-    <value>Chords: {0:P0}</value>
-  </data>
-  <data name="SuggestedRatingHopoFormat" xml:space="preserve">
-    <value>HOPOs and taps: {0:P0}</value>
-  </data>
   <data name="SuggestedRatingKickFormat" xml:space="preserve">
     <value>Kicks apart from the hands: {0:P0}</value>
   </data>
   <data name="SuggestedRatingDifficultyFormat" xml:space="preserve">
     <value>{0}: {1}</value>
-  </data>
-  <data name="SuggestedRatingOnlySuggestion" xml:space="preserve">
-    <value>Only a suggestion, from hand-set weights.</value>
   </data>
   <data name="SuggestedRatingUseFormat" xml:space="preserve">
     <value>Use as {0}</value>
@@ -2696,6 +2690,12 @@ Saving also makes these changes to song.ini:
   <data name="SuggestedRatingUsedFormat" xml:space="preserve">
     <value>Rating {0} will be saved as {1}.</value>
   </data>
+  <data name="SuggestedRatingsUsedFormat" xml:space="preserve">
+    <value>Ratings will be saved: {0}.</value>
+  </data>
+  <data name="SuggestedRatingPairFormat" xml:space="preserve">
+    <value>{0} as {1}</value>
+  </data>
   <data name="SuggestedRatingRankFormat" xml:space="preserve">
     <value>Rank {0:0.00}, 0 to 6 for charts written to be played</value>
   </data>
@@ -2705,8 +2705,14 @@ Saving also makes these changes to song.ini:
   <data name="SuggestedRatingAttributesFormat" xml:space="preserve">
     <value>Strum {0:0}, note {1:0}, rhythm {2:0}, pattern {3:0}, endurance {4:0} (100 is the limit of realistic play)</value>
   </data>
+  <data name="SuggestedRatingDrumAttributesFormat" xml:space="preserve">
+    <value>Kick {0:0}, hands {1:0}, rhythm {2:0}, pattern {3:0}, endurance {4:0} (100 is the limit of realistic play)</value>
+  </data>
+  <data name="SuggestedRatingProDrumsFormat" xml:space="preserve">
+    <value>Pro drums, with the cymbals: {0}, rank {1:0.00}</value>
+  </data>
   <data name="SuggestedRatingModelSuggestion" xml:space="preserve">
-    <value>Only a suggestion, from a difficulty model not yet tuned against rated charts.</value>
+    <value>Only a suggestion, from a difficulty model tuned against the ratings of official charts.</value>
   </data>
   <data name="DifficultyTab" xml:space="preserve">
     <value>Difficulty</value>
@@ -2722,9 +2728,6 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="DifficultyNothing" xml:space="preserve">
     <value>Nothing to analyze: focus a five-fret lane with notes, or pick one.</value>
-  </data>
-  <data name="DifficultyNotFiveFret" xml:space="preserve">
-    <value>The difficulty analysis covers five-fret parts. Drums and six-fret are rated from note density, in the Preview tab.</value>
   </data>
   <data name="DifficultyFailed" xml:space="preserve">
     <value>The difficulty couldn't be worked out. The log says why.</value>
@@ -2776,6 +2779,18 @@ Saving also makes these changes to song.ini:
   </data>
   <data name="DifficultyAttributeEndurance" xml:space="preserve">
     <value>Endurance</value>
+  </data>
+  <data name="DifficultyAttributeKick" xml:space="preserve">
+    <value>Kick</value>
+  </data>
+  <data name="DifficultyAttributeHands" xml:space="preserve">
+    <value>Hands</value>
+  </data>
+  <data name="DifficultyProView" xml:space="preserve">
+    <value>Pro drums</value>
+  </data>
+  <data name="DifficultyProViewToolTip" xml:space="preserve">
+    <value>Rate the drums as Pro drums, each cymbal a pad of its own, as diff_drums_real does; otherwise as 4-lane drums, as diff_drums does</value>
   </data>
   <data name="DifficultyLinesLabel" xml:space="preserve">
     <value>Lines</value>

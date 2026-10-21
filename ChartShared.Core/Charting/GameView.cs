@@ -140,6 +140,18 @@ public static class GameView
     }
 
     /// <summary>
+    /// Whether the games read <paramref name="chart"/>'s drums as Pro, with cymbals, given <paramref name="options"/>: only
+    /// then does the game view flag them.
+    /// </summary>
+    public static bool IsProDrums(EditableChart chart, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        var drums = chart.Parts.FirstOrDefault(p => p.Kind == ChartInstrumentKind.Drums);
+        return drums is not null && DrumsLayoutOf(drums, SavedTomMarkers(chart, drums), options) == DrumsLayout.Pro;
+    }
+
+    /// <summary>
     /// Where the games swap red and yellow on <paramref name="chart"/>'s drums (charter-spec C6 item 7), worked out as
     /// <see cref="Project(EditableChart, ChartReadOptions)"/> works out each drum note's: from the mix events the reader
     /// reads, the model's and any kept as text, and the drums' layout, given <paramref name="options"/>. None when the

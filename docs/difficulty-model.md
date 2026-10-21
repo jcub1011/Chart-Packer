@@ -2,7 +2,7 @@
 
 *Design document: difficulty criteria, online measurement model, aggregation, and visualization*
 
-*From issue #108's attachment (`chart-difficulty-design-v2.md`), with ranks counted from 0 so they match `song.ini`'s `diff_*` tiers, and the implementation's choices in section 13. The code is in `ChartShared.Core/Charting/Difficulty`.*
+*From issue #108's attachment (`chart-difficulty-design-v2.md`), with ranks counted from 0 so they match `song.ini`'s `diff_*` tiers, the implementation's choices in section 13, and the other instruments in section 14. The code is in `ChartShared.Core/Charting/Difficulty`.*
 
 ---
 
@@ -30,7 +30,7 @@ The rating measures **the difficulty of playing the chart cleanly** (high accura
 
 ### 1.3 Out of scope
 
-Drums, vocals, 6-fret guitar, star power strategy, and player-specific settings (scroll speed, note skin, highway length) are out of scope for the first version. Section 12 lists possible extensions.
+Vocals, star power strategy, and player-specific settings (scroll speed, note skin, highway length) are out of scope. Sections 1 to 11 describe 5-fret guitar; section 14 carries the model to keys, 6-fret guitar, and drums, Pro drums among them. Section 12 lists possible extensions.
 
 ---
 
@@ -706,16 +706,16 @@ All values are starting points to be tuned during calibration. Attribute weights
 
 **Sight-reading.** Visual density (how many notes are on screen at once at a given scroll speed) affects first-play difficulty. It is out of scope for a clean-play target but could become a sixth attribute if the target shifts toward first-attempt difficulty.
 
-**Other instruments and difficulties.** The strain model, aggregation, and rank curve generalize to bass and 6-fret guitar with new transition costs, and to drums with entirely different per-note attributes. The instantaneous values could also support tools for lower difficulties, such as flagging passages in a Hard chart that exceed its intended tier.
+**Other instruments and difficulties.** Section 14 carries the strain model, aggregation, and rank curve to keys, 6-fret guitar and drums. Vocals would need a model of their own: pitch, range and phrasing rather than lanes. The instantaneous values could also support tools for lower difficulties, such as flagging passages in a Hard chart that exceed its intended tier.
 
 ---
 
 ## 13. Implementation Notes
 
-**Where it runs.** Five-fret parts are rated by this model; drums and six-fret, which it doesn't cover, keep the earlier
-note-density rating. The suggested `diff_*` value is the chart rank, uncapped, so an overchart is suggested as 7 or more.
-Chart Builder shows the rank, the spider graph (chart, selection or playhead) and the difficulty graph in the Editor's
-Difficulty tab, which also opens in a window of its own.
+**Where it runs.** Every part is rated by this model, with its instrument's costs and parameters (section 14). The
+suggested `diff_*` value is the chart rank, uncapped, so an overchart is suggested as 7 or more. Chart Builder shows the
+rank, the spider graph (chart, selection or playhead) and the difficulty graph in the Editor's Difficulty tab, which also
+opens in a window of its own.
 
 **Note types.** The model reads the game view, which resolves natural HOPOs, forced flags, taps and the sustain cutoff as
 the games do (the engine profile of section 12). Notes after the `[end]` event are left out. A chord with an open note and
@@ -759,4 +759,108 @@ What changed, and why:
 - **The load's own weights** (section 5.2). The load once took strum's and note's weights in $D$, so lowering strum's to 0.10 seemed to help official charts, but only by raising the endurance of charts tapped or hammered on without strumming. Those then ranked a tier or more above what they play like.
 - **Thresholds refitted** (section 7.1) to the tier official charts of each score are most often rated. By five-fold cross-validation over artists, official charts land on their tier 43% of the time and within one 87%. Thresholds halfway between official tiers' median scores keep the spread better (each official tier's median chart lands within 0.15 of the middle of its tier) but are less accurate for one chart (41% and 82%), and put community charts that play like a 3 at 4 to 5.
 
-Raising the power mean to 2, or note's weight, helped official charts a little but hurt the rest, so they're unchanged. What's left is mostly how charters rate. Guitar's held-out correlation stays about 0.53 across every variant tried. Community charts are rated about a tier lower than official ones at the same score, so their suggestions often run above their own ratings. Rated by official charters, bass and guitar agree on the scale, so one curve serves every part.
+Raising the power mean to 2, or note's weight, helped official charts a little but hurt the rest, so they're unchanged. What's left is mostly how charters rate. Guitar's held-out correlation stays about 0.53 across every variant tried. Community charts are rated about a tier lower than official ones at the same score, so their suggestions often run above their own ratings. Rated by official charters, bass and guitar agree on the scale, so one curve serves every five-fret part but keys (section 14.4).
+
+---
+
+## 14. Other Instruments
+
+Every part a chart can have is rated: five-fret guitar, bass, rhythm, co-op and keys, Guitar Hero Live's six frets, and drums, as 4-lane, 5-lane or Pro drums. Each **instrument model** (`DifficultyInstrument`) has its own parameters (`DifficultyParameters.For`), reference patterns, and rank curve. Everything from section 3 on is shared: the strain accumulation and decay, rhythm and pattern (sections 4.3 and 4.5), endurance, the power mean, the window-peak score and the rank curve's shape.
+
+Only the first two attributes, the physical ones, differ:
+
+| Model | Attribute 1 | Attribute 2 | Lanes |
+|---|---|---|---|
+| Five-fret, keys | Strum (4.1) | Note (4.2) | Bits 0–4, green the lowest; 0 is an open note |
+| Six-fret | Strum (4.1) | Note, on a grid (14.2) | Bits 0–2 the white frets, 3–5 the black ones; 0 is an open note |
+| Drums | Kick (14.1) | Hands (14.1) | Bits 0–4 the pads from red; bit 7 the kick |
+| Pro drums | Kick | Hands | As drums, with bits 4–6 the yellow, blue and green cymbals |
+
+Their parameters are the strum and note ones: the same weights, half-lives, scales, speed powers and reference tempos. The endurance load (section 4.4) is made from the two of them for every model.
+
+A part's `diff_*` key is rated by the part's model. Pro drums have two keys: `diff_drums`, rated as 4-lane drums play the chart, each cymbal read as the tom of its colour, and `diff_drums_real`, rated as Pro drums. Only drums the games read as Pro have cymbals, so `diff_drums_real` is rated only for them: a Pro chart that song.ini's settings or a fifth-pad note make the games read as 4-lane or 5-lane isn't rated as Pro drums. Chart Builder's Difficulty tab shows either view of drums the games read as Pro.
+
+Phrase tokens (section 4.5) take eight bits of lanes, two of kind and nine of interval, in twenty-bit fields, so a phrase key holds up to six of them. Five-fret phrases are told apart exactly as before, so five-fret scores didn't change.
+
+### 14.1 Drums
+
+Drums are read from the game view, so the layout (4-lane, 5-lane or Pro) and disco flip are as the games play them. Expert+ kicks aren't read, because `diff_drums` rates Expert; nor are they counted in what a suggested rating shows it was worked out from. Hits within $\Delta_{chord}$ of each other, such as flams, are one note. Accents and ghost notes are read as plain hits.
+
+**Kick.** For a note with a kick, where $\hat\Delta_k$ is the guarded time since the last kick:
+
+$$C_K = s_K \cdot (1000/\hat\Delta_k)^{a_K} \cdot \max(1, T_{dk}/\hat\Delta_k)^{b_{dk}} \cdot (1 + w_{ind}\,I)$$
+
+$I = 1$ for a kick with no pad that comes less than $T_{ind}$ after a hand's hit: a kick between the hands' hits rather than with one. The first kick costs nothing.
+
+**Hands.** Two hands each remember their last hit: when it was, and on which pad. A hand $h$ hitting pad $q$ costs:
+
+$$c_h(q) = r(\hat\Delta_h) \cdot \big(1 + w_{mv}\,|x_q - x_h| + w_{pad}\,[q \ne q_h] + w_{row}\,[\text{row}_q \ne \text{row}_h]\big), \qquad r(\Delta) = (1000/\Delta)^{a_H} \cdot \max(1, T_h/\Delta)^{b_h}$$
+
+- $x$ is a pad's place across the kit, in pads from red. A Pro cymbal has the place of the tom of its colour, on a row above it. The row term applies only to Pro drums.
+- A hand's first hit costs nothing.
+- One pad is hit by whichever hand costs least. Of two that cost the same, the one rested longer hits it, then the right. So fast single strokes alternate on their own.
+- Two pads are hit by both hands, the left hand taking the leftmost. Each pad past two costs $w_{extra}$ more at the hands' rate.
+
+**Roll and trill lanes.** The game counts whatever is hit in a roll or trill lane, however fast, so notes in one (on the difficulties it reaches) count no interval shorter than $\Delta_{lane}$, the kick's as well as the hands', and cost no rhythm or pattern. Rhythm and pattern read the lane as a rest: its notes don't enter their history, so the first note after it is timed from the last note before it, and the lane's moves aren't among the recent moves or phrases.
+
+| Parameter | Value | Meaning |
+|---|---|---|
+| $T_{dk}$, $b_{dk}$ | 100 ms, 1.5 | Kick interval double-kick footwork starts below |
+| $w_{ind}$, $T_{ind}$ | 0.5, 200 ms | A kick alone between the hands' hits |
+| $T_h$, $b_h$ | 110 ms, 1.5 | One hand's limit |
+| $w_{mv}$, $w_{pad}$, $w_{row}$ | 0.25, 0.3, 0.3 | Moving across the kit, to another pad, between toms and cymbals |
+| $w_{extra}$ | 1.0 | Each pad past two at once |
+| $\Delta_{lane}$ | 125 ms | Shortest interval counted in a roll or trill lane |
+| $a_K$, $a_H$ | 1.0, 1.0 | Speed powers |
+| Kick, hands half-lives | 0.4 s, 0.5 s | |
+| Weights | Kick 0.20, hands 0.35, rhythm 0, pattern 0.30, endurance 0.05 | |
+| $L_0$ | 40 | Endurance threshold: drummers play without a break far more than guitarists |
+
+### 14.2 Six-fret
+
+Guitar Hero Live's frets are three columns, each with a white fret and a black one, and each column is one finger's: both of a column's frets at once are a **barre**, one finger across them. Strum difficulty is as section 4.1. Note difficulty is as section 4.2, with the transition cost $T$ worked out on the grid (`GridTransitionCost`):
+
+- Each column whose finger changes costs $w_f$. A column that only moves between its white and its black fret costs $w_{row} = 0.3$ instead.
+- Going into or out of an open note costs $w_o$, as before.
+- The hand's centre $\mu$ is the average column, and the open position is the middle column. Travel costs $w_c$ per column.
+- A chord costs $w_n$ for each column it uses, $w_{barre} = 0.2$ for each barre, $w_{mixed} = 0.4$ when it has white frets alone in one column and black ones alone in another, and $w_g$ for each column it skips.
+
+The other parameters are five-fret's.
+
+### 14.3 Reference patterns
+
+| Model | Strum or kick | Note or hands | Rhythm | Pattern | Endurance |
+|---|---|---|---|---|---|
+| Five-fret, keys | As section 13 | | | | |
+| Six-fret | First white fret | HOPOs along the white frets and back along the black, at 240 BPM | First white fret | Six frets picked at random | First white fret |
+| Drums, Pro drums | Kicks alone, sixteenths at 110 BPM | Single strokes across the toms and back, sixteenths at 240 BPM | Red | The four pads and the kick picked at random | Yellow sixteenths with a kick on every eighth, at 150 BPM |
+
+Pro drums' references are on the toms alone, so they're the 4-lane view's. A Pro chart with no cymbals scores the same either way, and one with cymbals scores at least as high as its 4-lane view.
+
+### 14.4 Calibration
+
+The same library and method as section 13 were used, with `tools/DifficultyCalibration --model`. A part rated by both `diff_drums` and `diff_drums_real` counts once for each. With the thresholds shipped, the Spearman correlation and tier accuracy are:
+
+| Rating | Parts (official) | Official, fit | Official, held out | All, held out | Official within one tier, fit / held out | Official MAE, fit / held out |
+|---|---|---|---|---|---|---|
+| Drums | 575 (181) | 0.82 | 0.66 | 0.61 | 93% / 83% | 0.51 / 0.87 |
+| Pro drums | 298 (158) | 0.85 | 0.70 | 0.68 | 95% / 84% | 0.49 / 0.88 |
+| Keys | 126 (72) | 0.87 | 0.80 | 0.76 | 92% / 95% | 0.62 / 0.63 |
+| Six-fret guitar | 34 (13) | 0.66 | – | – | 100% / – | 0.40 / – |
+
+**Drums.** With the starting values, official charts' correlation was 0.60. What changed, and why:
+
+- **Endurance's weight from 0.15 to 0.05, and its threshold $L_0$ from 20 to 40.** Endurance topped 328 of the 575 charts, because a drummer's hands and feet are always working. Without it, official charts' correlation rose to 0.70.
+- **The kick reference from 160 to 110 BPM.** At 160 BPM the kick hardly registered.
+- **Rhythm's weight from 0.05 to 0, and pattern's from 0.15 to 0.30.** Alone, pattern orders the rated drums best of the five, at 0.68.
+- **The hands reference from 200 to 240 BPM**, so hand speed doesn't swamp pattern.
+- **No cost for two pads at once.** It only made the order worse.
+- **The double-kick interval from 130 to 100 ms.**
+
+The thresholds are the least-error fit to official charts. Pro drums' own least-error fit put every threshold within 0.3 of the drums' ones, so Pro drums share them. Pro drums' tier is the same as the 4-lane view's on 97% of charts, and within one tier on all of them, as official charts never rate the two apart.
+
+**Keys** are read as five-fret parts. Their notes are read as strummed, HOPOs or taps as the chart has them: reading every note as pressed instead ordered them worse. Official keys charts are rated about a tier higher than guitar at the same score, so keys have thresholds of their own, the least-error fit to every rated keys chart.
+
+**Six-fret.** Only 40 six-fret parts are rated, 15 of them official, which is too few to fit anything of their own, so six-fret uses five-fret's parameters and rank curve. Over the fit set's 29 six-fret guitar charts, official and community, the correlation is 0.58 and 79% are within one tier. The grid costs barely moved the order.
+
+The drums outliers are community charts rated 2 or 3 that the model ranks 5 to 6, much as with five-fret, where community charts are rated about a tier lower than official ones at the same score.

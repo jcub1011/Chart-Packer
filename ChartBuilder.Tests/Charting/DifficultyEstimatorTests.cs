@@ -90,17 +90,87 @@ public sealed class DifficultyEstimatorTests
     }
 
     [TestMethod]
-    public void KicksApartFromTheHandsRaiseTheDrumsRating()
+    public void KicksBetweenTheHandsHitsAreHarderThanKicksWithThem()
     {
-        var together = Chart(Drums, Enumerable.Range(0, 64).SelectMany(i => new[] { new EditableNote(i * 240L, 1, 0), new EditableNote(i * 240L, 1, 1) }));
-        var apart = Chart(Drums, Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, i % 2 == 0 ? 0 : 1)));
+        // Snare eighths at 120 BPM, a kick with each, or a sixteenth after each.
+        var snare = Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, 1));
+        var together = Chart(Drums, snare.Concat(Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, 0))));
+        var apart = Chart(Drums, snare.Concat(Enumerable.Range(0, 64).Select(i => new EditableNote((i * 240L) + 120, 1, 0))));
 
         var a = DifficultyEstimator.EstimatePart(together, Drums, Options)!;
         var b = DifficultyEstimator.EstimatePart(apart, Drums, Options)!;
 
         Assert.AreEqual(0.0, a.Basis.KickIndependence);
         Assert.AreEqual(1.0, b.Basis.KickIndependence);
-        Assert.IsGreaterThan(a.Score - (DifficultyWeights.DrumChords * a.Basis.ChordShare), b.Score);
+        Assert.AreEqual(DifficultyInstrument.Drums, a.Rating.Instrument);
+        Assert.IsGreaterThan(a.Rating.Attributes.Strum, b.Rating.Attributes.Strum);
+    }
+
+    [TestMethod]
+    public void DrumsAndSixFretAreRatedByTheModel()
+    {
+        var drums = DifficultyEstimator.EstimatePart(Chart(Drums, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, (i % 4) + 1))), Drums, Options)!;
+        var ghl = DifficultyEstimator.EstimatePart(Chart(ChartInstrument.GhlGuitar, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, i % 6))), ChartInstrument.GhlGuitar, Options)!;
+
+        Assert.AreEqual(DifficultyInstrument.Drums, drums.Rating.Instrument);
+        Assert.AreEqual(DifficultyInstrument.SixFret, ghl.Rating.Instrument);
+        Assert.IsGreaterThan(0, drums.Rating.Attributes.Note);
+        Assert.IsGreaterThan(0, ghl.Rating.Attributes.Note);
+        Assert.AreEqual(drums.Tier, (int)Math.Floor(drums.Rating.Rank));
+    }
+
+    [TestMethod]
+    public void ProDrumsAreRatedForEachKeyTheirCymbalsOnlyInDiffDrumsReal()
+    {
+        // Sixteenths around the snare and the yellow and blue cymbals: Pro drums' cymbals are a row of their own.
+        var chart = Chart(Drums, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, (i % 3) + 1)));
+
+        var keyed = DifficultyEstimator.EstimateKeys(chart, Drums, Options);
+
+        Assert.AreSequenceEqual(["diff_drums", "diff_drums_real"], keyed.Select(k => k.Key).ToList());
+        Assert.AreSequenceEqual([DifficultyInstrument.Drums, DifficultyInstrument.ProDrums], keyed.Select(k => k.Estimate.Rating.Instrument).ToList());
+        Assert.IsGreaterThan(keyed[0].Estimate.Rating.Attributes.Note, keyed[1].Estimate.Rating.Attributes.Note);
+        Assert.AreEqual(keyed[0].Estimate, DifficultyEstimator.EstimatePart(chart, Drums, Options));
+        Assert.AreEqual(keyed[1].Estimate, DifficultyEstimator.EstimatePart(chart, Drums, Options, DifficultyInstrument.ProDrums));
+    }
+
+    [TestMethod]
+    public void ANotProDrumsChartIsRatedForDiffDrumsAlone()
+    {
+        var chart = Chart(Drums, Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, (i % 2) + 1)));
+        chart.DrumsVariant = DrumsVariant.FourLane;
+
+        Assert.AreSequenceEqual(["diff_drums"], DifficultyEstimator.EstimateKeys(chart, Drums, Options).Select(k => k.Key).ToList());
+    }
+
+    [TestMethod]
+    public void AProChartTheGamesDontReadAsProIsntRatedAsProDrums()
+    {
+        // song.ini says five pads, or no pro drums: either way the game view has no cymbals to rate.
+        var chart = Chart(Drums, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, (i % 4) + 1)));
+
+        foreach (var options in new[] { new ChartReadOptions(FiveLaneDrums: true), new ChartReadOptions(ProDrums: false) })
+        {
+            Assert.AreSequenceEqual(["diff_drums"], DifficultyEstimator.EstimateKeys(chart, Drums, options).Select(k => k.Key).ToList());
+            Assert.IsNull(DifficultyEstimator.EstimatePart(chart, Drums, options, DifficultyInstrument.ProDrums));
+            Assert.IsEmpty(DifficultyEstimator.EstimateDifficulties(chart, Drums, options, DifficultyInstrument.ProDrums));
+            Assert.IsNotNull(DifficultyEstimator.EstimatePart(chart, Drums, options));
+        }
+    }
+
+    [TestMethod]
+    public void ExpertPlusKicksArentCountedInWhatTheRatingWasWorkedOutFrom()
+    {
+        // Snare and kick on the beat, and Expert+ kicks between them.
+        var played = Enumerable.Range(0, 64).SelectMany(i => new[] { new EditableNote(i * 480L, 1, 1), new EditableNote(i * 480L, 1, 0) }).ToList();
+        var plain = Chart(Drums, played);
+        var plus = Chart(Drums, played.Concat(Enumerable.Range(0, 64).Select(i => new EditableNote((i * 480L) + 240, 1, 0, DoubleKick: true))));
+
+        var a = DifficultyEstimator.EstimatePart(plain, Drums, Options)!;
+        var b = DifficultyEstimator.EstimatePart(plus, Drums, Options)!;
+
+        Assert.AreEqual(a.Basis, b.Basis);
+        Assert.AreEqual(a.Rating, b.Rating);
     }
 
     [TestMethod]
@@ -173,14 +243,27 @@ public sealed class DifficultyEstimatorTests
     }
 
     [TestMethod]
-    public void OnlyTheKeysSongIniRatesOtherwiseAreSet()
+    public void OnlyTheKeysSongIniRatesOtherwiseAreSetEachToItsOwnTier()
     {
-        var chart = NewChart(Drums);
-        chart.DrumsVariant = DrumsVariant.Pro;
+        var chart = Chart(Drums, Enumerable.Range(0, 64).Select(i => new EditableNote(i * 240L, 1, (i % 2) + 1)));
+        var keyed = DifficultyEstimator.EstimateKeys(chart, Drums, Options);
+        var basis = keyed[0].Estimate;
+        KeyedEstimate[] estimates = [keyed[0] with { Estimate = basis with { Tier = 3 } }, keyed[1] with { Estimate = basis with { Tier = 4 } }];
 
-        var keys = PendingSongIniFixes.RatingKeysToSet(chart, Drums, [KeyValuePair.Create("diff_drums", "3")], 3);
+        var ratings = PendingSongIniFixes.RatingsToSet(Drums, [KeyValuePair.Create("diff_drums", "3")], estimates);
 
-        Assert.AreSequenceEqual(["diff_drums_real"], keys.ToList());
+        Assert.AreSequenceEqual([("diff_drums_real", 4)], ratings.ToList());
+    }
+
+    [TestMethod]
+    public void TheUnratedFindingOfDiffDrumsRealIsFixedWithTheProDrumsRating()
+    {
+        var chart = Chart(Drums, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, i % 2 == 0 ? 1 : 2)));
+        var finding = new Finding(ChrRules.Chr083, Severity.Warning, "", Key: "diff_drums_real", Location: new ChartLocation(Drums, null, 0, 0));
+
+        var rating = PendingSongIniFixes.SuggestedRating(finding, chart, Options);
+
+        Assert.AreEqual(("diff_drums_real", DifficultyEstimator.EstimatePart(chart, Drums, Options, DifficultyInstrument.ProDrums)!.Tier), rating);
     }
 
     private static EditorSong Song()
