@@ -226,17 +226,24 @@ public static class GameView
     }
 
     /// <summary>A fret difficulty's notes, as <see cref="MidiChartReader"/> reads them from the written track.</summary>
-    private static List<ChartNote> Frets(EditableTrack track, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower)
+    private static List<ChartNote> Frets(EditableTrack track, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower) =>
+        Frets(track.Notes.AsSpan().ToArray(), track.FlaggedChords.AsSpan().ToArray(), resolution, options, starPower);
+
+    /// <summary>
+    /// 5-fret or GHL <paramref name="notes"/> with <paramref name="flags"/>, as the games read them: each note's HOPO and tap
+    /// flags as a track of them would have, for a draft not yet in a chart.
+    /// </summary>
+    internal static List<ChartNote> Frets(IReadOnlyCollection<EditableNote> notes, IEnumerable<FlaggedChord> flags, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower)
     {
-        var gems = new List<Gem>(track.Notes.Count);
-        foreach (var note in track.Notes)
+        var gems = new List<Gem>(notes.Count);
+        foreach (var note in notes)
             gems.Add(new Gem(note.Tick, note.Length, note.Lane));
 
         // A flagged chord is written as a marker over its tick.
         var forceHopo = new List<TickSpan>();
         var forceStrum = new List<TickSpan>();
         var taps = new List<TickSpan>();
-        foreach (var chord in track.FlaggedChords)
+        foreach (var chord in flags)
         {
             var span = new TickSpan(chord.Tick, chord.Tick + 1);
             if (chord.Flags.HasFlag(ChordFlags.ForceHopo))

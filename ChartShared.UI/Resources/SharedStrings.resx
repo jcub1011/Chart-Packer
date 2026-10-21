@@ -883,16 +883,25 @@
     <value>Max chord size</value>
   </data>
   <data name="ReductionThinningLabel" xml:space="preserve">
-    <value>No closer than</value>
+    <value>On average no closer than</value>
   </data>
-  <data name="ReductionMinGapLabel" xml:space="preserve">
-    <value>And no closer than (ms)</value>
+  <data name="ReductionBurstLabel" xml:space="preserve">
+    <value>Bursts no closer than</value>
+  </data>
+  <data name="ReductionMaxBurstLabel" xml:space="preserve">
+    <value>Longest burst (chords)</value>
+  </data>
+  <data name="ReductionMaxBurstHitsLabel" xml:space="preserve">
+    <value>Longest burst (hits)</value>
   </data>
   <data name="ReductionKeepForcing" xml:space="preserve">
-    <value>Keep forced HOPOs and taps</value>
+    <value>Keep HOPOs and taps as played</value>
   </data>
   <data name="ReductionKeepShortSustains" xml:space="preserve">
     <value>Keep sustains shorter than a beat</value>
+  </data>
+  <data name="ReductionKeepExtendedSustains" xml:space="preserve">
+    <value>Keep sustains held while other notes are played</value>
   </data>
   <data name="ReductionPadsLabel" xml:space="preserve">
     <value>Pads per hit (plus kick)</value>

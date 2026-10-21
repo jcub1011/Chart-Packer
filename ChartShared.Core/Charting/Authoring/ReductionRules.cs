@@ -15,20 +15,40 @@ public sealed record FretReductionRules
     /// <summary>The highest column used: a fret from 0 (green) to 4 (orange), or a GHL column from 0 to 2.</summary>
     public int HighestLane { get; init; } = 4;
 
-    /// <summary>The thinning grid, as a snap's division (16 for 1/16): no two chords closer than one step. 0 thins nothing.</summary>
+    /// <summary>
+    /// The thinning grid, as a snap's division (16 for 1/16): chords are on average no closer than one step, and closer only
+    /// in a burst (<see cref="MaxBurst"/>). 0 thins nothing.
+    /// </summary>
     public int ThinningDivision { get; init; } = 16;
 
-    /// <summary>Whether forced HOPOs and taps are kept; forced strums always are.</summary>
+    /// <summary>
+    /// Whether HOPOs and taps are kept: each chord played as the source plays it, a strum, a HOPO or a tap, forced where
+    /// the notes left out would change it. Otherwise forced HOPOs and taps are removed; forced strums always are kept.
+    /// </summary>
     public bool KeepForcedHopoAndTap { get; init; } = true;
 
     /// <summary>Whether sustains shorter than a beat are kept, rather than made plain notes.</summary>
     public bool KeepShortSustains { get; init; } = true;
 
     /// <summary>
-    /// The fewest milliseconds two chords are apart, beside the thinning grid: whichever gap is larger holds. 0 for none;
-    /// null in settings saved before it was added, which <see cref="ReductionDefaults.Normalized"/> fills from the shipped.
+    /// Whether a sustain held while other notes are played, past the next chord's start, is kept, rather than made a plain
+    /// note (a tap staying a tap). Null keeps it; null too in settings saved before it was added, which
+    /// <see cref="ReductionDefaults.Normalized"/> fills from the shipped.
     /// </summary>
-    public int? MinGapMs { get; init; }
+    public bool? KeepExtendedSustains { get; init; }
+
+    /// <summary>
+    /// The grid a burst's chords can be as close as, as a snap's division; no coarser than the thinning grid. Null for the
+    /// thinning grid, so no burst is closer than it; null too in settings saved before it was added, which
+    /// <see cref="ReductionDefaults.Normalized"/> fills from the shipped.
+    /// </summary>
+    public int? BurstDivision { get; init; }
+
+    /// <summary>
+    /// The most chords in a burst: any one more in a row span at least this many thinning gaps, so a burst has room around
+    /// it. 1 keeps every two chords a gap apart; null for 1.
+    /// </summary>
+    public int? MaxBurst { get; init; }
 
     /// <summary>The shipped defaults for reducing a <paramref name="kind"/> part to <paramref name="target"/> (the C9 table).</summary>
     public static FretReductionRules Default(ChartInstrumentKind kind, ChartDifficulty target)
@@ -36,9 +56,9 @@ public sealed record FretReductionRules
         bool ghl = kind == ChartInstrumentKind.SixFret;
         return target switch
         {
-            ChartDifficulty.Hard => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 4, ThinningDivision = 16, MinGapMs = 100, KeepForcedHopoAndTap = true, KeepShortSustains = true },
-            ChartDifficulty.Medium => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 3, ThinningDivision = 8, MinGapMs = 200, KeepForcedHopoAndTap = false, KeepShortSustains = true },
-            _ => new() { MaxChordSize = 1, HighestLane = ghl ? 1 : 2, ThinningDivision = 4, MinGapMs = 400, KeepForcedHopoAndTap = false, KeepShortSustains = false },
+            ChartDifficulty.Hard => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 4, ThinningDivision = 16, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = true, KeepExtendedSustains = false },
+            ChartDifficulty.Medium => new() { MaxChordSize = 2, HighestLane = ghl ? 2 : 3, ThinningDivision = 8, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = true, KeepExtendedSustains = false },
+            _ => new() { MaxChordSize = 1, HighestLane = ghl ? 1 : 2, ThinningDivision = 4, BurstDivision = 8, MaxBurst = ReductionDefaults.ShippedBurst, KeepForcedHopoAndTap = true, KeepShortSustains = false, KeepExtendedSustains = false },
         };
     }
 
@@ -46,12 +66,14 @@ public sealed record FretReductionRules
     public FretReductionRules Normalized(ChartInstrumentKind kind)
     {
         int columns = kind == ChartInstrumentKind.SixFret ? 3 : 5;
+        int division = ReductionDefaults.NormalizedDivision(ThinningDivision);
         return this with
         {
             MaxChordSize = Math.Clamp(MaxChordSize, 1, columns),
             HighestLane = Math.Clamp(HighestLane, 0, columns - 1),
-            ThinningDivision = ReductionDefaults.NormalizedDivision(ThinningDivision),
-            MinGapMs = ReductionDefaults.NormalizedGap(MinGapMs),
+            ThinningDivision = division,
+            BurstDivision = ReductionDefaults.NormalizedBurstDivision(BurstDivision, division),
+            MaxBurst = ReductionDefaults.NormalizedBurst(MaxBurst),
         };
     }
 }
@@ -62,7 +84,10 @@ public sealed record DrumReductionRules
     /// <summary>The most pads hit at once, the kick aside.</summary>
     public int PadsPerHit { get; init; } = 2;
 
-    /// <summary>The thinning grid for every hit, kick and pads together, as a snap's division. 0 thins nothing.</summary>
+    /// <summary>
+    /// The thinning grid for every hit, kick and pads together, as a snap's division: hits are on average no closer than
+    /// one step, and closer only in a burst (<see cref="MaxBurst"/>). 0 thins nothing.
+    /// </summary>
     public int ThinningDivision { get; init; } = 16;
 
     /// <summary>The kick's own thinning grid, after the hits are thinned, as a snap's division. 0 keeps every kick left.</summary>
@@ -71,29 +96,34 @@ public sealed record DrumReductionRules
     /// <summary>Whether 2× kicks are kept; only Expert can have them, so Reduce never keeps them.</summary>
     public bool KeepDoubleKick { get; init; }
 
-    /// <summary>
-    /// The fewest milliseconds two hits are apart, beside the thinning grid (not the kick's own): whichever gap is larger
-    /// holds. 0 for none; null in settings saved before it was added.
-    /// </summary>
-    public int? MinGapMs { get; init; }
+    /// <summary>The grid a burst's hits can be as close as, as a snap's division; no coarser than the thinning grid. Null for the thinning grid.</summary>
+    public int? BurstDivision { get; init; }
+
+    /// <summary>The most hits in a burst: any one more in a row span at least this many thinning gaps. Null for 1.</summary>
+    public int? MaxBurst { get; init; }
 
     /// <summary>The shipped defaults for reducing drums to <paramref name="target"/> (the C9 table).</summary>
     public static DrumReductionRules Default(ChartDifficulty target) => target switch
     {
-        ChartDifficulty.Hard => new() { PadsPerHit = 2, ThinningDivision = 16, MinGapMs = 100, KickDivision = 0 },
-        ChartDifficulty.Medium => new() { PadsPerHit = 2, ThinningDivision = 8, MinGapMs = 200, KickDivision = 8 },
-        _ => new() { PadsPerHit = 1, ThinningDivision = 4, MinGapMs = 400, KickDivision = 4 },
+        ChartDifficulty.Hard => new() { PadsPerHit = 2, ThinningDivision = 16, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KickDivision = 0 },
+        ChartDifficulty.Medium => new() { PadsPerHit = 2, ThinningDivision = 8, BurstDivision = 16, MaxBurst = ReductionDefaults.ShippedBurst, KickDivision = 8 },
+        _ => new() { PadsPerHit = 1, ThinningDivision = 4, BurstDivision = 8, MaxBurst = ReductionDefaults.ShippedBurst, KickDivision = 4 },
     };
 
     /// <summary>These rules with every value kept to what it can be.</summary>
-    public DrumReductionRules Normalized() => this with
+    public DrumReductionRules Normalized()
     {
-        PadsPerHit = Math.Clamp(PadsPerHit, 1, 5),
-        ThinningDivision = ReductionDefaults.NormalizedDivision(ThinningDivision),
-        MinGapMs = ReductionDefaults.NormalizedGap(MinGapMs),
-        KickDivision = ReductionDefaults.NormalizedDivision(KickDivision),
-        KeepDoubleKick = false,
-    };
+        int division = ReductionDefaults.NormalizedDivision(ThinningDivision);
+        return this with
+        {
+            PadsPerHit = Math.Clamp(PadsPerHit, 1, 5),
+            ThinningDivision = division,
+            BurstDivision = ReductionDefaults.NormalizedBurstDivision(BurstDivision, division),
+            MaxBurst = ReductionDefaults.NormalizedBurst(MaxBurst),
+            KickDivision = ReductionDefaults.NormalizedDivision(KickDivision),
+            KeepDoubleKick = false,
+        };
+    }
 }
 
 /// <summary>
@@ -175,7 +205,8 @@ public sealed class ReductionDefaults
 
     /// <summary>
     /// A copy with every value kept to what it can be, and the shipped rules for any set the file lacks, or any value: a
-    /// set saved before its minimum gap was added gets the shipped one.
+    /// set saved before its bursts were added gets the shipped ones. A minimum gap in milliseconds, which older settings
+    /// have, is no longer read: thinning is by fractions of a beat alone.
     /// </summary>
     public ReductionDefaults Normalized()
     {
@@ -198,17 +229,37 @@ public sealed class ReductionDefaults
     internal static int NormalizedDivision(int division) =>
         division <= 0 ? 0 : SnapGrid.CommonDivisions.MinBy(d => Math.Abs(d - division));
 
-    /// <summary>The most milliseconds a minimum gap can be.</summary>
-    public const int MaxGapMs = 2000;
+    /// <summary>The most chords a burst can be.</summary>
+    public const int MaxBurstLimit = 8;
 
-    /// <summary><paramref name="ms"/> as a minimum gap: from 0 (none) to <see cref="MaxGapMs"/>, or null when it isn't set.</summary>
-    internal static int? NormalizedGap(int? ms) => ms is { } value ? Math.Clamp(value, 0, MaxGapMs) : null;
+    /// <summary>The most chords in a burst the shipped rules allow.</summary>
+    public const int ShippedBurst = 3;
 
+    /// <summary>
+    /// <paramref name="division"/> as a burst's grid: the nearest of the common snaps, no coarser than
+    /// <paramref name="thinning"/>; null when it isn't set or nothing is thinned.
+    /// </summary>
+    internal static int? NormalizedBurstDivision(int? division, int thinning) =>
+        division is { } value && thinning > 0 ? Math.Max(thinning, NormalizedDivision(Math.Max(1, value))) : null;
+
+    /// <summary><paramref name="chords"/> as the most in a burst: from 1 to <see cref="MaxBurstLimit"/>, or null when it isn't set.</summary>
+    internal static int? NormalizedBurst(int? chords) => chords is { } value ? Math.Clamp(value, 1, MaxBurstLimit) : null;
+
+    // A set from a file, with what it lacks from the shipped: none, or a value saved before it was added.
     private static FretReductionRules Filled(FretReductionRules? rules, FretReductionRules shipped) =>
-        rules is null ? shipped : rules.MinGapMs is null ? rules with { MinGapMs = shipped.MinGapMs } : rules;
+        rules is null ? shipped : rules with
+        {
+            BurstDivision = rules.BurstDivision ?? shipped.BurstDivision,
+            MaxBurst = rules.MaxBurst ?? shipped.MaxBurst,
+            KeepExtendedSustains = rules.KeepExtendedSustains ?? shipped.KeepExtendedSustains,
+        };
 
     private static DrumReductionRules Filled(DrumReductionRules? rules, DrumReductionRules shipped) =>
-        rules is null ? shipped : rules.MinGapMs is null ? rules with { MinGapMs = shipped.MinGapMs } : rules;
+        rules is null ? shipped : rules with
+        {
+            BurstDivision = rules.BurstDivision ?? shipped.BurstDivision,
+            MaxBurst = rules.MaxBurst ?? shipped.MaxBurst,
+        };
 
     private ReductionDefaults Copy() => new()
     {

@@ -340,7 +340,8 @@ class, rules in and a `ReductionResult` out.
 - **The melody's shape.** `Reducer.Phrases` splits the chords at rests and sections, and
   `Reducer.MapPhrase` fits each phrase to the range as a whole, keeping each step's direction.
 - **Thinning by time.** `MinGapMs` in both rule sets (100, 200 and 400 ms); the larger of it and the
-  grid holds (`ThinningGap`). Settings saved before it get the shipped values.
+  grid holds (`ThinningGap`). Settings saved before it get the shipped values. Later removed: thinning
+  is by fractions of a beat alone (`ThinningSpacing`, charter-spec C9).
 - **A score per chord.** `ThinningWeights`: beat strength, sustains, chords, after a rest, turns of
   the melody, and phrase ends.
 - **Star power and solos.** Each keeps its best chord, seeded before thinning. CHR065 flags a phrase

@@ -62,7 +62,7 @@ public sealed class ReduceProposals
     /// </summary>
     /// <returns>Whether there was anything to reduce.</returns>
     public bool Start(ChartInstrument part, ChartDifficulty from, ChartDifficulty to, FretReductionRules rules, (long From, long To)? range = null) =>
-        Start(part, range, [(from, to)], (chart, f, t) => Reducer.Reduce(chart, part, f, t, rules, range));
+        Start(part, range, [(from, to)], (chart, f, t) => Reducer.Reduce(chart, part, f, t, rules, range, _session.ReadOptions));
 
     /// <summary>Starts a run of the drums, in place of any going on.</summary>
     /// <returns>Whether there was anything to reduce.</returns>
@@ -80,7 +80,7 @@ public sealed class ReduceProposals
     public bool StartAll(ChartInstrument part, IReadOnlyDictionary<ChartDifficulty, FretReductionRules> targets, (long From, long To)? range = null)
     {
         ArgumentNullException.ThrowIfNull(targets);
-        return Start(part, range, [.. targets.Keys.Select(static t => ((ChartDifficulty?)null, t))], (chart, f, t) => Reducer.Reduce(chart, part, f, t, targets[t], range));
+        return Start(part, range, [.. targets.Keys.Select(static t => ((ChartDifficulty?)null, t))], (chart, f, t) => Reducer.Reduce(chart, part, f, t, targets[t], range, _session.ReadOptions));
     }
 
     /// <summary>Starts a run of the drums over several difficulties, in place of any going on.</summary>

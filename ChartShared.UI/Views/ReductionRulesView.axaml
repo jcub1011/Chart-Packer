@@ -37,7 +37,7 @@
         <!-- 5-fret and GHL. -->
         <Border Classes="card" IsVisible="{Binding IsFrets}">
             <StackPanel Spacing="8">
-                <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0" Text="{x:Static res:SharedStrings.ReductionChordSizeLabel}" />
                     <NumericUpDown Grid.Row="0" Grid.Column="1"
                                    Value="{Binding MaxChordSize}" Minimum="1" Maximum="{Binding ChordSizeMaximum}"
@@ -55,11 +55,17 @@
                               SelectedItem="{Binding Thinning}"
                               DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
                               AutomationProperties.Name="{x:Static res:SharedStrings.ReductionThinningLabel}" />
-                    <TextBlock Grid.Row="3" Text="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
-                    <NumericUpDown Grid.Row="3" Grid.Column="1"
-                                   Value="{Binding MinGapMs}" Minimum="0" Maximum="{Binding MinGapMaximum}"
-                                   Increment="10" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
-                                   AutomationProperties.Name="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
+                    <TextBlock Grid.Row="3" Text="{x:Static res:SharedStrings.ReductionBurstLabel}" />
+                    <ComboBox Grid.Row="3" Grid.Column="1"
+                              ItemsSource="{Binding BurstChoices}"
+                              SelectedItem="{Binding BurstThinning}"
+                              DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                              AutomationProperties.Name="{x:Static res:SharedStrings.ReductionBurstLabel}" />
+                    <TextBlock Grid.Row="4" Text="{x:Static res:SharedStrings.ReductionMaxBurstLabel}" />
+                    <NumericUpDown Grid.Row="4" Grid.Column="1"
+                                   Value="{Binding MaxBurst}" Minimum="1" Maximum="{Binding MaxBurstMaximum}"
+                                   Increment="1" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
+                                   AutomationProperties.Name="{x:Static res:SharedStrings.ReductionMaxBurstLabel}" />
                 </Grid>
                 <CheckBox Classes="rule" IsChecked="{Binding KeepForcedHopoAndTap}">
                     <TextBlock Text="{x:Static res:SharedStrings.ReductionKeepForcing}" />
@@ -67,12 +73,15 @@
                 <CheckBox Classes="rule" IsChecked="{Binding KeepShortSustains}">
                     <TextBlock Text="{x:Static res:SharedStrings.ReductionKeepShortSustains}" />
                 </CheckBox>
+                <CheckBox Classes="rule" IsChecked="{Binding KeepExtendedSustains}">
+                    <TextBlock Text="{x:Static res:SharedStrings.ReductionKeepExtendedSustains}" />
+                </CheckBox>
             </StackPanel>
         </Border>
 
         <!-- Drums. -->
         <Border Classes="card" IsVisible="{Binding IsDrums}">
-            <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <Grid Classes="fields" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Grid.Row="0" Text="{x:Static res:SharedStrings.ReductionPadsLabel}" />
                 <NumericUpDown Grid.Row="0" Grid.Column="1"
                                Value="{Binding PadsPerHit}" Minimum="1" Maximum="5"
@@ -84,13 +93,19 @@
                           SelectedItem="{Binding Thinning}"
                           DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
                           AutomationProperties.Name="{x:Static res:SharedStrings.ReductionThinningLabel}" />
-                <TextBlock Grid.Row="2" Text="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
-                <NumericUpDown Grid.Row="2" Grid.Column="1"
-                               Value="{Binding MinGapMs}" Minimum="0" Maximum="{Binding MinGapMaximum}"
-                               Increment="10" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
-                               AutomationProperties.Name="{x:Static res:SharedStrings.ReductionMinGapLabel}" />
-                <TextBlock Grid.Row="3" Text="{x:Static res:SharedStrings.ReductionKickLabel}" />
-                <ComboBox Grid.Row="3" Grid.Column="1"
+                <TextBlock Grid.Row="2" Text="{x:Static res:SharedStrings.ReductionBurstLabel}" />
+                <ComboBox Grid.Row="2" Grid.Column="1"
+                          ItemsSource="{Binding BurstChoices}"
+                          SelectedItem="{Binding BurstThinning}"
+                          DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
+                          AutomationProperties.Name="{x:Static res:SharedStrings.ReductionBurstLabel}" />
+                <TextBlock Grid.Row="3" Text="{x:Static res:SharedStrings.ReductionMaxBurstHitsLabel}" />
+                <NumericUpDown Grid.Row="3" Grid.Column="1"
+                               Value="{Binding MaxBurst}" Minimum="1" Maximum="{Binding MaxBurstMaximum}"
+                               Increment="1" FormatString="0" ParsingNumberStyle="Integer" ClipValueToMinMax="True"
+                               AutomationProperties.Name="{x:Static res:SharedStrings.ReductionMaxBurstHitsLabel}" />
+                <TextBlock Grid.Row="4" Text="{x:Static res:SharedStrings.ReductionKickLabel}" />
+                <ComboBox Grid.Row="4" Grid.Column="1"
                           ItemsSource="{Binding KickChoices}"
                           SelectedItem="{Binding KickThinning}"
                           DisplayMemberBinding="{Binding Label, x:DataType=vm:DivisionChoice}"
