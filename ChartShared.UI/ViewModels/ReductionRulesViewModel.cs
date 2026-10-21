@@ -32,6 +32,7 @@ namespace ChartShared.UI.ViewModels
         /// <summary>The difficulties a part can be reduced to, highest first.</summary>
         public static IReadOnlyList<ChartDifficulty> Targets { get; } = [ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy];
 
+        private readonly IReadOnlyList<DivisionChoice> _burstGrids;
         private ReductionDefaults _defaults;
         private bool _loading;
 
@@ -44,7 +45,7 @@ namespace ChartShared.UI.ViewModels
             _defaults = defaults;
             DivisionChoices = [new DivisionChoice(0, SharedStrings.ReductionNoThinning), .. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, SnapLabel(d)))];
             KickChoices = [new DivisionChoice(0, SharedStrings.ReductionKickKept), .. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, SnapLabel(d)))];
-            BurstChoices = [.. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, SnapLabel(d)))];
+            _burstGrids = [.. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, SnapLabel(d)))];
             Kind = kind;
             Target = target;
             LoadRules();
@@ -91,8 +92,10 @@ namespace ChartShared.UI.ViewModels
 
         public IReadOnlyList<DivisionChoice> KickChoices { get; }
 
-        /// <summary>The grids a burst can be as close as: a snap each, never none.</summary>
-        public IReadOnlyList<DivisionChoice> BurstChoices { get; }
+        /// <summary>The grids a burst can be as close as: a snap each, never none, and none coarser than the thinning grid.</summary>
+        public IReadOnlyList<DivisionChoice> BurstChoices => Thinning is { Division: > 0 } thinning
+            ? [.. _burstGrids.Where(c => c.Division >= thinning.Division)]
+            : _burstGrids;
 
         public IReadOnlyList<LaneLimitChoice> LaneLimitChoices => Kind == ChartInstrumentKind.SixFret
             ? [.. Enumerable.Range(0, 3).Select(c => new LaneLimitChoice(c, string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionColumnsFormat, c + 1)))]
@@ -208,7 +211,24 @@ namespace ChartShared.UI.ViewModels
 
         partial void OnHighestLaneChanged(LaneLimitChoice? value) => OnFieldChanged();
 
-        partial void OnThinningChanged(DivisionChoice? value) => OnFieldChanged();
+        partial void OnThinningChanged(DivisionChoice? value)
+        {
+            // The burst's choices go no coarser than the thinning; its control may clear it meanwhile, which is no edit.
+            bool loading = _loading;
+            _loading = true;
+            try
+            {
+                int grid = BurstThinning?.Division ?? value?.Division ?? 0;
+                OnPropertyChanged(nameof(BurstChoices));
+                BurstThinning = PickBurst(grid);
+            }
+            finally
+            {
+                _loading = loading;
+            }
+
+            OnFieldChanged();
+        }
 
         partial void OnBurstThinningChanged(DivisionChoice? value) => OnFieldChanged();
 
@@ -274,9 +294,15 @@ namespace ChartShared.UI.ViewModels
         // A set's bursts, into the fields: where it has none set, as close as its thinning, one chord at a time.
         private void LoadBursts(int division, int? burstDivision, int? maxBurst)
         {
-            int grid = burstDivision ?? division;
-            BurstThinning = BurstChoices.FirstOrDefault(c => c.Division == grid) ?? BurstChoices.MinBy(c => Math.Abs(c.Division - grid));
+            BurstThinning = PickBurst(burstDivision ?? division);
             MaxBurst = maxBurst ?? 1;
+        }
+
+        // The burst's choice on grid, or the nearest there is: one coarser than the thinning is the thinning's.
+        private DivisionChoice? PickBurst(int grid)
+        {
+            var choices = BurstChoices;
+            return choices.FirstOrDefault(c => c.Division == grid) ?? choices.MinBy(c => Math.Abs(c.Division - grid));
         }
 
         // The fields, into the working copy, for the family and target they show.

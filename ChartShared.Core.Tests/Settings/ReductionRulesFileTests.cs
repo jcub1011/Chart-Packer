@@ -66,10 +66,11 @@ public sealed class ReductionRulesFileTests
     }
 
     [TestMethod]
-    public void ASetSavedBeforeBurstsTakesTheShippedOnesAndItsGapInMsIsLeftUnread()
+    public void ASetSavedBeforeBurstsThinningAsShippedTakesTheShippedBurstsAndHopos()
     {
-        // Saved before the bursts were added, and while thinning had a gap in milliseconds, which it no longer has.
-        File.WriteAllText(_path, """{ "FiveFretMedium": { "MaxChordSize": 2, "HighestLane": 3, "ThinningDivision": 8, "MinGapMs": 200 } }""");
+        // Saved before the bursts were added, with Medium's old default of no HOPOs kept, and while thinning had a gap in
+        // milliseconds, which it no longer has.
+        File.WriteAllText(_path, """{ "FiveFretMedium": { "MaxChordSize": 2, "HighestLane": 3, "ThinningDivision": 8, "KeepForcedHopoAndTap": false, "MinGapMs": 200 } }""");
 
         var medium = new ReductionRulesFile(_path, null).Load().FiveFretMedium;
 
@@ -77,6 +78,20 @@ public sealed class ReductionRulesFileTests
         Assert.AreEqual(8, medium.ThinningDivision);
         Assert.AreEqual(shipped.BurstDivision, medium.BurstDivision);
         Assert.AreEqual(shipped.MaxBurst, medium.MaxBurst);
+        Assert.IsTrue(medium.KeepForcedHopoAndTap, "A burst's chords are played as the source's only with HOPOs kept.");
+    }
+
+    [TestMethod]
+    public void ASetSavedBeforeBurstsWithItsOwnThinningTakesNone()
+    {
+        File.WriteAllText(_path, """{ "FiveFretHard": { "MaxChordSize": 2, "HighestLane": 4, "ThinningDivision": 4, "KeepForcedHopoAndTap": false } }""");
+
+        var hard = new ReductionRulesFile(_path, null).Load().FiveFretHard;
+
+        Assert.AreEqual(4, hard.ThinningDivision);
+        Assert.IsNull(hard.BurstDivision);
+        Assert.IsNull(hard.MaxBurst);
+        Assert.IsFalse(hard.KeepForcedHopoAndTap);
     }
 
     [TestMethod]

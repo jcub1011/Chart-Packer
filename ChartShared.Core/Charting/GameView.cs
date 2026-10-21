@@ -227,7 +227,7 @@ public static class GameView
 
     /// <summary>A fret difficulty's notes, as <see cref="MidiChartReader"/> reads them from the written track.</summary>
     private static List<ChartNote> Frets(EditableTrack track, int resolution, ChartReadOptions options, IReadOnlyList<StarPowerPhrase> starPower) =>
-        Frets(track.Notes.AsSpan().ToArray(), track.FlaggedChords.AsSpan().ToArray(), resolution, options, starPower);
+        Frets(track.Notes, track.FlaggedChords, resolution, options, starPower);
 
     /// <summary>
     /// 5-fret or GHL <paramref name="notes"/> with <paramref name="flags"/>, as the games read them: each note's HOPO and tap

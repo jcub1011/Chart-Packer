@@ -141,14 +141,14 @@ public sealed class ReducerTests
     [TestMethod]
     public void ANaturalHopoTheThinningWouldStrumIsForced()
     {
-        // Sixteenths green, red, yellow, red: natural HOPOs after the first. On Medium the last red, which ends the phrase,
-        // is past the HOPO threshold of green, so it's forced to stay a HOPO.
+        // Sixteenths green, red, yellow, red: natural HOPOs after the first. On Medium the yellow, on the "and", is past the
+        // HOPO threshold of green, so it's forced to stay a HOPO.
         var chart = Frets(Chord(0, G), Chord(120, R), Chord(240, Y), Chord(360, R), Chord(1920, G));
 
         var result = Reducer.Reduce(chart, Guitar, Expert, Medium, Rules(Medium));
 
-        Assert.AreSequenceEqual([0L, 360L, 1920L], result.Notes.Select(n => n.Tick).ToList());
-        Assert.AreSequenceEqual([new FlaggedChord(360, ChordFlags.ForceHopo)], result.Flags.ToList());
+        Assert.AreSequenceEqual([0L, 240L, 1920L], result.Notes.Select(n => n.Tick).ToList());
+        Assert.AreSequenceEqual([new FlaggedChord(240, ChordFlags.ForceHopo)], result.Flags.ToList());
     }
 
     [TestMethod]
@@ -440,6 +440,54 @@ public sealed class ReducerTests
     }
 
     [TestMethod]
+    public void AWeakNoteBeforeALongRestAnticipatesNothing()
+    {
+        // A sixteenth on the "a" of 4, the next downbeat empty: with the part going on in the next measure it anticipates
+        // the downbeat; with two measures' rest after it, it's only a sixteenth.
+        var map = NewChart(Guitar).TempoMap.ToTempoMap();
+        double ScoreAt1800(long[] ticks)
+        {
+            var chords = ticks.Select(t => (t, new[] { Note(t, G) })).ToList();
+            var scores = Reducer.Scores(chords, [(0, chords.Count - 1)], null, map, 480, static (_, _) => false);
+            return scores[Array.IndexOf(ticks, 1800L)];
+        }
+
+        Assert.AreEqual(-ThinningWeights.Anticipation, ScoreAt1800([0, 1800, 2400, 2880]));
+        Assert.AreEqual(-3, ScoreAt1800([0, 1800, 5760, 6240]));
+    }
+
+    [TestMethod]
+    public void AChordNextToABurstKeepsThePaceWhicheverIsTakenFirst()
+    {
+        // Easy's spacing, a burst of three eighths and a chord a quarter after it: any four in a row span three quarters,
+        // whether the burst or the chord after it scores better.
+        var spacing = new ThinningSpacing(480, 240, 3);
+        long[] ticks = [0, 240, 480, 960];
+
+        foreach (double[] scores in new double[][] { [5, 5, 5, 0], [0, 0, 0, 5] })
+        {
+            var kept = Reducer.Thin(ticks, scores, spacing, [], []).Select(i => ticks[i]).ToList();
+
+            for (int i = spacing.Burst; i < kept.Count; i++)
+                Assert.IsGreaterThanOrEqualTo(spacing.Pace * spacing.Burst, kept[i] - kept[i - spacing.Burst], $"Scores {string.Join(",", scores)}: {string.Join(" ", kept)}.");
+            Assert.HasCount(3, kept, $"Scores {string.Join(",", scores)}: {string.Join(" ", kept)}.");
+        }
+    }
+
+    [TestMethod]
+    public void AChordARiffLeftOutHadKeptTooNearIsKeptAfterAll()
+    {
+        // A riff's chord kept in one measure of three, and too near a chord of that measure to keep both: made the same as
+        // the other two, the riff's chord is left out, and the chord beside it is kept in its place.
+        long[] ticks = [240, 480, 2160, 4080];
+        var riff = new Riff(1, [0, 2, 3]);
+
+        var kept = Reducer.Thin(ticks, [1, 0, 1, 1], ThinningSpacing.Even(480), [], [1920, 3840], [riff]);
+
+        Assert.AreSequenceEqual([1], kept);
+    }
+
+    [TestMethod]
     public void ARepeatedRiffIsThinnedTheSameEachTime()
     {
         // A riff of sixteenths and eighths four times over, in one phrase: its first and last measures have the phrase's
@@ -545,9 +593,9 @@ public sealed class ReducerTests
     public void AChordChangeAlreadyShownDoesNotMove()
     {
         // As chords of two, green–red to green–yellow is a step up as it is; as single notes it would be none.
-        Assert.AreSequenceEqual([0, 0], Reducer.MapPhrase([0, 0], [1, 2], 3, [1, 2]).ToList());
-        Assert.AreSequenceEqual([0, 1], Reducer.MapPhrase([0, 0], [0, 0], 2, [1, 2]).ToList());
-        Assert.AreSequenceEqual([0, 0], Reducer.MapPhrase([0, 0], [0, 0], 2).ToList(), "Without the tops, single notes on one fret stay.");
+        Assert.AreSequenceEqual([0, 0], Reducer.FitPhrase([0, 0], [1, 2], 3, [1, 2]).Select(p => p.Anchor).ToList());
+        Assert.AreSequenceEqual([0, 1], Reducer.FitPhrase([0, 0], [0, 0], 2, [1, 2]).Select(p => p.Anchor).ToList());
+        Assert.AreSequenceEqual([0, 0], Reducer.FitPhrase([0, 0], [0, 0], 2).Select(p => p.Anchor).ToList(), "Without the tops, single notes on one fret stay.");
     }
 
     [TestMethod]
@@ -777,6 +825,34 @@ public sealed class ReducerTests
     }
 
     [TestMethod]
+    public void ATargetsSustainCutShortOutsideTheRangeStaysASustain()
+    {
+        // Easy with eighths and no short sustains: the target's sustain before the range is cut to an eighth by the draft's
+        // first note, and stays a sustain, as the target outside the range is its own.
+        var chart = Frets(Chord(240, G));
+        Add(chart, Guitar, Easy, new EditableNote(0, 1920, G));
+
+        var notes = Reducer.Reduce(chart, Guitar, Expert, Easy, Rules(Easy) with { ThinningDivision = 8 }, (200, 2000)).Notes;
+
+        Assert.AreEqual(240, notes.First(n => n.Tick == 0).Length);
+    }
+
+    [TestMethod]
+    public void TheTargetsFirstChordAfterTheRangeIsPlayedAsItWas()
+    {
+        // Hard's red at 960 was a strum after its green at 0; the draft's green at 840 now comes a sixteenth before it,
+        // which would make it a natural HOPO, so it's forced to stay a strum.
+        var chart = Frets(Chord(0, G), Chord(840, G));
+        Add(chart, Guitar, Hard, Note(0, G), Note(960, R));
+
+        var result = Reducer.Reduce(chart, Guitar, Expert, Hard, Rules(Hard), (0, 900));
+        var read = GameView.Frets(result.Notes.ToList(), result.Flags, 480, ChartReadOptions.Default, []);
+
+        Assert.IsFalse(read.Single(n => n.Tick == 960).Flags.HasFlag(NoteFlags.Hopo));
+        Assert.Contains(new FlaggedChord(960, ChordFlags.ForceStrum), result.Flags);
+    }
+
+    [TestMethod]
     public void DrumsKeepRedThenCymbalsThenToms()
     {
         var chart = DrumsChart(DrumsVariant.Pro);
@@ -892,7 +968,7 @@ public sealed class ReducerTests
         {
             FiveFretEasy = new FretReductionRules { MaxChordSize = 9, HighestLane = -2, ThinningDivision = 15, BurstDivision = 4, MaxBurst = 20 },
             SixFretEasy = new FretReductionRules { ThinningDivision = 4, BurstDivision = 8, MaxBurst = 0 },
-            FiveFretMedium = new FretReductionRules { BurstDivision = null, MaxBurst = null },
+            FiveFretMedium = new FretReductionRules { ThinningDivision = 8, KeepForcedHopoAndTap = false, BurstDivision = null, MaxBurst = null },
             SixFretHard = new FretReductionRules { MaxChordSize = 5, HighestLane = 4 },
             DrumsMedium = new DrumReductionRules { PadsPerHit = 0, ThinningDivision = -1, KickDivision = 9, KeepDoubleKick = true },
             FiveFretHard = null!,
@@ -909,6 +985,7 @@ public sealed class ReducerTests
         Assert.AreEqual(1, fixedUp.SixFretEasy.MaxBurst);
         Assert.AreEqual(ReductionDefaults.Shipped.FiveFretMedium.BurstDivision, fixedUp.FiveFretMedium.BurstDivision);
         Assert.AreEqual(ReductionDefaults.Shipped.FiveFretMedium.MaxBurst, fixedUp.FiveFretMedium.MaxBurst);
+        Assert.IsTrue(fixedUp.FiveFretMedium.KeepForcedHopoAndTap, "A set saved before bursts takes the shipped HOPOs and taps with them.");
         Assert.IsFalse(fixedUp.FiveFretMedium.KeepExtendedSustains, "A set saved before it takes the shipped.");
         Assert.AreEqual(3, fixedUp.SixFretHard.MaxChordSize);
         Assert.AreEqual(2, fixedUp.SixFretHard.HighestLane);

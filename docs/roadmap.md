@@ -338,7 +338,7 @@ class, rules in and a `ReductionResult` out.
   it as it will be, on a copy of the chart, and `Accept` adds them as one step
   (`EditorSession.ExecuteAsOne`). A run holds `ReductionDraft`s.
 - **The melody's shape.** `Reducer.Phrases` splits the chords at rests and sections, and
-  `Reducer.MapPhrase` fits each phrase to the range as a whole, keeping each step's direction.
+  `Reducer.FitPhrase` fits each phrase to the range as a whole, keeping each step's direction.
 - **Thinning by time.** `MinGapMs` in both rule sets (100, 200 and 400 ms); the larger of it and the
   grid holds (`ThinningGap`). Settings saved before it get the shipped values. Later removed: thinning
   is by fractions of a beat alone (`ThinningSpacing`, charter-spec C9).

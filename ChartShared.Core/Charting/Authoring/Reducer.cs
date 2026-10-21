@@ -106,7 +106,8 @@ public static class Reducer
     /// <summary>
     /// A draft of <paramref name="to"/> of the 5-fret or GHL <paramref name="part"/>, from <paramref name="from"/>: in
     /// place of all of it, or only of <paramref name="range"/> (ticks, both ends in). Where the rules keep HOPOs and taps,
-    /// each chord is played as the source's is, read with <paramref name="options"/> (the defaults when null).
+    /// each chord is played as the source's is, and the target's first after the range as it was, read with
+    /// <paramref name="options"/> (the defaults when null).
     /// </summary>
     public static ReductionResult Reduce(EditableChart chart, ChartInstrument part, ChartDifficulty from, ChartDifficulty to, FretReductionRules rules, (long From, long To)? range = null, ChartReadOptions? options = null)
     {
@@ -189,33 +190,44 @@ public static class Reducer
             flags.Sort(static (a, b) => a.Tick.CompareTo(b.Tick));
         }
 
-        CutOverlappingSustains(notes, rules.KeepShortSustains ? 0 : chart.Resolution);
+        CutOverlappingSustains(notes, rules.KeepShortSustains ? 0 : chart.Resolution, range);
         if (rules.KeepExtendedSustains is false)
             PlainExtendedSustains(notes, range);
         if (rules.KeepForcedHopoAndTap)
-            flags = PlayedAsTheSource(source, notes, flags, [.. kept.Select(i => chords[i].Tick)], chart.Resolution, options ?? ChartReadOptions.Default);
+        {
+            var read = options ?? ChartReadOptions.Default;
+            var fromSource = HopoStates(GameView.Frets(source.Notes, source.FlaggedChords, chart.Resolution, read, []));
+            var wanted = kept.Select(i => chords[i].Tick).Where(fromSource.ContainsKey).ToDictionary(static t => t, t => fromSource[t]);
+
+            // The target's first chord after the range follows the draft's last now, so it's played as it was before.
+            int first = range is { } after ? target.Notes.FirstAfter(after.To) : target.Notes.Count;
+            if (first < target.Notes.Count && HopoStates(GameView.Frets(target.Notes, target.FlaggedChords, chart.Resolution, read, [])).TryGetValue(target.Notes[first].Tick, out var was))
+                wanted[target.Notes[first].Tick] = was;
+
+            flags = PlayedAs(wanted, notes, flags, chart.Resolution, read);
+        }
+
         return new ReductionResult(notes, flags, [], inRange.Length - made);
     }
 
     /// <summary>
-    /// <paramref name="flags"/>, with each of <paramref name="ticks"/> forced to a HOPO or a strum where the draft's
-    /// <paramref name="notes"/> would play it otherwise than <paramref name="source"/> does: notes left out between two can
-    /// put them past the HOPO threshold, or bring them within it. A chord on the same frets as the one before it is a strum,
-    /// whatever the source has: a HOPO there, where frets the source had apart were pressed together, is awkward to play.
-    /// A tap stays a tap.
+    /// <paramref name="flags"/>, with each chord of <paramref name="wanted"/> forced to a HOPO or a strum where the draft's
+    /// <paramref name="notes"/> would play it otherwise than it wants: notes left out between two can put them past the
+    /// HOPO threshold, or bring them within it. A chord on the same frets as the one before it is a strum, whatever it
+    /// wants: a HOPO there, where frets the source had apart were pressed together, is awkward to play. A tap stays a tap.
     /// </summary>
-    private static List<FlaggedChord> PlayedAsTheSource(EditableTrack source, List<EditableNote> notes, List<FlaggedChord> flags, long[] ticks, int resolution, ChartReadOptions options)
+    private static List<FlaggedChord> PlayedAs(Dictionary<long, NoteFlags> wanted, List<EditableNote> notes, List<FlaggedChord> flags, int resolution, ChartReadOptions options)
     {
-        var wanted = HopoStates(GameView.Frets(source.Notes.AsSpan().ToArray(), source.FlaggedChords.AsSpan().ToArray(), resolution, options, []));
         var played = HopoStates(GameView.Frets(notes, flags, resolution, options, []));
         var marked = flags.ToDictionary(static f => f.Tick, static f => f.Flags);
 
         // Each chord's frets, and whether it's on the same ones as the chord before it.
         var chords = notes.GroupBy(static n => n.Tick).Select(static g => (g.Key, Frets: string.Join(",", g.Select(static n => n.Lane).Distinct().Order()))).ToList();
         var repeated = Enumerable.Range(1, Math.Max(0, chords.Count - 1)).Where(i => chords[i].Frets == chords[i - 1].Frets).Select(i => chords[i].Key).ToHashSet();
-        foreach (long tick in ticks)
+        foreach (var (tick, wants) in wanted)
         {
-            if (!wanted.TryGetValue(tick, out var want) || !played.TryGetValue(tick, out var have) || want == NoteFlags.Tap || have == NoteFlags.Tap)
+            var want = wants;
+            if (!played.TryGetValue(tick, out var have) || want == NoteFlags.Tap || have == NoteFlags.Tap)
                 continue;
             bool again = repeated.Contains(tick);
             if (again)
@@ -229,20 +241,20 @@ public static class Reducer
         }
 
         return [.. marked.Where(static m => m.Value != ChordFlags.None).OrderBy(static m => m.Key).Select(static m => new FlaggedChord(m.Key, m.Value))];
+    }
 
-        // Each chord's tick, and whether it's a tap, a HOPO or a strum (none), as the games give a chord's notes the same:
-        // the most of its notes' flags, which rank a tap over a HOPO over neither.
-        static Dictionary<long, NoteFlags> HopoStates(List<ChartNote> read)
+    // Each chord's tick, and whether it's a tap, a HOPO or a strum (none), as the games give a chord's notes the same: the
+    // most of its notes' flags, which rank a tap over a HOPO over neither.
+    private static Dictionary<long, NoteFlags> HopoStates(List<ChartNote> read)
+    {
+        var states = new Dictionary<long, NoteFlags>();
+        foreach (var note in read)
         {
-            var states = new Dictionary<long, NoteFlags>();
-            foreach (var note in read)
-            {
-                var state = (note.Flags & NoteFlags.Tap) != 0 ? NoteFlags.Tap : note.Flags & NoteFlags.Hopo;
-                states[note.Tick] = states.TryGetValue(note.Tick, out var other) && other > state ? other : state;
-            }
-
-            return states;
+            var state = (note.Flags & NoteFlags.Tap) != 0 ? NoteFlags.Tap : note.Flags & NoteFlags.Hopo;
+            states[note.Tick] = states.TryGetValue(note.Tick, out var other) && other > state ? other : state;
         }
+
+        return states;
     }
 
     /// <summary>
@@ -335,9 +347,13 @@ public static class Reducer
     internal static (long Tick, int Strength)? NextStronger(long tick, TempoMap map)
     {
         int own = BeatStrength(tick, map);
-        if (own <= 0 || own == OffGrid)
-            return null;
+        return own <= 0 || own == OffGrid ? null : NextAtLeast(tick, own - 1, map);
+    }
 
+    // The first position after tick as strong as strength or stronger (BeatStrength), and how strong; a time signature's
+    // start is a measure's first beat. Null where there's none.
+    private static (long Tick, int Strength)? NextAtLeast(long tick, int strength, TempoMap map)
+    {
         var (signature, next) = SignatureAt(tick, map);
         long beat = BeatOf(signature, map);
         long offset = Math.Max(0, tick - signature.Tick);
@@ -359,9 +375,9 @@ public static class Reducer
             long at = signature.Tick + (((offset / grid) + 1) * grid);
             if (best is { } b && at >= b.Tick)
                 continue;
-            int strength = BeatStrength(at, map);
-            if (strength < own)
-                best = (at, strength);
+            int found = BeatStrength(at, map);
+            if (found <= strength)
+                best = (at, found);
         }
 
         return best;
@@ -400,9 +416,13 @@ public static class Reducer
         var bursts = spacing.IsEven ? null : SourceBursts(ticks, spacing);
 
         // A chord of one of the source's bursts can be nearer than the pace to the others in it; any other keeps the pace.
-        bool Keeps(int i) => bursts is null || !bursts[i]
+        // Either way, with bursts, every Burst + 1 in a row it's among keep the pace on average, whichever was taken first.
+        bool Keeps(int i) => bursts is null
             ? IsClear(taken, ticks[i], spacing.Pace)
-            : IsClear(taken, ticks[i], spacing.Floor) && KeepsPace(taken, ticks[i], spacing) && IsClear(fixedSet, ticks[i], spacing.Pace);
+            : (bursts[i]
+                ? IsClear(taken, ticks[i], spacing.Floor) && IsClear(fixedSet, ticks[i], spacing.Pace)
+                : IsClear(taken, ticks[i], spacing.Pace))
+              && KeepsPace(taken, ticks[i], spacing);
 
         bool Try(int i)
         {
@@ -424,14 +444,25 @@ public static class Reducer
             }
         }
 
-        foreach (int i in Enumerable.Range(0, ticks.Count).OrderByDescending(i => scores[i]).ThenBy(i => ticks[i]))
+        var order = Enumerable.Range(0, ticks.Count).OrderByDescending(i => scores[i]).ThenBy(i => ticks[i]).ToList();
+        foreach (int i in order)
             Try(i);
         if (riffs is { Count: > 0 })
             Conform(riffs);
         return [.. kept.Order()];
 
+        bool Add(int i)
+        {
+            if (kept.Contains(i) || taken.Contains(ticks[i]) || !Keeps(i))
+                return false;
+            taken.Add(ticks[i]);
+            kept.Add(i);
+            return true;
+        }
+
         // Leaving a chord out never brings two closer, so those most measures leave out go first; then those most keep are
-        // tried in the rest, best first.
+        // tried in the rest, best first; then, where any was left out, every other chord again, as one it had kept too
+        // close may fit now.
         void Conform(IReadOnlyList<Riff> riffs)
         {
             var groupsOf = groups.SelectMany(g => g.Select(i => (i, g))).ToLookup(static p => p.i, static p => p.g);
@@ -439,12 +470,16 @@ public static class Reducer
             int Kept(Riff riff, int k) => riff.Starts.Count(s => kept.Contains(s + k));
 
             var places = riffs.SelectMany(r => Enumerable.Range(0, r.Length).Select(k => (Riff: r, K: k))).ToList();
+            var leftOut = new HashSet<int>();
+            bool removed = false;
             foreach (var (riff, k) in places.Where(p => Kept(p.Riff, p.K) * 2 < p.Riff.Starts.Count))
             {
+                leftOut.UnionWith(riff.Starts.Select(s => s + k));
                 foreach (int s in riff.Starts.Where(s => kept.Contains(s + k) && !Needed(s + k)))
                 {
                     kept.Remove(s + k);
                     taken.Remove(ticks[s + k]);
+                    removed = true;
                 }
             }
 
@@ -453,15 +488,13 @@ public static class Reducer
                 if (Kept(riff, k) * 2 < riff.Starts.Count)
                     continue;
                 foreach (int s in riff.Starts)
-                {
-                    int i = s + k;
-                    if (!kept.Contains(i) && !taken.Contains(ticks[i]) && Keeps(i))
-                    {
-                        taken.Add(ticks[i]);
-                        kept.Add(i);
-                    }
-                }
+                    Add(s + k);
             }
+
+            if (!removed)
+                return;
+            foreach (int i in order.Where(i => !leftOut.Contains(i)))
+                Add(i);
         }
     }
 
@@ -500,13 +533,6 @@ public static class Reducer
 
         return phrases;
     }
-
-    /// <summary>
-    /// Where each chord of a phrase goes, by its lowest column (<paramref name="anchors"/>) and how wide it is
-    /// (<paramref name="widths"/>), so none reaches past <paramref name="highest"/>: <see cref="FitPhrase"/>'s anchors.
-    /// </summary>
-    internal static int[] MapPhrase(IReadOnlyList<int> anchors, IReadOnlyList<int> widths, int highest, IReadOnlyList<int>? tops = null) =>
-        [.. FitPhrase(anchors, widths, highest, tops).Select(static p => p.Anchor)];
 
     /// <summary>
     /// Where each chord of a phrase goes, by its lowest column (<paramref name="anchors"/>) and how wide it is
@@ -689,8 +715,10 @@ public static class Reducer
         var scores = new double[chords.Count];
         for (int i = 0; i < chords.Count; i++)
         {
-            // A chord whose next stronger position is empty, the next chord after it, anticipates it.
+            // A chord whose next stronger position is empty, the next chord after it, anticipates it; but only where the next
+            // chord comes before the position after that as strong, so the part goes on through it rather than rests.
             scores[i] = i + 1 < chords.Count && NextStronger(chords[i].Tick, map) is { } stronger && chords[i + 1].Tick > stronger.Tick
+                && chords[i + 1].Tick < (NextAtLeast(stronger.Tick, stronger.Strength, map)?.Tick ?? long.MaxValue)
                 ? -(stronger.Strength + ThinningWeights.Anticipation)
                 : -BeatStrength(chords[i].Tick, map);
             if (chords[i].Notes.Any(n => n.Length >= resolution))
@@ -900,9 +928,10 @@ public static class Reducer
         return placed.Values.OrderBy(static n => n.Lane);
     }
 
-    // A sustain held into the next note on its lane ends there, or is a plain note where that leaves it shorter than
-    // shortest (0 for none): a burst can bring a sustain's next note nearer than the rules keep sustains.
-    private static void CutOverlappingSustains(List<EditableNote> notes, long shortest)
+    // A sustain held into the next note on its lane ends there, or, one the draft makes (in range, when there's one), is a
+    // plain note where that leaves it shorter than shortest (0 for none): a burst can bring a sustain's next note nearer
+    // than the rules keep sustains. The target's outside the range stay sustains, only shorter.
+    private static void CutOverlappingSustains(List<EditableNote> notes, long shortest, (long From, long To)? range)
     {
         notes.Sort(EditableNote.Order);
         var next = new Dictionary<int, long>();
@@ -912,7 +941,8 @@ public static class Reducer
             if (next.TryGetValue(note.Lane, out long after) && note.Tick + note.Length > after)
             {
                 long length = Math.Max(EditableNote.PlainLength, after - note.Tick);
-                notes[i] = note with { Length = length < shortest ? EditableNote.PlainLength : length };
+                bool drafted = range is not { } r || (note.Tick >= r.From && note.Tick <= r.To);
+                notes[i] = note with { Length = drafted && length < shortest ? EditableNote.PlainLength : length };
             }
 
             next[note.Lane] = note.Tick;

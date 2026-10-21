@@ -205,8 +205,9 @@ public sealed class ReductionDefaults
 
     /// <summary>
     /// A copy with every value kept to what it can be, and the shipped rules for any set the file lacks, or any value: a
-    /// set saved before its bursts were added gets the shipped ones. A minimum gap in milliseconds, which older settings
-    /// have, is no longer read: thinning is by fractions of a beat alone.
+    /// set saved before its bursts were added gets the shipped ones, and the shipped HOPOs and taps, where it thins as the
+    /// shipped does, and no bursts where it has its own thinning. A minimum gap in milliseconds, which older settings have,
+    /// is no longer read: thinning is by fractions of a beat alone.
     /// </summary>
     public ReductionDefaults Normalized()
     {
@@ -245,21 +246,30 @@ public sealed class ReductionDefaults
     /// <summary><paramref name="chords"/> as the most in a burst: from 1 to <see cref="MaxBurstLimit"/>, or null when it isn't set.</summary>
     internal static int? NormalizedBurst(int? chords) => chords is { } value ? Math.Clamp(value, 1, MaxBurstLimit) : null;
 
-    // A set from a file, with what it lacks from the shipped: none, or a value saved before it was added.
-    private static FretReductionRules Filled(FretReductionRules? rules, FretReductionRules shipped) =>
-        rules is null ? shipped : rules with
-        {
-            BurstDivision = rules.BurstDivision ?? shipped.BurstDivision,
-            MaxBurst = rules.MaxBurst ?? shipped.MaxBurst,
-            KeepExtendedSustains = rules.KeepExtendedSustains ?? shipped.KeepExtendedSustains,
-        };
+    // A set from a file, with what it lacks from the shipped: none, or a value saved before it was added. A set saved
+    // before bursts, with neither of theirs, takes the shipped bursts where it thins as the shipped does, and the shipped
+    // HOPOs and taps with them, which make a burst's chords played as the source's; with its own thinning it has none.
+    private static FretReductionRules Filled(FretReductionRules? rules, FretReductionRules shipped)
+    {
+        if (rules is null)
+            return shipped;
+        rules = rules with { KeepExtendedSustains = rules.KeepExtendedSustains ?? shipped.KeepExtendedSustains };
+        if (!BeforeBursts(rules.BurstDivision, rules.MaxBurst) || NormalizedDivision(rules.ThinningDivision) != shipped.ThinningDivision)
+            return rules;
+        return rules with { BurstDivision = shipped.BurstDivision, MaxBurst = shipped.MaxBurst, KeepForcedHopoAndTap = shipped.KeepForcedHopoAndTap };
+    }
 
-    private static DrumReductionRules Filled(DrumReductionRules? rules, DrumReductionRules shipped) =>
-        rules is null ? shipped : rules with
-        {
-            BurstDivision = rules.BurstDivision ?? shipped.BurstDivision,
-            MaxBurst = rules.MaxBurst ?? shipped.MaxBurst,
-        };
+    private static DrumReductionRules Filled(DrumReductionRules? rules, DrumReductionRules shipped)
+    {
+        if (rules is null)
+            return shipped;
+        if (!BeforeBursts(rules.BurstDivision, rules.MaxBurst) || NormalizedDivision(rules.ThinningDivision) != shipped.ThinningDivision)
+            return rules;
+        return rules with { BurstDivision = shipped.BurstDivision, MaxBurst = shipped.MaxBurst };
+    }
+
+    // Whether a set was saved before bursts were added: the fields always save both.
+    private static bool BeforeBursts(int? division, int? maxBurst) => division is null && maxBurst is null;
 
     private ReductionDefaults Copy() => new()
     {
