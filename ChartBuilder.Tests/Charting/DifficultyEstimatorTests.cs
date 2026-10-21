@@ -144,6 +144,36 @@ public sealed class DifficultyEstimatorTests
     }
 
     [TestMethod]
+    public void AProChartTheGamesDontReadAsProIsntRatedAsProDrums()
+    {
+        // song.ini says five pads, or no pro drums: either way the game view has no cymbals to rate.
+        var chart = Chart(Drums, Enumerable.Range(0, 128).Select(i => new EditableNote(i * 120L, 1, (i % 4) + 1)));
+
+        foreach (var options in new[] { new ChartReadOptions(FiveLaneDrums: true), new ChartReadOptions(ProDrums: false) })
+        {
+            Assert.AreSequenceEqual(["diff_drums"], DifficultyEstimator.EstimateKeys(chart, Drums, options).Select(k => k.Key).ToList());
+            Assert.IsNull(DifficultyEstimator.EstimatePart(chart, Drums, options, DifficultyInstrument.ProDrums));
+            Assert.IsEmpty(DifficultyEstimator.EstimateDifficulties(chart, Drums, options, DifficultyInstrument.ProDrums));
+            Assert.IsNotNull(DifficultyEstimator.EstimatePart(chart, Drums, options));
+        }
+    }
+
+    [TestMethod]
+    public void ExpertPlusKicksArentCountedInWhatTheRatingWasWorkedOutFrom()
+    {
+        // Snare and kick on the beat, and Expert+ kicks between them.
+        var played = Enumerable.Range(0, 64).SelectMany(i => new[] { new EditableNote(i * 480L, 1, 1), new EditableNote(i * 480L, 1, 0) }).ToList();
+        var plain = Chart(Drums, played);
+        var plus = Chart(Drums, played.Concat(Enumerable.Range(0, 64).Select(i => new EditableNote((i * 480L) + 240, 1, 0, DoubleKick: true))));
+
+        var a = DifficultyEstimator.EstimatePart(plain, Drums, Options)!;
+        var b = DifficultyEstimator.EstimatePart(plus, Drums, Options)!;
+
+        Assert.AreEqual(a.Basis, b.Basis);
+        Assert.AreEqual(a.Rating, b.Rating);
+    }
+
+    [TestMethod]
     public void FewerThanTwoChordsGiveNoRating()
     {
         Assert.IsNull(DifficultyEstimator.EstimatePart(Chart(Guitar, [new EditableNote(0, 1, 0)]), Guitar, Options));

@@ -81,14 +81,13 @@ public sealed class InstrumentNotesTests
     }
 
     [TestMethod]
-    public void KeysCanBeReadAsPressedRatherThanStrummedOrHammered()
+    public void KeysAreReadStrummedHammeredOrTappedAsTheChartHasThem()
     {
         var track = Track(new ChartNote(0, 0, 0, NoteFlags.None), new ChartNote(120, 0, 1, NoteFlags.Hopo), new ChartNote(240, 0, 2, NoteFlags.Tap));
 
-        var pressed = DifficultyNotes.Of(track, Tempo, parameters: DifficultyParameters.For(DifficultyInstrument.Keys) with { ReadsNoteKinds = false });
+        var notes = DifficultyNotes.Of(track, Tempo, parameters: DifficultyParameters.For(DifficultyInstrument.Keys));
 
-        Assert.IsTrue(pressed.All(n => n.Kind == NoteKind.Strum));
-        Assert.AreSequenceEqual([NoteKind.Strum, NoteKind.Hopo, NoteKind.Tap], DifficultyNotes.Of(track, Tempo).Select(n => n.Kind).ToList());
+        Assert.AreSequenceEqual([NoteKind.Strum, NoteKind.Hopo, NoteKind.Tap], notes.Select(n => n.Kind).ToList());
     }
 
     private static NoteTrack Track(params ChartNote[] notes) => new(notes, []);

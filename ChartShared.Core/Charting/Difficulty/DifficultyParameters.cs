@@ -158,12 +158,6 @@ public sealed record DifficultyParameters
     /// <summary>Where an open note puts the hand's centre, as a lane (μ_open); for six-fret, as a column.</summary>
     public double OpenPosition { get; init; } = 2;
 
-    /// <summary>
-    /// Whether a note is read as strummed, a HOPO or a tap as the chart has it; when not, every note is read as strummed,
-    /// pressed as a key is (§14).
-    /// </summary>
-    public bool ReadsNoteKinds { get; init; } = true;
-
     // Six-fret (§14.2): the frets as three columns of a white and a black fret.
 
     /// <summary>The cost of a column changing between its white and its black fret, rather than <see cref="FingerCost"/>.</summary>

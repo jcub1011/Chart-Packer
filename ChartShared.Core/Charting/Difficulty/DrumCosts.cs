@@ -12,7 +12,8 @@ namespace ChartShared.Core.Charting.Difficulty;
 /// <para><b>Hands.</b> Each hand's rate from its own hit before, more past its limit, and more for going to another pad,
 /// across the kit, or between a tom and a cymbal. One pad is hit by whichever hand that costs least, so fast single
 /// strokes alternate; two are hit by both, the left hand the leftmost, and more than two cost more again.</para>
-/// <para>In a roll or trill lane, intervals count no shorter than <see cref="DifficultyParameters.LaneIntervalMs"/>.</para>
+/// <para>In a roll or trill lane, the kick's and each hand's intervals count no shorter than
+/// <see cref="DifficultyParameters.LaneIntervalMs"/>.</para>
 /// </remarks>
 internal sealed class DrumCosts(DifficultyParameters parameters) : PhysicalCosts
 {
@@ -31,7 +32,7 @@ internal sealed class DrumCosts(DifficultyParameters parameters) : PhysicalCosts
         {
             if (!double.IsNaN(_lastKick))
             {
-                double interval = Math.Max(time - _lastKick, _p.MinIntervalMs);
+                double interval = Math.Max(time - _lastKick, floor);
                 bool between = pads == 0 && !double.IsNaN(_lastHands) && time - _lastHands < _p.IndependenceWindowMs;
                 kick = _p.StrumScale * Math.Pow(1000 / interval, _p.StrumSpeedPower)
                     * Math.Pow(Math.Max(1, _p.DoubleKickMs / interval), _p.DoubleKickPower)

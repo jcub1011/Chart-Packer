@@ -778,13 +778,13 @@ Only the first two attributes, the physical ones, differ:
 
 Their parameters are the strum and note ones: the same weights, half-lives, scales, speed powers and reference tempos. The endurance load (section 4.4) is made from the two of them for every model.
 
-A part's `diff_*` key is rated by the part's model. Pro drums have two keys: `diff_drums`, rated as 4-lane drums play the chart, each cymbal read as the tom of its colour, and `diff_drums_real`, rated as Pro drums. Chart Builder's Difficulty tab shows either view of a Pro chart.
+A part's `diff_*` key is rated by the part's model. Pro drums have two keys: `diff_drums`, rated as 4-lane drums play the chart, each cymbal read as the tom of its colour, and `diff_drums_real`, rated as Pro drums. Only drums the games read as Pro have cymbals, so `diff_drums_real` is rated only for them: a Pro chart that song.ini's settings or a fifth-pad note make the games read as 4-lane or 5-lane isn't rated as Pro drums. Chart Builder's Difficulty tab shows either view of drums the games read as Pro.
 
 Phrase tokens (section 4.5) take eight bits of lanes, two of kind and nine of interval, in twenty-bit fields, so a phrase key holds up to six of them. Five-fret phrases are told apart exactly as before, so five-fret scores didn't change.
 
 ### 14.1 Drums
 
-Drums are read from the game view, so the layout (4-lane, 5-lane or Pro) and disco flip are as the games play them. Expert+ kicks aren't read, because `diff_drums` rates Expert. Hits within $\Delta_{chord}$ of each other, such as flams, are one note. Accents and ghost notes are read as plain hits.
+Drums are read from the game view, so the layout (4-lane, 5-lane or Pro) and disco flip are as the games play them. Expert+ kicks aren't read, because `diff_drums` rates Expert; nor are they counted in what a suggested rating shows it was worked out from. Hits within $\Delta_{chord}$ of each other, such as flams, are one note. Accents and ghost notes are read as plain hits.
 
 **Kick.** For a note with a kick, where $\hat\Delta_k$ is the guarded time since the last kick:
 
@@ -801,7 +801,7 @@ $$c_h(q) = r(\hat\Delta_h) \cdot \big(1 + w_{mv}\,|x_q - x_h| + w_{pad}\,[q \ne 
 - One pad is hit by whichever hand costs least. Of two that cost the same, the one rested longer hits it, then the right. So fast single strokes alternate on their own.
 - Two pads are hit by both hands, the left hand taking the leftmost. Each pad past two costs $w_{extra}$ more at the hands' rate.
 
-**Roll and trill lanes.** The game counts whatever is hit in a roll or trill lane, however fast, so notes in one (on the difficulties it reaches) count no interval shorter than $\Delta_{lane}$, and cost no rhythm or pattern.
+**Roll and trill lanes.** The game counts whatever is hit in a roll or trill lane, however fast, so notes in one (on the difficulties it reaches) count no interval shorter than $\Delta_{lane}$, the kick's as well as the hands', and cost no rhythm or pattern. Rhythm and pattern read the lane as a rest: its notes don't enter their history, so the first note after it is timed from the last note before it, and the lane's moves aren't among the recent moves or phrases.
 
 | Parameter | Value | Meaning |
 |---|---|---|
@@ -859,7 +859,7 @@ The same library and method as section 13 were used, with `tools/DifficultyCalib
 
 The thresholds are the least-error fit to official charts. Pro drums' own least-error fit put every threshold within 0.3 of the drums' ones, so Pro drums share them. Pro drums' tier is the same as the 4-lane view's on 97% of charts, and within one tier on all of them, as official charts never rate the two apart.
 
-**Keys** are read as five-fret parts. Reading every note as pressed rather than strummed or hammered (`ReadsNoteKinds`) ordered them worse, so it's off. Official keys charts are rated about a tier higher than guitar at the same score, so keys have thresholds of their own, the least-error fit to every rated keys chart.
+**Keys** are read as five-fret parts. Their notes are read as strummed, HOPOs or taps as the chart has them: reading every note as pressed instead ordered them worse. Official keys charts are rated about a tier higher than guitar at the same score, so keys have thresholds of their own, the least-error fit to every rated keys chart.
 
 **Six-fret.** Only 40 six-fret parts are rated, 15 of them official, which is too few to fit anything of their own, so six-fret uses five-fret's parameters and rank curve. Over the fit set's 29 six-fret guitar charts, official and community, the correlation is 0.58 and 79% are within one tier. The grid costs barely moved the order.
 

@@ -119,9 +119,9 @@ namespace ChartBuilder.ViewModels
         // The keys the suggestion would set, each with its tier.
         private IReadOnlyList<(string Key, int Tier)>? _suggestion;
 
-        // The track last rated, and for each of its part's diff_* keys the model that rates it and each difficulty's
-        // estimate, lowest first, the part's own key first; and the runs started, so only the latest is shown.
-        private (ChartTrackKey Track, List<KeyedEstimates> Keys)? _estimated;
+        // The track last rated, each of its part's diff_* keys' rating, the part's own key first, and each charted
+        // difficulty's estimate by the own key's model, lowest first; and the runs started, so only the latest is shown.
+        private (ChartTrackKey Track, IReadOnlyList<KeyedEstimate> Keys, List<(ChartDifficulty Difficulty, DifficultyEstimate Estimate)> Own)? _estimated;
         private int _suggestions;
 
         private static ILogger Logger => Log.ForContext<PreviewViewModel>();
@@ -158,30 +158,45 @@ namespace ChartBuilder.ViewModels
 
             var tempo = Session.TempoMap;
             long? end = DifficultyNotes.EndTickOf(Session.Chart);
-            var models = DifficultyInstruments.KeysOf(key.Instrument, Session.Chart.DrumsVariant);
+            var models = DifficultyEstimator.KeyModelsOf(Session.Chart, key.Instrument, Session.ReadOptions);
             var tracks = Enum.GetValues<ChartDifficulty>()
                 .Where(d => part[d].Notes.Count > 0)
-                .Select(d => (Difficulty: d, Game: Session.GameTrack(new ChartTrackKey(key.Instrument, d)), FreeLanes: DifficultyNotes.FreeLanesOf(part, d)))
+                .Select(d => (Difficulty: d, Track: Session.GameTrack(new ChartTrackKey(key.Instrument, d)), FreeLanes: DifficultyNotes.FreeLanesOf(part, d)))
                 .ToList();
             _ = EstimateAsync(run, key, models, tracks, tempo, end);
         }
 
+        // The own key's model rates every difficulty, which the tooltip lists; the other keys' only their highest.
         private async Task EstimateAsync(
             int run, ChartTrackKey key, IReadOnlyList<(string Key, DifficultyInstrument Instrument)> models,
-            List<(ChartDifficulty Difficulty, NoteTrack Game, IReadOnlyList<Phrase> FreeLanes)> tracks, TempoMap tempo, long? end)
+            List<(ChartDifficulty Difficulty, NoteTrack Track, IReadOnlyList<Phrase> FreeLanes)> tracks, TempoMap tempo, long? end)
         {
             try
             {
-                var keyed = await Task.Run(() => models
-                    .Select(m => new KeyedEstimates(m.Key, m.Instrument, [.. tracks
-                        .Select(t => (t.Difficulty, Estimate: DifficultyEstimator.Estimate(t.Game, tempo, m.Instrument, end, t.FreeLanes)))
+                var (keyed, own) = await Task.Run(() =>
+                {
+                    var keyed = new List<KeyedEstimate>();
+                    var own = new List<(ChartDifficulty Difficulty, DifficultyEstimate Estimate)>();
+                    if (models.Count == 0)
+                        return (keyed, own);
+                    own.AddRange(tracks
+                        .Select(t => (t.Difficulty, Estimate: DifficultyEstimator.Estimate(t.Track, tempo, models[0].Instrument, end, t.FreeLanes)))
                         .Where(e => e.Estimate is not null)
-                        .Select(e => (e.Difficulty, e.Estimate!))]))
-                    .Where(k => k.Estimates.Count > 0)
-                    .ToList());
+                        .Select(e => (e.Difficulty, e.Estimate!)));
+                    if (own.Count == 0)
+                        return (keyed, own);
+                    keyed.Add(new KeyedEstimate(models[0].Key, models[0].Instrument, own[^1].Estimate));
+                    foreach (var (other, instrument) in models.Skip(1))
+                    {
+                        if (DifficultyEstimator.EstimateHighest(tracks, tempo, instrument, end) is { } highest)
+                            keyed.Add(new KeyedEstimate(other, instrument, highest.Estimate));
+                    }
+
+                    return (keyed, own);
+                });
                 if (run != _suggestions)
                     return;
-                _estimated = (key, keyed);
+                _estimated = (key, keyed, own);
                 ShowSuggestion();
             }
             catch (Exception ex)
@@ -201,8 +216,7 @@ namespace ChartBuilder.ViewModels
             }
 
             var key = estimated.Track;
-            var own = estimated.Keys[0];
-            var (top, estimate) = own.Estimates[^1];
+            var (top, estimate) = estimated.Own[^1];
             var basis = estimate.Basis;
             var rating = estimate.Rating;
             var a = rating.Attributes;
@@ -216,31 +230,25 @@ namespace ChartBuilder.ViewModels
             // Pro drums' own rating, with the cymbals, for diff_drums_real.
             var others = estimated.Keys.Skip(1).ToList();
             foreach (var other in others)
-            {
-                var proRating = other.Estimates[^1].Estimate;
-                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingProDrumsFormat, proRating.Tier, proRating.Rating.Rank));
-            }
+                lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingProDrumsFormat, other.Estimate.Tier, other.Estimate.Rating.Rank));
 
             lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingNpsFormat, basis.PeakNps, basis.AverageNps));
             if (basis.KickIndependence is { } kick)
                 lines.Add(string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingKickFormat, kick));
-            lines.AddRange(own.Estimates.OrderByDescending(e => e.Difficulty).Select(e =>
+            lines.AddRange(estimated.Own.OrderByDescending(e => e.Difficulty).Select(e =>
                 string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingDifficultyFormat, ChartLabels.DifficultyName(e.Difficulty), e.Estimate.Tier)));
             lines.Add(Strings.SuggestedRatingModelSuggestion);
 
-            int? proTier = others.Count > 0 ? others[0].Estimates[^1].Estimate.Tier : null;
+            int? proTier = others.Count > 0 ? others[0].Estimate.Tier : null;
             SuggestionText = proTier is { } pro && pro != estimate.Tier
                 ? string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingWithProFormat, estimate.Tier, pro)
                 : string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingFormat, estimate.Tier);
             SuggestionBasis = string.Join(Environment.NewLine, lines);
             var pairs = _editor.Song.EffectivePairs();
-            var ratings = PendingSongIniFixes.RatingsToSet(key.Instrument, pairs, [.. estimated.Keys.Select(static k => new KeyedEstimate(k.Key, k.Instrument, k.Estimates[^1].Estimate))]);
+            var ratings = PendingSongIniFixes.RatingsToSet(key.Instrument, pairs, estimated.Keys);
             _suggestion = ratings.Count > 0 ? ratings : null;
             UseSuggestionText = ratings.Count > 0 ? string.Format(CultureInfo.CurrentCulture, Strings.SuggestedRatingUseFormat, string.Join(", ", ratings.Select(static r => r.Key))) : null;
         }
-
-        // One diff_* key's estimates: the model that rates it, and each charted difficulty's, lowest first.
-        private sealed record KeyedEstimates(string Key, DifficultyInstrument Instrument, List<(ChartDifficulty Difficulty, DifficultyEstimate Estimate)> Estimates);
 
         /// <summary>How many seconds ahead of the strike line the highway shows: the further, the slower notes fall.</summary>
         [ObservableProperty]

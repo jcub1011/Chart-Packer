@@ -25,6 +25,10 @@ internal sealed class DifficultyState
 
     private int _count;
     private double _previousTime;
+
+    // The rhythm's and patterns' history: the notes outside roll and trill lanes, which they read as rests (§14.1).
+    private int _heard;
+    private double _heardTime;
     private double _previousInterval = double.PositiveInfinity;
     private double _previousBeat;
     private byte _previousLanes;
@@ -95,15 +99,25 @@ internal sealed class DifficultyState
         bool first = _count == 0;
         double interval = first ? double.PositiveInfinity : note.TimeMs - _previousTime;
         double guarded = Math.Max(interval, _p.MinIntervalMs);
-        double rate = first ? 0 : 1000 / guarded;
-
         var (strum, fret) = _costs.Cost(note, guarded, first);
-        double rhythm = RhythmCost(note, interval, rate, first);
-        double pattern = PatternCost(note, rate, first);
 
-        // A roll or trill lane is played however the player likes, so its timing and patterns cost nothing (§14.1).
-        if (note.Kind == NoteKind.Roll)
-            rhythm = pattern = 0;
+        // A roll or trill lane is played however the player likes, so its timing and patterns cost nothing, and the
+        // rhythm and patterns read it as a rest: what's after it is timed from the note before it (§14.1).
+        double rhythm = 0, pattern = 0;
+        if (note.Kind != NoteKind.Roll)
+        {
+            bool firstHeard = _heard == 0;
+            double heardInterval = firstHeard ? double.PositiveInfinity : note.TimeMs - _heardTime;
+            double rate = firstHeard ? 0 : 1000 / Math.Max(heardInterval, _p.MinIntervalMs);
+            rhythm = RhythmCost(note, heardInterval, rate, firstHeard);
+            pattern = PatternCost(note, rate, firstHeard);
+            _previousInterval = heardInterval;
+            _heardTime = note.TimeMs;
+            _previousBeat = note.Beat;
+            _previousLanes = note.Lanes;
+            _heard++;
+        }
+
         var levels = Levels;
         Levels = new DifficultyAttributes(
             levels.Strum + (strum * _model.StrumScale),
@@ -112,10 +126,7 @@ internal sealed class DifficultyState
             levels.Pattern + (pattern * _model.PatternScale),
             levels.Endurance);
 
-        _previousInterval = interval;
         _previousTime = note.TimeMs;
-        _previousBeat = note.Beat;
-        _previousLanes = note.Lanes;
         _count++;
     }
 
@@ -150,20 +161,20 @@ internal sealed class DifficultyState
     private double PatternCost(in DifficultyNote note, double rate, bool first)
     {
         int iota = first ? None : (int)Math.Min(Math.Round(48 * (note.Beat - _previousBeat)), 48.0 * _p.RestBeats);
-        _moves[_count % _moves.Length] = _costs.MoveToken(note, _previousLanes, iota, first);
+        _moves[_heard % _moves.Length] = _costs.MoveToken(note, _previousLanes, iota, first);
 
-        int window = Math.Min(_count + 1, _moves.Length);
+        int window = Math.Min(_heard + 1, _moves.Length);
         double entropy = window < 2 ? 0 : Entropy(window) / Math.Log2(window);
 
         // Phrase tokens keep the lanes, so a phrase is only seen again when it truly is: eight bits of lanes, two of kind
         // and nine of interval.
-        _phraseTokens[_count % _phraseTokens.Length] = (uint)(note.Lanes | ((int)note.Kind << 8) | (Math.Min(iota + 1, 511) << 10));
+        _phraseTokens[_heard % _phraseTokens.Length] = (uint)(note.Lanes | ((int)note.Kind << 8) | (Math.Min(iota + 1, 511) << 10));
         double novelty = 1;
-        if (_count + 1 >= _phraseTokens.Length)
+        if (_heard + 1 >= _phraseTokens.Length)
         {
             UInt128 key = 0;
             for (int k = _phraseTokens.Length - 1; k >= 0; k--)
-                key = (key << PhraseTokenBits) | _phraseTokens[(_count - k) % _phraseTokens.Length];
+                key = (key << PhraseTokenBits) | _phraseTokens[(_heard - k) % _phraseTokens.Length];
             if (_lastSeen.TryGetValue(key, out double last))
                 novelty = 1 - Math.Exp(-(note.TimeMs - last) / _p.RecognitionMs);
             _lastSeen[key] = note.TimeMs;
@@ -177,7 +188,7 @@ internal sealed class DifficultyState
     {
         var scratch = _entropyScratch.AsSpan(0, window);
         for (int k = 0; k < window; k++)
-            scratch[k] = _moves[(_count - k) % _moves.Length];
+            scratch[k] = _moves[(_heard - k) % _moves.Length];
         scratch.Sort();
         double entropy = 0;
         for (int start = 0; start < window;)

@@ -359,7 +359,8 @@ namespace ChartBuilder.ViewModels
 
             int run = ++_runs;
             _ranFor = Track;
-            bool pro = Track is { Instrument: ChartInstrument.Drums } && Session.Chart.DrumsVariant == DrumsVariant.Pro;
+            // Only drums the games read as Pro have cymbals to rate.
+            bool pro = Track is { Instrument: ChartInstrument.Drums } && GameView.IsProDrums(Session.Chart, Session.ReadOptions);
             ShowsProToggle = pro;
             if (Track is not { } key || Session.Chart.PartOf(key.Instrument) is not { } part || part[key.Difficulty].Notes.Count == 0)
             {

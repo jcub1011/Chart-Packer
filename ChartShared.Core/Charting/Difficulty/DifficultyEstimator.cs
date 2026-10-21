@@ -50,14 +50,18 @@ public static class DifficultyEstimator
 
     /// <summary>
     /// The tier of one track as the games read it, rated as <paramref name="instrument"/>, or null when it has fewer than
-    /// two chords, or none apart in time. Notes after <paramref name="endTick"/>, the <c>[end]</c> event, aren't rated.
+    /// two chords, or none apart in time. Notes after <paramref name="endTick"/>, the <c>[end]</c> event, aren't rated,
+    /// nor counted; nor are Expert+ kicks, which the model doesn't read.
     /// </summary>
     /// <param name="freeLanes">For drums, the part's roll and trill lanes (<see cref="DifficultyNotes.FreeLanesOf"/>).</param>
     public static DifficultyEstimate? Estimate(NoteTrack track, TempoMap tempo, DifficultyInstrument instrument, long? endTick = null, IReadOnlyList<Phrase>? freeLanes = null)
     {
         ArgumentNullException.ThrowIfNull(track);
         ArgumentNullException.ThrowIfNull(tempo);
-        var chords = track.Notes.Where(n => endTick is not { } end || n.Tick <= end).GroupBy(static n => n.Tick).OrderBy(static g => g.Key).Select(static g => g.ToList()).ToList();
+        bool drums = instrument.IsDrums();
+        var chords = track.Notes
+            .Where(n => (endTick is not { } end || n.Tick <= end) && !(drums && (n.Flags & NoteFlags.DoubleKick) != 0))
+            .GroupBy(static n => n.Tick).OrderBy(static g => g.Key).Select(static g => g.ToList()).ToList();
         if (chords.Count < 2)
             return null;
         double[] times = [.. chords.Select(c => tempo.SecondsAt(c[0].Tick))];
@@ -65,7 +69,6 @@ public static class DifficultyEstimator
         if (seconds <= 0)
             return null;
 
-        bool drums = instrument.IsDrums();
         double average = chords.Count / seconds;
         double peak = Peak(times);
         int chordCount = chords.Count(c => c.Count(n => n.Lane != ChartNote.OpenLane) >= 2);
@@ -94,28 +97,50 @@ public static class DifficultyEstimator
 
     /// <summary>
     /// Each charted difficulty's tier of <paramref name="part"/>, as the games read it with <paramref name="options"/>,
-    /// rated as <paramref name="instrument"/>: by default the part's own model, for drums the 4-lane view.
+    /// rated as <paramref name="instrument"/>: by default the part's own model, for drums the 4-lane view. None as Pro
+    /// drums unless the games read the drums as Pro.
     /// </summary>
     public static IReadOnlyDictionary<ChartDifficulty, DifficultyEstimate> EstimateDifficulties(EditableChart chart, ChartInstrument part, ChartReadOptions options, DifficultyInstrument? instrument = null)
     {
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(options);
-        if (chart.PartOf(part) is not { } editable)
+        var model = instrument ?? DifficultyInstruments.Of(part);
+        if (chart.PartOf(part) is not { } editable || !Rates(chart, options, model))
             return new Dictionary<ChartDifficulty, DifficultyEstimate>();
-        return EstimateDifficulties(chart, editable, GameView.ProjectPart(chart, part, options), instrument ?? DifficultyInstruments.Of(part));
+        return EstimateDifficulties(chart, editable, GameView.ProjectPart(chart, part, options), model);
     }
 
     /// <summary>
     /// The suggested rating of <paramref name="part"/>, rated as <paramref name="instrument"/> (by default its own model):
-    /// its highest charted difficulty's, or null when it has none to rate.
+    /// its highest charted difficulty's, or null when it has none to rate, or it's to be rated as Pro drums and the games
+    /// don't read the drums as Pro.
     /// </summary>
-    public static DifficultyEstimate? EstimatePart(EditableChart chart, ChartInstrument part, ChartReadOptions options, DifficultyInstrument? instrument = null) =>
-        Highest(EstimateDifficulties(chart, part, options, instrument));
+    public static DifficultyEstimate? EstimatePart(EditableChart chart, ChartInstrument part, ChartReadOptions options, DifficultyInstrument? instrument = null)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        var model = instrument ?? DifficultyInstruments.Of(part);
+        if (chart.PartOf(part) is not { } editable || !Rates(chart, options, model))
+            return null;
+        return EstimateHighest(chart, editable, GameView.ProjectPart(chart, part, options), model);
+    }
 
     /// <summary>
-    /// The suggested rating of each of <paramref name="part"/>'s <c>diff_*</c> keys, with the model that rates it: Pro
-    /// drums' <c>diff_drums</c> as 4-lane drums and <c>diff_drums_real</c> with the cymbals. A key whose part has no
-    /// difficulty to rate is left out.
+    /// <paramref name="part"/>'s <c>diff_*</c> keys that can be rated, each with the model that rates it, as the games
+    /// read <paramref name="chart"/> with <paramref name="options"/>: Pro drums' <c>diff_drums</c> as 4-lane drums, and
+    /// <c>diff_drums_real</c> with the cymbals, but only when the games read the drums as Pro, as only then do they have
+    /// cymbals.
+    /// </summary>
+    public static IReadOnlyList<(string Key, DifficultyInstrument Instrument)> KeyModelsOf(EditableChart chart, ChartInstrument part, ChartReadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(options);
+        return [.. DifficultyInstruments.KeysOf(part, chart.DrumsVariant).Where(k => Rates(chart, options, k.Instrument))];
+    }
+
+    /// <summary>
+    /// The suggested rating of each of <paramref name="part"/>'s <c>diff_*</c> keys (<see cref="KeyModelsOf"/>), with the
+    /// model that rates it. A key whose part has no difficulty to rate is left out.
     /// </summary>
     public static IReadOnlyList<KeyedEstimate> EstimateKeys(EditableChart chart, ChartInstrument part, ChartReadOptions options)
     {
@@ -123,16 +148,47 @@ public static class DifficultyEstimator
         ArgumentNullException.ThrowIfNull(options);
         if (chart.PartOf(part) is not { } editable)
             return [];
+        var models = KeyModelsOf(chart, part, options);
         var tracks = GameView.ProjectPart(chart, part, options);
         var keyed = new List<KeyedEstimate>();
-        foreach (var (key, instrument) in DifficultyInstruments.KeysOf(part, chart.DrumsVariant))
+        foreach (var (key, instrument) in models)
         {
-            if (Highest(EstimateDifficulties(chart, editable, tracks, instrument)) is { } estimate)
+            if (EstimateHighest(chart, editable, tracks, instrument) is { } estimate)
                 keyed.Add(new KeyedEstimate(key, instrument, estimate));
         }
 
         return keyed;
     }
+
+    /// <summary>
+    /// The rating of the highest of <paramref name="tracks"/> that has one, rated as <paramref name="instrument"/>, and
+    /// its difficulty; null when none has. Each is a difficulty's game view and its roll and trill lanes
+    /// (<see cref="DifficultyNotes.FreeLanesOf"/>), in any order; those below the one rated aren't rated.
+    /// </summary>
+    public static (ChartDifficulty Difficulty, DifficultyEstimate Estimate)? EstimateHighest(
+        IEnumerable<(ChartDifficulty Difficulty, NoteTrack Track, IReadOnlyList<Phrase> FreeLanes)> tracks, TempoMap tempo, DifficultyInstrument instrument, long? endTick = null)
+    {
+        ArgumentNullException.ThrowIfNull(tracks);
+        foreach (var (difficulty, track, freeLanes) in tracks.OrderByDescending(static t => t.Difficulty))
+        {
+            if (Estimate(track, tempo, instrument, endTick, freeLanes) is { } estimate)
+                return (difficulty, estimate);
+        }
+
+        return null;
+    }
+
+    private static DifficultyEstimate? EstimateHighest(EditableChart chart, EditablePart editable, IReadOnlyDictionary<ChartDifficulty, NoteTrack> tracks, DifficultyInstrument instrument) =>
+        EstimateHighest(
+            Enum.GetValues<ChartDifficulty>().Where(d => editable[d].Notes.Count > 0).Select(d => (d, tracks[d], DifficultyNotes.FreeLanesOf(editable, d))),
+            chart.TempoMap.ToTempoMap(),
+            instrument,
+            DifficultyNotes.EndTickOf(chart))?.Estimate;
+
+    // Whether chart can be rated as instrument: as Pro drums only when the games read its drums as Pro, as the game view
+    // has cymbals only then, and DrumPads lays out Pro drums' pads only.
+    private static bool Rates(EditableChart chart, ChartReadOptions options, DifficultyInstrument instrument) =>
+        instrument != DifficultyInstrument.ProDrums || GameView.IsProDrums(chart, options);
 
     private static Dictionary<ChartDifficulty, DifficultyEstimate> EstimateDifficulties(EditableChart chart, EditablePart editable, IReadOnlyDictionary<ChartDifficulty, NoteTrack> tracks, DifficultyInstrument instrument)
     {
@@ -149,9 +205,6 @@ public static class DifficultyEstimator
 
         return estimates;
     }
-
-    private static DifficultyEstimate? Highest(IReadOnlyDictionary<ChartDifficulty, DifficultyEstimate> estimates) =>
-        estimates.Count == 0 ? null : estimates[estimates.Keys.Max()];
 
     // The most chords in any stretch of the window, per second.
     private static double Peak(double[] times)

@@ -11,6 +11,8 @@ namespace ChartShared.Core.Charting.Difficulty;
 /// red, yellow, blue and green, and 5-lane red, yellow, blue, orange and green.</para>
 /// <para>For Pro drums, bits 1 to 3 are the yellow, blue and green toms, and bits 4 to 6 the cymbals of those colours: a
 /// row of their own above the toms. Read as 4-lane drums, a cymbal is the tom of its colour.</para>
+/// <para>The Pro layout is only for drums the games read as Pro (<see cref="GameView.IsProDrums"/>): it has no bit for
+/// 5-lane's fifth pad, so 5-lane drums are always read as <see cref="DifficultyInstrument.Drums"/>.</para>
 /// </remarks>
 public static class DrumPads
 {

@@ -93,8 +93,8 @@ internal static class Library
                 if (song.Chart.PartOf(instrument) is not { } editable)
                     continue;
 
-                // Pro drums are rated twice: as 4-lane drums, and with their cymbals.
-                foreach (var (key, model) in DifficultyInstruments.KeysOf(instrument, song.Chart.DrumsVariant))
+                // Pro drums are rated twice: as 4-lane drums, and with their cymbals when the games read them as Pro.
+                foreach (var (key, model) in DifficultyEstimator.KeyModelsOf(song.Chart, instrument, song.Options))
                 {
                     if (!int.TryParse(song.Value(key)?.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int reported) || reported < 0)
                         continue;

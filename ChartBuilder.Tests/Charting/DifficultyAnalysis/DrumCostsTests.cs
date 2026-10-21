@@ -78,6 +78,31 @@ public sealed class DrumCostsTests
         Assert.AreEqual(0, free.ChartAttributes.Pattern);
     }
 
+    [TestMethod]
+    public void KicksInARollLaneAreCountedNoFasterThanTheLanesFloor()
+    {
+        // Kicks 30 ms apart in a lane: read as the lane's floor, not as double-kick footwork at 30 ms.
+        var costs = Costs(P, Enumerable.Range(0, 3).Select(i => Note(i * 30.0, Kick) with { Kind = NoteKind.Roll }));
+
+        double lane = P.LaneIntervalMs;
+        Assert.AreEqual(1000 / lane * Math.Pow(Math.Max(1, P.DoubleKickMs / lane), P.DoubleKickPower), costs[2].First, 1e-9);
+    }
+
+    [TestMethod]
+    public void RhythmAndPatternReadARollLaneAsARest()
+    {
+        // Quarter notes on the snare at 120 BPM, a beat of 32nds on yellow in a lane, then the snare on beat 10.
+        var before = Enumerable.Range(0, 8).Select(i => Note(i * 500.0, Red, i)).ToList();
+        var lane = Enumerable.Range(0, 8).Select(i => Note(4000 + (i * 62.5), Yellow, 8 + (i * 0.125)) with { Kind = NoteKind.Roll });
+        var after = Note(5000, Red, 10);
+
+        var (rhythm, pattern) = RhythmAndPatternOfLast(P, [.. before, .. lane, after]);
+        var (restRhythm, restPattern) = RhythmAndPatternOfLast(P, [.. before, after]);
+
+        Assert.AreEqual(restRhythm, rhythm, 1e-9);
+        Assert.AreEqual(restPattern, pattern, 1e-9);
+    }
+
     private static DifficultyNote Note(double timeMs, int lanes, double beat = 0) => new(timeMs, beat, (byte)lanes, NoteKind.Strum, 0);
 
     // Each note's costs to the kick and the hands, in order.
@@ -95,5 +120,17 @@ public sealed class DrumCostsTests
         }
 
         return result;
+    }
+
+    // What the last of the notes adds to the rhythm and the pattern, unnormalized.
+    private static (double Rhythm, double Pattern) RhythmAndPatternOfLast(DifficultyParameters p, IReadOnlyList<DifficultyNote> notes)
+    {
+        var state = new DifficultyState(new DifficultyModel(p, DifficultyReferences.Raw));
+        foreach (var note in notes.Take(notes.Count - 1))
+            state.Advance(note);
+        state.AdvanceTo(notes[^1].TimeMs);
+        var levels = state.Levels;
+        state.Advance(notes[^1]);
+        return (state.Levels.Rhythm - levels.Rhythm, state.Levels.Pattern - levels.Pattern);
     }
 }

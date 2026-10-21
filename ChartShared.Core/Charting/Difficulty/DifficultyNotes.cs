@@ -108,7 +108,7 @@ public static class DifficultyNotes
                     holds[note.Lane] = Math.Max(holds[note.Lane], note.Tick + note.Length);
             }
 
-            var kind = !p.ReadsNoteKinds ? NoteKind.Strum : (flags & NoteFlags.Tap) != 0 ? NoteKind.Tap : (flags & NoteFlags.Hopo) != 0 ? NoteKind.Hopo : NoteKind.Strum;
+            var kind = (flags & NoteFlags.Tap) != 0 ? NoteKind.Tap : (flags & NoteFlags.Hopo) != 0 ? NoteKind.Hopo : NoteKind.Strum;
             notes.Add(new DifficultyNote(timeMs, tick / resolution, lanes, kind, held));
             i = j;
 

@@ -10,7 +10,7 @@ namespace ChartShared.Core.Charting.Difficulty;
 /// <param name="Reported">Its <c>diff_*</c> value as <c>song.ini</c> has it (-1 for unrated); null with no value.</param>
 /// <param name="Analyzed">
 /// What the model that rates the key made of the part's highest charted difficulty; null when the song hasn't the part,
-/// or for <c>diff_drums_real</c>, drums that aren't Pro.
+/// or for <c>diff_drums_real</c>, drums the games don't read as Pro.
 /// </param>
 public sealed record DifficultyReportPart(ChartInstrument Instrument, string Key, int? Reported, DifficultyRating? Analyzed);
 
@@ -113,9 +113,7 @@ public static class DifficultyReport
                 column.Instrument,
                 column.Key,
                 ReportedOf(song.Pairs, column.Key),
-                column.Model == DifficultyInstrument.ProDrums && song.Chart.DrumsVariant != DrumsVariant.Pro
-                    ? null
-                    : DifficultyEstimator.EstimatePart(song.Chart, column.Instrument, song.Options, column.Model)?.Rating)).ToList();
+                DifficultyEstimator.EstimatePart(song.Chart, column.Instrument, song.Options, column.Model)?.Rating)).ToList();
             return new DifficultyReportRow(entry.FullPath, parts, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
