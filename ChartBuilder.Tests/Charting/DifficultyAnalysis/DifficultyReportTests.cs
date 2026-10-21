@@ -63,7 +63,7 @@ public sealed class DifficultyReportTests
         Assert.HasCount(1 + (DifficultyReport.Instruments.Count * 7) + 1, header);
         Assert.AreSequenceEqual(
             ["Song", "Guitar reported", "Guitar analyzed", "Guitar strum", "Guitar note", "Guitar rhythm", "Guitar pattern", "Guitar endurance", "Bass reported"],
-            header.Take(9).ToArray());
+            [.. header.Take(9)]);
         Assert.AreEqual("Problem", header[^1]);
 
         // The path has a comma, so it's quoted; the bass and the parts after it are empty.

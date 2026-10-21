@@ -74,12 +74,13 @@ public static class DifficultyGenerator
 
     /// <summary>
     /// Fills <paramref name="targets"/> of <paramref name="part"/> by <paramref name="rules"/>, each from the nearest
-    /// difficulty above it with notes. Drums are reduced as <paramref name="variant"/>.
+    /// difficulty above it with notes. Drums are reduced as <paramref name="variant"/>; HOPOs are read with
+    /// <paramref name="options"/>, the song's (the defaults when null).
     /// </summary>
     /// <returns>The drafts; none when there's nothing to reduce.</returns>
     /// <exception cref="InvalidOperationException">A draft can't be added to the chart.</exception>
     /// <exception cref="ArgumentException">A draft can't be added to the chart.</exception>
-    public static GeneratedDifficulties Generate(EditableChart chart, ChartInstrument part, IReadOnlyCollection<ChartDifficulty> targets, ReductionDefaults rules, DrumsVariant variant)
+    public static GeneratedDifficulties Generate(EditableChart chart, ChartInstrument part, IReadOnlyCollection<ChartDifficulty> targets, ReductionDefaults rules, DrumsVariant variant, ChartReadOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(chart);
         ArgumentNullException.ThrowIfNull(targets);
@@ -91,7 +92,7 @@ public static class DifficultyGenerator
         List<(ChartDifficulty? From, ChartDifficulty To)> steps = [.. targets.Select(static t => ((ChartDifficulty?)null, t))];
         return kind == ChartInstrumentKind.Drums
             ? Draft(chart, part, steps, (c, f, t) => Reducer.Reduce(c, f, t, rules.DrumsFor(t), variant))
-            : Draft(chart, part, steps, (c, f, t) => Reducer.Reduce(c, part, f, t, rules.FretsFor(kind, t)));
+            : Draft(chart, part, steps, (c, f, t) => Reducer.Reduce(c, part, f, t, rules.FretsFor(kind, t), options: options));
     }
 
     /// <summary>

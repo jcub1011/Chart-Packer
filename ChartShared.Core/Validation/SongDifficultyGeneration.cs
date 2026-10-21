@@ -128,7 +128,7 @@ public static class SongDifficultyGeneration
         var parts = new Dictionary<ChartInstrument, GeneratedDifficulties>();
         foreach (var (part, targets) in DifficultyGenerator.MissingTargets(chart))
         {
-            var generated = DifficultyGenerator.Generate(chart, part, targets, rules, variant);
+            var generated = DifficultyGenerator.Generate(chart, part, targets, rules, variant, options);
             parts[part] = generated;
             chart = generated.Drafted;
         }

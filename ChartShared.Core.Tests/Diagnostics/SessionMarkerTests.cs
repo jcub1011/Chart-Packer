@@ -82,7 +82,7 @@ public sealed class SessionMarkerTests
 
         var marker = Begin(processId: 200);
 
-        Assert.AreSequenceEqual(["1.0.0", "1.1.0"], marker.Unclean.Select(s => s.Version).ToArray());
+        Assert.AreSequenceEqual(["1.0.0", "1.1.0"], [.. marker.Unclean.Select(s => s.Version)]);
     }
 
     [TestMethod]

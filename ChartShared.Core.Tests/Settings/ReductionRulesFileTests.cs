@@ -49,13 +49,13 @@ public sealed class ReductionRulesFileTests
     public void UntilItsSavedTheRulesAreChartBuildersOld()
     {
         // As an older Chart Builder saved them in its own settings, with a value out of range.
-        File.WriteAllText(_builder, """{ "DefaultCharterName": "Me", "ReductionRules": { "DrumsEasy": { "PadsPerHit": 1, "ThinningDivision": 4, "KickDivision": 4, "MinGapMs": 9999 } } }""");
+        File.WriteAllText(_builder, """{ "DefaultCharterName": "Me", "ReductionRules": { "DrumsEasy": { "PadsPerHit": 9, "ThinningDivision": 4, "KickDivision": 4 } } }""");
         var file = new ReductionRulesFile(_path, _builder);
 
         var migrated = file.Load();
 
         Assert.AreEqual(4, migrated.DrumsEasy.ThinningDivision);
-        Assert.AreEqual(ReductionDefaults.MaxGapMs, migrated.DrumsEasy.MinGapMs);
+        Assert.AreEqual(5, migrated.DrumsEasy.PadsPerHit);
         Assert.AreEqual(ReductionDefaults.Shipped.FiveFretHard, migrated.FiveFretHard);
 
         // Once saved, the file has them, and Chart Builder's settings are left as they were.
@@ -63,6 +63,35 @@ public sealed class ReductionRulesFileTests
         Assert.IsTrue(file.Save(migrated));
         Assert.AreEqual(4, new ReductionRulesFile(_path, null).Load().DrumsEasy.ThinningDivision);
         Assert.AreEqual(builder, File.ReadAllText(_builder));
+    }
+
+    [TestMethod]
+    public void ASetSavedBeforeBurstsThinningAsShippedTakesTheShippedBurstsAndHopos()
+    {
+        // Saved before the bursts were added, with Medium's old default of no HOPOs kept, and while thinning had a gap in
+        // milliseconds, which it no longer has.
+        File.WriteAllText(_path, """{ "FiveFretMedium": { "MaxChordSize": 2, "HighestLane": 3, "ThinningDivision": 8, "KeepForcedHopoAndTap": false, "MinGapMs": 200 } }""");
+
+        var medium = new ReductionRulesFile(_path, null).Load().FiveFretMedium;
+
+        var shipped = ReductionDefaults.Shipped.FiveFretMedium;
+        Assert.AreEqual(8, medium.ThinningDivision);
+        Assert.AreEqual(shipped.BurstDivision, medium.BurstDivision);
+        Assert.AreEqual(shipped.MaxBurst, medium.MaxBurst);
+        Assert.IsTrue(medium.KeepForcedHopoAndTap, "A burst's chords are played as the source's only with HOPOs kept.");
+    }
+
+    [TestMethod]
+    public void ASetSavedBeforeBurstsWithItsOwnThinningTakesNone()
+    {
+        File.WriteAllText(_path, """{ "FiveFretHard": { "MaxChordSize": 2, "HighestLane": 4, "ThinningDivision": 4, "KeepForcedHopoAndTap": false } }""");
+
+        var hard = new ReductionRulesFile(_path, null).Load().FiveFretHard;
+
+        Assert.AreEqual(4, hard.ThinningDivision);
+        Assert.IsNull(hard.BurstDivision);
+        Assert.IsNull(hard.MaxBurst);
+        Assert.IsFalse(hard.KeepForcedHopoAndTap);
     }
 
     [TestMethod]

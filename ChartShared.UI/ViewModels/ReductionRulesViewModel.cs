@@ -32,6 +32,7 @@ namespace ChartShared.UI.ViewModels
         /// <summary>The difficulties a part can be reduced to, highest first.</summary>
         public static IReadOnlyList<ChartDifficulty> Targets { get; } = [ChartDifficulty.Hard, ChartDifficulty.Medium, ChartDifficulty.Easy];
 
+        private readonly IReadOnlyList<DivisionChoice> _burstGrids;
         private ReductionDefaults _defaults;
         private bool _loading;
 
@@ -44,6 +45,7 @@ namespace ChartShared.UI.ViewModels
             _defaults = defaults;
             DivisionChoices = [new DivisionChoice(0, SharedStrings.ReductionNoThinning), .. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, SnapLabel(d)))];
             KickChoices = [new DivisionChoice(0, SharedStrings.ReductionKickKept), .. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, SnapLabel(d)))];
+            _burstGrids = [.. SnapGrid.CommonDivisions.Select(d => new DivisionChoice(d, SnapLabel(d)))];
             Kind = kind;
             Target = target;
             LoadRules();
@@ -90,6 +92,11 @@ namespace ChartShared.UI.ViewModels
 
         public IReadOnlyList<DivisionChoice> KickChoices { get; }
 
+        /// <summary>The grids a burst can be as close as: a snap each, never none, and none coarser than the thinning grid.</summary>
+        public IReadOnlyList<DivisionChoice> BurstChoices => Thinning is { Division: > 0 } thinning
+            ? [.. _burstGrids.Where(c => c.Division >= thinning.Division)]
+            : _burstGrids;
+
         public IReadOnlyList<LaneLimitChoice> LaneLimitChoices => Kind == ChartInstrumentKind.SixFret
             ? [.. Enumerable.Range(0, 3).Select(c => new LaneLimitChoice(c, string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionColumnsFormat, c + 1)))]
             : [.. Enumerable.Range(0, 5).Select(f => new LaneLimitChoice(f, string.Format(CultureInfo.CurrentCulture, SharedStrings.ReductionFretsFormat, FretName(f))))];
@@ -98,7 +105,7 @@ namespace ChartShared.UI.ViewModels
 
         public decimal ChordSizeMaximum => Kind == ChartInstrumentKind.SixFret ? 3 : 5;
 
-        public decimal MinGapMaximum => ReductionDefaults.MaxGapMs;
+        public decimal MaxBurstMaximum => ReductionDefaults.MaxBurstLimit;
 
         [ObservableProperty]
         public partial decimal? MaxChordSize { get; set; }
@@ -109,15 +116,27 @@ namespace ChartShared.UI.ViewModels
         [ObservableProperty]
         public partial DivisionChoice? Thinning { get; set; }
 
-        /// <summary>The fewest milliseconds two chords are apart, beside the thinning grid.</summary>
+        /// <summary>The grid a burst's chords can be as close as.</summary>
         [ObservableProperty]
-        public partial decimal? MinGapMs { get; set; }
+        public partial DivisionChoice? BurstThinning { get; set; }
+
+        /// <summary>The most chords in a burst.</summary>
+        [ObservableProperty]
+        public partial decimal? MaxBurst { get; set; }
 
         [ObservableProperty]
         public partial bool KeepForcedHopoAndTap { get; set; }
 
         [ObservableProperty]
         public partial bool KeepShortSustains { get; set; }
+
+        /// <summary>Whether a sustain held while other notes are played is kept.</summary>
+        [ObservableProperty]
+        public partial bool KeepExtendedSustains { get; set; }
+
+        /// <summary>Whether open notes are kept in a phrase that has pressed notes too, rather than made frets.</summary>
+        [ObservableProperty]
+        public partial bool KeepOpenNotes { get; set; }
 
         [ObservableProperty]
         public partial decimal? PadsPerHit { get; set; }
@@ -175,9 +194,12 @@ namespace ChartShared.UI.ViewModels
             MaxChordSize = (int)(MaxChordSize ?? 1),
             HighestLane = HighestLane?.Lane ?? 4,
             ThinningDivision = Thinning?.Division ?? 0,
-            MinGapMs = (int)(MinGapMs ?? 0),
+            BurstDivision = BurstThinning?.Division,
+            MaxBurst = (int)(MaxBurst ?? 1),
             KeepForcedHopoAndTap = KeepForcedHopoAndTap,
             KeepShortSustains = KeepShortSustains,
+            KeepExtendedSustains = KeepExtendedSustains,
+            KeepOpenNotes = KeepOpenNotes,
         }.Normalized(Kind);
 
         /// <summary>The fields, as rules for drums.</summary>
@@ -185,7 +207,8 @@ namespace ChartShared.UI.ViewModels
         {
             PadsPerHit = (int)(PadsPerHit ?? 1),
             ThinningDivision = Thinning?.Division ?? 0,
-            MinGapMs = (int)(MinGapMs ?? 0),
+            BurstDivision = BurstThinning?.Division,
+            MaxBurst = (int)(MaxBurst ?? 1),
             KickDivision = KickThinning?.Division ?? 0,
         }.Normalized();
 
@@ -193,13 +216,36 @@ namespace ChartShared.UI.ViewModels
 
         partial void OnHighestLaneChanged(LaneLimitChoice? value) => OnFieldChanged();
 
-        partial void OnThinningChanged(DivisionChoice? value) => OnFieldChanged();
+        partial void OnThinningChanged(DivisionChoice? value)
+        {
+            // The burst's choices go no coarser than the thinning; its control may clear it meanwhile, which is no edit.
+            bool loading = _loading;
+            _loading = true;
+            try
+            {
+                int grid = BurstThinning?.Division ?? value?.Division ?? 0;
+                OnPropertyChanged(nameof(BurstChoices));
+                BurstThinning = PickBurst(grid);
+            }
+            finally
+            {
+                _loading = loading;
+            }
 
-        partial void OnMinGapMsChanged(decimal? value) => OnFieldChanged();
+            OnFieldChanged();
+        }
+
+        partial void OnBurstThinningChanged(DivisionChoice? value) => OnFieldChanged();
+
+        partial void OnMaxBurstChanged(decimal? value) => OnFieldChanged();
 
         partial void OnKeepForcedHopoAndTapChanged(bool value) => OnFieldChanged();
 
         partial void OnKeepShortSustainsChanged(bool value) => OnFieldChanged();
+
+        partial void OnKeepExtendedSustainsChanged(bool value) => OnFieldChanged();
+
+        partial void OnKeepOpenNotesChanged(bool value) => OnFieldChanged();
 
         partial void OnPadsPerHitChanged(decimal? value) => OnFieldChanged();
 
@@ -231,7 +277,7 @@ namespace ChartShared.UI.ViewModels
                     var rules = _defaults.DrumsFor(Target);
                     PadsPerHit = rules.PadsPerHit;
                     Thinning = DivisionChoices.FirstOrDefault(c => c.Division == rules.ThinningDivision) ?? DivisionChoices[0];
-                    MinGapMs = rules.MinGapMs ?? 0;
+                    LoadBursts(rules.ThinningDivision, rules.BurstDivision, rules.MaxBurst);
                     KickThinning = KickChoices.FirstOrDefault(c => c.Division == rules.KickDivision) ?? KickChoices[0];
                 }
                 else
@@ -240,15 +286,31 @@ namespace ChartShared.UI.ViewModels
                     MaxChordSize = rules.MaxChordSize;
                     HighestLane = LaneLimitChoices.FirstOrDefault(c => c.Lane == rules.HighestLane) ?? LaneLimitChoices[^1];
                     Thinning = DivisionChoices.FirstOrDefault(c => c.Division == rules.ThinningDivision) ?? DivisionChoices[0];
-                    MinGapMs = rules.MinGapMs ?? 0;
+                    LoadBursts(rules.ThinningDivision, rules.BurstDivision, rules.MaxBurst);
                     KeepForcedHopoAndTap = rules.KeepForcedHopoAndTap;
                     KeepShortSustains = rules.KeepShortSustains;
+                    KeepExtendedSustains = rules.KeepExtendedSustains ?? true;
+                    KeepOpenNotes = rules.KeepOpenNotes ?? true;
                 }
             }
             finally
             {
                 _loading = false;
             }
+        }
+
+        // A set's bursts, into the fields: where it has none set, as close as its thinning, one chord at a time.
+        private void LoadBursts(int division, int? burstDivision, int? maxBurst)
+        {
+            BurstThinning = PickBurst(burstDivision ?? division);
+            MaxBurst = maxBurst ?? 1;
+        }
+
+        // The burst's choice on grid, or the nearest there is: one coarser than the thinning is the thinning's.
+        private DivisionChoice? PickBurst(int grid)
+        {
+            var choices = BurstChoices;
+            return choices.FirstOrDefault(c => c.Division == grid) ?? choices.MinBy(c => Math.Abs(c.Division - grid));
         }
 
         // The fields, into the working copy, for the family and target they show.

@@ -22,7 +22,7 @@ public sealed class ReduceProposalsTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(3)]
-    public void ReducingExpertToEasyMakesNoChordOrNoteCloserThanTheEasyGridAndIsUndoneInOneStep(int seed)
+    public void ReducingExpertToEasyKeepsTheEasySpacingAndIsUndoneInOneStep(int seed)
     {
         // AC C9.1, on a dense chart: 1/32 runs, triplets, chords of up to five, opens, forcing, taps and sustains, and a
         // change to 3/4 part way.
@@ -45,9 +45,8 @@ public sealed class ReduceProposalsTests
             Assert.IsTrue(chord.All(n => n.Lane is ChartNote.OpenLane or >= 0 and <= 2), $"The chord at {chord.Key} is past yellow.");
         }
 
-        for (int i = 1; i < chords.Count; i++)
-            Assert.IsGreaterThanOrEqualTo(480L, chords[i].Key - chords[i - 1].Key, $"Chords at {chords[i - 1].Key} and {chords[i].Key}.");
-        Assert.DoesNotContain(f => (f.Flags & (ChordFlags.ForceHopo | ChordFlags.Tap)) != 0, easy.FlaggedChords);
+        AssertEasySpacing([.. chords.Select(c => c.Key)]);
+        AssertPlayedAsTheSource(chart, session.ReadOptions, Expert, Easy);
         Assert.DoesNotContain(n => n.Length > EditableNote.PlainLength && n.Length < 480, easy.Notes);
         Assert.IsFalse(session.Reduce.IsActive);
 
@@ -73,12 +72,41 @@ public sealed class ReduceProposalsTests
         Assert.IsNotEmpty(hits);
         foreach (var hit in hits)
             Assert.IsLessThanOrEqualTo(1, hit.Count(n => n.Lane > 0), $"The hit at {hit.Key} has more than one pad.");
-        for (int i = 1; i < hits.Count; i++)
-            Assert.IsGreaterThanOrEqualTo(480L, hits[i].Key - hits[i - 1].Key);
+        AssertEasySpacing([.. hits.Select(h => h.Key)]);
         Assert.DoesNotContain(n => n.DoubleKick, easy.Notes);
 
         session.Undo();
         AssertSame(start, chart, "after one undo");
+    }
+
+    // Every chord of to played as from's at its tick is, as the games read them: a strum, a HOPO or a tap. A HOPO on the
+    // fret before it plays as a strum whatever forces it, so a chord on the same frets as the one before is left out.
+    private static void AssertPlayedAsTheSource(EditableChart chart, ChartReadOptions options, ChartDifficulty from, ChartDifficulty to)
+    {
+        static Dictionary<long, NoteFlags> States(IEnumerable<ChartNote> notes) =>
+            notes.GroupBy(n => n.Tick).ToDictionary(g => g.Key, g => g.Select(n => n.Flags & (NoteFlags.Hopo | NoteFlags.Tap)).Max());
+        var source = States(GameView.Project(chart, new ChartTrackKey(ChartInstrument.Guitar, from), options).Notes);
+        var drafted = GameView.Project(chart, new ChartTrackKey(ChartInstrument.Guitar, to), options).Notes.ToList();
+        var lanes = drafted.GroupBy(n => n.Tick).Select(g => (g.Key, Lanes: string.Join(",", g.Select(n => n.Lane).Order()))).ToList();
+        var played = States(drafted);
+        for (int i = 0; i < lanes.Count; i++)
+        {
+            long tick = lanes[i].Key;
+            if (i > 0 && lanes[i].Lanes == lanes[i - 1].Lanes)
+                continue;
+            Assert.AreEqual(source[tick], played[tick], $"The chord at {tick}.");
+        }
+    }
+
+    // Easy's spacing (AC C9.1) at a beat of 480 ticks: no two chords closer than its burst's grid (1/8), and any one more
+    // than its longest burst in a row span that many of its grid's steps (1/4).
+    private static void AssertEasySpacing(IReadOnlyList<long> ticks)
+    {
+        int burst = FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy).MaxBurst ?? 1;
+        for (int i = 1; i < ticks.Count; i++)
+            Assert.IsGreaterThanOrEqualTo(240L, ticks[i] - ticks[i - 1], $"Chords at {ticks[i - 1]} and {ticks[i]}.");
+        for (int i = burst; i < ticks.Count; i++)
+            Assert.IsGreaterThanOrEqualTo(480L * burst, ticks[i] - ticks[i - burst], $"Chords from {ticks[i - burst]} to {ticks[i]}.");
     }
 
     [TestMethod]
@@ -289,7 +317,7 @@ public sealed class ReduceProposalsTests
         var chart = Guitar();
         new AddNotes(ChartInstrument.Guitar, Expert, [new EditableNote(0, 1, 0), new EditableNote(360, 1, 0), new EditableNote(480, 1, 1)]).Apply(chart);
         var session = Of(chart);
-        session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy));
+        session.Reduce.Start(ChartInstrument.Guitar, Expert, Easy, FretReductionRules.Default(ChartInstrumentKind.FiveFret, Easy) with { KeepForcedHopoAndTap = false });
 
         var diff = (await session.Reduce.DiffAsync()).Single();
 

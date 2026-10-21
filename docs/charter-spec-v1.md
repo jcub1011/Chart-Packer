@@ -1358,10 +1358,13 @@ Acceptance criteria:
      | Max chord size (5-fret / GHL) | 2 | 2 | 1 |
      | Frets used (5-fret) | all | G–B | G–Y |
      | Columns used (GHL) | all | 1–3 | 1–2 |
-     | Thinning grid (no closer than) | 1/16 | 1/8 | 1/4 |
-     | And no closer than (frets and drums) | 100 ms | 200 ms | 400 ms |
-     | Forced HOPOs and taps | kept | removed | removed |
+     | Thinning grid (on average no closer than) | 1/16 | 1/8 | 1/4 |
+     | Bursts no closer than | 1/16 | 1/16 | 1/8 |
+     | Longest burst (chords or hits) | 3 | 3 | 3 |
+     | HOPOs and taps, as played | kept | kept | kept |
      | Sustains shorter than a beat | kept | kept | removed |
+     | Sustains held while other notes are played | removed | removed | removed |
+     | Open notes in phrases with pressed notes | fretted | fretted | fretted |
      | Drums: pads per hit (plus kick) | 2 | 2 | 1 |
      | Drums: kick | kept | thinned to 1/8 | thinned to 1/4 |
      | Drums: 2× kick | removed | removed | removed |
@@ -1370,9 +1373,10 @@ Acceptance criteria:
      Frets outside the allowed range are moved inward, with the melody's shape kept as far as
      possible. For GHL, a white and a black on one column count as one column.
    - Thinning keeps the chords that matter most first: strong beats, sustains, chords, the first
-     note after a rest, turns in the melody, and the ends of phrases. No two chords are closer than
-     the thinning grid or the minimum gap, whichever is larger. Every star power phrase and solo
-     keeps at least one note.
+     note after a rest, turns in the melody, and the ends of phrases. Chords are on average no
+     closer than the thinning grid, and only a short burst the source has comes closer, down to
+     the burst's grid. Every gap is a fraction of a beat, never a time, so a faster song is harder.
+     Every star power phrase and solo keeps at least one note.
    - The lane limits apply only to what Reduce makes. The editor still lets the charter place notes
      on any lane on any difficulty.
    - **Reduce all** fills Hard, Medium and Easy in one run, each from the difficulty above it, so
@@ -1419,7 +1423,8 @@ Acceptance criteria:
   chord after a rest, +0.5 for a turn of the melody (by each chord's lowest column; not drums),
   and +1 for a phrase's first or last chord. So a long sustain on the "and" beats a plain note on
   the beat. Chords are taken best first, the earlier on a tie, where no chord taken is closer
-  than the grid's step or the minimum gap in milliseconds, on either side. Before them, each star
+  than the grid's step or the minimum gap in milliseconds, on either side (the milliseconds were
+  later removed: see below). Before them, each star
   power phrase and solo takes its best chord, where that keeps the gap. The drums' kick pass keeps
   its own grid only.
 - **Chords** keep their lowest and highest columns, then inner ones up to the limit, as before.
@@ -1445,10 +1450,86 @@ Acceptance criteria:
   harder, and the draft's findings: the 5-fret, drum and phrase rules on its difficulties, and
   CHR081 against the difficulty above. CHR065 flags a phrase a draft left empty.
 
+*Improved to keep a song's character:*
+
+A single gap between every two chords turned Medium and Easy into a steady pulse. It cut the
+syncopation, gallops and short runs that make a part fun to play. A lower difficulty may now be
+harder than another song's at the same level, as its rating says, so long as it keeps the song's
+rhythm.
+
+- **Fractions of a beat, not time.** The minimum gaps in milliseconds are gone, both the average
+  gap and the burst's. Every spacing rule is a grid, so it reads the same at any tempo and in any
+  time signature. A gap in time sat at a different place in each song's rhythm. At 154 BPM eighths
+  are 195 ms apart, just under Medium's old 200 ms, so a steady eighth chug became quarters, or
+  groups of three with bursts. A faster song now keeps as many notes a beat as a slower one, and
+  is harder, as its rating says. A charter who wants it easier picks a coarser grid. Settings saved
+  with a gap in milliseconds load as before, without it.
+- **Bursts.** The thinning grid is now what chords keep on average. Any one more than the longest
+  burst in a row span at least that many of its steps. Within that, a burst's chords can be as
+  close as the burst's grid, never closer. So on Easy two or three eighths with room around them
+  stay, while a run of sixteenths still thins to the beats. A longest burst of 1 keeps every two
+  chords a step apart, as before. Hard's bursts ship as close as its grid, so Hard is thinned
+  evenly. The drums' kick pass keeps its own grid only.
+  - Only the source's own bursts count. A burst is a run of two or more chords, each closer than
+    the grid's step to the next, with a step or more on either side, that fits within the longest
+    burst's steps. A longer run is a steady stream, which thins evenly. Allowing bursts in a stream
+    cut it into groups the chart never had.
+- **HOPOs and taps** are kept on every difficulty by default. Each chord plays as the source's
+  does: a strum, a HOPO or a tap, read with the song's HOPO threshold. Where leaving notes out
+  would change that, the chord is forced to a HOPO or a strum. A HOPO thinned past the threshold
+  stays a HOPO, and a strum thinned within it stays a strum. With the rule off, forced HOPOs and
+  taps are removed and forced strums kept, as before.
+  - A chord on the same frets as the chord before it is a strum, never a HOPO. Thinning and
+    fitting can press frets the source had apart into one, and a HOPO on the note just played is
+    awkward. Its forcing is left out, so it reads as a strum. A tap stays a tap.
+- **Anticipation.** A chord off the beat, with nothing charted on the next stronger position before
+  the next chord, anticipates that position. An example is the "and" of 4 held over an empty
+  downbeat. It scores as that position less 0.5, so it's kept over beat 4, but not over a chord on
+  the position itself. The next stronger position follows the time signature. A chord off every
+  grid anticipates nothing.
+- **Riffs.** Measures charted the same are thinned the same. That means the same chords at the
+  same places, each with the same notes and long sustain or not.
+  Each chord's score is its mean across them. After thinning, a chord most of those measures left
+  out is left out of the rest, unless that would leave a star power phrase or solo empty. A chord
+  most kept is then added to the rest where the spacing allows.
+- **Sustains.** On a difficulty that removes sustains shorter than a beat, a sustain a burst cuts
+  short of a beat is a plain note.
+- **Open notes in phrases with pressed notes.** Going between an open and a fret is hard to play,
+  so Hard, Medium and Easy fret the opens of a phrase that has opens played alone and pressed notes
+  both. Every open in the phrase becomes green, those before and after its frets as well as those
+  between them. An open in a chord with frets becomes green pressed with them, so `o+R` is `G R`,
+  and Easy keeps only the green. Each fret next to an open alone, with the same chord repeated
+  beside it, moves up one and is kept off green, so the change is still a move. An Expert
+  `R o R o G o G o` is `Y G Y G R G R G` on Hard. Frets further from an open keep their place, so a
+  fill in the same phrase keeps its orange. The phrase is then fitted to the range as a whole, its
+  steps judged on the source's frets. The lift follows the source, so Medium keeps it where its
+  opens are thinned out. A fret next to an open only once thinning has left them side by side
+  moves up one too. A phrase without an open alone keeps its opens, such as one of opens alone, or
+  of `o+R` chords and frets. So does every phrase where green is the highest fret, since no fret
+  can move off it. On GHL an open becomes the first white fret.
+- **A chord change over one fret.** A step of the melody goes the way the chord's lowest fret goes,
+  or, where that stays, the way its highest goes. Easy keeps a chord's lowest fret alone, so
+  green–red then green–yellow was green twice, and the change was lost. Where a phrase loses a
+  step like that, it's fitted again, keeping each step's way and as near its frets as it can. So
+  that change is green then red on Easy. Medium keeps the chords, which show the change, and
+  doesn't move.
+- **A chord as wide as the range.** Fitting a phrase may make a chord narrower, its top pressed
+  in, where its full width would lose a step. A chord as wide as the range has nowhere to go, so
+  green–blue then red–orange on Medium was green–blue twice. Now it's green–blue then red–blue,
+  and red–blue after that is red–yellow, so each change shows. A chord stays a chord, and is
+  moved before it's narrowed. A run of one chord repeated is one step of the melody, so a long run
+  counts no more than a short one.
+- **Sustains held over other notes.** A sustain the draft holds past the start of the next chord,
+  so held while other notes are played, is a plain note on every difficulty Reduce makes. Its chord
+  keeps its forcing, so a tap stays a tap. It's judged on the draft, so a sustain whose notes under
+  it are thinned away stays a sustain, and one that ends as the next chord starts is no extended
+  sustain. A set saved before the rule takes the shipped value.
+
 Acceptance criteria:
 
-- **AC C9.1** Reducing Expert to Easy never makes a chord or a note closer than the Easy thinning
-  grid, and is undone in one step.
+- **AC C9.1** Reducing Expert to Easy never makes two chords or notes closer than Easy's burst
+  grid, and any one more than its longest burst in a row span that many steps of its thinning grid.
+  It is undone in one step.
 - **AC C9.2** Reduce all fills Hard, Medium and Easy as one undo step, and each one's chords are on
   ticks of the difficulty above it.
 - **AC C9.3** Every star power phrase and solo with notes on the source keeps at least one note on

@@ -194,7 +194,7 @@ public static class OpusTranscoder
     }
     private static int EncodeFrame(List<float> pending, byte[] packet, IOpusEncoder encoder, int channels)
     {
-        float[] frame = pending.GetRange(0, FrameSize * channels).ToArray();
+        float[] frame = [.. pending.GetRange(0, FrameSize * channels)];
         int length;
         try
         {
