@@ -253,7 +253,11 @@ namespace ChartBuilder.ViewModels
 
         /// <summary>Shows every message said this session, from the message bar.</summary>
         [RelayCommand]
-        private Task ShowMessagesAsync() => _services.MessagesDialog.ShowAsync(new MessagesDialogViewModel(Messages));
+        private async Task ShowMessagesAsync()
+        {
+            using var dialog = new MessagesDialogViewModel(Messages);
+            await _services.MessagesDialog.ShowAsync(dialog);
+        }
 
         private bool CanShowSong() => Song.Entry is not null;
 

@@ -122,6 +122,14 @@
     <value>Nothing has been said yet.</value>
     <comment>The Messages dialog when there are no messages.</comment>
   </data>
+  <data name="MessagesSearchWatermark" xml:space="preserve">
+    <value>Search messages</value>
+    <comment>The Messages dialog's search box, which narrows the list to the messages containing it.</comment>
+  </data>
+  <data name="MessagesNoMatchesFormat" xml:space="preserve">
+    <value>No messages match “{0}”.</value>
+    <comment>The Messages dialog when the search matches no message. {0} is the search text.</comment>
+  </data>
   <data name="MessagesCopyButton" xml:space="preserve">
     <value>Copy</value>
     <comment>Copies the message picked in the Messages dialog.</comment>
