@@ -349,6 +349,7 @@ namespace ChartBuilder.Services
                     Volume("audio.hitSoundVolume", audio, Strings.HitSoundVolumeLabel, Strings.HitSoundVolumeDescription, Strings.HitSoundVolumeKeywords,
                         () => settings.Settings.HitSoundVolume, volume => settings.Settings.HitSoundVolume = volume),
                     AppLog.CreateSetting(logging, () => settings.Settings.LoggingEnabled, enabled => settings.Settings.LoggingEnabled = enabled),
+                    .. UpdateCheck.CreateSettings(general),
                     new ChoiceSetting<StartupAction>
                     {
                         Id = "general.startupAction",

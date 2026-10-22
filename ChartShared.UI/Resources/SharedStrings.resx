@@ -715,6 +715,62 @@
     <value>See the releases on GitHub</value>
     <comment>The title bar's version, which opens the project's releases page in the browser.</comment>
   </data>
+  <data name="VersionUpdateAvailableToolTipFormat" xml:space="preserve">
+    <value>Version {0} is available — see the releases on GitHub</value>
+    <comment>The title bar's version when a newer release is available. {0} is the latest version, e.g. v1.2.0.</comment>
+  </data>
+  <data name="VersionUpdatePrereleaseToolTipFormat" xml:space="preserve">
+    <value>Pre-release version {0} is available — see the releases on GitHub</value>
+    <comment>The title bar's version when a newer pre-release is available. {0} is the latest version, e.g. v1.3.0-beta.1.</comment>
+  </data>
+  <data name="UpdateIncludePrereleasesLabel" xml:space="preserve">
+    <value>Include pre-releases in update check</value>
+    <comment>The setting for whether pre-release versions count as available updates in the title bar's version check.</comment>
+  </data>
+  <data name="UpdateIncludePrereleasesDescription" xml:space="preserve">
+    <value>When on, the version in the title bar shows an update badge for pre-release versions too. Shared by both apps.</value>
+    <comment>The description of the setting for whether pre-release versions count as available updates.</comment>
+  </data>
+  <data name="UpdateIncludePrereleasesKeywords" xml:space="preserve">
+    <value>update updates upgrade prerelease pre-release beta version releases github</value>
+    <comment>Extra words, separated by spaces, that find the pre-releases update setting in the Settings search.</comment>
+  </data>
+  <data name="UpdateCheckLabel" xml:space="preserve">
+    <value>Check for updates</value>
+    <comment>The setting for whether the app checks GitHub for newer releases for the title bar's version badge.</comment>
+  </data>
+  <data name="UpdateCheckDescription" xml:space="preserve">
+    <value>When on, the version in the title bar shows a badge when a newer release is available. Shared by both apps.</value>
+    <comment>The description of the setting for whether the app checks for updates.</comment>
+  </data>
+  <data name="UpdateCheckKeywords" xml:space="preserve">
+    <value>update updates upgrade version releases github badge</value>
+    <comment>Extra words, separated by spaces, that find the update check setting in the Settings search.</comment>
+  </data>
+  <data name="UpdateFrequencyLabel" xml:space="preserve">
+    <value>Update check frequency</value>
+    <comment>The setting for how often the app checks GitHub for newer releases for the title bar's version badge.</comment>
+  </data>
+  <data name="UpdateFrequencyDescription" xml:space="preserve">
+    <value>How often to look for a newer release: every hour, once a day, or on every launch. Shared by both apps.</value>
+    <comment>The description of the setting for how often the app checks for updates.</comment>
+  </data>
+  <data name="UpdateFrequencyKeywords" xml:space="preserve">
+    <value>update updates upgrade frequency hourly daily startup launch version releases github</value>
+    <comment>Extra words, separated by spaces, that find the update frequency setting in the Settings search.</comment>
+  </data>
+  <data name="UpdateFrequencyHourly" xml:space="preserve">
+    <value>Hourly</value>
+    <comment>Checking for updates at most once an hour.</comment>
+  </data>
+  <data name="UpdateFrequencyDaily" xml:space="preserve">
+    <value>Daily</value>
+    <comment>Checking for updates at most once a day.</comment>
+  </data>
+  <data name="UpdateFrequencyOnStartup" xml:space="preserve">
+    <value>On Startup</value>
+    <comment>Checking for updates on every launch of the app.</comment>
+  </data>
   <data name="CalibrationWindowTitle" xml:space="preserve">
     <value>Calibrate Audio Latency</value>
   </data>

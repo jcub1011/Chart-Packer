@@ -47,6 +47,12 @@ public static class UserConfigPaths
     public static string InputBindingsFile => Path.Combine(ConfigFolder, "input-bindings.json");
 
     /// <summary>
+    /// Shared update preferences: whether pre-releases count as available updates, plus the last check
+    /// and its cached result, so the title bar's version badge shows instantly. Read and written by both apps.
+    /// </summary>
+    public static string UpdateSettingsFile => Path.Combine(ConfigFolder, "update-settings.json");
+
+    /// <summary>
     /// Where Chart Builder autosaves the chart open, for recovery after a crash (charter-spec C15 item 6,
     /// <c>RecoveryStore</c>). Never inside a song.
     /// </summary>
