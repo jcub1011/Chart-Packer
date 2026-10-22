@@ -3,9 +3,10 @@
         xmlns:vm="using:ChartBuilder.ViewModels"
         xmlns:res="using:ChartBuilder.Resources"
         xmlns:sres="using:ChartShared.UI.Resources"
+        xmlns:ui="using:ChartShared.UI.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="720"
+        mc:Ignorable="d" d:DesignWidth="620" d:DesignHeight="720"
         x:Class="ChartBuilder.Views.ExportSngWindow"
         x:DataType="vm:ExportSngViewModel"
         Icon="/Assets/ChartBuilder.ico"
@@ -14,208 +15,394 @@
         WindowStartupLocation="CenterOwner"
         SizeToContent="Height"
         CanResize="False"
+        CanMinimize="False"
         ShowInTaskbar="False"
-        Width="600">
+        Width="620"
+        MaxHeight="660"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="30"
+        WindowDecorationsTheme="{StaticResource TitleBarDecorations}">
 
-    <!-- Export to .sng: a read-only preview of what will be packed, the export location, and what to do
-         when the .sng already exists. Nothing is written until Export is chosen. -->
+    <!-- Export Song: the song as it will be packed in a band at the top, then where the .sng goes, its audio and its
+         metadata, and Cancel and Export in a footer. Nothing is written until Export is chosen. -->
     <Window.Styles>
         <StyleInclude Source="avares://ChartShared.UI/Styles/Inspector.axaml" />
-        <Style Selector="TextBlock.section-heading">
+        <Style Selector="TextBlock.heading">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
-            <Setter Property="Margin" Value="0,4,0,0" />
         </Style>
-        <Style Selector="TextBlock.note">
+        <Style Selector="TextBlock.hint">
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.6" />
             <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.warning">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- A recessed box for what's read rather than edited: the .sng to be written, the stems, the metadata. -->
+        <Style Selector="Border.well">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+
+        <!-- The metadata's heading, which shows or hides the list: flat, its chevron turning down while it's open. -->
+        <Style Selector="ToggleButton.disclosure">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="Margin" Value="-4,0,0,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ToolPressedBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:pressed">
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure ui|LineIcon.chevron">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+            <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.disclosure:checked ui|LineIcon.chevron">
+            <Setter Property="RenderTransform" Value="rotate(0deg)" />
         </Style>
     </Window.Styles>
 
-    <ScrollViewer MaxHeight="660">
-        <StackPanel Margin="20" Spacing="12">
-            <TextBlock Classes="muted note" Text="{x:Static res:Strings.ExportSngIntro}" />
+    <DockPanel>
+        <!-- The title bar, as the Editor's is: the icon and the title. -->
+        <ui:TitleBar x:Name="WindowTitleBar"
+                     DockPanel.Dock="Top"
+                     Height="31"
+                     BorderThickness="0,0,0,1"
+                     BorderBrush="{DynamicResource SubtleBorderBrush}">
+            <TextBlock Margin="8,0,12,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{x:Static res:Strings.ExportSngTitle}" />
+        </ui:TitleBar>
 
-            <TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding SongTitle}" />
-
-            <TextBlock Classes="note"
-                       Foreground="{DynamicResource WarningTextBrush}"
-                       Text="{Binding ErrorsText}"
-                       IsVisible="{Binding ErrorsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Classes="muted note"
-                       Text="{Binding PendingText}"
-                       IsVisible="{Binding PendingText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-
-            <!-- What will be packed: the art beside the headline fields, the rest below. -->
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ExportSngSongHeading}" />
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-                <StackPanel Grid.Column="0" Spacing="6" Width="148">
-                    <Border Classes="artTile" AutomationProperties.Name="{x:Static res:Strings.ExportSngArtLabel}">
-                        <Panel Height="148">
-                            <Image Source="{Binding AlbumArt}" Stretch="Uniform" IsVisible="{Binding HasAlbumArt}" />
-                            <TextBlock Classes="muted note"
-                                       VerticalAlignment="Center"
+        <!-- The song as it will be packed: its art beside its name, artist and album, then its genre, year and length,
+             and who charted it. -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="20,18">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18">
+                <Border Grid.Column="0"
+                        Classes="artTile"
+                        Width="112"
+                        Height="112"
+                        CornerRadius="6"
+                        VerticalAlignment="Top"
+                        ToolTip.Tip="{Binding ArtStatus}"
+                        AutomationProperties.Name="{x:Static res:Strings.ExportSngArtLabel}">
+                    <Panel>
+                        <Image Source="{Binding AlbumArt}" Stretch="Uniform" IsVisible="{Binding HasAlbumArt}" />
+                        <!-- With no image to show, the placeholder and the art in words: its file, when it won't load, or none. -->
+                        <StackPanel VerticalAlignment="Center" Spacing="6" Margin="8,0" IsVisible="{Binding !HasAlbumArt}">
+                            <ui:LineIcon Width="32"
+                                         Height="32"
+                                         Opacity="0.4"
+                                         HorizontalAlignment="Center"
+                                         Data="{StaticResource ImageStroke}" />
+                            <TextBlock Classes="muted"
+                                       FontSize="11"
                                        HorizontalAlignment="Center"
-                                       TextAlignment="Center"
-                                       Margin="8"
-                                       Text="{x:Static res:Strings.ExportSngArtNone}"
-                                       IsVisible="{Binding !HasAlbumArt}" />
-                        </Panel>
-                    </Border>
-                    <TextBlock Classes="muted note"
-                               Text="{Binding ArtStatus}"
-                               ToolTip.Tip="{Binding ArtStatus}"
-                               TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="2" Grid.IsSharedSizeScope="True" IsVisible="{Binding HasDetails}">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasName}">
-                        <TextBlock Grid.Column="0" Classes="muted note" MinWidth="70" Text="{x:Static res:Strings.ExportSngNameLabel}" />
-                        <TextBlock Grid.Column="1" Classes="note" FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasArtist}">
-                        <TextBlock Grid.Column="0" Classes="muted note" MinWidth="70" Text="{x:Static res:Strings.ExportSngArtistLabel}" />
-                        <TextBlock Grid.Column="1" Classes="note" Text="{Binding Artist}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Artist}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasAlbum}">
-                        <TextBlock Grid.Column="0" Classes="muted note" MinWidth="70" Text="{x:Static res:Strings.ExportSngAlbumLabel}" />
-                        <TextBlock Grid.Column="1" Classes="note" Text="{Binding Album}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Album}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasGenre}">
-                        <TextBlock Grid.Column="0" Classes="muted note" MinWidth="70" Text="{x:Static res:Strings.ExportSngGenreLabel}" />
-                        <TextBlock Grid.Column="1" Classes="note" Text="{Binding Genre}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Genre}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasYear}">
-                        <TextBlock Grid.Column="0" Classes="muted note" MinWidth="70" Text="{x:Static res:Strings.ExportSngYearLabel}" />
-                        <TextBlock Grid.Column="1" Classes="note" Text="{Binding Year}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasCharter}">
-                        <TextBlock Grid.Column="0" Classes="muted note" MinWidth="70" Text="{x:Static res:Strings.ExportSngCharterLabel}" />
-                        <TextBlock Grid.Column="1" Classes="note" Text="{Binding Charter}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Charter}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasSongLength}">
-                        <TextBlock Grid.Column="0" Classes="muted note" MinWidth="70" Text="{x:Static res:Strings.ExportSngLengthLabel}" />
-                        <TextBlock Grid.Column="1" Classes="note" Text="{Binding SongLength}" />
-                    </Grid>
+                                       TextTrimming="CharacterEllipsis"
+                                       Text="{Binding ArtStatus}" />
+                        </StackPanel>
+                    </Panel>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock FontSize="20"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               MaxLines="2"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Headline}"
+                               ToolTip.Tip="{Binding Headline}" />
+                    <TextBlock FontSize="14"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding ArtistLine}"
+                               ToolTip.Tip="{Binding ArtistLine}"
+                               IsVisible="{Binding ArtistLine, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock Classes="muted"
+                               FontSize="13"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Album}"
+                               ToolTip.Tip="{Binding Album}"
+                               IsVisible="{Binding HasAlbum}" />
+                    <WrapPanel Margin="0,8,0,0" ItemSpacing="6" LineSpacing="6">
+                        <WrapPanel.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                                <Binding Path="HasGenre" />
+                                <Binding Path="HasYear" />
+                                <Binding Path="HasSongLength" />
+                            </MultiBinding>
+                        </WrapPanel.IsVisible>
+                        <Border Classes="chip large"
+                                ToolTip.Tip="{x:Static res:Strings.ExportSngGenreLabel}"
+                                IsVisible="{Binding HasGenre}">
+                            <TextBlock Text="{Binding Genre}" />
+                        </Border>
+                        <Border Classes="chip large"
+                                ToolTip.Tip="{x:Static res:Strings.ExportSngYearLabel}"
+                                IsVisible="{Binding HasYear}">
+                            <TextBlock Text="{Binding Year}" />
+                        </Border>
+                        <Border Classes="chip large"
+                                ToolTip.Tip="{x:Static res:Strings.ExportSngLengthLabel}"
+                                IsVisible="{Binding HasSongLength}">
+                            <TextBlock Text="{Binding SongLength}" />
+                        </Border>
+                    </WrapPanel>
+                    <TextBlock Classes="muted"
+                               Margin="0,6,0,0"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding CharterText}"
+                               ToolTip.Tip="{Binding CharterText}"
+                               IsVisible="{Binding CharterText, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 </StackPanel>
             </Grid>
+        </Border>
 
-            <StackPanel Spacing="4" IsVisible="{Binding HasOtherMetadata}">
-                <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ExportSngOtherHeading}" />
-                <ScrollViewer MaxHeight="140">
-                    <ItemsControl ItemsSource="{Binding OtherMetadata}" Grid.IsSharedSizeScope="True">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ExportMetadataRow">
-                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                                    <TextBlock Grid.Column="0"
-                                               Classes="muted note"
-                                               MinWidth="140"
-                                               Text="{Binding Key}"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip.Tip="{Binding Key}" />
-                                    <TextBlock Grid.Column="1" Classes="note" Text="{Binding Value}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Value}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
-
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ExportSngAudioHeading}" />
-            <StackPanel Spacing="4">
-                <ItemsControl ItemsSource="{Binding StemDisplays}" IsVisible="{Binding HasStems}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ExportStemDisplay">
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                <TextBlock Grid.Column="0"
-                                           Classes="note"
-                                           VerticalAlignment="Center"
-                                           Text="{Binding FileName}"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip.Tip="{Binding FileName}" />
-                                <Border Grid.Column="1" Classes="chip">
-                                    <TextBlock Text="{Binding Note}" />
-                                </Border>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Classes="muted note"
-                           Text="{x:Static res:Strings.ExportSngNoStems}"
-                           IsVisible="{Binding !HasStems}" />
-                <CheckBox Content="{x:Static res:Strings.ExportSngTranscodeLabel}"
-                          IsChecked="{Binding TranscodeToOpus}"
-                          IsEnabled="{Binding CanTranscode}" />
-                <TextBlock Classes="muted note" Text="{Binding TranscodeNote}" />
-                <ComboBox HorizontalAlignment="Stretch"
-                          ItemsSource="{Binding QualityChoices}"
-                          SelectedItem="{Binding SelectedQuality}"
-                          IsVisible="{Binding TranscodeToOpus}"
-                          AutomationProperties.Name="{x:Static res:Strings.ExportSngQualityLabel}">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ExportQualityChoice">
-                            <TextBlock Text="{Binding Label}" />
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-                <TextBlock Classes="muted note"
-                           Text="{x:Static res:Strings.ExportSngQualityNote}"
-                           IsVisible="{Binding TranscodeToOpus}" />
-                <TextBlock Classes="note"
-                           Foreground="{DynamicResource WarningTextBrush}"
-                           Text="{x:Static res:Strings.ExportSngTranscodeUnavailable}"
-                           IsVisible="{Binding TranscodeBlocked}" />
-            </StackPanel>
-
-            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.ExportSngLocationHeading}" />
-            <StackPanel Spacing="6">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <TextBox Grid.Column="0" Text="{Binding ExportFolder}" AutomationProperties.Name="{x:Static res:Strings.ExportSngLocationLabel}" />
-                    <Button Grid.Column="1" Content="{x:Static res:Strings.ExportSngBrowseButton}" Command="{Binding BrowseCommand}" />
+        <!-- Cancel and Export at the right, as the other dialogs have them; while Export can't run, why, at the left. -->
+        <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Grid Grid.Column="0"
+                      ColumnDefinitions="Auto,*"
+                      ColumnSpacing="6"
+                      Margin="4,0,0,0"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding HasProblem}">
+                    <ui:LineIcon Grid.Column="0"
+                                 Width="14"
+                                 Height="14"
+                                 Foreground="{DynamicResource WarningTextBrush}"
+                                 Data="{StaticResource WarningStroke}" />
+                    <TextBlock Grid.Column="1"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource WarningTextBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Problem}"
+                               ToolTip.Tip="{Binding Problem}" />
                 </Grid>
-                <StackPanel Spacing="2" IsVisible="{Binding HasTarget}">
-                    <TextBlock Classes="caption" Text="{x:Static res:Strings.ExportSngTargetLabel}" />
-                    <TextBlock Classes="note"
-                               Text="{Binding EffectiveTarget}"
-                               TextTrimming="PathSegmentEllipsis"
-                               ToolTip.Tip="{Binding EffectiveTarget}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Content="{x:Static sres:SharedStrings.CancelButton}"
+                            IsCancel="True"
+                            Click="OnCancel"
+                            AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+                    <Button MinWidth="80"
+                            HorizontalContentAlignment="Center"
+                            Classes="accent"
+                            Content="{x:Static res:Strings.ExportSngExportButton}"
+                            Command="{Binding ExportCommand}"
+                            IsDefault="True"
+                            AutomationProperties.Name="{x:Static res:Strings.ExportSngExportButton}" />
                 </StackPanel>
-                <TextBlock Classes="note"
-                           Foreground="{DynamicResource WarningTextBrush}"
-                           Text="{Binding ExistsText}"
-                           IsVisible="{Binding ExistsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                <TextBlock Classes="muted note"
-                           Text="{Binding RenameText}"
-                           IsVisible="{Binding RenameText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                <TextBlock Classes="caption" Text="{x:Static res:Strings.ExportSngPolicyLabel}" />
-                <ComboBox HorizontalAlignment="Stretch"
-                          ItemsSource="{Binding PolicyChoices}"
-                          SelectedItem="{Binding SelectedPolicy}"
-                          AutomationProperties.Name="{x:Static res:Strings.ExportSngPolicyLabel}">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ExportPolicyChoice">
-                            <TextBlock Text="{Binding Label}" />
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-            </StackPanel>
+            </Grid>
+        </Border>
 
-            <TextBlock Classes="note"
-                       Foreground="{DynamicResource WarningTextBrush}"
-                       Text="{Binding Problem}"
-                       IsVisible="{Binding HasProblem}" />
+        <!-- The rest of the window's height: it scrolls so the header and footer always show. -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,16,20,20" Spacing="20">
+                <!-- What stands in the way, or what Export does first. -->
+                <StackPanel Spacing="8">
+                    <StackPanel.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                            <Binding Path="ErrorsText" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                            <Binding Path="PendingText" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                        </MultiBinding>
+                    </StackPanel.IsVisible>
+                    <Border Classes="banner error" IsVisible="{Binding ErrorsText, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <ui:LineIcon Grid.Column="0" Width="14" Height="14" VerticalAlignment="Top" Margin="0,1,0,0"
+                                         Data="{StaticResource WarningStroke}" />
+                            <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap" Text="{Binding ErrorsText}" />
+                        </Grid>
+                    </Border>
+                    <Border Classes="banner" IsVisible="{Binding PendingText, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <ui:LineIcon Grid.Column="0" Width="14" Height="14" VerticalAlignment="Top" Margin="0,1,0,0"
+                                         Foreground="{DynamicResource AccentTextBrush}"
+                                         Data="{StaticResource InfoStroke}" />
+                            <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap" Text="{Binding PendingText}" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-                <Button Classes="accent"
-                        Content="{x:Static res:Strings.ExportSngExportButton}"
-                        Command="{Binding ExportCommand}"
-                        IsDefault="True"
-                        AutomationProperties.Name="{x:Static res:Strings.ExportSngExportButton}" />
-                <Button Content="{x:Static sres:SharedStrings.CancelButton}"
-                        IsCancel="True"
-                        Click="OnCancel"
-                        AutomationProperties.Name="{x:Static sres:SharedStrings.CancelButton}" />
+                <!-- Where the .sng goes, what to do if it's there already, and the file Export writes. -->
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="heading" Text="{x:Static res:Strings.ExportSngLocationHeading}" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                                   Text="{x:Static res:Strings.ExportSngFolderLabel}" />
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 Text="{Binding ExportFolder}"
+                                 AutomationProperties.Name="{x:Static res:Strings.ExportSngFolderLabel}" />
+                        <Button Grid.Row="0" Grid.Column="2"
+                                Content="{x:Static res:Strings.ExportSngBrowseButton}"
+                                Command="{Binding BrowseCommand}" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                                   Text="{x:Static res:Strings.ExportSngPolicyLabel}" />
+                        <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding PolicyChoices}"
+                                  SelectedItem="{Binding SelectedPolicy}"
+                                  DisplayMemberBinding="{Binding Label, x:DataType=vm:ExportPolicyChoice}"
+                                  AutomationProperties.Name="{x:Static res:Strings.ExportSngPolicyLabel}" />
+                    </Grid>
+                    <Border Classes="well" IsVisible="{Binding HasTarget}">
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.ExportSngTargetLabel}" />
+                            <TextBlock FontSize="12"
+                                       Text="{Binding EffectiveTarget}"
+                                       TextTrimming="PathSegmentEllipsis"
+                                       ToolTip.Tip="{Binding EffectiveTarget}" />
+                            <TextBlock Classes="warning"
+                                       Text="{Binding ExistsText}"
+                                       IsVisible="{Binding ExistsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            <TextBlock Classes="hint"
+                                       Text="{Binding RenameText}"
+                                       IsVisible="{Binding RenameText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- The stems, each with what happens to its file, and converting them to Opus. -->
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="heading" Text="{x:Static res:Strings.ExportSngAudioHeading}" />
+                    <Border Classes="well" IsVisible="{Binding HasStems}">
+                        <ItemsControl ItemsSource="{Binding StemDisplays}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="6" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ExportStemDisplay">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                        <ui:LineIcon Grid.Column="0" Width="14" Height="14" Opacity="0.6"
+                                                     Data="{StaticResource AudioWaveStroke}" />
+                                        <TextBlock Grid.Column="1"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding FileName}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding FileName}" />
+                                        <Border Grid.Column="2" Classes="chip large">
+                                            <TextBlock Text="{Binding Note}" />
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                    <TextBlock Classes="hint"
+                               Text="{x:Static res:Strings.ExportSngNoStems}"
+                               IsVisible="{Binding !HasStems}" />
+                    <CheckBox Content="{x:Static res:Strings.ExportSngTranscodeLabel}"
+                              IsChecked="{Binding TranscodeToOpus}"
+                              IsEnabled="{Binding CanTranscode}" />
+                    <!-- Under the check box, in line with its text. -->
+                    <StackPanel Margin="28,0,0,0" Spacing="6">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding TranscodeToOpus}">
+                            <TextBlock Grid.Column="0" Classes="caption" VerticalAlignment="Center"
+                                       Text="{x:Static res:Strings.ExportSngQualityLabel}" />
+                            <ComboBox Grid.Column="1"
+                                      HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding QualityChoices}"
+                                      SelectedItem="{Binding SelectedQuality}"
+                                      DisplayMemberBinding="{Binding Label, x:DataType=vm:ExportQualityChoice}"
+                                      AutomationProperties.Name="{x:Static res:Strings.ExportSngQualityLabel}" />
+                        </Grid>
+                        <TextBlock Classes="hint"
+                                   Text="{x:Static res:Strings.ExportSngQualityNote}"
+                                   IsVisible="{Binding TranscodeToOpus}" />
+                        <TextBlock Classes="warning"
+                                   Text="{x:Static res:Strings.ExportSngTranscodeUnavailable}"
+                                   IsVisible="{Binding TranscodeBlocked}" />
+                        <TextBlock Classes="hint"
+                                   Text="{x:Static res:Strings.ExportSngTranscodeSngNote}"
+                                   IsVisible="{Binding IsSngSource}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Every song.ini pair as it's exported, closed until it's wanted. -->
+                <StackPanel Spacing="8" IsVisible="{Binding HasMetadata}">
+                    <ToggleButton x:Name="MetadataToggle"
+                                  Classes="disclosure"
+                                  HorizontalAlignment="Left"
+                                  AutomationProperties.Name="{Binding MetadataHeading}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ui:LineIcon Classes="chevron" Data="{StaticResource ChevronDownStroke}" />
+                            <TextBlock Classes="heading" Text="{Binding MetadataHeading}" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <Border Classes="well" IsVisible="{Binding #MetadataToggle.IsChecked}">
+                        <ScrollViewer MaxHeight="200" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Metadata}" Grid.IsSharedSizeScope="True">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="3" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ExportMetadataRow">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="MetadataKey" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Classes="muted"
+                                                       FontSize="12"
+                                                       MaxWidth="200"
+                                                       Text="{Binding Key}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip.Tip="{Binding Key}" />
+                                            <TextBlock Grid.Column="1"
+                                                       FontSize="12"
+                                                       Text="{Binding Value}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip.Tip="{Binding Value}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
             </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+    </DockPanel>
 </Window>
