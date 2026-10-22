@@ -129,6 +129,7 @@ specifications; no code from any implementation of them is used.
 | [arrow-right-to-line](https://lucide.dev/icons/arrow-right-to-line) | Sustain until the next note |
 | [arrow-up-narrow-wide](https://lucide.dev/icons/arrow-up-narrow-wide) | Sort first to last |
 | [audio-lines](https://lucide.dev/icons/audio-lines) | Audio, in the Merge window |
+| [chart-column-big](https://lucide.dev/icons/chart-column-big) | Quantize what's recorded |
 | [check](https://lucide.dev/icons/check) | Validate; ticks |
 | [check-check](https://lucide.dev/icons/check-check) | Fix all of a finding |
 | [chevron-down](https://lucide.dev/icons/chevron-down) | Opens a menu |
@@ -139,6 +140,7 @@ specifications; no code from any implementation of them is used.
 | [disc-3](https://lucide.dev/icons/disc-3) | A `.sng` file |
 | [disc-album](https://lucide.dev/icons/disc-album) | Album art |
 | [download](https://lucide.dev/icons/download) | Download a file |
+| [drum](https://lucide.dev/icons/drum) | Hit sounds |
 | [ellipsis](https://lucide.dev/icons/ellipsis) | More tools |
 | [eraser](https://lucide.dev/icons/eraser) | The Erase tool |
 | [eye](https://lucide.dev/icons/eye) | Ghost difficulty; what's shown |
@@ -159,7 +161,7 @@ specifications; no code from any implementation of them is used.
 | [list-checks](https://lucide.dev/icons/list-checks) | Fix all of a finding in a part |
 | [magnet](https://lucide.dev/icons/magnet) | Quantize; snap to the grid |
 | [merge](https://lucide.dev/icons/merge) | Merge |
-| [metronome](https://lucide.dev/icons/metronome) | The Tempo tool |
+| [metronome](https://lucide.dev/icons/metronome) | The Tempo tool; the metronome |
 | [midi-port](https://lucide.dev/icons/midi-port) | A MIDI chart |
 | [minus](https://lucide.dev/icons/minus) | Less, e.g. zoom out |
 | [mouse-pointer-2](https://lucide.dev/icons/mouse-pointer-2) | The Select tool |
@@ -173,6 +175,7 @@ specifications; no code from any implementation of them is used.
 | [play](https://lucide.dev/icons/play) | Play |
 | [plus](https://lucide.dev/icons/plus) | Add |
 | [refresh-cw](https://lucide.dev/icons/refresh-cw) | Rescan |
+| [repeat](https://lucide.dev/icons/repeat) | Loop |
 | [replace](https://lucide.dev/icons/replace) | If the output exists |
 | [rotate-ccw](https://lucide.dev/icons/rotate-ccw) | Revert |
 | [save](https://lucide.dev/icons/save) | Save |

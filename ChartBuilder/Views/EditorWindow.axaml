@@ -680,19 +680,33 @@
                                       AutomationProperties.Name="{x:Static res:Strings.PlaytestButton}">
                             <PathIcon Width="16" Height="16" Data="{StaticResource PlaytestIconGeometry}" />
                         </ToggleButton>
-                        <ComboBox ItemsSource="{Binding Editor.RecordModeChoices}"
+                        <!-- The drop-downs are centred on the row, as Fluent puts a ComboBox at the top of it. -->
+                        <ComboBox VerticalAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Height="28"
+                                  ItemsSource="{Binding Editor.RecordModeChoices}"
                                   SelectedItem="{Binding Editor.SelectedRecordMode}"
                                   DisplayMemberBinding="{Binding Label, x:DataType=vm:RecordModeChoice}"
                                   MinWidth="100"
                                   ToolTip.Tip="{x:Static res:Strings.RecordModeToolTip}"
                                   AutomationProperties.Name="{x:Static res:Strings.RecordModeToolTip}" />
-                        <!-- Quantize: on, record mode puts what's played on the grid beside it; off, it's kept as played. The
-                             grid is also what Quantize in the note menu uses. -->
-                        <CheckBox VerticalAlignment="Center"
-                                  Content="{x:Static res:Strings.QuantizeLabel}"
-                                  IsChecked="{Binding Editor.IsRecordQuantized}"
-                                  ToolTip.Tip="{x:Static res:Strings.QuantizeToolTip}" />
-                        <ComboBox ItemsSource="{Binding Editor.SnapChoices}"
+                        <!-- Quantize, lit while on: record mode puts what's played on the grid beside it; off, it's kept as
+                             played. The grid is also what Quantize in the note menu uses. -->
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Editor.IsRecordQuantized}"
+                                      AutomationProperties.Name="{x:Static res:Strings.QuantizeLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.QuantizeLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.QuantizeToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource QuantizeRecordStroke}" />
+                        </ToggleButton>
+                        <ComboBox VerticalAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Height="28"
+                                  ItemsSource="{Binding Editor.SnapChoices}"
                                   SelectedItem="{Binding Editor.SelectedQuantize}"
                                   DisplayMemberBinding="{Binding Label, x:DataType=vm:SnapChoice}"
                                   MinWidth="80"
@@ -741,7 +755,10 @@
                                 IsVisible="{Binding Editor.Playtest.HasFeedback}"
                                 ToolTip.Tip="{x:Static res:Strings.PlaytestClearToolTip}"
                                 AutomationProperties.Name="{x:Static res:Strings.PlaytestClearToolTip}" />
-                        <ComboBox ItemsSource="{Binding Playback.SpeedPercents}"
+                        <ComboBox VerticalAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Height="28"
+                                  ItemsSource="{Binding Playback.SpeedPercents}"
                                   SelectedItem="{Binding Playback.SpeedPercent}"
                                   IsEnabled="{Binding Playback.IsReady}"
                                   MinWidth="80"
@@ -753,23 +770,56 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <CheckBox Content="{x:Static res:Strings.PitchCorrectionLabel}"
-                                  IsChecked="{Binding Playback.PitchCorrection}"
-                                  IsEnabled="{Binding Playback.IsReady}"
-                                  ToolTip.Tip="{x:Static res:Strings.PitchCorrectionToolTip}" />
-                        <CheckBox Content="{x:Static res:Strings.LoopLabel}"
-                                  IsChecked="{Binding Playback.IsLooping}"
-                                  IsEnabled="{Binding Playback.HasLoop}"
-                                  ToolTip.Tip="{Binding Playback.LoopToolTip}"
-                                  ToolTip.ShowOnDisabled="True" />
-                        <CheckBox Content="{x:Static res:Strings.MetronomeLabel}"
-                                  IsChecked="{Binding Playback.IsMetronomeOn}"
-                                  IsEnabled="{Binding Playback.IsReady}"
-                                  ToolTip.Tip="{x:Static res:Strings.MetronomeToolTip}" />
-                        <CheckBox Content="{x:Static res:Strings.HitSoundsLabel}"
-                                  IsChecked="{Binding Playback.IsHitSoundsOn}"
-                                  IsEnabled="{Binding Playback.IsReady}"
-                                  ToolTip.Tip="{x:Static res:Strings.HitSoundsToolTip}" />
+                        <!-- Keep pitch (Chart Packer's pitch icon), loop, metronome and hit sounds, each lit while on. -->
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.PitchCorrection}"
+                                      IsEnabled="{Binding Playback.IsReady}"
+                                      AutomationProperties.Name="{x:Static res:Strings.PitchCorrectionLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.PitchCorrectionLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.PitchCorrectionToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <PathIcon Width="14" Height="14" Data="{StaticResource PitchCorrectionIconGeometry}" />
+                        </ToggleButton>
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.IsLooping}"
+                                      IsEnabled="{Binding Playback.HasLoop}"
+                                      ToolTip.ShowOnDisabled="True"
+                                      AutomationProperties.Name="{x:Static res:Strings.LoopLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.LoopLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{Binding Playback.LoopToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource LoopStroke}" />
+                        </ToggleButton>
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.IsMetronomeOn}"
+                                      IsEnabled="{Binding Playback.IsReady}"
+                                      AutomationProperties.Name="{x:Static res:Strings.MetronomeLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.MetronomeLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.MetronomeToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource MetronomeStroke}" />
+                        </ToggleButton>
+                        <ToggleButton Classes="tool"
+                                      IsChecked="{Binding Playback.IsHitSoundsOn}"
+                                      IsEnabled="{Binding Playback.IsReady}"
+                                      AutomationProperties.Name="{x:Static res:Strings.HitSoundsLabel}">
+                            <ToolTip.Tip>
+                                <StackPanel MaxWidth="320" Spacing="4">
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Static res:Strings.HitSoundsLabel}" />
+                                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.HitSoundsToolTip}" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                            <ctl:LineIcon Data="{StaticResource HitSoundsStroke}" />
+                        </ToggleButton>
                         <Button Classes="labelled"
                                 Command="{Binding Playback.OpenCalibrationCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.LatencyToolTip}"
@@ -780,8 +830,12 @@
                             </StackPanel>
                         </Button>
                     </WrapPanel>
-                    <!-- Figures all one width, so the bar isn't laid out again each time the position changes while it plays. -->
-                    <TextBlock Grid.Column="1" FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
+                    <!-- The playhead's tick, then its time. Figures all one width, and the tick room for seven digits, so the
+                         bar isn't laid out again each time the position changes while it plays. -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <TextBlock Classes="muted" FontSize="12" FontFeatures="tnum" MinWidth="88" TextAlignment="Right" VerticalAlignment="Center" Text="{Binding Editor.PlayheadTickText}" />
+                        <TextBlock FontSize="12" FontFeatures="tnum" VerticalAlignment="Center" Text="{Binding Playback.PositionText}" />
+                    </StackPanel>
                 </Grid>
             </Border>
             <bctl:TimelineView Margin="8,4,8,8"

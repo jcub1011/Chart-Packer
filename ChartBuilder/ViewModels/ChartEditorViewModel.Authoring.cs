@@ -66,7 +66,7 @@ namespace ChartBuilder.ViewModels
         public partial SnapChoice? SelectedQuantize { get; set; }
 
         /// <summary>The quantize grid, as <see cref="SelectedQuantize"/> picks it.</summary>
-        public SnapGrid QuantizeGrid => SnapGrid.Of(SelectedQuantize?.Division ?? SnapGrid.Default.Division);
+        public SnapGrid QuantizeGrid => SnapGrid.Of(SelectedQuantize?.Division ?? BuilderSettings.DefaultQuantizeDivision);
 
         partial void OnIsRecordQuantizedChanged(bool value)
         {

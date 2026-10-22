@@ -303,6 +303,9 @@ namespace ChartBuilder.Services
         /// The grid Quantize puts notes on, and record mode with it on, as steps in a whole note: one of
         /// <see cref="SnapGrid.CommonDivisions"/>, the last one picked.
         /// </summary>
-        public int QuantizeDivision { get; set; } = SnapGrid.Default.Division;
+        public int QuantizeDivision { get; set; } = DefaultQuantizeDivision;
+
+        /// <summary>1/32, the quantize grid before one is picked: finer than the snap, so a quick part keeps its notes apart.</summary>
+        public const int DefaultQuantizeDivision = 32;
     }
 }

@@ -80,7 +80,7 @@ namespace ChartBuilder.Services
             if (!SnapGrid.CommonDivisions.Contains(settings.DefaultSnapDivision))
                 settings.DefaultSnapDivision = SnapGrid.Default.Division;
             if (!SnapGrid.CommonDivisions.Contains(settings.QuantizeDivision))
-                settings.QuantizeDivision = SnapGrid.Default.Division;
+                settings.QuantizeDivision = BuilderSettings.DefaultQuantizeDivision;
             if (!Enum.IsDefined(settings.DefaultEditorView))
                 settings.DefaultEditorView = LaneView.Highway;
             if (!Enum.IsDefined(settings.WheelScrollDirection))
