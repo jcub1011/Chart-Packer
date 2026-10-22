@@ -1477,25 +1477,13 @@ Saving also makes these changes to song.ini:
     <comment>The folder picker's title for Save and pack; the .sng is written inside the one picked.</comment>
   </data>
   <data name="ExportSngTitle" xml:space="preserve">
-    <value>Export to .sng</value>
-  </data>
-  <data name="ExportSngIntro" xml:space="preserve">
-    <value>Review what will be packed, choose where the .sng goes, then Export. Nothing is written until then.</value>
-  </data>
-  <data name="ExportSngSongLabel" xml:space="preserve">
-    <value>Song</value>
-  </data>
-  <data name="ExportSngMetadataLabel" xml:space="preserve">
-    <value>Song metadata (as exported)</value>
+    <value>Export Song</value>
   </data>
   <data name="ExportSngArtLabel" xml:space="preserve">
     <value>Album art</value>
   </data>
   <data name="ExportSngArtNone" xml:space="preserve">
     <value>No album art</value>
-  </data>
-  <data name="ExportSngStemsLabel" xml:space="preserve">
-    <value>Audio stems</value>
   </data>
   <data name="ExportSngStemPassthrough" xml:space="preserve">
     <value>already Opus</value>
@@ -1512,9 +1500,6 @@ Saving also makes these changes to song.ini:
   <data name="ExportSngNoStems" xml:space="preserve">
     <value>No audio stems.</value>
   </data>
-  <data name="ExportSngLocationLabel" xml:space="preserve">
-    <value>Export location</value>
-  </data>
   <data name="ExportSngBrowseButton" xml:space="preserve">
     <value>Browse…</value>
   </data>
@@ -1526,7 +1511,7 @@ Saving also makes these changes to song.ini:
     <comment>{0} is the .sng that exists.</comment>
   </data>
   <data name="ExportSngPolicyLabel" xml:space="preserve">
-    <value>If the .sng already exists</value>
+    <value>If the .sng exists</value>
   </data>
   <data name="ExportSngPolicyOverwrite" xml:space="preserve">
     <value>Overwrite it</value>
@@ -1542,19 +1527,20 @@ Saving also makes these changes to song.ini:
     <comment>{0} is the renamed .sng.</comment>
   </data>
   <data name="ExportSngTranscodeLabel" xml:space="preserve">
-    <value>Auto-transcode non-Opus audio to Opus</value>
-  </data>
-  <data name="ExportSngTranscodeNote" xml:space="preserve">
-    <value>Off by default. Applies to song folders only.</value>
+    <value>Convert non-Opus audio to Opus</value>
   </data>
   <data name="ExportSngTranscodeUnavailable" xml:space="preserve">
     <value>Transcoding to Opus isn't available in this build, so Export stays disabled while this is checked with non-Opus stems. Convert the stems to .opus first, or uncheck it to pack as-is.</value>
+  </data>
+  <data name="ExportSngTranscodeBlockedProblem" xml:space="preserve">
+    <value>Opus transcoding isn't available in this build.</value>
+    <comment>Beside Export while it's off because auto-transcode can't run; ExportSngTranscodeUnavailable explains it in full.</comment>
   </data>
   <data name="ExportSngTranscodeSngNote" xml:space="preserve">
     <value>Transcoding isn't available for songs opened from a .sng; the .sng is copied as-is.</value>
   </data>
   <data name="ExportSngQualityLabel" xml:space="preserve">
-    <value>Opus quality</value>
+    <value>Quality</value>
   </data>
   <data name="ExportSngQualityVoiceName" xml:space="preserve">
     <value>Voice</value>
@@ -1596,6 +1582,10 @@ Saving also makes these changes to song.ini:
     <value>Resolve the {0} chart error(s) in Findings before exporting.</value>
     <comment>{0} is the error count.</comment>
   </data>
+  <data name="ExportSngErrorsProblem" xml:space="preserve">
+    <value>Fix the chart's errors first.</value>
+    <comment>Beside Export while it's off because of chart errors; ExportSngErrorsFormat explains it in full.</comment>
+  </data>
   <data name="ExportSngPendingFormat" xml:space="preserve">
     <value>{0} unsaved change(s) will be saved on Export.</value>
     <comment>{0} is the pending change count.</comment>
@@ -1618,35 +1608,28 @@ Saving also makes these changes to song.ini:
     <value>Saved, but nothing was written: {0} is already there, and the choice is to skip it.</value>
     <comment>{0} is the .sng that exists.</comment>
   </data>
-  <data name="ExportSngSongHeading" xml:space="preserve">
-    <value>Song</value>
-  </data>
   <data name="ExportSngAudioHeading" xml:space="preserve">
     <value>Audio</value>
   </data>
   <data name="ExportSngLocationHeading" xml:space="preserve">
-    <value>Location</value>
+    <value>Destination</value>
   </data>
-  <data name="ExportSngOtherHeading" xml:space="preserve">
-    <value>Other Metadata</value>
+  <data name="ExportSngFolderLabel" xml:space="preserve">
+    <value>Folder</value>
   </data>
-  <data name="ExportSngNameLabel" xml:space="preserve">
-    <value>Name</value>
+  <data name="ExportSngCharterFormat" xml:space="preserve">
+    <value>Charted by {0}</value>
+    <comment>{0} is the charter, from song.ini.</comment>
   </data>
-  <data name="ExportSngArtistLabel" xml:space="preserve">
-    <value>Artist</value>
-  </data>
-  <data name="ExportSngAlbumLabel" xml:space="preserve">
-    <value>Album</value>
+  <data name="ExportSngMetadataFormat" xml:space="preserve">
+    <value>Song metadata ({0})</value>
+    <comment>{0} is how many song.ini pairs are exported.</comment>
   </data>
   <data name="ExportSngGenreLabel" xml:space="preserve">
     <value>Genre</value>
   </data>
   <data name="ExportSngYearLabel" xml:space="preserve">
     <value>Year</value>
-  </data>
-  <data name="ExportSngCharterLabel" xml:space="preserve">
-    <value>Charter</value>
   </data>
   <data name="ExportSngLengthLabel" xml:space="preserve">
     <value>Length</value>
