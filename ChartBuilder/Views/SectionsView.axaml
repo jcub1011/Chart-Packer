@@ -17,7 +17,7 @@
         <bctl:LaneMenuConverter x:Key="Menu" Check="{StaticResource CheckStroke}" />
 
         <!-- A row: a bar on its left in the accent for a section and manila for a song event; the name or text, or a song
-             event's label; where it is; and its tick. A song event the editor places can't be deleted, and its tick is
+             event's label; move to the playhead, go-to and delete; where it is; and its tick. A song event the editor places can't be deleted, and its tick is
              only shown. -->
         <DataTemplate x:Key="EventRowTemplate" DataType="vm:EventItem">
             <Border Classes="event-row" Classes.section="{Binding IsSection}" Classes.song="{Binding IsSongEvent}">
@@ -35,12 +35,19 @@
                                ToolTip.Tip="{Binding WrittenAs}"
                                IsVisible="{Binding IsSongEvent}" />
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                        <Button Classes="labelled"
-                                FontSize="12"
-                                Content="{x:Static res:Strings.SectionsGoToButton}"
+                        <Button Classes="tool"
+                                Command="{Binding MoveToPlayheadCommand}"
+                                IsEnabled="{Binding !IsPlaced}"
+                                ToolTip.Tip="{x:Static res:Strings.SectionsMoveToPlayheadToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.TempoMapMoveToPlayhead}">
+                            <ctl:LineIcon Data="{StaticResource PlayheadStroke}" />
+                        </Button>
+                        <Button Classes="tool"
                                 Command="{Binding GoToCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.SectionsGoToToolTip}"
-                                AutomationProperties.Name="{x:Static res:Strings.SectionsGoToToolTip}" />
+                                AutomationProperties.Name="{x:Static res:Strings.SectionsGoToToolTip}">
+                            <ctl:LineIcon Data="{StaticResource ArrowRightStroke}" />
+                        </Button>
                         <Button Classes="tool"
                                 Command="{Binding DeleteCommand}"
                                 IsVisible="{Binding !IsPlaced}"
@@ -108,74 +115,76 @@
         </Style>
     </UserControl.Styles>
 
-    <DockPanel>
-        <WrapPanel DockPanel.Dock="Top" Margin="12,8,12,6" ItemSpacing="6" LineSpacing="6">
-            <Button Classes="labelled"
-                    FontSize="12"
-                    ToolTip.Tip="{x:Static res:Strings.SectionsInsertSectionToolTip}"
-                    AutomationProperties.Name="{x:Static res:Strings.SectionsInsertSectionButton}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsInsertSectionButton}" />
-                    <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
-                </StackPanel>
-                <Button.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                ItemsSource="{Binding InsertSectionMenu, Converter={StaticResource Menu}}" />
-                </Button.Flyout>
-            </Button>
-            <Button Classes="labelled"
-                    FontSize="12"
-                    ToolTip.Tip="{x:Static res:Strings.SectionsInsertEventToolTip}"
-                    AutomationProperties.Name="{x:Static res:Strings.SectionsInsertEventButton}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <ctl:LineIcon Data="{StaticResource AddStroke}" />
-                    <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsInsertEventButton}" />
-                    <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
-                </StackPanel>
-                <Button.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedLeft"
-                                ItemsSource="{Binding InsertEventMenu, Converter={StaticResource Menu}}" />
-                </Button.Flyout>
-            </Button>
-        </WrapPanel>
+    <!-- One section, which fills the tab: the insert buttons, the events and the keys. -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <bctl:PanelSectionStack TabKey="sections">
+            <bctl:PanelSection Key="events" Header="{x:Static res:Strings.SectionsEventsHeading}" Fills="True" FillMinHeight="200">
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Top" Margin="12,8,12,6" ItemSpacing="6" LineSpacing="6">
+                        <Button Classes="labelled"
+                                FontSize="12"
+                                ToolTip.Tip="{x:Static res:Strings.SectionsInsertSectionToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.SectionsInsertSectionButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsInsertSectionButton}" />
+                                <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                            ItemsSource="{Binding InsertSectionMenu, Converter={StaticResource Menu}}" />
+                            </Button.Flyout>
+                        </Button>
+                        <Button Classes="labelled"
+                                FontSize="12"
+                                ToolTip.Tip="{x:Static res:Strings.SectionsInsertEventToolTip}"
+                                AutomationProperties.Name="{x:Static res:Strings.SectionsInsertEventButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <ctl:LineIcon Data="{StaticResource AddStroke}" />
+                                <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.SectionsInsertEventButton}" />
+                                <ctl:LineIcon Data="{StaticResource ChevronDownStroke}" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                            ItemsSource="{Binding InsertEventMenu, Converter={StaticResource Menu}}" />
+                            </Button.Flyout>
+                        </Button>
+                    </WrapPanel>
 
-        <TextBlock DockPanel.Dock="Bottom"
-                   Classes="muted"
-                   FontSize="11"
-                   Margin="12,4,12,8"
-                   TextWrapping="Wrap"
-                   Text="{x:Static res:Strings.SectionsKeysHint}" />
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Classes="muted"
+                               FontSize="11"
+                               Margin="12,4,12,8"
+                               TextWrapping="Wrap"
+                               Text="{x:Static res:Strings.SectionsKeysHint}" />
 
-        <TextBlock DockPanel.Dock="Top"
-                   Classes="caption"
-                   Margin="12,2,12,4"
-                   Text="{x:Static res:Strings.SectionsEventsHeading}"
-                   IsVisible="{Binding HasEvents}" />
-        <TextBlock DockPanel.Dock="Top"
-                   Classes="muted"
-                   FontSize="12"
-                   Margin="12,4,12,8"
-                   TextWrapping="Wrap"
-                   Text="{x:Static res:Strings.SectionsNone}"
-                   IsVisible="{Binding !HasEvents}" />
+                    <TextBlock DockPanel.Dock="Top"
+                               Classes="muted"
+                               FontSize="12"
+                               Margin="12,4,12,8"
+                               TextWrapping="Wrap"
+                               Text="{x:Static res:Strings.SectionsNone}"
+                               IsVisible="{Binding !HasEvents}" />
 
-        <!-- EVENTS' rows, then the focused part's own text events under their heading, when it has any (C8 item 6): one
-             virtualizing list, so only the rows on screen are made. Not a ListBox, whose keys would take the fields' arrows. -->
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="EventList" Margin="8,0,8,8" ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.DataTemplates>
-                    <DataTemplate DataType="vm:PartEventsHeading">
-                        <TextBlock Classes="caption" Margin="4,10,0,4" Text="{Binding Text}" />
-                    </DataTemplate>
-                    <StaticResource ResourceKey="EventRowTemplate" />
-                </ItemsControl.DataTemplates>
-            </ItemsControl>
-        </ScrollViewer>
-    </DockPanel>
+                    <!-- EVENTS' rows, then the focused part's own text events under their heading, when it has any (C8 item 6): one
+                         virtualizing list, so only the rows on screen are made. Not a ListBox, whose keys would take the fields' arrows. -->
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="EventList" Margin="8,0,8,8" ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.DataTemplates>
+                                <DataTemplate DataType="vm:PartEventsHeading">
+                                    <TextBlock Classes="caption" Margin="4,10,0,4" Text="{Binding Text}" />
+                                </DataTemplate>
+                                <StaticResource ResourceKey="EventRowTemplate" />
+                            </ItemsControl.DataTemplates>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </bctl:PanelSection>
+        </bctl:PanelSectionStack>
+    </ScrollViewer>
 </UserControl>

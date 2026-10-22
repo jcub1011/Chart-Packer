@@ -143,6 +143,9 @@ namespace ChartBuilder.ViewModels
         private const int DecodeWidth = 1024;
         private const int VideoDecodeWidth = 960;
 
+        // No taller than wide, so a portrait picture doesn't push the rest of the tab down; it's fitted inside a square.
+        private const double MinAspectRatio = 1.0;
+
         private readonly ArtViewModel _owner;
         private readonly Func<Task<string?>> _pick;
         private readonly Action<IChartCommand> _execute;
@@ -156,6 +159,7 @@ namespace ChartBuilder.ViewModels
             Title = title;
             _pick = pick;
             _execute = execute;
+            AspectRatio = DefaultRatio;
         }
 
         public MediaSlot Slot { get; }
@@ -222,8 +226,12 @@ namespace ChartBuilder.ViewModels
         /// <summary><c>*</c> beside the name while the slot has a pending change, as an edited row has.</summary>
         public string? Marker => IsChanged ? "*" : null;
 
-        /// <summary>How tall the tile is: a square's height for the art, a 16:9 frame's for a background at the panel's usual width.</summary>
-        public double TileHeight => Slot.Kind == MediaKind.AlbumArt ? 200 : 152;
+        /// <summary>
+        /// The tile's width over its height: the shown image's or video's, no taller than wide; while there's none, a square
+        /// for the art and 16:9 for a background.
+        /// </summary>
+        [ObservableProperty]
+        public partial double AspectRatio { get; private set; }
 
         public VideoTimeline Timeline => _owner.Timeline;
 
@@ -310,6 +318,7 @@ namespace ChartBuilder.ViewModels
         {
             if (Video is { } playback)
             {
+                playback.Changed -= OnVideoChanged;
                 Video = null;
                 playback.Dispose();
             }
@@ -332,6 +341,11 @@ namespace ChartBuilder.ViewModels
             FileName = name;
             Note = open is null ? NoteFor(effective) : null;
             _ = ShowSizeAsync(sizeKey);
+
+            // One that can't play takes the default shape. One that will keeps the shape the tile has until it's open, so
+            // the same video stopped for a save or a hidden tab doesn't flicker as it plays again.
+            if (open is null || !FfmpegLibrary.IsAvailable)
+                AspectRatio = DefaultRatio;
             if (open is null || !_owner.IsShown)
                 return;
 
@@ -341,7 +355,23 @@ namespace ChartBuilder.ViewModels
                 return;
             }
 
-            Video = new VideoPlayback(open, VideoDecodeWidth, name);
+            var playback = new VideoPlayback(open, VideoDecodeWidth, name);
+            playback.Changed += OnVideoChanged;
+            Video = playback;
+        }
+
+        // Raised on the playback thread once it's open or has failed, then each frame; only the first changes the tile.
+        private void OnVideoChanged(object? sender, EventArgs e)
+        {
+            if (sender is not VideoPlayback playback || (playback.Width <= 0 && playback.Error is null))
+                return;
+
+            playback.Changed -= OnVideoChanged;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (ReferenceEquals(playback, Video))
+                    AspectRatio = playback.Error is null ? RatioOf(playback.Width, playback.Height) : DefaultRatio;
+            });
         }
 
         private async Task ShowImageAsync(MediaRef effective)
@@ -413,9 +443,16 @@ namespace ChartBuilder.ViewModels
         {
             var old = Image;
             Image = bitmap;
+            AspectRatio = bitmap is null ? DefaultRatio : RatioOf(bitmap.Size.Width, bitmap.Size.Height);
             if (!ReferenceEquals(old, bitmap))
                 old?.Dispose();
         }
+
+        // The tile's shape while there's no picture to take it from.
+        private double DefaultRatio => Slot.Kind == MediaKind.AlbumArt ? 1.0 : 16.0 / 9.0;
+
+        private double RatioOf(double width, double height) =>
+            width > 0 && height > 0 ? Math.Max(width / height, MinAspectRatio) : DefaultRatio;
 
         // The stored file the games would pick for the slot.
         private string? StoredName()

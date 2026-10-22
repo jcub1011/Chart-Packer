@@ -20,7 +20,8 @@
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="30"
         WindowDecorationsTheme="{StaticResource TitleBarDecorations}"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        bctl:PanelLayout.Store="{Binding PanelLayout}">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+N" Command="{Binding NewChartCommand}" />
@@ -382,23 +383,27 @@
                 <ColumnDefinition Width="280" MinWidth="180" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left panel: Chart settings (the timing, parts, metadata and tracks), the Art, the sections and other text
-                 events, and the tempo and time signature changes (charter-spec C1; C8 items 3, 5 and 6; C4). Their order is
-                 EditorWindowViewModel's tab indices. -->
-            <bctl:EditorSidePanel Grid.Column="0"
-                                  IsCollapsed="{Binding IsLeftPanelCollapsed}"
-                                  ToggleCommand="{Binding ToggleLeftPanelCommand}"
-                                  SelectedIndex="{Binding LeftPanelTab, Mode=TwoWay}">
-                <TabItem Header="{x:Static res:Strings.ChartSettingsTab}">
+            <!-- Left panel: Chart settings (the parts, metadata and tracks), the Art, the sections and other text events, and
+                 the timing and the tempo and time signature changes (charter-spec C1; C8 items 3, 5 and 6; C4). Each tab's key
+                 is EditorWindowViewModel's, and keeps its place wherever it's dragged. Pinned, it's in its column;
+                 auto-hiding, EditorWindow.axaml.cs lays it over the chart. -->
+            <bctl:EditorSidePanel x:Name="LeftPanel"
+                                  Grid.Column="0"
+                                  LayoutKey="left"
+                                  IsAutoHide="{Binding IsLeftPanelAutoHide}"
+                                  IsOpen="{Binding IsLeftPanelOpen}"
+                                  PanelWidth="{Binding LeftPanelWidth}"
+                                  SelectedKey="{Binding LeftPanelTab}">
+                <TabItem bctl:EditorSidePanel.Key="chart-settings" Header="{x:Static res:Strings.ChartSettingsTab}">
                     <views:ChartSettingsView />
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.ArtTab}">
+                <TabItem bctl:EditorSidePanel.Key="art" Header="{x:Static res:Strings.ArtTab}">
                     <views:ArtView DataContext="{Binding Art}" />
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.SectionsTab}">
+                <TabItem bctl:EditorSidePanel.Key="sections" Header="{x:Static res:Strings.SectionsTab}">
                     <views:SectionsView DataContext="{Binding Sections}" />
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.TempoMapTab}">
+                <TabItem bctl:EditorSidePanel.Key="tempo-map" Header="{x:Static res:Strings.TempoMapTab}">
                     <views:TempoMapView DataContext="{Binding TempoMap}" />
                 </TabItem>
             </bctl:EditorSidePanel>
@@ -407,7 +412,7 @@
                           ResizeDirection="Columns"
                           Width="4"
                           Background="{DynamicResource SubtleBorderBrush}"
-                          IsVisible="{Binding !IsLeftPanelCollapsed}" />
+                          IsVisible="{Binding !IsLeftPanelAutoHide}" />
 
             <!-- The chart: its lanes, each a part's highway or a vocal part, docked as the user arranges them. Over them,
                  while Generate fills or Generate star power runs (charter-spec C6 item 5, C8 item 1), a bar to keep, drop,
@@ -530,15 +535,18 @@
                           ResizeDirection="Columns"
                           Width="4"
                           Background="{DynamicResource SubtleBorderBrush}"
-                          IsVisible="{Binding !IsRightPanelCollapsed}" />
+                          IsVisible="{Binding !IsRightPanelAutoHide}" />
 
             <!-- Right panel: Properties, which shows what's selected (charter-spec C3 item 4), and the song.ini changes
                  waiting to be saved (C17 item 2), each of which can be reverted. -->
-            <bctl:EditorSidePanel Grid.Column="4"
-                                  IsCollapsed="{Binding IsRightPanelCollapsed}"
-                                  ToggleCommand="{Binding ToggleRightPanelCommand}"
+            <bctl:EditorSidePanel x:Name="RightPanel"
+                                  Grid.Column="4"
+                                  LayoutKey="right"
+                                  IsAutoHide="{Binding IsRightPanelAutoHide}"
+                                  IsOpen="{Binding IsRightPanelOpen}"
+                                  PanelWidth="{Binding RightPanelWidth}"
                                   IsRightEdge="True">
-                <TabItem Header="{x:Static res:Strings.PropertiesTab}">
+                <TabItem bctl:EditorSidePanel.Key="properties" Header="{x:Static res:Strings.PropertiesTab}">
                     <Panel>
                         <StackPanel Classes="placeholder" IsVisible="{Binding Editor.Properties.IsEmpty}">
                             <TextBlock Classes="centered" FontWeight="SemiBold" Text="{x:Static res:Strings.PropertiesNothingSelected}" />
@@ -547,82 +555,87 @@
                                        TextWrapping="Wrap"
                                        Text="{x:Static res:Strings.PropertiesNothingSelectedHint}" />
                         </StackPanel>
-                        <ScrollViewer IsVisible="{Binding !Editor.Properties.IsEmpty}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding !Editor.Properties.IsEmpty}">
                             <views:PropertiesView DataContext="{Binding Editor.Properties}" />
                         </ScrollViewer>
                     </Panel>
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.FindingsTab}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   Margin="12,8,12,4"
-                                   Text="{Binding Findings.Issues.Summary}" />
-                        <uiviews:ChartIssuesView DataContext="{Binding Findings.Issues}" />
-                    </DockPanel>
+                <!-- The chart's findings, searched and filtered as Chart Packer's chart issues window has them. -->
+                <TabItem bctl:EditorSidePanel.Key="findings" Header="{x:Static res:Strings.FindingsTab}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <bctl:PanelSectionStack TabKey="findings">
+                            <bctl:PanelSection Key="findings" Header="{x:Static res:Strings.FindingsTab}" Fills="True" FillMinHeight="240">
+                                <uiviews:ChartIssuesPanel DataContext="{Binding Findings.Issues}" />
+                            </bctl:PanelSection>
+                        </bctl:PanelSectionStack>
+                    </ScrollViewer>
                 </TabItem>
-                <TabItem Header="{x:Static res:Strings.PendingChangesTab}">
-                    <!-- The list virtualizes, in its own scroller, with the heading above it and the hint below. -->
-                    <DockPanel Margin="12,8">
-                        <TextBlock DockPanel.Dock="Top" Classes="caption" Text="{x:Static res:Strings.PendingChangesHeading}" />
-                        <TextBlock DockPanel.Dock="Top"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap"
-                                   Text="{x:Static res:Strings.PendingChangesNone}"
-                                   IsVisible="{Binding !HasPendingChanges}" />
-                        <TextBlock DockPanel.Dock="Bottom"
-                                   Classes="muted"
-                                   FontSize="12"
-                                   Margin="0,6,0,0"
-                                   TextWrapping="Wrap"
-                                   Text="{x:Static res:Strings.PendingChangesHint}"
-                                   IsVisible="{Binding HasPendingChanges}" />
-                        <ScrollViewer Margin="0,6,0,0" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasPendingChanges}">
-                            <ItemsControl ItemsSource="{Binding PendingChanges}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:PendingChangeItem">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,2" ToolTip.Tip="{Binding Reason}">
-                                            <SelectableTextBlock Grid.Column="0"
-                                                                 FontSize="12"
-                                                                 VerticalAlignment="Center"
-                                                                 Text="{Binding Text}"
-                                                                 TextWrapping="Wrap"
-                                                                 Classes.reverted="{Binding IsReverted}" />
-                                            <Button Grid.Column="1"
-                                                    Classes="labelled"
-                                                    FontSize="12"
-                                                    Content="{x:Static res:Strings.PendingChangeRevertButton}"
-                                                    Command="{Binding RevertCommand}"
-                                                    IsVisible="{Binding IsApplied}"
-                                                    ToolTip.Tip="{Binding NotRevertableReason}"
-                                                    ToolTip.ShowOnDisabled="True" />
-                                            <Button Grid.Column="1"
-                                                    Classes="labelled"
-                                                    FontSize="12"
-                                                    Content="{x:Static res:Strings.PendingChangeRestoreButton}"
-                                                    Command="{Binding RestoreCommand}"
-                                                    IsVisible="{Binding IsReverted}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </DockPanel>
+                <TabItem bctl:EditorSidePanel.Key="pending-changes" Header="{x:Static res:Strings.PendingChangesTab}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <bctl:PanelSectionStack TabKey="pending-changes">
+                            <bctl:PanelSection Key="pending-changes" Header="{x:Static res:Strings.PendingChangesHeading}" Fills="True" FillMinHeight="200">
+                                <!-- The list virtualizes, in its own scroller, with the hint below it. -->
+                                <DockPanel Margin="12,8">
+                                    <TextBlock DockPanel.Dock="Top"
+                                               Classes="muted"
+                                               FontSize="12"
+                                               Margin="0,6,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="{x:Static res:Strings.PendingChangesNone}"
+                                               IsVisible="{Binding !HasPendingChanges}" />
+                                    <TextBlock DockPanel.Dock="Bottom"
+                                               Classes="muted"
+                                               FontSize="12"
+                                               Margin="0,6,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="{x:Static res:Strings.PendingChangesHint}"
+                                               IsVisible="{Binding HasPendingChanges}" />
+                                    <ScrollViewer Margin="0,6,0,0" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasPendingChanges}">
+                                        <ItemsControl ItemsSource="{Binding PendingChanges}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <VirtualizingStackPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:PendingChangeItem">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,2" ToolTip.Tip="{Binding Reason}">
+                                                        <SelectableTextBlock Grid.Column="0"
+                                                                             FontSize="12"
+                                                                             VerticalAlignment="Center"
+                                                                             Text="{Binding Text}"
+                                                                             TextWrapping="Wrap"
+                                                                             Classes.reverted="{Binding IsReverted}" />
+                                                        <Button Grid.Column="1"
+                                                                Classes="labelled"
+                                                                FontSize="12"
+                                                                Content="{x:Static res:Strings.PendingChangeRevertButton}"
+                                                                Command="{Binding RevertCommand}"
+                                                                IsVisible="{Binding IsApplied}"
+                                                                ToolTip.Tip="{Binding NotRevertableReason}"
+                                                                ToolTip.ShowOnDisabled="True" />
+                                                        <Button Grid.Column="1"
+                                                                Classes="labelled"
+                                                                FontSize="12"
+                                                                Content="{x:Static res:Strings.PendingChangeRestoreButton}"
+                                                                Command="{Binding RestoreCommand}"
+                                                                IsVisible="{Binding IsReverted}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </bctl:PanelSection>
+                        </bctl:PanelSectionStack>
+                    </ScrollViewer>
                 </TabItem>
                 <!-- The highway preview (charter-spec C18), docked; it also opens in a window of its own. -->
-                <TabItem Header="{x:Static res:Strings.PreviewTab}">
+                <TabItem bctl:EditorSidePanel.Key="preview" Header="{x:Static res:Strings.PreviewTab}">
                     <views:PreviewView DataContext="{Binding Editor.Preview}" />
                 </TabItem>
                 <!-- The difficulty analysis of a five-fret lane, docked; it also opens in a window of its own. -->
-                <TabItem Header="{x:Static res:Strings.DifficultyTab}">
+                <TabItem bctl:EditorSidePanel.Key="difficulty" Header="{x:Static res:Strings.DifficultyTab}">
                     <views:DifficultyView DataContext="{Binding Editor.Difficulty}" />
                 </TabItem>
             </bctl:EditorSidePanel>

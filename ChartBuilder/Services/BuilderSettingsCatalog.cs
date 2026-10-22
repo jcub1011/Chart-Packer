@@ -378,5 +378,9 @@ namespace ChartBuilder.Services
         /// <summary>A resolution as Settings shows it, e.g. "480 ticks per beat".</summary>
         public static string ResolutionLabel(int resolution) =>
             string.Format(CultureInfo.CurrentCulture, Strings.ChartResolutionFormat, resolution);
+
+        /// <summary>A resolution as the Tempo map tab's narrow drop-down shows it, e.g. "480 TPB".</summary>
+        public static string ResolutionShortLabel(int resolution) =>
+            string.Format(CultureInfo.CurrentCulture, Strings.ChartResolutionShortFormat, resolution);
     }
 }

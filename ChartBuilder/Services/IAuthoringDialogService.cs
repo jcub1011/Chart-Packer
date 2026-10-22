@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using ChartBuilder.Controls;
 using ChartBuilder.ViewModels;
 using ChartBuilder.Views;
 using ChartShared.Core.Charting.Editing;
@@ -48,6 +49,7 @@ namespace ChartBuilder.Services
                 return;
             var preview = new PreviewWindow { DataContext = viewModel };
             WindowChrome.UseOwnerIcon(preview, window);
+            ShareLayout(preview, window);
             preview.Closed += (_, _) => _preview = null;
             _preview = preview;
             preview.Show(window);
@@ -60,7 +62,11 @@ namespace ChartBuilder.Services
         public void Follow(PreviewViewModel viewModel)
         {
             if (_preview is { } open)
+            {
                 open.DataContext = viewModel;
+                if (owner() is { } window)
+                    ShareLayout(open, window);
+            }
         }
 
         // The difficulty analysis's window, while it's open.
@@ -78,6 +84,7 @@ namespace ChartBuilder.Services
                 return;
             var difficulty = new DifficultyWindow { DataContext = viewModel };
             WindowChrome.UseOwnerIcon(difficulty, window);
+            ShareLayout(difficulty, window);
             difficulty.Closed += (_, _) => _difficulty = null;
             _difficulty = difficulty;
             difficulty.Show(window);
@@ -90,8 +97,16 @@ namespace ChartBuilder.Services
         public void Follow(DifficultyViewModel viewModel)
         {
             if (_difficulty is { } open)
+            {
                 open.DataContext = viewModel;
+                if (owner() is { } window)
+                    ShareLayout(open, window);
+            }
         }
+
+        // A tab in a window of its own has its sections arranged as they are in the Editor's panel, and arranging them in
+        // either arranges both.
+        private static void ShareLayout(Window tab, Window editor) => PanelLayout.SetStore(tab, PanelLayout.GetStore(editor));
 
         public async Task ShowReduceAsync(ReduceViewModel viewModel)
         {

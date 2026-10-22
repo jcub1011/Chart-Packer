@@ -216,7 +216,7 @@ namespace ChartBuilder.ViewModels
 
             // Only this changes the resolution and the time signature, so the chart's can only be these or what it had.
             var values = ChartSettingsValues.Of(_chart);
-            Resolutions = [.. NewChartSettings.Resolutions.Append(values.Resolution).Distinct().Order().Select(r => new ResolutionChoice(r, BuilderSettingsCatalog.ResolutionLabel(r)))];
+            Resolutions = [.. NewChartSettings.Resolutions.Append(values.Resolution).Distinct().Order().Select(r => new ResolutionChoice(r, BuilderSettingsCatalog.ResolutionShortLabel(r)))];
             Denominators = [.. NewChartSettings.Denominators.Append(values.Denominator).Distinct().Order()];
             PartChips = BuildChips(values);
             foreach (var chip in PartChips)

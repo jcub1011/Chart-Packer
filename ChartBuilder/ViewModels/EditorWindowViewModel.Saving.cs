@@ -72,7 +72,9 @@ namespace ChartBuilder.ViewModels
                 Strings.CloseUnsavedTitle,
                 string.Format(CultureInfo.CurrentCulture, Strings.CloseUnsavedMessageFormat, Song.Title ?? Strings.EditorUntitledChart),
                 Strings.SaveButton,
-                Strings.DiscardButton);
+                Strings.DiscardButton,
+                "SaveStroke",
+                "TrashStroke");
             switch (choice)
             {
                 case ConfirmChoice.First:
@@ -491,10 +493,10 @@ namespace ChartBuilder.ViewModels
             string artist = Value("artist");
             if (name.Length == 0 || artist.Length == 0)
             {
-                // They're set in Chart settings' Metadata, which is brought up to set them in.
+                // They're set in Chart settings' Metadata, which is brought up, expanded, to set them in.
                 Messages.Error(Strings.FirstSaveNeedsNameAndArtist);
-                LeftPanelTab = ChartSettingsTab;
-                IsLeftPanelCollapsed = false;
+                PanelLayout.SetCollapsed(ChartSettingsTab, MetadataSection, false);
+                ShowLeftPanel(ChartSettingsTab);
                 return false;
             }
 

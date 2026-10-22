@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using ChartBuilder.Controls;
 using ChartBuilder.Services;
@@ -15,6 +16,9 @@ namespace ChartBuilder.Views
     public partial class EditorWindow : Window
     {
         private const double SplitterSize = 4;
+
+        // How much of the window a flown-out panel leaves uncovered, at the least.
+        private const double FlyoutGap = 80;
 
         private ColumnDefinition LeftColumn => PanelsGrid.ColumnDefinitions[0];
 
@@ -33,7 +37,9 @@ namespace ChartBuilder.Views
         // Space played or paused and hasn't been let go yet, so its auto-repeat doesn't toggle again.
         private bool _isSpaceHeld;
 
-        // The sizes last given to the side columns and the timeline row: NaN for a collapsed side, and before the
+        private bool _isApplying;
+
+        // The sizes last given to the side columns and the timeline row: NaN for an auto-hiding side, and before the
         // window opens. A definition that no longer matches was moved by its splitter, i.e. by the user.
         private double _leftApplied = double.NaN;
         private double _rightApplied = double.NaN;
@@ -212,8 +218,10 @@ namespace ChartBuilder.Views
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            // The panel's width is kept while it's collapsed, so expanding it brings it back as it was.
-            if (e.PropertyName is nameof(EditorWindowViewModel.IsLeftPanelCollapsed) or nameof(EditorWindowViewModel.IsRightPanelCollapsed))
+            // The panel's width is kept while it auto-hides, so pinning it brings it back as it was; flown out, it's as wide.
+            if (e.PropertyName is nameof(EditorWindowViewModel.IsLeftPanelAutoHide) or nameof(EditorWindowViewModel.IsRightPanelAutoHide)
+                or nameof(EditorWindowViewModel.IsLeftPanelOpen) or nameof(EditorWindowViewModel.IsRightPanelOpen)
+                or nameof(EditorWindowViewModel.LeftPanelWidth) or nameof(EditorWindowViewModel.RightPanelWidth))
                 ApplyLayout();
         }
 
@@ -223,49 +231,91 @@ namespace ChartBuilder.Views
         /// </summary>
         private void ApplyLayout()
         {
-            if (!_isOpen || _viewModel is not { } vm)
+            // Taking a splitter's move sets the view model's width, which comes back here.
+            if (!_isOpen || _viewModel is not { } vm || _isApplying)
                 return;
 
-            // A splitter moved since the last fit is a size the user chose. Taken before refitting, which would undo it.
-            AbsorbSplitterChanges(vm);
+            _isApplying = true;
+            try
+            {
+                // A splitter moved since the last fit is a size the user chose. Taken before refitting, which would undo it.
+                AbsorbSplitterChanges(vm);
 
-            // The left panel is fitted first, leaving the right one at least its minimum, so it's the right one that
-            // gives way when both don't fit.
-            double room = ClientSize.Width - CenterColumn.MinWidth;
-            _leftApplied = SizeSidePanel(LeftColumn, vm.IsLeftPanelCollapsed, vm.LeftPanelWidth, room - LeastWidth(vm.IsRightPanelCollapsed));
-            _rightApplied = SizeSidePanel(RightColumn, vm.IsRightPanelCollapsed, vm.RightPanelWidth, room - WidthTaken(_leftApplied));
+                // The left panel is fitted first, leaving the right one at least its minimum, so it's the right one that
+                // gives way when both don't fit.
+                double room = ClientSize.Width - CenterColumn.MinWidth;
+                _leftApplied = SizeSidePanel(LeftPanel, LeftColumn, vm.IsLeftPanelAutoHide, vm.LeftPanelWidth, room - LeastWidth(vm.IsRightPanelAutoHide));
+                _rightApplied = SizeSidePanel(RightPanel, RightColumn, vm.IsRightPanelAutoHide, vm.RightPanelWidth, room - WidthTaken(_leftApplied));
 
-            double maxHeight = Math.Floor(ClientSize.Height - TopBand.Bounds.Height - MessageBar.Bounds.Height - PanelsRow.MinHeight - SplitterSize);
-            _timelineApplied = Math.Clamp(vm.TimelineHeight, TimelineRow.MinHeight, Math.Max(TimelineRow.MinHeight, maxHeight));
-            TimelineRow.Height = new GridLength(_timelineApplied, GridUnitType.Pixel);
+                // A flown-out panel stops short of the other side, which is sized by now.
+                FitFlyout(LeftPanel, vm.IsLeftPanelAutoHide, vm.IsLeftPanelOpen, vm.LeftPanelWidth, WidthTaken(_rightApplied));
+                FitFlyout(RightPanel, vm.IsRightPanelAutoHide, vm.IsRightPanelOpen, vm.RightPanelWidth, WidthTaken(_leftApplied));
+
+                double maxHeight = Math.Floor(ClientSize.Height - TopBand.Bounds.Height - MessageBar.Bounds.Height - PanelsRow.MinHeight - SplitterSize);
+                _timelineApplied = Math.Clamp(vm.TimelineHeight, TimelineRow.MinHeight, Math.Max(TimelineRow.MinHeight, maxHeight));
+                TimelineRow.Height = new GridLength(_timelineApplied, GridUnitType.Pixel);
+            }
+            finally
+            {
+                _isApplying = false;
+            }
         }
 
         /// <summary>
-        /// Collapses <paramref name="column"/> to its strip, or gives it <paramref name="preferred"/>, as much of it as
-        /// fits with its splitter in <paramref name="room"/>.
+        /// Pins <paramref name="panel"/> in <paramref name="column"/> with <paramref name="preferred"/>, as much of it as
+        /// fits with its splitter in <paramref name="room"/>; or, auto-hiding, leaves the column its strip and lays the panel
+        /// over the chart beside it, its width left to <see cref="FitFlyout"/>.
         /// </summary>
-        /// <returns>The width given, or NaN when collapsed.</returns>
-        private static double SizeSidePanel(ColumnDefinition column, bool collapsed, double preferred, double room)
+        /// <returns>The width given the column, or NaN when the panel auto-hides.</returns>
+        private double SizeSidePanel(EditorSidePanel panel, ColumnDefinition column, bool autoHide, double preferred, double room)
         {
-            if (collapsed)
+            bool right = panel == RightPanel;
+            double min = BuilderSettings.MinEditorPanelWidth;
+            if (autoHide)
             {
                 column.MinWidth = 0;
-                column.Width = GridLength.Auto;
+                column.Width = new GridLength(EditorSidePanel.StripWidth, GridUnitType.Pixel);
+
+                // Over the chart's column too, from its own edge, and above it.
+                Grid.SetColumn(panel, right ? 2 : 0);
+                Grid.SetColumnSpan(panel, 3);
+                panel.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+                panel.ZIndex = 1;
                 return double.NaN;
             }
 
-            double min = BuilderSettings.MinEditorPanelWidth;
+            Grid.SetColumn(panel, right ? 4 : 0);
+            Grid.SetColumnSpan(panel, 1);
+            panel.HorizontalAlignment = HorizontalAlignment.Stretch;
+            panel.ZIndex = 0;
+            panel.Width = double.NaN;
+
             double width = Math.Clamp(preferred, min, Math.Max(min, Math.Floor(room - SplitterSize)));
             column.MinWidth = min;
             column.Width = new GridLength(width, GridUnitType.Pixel);
             return width;
         }
 
-        /// <summary>The least a side panel takes: its strip while collapsed, or its minimum and its splitter.</summary>
-        private static double LeastWidth(bool collapsed) =>
-            collapsed ? EditorSidePanel.StripWidth : BuilderSettings.MinEditorPanelWidth + SplitterSize;
+        /// <summary>
+        /// Makes an auto-hiding <paramref name="panel"/> as wide as its strip, or, flown out, that and <paramref name="preferred"/>,
+        /// as much of it as leaves the chart <see cref="FlyoutGap"/> beside <paramref name="otherTaken"/>, what the other side
+        /// takes: its strip, or the panel pinned there and its splitter.
+        /// </summary>
+        private void FitFlyout(EditorSidePanel panel, bool autoHide, bool open, double preferred, double otherTaken)
+        {
+            if (!autoHide)
+                return;
 
-        /// <summary>What a side panel given <paramref name="applied"/> takes: its strip while collapsed (NaN), or that and its splitter.</summary>
+            double min = BuilderSettings.MinEditorPanelWidth;
+            double most = Math.Max(min, Math.Floor(ClientSize.Width - EditorSidePanel.StripWidth - otherTaken - FlyoutGap));
+            panel.Width = open ? EditorSidePanel.StripWidth + Math.Clamp(preferred, min, most) : EditorSidePanel.StripWidth;
+        }
+
+        /// <summary>The least a side panel takes: its strip while it auto-hides, or its minimum and its splitter.</summary>
+        private static double LeastWidth(bool autoHide) =>
+            autoHide ? EditorSidePanel.StripWidth : BuilderSettings.MinEditorPanelWidth + SplitterSize;
+
+        /// <summary>What a side panel given <paramref name="applied"/> takes: its strip while it auto-hides (NaN), or that and its splitter.</summary>
         private static double WidthTaken(double applied) =>
             double.IsNaN(applied) ? EditorSidePanel.StripWidth : applied + SplitterSize;
 

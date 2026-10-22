@@ -142,11 +142,34 @@ namespace ChartBuilder.Services
         /// <summary>The height of the timeline along the bottom of the editor.</summary>
         public double EditorTimelineHeight { get; set; } = DefaultEditorTimelineHeight;
 
-        /// <summary>Whether the editor's left panel is collapsed to a strip along the window's edge.</summary>
+        /// <summary>Whether the editor's left panel was collapsed to a strip, before panels could auto-hide.</summary>
+        /// <remarks>Only read, for <see cref="EditorLeftPanelAutoHide"/> in files saved before it.</remarks>
         public bool EditorLeftPanelCollapsed { get; set; }
 
-        /// <summary>Whether the editor's right panel is collapsed to a strip along the window's edge.</summary>
+        /// <summary>Whether the editor's right panel was collapsed to a strip, before panels could auto-hide.</summary>
+        /// <remarks>Only read, for <see cref="EditorRightPanelAutoHide"/> in files saved before it.</remarks>
         public bool EditorRightPanelCollapsed { get; set; }
+
+        /// <summary>
+        /// Whether the editor's left panel auto-hides: a strip along the window's edge that it flies out from, over the chart,
+        /// rather than pinned beside it. Null in files saved before it, which <see cref="EditorLeftPanelCollapsed"/> stands in for.
+        /// </summary>
+        public bool? EditorLeftPanelAutoHide { get; set; }
+
+        /// <summary>Whether the editor's right panel auto-hides, as <see cref="EditorLeftPanelAutoHide"/>.</summary>
+        public bool? EditorRightPanelAutoHide { get; set; }
+
+        /// <summary>The order of the left panel's tabs, by key, as the user dragged them. Null for the default order.</summary>
+        public List<string>? EditorLeftTabs { get; set; }
+
+        /// <summary>The order of the right panel's tabs, by key. Null for the default order.</summary>
+        public List<string>? EditorRightTabs { get; set; }
+
+        /// <summary>The order of each side-panel tab's sections, by the tab's key and then the sections'. Null for the defaults.</summary>
+        public Dictionary<string, List<string>>? EditorSectionOrder { get; set; }
+
+        /// <summary>The side-panel sections that are collapsed, each as <c>tab/section</c>. Null for none.</summary>
+        public List<string>? EditorCollapsedSections { get; set; }
 
         /// <summary>The editor's lanes, where each is docked and how big. Null for the default layout.</summary>
         public LaneDockState? EditorLanes { get; set; }

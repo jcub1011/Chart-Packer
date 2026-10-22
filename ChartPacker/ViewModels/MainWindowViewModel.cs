@@ -120,7 +120,9 @@ namespace ChartPacker.ViewModels
                 Strings.EditChartUnsavedTitle,
                 string.Format(CultureInfo.CurrentCulture, Strings.EditChartUnsavedMessageFormat, song.DisplayName),
                 Strings.SaveButton,
-                Strings.DiscardButton);
+                Strings.DiscardButton,
+                "SaveStroke",
+                "TrashStroke");
             switch (choice)
             {
                 case ConfirmChoice.First:

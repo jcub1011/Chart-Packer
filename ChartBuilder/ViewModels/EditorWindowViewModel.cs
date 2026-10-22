@@ -85,8 +85,9 @@ namespace ChartBuilder.ViewModels
             LeftPanelWidth = saved.EditorLeftPanelWidth;
             RightPanelWidth = saved.EditorRightPanelWidth;
             TimelineHeight = saved.EditorTimelineHeight;
-            IsLeftPanelCollapsed = saved.EditorLeftPanelCollapsed;
-            IsRightPanelCollapsed = saved.EditorRightPanelCollapsed;
+            IsLeftPanelAutoHide = saved.EditorLeftPanelAutoHide ?? false;
+            IsRightPanelAutoHide = saved.EditorRightPanelAutoHide ?? false;
+            PanelLayout = PanelLayoutStore.From(saved);
             Editor = new ChartEditorViewModel(song, _undo, Playback, Audio, settings, services.Confirmations, Messages, LaneDockLayout.FromState(saved.EditorLanes) ?? LaneDockLayout.CreateDefault(), services.Authoring, services.Input);
             Audio.AudibleChanged += OnAudibleChanged;
             Audio.Start();
@@ -187,40 +188,68 @@ namespace ChartBuilder.ViewModels
         /// <summary>The lanes in the middle of the window: the parts' highways and the vocals.</summary>
         public LaneDockViewModel Lanes => Editor.Lanes;
 
-        /// <summary>The left panel's width while expanded, as the user last set it.</summary>
-        public double LeftPanelWidth { get; set; }
+        /// <summary>The left panel's width, pinned or flown out, as the user last set it.</summary>
+        [ObservableProperty]
+        public partial double LeftPanelWidth { get; set; }
 
-        /// <summary>The Properties panel's width while expanded, as the user last set it.</summary>
-        public double RightPanelWidth { get; set; }
+        /// <summary>The right panel's width, pinned or flown out, as the user last set it.</summary>
+        [ObservableProperty]
+        public partial double RightPanelWidth { get; set; }
 
         /// <summary>The timeline's height, as the user last set it.</summary>
         public double TimelineHeight { get; set; }
 
+        /// <summary>How the side panels' tabs and sections are arranged, and which sections are collapsed.</summary>
+        public PanelLayoutStore PanelLayout { get; }
+
+        /// <summary>
+        /// Whether the left panel auto-hides, like a Visual Studio tool window: a strip along the window's edge that it flies
+        /// out from, over the chart, rather than pinned beside the chart.
+        /// </summary>
         [ObservableProperty]
-        public partial bool IsLeftPanelCollapsed { get; set; }
+        public partial bool IsLeftPanelAutoHide { get; set; }
 
-        /// <summary>The left panel's tab shown: Chart settings (<see cref="ChartSettingsTab"/>), Art, Sections or Tempo map.</summary>
+        /// <summary>Whether the left panel, auto-hiding, has flown out.</summary>
         [ObservableProperty]
-        public partial int LeftPanelTab { get; set; }
+        public partial bool IsLeftPanelOpen { get; set; }
 
-        /// <summary>The left panel's tab index of Chart settings.</summary>
-        public const int ChartSettingsTab = 0;
-
-        /// <summary>The left panel's tab index of Art.</summary>
-        public const int ArtTab = 1;
-
-        partial void OnLeftPanelTabChanged(int value) => Art.IsShown = value == ArtTab && !IsLeftPanelCollapsed;
-
-        partial void OnIsLeftPanelCollapsedChanged(bool value) => Art.IsShown = LeftPanelTab == ArtTab && !value;
-
+        /// <summary>The left panel's tab shown, by its key: Chart settings (<see cref="ChartSettingsTab"/>), Art, Sections or Tempo map.</summary>
         [ObservableProperty]
-        public partial bool IsRightPanelCollapsed { get; set; }
+        public partial string? LeftPanelTab { get; set; } = ChartSettingsTab;
 
-        [RelayCommand]
-        private void ToggleLeftPanel() => IsLeftPanelCollapsed = !IsLeftPanelCollapsed;
+        /// <summary>The key of the left panel's Chart settings tab.</summary>
+        public const string ChartSettingsTab = "chart-settings";
 
-        [RelayCommand]
-        private void ToggleRightPanel() => IsRightPanelCollapsed = !IsRightPanelCollapsed;
+        /// <summary>The key of Chart settings' Metadata section.</summary>
+        public const string MetadataSection = "metadata";
+
+        /// <summary>The key of the left panel's Art tab.</summary>
+        public const string ArtTab = "art";
+
+        partial void OnLeftPanelTabChanged(string? value) => RefreshArtShown();
+
+        partial void OnIsLeftPanelAutoHideChanged(bool value) => RefreshArtShown();
+
+        partial void OnIsLeftPanelOpenChanged(bool value) => RefreshArtShown();
+
+        // The Art tab only plays its video while it can be seen.
+        private void RefreshArtShown() => Art.IsShown = LeftPanelTab == ArtTab && (!IsLeftPanelAutoHide || IsLeftPanelOpen);
+
+        /// <summary>Whether the right panel auto-hides, as <see cref="IsLeftPanelAutoHide"/>.</summary>
+        [ObservableProperty]
+        public partial bool IsRightPanelAutoHide { get; set; }
+
+        /// <summary>Whether the right panel, auto-hiding, has flown out.</summary>
+        [ObservableProperty]
+        public partial bool IsRightPanelOpen { get; set; }
+
+        /// <summary>Brings the left panel into view on <paramref name="tab"/>: flown out if it auto-hides.</summary>
+        public void ShowLeftPanel(string tab)
+        {
+            LeftPanelTab = tab;
+            if (IsLeftPanelAutoHide)
+                IsLeftPanelOpen = true;
+        }
 
         /// <summary>Shows every message said this session, from the message bar.</summary>
         [RelayCommand]
@@ -303,15 +332,16 @@ namespace ChartBuilder.ViewModels
 
         private static bool IsSongEdit(IChartCommand? command) => command is SongValueCommand or MediaCommand;
 
-        /// <summary>Saves the panels' sizes and whether they're collapsed, and the lanes, for the next Editor.</summary>
+        /// <summary>Saves the panels' sizes, whether they auto-hide and how they're arranged, and the lanes, for the next Editor.</summary>
         public void SaveLayout()
         {
             var saved = _settings.Settings;
             saved.EditorLeftPanelWidth = LeftPanelWidth;
             saved.EditorRightPanelWidth = RightPanelWidth;
             saved.EditorTimelineHeight = TimelineHeight;
-            saved.EditorLeftPanelCollapsed = IsLeftPanelCollapsed;
-            saved.EditorRightPanelCollapsed = IsRightPanelCollapsed;
+            saved.EditorLeftPanelAutoHide = IsLeftPanelAutoHide;
+            saved.EditorRightPanelAutoHide = IsRightPanelAutoHide;
+            PanelLayout.WriteTo(saved);
             saved.EditorLanes = Lanes.Layout.ToState();
             _settings.Save();
         }
